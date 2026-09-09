@@ -27,11 +27,15 @@
  * back. That is also a signal in itself: nobody writes their own brand with a
  * hyphen in the middle of it.
  *
- * **And it is only a lie if the message is not theirs.** A brand named by a
- * message that comes from that brand's own domain, or that links to it, is a
- * message from that brand. That check is what keeps the real receipts out of
- * this, and it is why the table below is domains rather than words.
+ * **And it is only a lie if the message is not theirs.** A message that comes
+ * from any of these names' own domains, or that links to the one it mentions, is
+ * that name's message - one of them naming another is a receipt, not a disguise.
+ * That check is what keeps the real ones out of this, and it is why the table
+ * below is domains rather than words. The exception is the domains anybody can
+ * have a mailbox at, which say who sent nothing at all.
  */
+
+import { baseDomain } from "./vault-uris.js";
 
 /** A name people are phished with, and where its mail genuinely comes from. */
 export interface ImpersonatedBrand {
@@ -39,20 +43,27 @@ export interface ImpersonatedBrand {
     readonly id: string;
     /** What to call it on screen. */
     readonly label: string;
-    /** How it is written, squashed - see `squash`. Several where a brand is
+    /** How it is written, as `squash` leaves it - lower case, no accents, and a
+     *  single space wherever the name itself has one. Several where a brand is
      *  known by more than one name. */
     readonly names: readonly string[];
     /** The registrable domains its mail and its links legitimately come from. */
     readonly domains: readonly string[];
     /**
-     * Whether the name is also an ordinary word.
+     * Which of the names above are also ordinary words.
      *
      * `orange`, `visa` and `apple` are a colour, a document and a fruit, and a
      * subject line containing one of them is usually about none of the three
      * companies. Those only count when the message is also asking for account
      * details, which is the combination that is never innocent.
+     *
+     * Named one by one rather than marked on the brand, because a brand is
+     * usually known by one ordinary word and several that are nobody else's:
+     * `hacienda` is a word and `agencia tributaria` is not, `apple` is a fruit
+     * and `icloud` is not, and holding the whole brand to the weaker rule would
+     * throw away the names that are worth the most.
      */
-    readonly common?: boolean;
+    readonly common?: readonly string[];
 }
 
 /**
@@ -71,14 +82,14 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
     {
         id: "apple",
         label: "Apple",
-        names: ["apple", "icloud", "appleid"],
+        names: ["apple", "icloud", "apple id"],
         domains: ["apple.com", "icloud.com"],
-        common: true
+        common: ["apple"]
     },
     {
         id: "microsoft",
         label: "Microsoft",
-        names: ["microsoft", "office365", "outlook", "onedrive"],
+        names: ["microsoft", "office 365", "outlook", "onedrive"],
         domains: ["microsoft.com", "outlook.com", "office.com", "live.com", "microsoftonline.com"]
     },
     {
@@ -98,44 +109,51 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
     { id: "telegram", label: "Telegram", names: ["telegram"], domains: ["telegram.org"] },
     { id: "steam", label: "Steam", names: ["steam", "steampowered"], domains: ["steampowered.com", "valvesoftware.com"] },
     { id: "spotify", label: "Spotify", names: ["spotify"], domains: ["spotify.com"] },
-    { id: "disney", label: "Disney+", names: ["disneyplus", "disney"], domains: ["disneyplus.com", "disney.com"] },
-    { id: "hbo", label: "HBO Max", names: ["hbomax", "hbo"], domains: ["hbomax.com", "max.com", "hbo.com"] },
+    { id: "disney", label: "Disney+", names: ["disney plus", "disney"], domains: ["disneyplus.com", "disney.com"] },
+    { id: "hbo", label: "HBO Max", names: ["hbo max", "hbo"], domains: ["hbomax.com", "max.com", "hbo.com"] },
     { id: "dropbox", label: "Dropbox", names: ["dropbox"], domains: ["dropbox.com"] },
     { id: "adobe", label: "Adobe", names: ["adobe"], domains: ["adobe.com"] },
     { id: "binance", label: "Binance", names: ["binance"], domains: ["binance.com"] },
     { id: "coinbase", label: "Coinbase", names: ["coinbase"], domains: ["coinbase.com"] },
     { id: "ebay", label: "eBay", names: ["ebay"], domains: ["ebay.com", "ebay.es"] },
     { id: "aliexpress", label: "AliExpress", names: ["aliexpress"], domains: ["aliexpress.com"] },
-    { id: "booking", label: "Booking.com", names: ["bookingcom"], domains: ["booking.com"] },
+    { id: "booking", label: "Booking.com", names: ["booking com"], domains: ["booking.com"] },
     { id: "airbnb", label: "Airbnb", names: ["airbnb"], domains: ["airbnb.com", "airbnb.es"] },
     { id: "dhl", label: "DHL", names: ["dhl"], domains: ["dhl.com", "dhl.de", "dhl.es"] },
-    { id: "ups", label: "UPS", names: ["ups"], domains: ["ups.com"], common: true },
+    { id: "ups", label: "UPS", names: ["ups"], domains: ["ups.com"], common: ["ups"] },
     { id: "fedex", label: "FedEx", names: ["fedex"], domains: ["fedex.com"] },
-    { id: "correos", label: "Correos", names: ["correos"], domains: ["correos.es", "correos.com"] },
+    {
+        id: "correos",
+        label: "Correos",
+        names: ["correos"],
+        domains: ["correos.es", "correos.com"],
+        common: ["correos"]
+    },
     { id: "seur", label: "SEUR", names: ["seur"], domains: ["seur.com", "seur.es"] },
     { id: "mrw", label: "MRW", names: ["mrw"], domains: ["mrw.es"] },
     { id: "glovo", label: "Glovo", names: ["glovo"], domains: ["glovoapp.com"] },
     { id: "santander", label: "Santander", names: ["santander"], domains: ["santander.es", "santander.com"] },
     { id: "bbva", label: "BBVA", names: ["bbva"], domains: ["bbva.es", "bbva.com"] },
-    { id: "caixabank", label: "CaixaBank", names: ["caixabank", "lacaixa"], domains: ["caixabank.es", "caixabank.com"] },
-    { id: "sabadell", label: "Banco Sabadell", names: ["bancosabadell", "sabadell"], domains: ["bancsabadell.com", "bancosabadell.com"] },
+    { id: "caixabank", label: "CaixaBank", names: ["caixabank", "la caixa"], domains: ["caixabank.es", "caixabank.com"] },
+    { id: "sabadell", label: "Banco Sabadell", names: ["banco sabadell", "sabadell"], domains: ["bancsabadell.com", "bancosabadell.com"] },
     { id: "bankinter", label: "Bankinter", names: ["bankinter"], domains: ["bankinter.com"] },
     { id: "openbank", label: "Openbank", names: ["openbank"], domains: ["openbank.es"] },
     { id: "revolut", label: "Revolut", names: ["revolut"], domains: ["revolut.com"] },
     { id: "n26", label: "N26", names: ["n26"], domains: ["n26.com"] },
-    { id: "visa", label: "Visa", names: ["visa"], domains: ["visa.com", "visa.es"], common: true },
+    { id: "visa", label: "Visa", names: ["visa"], domains: ["visa.com", "visa.es"], common: ["visa"] },
     { id: "mastercard", label: "Mastercard", names: ["mastercard"], domains: ["mastercard.com", "mastercard.es"] },
     {
         id: "aeat",
         label: "the Agencia Tributaria",
-        names: ["agenciatributaria", "hacienda", "aeat"],
-        domains: ["agenciatributaria.es", "agenciatributaria.gob.es"]
+        names: ["agencia tributaria", "hacienda", "aeat"],
+        domains: ["agenciatributaria.es", "agenciatributaria.gob.es"],
+        common: ["hacienda"]
     },
     { id: "dgt", label: "the DGT", names: ["dgt"], domains: ["dgt.es", "sede.dgt.gob.es"] },
     {
         id: "segsocial",
         label: "the Seguridad Social",
-        names: ["seguridadsocial"],
+        names: ["seguridad social"],
         domains: ["seg-social.es", "seg-social.gob.es"]
     },
     { id: "endesa", label: "Endesa", names: ["endesa"], domains: ["endesa.com", "endesa.es"] },
@@ -143,7 +161,7 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
     { id: "naturgy", label: "Naturgy", names: ["naturgy"], domains: ["naturgy.es", "naturgy.com"] },
     { id: "movistar", label: "Movistar", names: ["movistar", "telefonica"], domains: ["movistar.es", "telefonica.com"] },
     { id: "vodafone", label: "Vodafone", names: ["vodafone"], domains: ["vodafone.es", "vodafone.com"] },
-    { id: "orange", label: "Orange", names: ["orange"], domains: ["orange.es", "orange.com"], common: true }
+    { id: "orange", label: "Orange", names: ["orange"], domains: ["orange.es", "orange.com"], common: ["orange"] }
 ];
 
 /**
@@ -175,34 +193,108 @@ export function squash(value: string): string {
  *  is not a disguised word, it is a different sentence. */
 const DRESSING = "[\\s._-]{0,2}";
 
-/** The name as written, and the name however it has been dressed up. Built once:
- *  this is a table of fifty names and a message is judged on arrival. */
-const PATTERNS = new Map<string, { plain: RegExp; dressed: RegExp }>(
-    IMPERSONATED_BRANDS.flatMap((brand) =>
-        brand.names.map((name) => [
-            name,
-            {
-                plain: new RegExp(`\\b${name}\\b`),
-                dressed: new RegExp(`\\b${[...name].join(DRESSING)}\\b`)
-            }
-        ] as const)
-    )
+/** One name to look for, ready to compare. */
+interface NamePattern {
+    /** Whether this particular name is also an ordinary word. */
+    readonly common: boolean;
+    /** The name, however it has been dressed up. What it matched is read back
+     *  afterwards to see how much dressing it took. */
+    readonly dressed: RegExp;
+    /** How many separators the name has of its own: one for `Agencia
+     *  Tributaria`, none for `Netflix`. What a match is allowed before it reads
+     *  as somebody writing the name oddly on purpose. */
+    readonly spacing: number;
+}
+
+/**
+ * The names, compiled. Built once: this is a table of fifty names and a message
+ * is judged on arrival.
+ *
+ * Compiled from the *squashed* name rather than from the name as it is written
+ * in the table, because the squashed form is what the comparison happens in.
+ * `Office 365` squashes to `office e6s` - the digits people substitute are
+ * mapped back whether or not the brand put them there itself - so a pattern
+ * built from the raw name is a pattern that can never match anything, silently,
+ * for every name in the table that has a digit in it.
+ */
+const PATTERNS = new Map<string, readonly NamePattern[]>(
+    IMPERSONATED_BRANDS.map((brand) => [
+        brand.id,
+        brand.names.map((name) => {
+            const written = squash(name);
+            return {
+                common: brand.common?.includes(name) ?? false,
+                dressed: new RegExp(`\\b${[...written.replace(/\s+/g, "")].join(DRESSING)}\\b`),
+                spacing: (written.match(/ /g) ?? []).length
+            };
+        })
+    ])
 );
 
-/** A registrable domain, near enough: the last two labels. The same rule the
- *  rest of the filter uses, and enough to compare against a table of well-known
- *  names. */
-function baseDomain(host: string): string {
-    const parts = host.trim().toLowerCase().replace(/\.$/, "").split(".");
-    return parts.length <= 2 ? parts.join(".") : parts.slice(-2).join(".");
+/**
+ * Whether the name had to be undressed to be read.
+ *
+ * What the match holds is read back with the letters taken out, leaving exactly
+ * what somebody put between them, and weighed against what the name has of its
+ * own. `Netflix` has nothing between its letters, so `Net-flix` and
+ * `N e t f l i x` are both somebody's doing; `Agencia Tributaria` has one space,
+ * and writing it with that one space is writing it correctly.
+ *
+ * Getting this wrong is not a missed phish, it is a sentence on the screen
+ * accusing an institution of dressing up its own name on the strength of it
+ * being spelled the way it is spelled - and every name in the table that is two
+ * words would have carried it.
+ */
+function dressing(matched: string, spacing: number): boolean {
+    return matched.replace(/[a-z0-9]/g, "").length > spacing;
 }
+
+/**
+ * The domains of the table, as the comparison sees them.
+ *
+ * Every one of them is put through the same `baseDomain` the rest of the filter
+ * uses, so both sides of the comparison are the same shape. Doing it any other
+ * way is how `amazon.co.uk` came to be unreachable: a sender at
+ * `mail.amazon.co.uk` reduces to `amazon.co.uk`, and a table holding the string
+ * it was typed as would still have matched, but a table holding a *different*
+ * reduction of it would not.
+ */
+const OWNED = new Map<string, ReadonlySet<string>>(
+    IMPERSONATED_BRANDS.map((brand) => [
+        brand.id,
+        new Set(brand.domains.map((one) => baseDomain(one)))
+    ])
+);
+
+/**
+ * The domains in the table that anybody at all can have an address at.
+ *
+ * Some of these names are mailbox providers, and a sender at one of them is a
+ * person rather than the company: a phishing message sent from a free account is
+ * the oldest shape there is. So they identify nobody, and they are the one part
+ * of the table that cannot exonerate a message.
+ */
+const PUBLIC_MAILBOXES: ReadonlySet<string> = new Set([
+    "gmail.com",
+    "icloud.com",
+    "outlook.com",
+    "live.com"
+]);
+
+/** Every domain in the table that says who sent a message, in one set: what
+ *  answers "is this sender one of these names in its own right". */
+const ALL_OWNED: ReadonlySet<string> = new Set(
+    [...OWNED.values()].flatMap((domains) =>
+        [...domains].filter((one) => !PUBLIC_MAILBOXES.has(one))
+    )
+);
 
 /** What was found, and how badly it was dressed. */
 export interface BrandClaim {
     readonly brand: ImpersonatedBrand;
     /** True when the name only reads as itself once the dressing is taken off -
-     *  the hyphen in `Net-flix`, the spaces in `N e t f l i x`, the accent in
-     *  `Netflíx`. Nobody writes their own name that way. */
+     *  the hyphen in `Net-flix`, the spaces in `N e t f l i x`, the dots in
+     *  `N.E.T.F.L.I.X`. Nobody writes their own name that way. */
     readonly obfuscated: boolean;
 }
 
@@ -233,21 +325,26 @@ export function brandClaim(
     if (!text) return null;
 
     const from = baseDomain(input.fromDomain);
+    // A message sent by one of these names is not impersonating another one of
+    // them. An Apple receipt for a Spotify subscription names Spotify, and PayPal
+    // saying "you sent a payment to Netflix" names Netflix; both are the sender's
+    // own mail, and reading the table in order would have accused them of the
+    // first name they happen to mention.
+    if (from && ALL_OWNED.has(from)) return null;
+
     const linked = new Set(input.linkHosts.map((host) => baseDomain(host)));
 
     for (const brand of IMPERSONATED_BRANDS) {
-        for (const name of brand.names) {
-            const pattern = PATTERNS.get(name);
-            if (!pattern) continue;
-            const plain = pattern.plain.test(text);
-            const dressed = plain || pattern.dressed.test(text);
-            if (!dressed) continue;
-            if (brand.common && !asksForAccount) continue;
-            // Theirs. A message from the brand's own domain, or one that sends
-            // the reader to it, is the brand talking about itself.
-            if (brand.domains.includes(from)) return null;
-            if (brand.domains.some((domain) => linked.has(domain))) return null;
-            return { brand, obfuscated: !plain };
+        const owned = OWNED.get(brand.id);
+        for (const pattern of PATTERNS.get(brand.id) ?? []) {
+            const found = pattern.dressed.exec(text);
+            if (!found) continue;
+            if (pattern.common && !asksForAccount) continue;
+            // Theirs. A message that sends the reader to the brand is the brand
+            // talking about itself - the sender's side of the same question was
+            // answered above, for the whole table at once.
+            if (owned && [...linked].some((host) => owned.has(host))) return null;
+            return { brand, obfuscated: dressing(found[0], pattern.spacing) };
         }
     }
     return null;

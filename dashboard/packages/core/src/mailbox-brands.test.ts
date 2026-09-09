@@ -98,3 +98,118 @@ describe("what it refuses to accuse", () => {
         expect(claim({ subject: "Lunch on Thursday", fromName: "Maya Chen" })).toBeNull();
     });
 });
+
+describe("every name in the table can actually be found", () => {
+    // A name is compiled into the form the comparison happens in, and getting
+    // that wrong is silent: `office365` squashes to `officee6s`, so a pattern
+    // built from the name as it is typed matched nothing at all and nobody would
+    // have known. Each name is asked for by itself here rather than reviewed.
+    it.each(
+        brands.IMPERSONATED_BRANDS.flatMap((brand) =>
+            brand.names.map((name) => [brand.id, name] as const)
+        )
+    )("finds %s by the name %s", (id, name) => {
+        const found = claim({
+            subject: `Your ${name} account`,
+            fromName: "account services",
+            fromDomain: "mail.some-domain-nobody-has-heard-of.tld",
+            linkHosts: []
+        });
+        expect(found?.brand.id).toBe(id);
+    });
+});
+
+describe("a domain of more than two labels", () => {
+    it("is still the brand's own, so its mail is not an impersonation", () => {
+        // The last two labels of `amazon.co.uk` are `co.uk`, which belongs to
+        // nobody: every UK, and every `.gob.es`, entry in the table was
+        // unreachable while that was the rule.
+        expect(
+            claim({
+                subject: "Your Amazon order",
+                fromName: "Amazon",
+                fromDomain: "mail.amazon.co.uk"
+            })
+        ).toBeNull();
+        expect(
+            claim({
+                subject: "Your Amazon order",
+                fromName: "Amazon",
+                fromDomain: "stranger.tld",
+                linkHosts: ["www.amazon.co.uk"]
+            })
+        ).toBeNull();
+    });
+
+    it("is the brand's own for an institution under gob.es too", () => {
+        expect(
+            claim({
+                subject: "Notificacion de la Agencia Tributaria",
+                fromName: "Agencia Tributaria",
+                fromDomain: "correo.agenciatributaria.gob.es"
+            })
+        ).toBeNull();
+    });
+});
+
+describe("one of these names writing about another", () => {
+    it("is the sender's own mail, not an impersonation of the name it mentions", () => {
+        // The table is read in order, so the first name a message mentions used
+        // to be the one it was accused of wearing - and PayPal's receipts
+        // mention Netflix by design.
+        expect(
+            claim({
+                subject: "You sent a payment to Netflix",
+                fromName: "PayPal",
+                fromDomain: "service.paypal.com",
+                linkHosts: []
+            })
+        ).toBeNull();
+    });
+});
+
+describe("a name that is also an ordinary word", () => {
+    it("does not hold the brand's other names to the same rule", () => {
+        // `hacienda` is a word and `agencia tributaria` is nobody else's, so
+        // the weaker rule belongs to the word rather than to the brand.
+        expect(
+            claim({ subject: "Resumen de la hacienda familiar", fromName: "Maya" }, false)
+        ).toBeNull();
+        expect(
+            claim({ subject: "Notificacion de la Agencia Tributaria", fromName: "Maya" }, false)
+                ?.brand.id
+        ).toBe("aeat");
+    });
+});
+
+describe("a name that is two words", () => {
+    it("is not called dressed up for being spelled the way it is spelled", () => {
+        // The table holds these as one word, so the space between them looked
+        // like something inserted - and the reason line went out telling the
+        // reader an institution had hyphenated its own name.
+        const found = claim({ subject: "Notificacion de la Agencia Tributaria", fromName: "Maya" });
+        expect(found?.brand.id).toBe("aeat");
+        expect(found?.obfuscated).toBe(false);
+    });
+
+    it("still reads a name spaced out letter by letter as dressed up", () => {
+        expect(claim({ subject: "N e t f l i x billing", fromName: "Maya" })?.obfuscated).toBe(
+            true
+        );
+    });
+});
+
+describe("a sender at a free mailbox", () => {
+    it("is a person, not the company whose mailboxes they are", () => {
+        // The table holds `gmail.com` because Google's own mail comes from it,
+        // and anybody at all can have an address there. Reading it as "this is
+        // Google" would exonerate the oldest phishing shape there is.
+        const found = claim({
+            subject: "Your Netflix account needs a quick review",
+            fromName: "NETFLIX",
+            fromDomain: "gmail.com",
+            linkHosts: []
+        });
+        expect(found?.brand.id).toBe("netflix");
+    });
+});

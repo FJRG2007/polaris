@@ -53,14 +53,27 @@ describe("a panel over the page does not scroll the page", () => {
     /** What Tailwind calls a vertical scroller. */
     const SCROLLS = /\b(?:overflow-y-auto|overflow-y-scroll|overflow-auto)\b/;
 
+    /** Every string a class list can be written as: the double quotes a `className`
+     *  usually takes, and the other two quotes as well - a pane whose classes are
+     *  assembled in a template literal is the same pane, and a rule that only reads
+     *  one kind of quote is a rule somebody steps over without knowing it. */
+    const LITERALS = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
+
+    /** The file with its comments taken out. A note that quotes `overflow-y-auto`
+     *  to explain the rule is backticked prose, not a pane - and reading it as one
+     *  is how a guard starts failing on the file that documents it. */
+    function code(source: string): string {
+        return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    }
+
     it("every scrolling class list in the app contains its own scrolling", () => {
         const loose: string[] = [];
         for (const root of roots) {
             for (const path of sources(root)) {
-                const source = readFileSync(path, "utf8");
+                const source = code(readFileSync(path, "utf8"));
                 if (!SCROLLS.test(source)) continue;
-                for (const match of source.matchAll(/"([^"\n]*)"/g)) {
-                    const classes = match[1] ?? "";
+                for (const match of source.matchAll(LITERALS)) {
+                    const classes = match[1] ?? match[2] ?? match[3] ?? "";
                     if (!SCROLLS.test(classes)) continue;
                     if (classes.includes("overscroll-")) continue;
                     loose.push(`${path.split(/[/\\]/).slice(-2).join("/")}: ${classes}`);

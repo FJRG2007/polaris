@@ -509,3 +509,24 @@ describe("a message wearing somebody else's name", () => {
         expect(spam.judgeSpam(real, knows()).verdict).toBe("clean");
     });
 });
+
+describe("a brand's own mail from a domain the table does not hold", () => {
+    it("is left alone when the message sends the reader to the brand", () => {
+        // The rule that keeps a real receipt out of Junk: the table of domains
+        // is hand-written and no hand-written table is complete, so a message
+        // that links to the brand it names is that brand's message. It is only
+        // worth anything if the judgement can see a body - which is why the sync
+        // now hands over the part it has already read.
+        const bill = message({
+            subject: "Tu factura de Endesa",
+            fromName: "Endesa",
+            fromAddress: "facturas@clientes-endesa.example",
+            snippet: "Ya puedes consultar tus datos de facturacion",
+            bodyText: "Ya puedes consultar tus datos de facturacion en tu area privada.",
+            bodyHtml: '<a href="https://www.endesa.es/area-privada">Area privada</a>'
+        });
+        const judged = spam.judgeSpam(bill, knows());
+        expect(judged.signals.map((signal) => signal.id)).not.toContain("brand_credential_phish");
+        expect(judged.verdict).toBe("clean");
+    });
+});

@@ -526,7 +526,11 @@ async function storeMessages(
                 // filed is no longer in the inbox to judge. Before, because
                 // answering junk with an out-of-office is how a mailbox tells a
                 // sender that the address is real.
-                if (await judgeArrival(account.id, row.id)) judged.push(row.id);
+                // With the part that was already read for the preview: the
+                // filter's links and its account wording are in the body, and a
+                // row has no body until somebody opens the message.
+                if (await judgeArrival(account.id, row.id, snippets.get(message.uid) ?? ""))
+                    judged.push(row.id);
                 // The away reply reads the folder itself, so a message about to
                 // be filed as junk is still in the inbox here - it is filed at
                 // the end of the pass. Answering junk with an out-of-office is
