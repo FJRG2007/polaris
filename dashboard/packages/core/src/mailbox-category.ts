@@ -578,6 +578,32 @@ const PAYMENT_SETTLED: readonly RegExp[] = [
 ];
 
 /**
+ * A payment that went through, said with the sender's own words in the middle.
+ *
+ * The phrases above are contiguous, and a payment confirmation usually is not:
+ *
+ *     Tu pago con Paga en 4 en AMAZON ha sido aceptado
+ *
+ * "pago" and "ha sido aceptado" are eleven words apart, and no list of phrases
+ * was ever going to hold that one - the middle is the shop, the card and the
+ * plan, and it differs per message. What does not differ is the pair, so the
+ * pair is what is matched, with a bounded gap so it cannot reach across a whole
+ * paragraph and pick up two unrelated sentences.
+ *
+ * A refusal - "tu pago NO ha sido aceptado" - matches these too, and that is
+ * right: it is still money news, it still belongs in this tab, and the billing
+ * words above it catch it first anyway.
+ */
+const PAYMENT_SETTLED: readonly RegExp[] = [
+    /\bpayment\b.{0,60}?\b(?:accepted|approved|confirmed|successful|complete|completed|processed)\b/,
+    /\bpago\b.{0,60}?\b(?:aceptado|aprobado|confirmado|realizado|completado|procesado)\b/,
+    /\bpagamento\b.{0,60}?\b(?:aceito|aprovado|confirmado|aceitado)\b/,
+    /\bpaiement\b.{0,60}?\b(?:accepte|approuve|confirme|recu)\b/,
+    /\bzahlung\b.{0,60}?\b(?:bestatigt|erfolgreich|erhalten)\b/,
+    /\bpagamento\b.{0,60}?\b(?:accettato|confermato)\b/
+];
+
+/**
  * Words that mean something is on its way, or that a record was issued.
  *
  * What is left of the transactional pile once money has been taken out of it: a
