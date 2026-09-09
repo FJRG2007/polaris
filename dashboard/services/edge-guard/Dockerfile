@@ -6,15 +6,24 @@
 FROM node:22-bookworm-slim AS builder
 WORKDIR /build
 
-# Manifests first so the npm ci layer is cached until dependencies change.
+# Manifests first so the install layer is cached until dependencies change. Not
+# only this service's: `npm ci` resolves the lockfile against every member it
+# names, and a member whose manifest is absent is a member whose dependencies
+# never arrive - which surfaces much later, as another package failing to build
+# for want of one of its own imports. So whatever is copied here, everything it
+# asks for is copied too, which a test in the web app checks.
 COPY package.json package-lock.json ./
+COPY packages/agent-runtime/package.json ./packages/agent-runtime/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/docker/package.json ./packages/docker/
+COPY packages/docx/package.json ./packages/docx/
 COPY packages/hostd-client/package.json ./packages/hostd-client/
+COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/pptx/package.json ./packages/pptx/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
@@ -23,7 +32,7 @@ COPY services/edge-guard/package.json ./services/edge-guard/
 # Plain `npm ci`, no BuildKit cache mount: an update builds this on the operator's
 # own machine, and `docker compose` falls back to the classic builder wherever the
 # buildx plugin is absent - which rejects `RUN --mount` and fails the update.
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY . .
 # @polaris/core must be built first (the guard bundles from its dist), then bundle.
