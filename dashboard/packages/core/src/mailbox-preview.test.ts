@@ -127,3 +127,32 @@ describe("mail that came out unreadable", () => {
         expect(snippetFrom(once)).toBe(once);
     });
 });
+
+describe("a preview stored before any of this existed", () => {
+    /** A payment confirmation, as one lender's server sends it: the whole
+     *  message is one base64 part, and what the list stored was a slice of it. */
+    const html =
+        '<html><head><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">' +
+        "<body><p>Tu pago con Paga en 4 en AMAZON ha sido aceptado.</p></body></html>";
+    const wrapped = Buffer.from(html, "utf8")
+        .toString("base64")
+        .replace(/(.{72})/g, "$1 ");
+
+    it("is read back when the whole slice was kept", () => {
+        expect(snippetFrom(wrapped)).toContain("Paga en 4");
+    });
+
+    it("is read back when the slice was cut short and ellipsised", () => {
+        // What a row written before the base64 repair existed actually holds:
+        // 200 characters of base64 with the list's own ellipsis on the end. The
+        // ellipsis is not base64, so the repair refused the whole line and the
+        // reader kept looking at `PGh0bWw+PGhlYWQ+`.
+        const stored = `${wrapped.slice(0, 199)}…`;
+        expect(snippetFrom(stored)).toContain("Paga en 4");
+        expect(snippetFrom(stored)).not.toContain("PGh0bWw");
+    });
+
+    it("leaves an ordinary sentence that happens to end in an ellipsis alone", () => {
+        expect(snippetFrom("Te escribo por lo de ayer…")).toBe("Te escribo por lo de ayer…");
+    });
+});

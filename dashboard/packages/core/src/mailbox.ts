@@ -206,15 +206,29 @@ export function sameAddress(left: string, right: string): boolean {
  */
 export function snippetFrom(text: string, limit = 200): string {
     const decoded = undoTransferEncoding(text);
-    const words = looksLikeMarkup(decoded) ? stripMarkup(decoded) : decoded;
-    const collapsed = words
+    const markup = looksLikeMarkup(decoded);
+    const readable = tidy(markup ? stripMarkup(decoded) : decoded);
+    // Nothing left is not an answer. It happens to one message shape in
+    // particular: the slice is entirely inside a `<head>` whose closing tag is
+    // past the end of it, and a head with no end swallows everything after it -
+    // which is the right rule for a stylesheet and the wrong one here. A line
+    // that reads oddly beats a row with nothing under its subject, so the
+    // second attempt keeps everything but the parts that are genuinely not
+    // words.
+    const collapsed = readable || (markup ? tidy(stripMarkup(decoded, { keepUnclosed: true })) : "");
+    return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
+}
+
+/** One line, without the quoted history, the padding or the run of spaces a
+ *  stripped-out tag leaves behind. */
+function tidy(value: string): string {
+    return value
         .split(/\r?\n/)
         .filter((line) => !line.trimStart().startsWith(">"))
         .join(" ")
         .replace(INVISIBLE, "")
         .replace(/\s+/g, " ")
         .trim();
-    return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
 }
 
 /** Whatever a part was wrapped in for the journey, undone. Base64 first, because
@@ -247,7 +261,13 @@ function undoBase64(text: string): string {
     // removing the whitespace first makes a sentence look exactly like one long
     // run of base64 characters. Only the last chunk may be short: a preview is a
     // slice, and the slice ends where it ends.
-    const chunks = text.trim().split(/\s+/);
+    // The ellipsis the list itself put there. A preview stored before any of
+    // this existed is a slice of base64 with the truncation mark on the end, and
+    // that one character is not base64 - so the repair refused the whole line
+    // and the reader went on looking at `PGh0bWw+PGhlYWQ+`. It is dropped here
+    // rather than tolerated in the test below, which has to stay strict: what
+    // makes this guess safe is that nothing else looks like it.
+    const chunks = text.trim().replace(/…+$/, "").trim().split(/\s+/);
     const wrapped = chunks.every(
         (chunk, index) => chunk.length >= (index === chunks.length - 1 ? 4 : 16)
     );
@@ -381,7 +401,7 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
  * `<style>` that never closes, a tag cut in half at the end, a stylesheet with
  * no markup around it at all - each of those was a preview line somebody read.
  */
-function stripMarkup(html: string): string {
+function stripMarkup(html: string, options: { keepUnclosed?: boolean } = {}): string {
     return (
         html
             .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
@@ -389,7 +409,17 @@ function stripMarkup(html: string): string {
             // is optional in these: a preview is cut off after four kilobytes and
             // a stylesheet is easily longer than that, so demanding `</style>`
             // meant the stylesheet WAS the preview.
-            .replace(/<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+            //
+            // `keepUnclosed` is the second attempt, for the slice where that
+            // rule leaves nothing at all: a `<head>` whose end is past the cut
+            // takes the whole message with it, and the words in it are the only
+            // ones there are.
+            .replace(
+                options.keepUnclosed
+                    ? /<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
+                    : /<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi,
+                " "
+            )
             // Anything that ends a line becomes one, so two sentences do not run
             // together into one word.
             .replace(/<(?:br|\/p|\/div|\/tr|\/li|\/h[1-6]|\/table)\b[^>]*>/gi, " ")

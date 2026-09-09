@@ -458,3 +458,21 @@ describe("a purchase, recognised by what it says", () => {
         );
     });
 });
+
+describe("a lender's payment confirmation", () => {
+    it("is money, not an update", () => {
+        // "Paga en 4" is a lender's instalment plan, and this is the message
+        // that says a payment went through. It arrived under Updates, beside a
+        // parcel, which is the tab for what is about to happen rather than for
+        // what already cost something.
+        expect(
+            categoriseMail({
+                subject: "Tu pago con Paga en 4 en AMAZON ha sido aceptado",
+                snippet: "Tu pago con Paga en 4 en AMAZON ha sido aceptado. Importe 39,99 EUR",
+                fromAddress: "noreply@cofidis.es",
+                fromName: "noreply",
+                headers: {}
+            })
+        ).toBe("billing");
+    });
+});
