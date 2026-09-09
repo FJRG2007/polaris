@@ -190,6 +190,25 @@ describe("the message a mailto asks for", () => {
         ).toBe("100%20off");
     });
 
+    it("keeps a plus in the subject, which is a plus and not a space", () => {
+        // RFC 6068 percent-encodes a mailto's fields and does nothing else with
+        // them, so a `+` is a `+`. Reading it as a form field turns the string
+        // the robot at the other end matches on into a different string, and the
+        // message is sent, accepted and ignored.
+        expect(
+            unsub.unsubscribeMailto("mailto:leave@list.example?subject=unsubscribe+list-42")?.subject
+        ).toBe("unsubscribe+list-42");
+    });
+
+    it("decodes each field exactly once", () => {
+        // Decoding twice turns an address that legitimately contains `%25` into
+        // one that contains `%`, and a subject that survived the first pass into
+        // whatever the second one makes of it.
+        expect(
+            unsub.unsubscribeMailto("mailto:leave@list.example?subject=100%2520off")?.subject
+        ).toBe("100%20off");
+    });
+
     it("is nothing for anything that is not a mailto", () => {
         expect(unsub.unsubscribeMailto("https://list.example/out")).toBeNull();
         expect(unsub.unsubscribeMailto("mailto:not-an-address")).toBeNull();

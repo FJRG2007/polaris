@@ -4301,40 +4301,6 @@ model SubjectReputation {
 //
 // `rules` is the deny list the verdict was reached under, so changing what counts
 // as bad re-asks rather than serving an answer to a different question.
-// One reputation cache for the whole platform, whatever was looked up.
-//
-// The firewall and share links already remembered what a provider said about an
-// address. Mail asks the same kind of question about two more subjects - the
-// address a message came from, and the domain behind it - and there is no reason
-// for those to be a second cache with its own expiry and its own thing for an
-// administrator to clear.
-//
-// So the key is the question rather than an address: a kind, the value, and the
-// provider that answered it. A lookup paid for by the mail filter answers the
-// firewall's next question and the other way round, which is the point - both
-// pay per request, and a domain does not get to be reputable for one half of
-// Polaris and not the other.
-//
-// `rules` is the question the verdict was reached under. Changing what counts as
-// bad is a different question, so it is asked again rather than answered out of
-// a cache that predates the change.
-model SubjectReputation {
-    /// ip | domain | email
-    kind      String
-    /// Normalised by the caller: lower case, and an address without its tag.
-    subject   String
-    /// dymo | virustotal
-    provider  String
-    allow     Boolean
-    reason    String?
-    rules     String   @default("")
-    checkedAt DateTime @default(now())
-
-    @@id([kind, subject, provider])
-    @@index([checkedAt])
-    @@index([kind, checkedAt])
-}
-
 model AddressReputation {
     ip        String   @id
     provider  String
