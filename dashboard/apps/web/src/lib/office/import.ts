@@ -52,31 +52,29 @@ export class OfficeImportError extends Error {
     }
 }
 
-/** What each extension opens as. The list IS the answer to "what can I import",
- *  so the picker and the refusal both read it rather than each holding their
- *  own idea. */
-export const IMPORTABLE: Readonly<Record<string, core.OfficeKind>> = {
-    xlsx: "sheet",
-    xlsm: "sheet",
-    xls: "sheet",
-    ods: "sheet",
-    csv: "sheet",
-    tsv: "sheet",
-    docx: "doc",
-    txt: "doc",
-    md: "doc",
-    markdown: "doc"
-};
+/**
+ * How much of a workbook is a document somebody edits.
+ *
+ * Every cell becomes a key in one Yjs map, that map becomes one column of one
+ * row, and that row is handed to a browser whole - so the ceiling is not about
+ * how long the read takes. Past it the thing being made is not a spreadsheet
+ * anybody opens, and it is refused by name rather than opened as a page that
+ * never finishes loading.
+ */
+const MAX_CELLS = 200_000;
+const MAX_ROWS = 100_000;
+const MAX_COLUMNS = 1_024;
 
-/** The extensions, for a file input's `accept`. */
-export const IMPORTABLE_ACCEPT = Object.keys(IMPORTABLE)
-    .map((one) => `.${one}`)
-    .join(",");
+/** The levels the editor's own schema knows. A heading deeper than this is not
+ *  a heading it can draw: it falls back to the first level, so a document of
+ *  h4s would open as a document of h1s. */
+const MAX_HEADING_LEVEL = 3;
 
-/** What kind of document a file becomes, or null when it becomes none. */
+/** What kind of document a file becomes, or null when it becomes none. The
+ *  table itself is in core, because the picker on the screen filters by the
+ *  same list. */
 export function importableKind(filename: string): core.OfficeKind | null {
-    const extension = filename.split(".").pop()?.toLowerCase() ?? "";
-    return IMPORTABLE[extension] ?? null;
+    return core.officeImportableKind(filename);
 }
 
 /** The name to give the document: the file's, without the extension. */
@@ -137,7 +135,11 @@ function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8A
 
     let book: XLSX.WorkBook;
     try {
-        book = XLSX.read(bytes, { type: "array", cellDates: false });
+        // Dates come back as dates rather than as the number of days a workbook
+        // stores one as. The format that would make 46037 read as a date is not
+        // carried into the grid, so a cell that arrives as the number arrives
+        // as one nothing downstream can turn back.
+        book = XLSX.read(bytes, { type: "array", cellDates: true });
     } catch {
         throw new OfficeImportError(`${filename} is not a spreadsheet Polaris can read.`);
     }
@@ -146,33 +148,37 @@ function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8A
     const doc = new Y.Doc();
     const cells = doc.getMap<{ v: unknown }>(OFFICE_FIELDS.sheet.cells);
     const sheets: Record<string, unknown> = {};
+    let written = 0;
 
     for (const name of book.SheetNames) {
         const sheet = book.Sheets[name];
         if (!sheet) continue;
-        const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-            header: 1,
-            raw: true,
-            blankrows: true,
-            defval: null
-        });
 
+        // The cells the sheet actually carries, which are its own keys - never
+        // the range it declares. `!ref` is written as the whole grid,
+        // `A1:AMJ1048576`, by more than one generator, and walking that is a
+        // million rows allocated for a file with four cells in it.
+        let tallest = 0;
         let widest = 0;
-        rows.forEach((row, index) => {
-            if (!Array.isArray(row)) return;
-            widest = Math.max(widest, row.length);
-            row.forEach((value, column) => {
-                if (value === null || value === undefined || value === "") return;
-                cells.set(`${name}:${index}:${column}`, { v: value });
-            });
-        });
+        for (const address of Object.keys(sheet)) {
+            if (!CELL_ADDRESS.test(address)) continue;
+            const value = cellValue(sheet[address] as XLSX.CellObject | undefined);
+            if (value === null) continue;
+            const at = XLSX.utils.decode_cell(address);
+            if (at.r >= MAX_ROWS || at.c >= MAX_COLUMNS) throw tooMuch(filename);
+            written += 1;
+            if (written > MAX_CELLS) throw tooMuch(filename);
+            cells.set(`${name}:${at.r}:${at.c}`, { v: value });
+            tallest = Math.max(tallest, at.r + 1);
+            widest = Math.max(widest, at.c + 1);
+        }
 
         sheets[name] = {
             id: name,
             name,
             // The grid the engine draws, not the grid that has something in it:
             // a sheet has to have room under its last row to type in.
-            rowCount: Math.max(rows.length + 20, 100),
+            rowCount: Math.max(tallest + 20, 100),
             columnCount: Math.max(widest + 5, 26),
             cellData: {}
         };
@@ -185,6 +191,57 @@ function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8A
         sheets
     });
     return Y.encodeStateAsUpdate(doc);
+}
+
+/** A cell's own key, as a workbook writes one. Everything else in the object is
+ *  the sheet's metadata, which is named with a leading `!`. */
+const CELL_ADDRESS = /^[A-Z]+[1-9][0-9]*$/;
+
+/** The refusal for a workbook past what Polaris opens, said by name so nobody
+ *  tries the same file twice. */
+function tooMuch(filename: string): OfficeImportError {
+    const size = (count: number): string => count.toLocaleString("en-US");
+    return new OfficeImportError(
+        `${filename} reaches further than Polaris opens as a spreadsheet: past ${size(MAX_ROWS)} rows, ${size(MAX_COLUMNS)} columns or ${size(MAX_CELLS)} cells.`
+    );
+}
+
+/**
+ * What one cell holds, as a value a Yjs map can carry.
+ *
+ * A date is why this is not `cell.v`: a `Date` is not something Yjs encodes, and
+ * the number behind one is unreadable without the format that is not carried
+ * here. So a date becomes the text of the date, written the one way that is the
+ * same in every country.
+ */
+function cellValue(cell: XLSX.CellObject | undefined): string | number | boolean | null {
+    if (!cell || cell.t === "z") return null;
+    if (cell.t === "e") return cell.w ?? null;
+    const value = cell.v;
+    if (value === undefined || value === null || value === "") return null;
+    if (value instanceof Date) return readableDate(value);
+    if (typeof value === "number" || typeof value === "boolean") return value;
+    return String(value);
+}
+
+/**
+ * A date, as text that sorts and means the same thing in every country.
+ *
+ * Whether the midnight behind a date was put in this machine's zone or in UTC is
+ * not something the cell says - a workbook's serial is read as the one and a
+ * text file's `2026-01-15` as the other - and reading it the wrong way moves the
+ * date a day. So the reading that lands on midnight is the one the file meant. A
+ * cell that carries a real time of day lands on neither, and is read here the
+ * way the machine reading it would show it.
+ */
+function readableDate(value: Date): string {
+    const pad = (part: number): string => String(part).padStart(2, "0");
+    if (value.getUTCHours() === 0 && value.getUTCMinutes() === 0) {
+        return `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())}`;
+    }
+    const day = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+    const clock = value.getHours() * 60 + value.getMinutes();
+    return clock === 0 ? day : `${day} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -216,22 +273,60 @@ async function docUpdate(filename: string, bytes: Uint8Array): Promise<Uint8Arra
  */
 async function docxBlocks(bytes: Uint8Array, filename: string): Promise<core.DocBlock[]> {
     let xml: string;
+    let numbering: string;
     try {
         const zip = await JSZip.loadAsync(bytes);
         xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+        numbering = (await zip.file("word/numbering.xml")?.async("string")) ?? "";
     } catch {
         throw new OfficeImportError(`${filename} is not a Word document Polaris can read.`);
     }
     if (!xml) throw new OfficeImportError(`${filename} has no document part in it.`);
 
+    const counted = countedNumbering(numbering);
     const blocks: core.DocBlock[] = [];
     for (const match of xml.matchAll(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g)) {
         const paragraph = match[1] ?? "";
         const text = paragraphText(paragraph);
         if (!text.trim()) continue;
-        blocks.push({ kind: paragraphKind(paragraph), text });
+        blocks.push({ kind: paragraphKind(paragraph, counted), text });
     }
     return blocks;
+}
+
+/**
+ * The numberings that count rather than bullet.
+ *
+ * A numbered paragraph carries an id and nothing else; what its marker looks
+ * like lives in `word/numbering.xml`, two hops away - the id names a `w:num`,
+ * which names an abstract numbering, which is where each level's format sits.
+ * The hops are worth making because "1. 2. 3." arriving as "- - -" changes what
+ * the document SAYS rather than how it looks: a procedure whose steps are in an
+ * order stops saying that they are.
+ *
+ * A file with no numbering part, or an id that names nothing, is a bullet - the
+ * same answer as before it read one, and the safe one.
+ */
+function countedNumbering(xml: string): ReadonlySet<string> {
+    const counted = new Set<string>();
+    if (!xml) return counted;
+
+    const formats = new Map<string, string>();
+    for (const match of xml.matchAll(
+        /<w:abstractNum\b[^>]*w:abstractNumId="([^"]*)"([\s\S]*?)<\/w:abstractNum>/g
+    )) {
+        const body = match[2] ?? "";
+        const first = /<w:lvl\b[^>]*w:ilvl="0"[^>]*>([\s\S]*?)<\/w:lvl>/.exec(body);
+        const format = /<w:numFmt\b[^>]*w:val="([^"]*)"/.exec(first?.[1] ?? body)?.[1] ?? "";
+        if (match[1]) formats.set(match[1], format.toLowerCase());
+    }
+
+    for (const match of xml.matchAll(/<w:num\b[^>]*w:numId="([^"]*)"([\s\S]*?)<\/w:num>/g)) {
+        const abstract = /<w:abstractNumId\b[^>]*w:val="([^"]*)"/.exec(match[2] ?? "")?.[1] ?? "";
+        const format = formats.get(abstract) ?? "bullet";
+        if (match[1] && format !== "bullet" && format !== "none") counted.add(match[1]);
+    }
+    return counted;
 }
 
 /** The words in one paragraph: every run's text, with the tabs and the breaks
@@ -254,12 +349,13 @@ function paragraphText(paragraph: string): string {
 }
 
 /** What a paragraph is, from the style it names and the numbering it sits in. */
-function paragraphKind(paragraph: string): string {
+function paragraphKind(paragraph: string, counted: ReadonlySet<string>): string {
     const numbered = /<w:numPr\b/.test(paragraph);
     const style = /<w:pStyle\b[^>]*w:val="([^"]*)"/.exec(paragraph)?.[1] ?? "";
     const flat = style.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    const heading = /^heading([1-6])$/.exec(flat) ?? /^(?:titulo|titre|uberschrift)([1-6])$/.exec(flat);
+    const heading =
+        /^heading([1-6])$/.exec(flat) ?? /^(?:titulo|titre|uberschrift)([1-6])$/.exec(flat);
     if (heading) return `h${heading[1]}`;
     if (flat === "title") return "h1";
     if (flat === "subtitle") return "h2";
@@ -268,7 +364,10 @@ function paragraphKind(paragraph: string): string {
     // A list is a paragraph with numbering on it. The style is only a hint -
     // `ListParagraph` is applied to plenty of paragraphs that are not lists, and
     // a real list item always carries `w:numPr`.
-    if (numbered) return "li";
+    if (numbered) {
+        const numId = /<w:numPr\b[\s\S]*?<w:numId\b[^>]*w:val="([^"]*)"/.exec(paragraph)?.[1] ?? "";
+        return counted.has(numId) ? "oli" : "li";
+    }
     return "p";
 }
 
@@ -382,7 +481,12 @@ function nodeFor(block: core.DocBlock): Y.XmlElement {
     const heading = /^h([1-6])$/.exec(block.kind);
     if (heading) {
         const node = new Y.XmlElement("heading");
-        node.setAttribute("level", heading[1] ?? "1");
+        // A number, not the digit that was matched. The attribute is handed
+        // straight to the editor's schema, which knows the level 2 and does not
+        // know the level "2" - and a level it does not know is drawn as an H1,
+        // which is every heading in the document at the same size.
+        const level = Math.min(MAX_HEADING_LEVEL, Number(heading[1] ?? 1));
+        node.setAttribute("level", level as unknown as string);
         node.insert(0, [textNode(block.text)]);
         return node;
     }

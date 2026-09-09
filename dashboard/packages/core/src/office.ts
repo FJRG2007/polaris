@@ -91,6 +91,38 @@ export function officeKindForPath(segment: string): OfficeKind | null {
 }
 
 /**
+ * What each extension opens as, coming the other way.
+ *
+ * Here rather than beside the reader that uses it, because the picker on the
+ * screen has to offer the same list and a browser cannot carry a spreadsheet
+ * reader in just to be told what a `.xlsx` is. One table, read from both ends.
+ */
+export const OFFICE_IMPORTABLE: Readonly<Record<string, OfficeKind>> = {
+    xlsx: "sheet",
+    xlsm: "sheet",
+    xls: "sheet",
+    ods: "sheet",
+    csv: "sheet",
+    tsv: "sheet",
+    docx: "doc",
+    txt: "doc",
+    md: "doc",
+    markdown: "doc"
+};
+
+/** The extensions, for a file input's `accept` and for the listing that hides
+ *  what this cannot open. */
+export const OFFICE_IMPORT_ACCEPT = Object.keys(OFFICE_IMPORTABLE)
+    .map((one) => `.${one}`)
+    .join(",");
+
+/** What kind of document a file becomes, or null when it becomes none. */
+export function officeImportableKind(filename: string): OfficeKind | null {
+    const extension = filename.split(".").pop()?.toLowerCase() ?? "";
+    return OFFICE_IMPORTABLE[extension] ?? null;
+}
+
+/**
  * What a document can be exported as, per kind.
  *
  * The native format of each kind, plus the neutral ones anybody can open. Every

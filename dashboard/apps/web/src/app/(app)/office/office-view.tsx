@@ -16,13 +16,13 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
-import { RelativeTime } from "@/components/relative-time";
 import { useShelfScope } from "@/components/shelf-scope";
+import { RelativeTime } from "@/components/relative-time";
 import { asFiles } from "@/components/file-picker/as-files";
-import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
-import type { PickedFile } from "@/components/file-picker/picked-file";
 import type { OfficeDocumentView } from "@/lib/office/documents";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { PickedFile } from "@/components/file-picker/picked-file";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import {
     Columns3,
     FileText,
@@ -165,12 +165,15 @@ export function OfficeView({
                 const { files, failed } = await asFiles(picked);
                 for (const said of failed) toast.show({ title: said });
 
-                let opened: { id: string; kind: core.OfficeKind } | null = null;
+                const opened: { id: string; kind: core.OfficeKind }[] = [];
                 for (const file of files) {
                     const form = new FormData();
                     form.set("file", file);
                     if (on) form.set("orgId", on);
-                    const answer = await fetch("/api/office/import", { method: "POST", body: form });
+                    const answer = await fetch("/api/office/import", {
+                        method: "POST",
+                        body: form
+                    });
                     const body = (await answer.json().catch(() => null)) as {
                         id?: string;
                         kind?: core.OfficeKind;
@@ -180,19 +183,25 @@ export function OfficeView({
                         toast.show({ title: body?.error ?? `${file.name} could not be opened.` });
                         continue;
                     }
-                    opened = { id: body.id, kind: body.kind };
+                    opened.push({ id: body.id, kind: body.kind });
                 }
 
-                if (!opened) return;
+                const first = opened[0];
+                if (!first) return;
                 // Straight into the one that was just made when it is the only
                 // one: somebody importing a file is about to look at it. Several
                 // at once is a list to come back to, so the list is refreshed
                 // and nothing is opened over the top of it.
                 if (files.length === 1) {
-                    router.push(core.officeDocumentPath(opened.kind, opened.id));
+                    router.push(core.officeDocumentPath(first.kind, first.id));
                     return;
                 }
-                toast.show({ title: `${files.length} files opened.` });
+                // What was opened, never what was chosen: the refusals above are
+                // still on screen, and "4 files opened" over three of them is
+                // the screen contradicting itself.
+                toast.show({
+                    title: `${opened.length} ${opened.length === 1 ? "file" : "files"} opened.`
+                });
                 await load();
             } finally {
                 setReading(false);
@@ -218,7 +227,11 @@ export function OfficeView({
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader title={title} description={description} />
                 {shelf === "live" ? (
-                    <NewButton onPick={setMaking} onImport={() => setImporting(true)} busy={reading} />
+                    <NewButton
+                        onPick={setMaking}
+                        onImport={() => setImporting(true)}
+                        busy={reading}
+                    />
                 ) : null}
             </div>
 
@@ -315,6 +328,7 @@ export function OfficeView({
             {importing ? (
                 <FilePickerDialog
                     title="Open a file as a document"
+                    accept={core.OFFICE_IMPORT_ACCEPT}
                     onPick={(picked) => void importPicked(picked)}
                     onClose={() => setImporting(false)}
                 />

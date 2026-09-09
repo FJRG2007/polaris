@@ -27,6 +27,7 @@
 import { NextResponse } from "next/server";
 import { guardedUser } from "@/lib/session";
 import { gateShareRequest } from "@/lib/share-access";
+import { readCappedBody } from "@/lib/request-body";
 import { renderPptxDeck, DEFAULT_DECK_WIDTH } from "@/lib/office/pptx-deck";
 
 export const runtime = "nodejs";
@@ -41,43 +42,6 @@ const MOST_BYTES = 80 * 1024 * 1024;
  *  ask for a deck the size of a wall, and every distinct width is a full rebuild
  *  of every page. */
 const WIDTHS = [640, 960, 1280, 1600, 1920];
-
-/**
- * The body, read no further than `most` bytes, or `null` once it is past that.
- *
- * A route handler has no body limit of its own, so `arrayBuffer()` allocates
- * whatever arrives before anything can decide it was too much: a client sending
- * two gigabytes gets the allocation, and the refusal below it never runs. This
- * reads the stream instead and stops at the limit, so the most that is ever held
- * is the limit plus the chunk that crossed it.
- */
-async function readCapped(request: Request, most: number): Promise<Uint8Array | null> {
-    if (!request.body) return new Uint8Array(0);
-    const reader = request.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let held = 0;
-    try {
-        for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            held += value.byteLength;
-            if (held > most) return null;
-            chunks.push(value);
-        }
-    } finally {
-        // Nothing more is wanted, whether the body ended or was refused. On a
-        // refusal this is what stops the sender rather than reading the rest of
-        // it into a buffer that is already being thrown away.
-        void reader.cancel().catch(() => {});
-    }
-    const body = new Uint8Array(held);
-    let at = 0;
-    for (const chunk of chunks) {
-        body.set(chunk, at);
-        at += chunk.byteLength;
-    }
-    return body;
-}
 
 export async function POST(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -100,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
     if (Number.isFinite(claimed) && claimed > MOST_BYTES)
         return NextResponse.json({ error: "This presentation is too large." }, { status: 413 });
 
-    const body = await readCapped(request, MOST_BYTES);
+    const body = await readCappedBody(request, MOST_BYTES);
     if (!body)
         return NextResponse.json({ error: "This presentation is too large." }, { status: 413 });
     if (body.byteLength === 0)
