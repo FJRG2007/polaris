@@ -84,9 +84,16 @@ so on) is an Electron channel injected by a preload script. **The markdown one
 is implemented**: opening a `.md` in Drive offers "Full editor" beside Pretty,
 Raw and the plain textarea, and that runs GenOffice's editor against a bridge
 answered by Drive - reading the file the viewer already read, writing through
-the same toolbar every other editor in Drive saves with. The other three
-compile and are not yet reachable; their bridges are larger and each needs the
-same treatment.
+the same toolbar every other editor in Drive saves with. The docs and pdf
+bridges compile and are not yet reachable, and each needs the same treatment.
+
+Slides' bridge is no different - editing a deck in place still needs it, and
+it is still unreached. But its renderer does not need the bridge at all:
+`SlideThumb`, the component genoffice-slides itself draws its own thumbnails
+with, takes a parsed slide as plain data. The pptx packages above parse and
+lay out a `.pptx` server-side, and Drive's presentation viewer draws the
+result with that same component - eighty kilobytes rather than the three
+megabytes of the whole editor, and no bridge to answer.
 
 Polaris' own Office apps are unaffected and remain what `/office` serves. These
 are an alternative rather than a replacement, and they have no real-time
