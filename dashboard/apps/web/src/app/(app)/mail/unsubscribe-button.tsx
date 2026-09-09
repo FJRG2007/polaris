@@ -23,6 +23,15 @@
  * not silently swallowed: the same address works in a browser, so the dialog
  * turns into the link, which is the honest outcome and the one thing the reader
  * can still act on.
+ *
+ * The dialog also says where the way out came from, and it only matters for one
+ * combination: a `mailto` Polaris read out of a message body. A header is
+ * something the sender published on every message they send; an address in a
+ * body is whatever was written in a body, and one written to look like an
+ * unsubscribe footer is how somebody finds out a mailbox is real. Polaris still
+ * offers it - the small newsletters this feature exists for put their only way
+ * out there - but it says plainly what pressing it reveals, rather than the
+ * "nothing else is shared with them" that is true of a published header.
  */
 
 import * as core from "@polaris/core";
@@ -38,6 +47,9 @@ import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, useToast } fr
 export interface UnsubscribeTarget {
     readonly kind: core.UnsubscribeOffer["kind"];
     readonly url: string;
+    /** Whether the sender published this or Polaris read it out of the message.
+     *  What the dialog promises depends on it. */
+    readonly source: core.UnsubscribeOffer["source"];
     /** Who the mail is from, for the sentence in the dialog and the toast. */
     readonly sender: string;
     /** The registry row, when the press came from the subscriptions screen. */
@@ -183,9 +195,11 @@ export function UnsubscribeButton({
                         </p>
                     ) : (
                         <p className="text-[13px] text-muted-foreground">
-                            {target.kind === "mailto"
-                                ? "Polaris will send them a message from this mailbox asking to be taken off. Nothing else is shared with them."
-                                : "Polaris will tell their server directly. Nothing is opened, and they learn nothing about you that this message did not already carry."}
+                            {target.kind !== "mailto"
+                                ? "Polaris will tell their server directly. Nothing is opened, and they learn nothing about you that this message did not already carry."
+                                : target.source === "body"
+                                  ? `Polaris will send a message from this mailbox to an address it found inside the mail, not in a header ${target.sender} published. If the mail was not really from them, sending it tells whoever wrote it that this address is read.`
+                                  : "Polaris will send them a message from this mailbox asking to be taken off. Nothing else is shared with them."}
                         </p>
                     )}
 

@@ -56,6 +56,11 @@ export interface ReadableMessage {
     /** Which of the three ways out it is, so the reading pane can do it rather
      *  than only link to it. "" alongside an empty `unsubscribe`. */
     readonly unsubscribeKind: core.UnsubscribeOffer["kind"] | "";
+    /** Whether the sender published it or Polaris read it out of the message.
+     *  Carried to the screen because the two are not equally trustworthy: a
+     *  header is a promise, and an address found in a body is whatever was
+     *  written in a body - including by somebody fishing for a live mailbox. */
+    readonly unsubscribeSource: core.UnsubscribeOffer["source"] | "";
 }
 
 /** The account settings this reads. */
@@ -160,7 +165,8 @@ export async function readableMessage(
         trackerVendors: policy.nameTrackers ? core.trackerVendors(trackers) : [],
         wantsReceipt: message.wantsReceipt,
         unsubscribe: offer?.url ?? "",
-        unsubscribeKind: offer?.kind ?? ""
+        unsubscribeKind: offer?.kind ?? "",
+        unsubscribeSource: offer?.source ?? ""
     };
 }
 

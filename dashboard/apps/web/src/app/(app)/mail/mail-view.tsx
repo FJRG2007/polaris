@@ -2091,6 +2091,7 @@ function ThreadRow({
                                 target={{
                                     kind: thread.unsubscribeKind,
                                     url: thread.unsubscribe,
+                                    source: thread.unsubscribeSource || "header",
                                     sender: people(thread, mine),
                                     messageId: thread.leadMessageId
                                 }}

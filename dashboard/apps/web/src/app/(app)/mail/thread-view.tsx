@@ -714,6 +714,7 @@ function MessageCard({
                                         target={{
                                             kind: readable.unsubscribeKind,
                                             url: readable.unsubscribe,
+                                            source: readable.unsubscribeSource || "header",
                                             sender: sender
                                                 ? core.addressLabel(sender)
                                                 : "this sender",

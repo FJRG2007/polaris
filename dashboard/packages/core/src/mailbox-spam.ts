@@ -145,6 +145,17 @@ export interface SpamKnowledge {
      * yet, which is every mailbox on its first day.
      */
     readonly contentScore: number;
+    /**
+     * What somebody outside this mailbox says about the sender - a reputation
+     * provider the operator configured, already asked and already turned into
+     * signals by the half of the filter that can reach the network.
+     *
+     * Absent is the normal case: no provider configured, none that had heard of
+     * this sender, or one that did not answer. Silence contributes nothing at
+     * all rather than a small penalty, which is why this is a list and not a
+     * number.
+     */
+    readonly outside?: readonly SpamSignal[];
 }
 
 export interface SpamReputation {
@@ -304,6 +315,18 @@ export function authenticationSignals(
     return signals;
 }
 
+/**
+ * The `/.well-known/` names a real service links a PERSON to.
+ *
+ * Almost nothing in that directory is meant to be followed by hand, which is why
+ * a link into it is worth points at all - but these few are, and they turn up in
+ * exactly the mail that must not be filed as junk. `change-password` is the
+ * W3C's registered address for "change your password here" and is what a
+ * password or breach notice links to; `security.txt` is what a disclosure page
+ * points at. Written without the leading slash, which is how they are compared.
+ */
+const HUMAN_WELL_KNOWN: readonly string[] = ["change-password", "security.txt"];
+
 /** Link shorteners, which are not evidence on their own and are evidence
  *  alongside anything else: their whole purpose is that the destination cannot
  *  be read. */
@@ -357,15 +380,19 @@ export function urlSignals(message: JudgeableMessage): SpamSignal[] {
             reason: "A link hides where it goes behind a shortener"
         });
     }
-    // A link into `/.well-known/`. That directory exists so that machines can
-    // find a site's certificate challenges, its security contact and its app
-    // associations - nobody has ever had a reason to send a person a link into
-    // it. What puts one in an email is a phishing kit dropped on a server
-    // somebody else owns: `.well-known` is writable on a badly configured host,
-    // it is excluded from most site scans, and it survives longer there than
-    // anywhere else on the domain. `/.well-known/css/` and `/.well-known/pki/`
-    // are the two that turn up most.
-    if (/https?:\/\/[^\s"'<>)\]]*\/\.well-known\//i.test(`${message.bodyHtml} ${message.bodyText}`)) {
+    // A link into `/.well-known/`, other than the few names that were registered
+    // for a person to follow. That directory exists so that machines can find a
+    // site's certificate challenges, its security contact and its app
+    // associations, and what puts one of THOSE in an email is a phishing kit
+    // dropped on a server somebody else owns: `.well-known` is writable on a
+    // badly configured host, it is excluded from most site scans, and it
+    // survives longer there than anywhere else on the domain.
+    // `/.well-known/css/` and `/.well-known/pki/` are the two that turn up most.
+    if (
+        [...`${message.bodyHtml} ${message.bodyText}`.matchAll(
+            /https?:\/\/[^\s"'<>)\]]*\/\.well-known\/([^\s"'<>)\]\/?#]*)/gi
+        )].some((match) => !HUMAN_WELL_KNOWN.includes((match[1] ?? "").toLowerCase()))
+    ) {
         signals.push({
             id: "url_well_known",
             score: 20,
@@ -732,7 +759,11 @@ export function judgeSpam(message: JudgeableMessage, known: SpamKnowledge): Spam
         ...urlSignals(message),
         ...subjectSignals(message),
         ...structureSignals(message),
-        ...relationshipSignals(known)
+        ...relationshipSignals(known),
+        // Whatever a provider outside this mailbox said. Added as ordinary
+        // signals so an outside opinion is weighed against the rest rather than
+        // overriding it, and so it shows up in the reasons like anything else.
+        ...(known.outside ?? [])
     ];
     const reputation = reputationSignal(known);
     if (reputation) signals.push(reputation);

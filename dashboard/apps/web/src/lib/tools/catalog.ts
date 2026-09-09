@@ -62,7 +62,8 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
             "Turn a spreadsheet into CSV, and back",
             "Read what the file says about itself"
         ],
-        permission: "tools.use"
+        permission: "tools.use",
+        soon: true
     },
     {
         id: "video",

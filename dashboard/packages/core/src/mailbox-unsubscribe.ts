@@ -220,7 +220,13 @@ export interface UnsubscribeMail {
  * and the same word goes in the body for the ones that read that instead.
  *
  * Parsed by hand rather than with `URL`, which does not break a mailto into its
- * address and its query - to it the whole thing is one opaque path.
+ * address and its query - to it the whole thing is one opaque path. The query is
+ * parsed by hand too, and `URLSearchParams` is deliberately not used for it: it
+ * reads a `+` as a space, which is right for a form submission and wrong here.
+ * RFC 6068 says a mailto's fields are percent-encoded and nothing else, so
+ * `?subject=unsubscribe+list-42` names the subject `unsubscribe+list-42`. Losing
+ * that plus mangles the one string the robot at the other end matches on, and
+ * the message that gets sent does nothing while Polaris reports it as sent.
  */
 export function unsubscribeMailto(url: string): UnsubscribeMail | null {
     const bare = url.trim();
@@ -232,21 +238,47 @@ export function unsubscribeMailto(url: string): UnsubscribeMail | null {
     const address = decodeField((split === -1 ? rest : rest.slice(0, split)).split(",")[0] ?? "");
     if (!address.includes("@")) return null;
 
-    const query = new URLSearchParams(split === -1 ? "" : rest.slice(split + 1));
-    const subject = decodeField(query.get("subject") ?? "") || "unsubscribe";
-    const body = decodeField(query.get("body") ?? "") || "unsubscribe";
-    return { address: address.toLowerCase(), subject, body };
+    const fields = mailtoFields(split === -1 ? "" : rest.slice(split + 1));
+    return {
+        address: address.toLowerCase(),
+        subject: fields.subject || "unsubscribe",
+        body: fields.body || "unsubscribe"
+    };
 }
 
-/** Percent-decoding that survives a malformed escape, which a mailto written by
- *  hand routinely carries. */
-function decodeField(value: string): string {
-    const plain = value.trim();
-    try {
-        return decodeURIComponent(plain);
-    } catch {
-        return plain;
+/** The `name=value` pairs after the `?`, each decoded exactly once. */
+function mailtoFields(query: string): Record<string, string> {
+    const fields: Record<string, string> = {};
+    for (const pair of query.split("&")) {
+        if (!pair) continue;
+        const at = pair.indexOf("=");
+        const name = decodeField(at === -1 ? pair : pair.slice(0, at)).toLowerCase();
+        if (name && !(name in fields)) fields[name] = decodeField(at === -1 ? "" : pair.slice(at + 1));
     }
+    return fields;
+}
+
+/**
+ * Percent-decoding that survives a malformed escape, which a mailto written by
+ * hand routinely carries.
+ *
+ * Done a run of escapes at a time rather than over the whole string, because a
+ * sale newsletter puts a bare `%` in its subject - `?subject=100%%20off` - and
+ * `decodeURIComponent` refuses the entire value over it. One bad escape must
+ * cost that escape and nothing else, or the subject the robot matches on comes
+ * back with every other escape still in it.
+ *
+ * A run rather than a single `%XX` because anything outside ASCII is several of
+ * them in a row and they only mean a character together.
+ */
+function decodeField(value: string): string {
+    return value.trim().replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+        try {
+            return decodeURIComponent(run);
+        } catch {
+            return run;
+        }
+    });
 }
 
 /** Accents off, one space between words, lower case - the form everything here

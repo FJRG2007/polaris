@@ -26,7 +26,15 @@ import { useDisplayFormat } from "@/components/display-format";
 import { Button, EmptyState, Input, useToast } from "@polaris/ui";
 import type { MailSubscriptionView } from "@/lib/mailbox/subscriptions";
 
-export function SubscriptionsView({ subscriptions }: { subscriptions: MailSubscriptionView[] }) {
+export function SubscriptionsView({
+    subscriptions,
+    capped = false
+}: {
+    subscriptions: MailSubscriptionView[];
+    /** Set when the read hit its bound, so the screen says the list is not the
+     *  whole of it instead of implying it is. */
+    capped?: boolean;
+}) {
     const { accounts } = useMail();
     const format = useDisplayFormat();
     const [query, setQuery] = useState("");
@@ -50,6 +58,7 @@ export function SubscriptionsView({ subscriptions }: { subscriptions: MailSubscr
             <p className="mt-1 text-[13px] text-muted-foreground">
                 Senders that publish a way off their list. Polaris notes them as their mail arrives,
                 so this is everything it has seen rather than everything you ever signed up to.
+                {capped ? " Only the ones that wrote most recently are shown." : ""}
             </p>
 
             {accounts.length === 0 ? (
@@ -169,6 +178,11 @@ function Row({
                         {subscription.stillSending ? ", and they have written since." : "."}
                     </span>
                 ) : null}
+                {subscription.source === "body" ? (
+                    <span className="block text-[12px] text-foreground-subtle">
+                        Found in their message rather than published as a header.
+                    </span>
+                ) : null}
             </span>
 
             {subscription.stillSending ? (
@@ -203,6 +217,7 @@ function Row({
                 target={{
                     kind: subscription.kind,
                     url: subscription.url,
+                    source: subscription.source,
                     sender: name,
                     subscriptionId: subscription.id
                 }}

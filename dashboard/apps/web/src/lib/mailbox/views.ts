@@ -116,6 +116,10 @@ export interface MailThreadView {
      *  linking: a sender publishing RFC 8058 one-click is left without opening
      *  anything. "" alongside an empty `unsubscribe`. */
     readonly unsubscribeKind: core.UnsubscribeOffer["kind"] | "";
+    /** Whether the sender published it or Polaris read it out of the message.
+     *  A header is a promise; a body is a guess, and the screen says so before
+     *  it does anything from this mailbox on the strength of it. */
+    readonly unsubscribeSource: core.UnsubscribeOffer["source"] | "";
     readonly labels: readonly { id: string; name: string; color: string }[];
     /** The message to open when the row is clicked: the newest one in the
      *  folder being looked at, so opening a conversation from Sent lands on
@@ -298,6 +302,7 @@ export async function listThreads(
             lastMessageAt: thread.lastMessageAt.toISOString(),
             unsubscribe: offer?.url ?? "",
             unsubscribeKind: offer?.kind ?? "",
+            unsubscribeSource: offer?.source ?? "",
             labels: (thread.messages[0]?.labels ?? []).map((applied) => ({
                 id: applied.label.id,
                 name: applied.label.name,
@@ -582,6 +587,7 @@ export async function readThreadView(
             lastMessageAt: newest.sentAt,
             unsubscribe: "",
             unsubscribeKind: "",
+            unsubscribeSource: "",
             labels: [],
             leadMessageId: newest.id
         },

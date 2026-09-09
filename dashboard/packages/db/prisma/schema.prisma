@@ -4255,32 +4255,18 @@ model WafBan {
 /// A bulk address list Polaris fetches and republishes to the edge: the Tor exit
 /// list today, any other feed later. One row per feed, holding the whole list, so a
 /// refresh is one write and a stale feed is one timestamp to look at.
-// What a reputation provider last said about one address, whatever it said.
-//
-// The firewall used to remember only the addresses a provider flagged, because a
-// flag becomes a ban and a ban is a row. An address that came back clean left
-// nothing behind, so it was "not seen before" on the very next sweep - and the
-// sweep runs every thirty seconds over the same log window. Twenty-five lookups a
-// pass, twice a minute, forever: the same handful of ordinary visitors, asked
-// about seventy thousand times a day. This table is the other half of that
-// answer, and it is what makes a lookup something that happens once per address
-// rather than once per pass.
-//
-// `rules` is the deny list the verdict was reached under, so changing what counts
-// as bad re-asks rather than serving an answer to a different question.
 // One reputation cache for the whole platform, whatever was looked up.
 //
-// The firewall and share links already remembered what a provider said about an
-// address. Mail asks the same kind of question about two more subjects - the
-// address a message came from, and the domain behind it - and there is no reason
-// for those to be a second cache with its own expiry and its own thing for an
-// administrator to clear.
+// The key is the question rather than an address: a kind, the value, and the
+// provider that answered it. A domain the mail filter paid to look up is a
+// domain nothing else has to buy again, and an administrator has one table to
+// clear rather than one per feature.
 //
-// So the key is the question rather than an address: a kind, the value, and the
-// provider that answered it. A lookup paid for by the mail filter answers the
-// firewall's next question and the other way round, which is the point - both
-// pay per request, and a domain does not get to be reputable for one half of
-// Polaris and not the other.
+// Mail is what reads and writes it today - the address a message came from and
+// the domain behind it. `AddressReputation` below is the firewall's older cache
+// of the same kind of answer about an address, and it is still what the firewall
+// and share links use; it belongs here, under `kind = "ip"`, and moving it is
+// the reason this table takes a kind at all.
 //
 // `rules` is the question the verdict was reached under. Changing what counts as
 // bad is a different question, so it is asked again rather than answered out of
@@ -4302,6 +4288,19 @@ model SubjectReputation {
     @@index([kind, checkedAt])
 }
 
+// What a reputation provider last said about one address, whatever it said.
+//
+// The firewall used to remember only the addresses a provider flagged, because a
+// flag becomes a ban and a ban is a row. An address that came back clean left
+// nothing behind, so it was "not seen before" on the very next sweep - and the
+// sweep runs every thirty seconds over the same log window. Twenty-five lookups a
+// pass, twice a minute, forever: the same handful of ordinary visitors, asked
+// about seventy thousand times a day. This table is the other half of that
+// answer, and it is what makes a lookup something that happens once per address
+// rather than once per pass.
+//
+// `rules` is the deny list the verdict was reached under, so changing what counts
+// as bad re-asks rather than serving an answer to a different question.
 model AddressReputation {
     ip        String   @id
     provider  String

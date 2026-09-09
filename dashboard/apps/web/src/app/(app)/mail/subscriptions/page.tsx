@@ -13,12 +13,17 @@
 import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { SubscriptionsView } from "./subscriptions-view";
-import { listSubscriptions } from "@/lib/mailbox/subscriptions";
+import { MOST_SUBSCRIPTIONS, listSubscriptions } from "@/lib/mailbox/subscriptions";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailSubscriptionsPage() {
     const user = await requirePermission("mail.use");
     const subscriptions = await listSubscriptions(user.id, await scopeOrgIdFor(user.id));
-    return <SubscriptionsView subscriptions={subscriptions} />;
+    return (
+        <SubscriptionsView
+            subscriptions={subscriptions}
+            capped={subscriptions.length >= MOST_SUBSCRIPTIONS}
+        />
+    );
 }

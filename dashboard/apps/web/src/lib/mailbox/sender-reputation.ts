@@ -5,14 +5,17 @@
  * this address one that defrauds people or cannot receive mail at all (Dymo),
  * and is the domain behind it one the security engines have flagged
  * (VirusTotal). Both are billed per request, so both go through the platform's
- * one reputation cache - which the firewall reads and writes too, so a domain
- * looked up here is a domain the firewall does not pay to look up again.
+ * one reputation cache (`lib/reputation`), which is keyed on the question rather
+ * than on who asked it - so the same domain is bought once however many times
+ * Polaris wants to know about it.
  *
- * **Nothing here is on the path of a message arriving.** The filter's own
- * judgement is local, immediate and complete; this is asked afterwards, and what
- * it finds adjusts a score that already exists. That ordering is deliberate: a
- * provider being slow, rate-limited or unconfigured must never be the reason
- * somebody's mail is late, and none of these answers is worth waiting for.
+ * **Nothing here decides whether a message arrives.** It is read by
+ * `knowledgeFor` alongside what the mailbox already knows about the sender, and
+ * what it answers is added to the local judgement as ordinary signals rather
+ * than overriding it. Every path through it that cannot answer answers nothing:
+ * a provider that is unconfigured, out of quota, slow or broken leaves the
+ * filter with exactly the verdict it would have reached on its own, and the
+ * caller catches whatever this throws.
  *
  * **Silence is not an accusation.** A provider that is not configured, is out of
  * quota, or has never heard of a domain contributes nothing at all - not a small
@@ -50,16 +53,30 @@ const WEIGHTS = {
     addressClean: -4
 } as const;
 
-/** The provider names the cache stores these under. Shared with the firewall,
- *  which is the point of naming them here rather than at each call. */
+/** The provider names the cache stores these under. Named here rather than at
+ *  each call so one string decides what a remembered answer is filed under. */
 const DYMO = "dymo";
 const VIRUSTOTAL = "virustotal";
+
+/**
+ * How long the filter will wait for an outside opinion before going without it.
+ *
+ * This runs once per arriving message inside the sync, so the cost of a provider
+ * having a bad afternoon is paid on every message in the pass. One of the two
+ * SDKs sets no deadline of its own, and a request with no deadline is the one
+ * that stops a mailbox syncing. Four seconds is far longer than either takes
+ * when it is working, and short enough that a thousand messages behind a broken
+ * provider is a slow sync rather than a stopped one.
+ */
+const MOST_WAIT_MS = 4000;
 
 /**
  * Ask about one sender, using what is already known wherever possible.
  *
  * Answers an empty list when neither provider is configured, which is the normal
- * case and costs one settings read.
+ * case and costs one settings read. Also answers an empty list when a provider
+ * is simply taking too long: what it had to say was never worth delaying
+ * somebody's mail for.
  */
 export async function senderReputation(fromAddress: string): Promise<ReputationFinding[]> {
     const address = fromAddress.trim().toLowerCase();
@@ -68,22 +85,53 @@ export async function senderReputation(fromAddress: string): Promise<ReputationF
     if (!domain) return [];
 
     const findings: ReputationFinding[] = [];
-    const [fromDomain, fromAddressCheck] = await Promise.all([
-        domainOpinion(domain),
-        addressOpinion(address)
-    ]);
+    const [fromDomain, fromAddressCheck] = await inTime(
+        Promise.all([domainOpinion(domain), addressOpinion(address)])
+    );
     if (fromDomain) findings.push(fromDomain);
     if (fromAddressCheck) findings.push(fromAddressCheck);
     return findings;
 }
 
-/** What the security engines say about the domain, cached. */
+/** The pair of opinions, or neither of them once the deadline passes. The work
+ *  is not cancelled - what it writes to the cache is still worth having for the
+ *  next message from that sender. */
+function inTime(
+    work: Promise<[ReputationFinding | null, ReputationFinding | null]>
+): Promise<[ReputationFinding | null, ReputationFinding | null]> {
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve([null, null]), MOST_WAIT_MS);
+        // Never holds the process open on its own account: this is a deadline on
+        // work somebody is already waiting for.
+        timer.unref?.();
+        void work.then(
+            (answer) => {
+                clearTimeout(timer);
+                resolve(answer);
+            },
+            () => {
+                clearTimeout(timer);
+                resolve([null, null]);
+            }
+        );
+    });
+}
+
+/**
+ * What the security engines say about the domain, cached.
+ *
+ * The integration is asked about before the cache is, so turning VirusTotal off
+ * stops it counting straight away rather than a fortnight from now when the last
+ * remembered answer expires. It is also the cheaper order in the case that
+ * happens on nearly every message: nothing configured, one settings read, done.
+ */
 async function domainOpinion(domain: string): Promise<ReputationFinding | null> {
+    const state = await getIntegrationState(VIRUSTOTAL);
+    if (!state?.enabled) return null;
+
     const known = await knownReputation("domain", domain, VIRUSTOTAL);
     if (known) return fromVerdict("domain", domain, known);
 
-    const state = await getIntegrationState(VIRUSTOTAL);
-    if (!state?.enabled) return null;
     const apiKey = await getIntegrationSecret(VIRUSTOTAL);
     if (!apiKey) return null;
 
@@ -105,13 +153,15 @@ async function domainOpinion(domain: string): Promise<ReputationFinding | null> 
     return fromVerdict("domain", domain, remembered);
 }
 
-/** What the address itself is, cached. */
+/** What the address itself is, cached. Asked in the same order as the domain,
+ *  and for the same two reasons. */
 async function addressOpinion(address: string): Promise<ReputationFinding | null> {
+    const state = await getIntegrationState(DYMO);
+    if (!state?.enabled) return null;
+
     const known = await knownReputation("email", address, DYMO, MAIL_DENY_RULES);
     if (known) return fromVerdict("email", address, known);
 
-    const state = await getIntegrationState(DYMO);
-    if (!state?.enabled) return null;
     const apiKey = await getIntegrationSecret(DYMO);
     if (!apiKey) return null;
 

@@ -39,12 +39,11 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ error: "Tools is not installed." }, { status: 404 });
 
     const url = new URL(request.url);
-    const body = await request.arrayBuffer();
-    if (body.byteLength === 0)
-        return NextResponse.json({ error: "No picture was sent." }, { status: 400 });
-    if (body.byteLength > MOST_IMAGE_BYTES)
+    const bytes = await readUpload(request);
+    if (bytes === "too-large")
         return NextResponse.json({ error: "This picture is too large." }, { status: 413 });
-    const bytes = new Uint8Array(body);
+    if (bytes.byteLength === 0)
+        return NextResponse.json({ error: "No picture was sent." }, { status: 400 });
 
     if (url.searchParams.get("op") === "facts") {
         try {
@@ -80,4 +79,48 @@ export async function POST(request: Request): Promise<Response> {
     } catch {
         return NextResponse.json({ error: "That picture could not be read." }, { status: 422 });
     }
+}
+
+/**
+ * The upload, or `too-large` before it has all arrived.
+ *
+ * Read off the stream with a running total rather than through
+ * `arrayBuffer()`, because that buffers the whole thing first: a limit checked
+ * after the allocation is a limit that never prevents the allocation it exists
+ * for, and a handful of large POSTs from anyone holding `tools.use` would be
+ * the container's heap. The declared length is trusted only to refuse early -
+ * it can be absent or a lie, so the count over the bytes actually read is what
+ * decides.
+ */
+async function readUpload(request: Request): Promise<Uint8Array | "too-large"> {
+    if (Number(request.headers.get("content-length") ?? "0") > MOST_IMAGE_BYTES) return "too-large";
+    const stream = request.body;
+    if (!stream) return new Uint8Array(0);
+
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (!value) continue;
+            total += value.byteLength;
+            if (total > MOST_IMAGE_BYTES) {
+                await reader.cancel().catch(() => undefined);
+                return "too-large";
+            }
+            chunks.push(value);
+        }
+    } finally {
+        reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(total);
+    let at = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.byteLength;
+    }
+    return bytes;
 }

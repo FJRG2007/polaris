@@ -174,6 +174,37 @@ export async function recordSubscription(
 /* Reading                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * How many senders the screen is given.
+ *
+ * The screen filters what it has in the browser, so the whole answer travels in
+ * the page - every row of it carrying an unsubscribe address. That is fine at
+ * the size this actually reaches, and a bound is what keeps it that way: a
+ * mailbox that has been collecting since 2009 is not owed an unbounded read and
+ * a megabyte of payload to draw a list nobody scrolls past the top of.
+ *
+ * Ordered by who wrote last, so what a cap drops is the senders who stopped
+ * writing years ago - and the screen says so when it is reached rather than
+ * quietly showing a shorter list than it has.
+ */
+export const MOST_SUBSCRIPTIONS = 500;
+
+/** Only what `asView` reads. The row carries more - when it was first seen, the
+ *  timestamps - and none of it is drawn. */
+const VIEW_SELECT = {
+    id: true,
+    accountId: true,
+    sender: true,
+    senderName: true,
+    listId: true,
+    kind: true,
+    source: true,
+    url: true,
+    messageCount: true,
+    lastMessageAt: true,
+    unsubscribedAt: true
+} as const;
+
 /** Everything this shelf's mailboxes are subscribed to, busiest sender last
  *  heard from first. */
 export async function listSubscriptions(
@@ -185,7 +216,9 @@ export async function listSubscriptions(
 
     const rows = await prisma.mailSubscription.findMany({
         where: { accountId: { in: accountIds } },
-        orderBy: { lastMessageAt: "desc" }
+        orderBy: { lastMessageAt: "desc" },
+        select: VIEW_SELECT,
+        take: MOST_SUBSCRIPTIONS
     });
     return rows.map(asView);
 }

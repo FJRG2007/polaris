@@ -52,6 +52,30 @@ describe("an ordinary message", () => {
         expect(judged.reason).toBe("");
     });
 
+    it("counts what a provider outside this mailbox said, and nothing when it said nothing", () => {
+        // The lookups happen in the app, which can reach the network; what
+        // arrives here is already a list of signals, and an empty one is the
+        // normal case - no provider configured, or none that had heard of the
+        // sender.
+        expect(spam.judgeSpam(message(), knows({ outside: [] })).score).toBe(
+            spam.judgeSpam(message(), knows()).score
+        );
+        const flagged = spam.judgeSpam(
+            message(),
+            knows({
+                outside: [
+                    {
+                        id: "domain_reputation_flagged",
+                        score: 30,
+                        reason: "example.net is flagged by security engines"
+                    }
+                ]
+            })
+        );
+        expect(flagged.signals.map((one) => one.id)).toContain("domain_reputation_flagged");
+        expect(flagged.score).toBeGreaterThan(spam.judgeSpam(message(), knows()).score);
+    });
+
     it("is not accused because its server writes no authentication headers", () => {
         // Plenty of small mail servers write none at all. Reading their absence
         // as a failure would mark most mail from small domains as junk.
@@ -156,6 +180,38 @@ describe("the links in it", () => {
     it("notices a bare address instead of a name", () => {
         const found = spam.urlSignals(message({ bodyText: "http://203.0.113.9/login" }));
         expect(found.map((one) => one.id)).toContain("url_ip_literal");
+    });
+
+    it("notices one dropped into a directory meant for machines", () => {
+        const found = spam.urlSignals(
+            message({ bodyText: "https://shop.example.com/.well-known/pki/login.html" })
+        );
+        expect(found.map((one) => one.id)).toContain("url_well_known");
+    });
+
+    it("leaves the two names in there a person is meant to follow", () => {
+        // `/.well-known/change-password` is where the W3C says "change your
+        // password" points, so it arrives in exactly the security mail that must
+        // not be pushed towards junk by linking to it.
+        const found = spam.urlSignals(
+            message({ bodyText: "https://accounts.example.com/.well-known/change-password" })
+        );
+        expect(found.map((one) => one.id)).not.toContain("url_well_known");
+        expect(
+            spam
+                .urlSignals(message({ bodyText: "https://example.com/.well-known/security.txt" }))
+                .map((one) => one.id)
+        ).not.toContain("url_well_known");
+    });
+
+    it("still says so when a message carries one of each", () => {
+        const found = spam.urlSignals(
+            message({
+                bodyText:
+                    "https://example.com/.well-known/change-password and https://example.com/.well-known/css/a.html"
+            })
+        );
+        expect(found.map((one) => one.id)).toContain("url_well_known");
     });
 
     it("has nothing to say about a message with no links", () => {

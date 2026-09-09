@@ -620,13 +620,20 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // word that is selling something: half of these arrive dressed as an offer -
     // "your plan renews, and here is 20% off the annual one" - and the half a
     // reader needs is the renewal.
+    //
+    // Everything under it is asked twice: once for the messages that are only
+    // transactional, and again at the bottom for the ones that are also selling
+    // something. Between the two sits the offer, so a campaign that mentions a
+    // ticket or a receipt on its way to selling a ticket stays in Promotions -
+    // which is where it was before the purchase words were split out, and where
+    // somebody looking for what they spent does not want it.
     if (billed) return "billing";
-    if (transactional) return "updates";
-    if (purchased) return "billing";
     if (transactional && !promotional) return "updates";
+    if (purchased && !promotional) return "billing";
     if (bulk && promotional) return "promotions";
     if (bulk) return "updates";
     if (transactional) return "updates";
+    if (purchased) return "billing";
 
     // Not bulk, nothing recognised - somebody wrote this.
     return "primary";

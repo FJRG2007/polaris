@@ -8,11 +8,15 @@
  * without this every one of them was buying answers Polaris already had.
  *
  * So the key is the QUESTION rather than the asker: a kind, the value, and the
- * provider that answered. A domain the mail filter paid to look up answers the
- * firewall's next question about it, and the other way round. It also means an
- * administrator has one place to clear rather than one per feature - and one
- * fact about a domain, rather than Polaris believing two different things about
- * it depending on which screen is asking.
+ * provider that answered. It means an administrator has one place to clear
+ * rather than one per feature - and one fact about a domain, rather than Polaris
+ * believing two different things about it depending on which screen is asking.
+ *
+ * **The mail filter is what uses it today.** The firewall and share links still
+ * read and write `lib/address-reputation`, which is the same idea for an address
+ * and predates this. Their questions belong here under `kind: "ip"`, and that is
+ * what the kind is for; until they are moved, the two caches do not answer each
+ * other and nothing here should be read as if they did.
  *
  * **Nothing here decides anything.** What is stored is what the provider said,
  * not what Polaris did about it, so a rule change is applied to a remembered

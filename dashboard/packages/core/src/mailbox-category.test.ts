@@ -408,4 +408,26 @@ describe("a purchase, recognised by what it says", () => {
             "billing"
         );
     });
+
+    it("leaves a campaign that mentions one where a campaign belongs", () => {
+        // Splitting the receipt words out of the transactional pile must not
+        // move bulk mail that is plainly selling something: an offer on tickets
+        // is an offer, and a sale that thanks you for a past purchase on its way
+        // to the discount is still a sale.
+        const bulk = (subject: string, snippet: string) =>
+            categoriseMail(
+                message({
+                    subject,
+                    snippet,
+                    fromAddress: "news@shop.example",
+                    headers: { "list-unsubscribe": "<https://shop.example/out>" }
+                })
+            );
+        expect(bulk("Save 30% on your next ticket", "Book now, offer ends Sunday")).toBe(
+            "promotions"
+        );
+        expect(bulk("20% off, just for you", "Thank you for your purchase last month")).toBe(
+            "promotions"
+        );
+    });
 });

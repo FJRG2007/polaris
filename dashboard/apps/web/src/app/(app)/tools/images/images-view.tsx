@@ -93,8 +93,14 @@ export function ImagesView() {
     // otherwise be fifty of them.
     useEffect(() => {
         if (!file || !facts) return;
+        // Owned by the effect, not by the timer callback: a return value from
+        // inside `setTimeout` is thrown away, so a flag flipped there is a flag
+        // that is never false. It is the cleanup below that has to flip it -
+        // otherwise a slow encode overwrites the newer one that superseded it,
+        // and one that lands after the screen is gone sets state and leaks the
+        // object URL it made.
+        let alive = true;
         const timer = setTimeout(() => {
-            let alive = true;
             setWorking(true);
             void (async () => {
                 try {
@@ -125,11 +131,11 @@ export function ImagesView() {
                     if (alive) setWorking(false);
                 }
             })();
-            return () => {
-                alive = false;
-            };
         }, 250);
-        return () => clearTimeout(timer);
+        return () => {
+            alive = false;
+            clearTimeout(timer);
+        };
     }, [file, facts, format, quality, longest, keepMetadata, toast]);
 
     useEffect(
