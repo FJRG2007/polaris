@@ -102,7 +102,10 @@ export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
             lines.push(escapeMarkdown(text), "");
         }
     }
-    return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
+    return `${lines
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trimEnd()}\n`;
 }
 
 /** A table, as Markdown. The separator row is what makes it a table rather than

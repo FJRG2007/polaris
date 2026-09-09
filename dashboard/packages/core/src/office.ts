@@ -288,7 +288,10 @@ export const OFFICE_SORT_LABELS: Record<OfficeSort, string> = {
     title: "Name"
 };
 
-export function readOfficeSort(value: unknown, fallback: OfficeSort = DEFAULT_OFFICE_SORT): OfficeSort {
+export function readOfficeSort(
+    value: unknown,
+    fallback: OfficeSort = DEFAULT_OFFICE_SORT
+): OfficeSort {
     return (OFFICE_SORTS as readonly unknown[]).includes(value) ? (value as OfficeSort) : fallback;
 }
 

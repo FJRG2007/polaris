@@ -190,7 +190,10 @@ export async function writePptx(
             /<Relationship[^>]*relationships\/slide"[^>]*\/>/g,
             ""
         );
-        zip.file("ppt/_rels/presentation.xml.rels", relsXml.replace("</Relationships>", `${links}</Relationships>`));
+        zip.file(
+            "ppt/_rels/presentation.xml.rels",
+            relsXml.replace("</Relationships>", `${links}</Relationships>`)
+        );
     }
 
     // Every slide past the first needs its content type declared, or a reader
@@ -204,10 +207,7 @@ export async function writePptx(
                     `<Override PartName='/ppt/slides/slide${index + 2}.xml' ContentType='application/vnd.openxmlformats-officedocument.presentationml.slide+xml'/>`
             )
             .join("");
-        const types = (await typesPart.async("string")).replace(
-            "</Types>",
-            `${overrides}</Types>`
-        );
+        const types = (await typesPart.async("string")).replace("</Types>", `${overrides}</Types>`);
         zip.file("[Content_Types].xml", types);
     }
 

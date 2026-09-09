@@ -113,7 +113,10 @@ function sheetGrids(doc: Y.Doc): { name: string; rows: string[][] }[] {
         if (!at) continue;
         const held = bySheet.get(at.sheetId) ?? new Map<string, string>();
         const value = cell?.v;
-        held.set(`${at.row}:${at.column}`, value === undefined || value === null ? "" : String(value));
+        held.set(
+            `${at.row}:${at.column}`,
+            value === undefined || value === null ? "" : String(value)
+        );
         bySheet.set(at.sheetId, held);
     }
 
@@ -155,7 +158,10 @@ function readCellKey(key: string): { sheetId: string; row: number; column: numbe
  * Generated ids are unreadable anyway, so they become "Sheet 1".
  */
 function sheetName(sheetId: string, index: number): string {
-    const cleaned = sheetId.replace(/[:\\/?*[\]]/g, " ").trim().slice(0, 31);
+    const cleaned = sheetId
+        .replace(/[:\\/?*[\]]/g, " ")
+        .trim()
+        .slice(0, 31);
     return /^[0-9a-f-]{8,}$/i.test(sheetId) || !cleaned ? `Sheet ${index}` : cleaned;
 }
 
@@ -237,7 +243,11 @@ export async function exportDocument(
         if (format === "md") return text(core.toMarkdown(title, blocks), "md");
         if (format === "html") return text(core.toHtml(title, blocks), "html");
         if (format === "docx") {
-            return { bytes: await writeDocx(title, blocks), filename: named("docx"), contentType: type };
+            return {
+                bytes: await writeDocx(title, blocks),
+                filename: named("docx"),
+                contentType: type
+            };
         }
         return null;
     }
