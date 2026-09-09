@@ -22,39 +22,73 @@
  * the kind of thing nobody notices until a document is printed.
  */
 
-import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { basename, dirname, join } from "node:path";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { copyFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 
-const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboard = join(here, "..", "..", "..");
-const target = join(here, "..", "public", "office-fonts");
+
+/**
+ * The formula stylesheet, resolved from the editor that declares KaTeX rather
+ * than from here.
+ *
+ * Resolving it from this app finds whichever copy npm hoisted to the root, which
+ * is today a different version pulled in by something else entirely. The faces
+ * staged from it would then belong to a different KaTeX than the one the Markdown
+ * editor's stylesheet was built from - and the Markdown editor builds this same
+ * sheet with `pkg:katex/dist/katex.min.css`, which resolves it the same way.
+ */
+export const katexSheet = createRequire(
+    join(dashboard, "packages", "genoffice-markdown", "package.json")
+).resolve("katex/dist/katex.min.css");
+
+/** The one path the browser asks this origin for. The editors' builds are
+ *  handed it as `--assets=<base>` and this step fills the directory it names, so
+ *  the two halves have to spell it the same way - hence one exported name rather
+ *  than the same string written in three places. */
+export const base = "/office-fonts";
+
+export const target = join(here, "..", "public", base.replace(/^\//, ""));
 
 /** Every directory that holds faces the editors' stylesheets name. Flat on
  *  purpose: two sheets referencing the same family by different paths - which is
  *  what `@genoffice/ui/fonts/Carlito-Regular.ttf` and `./Carlito-Regular.ttf`
  *  are - have to land on one file. */
-const sources = [
+export const sources = [
     join(dashboard, "packages", "genoffice-docs", "src", "renderer", "fonts"),
     join(dashboard, "packages", "genoffice-ui", "src", "fonts"),
-    join(dirname(require.resolve("katex/dist/katex.min.css")), "fonts")
+    join(dirname(katexSheet), "fonts")
 ];
 
-const FACE = /\.(ttf|otf|woff2?|eot)$/i;
+export const FACE = /\.(ttf|otf|woff2?|eot)$/i;
 
-rmSync(target, { recursive: true, force: true });
-mkdirSync(target, { recursive: true });
-
-let copied = 0;
-for (const source of sources) {
-    if (!existsSync(source)) continue;
-    for (const name of readdirSync(source)) {
-        if (!FACE.test(name)) continue;
-        copyFileSync(join(source, name), join(target, basename(name)));
-        copied += 1;
+/**
+ * Fill `into` with every face the sources hold, and throw if one of them has
+ * none.
+ *
+ * A source that has moved must stop the build rather than be skipped. Staging
+ * nothing is not a visible failure anywhere downstream: the stylesheets still
+ * ask for the files, the browser still gets a 404 for each, and every document
+ * is drawn in a fallback face at the wrong widths - which is the exact outcome
+ * this step exists to prevent, arrived at with a green build.
+ */
+export function stageFonts(into = target) {
+    rmSync(into, { recursive: true, force: true });
+    mkdirSync(into, { recursive: true });
+    let copied = 0;
+    for (const source of sources) {
+        const faces = readdirSync(source).filter((name) => FACE.test(name));
+        if (faces.length === 0) throw new Error(`No font files under ${source}`);
+        for (const name of faces) {
+            copyFileSync(join(source, name), join(into, basename(name)));
+            copied += 1;
+        }
     }
+    return copied;
 }
 
-console.log(`Copied ${copied} office font files to ${target}`);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    console.log(`Copied ${stageFonts()} office font files to ${target}`);
+}

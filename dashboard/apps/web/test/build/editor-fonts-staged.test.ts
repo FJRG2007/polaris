@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { pointAtAssets } from "../../../../scripts/scope-editor-styles.mjs";
+import { FACE, base, katexSheet, sources } from "../../scripts/copy-office-fonts.mjs";
 
 /**
  * The embedded editors' fonts, and the two halves that have to agree.
@@ -21,7 +21,6 @@ import { pointAtAssets } from "../../../../scripts/scope-editor-styles.mjs";
  * font, gets a 404, and draws the fallback without a word.
  */
 describe("the editors' fonts", () => {
-    const require = createRequire(import.meta.url);
     const dashboard = join(__dirname, "..", "..", "..", "..");
 
     describe("pointing a stylesheet at the staged files", () => {
@@ -42,11 +41,16 @@ describe("the editors' fonts", () => {
         it("leaves alone what already resolves on its own", () => {
             // A data URI IS the file - rewriting it points at nothing. A remote
             // one is somebody else's server, and this must not quietly decide to
-            // serve it from here.
+            // serve it from here. A root-absolute path and a `#` fragment are
+            // already answered by this origin and this document; flattened to a
+            // file name they would ask the font directory for an image, or for a
+            // filter that is not a file at all.
             for (const url of [
                 "url('data:image/svg+xml,%3Csvg%3E')",
                 "url(https://example.invalid/a.png)",
-                "url(//example.invalid/a.png)"
+                "url(//example.invalid/a.png)",
+                "url(/images/logo.svg)",
+                "url(#blur)"
             ]) {
                 expect(pointAtAssets(`a{background:${url}}`, "/f")).toContain(url);
             }
@@ -58,29 +62,52 @@ describe("the editors' fonts", () => {
     });
 
     describe("what the sheets ask for is what the build stages", () => {
-        /** The directories `copy-office-fonts.mjs` copies from, in its order. */
-        const sources = [
-            join(dashboard, "packages", "genoffice-docs", "src", "renderer", "fonts"),
-            join(dashboard, "packages", "genoffice-ui", "src", "fonts"),
-            join(require.resolve("katex/dist/katex.min.css"), "..", "fonts")
-        ];
-
+        /** What the staging step copies, asked of the staging step rather than
+         *  restated here. A second list would go on agreeing with the sheets
+         *  while the build agreed with neither, which is the divergence this
+         *  file exists to catch. */
         const staged = new Set(
-            sources
-                .filter((source) => existsSync(source))
-                .flatMap((source) => readdirSync(source))
-                .filter((name) => /\.(ttf|otf|woff2?|eot)$/i.test(name))
+            sources.flatMap((source) => readdirSync(source)).filter((name) => FACE.test(name))
         );
 
         /** Every file name a stylesheet asks this origin for. */
         const asked = (sheet: string): string[] =>
-            [...pointAtAssets(readFileSync(sheet, "utf8"), "/office-fonts").matchAll(
-                /url\('\/office-fonts\/([^']+)'\)/g
-            )].map((match) => match[1]);
+            [
+                ...pointAtAssets(readFileSync(sheet, "utf8"), base).matchAll(
+                    new RegExp(`url\\('${base}/([^']+)'\\)`, "g")
+                )
+            ].map((match) => match[1]);
+
+        it.each([
+            ["the Word editor", "genoffice-docs"],
+            ["the Markdown editor", "genoffice-markdown"]
+        ])("%s is built pointing at the directory this step fills", (_name, pkg) => {
+            // The other half of the agreement, and the one nothing else reads:
+            // the base in the build command has to be the directory the staging
+            // step creates under `public/`.
+            const manifest = JSON.parse(
+                readFileSync(join(dashboard, "packages", pkg, "package.json"), "utf8")
+            ) as { scripts: Record<string, string> };
+            expect(manifest.scripts.build).toContain(`--assets=${base}`);
+        });
+
+        it("builds the formula sheet from the KaTeX whose faces this step stages", () => {
+            // Resolved, not reached for through `node_modules`: the root holds a
+            // different version of KaTeX, put there by something else, and a
+            // stylesheet from one copy with the faces of another is a formula
+            // drawn in boxes.
+            const manifest = JSON.parse(
+                readFileSync(
+                    join(dashboard, "packages", "genoffice-markdown", "package.json"),
+                    "utf8"
+                )
+            ) as { scripts: Record<string, string> };
+            expect(manifest.scripts.build).toContain("pkg:katex/dist/katex.min.css");
+        });
 
         const sheets: [string, string][] = [
             ["the Word editor", join(dashboard, "packages", "genoffice-docs", "src", "renderer", "fonts", "fonts.css")],
-            ["formulas", require.resolve("katex/dist/katex.min.css")]
+            ["formulas", katexSheet]
         ];
 
         it.each(sheets)("%s asks for something", (_name, sheet) => {
