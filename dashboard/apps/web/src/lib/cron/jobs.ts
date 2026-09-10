@@ -45,6 +45,7 @@ import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
 import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
 import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
+import { ensureManagedCertificates } from "@/lib/tls/managed-certificates";
 import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
@@ -598,6 +599,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // already gone are both no-ops, so a second runner changes nothing.
         leaseMs: null,
         run: reconcilePrivateNetworks
+    },
+    {
+        key: "managed-certificates",
+        // A quarter of an hour. A pass with nothing due reads a few rows and
+        // writes nothing a server has not already got, and a domain proven or a
+        // token saved on a screen is picked up on this cadence if the pass that
+        // screen started was already running.
+        everyMs: Number(process.env.POLARIS_MANAGED_CERTS_MS) || 15 * MINUTE,
+        // Unleased here because the pass takes its own lease: a screen starts one
+        // as well, and both must hold the same one.
+        leaseMs: null,
+        run: ensureManagedCertificates
     },
     {
         key: "drive-transfers",

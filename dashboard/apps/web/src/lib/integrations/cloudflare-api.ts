@@ -269,25 +269,24 @@ export async function upsertSrvRecord(
 }
 
 /**
- * Write the TXT record an ACME DNS-01 challenge is answered with, returning its id so
- * the caller can take it away again.
+ * Add one TXT record beside whatever is already at that name, returning its id so
+ * the caller can take exactly that one away again.
  *
- * A short TTL because the record exists for the length of one validation and a long
- * one would keep a spent answer resolvable. Never proxied - Cloudflare's proxy is for
- * traffic, and this record is only ever read by a resolver.
+ * Never an update: a certificate for `example.com` and `*.example.com` is proven
+ * by two different answers published at the same `_acme-challenge` name at the
+ * same time, and rewriting the record in place leaves only the second - so the
+ * first validation reads the wrong value and the whole order fails. A short TTL
+ * because the record exists for the length of one validation.
  */
-export async function upsertTxtRecord(
-    token: string,
-    zoneId: string,
-    name: string,
-    content: string
-): Promise<string> {
-    return upsertRecord(token, zoneId, { type: "TXT", name, content, proxied: false, ttl: 60 });
-}
-
-/** Every TXT record at a name, so a challenge can clear the ones it wrote. */
-export function findTxtRecords(token: string, zoneId: string, name: string): Promise<CfDnsRecord[]> {
-    return findDnsRecords(token, zoneId, "TXT", name);
+export async function createTxtRecord(token: string, zoneId: string, name: string, content: string): Promise<string> {
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, {
+        type: "TXT",
+        name,
+        content,
+        ttl: 60
+    });
+    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
 }
 
 /** One record as a mail server's DNS needs to read it: an MX has a priority,

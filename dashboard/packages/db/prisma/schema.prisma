@@ -4907,14 +4907,51 @@ model OwnerDomain {
     checkedAt    DateTime?
     // Why the last check said what it did, in a sentence the owner can act on.
     checkDetail  String?
+    // Where its zone is hosted, for the DNS-01 challenge its wildcard certificate is
+    // proven with ("cloudflare"), and the API token that writes it - encrypted at
+    // rest. Null means the instance's own connected token, when that reaches it.
+    dnsProvider  String?
+    dnsToken     String?
     createdAt    DateTime  @default(now())
     updatedAt    DateTime  @updatedAt
 
-    user User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user         User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    org          Organization?        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    certificates ManagedCertificate[]
 
     @@index([userId])
     @@index([orgId])
+}
+
+// A wildcard certificate Polaris orders itself over DNS-01 and keeps renewed: one
+// per domain it covers (`<domain>` and `*.<domain>`), for an owner domain or for a
+// wildcard hostname a service answers on. The deploy base's own wildcard is not
+// here - it predates this and keeps its own files.
+model ManagedCertificate {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    domain        String    @unique
+    // "owner" (an owner domain) | "hostname" (a wildcard hostname on a service).
+    source        String
+    ownerDomainId String?   @db.Uuid
+    // pending | issued | failed
+    status        String    @default("pending")
+    certPem       String?
+    // Encrypted at rest like every other secret.
+    certKey       String?
+    expiresAt     DateTime?
+    lastAttemptAt DateTime?
+    // Not tried again before this, so a zone that keeps refusing backs off instead
+    // of spending the Let's Encrypt rate limit.
+    nextAttemptAt DateTime?
+    failures      Int       @default(0)
+    // Why the last attempt said what it did, in a sentence the owner can act on.
+    detail        String?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    ownerDomain OwnerDomain? @relation(fields: [ownerDomainId], references: [id], onDelete: Cascade)
+
+    @@index([ownerDomainId])
 }
 
 // Somebody other than the owner on an organization's roster.

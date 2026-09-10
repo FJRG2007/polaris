@@ -22,8 +22,11 @@ import { requireOrgPermission } from "@/lib/orgs/org-service";
 import {
     addOwnerDomain,
     checkOwnerDomain,
+    getOwnerDomain,
     OwnerDomainError,
     removeOwnerDomain,
+    retryOwnerDomainCertificateFor,
+    setOwnerDomainDnsToken,
     type DomainOwner,
     type OwnerDomainView
 } from "@/lib/owner-domains";
@@ -97,6 +100,58 @@ export async function checkOwnerDomainAction(
         return { domain: checked };
     } catch (caught) {
         return failure(caught, "Could not check that domain");
+    }
+}
+
+/** One domain as it stands, for a screen waiting on its certificate. */
+export async function readOwnerDomainAction(
+    ref: DomainOwnerRef,
+    id: string
+): Promise<{ domain?: OwnerDomainView; error?: string }> {
+    try {
+        const caller = await callerFor(ref);
+        return { domain: await getOwnerDomain(caller.owner, id) };
+    } catch (caught) {
+        return failure(caught, "Could not read that domain");
+    }
+}
+
+/** Give a domain a DNS token of its own for its wildcard certificate, or clear it
+ *  with an empty token. The token itself is never logged or sent back. */
+export async function setOwnerDomainDnsTokenAction(
+    ref: DomainOwnerRef,
+    id: string,
+    token: string
+): Promise<{ domain?: OwnerDomainView; error?: string }> {
+    try {
+        const caller = await callerFor(ref);
+        const updated = await setOwnerDomainDnsToken(caller.owner, id, { token });
+        await recordAudit({
+            actorId: caller.userId,
+            orgId: caller.orgId ?? undefined,
+            action: updated.hasDnsToken ? "domain.owner.dns-token.set" : "domain.owner.dns-token.clear",
+            targetType: "domain",
+            targetId: id,
+            metadata: { domain: updated.domain }
+        });
+        refresh();
+        return { domain: updated };
+    } catch (caught) {
+        return failure(caught, "Could not save that token");
+    }
+}
+
+/** Order a domain's certificate now rather than after the wait a failure set. */
+export async function retryOwnerDomainCertificateAction(
+    ref: DomainOwnerRef,
+    id: string
+): Promise<{ domain?: OwnerDomainView; error?: string }> {
+    try {
+        const caller = await callerFor(ref);
+        await retryOwnerDomainCertificateFor(caller.owner, id);
+        return { domain: await getOwnerDomain(caller.owner, id) };
+    } catch (caught) {
+        return failure(caught, "Could not start the certificate order");
     }
 }
 
