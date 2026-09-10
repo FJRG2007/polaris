@@ -666,23 +666,33 @@ export async function power(caller: DeployCaller, ref: string, action: PowerActi
 }
 
 /**
- * Put a previous deployment back.
+ * Put an earlier release back in front of traffic, from its kept image.
  *
- * Authorized exactly like a deploy. Rolling back to a kept image is being built
- * in the service layer alongside this; until it lands the call is refused with a
- * status that says the operation exists but this Polaris cannot do it yet, rather
- * than rebuilding the branch head and calling that a rollback.
+ * Authorized exactly like a deploy, because it is one: a different version goes
+ * in front of the same traffic. Nothing is rebuilt - a release whose image is no
+ * longer kept is refused with the sentence that says to deploy its commit again,
+ * rather than quietly rebuilding the branch head and calling that a rollback.
+ * Answers the id of the new deployment the rollback runs as.
  */
 export async function rollback(
     caller: DeployCaller,
     deploymentId: string
-): Promise<{ deploymentId: string }> {
+): Promise<{ deploymentId: string; commitSha: string | null }> {
     requireScope(caller, "deploy.manage");
-    await deploymentAccess(caller, deploymentId, "deploy.run");
-    throw new DeployApiRefusal(
-        501,
-        "Rolling back to a previous deployment is not available on this Polaris yet. Update Polaris from Settings to get it."
-    );
+    const access = await deploymentAccess(caller, deploymentId, "deploy.run");
+    const started = await deployService.rollbackToDeployment(deploymentId, access.ownerId, caller.userId);
+    await recordChange(caller, {
+        action: "deploy.app.rollback",
+        targetType: "application",
+        targetId: started.applicationId,
+        activity: {
+            applicationId: started.applicationId,
+            action: "rolled back",
+            to: started.commitSha?.slice(0, 7) ?? deploymentId
+        },
+        metadata: { from: deploymentId, deploymentId: started.deploymentId }
+    });
+    return { deploymentId: started.deploymentId, commitSha: started.commitSha };
 }
 
 // ---------------------------------------------------------------------------

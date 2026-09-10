@@ -28,6 +28,7 @@ const access = (projectId = PROJECT_A) => ({
 
 const requireApplicationAccess = vi.fn();
 const deployApplication = vi.fn();
+const rollbackToDeployment = vi.fn();
 const recordAudit = vi.fn();
 const revealEnvVar = vi.fn();
 const setEnvVar = vi.fn();
@@ -53,6 +54,7 @@ vi.mock("@/lib/deploy-project-access", () => ({
 
 vi.mock("@/lib/deploy-service", () => ({
     deployApplication: (...args: unknown[]) => deployApplication(...args),
+    rollbackToDeployment: (...args: unknown[]) => rollbackToDeployment(...args),
     ensureApplicationDomain: async () => undefined,
     redeployForEnvScope: async () => undefined,
     getApplicationDeployStatuses: async () => ({})
@@ -228,14 +230,39 @@ describe("what is recorded", () => {
 });
 
 describe("rolling back", () => {
-    it("says the operation is not available yet rather than rebuilding the branch head", async () => {
+    const EARLIER = "44444444-4444-4444-8444-444444444444";
+
+    it("asks for the capability a deploy needs and rolls back as the project's owner", async () => {
         const deployments = await import("@/lib/deploy-project-access");
         vi.mocked(deployments.requireDeploymentAccess).mockResolvedValue(access());
+        rollbackToDeployment.mockResolvedValue({
+            deploymentId: "dep-2",
+            applicationId: APP,
+            commitSha: "abcdef1234"
+        });
+        const result = await surface.rollback(caller(["deploy.manage"]), EARLIER);
+        expect(deployments.requireDeploymentAccess).toHaveBeenCalledWith(EARLIER, USER, "deploy.run");
+        expect(rollbackToDeployment).toHaveBeenCalledWith(EARLIER, OWNER, USER);
+        expect(result).toEqual({ deploymentId: "dep-2", commitSha: "abcdef1234" });
+        expect(recordAudit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "deploy.app.rollback",
+                metadata: expect.objectContaining({ from: EARLIER, deploymentId: "dep-2", keyId: "key-1" })
+            })
+        );
+    });
+
+    it("keeps a project token out of another project's releases", async () => {
+        const deployments = await import("@/lib/deploy-project-access");
+        vi.mocked(deployments.requireDeploymentAccess).mockResolvedValue(access(PROJECT_B));
         expect(
-            await refusedWith(() =>
-                surface.rollback(caller(["deploy.manage"]), "44444444-4444-4444-8444-444444444444")
-            )
-        ).toBe(501);
-        expect(deployApplication).not.toHaveBeenCalled();
+            await refusedWith(() => surface.rollback(caller(["deploy.manage"], PROJECT_A), EARLIER))
+        ).toBe(404);
+        expect(rollbackToDeployment).not.toHaveBeenCalled();
+    });
+
+    it("refuses a key that may only read", async () => {
+        expect(await refusedWith(() => surface.rollback(caller(["deploy.read"]), EARLIER))).toBe(403);
+        expect(rollbackToDeployment).not.toHaveBeenCalled();
     });
 });

@@ -144,9 +144,11 @@ const deploymentsTool: McpTool<z.infer<typeof serviceInput>> = {
                 deployments
                     .map(
                         (row) =>
-                            `${row.id}  ${row.status}${row.isCurrent ? " (current)" : ""}  ${row.createdAt}  ${
-                                row.commitSha?.slice(0, 7) ?? ""
-                            } ${row.commitMessage?.split("\n")[0] ?? ""}`.trimEnd()
+                            `${row.id}  ${row.status}${row.isCurrent ? " (current)" : ""}${
+                                row.rollbackable && !row.isCurrent ? " (can roll back)" : ""
+                            }  ${row.createdAt}  ${row.commitSha?.slice(0, 7) ?? ""} ${
+                                row.commitMessage?.split("\n")[0] ?? ""
+                            }`.trimEnd()
                     )
                     .join("\n") || "This service has never been deployed.",
             structured: { deployments }
@@ -318,7 +320,7 @@ const rollbackInput = z.object({
 const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
     name: "deploy_rollback",
     description:
-        "Make an earlier deployment of a service its running release again. Find the id with deploy_deployments.",
+        "Make an earlier deployment of a service its running release again, from its kept image - nothing is rebuilt. Only releases deploy_deployments marks as able to roll back qualify.",
     input: rollbackInput,
     scope: "deploy.manage",
     readOnly: false,
@@ -326,7 +328,10 @@ const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
         const { deploymentId } = await attempt("roll back to that deployment", () =>
             surface.rollback(deployCaller(caller), input.deploymentId)
         );
-        return { text: `Rolling back: deployment ${deploymentId}.`, structured: { deploymentId } };
+        return {
+            text: `Rolling back as deployment ${deploymentId}. Read it with deploy_deployment.`,
+            structured: { deploymentId }
+        };
     }
 };
 

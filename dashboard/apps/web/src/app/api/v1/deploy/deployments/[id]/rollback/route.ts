@@ -1,5 +1,9 @@
-/** POST /api/v1/deploy/deployments/:id/rollback - make this earlier deployment
- *  the service's running release again. */
+/**
+ * POST /api/v1/deploy/deployments/:id/rollback - make this earlier deployment
+ * the service's running release again, from its kept image. Answers 202 with the
+ * id of the deployment the rollback runs as; follow it like any other. A
+ * release whose image is no longer kept is refused with 422.
+ */
 
 import { idSchema } from "@/lib/deploy/api/schemas";
 import { rollback } from "@/lib/deploy/api/surface";
