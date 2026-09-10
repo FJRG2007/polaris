@@ -112,10 +112,10 @@ function inputOf(draft: Draft) {
 }
 
 const STATUS_TONE: Record<string, string> = {
-    succeeded: "bg-success/15 text-success",
-    running: "bg-warning/15 text-warning",
-    failed: "bg-danger/15 text-danger",
-    timed_out: "bg-danger/15 text-danger",
+    succeeded: "bg-success-soft text-success-ink",
+    running: "bg-warning-soft text-warning-ink",
+    failed: "bg-danger-soft text-danger-ink",
+    timed_out: "bg-danger-soft text-danger-ink",
     skipped: "bg-muted text-muted-foreground"
 };
 

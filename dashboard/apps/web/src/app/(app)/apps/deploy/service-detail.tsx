@@ -284,11 +284,11 @@ export function ServiceDetail({
 type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
 
 function depBadge(deployment: DepSummary): { label: string; cls: string } {
-    if (deployment.isCurrent) return { label: "ACTIVE", cls: "bg-success/15 text-success" };
+    if (deployment.isCurrent) return { label: "ACTIVE", cls: "bg-success-soft text-success-ink" };
     if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
-        return { label: "FAILED", cls: "bg-danger/15 text-danger" };
+        return { label: "FAILED", cls: "bg-danger-soft text-danger-ink" };
     if (["queued", "deploying"].includes(deployment.status))
-        return { label: deployment.status.toUpperCase(), cls: "bg-warning/15 text-warning" };
+        return { label: deployment.status.toUpperCase(), cls: "bg-warning-soft text-warning-ink" };
     return { label: "REMOVED", cls: "bg-muted text-muted-foreground" };
 }
 
@@ -645,7 +645,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             <Globe className="size-4 shrink-0 text-muted-foreground" />{" "}
                             {primary.hostname}
                             {isLocalDomain(primary) && (
-                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[0.625rem] font-medium text-warning">
+                                <span className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink">
                                     LAN
                                 </span>
                             )}
@@ -687,9 +687,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
             ) : (
                 <>
                     {active && (
-                        <div className="overflow-hidden rounded-xl border border-success/30 bg-success/[0.06]">
+                        <div className="overflow-hidden rounded-xl border border-success-edge bg-success/[0.06]">
                             <div className="flex items-center gap-3 p-3">
-                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-success">
+                                <span className="shrink-0 rounded bg-success-soft px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-success-ink">
                                     ACTIVE
                                 </span>
                                 <DeployAvatar app={app} deployment={active} />
@@ -704,7 +704,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="shrink-0 border-success/40 text-success hover:bg-success/10 hover:text-success"
+                                    className="shrink-0 border-success-edge text-success-ink hover:bg-success-soft hover:text-success-ink"
                                     onClick={() => setLogsFor(active.id)}
                                 >
                                     View logs
@@ -721,7 +721,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             <button
                                 type="button"
                                 onClick={() => setSuccessOpen((value) => !value)}
-                                className="flex w-full items-center gap-1.5 border-t border-success/20 px-3 py-2 text-xs text-success"
+                                className="flex w-full items-center gap-1.5 border-t border-success-edge px-3 py-2 text-xs text-success-ink"
                             >
                                 <CheckCircle2 className="size-3.5" />
                                 {active.status === "running"
@@ -737,7 +737,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 />
                             </button>
                             {successOpen && (
-                                <div className="border-t border-success/20 px-3 py-2 text-xs text-muted-foreground">
+                                <div className="border-t border-success-edge px-3 py-2 text-xs text-muted-foreground">
                                     {active.commitSha ? (
                                         <CommitRef deployment={active} />
                                     ) : (
@@ -783,7 +783,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                 className={cn(
                                                     "flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-muted-foreground/40",
                                                     failed
-                                                        ? "border-danger/30 bg-danger/5"
+                                                        ? "border-danger-edge bg-danger/5"
                                                         : "border-border/60"
                                                 )}
                                             >
@@ -3012,8 +3012,8 @@ function SettingsTab({
                                             }
                                             className={cn(
                                                 "size-2 shrink-0 rounded-full",
-                                                domain.healthStatus === "up" && "bg-success",
-                                                domain.healthStatus === "down" && "bg-danger",
+                                                domain.healthStatus === "up" && "bg-success-solid",
+                                                domain.healthStatus === "down" && "bg-danger-solid",
                                                 domain.healthStatus !== "up" &&
                                                     domain.healthStatus !== "down" &&
                                                     "animate-pulse bg-muted-foreground/40"
@@ -3621,7 +3621,7 @@ function DangerSection({
     return (
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-danger">Danger</h3>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger/5 p-3">
                 <span className="min-w-0">
                     <span className="text-sm font-medium">Delete service</span>
                     <span className="block text-xs text-muted-foreground">

@@ -529,7 +529,7 @@ function SettingsTab({
 
             {canManage && (
                 <>
-                    <div className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-danger/5 p-3">
+                    <div className="flex flex-col gap-3 rounded-lg border border-danger-edge bg-danger/5 p-3">
                         <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
                             <TriangleAlert className="size-4" /> Danger
                         </p>
@@ -556,7 +556,7 @@ function SettingsTab({
                             </Button>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger/20 pt-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger-edge pt-3">
                             <div className="min-w-0">
                                 <p className="text-sm">Delete volume</p>
                                 <p className="text-xs text-muted-foreground">

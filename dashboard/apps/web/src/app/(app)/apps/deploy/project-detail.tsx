@@ -107,7 +107,7 @@ export function ProjectDetail({
         <ProjectAccessProvider capabilities={capabilities}>
             <div className="flex w-full flex-col gap-4">
                 {!localReady && canManage && (
-                    <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-warning-edge bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
                         The local host is not ready to build and deploy. This needs the full edition
                         with a running{" "}
                         <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
@@ -226,9 +226,9 @@ function EnvSummary({ environment }: { environment: ProjectSummary["environments
         total === 0
             ? "border-border/60 bg-surface text-muted-foreground"
             : partial
-              ? "border-warning/25 bg-warning/10 text-warning"
-              : "border-success/25 bg-success/10 text-success";
-    const dot = total === 0 ? "bg-muted-foreground" : partial ? "bg-warning" : "bg-success";
+              ? "border-warning-edge bg-warning-soft text-warning-ink"
+              : "border-success-edge bg-success-soft text-success-ink";
+    const dot = total === 0 ? "bg-muted-foreground" : partial ? "bg-warning-solid" : "bg-success-solid";
     return (
         <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}

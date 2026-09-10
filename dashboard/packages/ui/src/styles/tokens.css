@@ -64,11 +64,35 @@
     --accent: 275 70% 62%;
     --accent-foreground: 0 0% 100%;
 
-    /* Status. */
+    /* Status. The bare name is the colour itself, for a line of text or an icon.
+       Each status also has the four parts a status CHIP is made of, set per
+       theme rather than mixed at each site with an alpha: a 15% tint of a light
+       green is a chip on a dark card and a smudge on a white one, and the text
+       inside it wants a lighter tint in the dark and a darker one in the light.
+
+         ink        text on the soft fill
+         soft       the tinted fill behind it
+         edge       the chip's border
+         solid      a filled badge, a dot, a progress bar - desaturated in the
+                    dark themes so it reads as colour rather than as neon
+         foreground text on the solid */
     --success: 152 52% 44%;
+    --success-ink: 150 52% 64%;
+    --success-soft: hsl(152 52% 44% / 0.14);
+    --success-edge: hsl(152 52% 44% / 0.32);
+    --success-solid: 152 38% 42%;
+    --success-foreground: 152 60% 8%;
     --warning: 38 88% 54%;
+    --warning-ink: 40 92% 66%;
+    --warning-soft: hsl(38 88% 54% / 0.14);
+    --warning-edge: hsl(38 88% 54% / 0.32);
+    --warning-solid: 38 70% 50%;
     --warning-foreground: 36 60% 10%;
     --danger: 356 68% 57%;
+    --danger-ink: 356 86% 72%;
+    --danger-soft: hsl(356 68% 57% / 0.14);
+    --danger-edge: hsl(356 68% 57% / 0.34);
+    --danger-solid: 356 52% 52%;
     --danger-foreground: 0 0% 100%;
 
     /* Radius. --radius stays the name Tailwind's scale is derived from. */
@@ -118,9 +142,22 @@
     --accent-foreground: 0 0% 100%;
 
     --success: 152 50% 34%;
+    --success-ink: 152 62% 25%;
+    --success-soft: hsl(152 50% 34% / 0.1);
+    --success-edge: hsl(152 50% 34% / 0.26);
+    --success-solid: 152 50% 34%;
+    --success-foreground: 0 0% 100%;
     --warning: 34 88% 44%;
+    --warning-ink: 30 90% 30%;
+    --warning-soft: hsl(34 88% 44% / 0.12);
+    --warning-edge: hsl(34 88% 44% / 0.3);
+    --warning-solid: 36 90% 48%;
     --warning-foreground: 36 60% 10%;
     --danger: 356 64% 48%;
+    --danger-ink: 356 70% 40%;
+    --danger-soft: hsl(356 64% 48% / 0.1);
+    --danger-edge: hsl(356 64% 48% / 0.28);
+    --danger-solid: 356 64% 48%;
     --danger-foreground: 0 0% 100%;
 
     --shadow-popover: 0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);
@@ -162,9 +199,22 @@
         --accent-foreground: 0 0% 100%;
 
         --success: 152 50% 34%;
+        --success-ink: 152 62% 25%;
+        --success-soft: hsl(152 50% 34% / 0.1);
+        --success-edge: hsl(152 50% 34% / 0.26);
+        --success-solid: 152 50% 34%;
+        --success-foreground: 0 0% 100%;
         --warning: 34 88% 44%;
+        --warning-ink: 30 90% 30%;
+        --warning-soft: hsl(34 88% 44% / 0.12);
+        --warning-edge: hsl(34 88% 44% / 0.3);
+        --warning-solid: 36 90% 48%;
         --warning-foreground: 36 60% 10%;
         --danger: 356 64% 48%;
+        --danger-ink: 356 70% 40%;
+        --danger-soft: hsl(356 64% 48% / 0.1);
+        --danger-edge: hsl(356 64% 48% / 0.28);
+        --danger-solid: 356 64% 48%;
         --danger-foreground: 0 0% 100%;
 
         --shadow-popover: 0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);

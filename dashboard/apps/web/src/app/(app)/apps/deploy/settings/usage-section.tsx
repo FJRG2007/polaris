@@ -129,7 +129,7 @@ export function UsageSection({ projectId }: { projectId: string }) {
                                             )}
                                             <span className="truncate">{service.name}</span>
                                             <span
-                                                className={`size-1.5 shrink-0 rounded-full ${service.running ? "bg-success" : "bg-muted-foreground"}`}
+                                                className={`size-1.5 shrink-0 rounded-full ${service.running ? "bg-success-solid" : "bg-muted-foreground"}`}
                                                 title={service.running ? "Running" : "Not running"}
                                             />
                                         </span>

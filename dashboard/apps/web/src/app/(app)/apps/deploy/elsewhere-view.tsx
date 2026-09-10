@@ -70,9 +70,9 @@ const STATUS_WORDS: Readonly<Record<string, string>> = {
 const STATUS_TONES: Readonly<Record<string, string>> = {
     queued: "border-border bg-muted text-muted-foreground",
     building: "border-accent/30 bg-accent/10 text-accent",
-    live: "border-success/30 bg-success/10 text-success",
-    failed: "border-danger/30 bg-danger/10 text-danger",
-    cancelled: "border-warning/30 bg-warning/10 text-warning",
+    live: "border-success-edge bg-success-soft text-success-ink",
+    failed: "border-danger-edge bg-danger-soft text-danger-ink",
+    cancelled: "border-warning-edge bg-warning-soft text-warning-ink",
     unknown: "border-border bg-muted text-muted-foreground"
 };
 
@@ -185,7 +185,7 @@ export function ElsewhereView({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -567,7 +567,7 @@ function AddDialog({
                     </div>
 
                     {error && (
-                        <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                             {error}
                         </p>
                     )}

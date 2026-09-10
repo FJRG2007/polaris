@@ -188,7 +188,7 @@ function ServicePanel({
                 <Layers className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{service.name}</span>
                 <span
-                    className={cn("size-1.5 shrink-0 rounded-full", service.running ? "bg-success" : "bg-muted-foreground")}
+                    className={cn("size-1.5 shrink-0 rounded-full", service.running ? "bg-success-solid" : "bg-muted-foreground")}
                     title={service.running ? "Running" : "Not running"}
                 />
                 <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />

@@ -133,7 +133,7 @@ function variableNote(
 
 function Problem({ text }: { text: string }) {
     return (
-        <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
             {text}
         </p>
     );

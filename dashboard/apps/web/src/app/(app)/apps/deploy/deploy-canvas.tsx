@@ -189,17 +189,17 @@ const DOT_BG: React.CSSProperties = {
 };
 
 const TONE_DOT: Record<Tone, string> = {
-    success: "bg-success",
-    warning: "bg-warning",
-    danger: "bg-danger",
+    success: "bg-success-solid",
+    warning: "bg-warning-solid",
+    danger: "bg-danger-solid",
     idle: "bg-muted-foreground"
 };
 
 /** Status text color, like Railway's "Online" / "Crashed" node label. */
 const TONE_TEXT: Record<Tone, string> = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
+    success: "text-success-ink",
+    warning: "text-warning-ink",
+    danger: "text-danger-ink",
     idle: "text-muted-foreground"
 };
 
@@ -207,7 +207,7 @@ const TONE_TEXT: Record<Tone, string> = {
 const TONE_BORDER: Record<Tone, string> = {
     success: "border-border hover:border-muted-foreground/40",
     warning: "border-border hover:border-muted-foreground/40",
-    danger: "border-danger/40 hover:border-danger/60",
+    danger: "border-danger-edge hover:border-danger/60",
     idle: "border-border hover:border-muted-foreground/40"
 };
 

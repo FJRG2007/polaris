@@ -13,6 +13,21 @@ import animate from "tailwindcss-animate";
 
 const withAlpha = (variable: string) => `hsl(var(--${variable}) / <alpha-value>)`;
 
+/**
+ * A status's colour and the parts a chip is made of - see the Status block in
+ * tokens.css. `soft` and `edge` are whole colours with their alpha already in
+ * them, set per theme, so they take no opacity modifier: a chip that needs a
+ * different tint needs a different token, not a different number at the site.
+ */
+const status = (name: string) => ({
+    DEFAULT: withAlpha(name),
+    ink: withAlpha(`${name}-ink`),
+    soft: `var(--${name}-soft)`,
+    edge: `var(--${name}-edge)`,
+    solid: withAlpha(`${name}-solid`),
+    foreground: withAlpha(`${name}-foreground`)
+});
+
 const preset: Omit<Config, "content"> = {
     darkMode: ["class"],
     theme: {
@@ -41,18 +56,14 @@ const preset: Omit<Config, "content"> = {
                     DEFAULT: withAlpha("accent"),
                     foreground: withAlpha("accent-foreground")
                 },
-                success: withAlpha("success"),
-                warning: {
-                    DEFAULT: withAlpha("warning"),
-                    // Amber is a light colour in every theme here, so what is
-                    // written on it is dark in every theme here. It had no ink of
-                    // its own until something was actually filled with it: a
-                    // raised hand, which is a warning colour used as a surface
-                    // rather than as a line, and `text-background` on it is white
-                    // on amber the moment the reader is not in the dark theme.
-                    foreground: withAlpha("warning-foreground")
-                },
-                danger: { DEFAULT: withAlpha("danger"), foreground: withAlpha("danger-foreground") }
+                // `bg-success-soft text-success-ink border-success-edge` is a chip;
+                // `bg-success-solid text-success-foreground` is a filled badge.
+                // Amber and green are light colours here, so what is written on a
+                // solid one is dark ink - never `text-background`, which turns
+                // white on amber the moment the reader is not in the dark theme.
+                success: status("success"),
+                warning: status("warning"),
+                danger: status("danger")
             },
             // 4/6/8/12px. Anything rounder starts to read as a toy rather than an
             // instrument, and the whole set moves together from --radius.

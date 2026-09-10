@@ -348,7 +348,7 @@ function AppCard({
                     {isLocalDomain(primary) && (
                         <span
                             title="Resolves only on your local network"
-                            className="shrink-0 rounded bg-warning/10 px-1 text-[0.625rem] font-medium text-warning"
+                            className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink"
                         >
                             LAN
                         </span>
@@ -1709,16 +1709,16 @@ export function StatusPill({
     label: string;
 }) {
     const dot = {
-        success: "bg-success",
-        warning: "bg-warning",
-        danger: "bg-danger",
+        success: "bg-success-solid",
+        warning: "bg-warning-solid",
+        danger: "bg-danger-solid",
         idle: "bg-muted-foreground"
     }[tone];
     // Tint the whole chip by tone so state reads in color at a glance, Railway-style.
     const chip = {
-        success: "border-success/25 bg-success/10 text-success",
-        warning: "border-warning/25 bg-warning/10 text-warning",
-        danger: "border-danger/25 bg-danger/10 text-danger",
+        success: "border-success-edge bg-success-soft text-success-ink",
+        warning: "border-warning-edge bg-warning-soft text-warning-ink",
+        danger: "border-danger-edge bg-danger-soft text-danger-ink",
         idle: "border-border/60 bg-surface text-muted-foreground"
     }[tone];
     return (

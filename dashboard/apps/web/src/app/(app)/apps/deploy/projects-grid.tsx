@@ -131,7 +131,7 @@ export function ProjectsGrid({
             </div>
 
             {failure && (
-                <div className="flex items-start justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <div className="flex items-start justify-between gap-3 rounded-lg border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                     <p>
                         {failure.name} was not deleted. {failure.message}
                     </p>
@@ -142,7 +142,7 @@ export function ProjectsGrid({
             )}
 
             {!localReady && canManage && (
-                <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-warning-edge bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
                     The local host is not ready to build and deploy. This needs the full edition with a running{" "}
                     <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>. Remote
                     servers added in the Servers view work regardless.
@@ -332,14 +332,14 @@ function statusTone(project: ProjectCardData): { dot: string; text: string; chip
     }
     if (!busy && online >= total) {
         return {
-            dot: "bg-success",
+            dot: "bg-success-solid",
             text: "text-muted-foreground",
-            chip: "border-success/25 bg-success/10 text-success",
+            chip: "border-success-edge bg-success-soft text-success-ink",
             label,
             busy
         };
     }
-    return { dot: "bg-warning", text: "text-warning", chip: "border-warning/25 bg-warning/10 text-warning", label, busy };
+    return { dot: "bg-warning-solid", text: "text-warning-ink", chip: "border-warning-edge bg-warning-soft text-warning-ink", label, busy };
 }
 
 function ServiceTiles({ services }: { services: ServiceKind[] }) {
