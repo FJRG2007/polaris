@@ -376,6 +376,14 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 href: PROJECTS
             },
             {
+                title: "Billing",
+                description:
+                    "What each project and organization used in a month - CPU, memory, storage and network out - priced at rates you set, with CSV and JSON exports and a monthly budget per organization.",
+                where: "Management > Billing",
+                href: "/admin/billing",
+                adminOnly: true
+            },
+            {
                 title: "Alarms",
                 description: "Alerts on health, spikes, outages, full disks and network traffic, for services and servers.",
                 where: "Watch > Alarms",

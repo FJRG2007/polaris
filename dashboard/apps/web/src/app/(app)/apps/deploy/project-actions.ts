@@ -18,6 +18,7 @@ import * as deployService from "@/lib/deploy-service";
 import * as staged from "@/lib/deploy-staged-changes";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as projectService from "@/lib/deploy-project-service";
+import { readMonthToDate, type StatementView } from "@/lib/billing/statement";
 import {
     deleteVolume,
     getVolume,
@@ -501,6 +502,21 @@ export async function projectUsageAction(
         const user = await requirePermission("deploy.read");
         await requireProjectAccess(projectId, user.id, "project.read");
         return { usage: await projectService.getProjectUsage(projectId) };
+    });
+}
+
+/**
+ * What the project has used so far this month, and what that comes to at the
+ * instance's prices when it has any - the project's own line of the statement
+ * Management > Billing draws for every project.
+ */
+export async function projectMonthUsageAction(
+    projectId: string
+): Promise<Result<{ month: StatementView }>> {
+    return attempt("Could not work out this month's usage", async () => {
+        const user = await requirePermission("deploy.read");
+        await requireProjectAccess(projectId, user.id, "project.read");
+        return { month: await readMonthToDate({ kind: "project", projectId }) };
     });
 }
 

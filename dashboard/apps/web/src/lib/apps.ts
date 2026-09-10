@@ -85,6 +85,7 @@ import {
     Users,
     UsersRound,
     Video,
+    Wallet,
     Webhook,
     Workflow,
     Wrench,
@@ -1484,6 +1485,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
+            label: "Billing",
+            href: "/admin/billing",
+            adminOnly: true,
+            icon: Wallet,
+            keywords: [
+                "cost",
+                "costs",
+                "prices",
+                "rates",
+                "charge back",
+                "chargeback",
+                "invoice",
+                "statement",
+                "budget",
+                "spend",
+                "usage",
+                "vcpu",
+                "per project"
+            ],
+            group: ADMIN_PLATFORM_GROUP
+        },
+        {
             label: "Domains",
             href: "/admin/domains",
             adminOnly: true,
@@ -2012,6 +2035,13 @@ export function orgSubapp(slug: string): AppSubapp {
                 icon: Globe,
                 permission: "domains.manage",
                 keywords: ["dns", "deploys", "hostnames", "custom domain", "wildcard"]
+            },
+            {
+                label: "Billing",
+                href: `${base}/billing`,
+                icon: Wallet,
+                permission: "settings.manage",
+                keywords: ["cost", "costs", "budget", "spend", "statement", "invoice", "usage", "charge back"]
             },
             {
                 label: "Activity",

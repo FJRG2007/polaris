@@ -4929,6 +4929,7 @@ model Organization {
     avatar   OrganizationAvatar?
     banner   OrganizationBanner?
     successor OrganizationSuccessor?
+    budget   OrganizationBudget?
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -4995,6 +4996,28 @@ model OrganizationSuccessor {
     successor User         @relation("OrganizationSuccessorHeir", fields: [successorId], references: [id], onDelete: Cascade)
 
     @@index([successorId])
+}
+
+// What an organization means to spend in a month on what it deploys, and how
+// far into it the people running it have already been told it is.
+//
+// The amount is in the currency the instance's prices were in when it was set,
+// kept beside it: an operator who later bills in another currency has not
+// changed anybody's budget, and a budget in euros read against prices in dollars
+// is a comparison nobody made. The screen says so and the sweep skips it.
+//
+// `alertedMonth` and `alertedLevel` are what keeps each threshold to one
+// announcement a month; changing the amount clears them, so a raised budget is
+// measured afresh.
+model OrganizationBudget {
+    orgId        String   @id @db.Uuid
+    amount       Float
+    currency     String
+    alertedMonth String?
+    alertedLevel Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
 
 // What one of an organization's roles may do.

@@ -20,7 +20,8 @@ import {
     SlidersHorizontal,
     Sparkles,
     Users,
-    UsersRound
+    UsersRound,
+    Wallet
 } from "lucide-react";
 
 /**
@@ -74,6 +75,12 @@ const SECTIONS = [
         icon: Gauge,
         title: "Consumption",
         description: "What this machine is being spent on: Polaris itself, installed apps, and everything else running."
+    },
+    {
+        href: "/admin/billing",
+        icon: Wallet,
+        title: "Billing",
+        description: "What each project and organization used each month, priced at your rates, with budgets and exports."
     },
     {
         href: "/admin/organizations",

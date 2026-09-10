@@ -677,6 +677,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: async () => (await import("@/lib/database-ops/pitr")).sweepArchives()
     },
     {
+        key: "billing-budgets",
+        // Hourly: the figures a budget is measured against are folded by the
+        // hour, so a pass more often would read the same spend again.
+        everyMs: HOUR,
+        // Leased, because the pass tells people something: two runners would
+        // each find the same threshold crossed and each tell everybody.
+        leaseMs: 2 * HOUR,
+        run: async () => (await import("@/lib/billing/budgets")).sweepBudgets()
+    },
+    {
         key: "object-replication",
         // Five minutes: how long a bucket replication can be down after its
         // store's container was recreated before it is started again.

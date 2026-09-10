@@ -149,7 +149,9 @@ describe("one organization's own rail", () => {
         const gated = subapp.sections
             .filter((section) => section.permission)
             .map((section) => section.label);
-        expect(gated).toEqual(["Roles", "Mailboxes", "Domains", "Activity", "Settings"]);
+        // Billing is `settings.manage`: what the organization spends is the
+        // business of whoever runs it, not of everybody on the roster.
+        expect(gated).toEqual(["Roles", "Mailboxes", "Domains", "Billing", "Activity", "Settings"]);
     });
 });
 

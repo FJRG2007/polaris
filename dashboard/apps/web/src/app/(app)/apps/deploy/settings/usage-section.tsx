@@ -17,11 +17,13 @@ import { useCallback } from "react";
 import { Button } from "@polaris/ui";
 import { SettingsCard } from "../project-settings";
 import { COLLECT_TICK_MS } from "@/lib/metrics-shared";
-import { projectUsageAction } from "../project-actions";
 import { useLiveRead } from "@/components/use-live-resource";
+import type { StatementView } from "@/lib/billing/statement";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ProjectUsage } from "@/lib/deploy-project-service";
 import { Database, Layers, Loader2, RefreshCw } from "lucide-react";
+import { StatementTotals } from "@/components/billing/statement-parts";
+import { projectMonthUsageAction, projectUsageAction } from "../project-actions";
 
 function formatBytes(bytes: number | null): string {
     if (bytes == null) return "-";
@@ -105,6 +107,8 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 {stale && <p className="text-sm text-warning">Showing the last figures. {stale}</p>}
             </SettingsCard>
 
+            <MonthCard projectId={projectId} />
+
             <SettingsCard title="By service" description="A service with no figures is not reporting - usually because it is not running.">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[32rem] text-sm">
@@ -158,6 +162,43 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 </div>
             </SettingsCard>
         </div>
+    );
+}
+
+/** How often this month's figures are read again. They are folded by the hour,
+ *  so this only has to keep up with the hour or two not folded yet. */
+const MONTH_POLL_MS = 5 * 60_000;
+
+/**
+ * What the project has used so far this month, and what it comes to at the
+ * instance's prices when it has any - the same line Management > Billing shows
+ * for it, so whoever runs the project does not have to ask what it costs.
+ */
+function MonthCard({ projectId }: { projectId: string }) {
+    const load = useCallback(async (): Promise<StatementView> => {
+        const result = await projectMonthUsageAction(projectId);
+        if (result.error || !result.month) throw new Error(result.error ?? "Could not work out this month's usage");
+        return result.month;
+    }, [projectId]);
+    const { data, error, stale } = useLiveRead<StatementView>({
+        load,
+        cacheKey: `deploy.month.${projectId}`,
+        intervalMs: MONTH_POLL_MS
+    });
+
+    return (
+        <SettingsCard
+            title={data ? `${data.monthLabel} so far` : "This month so far"}
+            description={
+                data && !data.statement.rates
+                    ? "Usage since the first of the month. No prices are set on this Polaris, so there is no cost."
+                    : "Usage since the first of the month, and its cost at this Polaris's prices."
+            }
+        >
+            <StatementTotals view={data} />
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {stale ? <p className="text-sm text-warning">Showing the last figures. {stale}</p> : null}
+        </SettingsCard>
     );
 }
 
