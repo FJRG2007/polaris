@@ -1231,7 +1231,7 @@ function InFlightSteps({ deploymentId }: { deploymentId: string }) {
 function LivePill() {
     return (
         <span className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live
+            <span className="size-1.5 animate-pulse rounded-full bg-success-solid" /> Live
         </span>
     );
 }
@@ -1332,10 +1332,10 @@ function RuntimeLogView({
 
 /** Color an HTTP status by its class: 2xx ok, 3xx redirect, 4xx client, 5xx server. */
 function statusTone(status: number): string {
-    if (status >= 500) return "bg-red-500/10 text-red-600 dark:text-red-400";
-    if (status >= 400) return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    if (status >= 500) return "bg-danger-soft text-danger-ink";
+    if (status >= 400) return "bg-warning-soft text-warning-ink";
     if (status >= 300) return "bg-sky-500/10 text-sky-600 dark:text-sky-400";
-    if (status >= 200) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    if (status >= 200) return "bg-success-soft text-success-ink";
     return "bg-muted text-muted-foreground";
 }
 

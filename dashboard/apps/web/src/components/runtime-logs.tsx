@@ -235,7 +235,7 @@ function LiveBadge({ status, containers }: { status: LiveStatus; containers: num
             <span
                 className={cn(
                     "size-1.5 rounded-full",
-                    status === "live" ? "animate-pulse bg-emerald-500" : status === "failed" ? "bg-danger" : "bg-muted-foreground/60"
+                    status === "live" ? "animate-pulse bg-success-solid" : status === "failed" ? "bg-danger" : "bg-muted-foreground/60"
                 )}
             />
             {label}
