@@ -18,6 +18,7 @@
  */
 
 import { ImapFlow } from "imapflow";
+import { isCredentialRefusal } from "./refusals";
 import { mailCredential, MailAuthError, type MailCredentialSource } from "./credentials";
 
 /** Raised when the server could not be reached or would not finish a command.
@@ -57,44 +58,18 @@ const SOCKET_TIMEOUT_MS = 60_000;
 const CLIENT_INFO = { name: "Polaris", vendor: "Polaris" };
 
 /**
- * The words servers use to refuse a credential.
+ * Turn whatever came off the socket into one of the two answers above.
  *
- * Matched on rather than on a status code because IMAP has no code for it: a
- * refusal arrives as `NO` with a sentence after it, and the sentence is the only
- * thing that separates "your password is wrong" from "try again in a minute".
- * Anything unmatched is treated as reachable-but-failed, which is the safer of
- * the two mistakes: it retries instead of telling somebody their password is
- * wrong when it is not.
+ * Which one is `isCredentialRefusal`'s decision, shared with SMTP: anything it
+ * does not recognise is treated as reachable-but-failed, which retries instead
+ * of telling somebody their password is wrong when it is not.
  */
-const AUTH_REFUSALS = [
-    "authenticationfailed",
-    "authentication failed",
-    "invalid credentials",
-    "invalid login",
-    "login failed",
-    "auth failed",
-    "authorizationfailed",
-    "invalid_grant",
-    "user is authenticated but not connected",
-    "application-specific password required",
-    "web login required",
-    "logindisabled",
-    "authenticate failed"
-];
-
-function looksLikeRefusal(message: string): boolean {
-    const lowered = message.toLowerCase();
-    return AUTH_REFUSALS.some((phrase) => lowered.includes(phrase));
-}
-
-/** Turn whatever came off the socket into one of the two answers above. */
 export function asMailFailure(caught: unknown): MailAuthError | MailUnreachableError {
     if (caught instanceof MailAuthError || caught instanceof MailUnreachableError) return caught;
-    const message = caught instanceof Error ? caught.message : String(caught);
-    if (looksLikeRefusal(message)) {
+    if (isCredentialRefusal(caught)) {
         return new MailAuthError("The mail server refused this account's credentials.");
     }
-    return new MailUnreachableError(message);
+    return new MailUnreachableError(caught instanceof Error ? caught.message : String(caught));
 }
 
 /**

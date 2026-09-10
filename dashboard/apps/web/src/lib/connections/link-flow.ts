@@ -32,8 +32,8 @@ import { requireUser } from "@/lib/session";
 import { markConnectionProven } from "./proven";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { publicAppUrl, requestOrigin } from "@/lib/domain-service";
 import { findConnectionProvider } from "@polaris/core";
+import { publicAppUrl, requestOrigin } from "@/lib/domain-service";
 import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
 import { clearConnectionFailure, describeFailure, recordConnectionFailure } from "./attention";
@@ -378,7 +378,7 @@ async function finishLink(
 
     try {
         const authorized = await exchangeConnectionCode(provider, client, code, connectionCallbackUrl(provider, origin));
-        await saveConnection(user.id, {
+        const saved = await saveConnection(user.id, {
             provider,
             accountId: authorized.accountId,
             label: authorized.label,
@@ -390,6 +390,13 @@ async function finishLink(
             email: authorized.email,
             credential: authorized.credential
         });
+        // A mailbox this account authorizes may have been paused for a refused
+        // token, and authorizing again is what fixes that. Tried behind the
+        // redirect, and reached only here so this module does not carry the
+        // mail sync into every link.
+        void import("@/lib/mailbox/refused")
+            .then((refused) => refused.retryRefusedMailboxes(saved.id))
+            .catch(() => undefined);
         // The one thing that settles whether this application works, and the only
         // moment it can be observed: the provider took somebody all the way through
         // and handed back an account. From here the service is offered to everybody.

@@ -109,7 +109,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     security: "Security",
     drive: "Drive",
     places: "Places",
-    mail: "Mail server",
+    mail: "Mail",
     network: "Network",
     people: "People",
     system: "Polaris"
@@ -504,6 +504,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A mail server you run stopped answering, or answers again.",
         level: "warning",
         defaults: { inapp: true, email: true }
+    },
+    {
+        id: "mail.account.refused",
+        group: "mail",
+        label: "A mailbox stopped accepting its password",
+        description:
+            "A mailbox you connected refused its password or authorization, and Polaris paused checking it until you update it.",
+        level: "warning",
+        // Said once per refusal, not once per check: the mailbox stays paused
+        // until its owner fixes it, and the notice in Mail says the rest.
+        defaults: { inapp: true, email: false }
     },
     {
         id: "network.router",

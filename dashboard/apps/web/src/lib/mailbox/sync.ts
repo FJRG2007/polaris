@@ -36,10 +36,12 @@ import { applyRulesToMessage } from "./rules";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
+import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
 import { fileJudgedJunk, judgeArrival } from "./spam";
 import { MailUnreachableError, withImap } from "./imap";
 import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
+import { mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
 
 /** How many messages of a folder are held. Four hundred is roughly two years of
@@ -60,8 +62,16 @@ function worthSyncing(folder: { role: string; subscribed: boolean; hidden: boole
  * Never throws: a mailbox that cannot be reached leaves its reason on itself and
  * the rail says so. Throwing would mean one dead mailbox stopping the sweep for
  * every other account on the instance.
+ *
+ * A mailbox whose credential was refused is not tried again until its backoff
+ * has passed (`mayTryMailbox`), whoever asks - the sweep, a watching tab, the
+ * rail's refresh. `force` is for the one caller that is a person asking for a
+ * single try: the Check now button, and a credential that was just replaced.
  */
-export async function syncAccount(accountId: string): Promise<void> {
+export async function syncAccount(
+    accountId: string,
+    options: { readonly force?: boolean } = {}
+): Promise<void> {
     // One pass per mailbox at a time, whoever asked. The scheduled sweep, the
     // Check for new mail button and the fast pass a watching tab drives all
     // reach here, and two at once is two IMAP sessions on the same account -
@@ -70,7 +80,9 @@ export async function syncAccount(accountId: string): Promise<void> {
     // scheduled pass still finishes before the screen redraws.
     const running = passes().get(accountId);
     if (running) return running;
-    const pass = onePass(accountId).finally(() => passes().delete(accountId));
+    const pass = onePass(accountId, options.force === true).finally(() =>
+        passes().delete(accountId)
+    );
     passes().set(accountId, pass);
     return pass;
 }
@@ -85,12 +97,16 @@ function passes(): Map<string, Promise<void>> {
     return held[PASSES];
 }
 
-async function onePass(accountId: string): Promise<void> {
+async function onePass(accountId: string, force: boolean): Promise<void> {
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
         select: ACCOUNT_COLUMNS
     });
     if (!account) return;
+    // A refused credential is not offered to the server again on every tick. A
+    // provider that watches a login fail every twenty seconds locks the account,
+    // and that is worse than any amount of mail arriving late.
+    if (!mayTryMailbox(account, { force })) return;
 
     try {
         await withImap(account, async (client) => {
@@ -107,11 +123,15 @@ async function onePass(accountId: string): Promise<void> {
         await recordAccountState(accountId, "ok");
     } catch (caught) {
         const auth = caught instanceof MailAuthError;
-        await recordAccountState(
-            accountId,
-            auth ? "auth" : "unreachable",
-            auth ? caught.message : ""
-        );
+        // A refusal is said to the owner once and spaces the next try out; see
+        // `refused.ts`. Anything else is a retry on the ordinary interval.
+        if (auth) await recordCredentialRefusal(accountId, caught.message);
+        // Unreachable while refused says nothing about the credential, so it
+        // stays refused: flipping to unreachable and back would announce the
+        // same refusal a second time.
+        else if (account.state === "auth") {
+            await recordCredentialRefusal(accountId, account.stateDetail);
+        } else await recordAccountState(accountId, "unreachable");
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
             // and internal paths, so they never reach the screen.
@@ -928,16 +948,34 @@ async function reconcileDeletions(client: ImapFlow, folder: FolderRow): Promise<
  * check every minute is not held up by twenty that check every ten.
  */
 export async function accountsToSync(): Promise<string[]> {
+    const now = Date.now();
     const accounts = await prisma.mailAccount.findMany({
-        where: { state: { not: "auth" } },
-        select: { id: true, userId: true, pollSeconds: true, lastSyncAt: true },
+        // A refused mailbox only once the shortest backoff could have passed;
+        // the exact wait is `mayTryMailbox`'s. Left out entirely, as it used to
+        // be, it never recovered from a token endpoint that missed one answer.
+        where: {
+            OR: [
+                { state: { not: "auth" } },
+                { lastSyncAt: null },
+                { lastSyncAt: { lte: new Date(now - REFUSED_RETRY_MIN_MS) } }
+            ]
+        },
+        select: {
+            id: true,
+            userId: true,
+            pollSeconds: true,
+            state: true,
+            lastSyncAt: true,
+            lastOkAt: true,
+            createdAt: true
+        },
         orderBy: { lastSyncAt: { sort: "asc", nulls: "first" } },
         take: 200
     });
-    const now = Date.now();
     const watching = watchedReaders();
     return accounts
         .filter((account) => {
+            if (account.state === "auth") return mayTryMailbox(account, { now });
             if (!account.lastSyncAt) return true;
             // A mailbox somebody is looking at right now is asked far more often
             // than its own interval, which is set for a mailbox nobody has open.
