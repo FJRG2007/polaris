@@ -19,6 +19,15 @@ describe("splitting chunks into lines", () => {
         expect(splitter.flush()).toEqual([]);
     });
 
+    it("keeps a character whole when the pipe splits its bytes", () => {
+        const splitter = new LineSplitter();
+        const word = `caf${String.fromCharCode(0xe9)}`;
+        const bytes = Buffer.from(`${word}\n`, "utf8");
+        // The accent is two bytes; cut between them.
+        expect(splitter.push(bytes.subarray(0, 4))).toEqual([]);
+        expect(splitter.push(bytes.subarray(4))).toEqual([word]);
+    });
+
     it("hands back what was held when the stream ends", () => {
         const splitter = new LineSplitter();
         splitter.push("no newline at the end");
@@ -40,6 +49,8 @@ describe("reading the stamp", () => {
             text: "listening on :3000"
         });
         expect(splitStamp("plain output")).toEqual({ stamp: null, text: "plain output" });
+        // A NUL byte would fail the whole insert, every capture, until it left the tail.
+        expect(splitStamp(`a${String.fromCharCode(0)}b`).text).toBe("ab");
         expect(stampDate("2026-09-10T10:00:00.123456789Z").toISOString()).toBe("2026-09-10T10:00:00.123Z");
     });
 });
