@@ -123,6 +123,10 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Scheduled backups | done | P0 | encrypted before they leave |
 | Restore from backup | done | P1 | safety copy first |
 | Upgrades with a way back, PostgreSQL point-in-time recovery | done | P1 | |
+| MongoDB replica sets (3 or 5 members) | done | P1 | one server; keyfile auth; backups from a secondary; rolling upgrades |
+| MongoDB sharded clusters | partial | P2 | config set of 3, 2-4 shards of 3, a router; backups and upgrades refused, not yet offered |
+| MySQL read replicas (1-2, GTID) | done | P2 | read URI on the reference; MariaDB replicas not offered |
+| Replica members across several servers | todo | P2 | every member runs on the database's one server today |
 | DB metrics / size | done | P2 | |
 | DB web console | done | P2 | |
 | Object storage (S3-compatible) | done | P1 | |

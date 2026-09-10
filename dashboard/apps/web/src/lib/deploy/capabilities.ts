@@ -283,7 +283,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         items: [
             {
                 title: "Managed databases",
-                description: "PostgreSQL, MySQL, MariaDB, MongoDB and Redis, provisioned beside your services.",
+                description:
+                    "PostgreSQL, MySQL, MariaDB, MongoDB and Redis, provisioned beside your services. MongoDB can run as a replica set of three or five, or as a sharded cluster; MySQL with one or two read replicas.",
                 where: "Project > New service",
                 href: PROJECTS
             },
@@ -297,7 +298,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             {
                 title: "Database upkeep",
                 description:
-                    "Restore from a backup, upgrade with a way back, recover PostgreSQL to a moment, and copy data in.",
+                    "Restore from a backup, upgrade with a way back or a MongoDB replica set member by member, recover PostgreSQL to a moment, and copy data in.",
                 where: "Database > Manage",
                 href: PROJECTS
             },
