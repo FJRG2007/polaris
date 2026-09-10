@@ -133,7 +133,12 @@ export async function cloneEnvironment(
                 healthcheck: application.healthcheck,
                 replicas: application.replicas,
                 commitFilter: application.commitFilter,
-                watchPaths: application.watchPaths
+                watchPaths: application.watchPaths,
+                // The edge settings and whether the port is open come over too:
+                // a copy that answered on a port its original keeps closed, or
+                // without the original's rate limits, is not a copy.
+                publishPort: application.publishPort,
+                edgeConfig: application.edgeConfig
             }
         });
         await copyScopeValues(

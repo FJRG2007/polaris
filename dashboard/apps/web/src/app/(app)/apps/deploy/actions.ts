@@ -1431,7 +1431,7 @@ export async function saveEdgeSettingsAction(
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await deployService.setApplicationEdgeConfig(applicationId, access.ownerId, parsed.data);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.edge.update",
             targetType: "application",
@@ -1467,7 +1467,7 @@ export async function setPublishPortAction(
             access.ownerId,
             publish
         );
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.publishPort",
             targetType: "application",
