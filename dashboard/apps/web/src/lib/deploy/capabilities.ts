@@ -110,7 +110,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Logs",
-                description: "Every service's output in one stream.",
+                description: "Every service's output in one live stream, kept for a week and searchable.",
                 where: "Project > Logs",
                 href: PROJECTS
             },
@@ -199,8 +199,28 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Private networking",
-                description: "Services reach each other by a private name, handed to them as a variable.",
-                where: "Service > Variables",
+                description:
+                    "An environment can keep its services on a network of its own, where they reach each other by a private name.",
+                where: "Project > Settings > Environments",
+                href: PROJECTS
+            },
+            {
+                title: "Wildcard certificates",
+                description: "A domain you bring gets one certificate for itself and every name under it, renewed on its own.",
+                where: "My account > Domains",
+                href: "/account/domains"
+            },
+            {
+                title: "DNS records",
+                description: "Add and change records in a Cloudflare zone, and watch the resolvers pick them up.",
+                where: "Management > Domains",
+                href: "/admin/domains",
+                adminOnly: true
+            },
+            {
+                title: "CDN",
+                description: "A domain served through Cloudflare, with its cache emptied after every deploy.",
+                where: "Service > Settings",
                 href: PROJECTS
             }
         ]
@@ -215,6 +235,26 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 description: "PostgreSQL, MySQL, MariaDB, MongoDB and Redis, provisioned beside your services.",
                 where: "Project > New service",
                 href: PROJECTS
+            },
+            {
+                title: "Database upkeep",
+                description:
+                    "Restore from a backup, upgrade with a way back, recover PostgreSQL to a moment, and copy data in.",
+                where: "Database > Manage",
+                href: PROJECTS
+            },
+            {
+                title: "Object storage",
+                description: "S3-compatible buckets with keys of their own, signed links, expiry rules and replication.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
+                title: "Mail server",
+                description: "A mail server of your own, with its DNS records written and checked, mailboxes, aliases and DMARC reports.",
+                where: "Mail server",
+                href: "/apps/mail-server",
+                needs: "mailserver.manage"
             },
             {
                 title: "Database client",
@@ -273,7 +313,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Alarms",
-                description: "Alerts on health, spikes and outages.",
+                description: "Alerts on health, spikes, outages, full disks and network traffic, for services and servers.",
                 where: "Watch > Alarms",
                 href: "/watch/alarms"
             },
