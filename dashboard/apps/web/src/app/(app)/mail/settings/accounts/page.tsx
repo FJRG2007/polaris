@@ -7,6 +7,7 @@
  * has already been filled in.
  */
 
+import { z } from "zod";
 import { AccountsView } from "./accounts-view";
 import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
@@ -15,10 +16,18 @@ import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 
 export const dynamic = "force-dynamic";
 
+/** The mailbox `?edit=` names: an id, or nothing. */
+const EDIT_PARAM = z.string().uuid();
+
 export default async function MailAccountsPage({
     searchParams
 }: {
-    searchParams: Promise<{ connection?: string; provider?: string; connect?: string }>;
+    searchParams: Promise<{
+        connection?: string;
+        provider?: string;
+        connect?: string;
+        edit?: string;
+    }>;
 }) {
     const user = await requirePermission("mail.use");
     const params = await searchParams;
@@ -40,6 +49,10 @@ export default async function MailAccountsPage({
             // Sent here by a Write with nothing to write from: the dialog is
             // what they came for, so it is already open.
             connectNow={params.connect === "1"}
+            // Sent here by the notice that a mailbox stopped accepting its
+            // password. Only ever one of this person's own - the view looks it
+            // up in the list it was given and opens nothing otherwise.
+            editNow={EDIT_PARAM.safeParse(params.edit).data ?? ""}
         />
     );
 }

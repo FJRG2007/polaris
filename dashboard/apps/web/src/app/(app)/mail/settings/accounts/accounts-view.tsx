@@ -26,12 +26,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Button, ConfirmDeleteDialog, Switch, cn, useToast } from "@polaris/ui";
-import { AlertTriangle, CheckCircle2, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
+import { AlertTriangle, CheckCircle2, Mail, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
     editAccountAction,
     removeAccountAction,
@@ -47,7 +47,8 @@ export function AccountsView({
     microsoftReady,
     outcome,
     outcomeProvider,
-    connectNow = false
+    connectNow = false,
+    editNow = ""
 }: {
     accounts: MailAccountView[];
     links: LinkedAccount[];
@@ -59,8 +60,51 @@ export function AccountsView({
     outcomeProvider: string;
     /** Open the connect dialog straight away. */
     connectNow?: boolean;
+    /**
+     * Open one mailbox's edit form straight away - where the notice that a
+     * mailbox stopped accepting its password sends somebody. A refused mailbox
+     * opens on its password box, because that is the field they came to fill.
+     */
+    editNow?: string;
 }) {
+    const router = useRouter();
     const [adding, setAdding] = useState(connectNow);
+    const [editing, setEditing] = useState<{ id: string; focusPassword: boolean } | null>(() => {
+        const asked = accounts.find((account) => account.id === editNow);
+        return asked ? { id: asked.id, focusPassword: asked.state === "auth" } : null;
+    });
+    // The same, for a notice pressed while this screen is already open: the
+    // address changes and the view stays mounted. Once per `?edit=`, so the
+    // refresh that follows a save does not open the form it just closed.
+    const openedFor = useRef(editNow);
+    useEffect(() => {
+        if (!editNow) {
+            openedFor.current = "";
+            return;
+        }
+        if (openedFor.current === editNow) return;
+        const asked = accounts.find((account) => account.id === editNow);
+        if (!asked) return;
+        openedFor.current = editNow;
+        setEditing({ id: asked.id, focusPassword: asked.state === "auth" });
+    }, [editNow, accounts]);
+    /**
+     * What a row says while its edit is with the servers: the new name at once,
+     * and "checking" where a credential is being tried. Dropped when the
+     * server's own list arrives, or taken back by the dialog on a refusal.
+     */
+    const [pending, setPending] = useState<Record<string, Partial<MailAccountView>>>({});
+    useEffect(() => setPending({}), [accounts]);
+
+    const shown = accounts.map((account) => ({ ...account, ...pending[account.id] }));
+    const editedAccount = editing ? accounts.find((account) => account.id === editing.id) : undefined;
+
+    function closeEditor(): void {
+        setEditing(null);
+        // Arrived with `?edit=`: leaving it on the address would open the form
+        // again on the next refresh, which is every save.
+        if (editNow) router.replace("/mail/settings/accounts", { scroll: false });
+    }
 
     return (
         <div className="space-y-4">
@@ -114,11 +158,39 @@ export function AccountsView({
                 </div>
             ) : (
                 <ul className="space-y-2">
-                    {accounts.map((account) => (
-                        <AccountRow key={account.id} account={account} />
+                    {shown.map((account) => (
+                        <AccountRow
+                            key={account.id}
+                            account={account}
+                            onEdit={(focusPassword) => setEditing({ id: account.id, focusPassword })}
+                        />
                     ))}
                 </ul>
             )}
+
+            {editedAccount ? (
+                <ConnectMailboxDialog
+                    // One form per mailbox: opening another starts from its own
+                    // values rather than the last one's.
+                    key={editedAccount.id}
+                    editing={editedAccount}
+                    focusPassword={editing?.focusPassword ?? false}
+                    title="Edit mailbox"
+                    links={links}
+                    googleReady={googleReady}
+                    microsoftReady={microsoftReady}
+                    publicAddress={publicAddress}
+                    canSetDomain={canSetDomain}
+                    onPending={(next) =>
+                        setPending((held) => {
+                            const rest = { ...held };
+                            delete rest[editedAccount.id];
+                            return next ? { ...rest, [editedAccount.id]: next } : rest;
+                        })
+                    }
+                    onClose={closeEditor}
+                />
+            ) : null}
 
             {adding ? (
                 <ConnectMailboxDialog
@@ -138,7 +210,14 @@ export function AccountsView({
     );
 }
 
-function AccountRow({ account }: { account: MailAccountView }) {
+function AccountRow({
+    account,
+    onEdit
+}: {
+    account: MailAccountView;
+    /** Open the edit form, on the password box when that is what is wrong. */
+    onEdit: (focusPassword: boolean) => void;
+}) {
     const router = useRouter();
     const toast = useToast();
     const [busy, startBusy] = useTransition();
@@ -146,13 +225,21 @@ function AccountRow({ account }: { account: MailAccountView }) {
     const [unified, setUnified] = useState(account.unified);
     const [notify, setNotify] = useState(account.notify);
 
-    const broken = account.state === "auth" || account.state === "unreachable";
+    const refused = account.state === "auth";
+    const broken = refused || account.state === "unreachable";
 
     return (
         <li className="rounded-md border border-border bg-card px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 text-[13px] font-medium">
+                        {account.color ? (
+                            <span
+                                className="size-2 shrink-0 rounded-full"
+                                style={{ backgroundColor: account.color }}
+                                aria-hidden
+                            />
+                        ) : null}
                         <span className="min-w-0 truncate" title={account.label || account.address}>
                             {account.label || account.address}
                         </span>
@@ -181,12 +268,20 @@ function AccountRow({ account }: { account: MailAccountView }) {
                     >
                         {broken ? (
                             <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+                        ) : account.state === "checking" ? (
+                            <RefreshCw className="size-3.5 shrink-0 animate-spin" aria-hidden />
                         ) : (
                             <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />
                         )}
                         {stateSentence(account)}
                     </p>
                 </div>
+
+                {refused ? (
+                    <Button size="sm" variant="outline" onClick={() => onEdit(true)}>
+                        {account.auth === "oauth" ? "Reconnect" : "Update password"}
+                    </Button>
+                ) : null}
 
                 <label className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground">
                     <Switch
@@ -260,6 +355,15 @@ function AccountRow({ account }: { account: MailAccountView }) {
                 <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Edit this mailbox"
+                    title="Edit this mailbox"
+                    onClick={() => onEdit(false)}
+                >
+                    <Pencil className="size-4 shrink-0" aria-hidden />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
                     aria-label="Remove this mailbox"
                     title="Remove this mailbox"
                     onClick={() => setRemoving(true)}
@@ -299,8 +403,14 @@ function AccountRow({ account }: { account: MailAccountView }) {
 }
 
 function stateSentence(account: MailAccountView): string {
+    if (account.state === "checking") return "Checking the new details with its servers...";
     if (account.state === "auth") {
-        return account.stateDetail || "This mailbox needs connecting again.";
+        // Said as what happened and what Polaris did about it. The detail is
+        // the refusal's own sentence, which is Polaris' words, never the
+        // server's.
+        return account.auth === "oauth"
+            ? `${account.stateDetail || "Its authorization was refused."} Checking is paused until it is reconnected.`
+            : `${account.stateDetail || "The server stopped accepting its password."} Checking is paused until the password is updated.`;
     }
     if (account.state === "unreachable") return "Polaris cannot reach this mail server.";
     if (account.state === "never") return "Waiting for its first check.";

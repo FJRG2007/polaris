@@ -20,6 +20,7 @@ import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { Composer } from "./composer";
 import { MailRail } from "./mail-rail";
+import { MAIL_PALETTE } from "./palette";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
 import { Menu, PenLine, Plus } from "lucide-react";
@@ -142,16 +143,7 @@ export function useMail(): MailContextValue {
  * keeps its colour when another is added above it - a rail whose colours shuffle
  * on every change is a rail nobody learns.
  */
-const ACCOUNT_COLORS = [
-    "#6366f1",
-    "#0ea5e9",
-    "#10b981",
-    "#f59e0b",
-    "#ef4444",
-    "#a855f7",
-    "#14b8a6",
-    "#f43f5e"
-];
+const ACCOUNT_COLORS = MAIL_PALETTE.map((swatch) => swatch.hex);
 
 function colorFor(seed: string): string {
     let hash = 0;

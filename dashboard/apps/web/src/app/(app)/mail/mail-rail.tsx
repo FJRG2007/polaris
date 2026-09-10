@@ -24,9 +24,12 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { useMail } from "./mail-shell";
+import { MAIL_PALETTE } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
+import { RefusedMailboxes } from "./refused-notice";
 import { useCallback, useMemo, useState } from "react";
+import { refusedMailboxHref } from "@/lib/mailbox/refusals";
 import { moveToFolderAction, setFolderColorAction } from "./actions";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -81,24 +84,8 @@ const FOLDER_ICONS: Record<core.FolderLook, LucideIcon> = {
     folder: Layers
 };
 
-/**
- * The colours a folder can be given.
- *
- * Eight, and swatches rather than a picker. A menu with an input in it is a menu
- * that steals the input focus the moment it opens - see the note in
- * `@polaris/ui` - and eight is already more than anybody needs to make three
- * folders findable at a glance.
- */
-const FOLDER_COLORS: readonly { hex: string; name: string }[] = [
-    { hex: "#6366f1", name: "Indigo" },
-    { hex: "#0ea5e9", name: "Blue" },
-    { hex: "#10b981", name: "Green" },
-    { hex: "#f59e0b", name: "Amber" },
-    { hex: "#ef4444", name: "Red" },
-    { hex: "#a855f7", name: "Purple" },
-    { hex: "#14b8a6", name: "Teal" },
-    { hex: "#f43f5e", name: "Pink" }
-];
+/** The colours a folder can be given: the same eight a mailbox can. */
+const FOLDER_COLORS = MAIL_PALETTE;
 
 /** The merged views, in the order a mail client is read in. */
 const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: string }[] = [
@@ -183,6 +170,10 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
             aria-label="Mailboxes"
         >
+            {/* Above everything, because a mailbox that has stopped accepting
+                its password is receiving nothing, and the rail is the one
+                screen its owner is certain to be looking at. */}
+            <RefusedMailboxes accounts={accounts} className="pt-2" onNavigate={onNavigate} />
             {accounts.length > 1 ? (
                 <p className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
                     All mailboxes
@@ -496,7 +487,13 @@ function AccountLink({
 
     return (
         <Link
-            href={broken ? "/mail/settings/accounts" : inbox}
+            href={
+                account.state === "auth"
+                    ? refusedMailboxHref(account.id)
+                    : broken
+                      ? "/mail/settings/accounts"
+                      : inbox
+            }
             onClick={onNavigate}
             aria-current={pathname === inbox ? "page" : undefined}
             className={cn(
@@ -505,7 +502,7 @@ function AccountLink({
                     ? "bg-card font-medium text-foreground"
                     : "text-muted-foreground hover:bg-card hover:text-foreground"
             )}
-            title={broken ? whyBroken(account.state) : account.address}
+            title={broken ? whyBroken(account) : account.address}
         >
             <span
                 className="size-2 shrink-0 rounded-full"
@@ -518,7 +515,7 @@ function AccountLink({
             {broken ? (
                 <AlertTriangle
                     className="size-3.5 shrink-0 text-danger"
-                    aria-label={whyBroken(account.state)}
+                    aria-label={whyBroken(account)}
                 />
             ) : count > 0 ? (
                 <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">
@@ -529,8 +526,9 @@ function AccountLink({
     );
 }
 
-function whyBroken(state: string): string {
-    return state === "auth"
+function whyBroken(account: { state: string; auth: string }): string {
+    if (account.state !== "auth") return "Polaris cannot reach this mail server.";
+    return account.auth === "oauth"
         ? "This mailbox needs connecting again."
-        : "Polaris cannot reach this mail server.";
+        : "This mailbox stopped accepting its password.";
 }

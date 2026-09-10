@@ -29,6 +29,7 @@ import { MailSearch } from "./mail-search";
 import { useMailLayout } from "./use-mail-layout";
 import { ThreadContextMenu } from "./thread-menu";
 import type { DisplayFormat } from "@polaris/core";
+import { RefusedMailboxes } from "./refused-notice";
 import { forwardSeed, replySeed } from "./answering";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
@@ -1270,6 +1271,14 @@ export function MailView({
                     </div>
                     <MailSearch />
                     {categorised ? <CategoryTabs current={category} /> : null}
+                    {/* Where somebody looks when mail stops arriving. One
+                        mailbox's list names only that mailbox; a merged one
+                        names every mailbox feeding it that has gone quiet. */}
+                    <RefusedMailboxes
+                        accounts={accounts.filter(
+                            (account) => !page.accountId || account.id === page.accountId
+                        )}
+                    />
                 </header>
 
                 <div ref={pane} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
