@@ -12,6 +12,8 @@
 import * as core from "@polaris/core";
 import { Loader2 } from "lucide-react";
 import { Button, Input, Switch } from "@polaris/ui";
+import { describeServiceEvent } from "./service-history";
+import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ServiceScalingView } from "@/lib/deploy/scaling-service";
 import { saveServiceScalingAction, serviceScalingAction } from "./scaling-actions";
@@ -22,6 +24,8 @@ interface Draft {
     min: string;
     max: string;
     cpuPercent: string;
+    /** Blank is no traffic target: scaled on CPU alone. */
+    requestsPerCopy: string;
     sticky: boolean;
     healthPath: string;
     cpus: string;
@@ -37,6 +41,7 @@ function draftOf(view: ServiceScalingView): Draft {
         min: String(view.autoscale?.min ?? 1),
         max: String(view.autoscale?.max ?? Math.max(2, view.replicas)),
         cpuPercent: String(view.autoscale?.cpuPercent ?? 50),
+        requestsPerCopy: view.autoscale?.requestsPerCopy ? String(view.autoscale.requestsPerCopy) : "",
         sticky: view.balancing.sticky,
         healthPath: view.balancing.healthPath ?? "",
         cpus: view.limits.cpus === null ? "" : String(view.limits.cpus),
@@ -51,7 +56,12 @@ function parse(draft: Draft) {
     const input = {
         replicas: Number(draft.replicas),
         autoscale: draft.autoscale
-            ? { min: Number(draft.min), max: Number(draft.max), cpuPercent: Number(draft.cpuPercent) }
+            ? {
+                  min: Number(draft.min),
+                  max: Number(draft.max),
+                  cpuPercent: Number(draft.cpuPercent),
+                  requestsPerCopy: draft.requestsPerCopy.trim() ? Number(draft.requestsPerCopy) : null
+              }
             : null,
         balancing: { sticky: draft.sticky, healthPath: draft.healthPath.trim() || null },
         // Blank is no limit, not zero.
@@ -147,9 +157,11 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                         <span>
                             <span className="font-medium">Scale by itself</span>
                             <span className="block text-xs text-muted-foreground">
-                                Add a copy when the average CPU of each stays above the target for three
-                                minutes, and take one away after ten quiet ones. CPU is each copy&apos;s
-                                share of the machine, the same figure the Metrics tab shows.
+                                Add a copy when CPU or requests per copy stay above their target for
+                                three minutes, and take one away after ten minutes with both low. With a
+                                requests target, {core.AUTOSCALE_IDLE_AFTER} minutes with no requests at all
+                                drops straight to the fewest. CPU is each copy&apos;s share of the machine,
+                                the same figure the Metrics tab shows.
                                 {view.engine === "swarm" && " Not on a swarm machine, which keeps its own count."}
                             </span>
                         </span>
@@ -195,7 +207,32 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                                     className="w-24"
                                 />
                             </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">Requests per copy (a minute)</span>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={core.REQUESTS_PER_COPY_MAX}
+                                    value={draft.requestsPerCopy}
+                                    // A stored target can still be cleared where it cannot be read.
+                                    disabled={view.trafficBlocked !== null && !draft.requestsPerCopy.trim()}
+                                    onChange={(event) => set({ requestsPerCopy: event.target.value })}
+                                    placeholder="CPU only"
+                                    className="w-44"
+                                />
+                            </label>
                         </div>
+                    )}
+                    {draft.autoscale && view.trafficBlocked && (
+                        <p className="text-xs text-muted-foreground">{view.trafficBlocked}</p>
+                    )}
+                    {draft.autoscale && view.lastAutoscale && (
+                        <p className="text-xs text-muted-foreground">
+                            {describeServiceEvent(view.lastAutoscale)}{" "}
+                            <span className="text-foreground-subtle">
+                                <RelativeTime iso={view.lastAutoscale.createdAt} />
+                            </span>
+                        </p>
                     )}
 
                     <div className="flex items-start justify-between gap-3">

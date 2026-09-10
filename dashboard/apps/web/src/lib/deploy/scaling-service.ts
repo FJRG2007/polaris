@@ -14,11 +14,14 @@
  */
 
 import { prisma } from "@polaris/db";
+import type { ActivityLine } from "@/lib/activity/activity";
 import { restartFromKeptImage, syncAppRoutes } from "@/lib/deploy-service";
 import {
+    AUTOSCALED_ACTION_PREFIX,
     parseAppEdgeConfig,
     parseAutoscale,
     sleepRefusal,
+    trafficRefusal,
     type Autoscale,
     type EdgeBalancing,
     type ResourceLimitsInput,
@@ -28,6 +31,12 @@ import {
 export interface ServiceScalingView {
     readonly replicas: number;
     readonly autoscale: Autoscale | null;
+    /** Why its requests cannot be counted, so it scales on CPU alone, when they
+     *  cannot. */
+    readonly trafficBlocked: string | null;
+    /** The last change the autoscaler made, as its history line; null when it
+     *  never has. */
+    readonly lastAutoscale: ActivityLine | null;
     readonly balancing: EdgeBalancing;
     /** The most CPU and memory each copy may use. */
     readonly limits: ResourceLimitsInput;
@@ -93,11 +102,24 @@ async function loadApp(applicationId: string, ownerId: string): Promise<Scalable
     return app;
 }
 
+/** The autoscaler's latest line in a service's history. Nobody wrote it, so there
+ *  is no author to resolve. */
+async function lastAutoscale(applicationId: string): Promise<ActivityLine | null> {
+    const line = await prisma.activity.findFirst({
+        where: { subjectType: "app", subjectId: applicationId, action: { startsWith: AUTOSCALED_ACTION_PREFIX } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, action: true, fromValue: true, toValue: true, createdAt: true }
+    });
+    return line ? { ...line, authorName: null, createdAt: line.createdAt.toISOString() } : null;
+}
+
 export async function getServiceScaling(applicationId: string, ownerId: string): Promise<ServiceScalingView> {
     const app = await loadApp(applicationId, ownerId);
     return {
         replicas: app.replicas,
         autoscale: parseAutoscale(app.autoscale),
+        trafficBlocked: trafficRefusal(app),
+        lastAutoscale: await lastAutoscale(applicationId),
         balancing: parseAppEdgeConfig(app.edgeConfig).balancing,
         limits: { cpus: app.cpuLimit, memoryMb: app.memoryLimitMb },
         sleepAfterMinutes: app.sleepAfterMinutes,
@@ -125,6 +147,9 @@ export async function setServiceScaling(
     const single = singleCopyReason(app);
     const wantsMore = input.replicas > 1 || (input.autoscale?.max ?? 1) > 1;
     if (single && wantsMore) throw new Error(single);
+    // A traffic target nothing could ever count would read as working and never act.
+    const trafficBlocked = (input.autoscale?.requestsPerCopy ?? null) === null ? null : trafficRefusal(app);
+    if (trafficBlocked) throw new Error(trafficBlocked);
     // Autoscaling owns the count, so a count outside its range is brought into it.
     const replicas = input.autoscale
         ? Math.min(input.autoscale.max, Math.max(input.autoscale.min, input.replicas))

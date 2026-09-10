@@ -92,6 +92,30 @@ describe("a one-click service's setup", () => {
     });
 });
 
+describe("a change the autoscaler made", () => {
+    const scaled = (action: string, fromValue: string | null, toValue: string | null) =>
+        describeServiceEvent(line({ authorName: null, action, fromValue, toValue }));
+
+    it("says which signal moved it, and which way", () => {
+        expect(scaled("autoscaled-traffic", "1", "3")).toBe(
+            "Polaris scaled it from 1 to 3 copies: requests were over their target"
+        );
+        expect(scaled("autoscaled-cpu", "3", "2")).toBe("Polaris scaled it from 3 to 2 copies: CPU stayed low");
+        expect(scaled("autoscaled-both", "2", "1")).toBe(
+            "Polaris scaled it from 2 to 1 copy: CPU and requests stayed low"
+        );
+        expect(scaled("autoscaled-idle", "4", "1")).toBe(
+            "Polaris scaled it from 4 to 1 copy after 10 minutes with no requests"
+        );
+        expect(scaled("autoscaled-range", "7", "4")).toBe("Polaris scaled it from 7 to 4 copies to fit its range");
+    });
+
+    it("still says what happened for a signal this release does not know", () => {
+        expect(scaled("autoscaled-memory", "1", "2")).toBe("Polaris scaled it from 1 to 2 copies");
+        expect(scaled("autoscaled-cpu", null, "2")).toBe("Polaris scaled it by itself");
+    });
+});
+
 describe("unresolvedSetupFailure", () => {
     // Newest first, the order the history is read in.
     const failed = line({ id: "f", action: "setup-failed", fromValue: "Install FreshRSS", toValue: "It exited with code 1." });
