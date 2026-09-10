@@ -95,7 +95,8 @@ describe("what the browser lists", () => {
             managedDatabaseId: DB,
             where: "shop / production",
             readOnly: true,
-            note: null
+            note: null,
+            unreachable: false
         });
     });
 
@@ -110,6 +111,9 @@ describe("what the browser lists", () => {
         const [entry] = await listOpenable(ALICE);
 
         expect(entry.note).toContain("not published on a port");
+        // Said as a fact as well as a sentence, so the list can mark it without
+        // reading the prose.
+        expect(entry.unreachable).toBe(true);
     });
 
     it("lists a database a saved connection already points at once", async () => {

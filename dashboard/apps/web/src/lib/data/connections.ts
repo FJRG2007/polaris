@@ -59,6 +59,9 @@ export interface DataConnectionView {
     /** Something the row has to say before it is opened - that it cannot be
      *  reached from here, or why it is read-only. */
     readonly note: string | null;
+    /** True when Polaris already knows it cannot open a socket to it from here,
+     *  before anybody has tried. The note says why. */
+    readonly unreachable: boolean;
     readonly lastUsedAt: string | null;
     readonly createdAt: string | null;
 }
@@ -158,6 +161,7 @@ export async function listConnections(userId: string): Promise<DataConnectionVie
         readOnly: row.readOnly,
         tls: row.tls,
         note: null,
+        unreachable: false,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString()
     }));
@@ -203,6 +207,7 @@ export async function listOpenable(userId: string): Promise<DataConnectionView[]
             readOnly: true,
             tls: false,
             note: entry.reachable ? null : UNREACHABLE,
+            unreachable: !entry.reachable,
             lastUsedAt: null,
             createdAt: null
         }));
@@ -233,6 +238,7 @@ async function polarisDatabase(userId: string): Promise<DataConnectionView | nul
         readOnly: true,
         tls: address.tls,
         note: "Read-only. Polaris itself runs on this one.",
+        unreachable: false,
         lastUsedAt: null,
         createdAt: null
     };
