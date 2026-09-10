@@ -35,10 +35,10 @@ import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { draftSaves, type DraftFields, type DraftSaves } from "./draft-saves";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
 import { useRef, useMemo, useState, useEffect, useCallback, useTransition } from "react";
+import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
 import {
     ChevronDown,
     Clock,
@@ -93,6 +93,12 @@ interface Attached {
     readonly size: number;
 }
 
+/** Where a draft is written, for the composer's `draftSaves` queue. */
+const writeDraft: DraftWriter = async (fields, id) => {
+    const outcome = await saveDraftAction({ id, ...fields });
+    return "draftId" in outcome && outcome.draftId ? outcome.draftId : null;
+};
+
 export function Composer() {
     const { accounts, identities, composing, openComposer, refresh, viewerName } = useMail();
     const toast = useToast();
@@ -108,6 +114,7 @@ export function Composer() {
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<Attached[]>([]);
+    const saves = useRef<DraftSaves | null>(null);
     const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");
@@ -131,16 +138,31 @@ export function Composer() {
         if (seeded.current === composing) return;
         seeded.current = composing;
         const account = composing.accountId ?? accounts[0]?.id ?? "";
+        const identity = (identities[account] ?? []).find((one) => one.isDefault);
         setAccountId(account);
-        setIdentityId((identities[account] ?? []).find((one) => one.isDefault)?.id ?? "");
+        setIdentityId(identity?.id ?? "");
         setTo([...(composing.to ?? [])]);
         setCc([...(composing.cc ?? [])]);
         setBcc([...(composing.bcc ?? [])]);
         setShowCopies((composing.cc ?? []).length + (composing.bcc ?? []).length > 0);
         setSubject(composing.subject ?? "");
-        setBody(withSignature(composing, accounts, identities, account));
+        const body = withSignature(composing, accounts.find((one) => one.id === account), identity);
+        setBody(body);
         setFiles([]);
-        setDraftId(composing.draftId ?? null);
+        saves.current = draftSaves(
+            {
+                accountId: account,
+                identityId: identity?.id ?? null,
+                to: [...(composing.to ?? [])],
+                cc: [...(composing.cc ?? [])],
+                bcc: [...(composing.bcc ?? [])],
+                subject: composing.subject ?? "",
+                body,
+                attachmentIds: []
+            },
+            composing.draftId ?? null,
+            writeDraft
+        );
         setSendAt(null);
         setQueued(null);
         setProblem("");
@@ -174,6 +196,7 @@ export function Composer() {
             if ("uploads" in outcome) {
                 const carried = outcome.uploads as Attached[];
                 setFiles((held) => [...held, ...carried]);
+                saves.current?.carry(carried.map((file) => file.id));
                 setNotCarried(outcome.skipped);
             }
         })();
@@ -189,36 +212,19 @@ export function Composer() {
     useEffect(() => {
         if (!composing || !accountId || !dirty || queued) return;
         const timer = setTimeout(() => {
-            void (async () => {
-                const outcome = await saveDraftAction({
-                    id: draftId,
-                    accountId,
-                    identityId: identityId || null,
-                    to,
-                    cc,
-                    bcc,
-                    subject,
-                    body,
-                    attachmentIds: files.map((file) => file.id)
-                });
-                if ("draftId" in outcome && outcome.draftId) setDraftId(outcome.draftId);
-            })();
+            void saves.current?.save({
+                accountId,
+                identityId: identityId || null,
+                to,
+                cc,
+                bcc,
+                subject,
+                body,
+                attachmentIds: files.map((file) => file.id)
+            });
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [
-        composing,
-        accountId,
-        identityId,
-        to,
-        cc,
-        bcc,
-        subject,
-        body,
-        files,
-        draftId,
-        dirty,
-        queued
-    ]);
+    }, [composing, accountId, identityId, to, cc, bcc, subject, body, files, dirty, queued]);
 
     const attach = useCallback(
         async (chosen: readonly File[]) => {
@@ -293,7 +299,7 @@ export function Composer() {
         (when: Date | null) => {
             setProblem("");
             startSending(async () => {
-                const outcome = await sendAction({
+                const fields: DraftFields = {
                     accountId,
                     identityId: identityId || null,
                     to,
@@ -301,7 +307,12 @@ export function Composer() {
                     bcc,
                     subject,
                     body,
-                    attachmentIds: files.map((file) => file.id),
+                    attachmentIds: files.map((file) => file.id)
+                };
+                const draftId = (await saves.current?.after((id) => Promise.resolve(id))) ?? null;
+                saves.current?.hold();
+                const outcome = await sendAction({
+                    ...fields,
                     inReplyToId: composing?.inReplyToId ?? null,
                     forward: composing?.forward ?? false,
                     sendAt: when,
@@ -309,6 +320,7 @@ export function Composer() {
                 });
                 const said = refusalOf(outcome);
                 if (said) {
+                    saves.current?.release();
                     setProblem(said);
                     return;
                 }
@@ -318,6 +330,7 @@ export function Composer() {
                     "sendAt" in outcome &&
                     outcome.sendAt
                 ) {
+                    saves.current?.adopt(outcome.draftId, fields);
                     setQueued({
                         draftId: outcome.draftId,
                         until: new Date(outcome.sendAt).getTime()
@@ -326,7 +339,7 @@ export function Composer() {
                 refresh();
             });
         },
-        [accountId, identityId, to, cc, bcc, subject, body, files, composing, draftId, refresh]
+        [accountId, identityId, to, cc, bcc, subject, body, files, composing, refresh]
     );
 
     /**
@@ -340,9 +353,7 @@ export function Composer() {
     const close = useCallback(() => {
         openComposer(null);
         if (queued || !accountId) return;
-        const pending = { dirty, draftId };
-        const current = {
-            id: draftId,
+        const fields: DraftFields = {
             accountId,
             identityId: identityId || null,
             to,
@@ -353,29 +364,11 @@ export function Composer() {
             attachmentIds: files.map((file) => file.id)
         };
         void (async () => {
-            let id = pending.draftId;
-            if (pending.dirty) {
-                const outcome = await saveDraftAction(current);
-                if ("draftId" in outcome && outcome.draftId) id = outcome.draftId;
-            }
+            const id = await saves.current?.save(fields);
             if (id) await fileDraftOnServerAction(id);
             refresh();
         })();
-    }, [
-        openComposer,
-        queued,
-        accountId,
-        dirty,
-        draftId,
-        identityId,
-        to,
-        cc,
-        bcc,
-        subject,
-        body,
-        files,
-        refresh
-    ]);
+    }, [openComposer, queued, accountId, identityId, to, cc, bcc, subject, body, files, refresh]);
 
     const account = accounts.find((one) => one.id === accountId);
     const own = useMemo(() => identities[accountId] ?? [], [identities, accountId]);
@@ -465,7 +458,7 @@ export function Composer() {
                             const outcome = await undoSendAction(queued.draftId);
                             if ("undone" in outcome && outcome.undone) {
                                 setQueued(null);
-                                setDraftId(queued.draftId);
+                                saves.current?.release();
                                 toast.show({ title: "Brought back. Nothing was sent." });
                                 refresh();
                                 return;
@@ -553,7 +546,7 @@ export function Composer() {
                         <div className="flex min-h-0 flex-1 flex-col px-2 py-2">
                             <RichTextEditor
                                 value={body}
-                                onChange={setBody}
+                                onChange={(next) => setBody(keepSignatureDelimiter(next))}
                                 insert={insert}
                                 placeholder="Write your message"
                                 className="flex min-h-[14rem] flex-1 flex-col"
@@ -665,7 +658,10 @@ export function Composer() {
                                 aria-label="Insert your signature"
                                 title="Insert your signature"
                                 onClick={() =>
-                                    setInsert({ token: Date.now(), text: `\n\n-- \n${signature}` })
+                                    setInsert({
+                                        token: Date.now(),
+                                        text: `\n\n${signatureBlock(signature)}`
+                                    })
                                 }
                             >
                                 <PenLine className="size-4 shrink-0" aria-hidden />
@@ -838,60 +834,6 @@ function SendLaterMenu({
             ) : null}
         </>
     );
-}
-
-/**
- * What the composer opens with, signature included.
- *
- * A signature that has to be inserted by hand every time is one nobody ever
- * sends, which is what "very basic" meant. Each mailbox says when its own goes
- * in: never, on a message somebody starts, or on replies and forwards as well.
- *
- * Where it goes is the other half and it is not decoration. Above the quoted
- * history is what everybody expects and what makes a reply readable; below it is
- * what a mailing list expects. The mailbox already carried that choice and
- * nothing had ever read it.
- *
- * A draft being reopened is left exactly as it was: it already has whatever its
- * author decided, and adding a second signature to it every time they come back
- * to it is the bug this feature usually ships with.
- */
-function withSignature(
-    seed: ComposerSeed,
-    accounts: ReturnType<typeof useMail>["accounts"],
-    identities: ReturnType<typeof useMail>["identities"],
-    accountId: string
-): string {
-    const body = seed.body ?? "";
-    if (seed.draftId) return body;
-
-    const account = accounts.find((one) => one.id === accountId);
-    const own = identities[accountId] ?? [];
-    const identity = own.find((one) => one.isDefault);
-    const signature = (identity?.signature || account?.signature || "").trim();
-    if (!signature) return body;
-
-    const when = account?.signatureAuto ?? "new";
-    const answering = Boolean(seed.inReplyToId);
-    if (when === "never") return body;
-    if (when === "new" && answering) return body;
-
-    // The two dashes and the space are the convention every client recognises,
-    // and what lets the next one fold the signature away.
-    const block = `--
-${signature}`;
-    if (!body.trim())
-        return `
-
-${block}`;
-    return account?.signatureAboveQuote === false
-        ? `${body}
-
-${block}`
-        : `
-
-${block}
-${body}`;
 }
 
 /** The times worth having on a menu. Anything else is the picker. */
