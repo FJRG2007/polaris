@@ -494,6 +494,24 @@ export interface CfEditableRecord {
 const RECORDS_PER_PAGE = 100;
 const MAX_RECORD_PAGES = 50;
 
+/** One record from the API as the editor reads it, or null for a row missing its identity. */
+function editableOf(entry: unknown): CfEditableRecord | null {
+    if (!entry || typeof entry !== "object") return null;
+    const row = entry as Record<string, unknown>;
+    if (typeof row.id !== "string" || typeof row.type !== "string" || typeof row.name !== "string") return null;
+    return {
+        id: row.id,
+        type: row.type,
+        name: row.name,
+        content: typeof row.content === "string" ? row.content : "",
+        ttl: typeof row.ttl === "number" ? row.ttl : 1,
+        proxied: row.proxied === true,
+        proxiable: row.proxiable === true,
+        priority: typeof row.priority === "number" ? row.priority : null,
+        data: row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null
+    };
+}
+
 /** Every record in a zone, page by page, in the order Cloudflare keeps them. */
 export async function listDnsRecords(token: string, zoneId: string): Promise<CfEditableRecord[]> {
     const records: CfEditableRecord[] = [];
@@ -505,30 +523,34 @@ export async function listDnsRecords(token: string, zoneId: string): Promise<CfE
         );
         if (!Array.isArray(batch)) throw new Error("Unexpected DNS records response from Cloudflare");
         for (const entry of batch) {
-            const row = entry as Record<string, unknown>;
-            if (typeof row.id !== "string" || typeof row.type !== "string" || typeof row.name !== "string") continue;
-            records.push({
-                id: row.id,
-                type: row.type,
-                name: row.name,
-                content: typeof row.content === "string" ? row.content : "",
-                ttl: typeof row.ttl === "number" ? row.ttl : 1,
-                proxied: row.proxied === true,
-                proxiable: row.proxiable === true,
-                priority: typeof row.priority === "number" ? row.priority : null,
-                data: row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null
-            });
+            const record = editableOf(entry);
+            if (record) records.push(record);
         }
         if (batch.length < RECORDS_PER_PAGE) break;
     }
     return records;
 }
 
-/** Add a record, returning its id. `record` is the API's own shape. */
-export async function createDnsRecord(token: string, zoneId: string, record: object): Promise<string> {
-    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, record);
-    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
-    return created.id;
+/**
+ * Add a record, or replace the one with `recordId`, answering the record as the
+ * zone now holds it - so the editor shows what Cloudflare stored rather than what
+ * it asked for. `record` is the API's own shape.
+ */
+export async function saveDnsRecord(
+    token: string,
+    zoneId: string,
+    recordId: string | null,
+    record: object
+): Promise<CfEditableRecord> {
+    const saved = await cf<unknown>(
+        token,
+        recordId === null ? "POST" : "PUT",
+        recordId === null ? `/zones/${zoneId}/dns_records` : `/zones/${zoneId}/dns_records/${recordId}`,
+        record
+    );
+    const parsed = editableOf(saved);
+    if (!parsed) throw new Error("Cloudflare did not return the saved DNS record");
+    return parsed;
 }
 
 export async function updateZoneRecord(
@@ -541,9 +563,6 @@ export async function updateZoneRecord(
 }
 
 /** Replace a record's every field with these. */
-export async function updateDnsRecord(token: string, zoneId: string, recordId: string, record: object): Promise<void> {
-    await cf(token, "PUT", `/zones/${zoneId}/dns_records/${recordId}`, record);
-}
 
 /** One record, or null when the zone has no record by that id. */
 export async function getDnsRecord(

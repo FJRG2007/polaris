@@ -15,6 +15,8 @@ const ZONE_ID = "0123456789abcdef0123456789abcdef";
 const RECORD_ID = "fedcba9876543210fedcba9876543210";
 const created: object[] = [];
 let stored: { id: string; type: string; name: string } | null = null;
+/** What the zone holds when a save checks it for duplicates. */
+let listed: object[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -28,12 +30,11 @@ vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflare
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     listZones: async () => [{ id: ZONE_ID, name: "example.test" }],
     resolveZoneForHostname: async () => ({ id: ZONE_ID, name: "example.test" }),
-    listDnsRecords: async () => [],
-    createDnsRecord: async (_token: string, _zone: string, record: object) => {
+    listDnsRecords: async () => listed,
+    saveDnsRecord: async (_token: string, _zone: string, _id: string | null, record: { type: string; name: string }) => {
         created.push(record);
-        return RECORD_ID;
+        return { id: RECORD_ID, content: "", ttl: 1, proxied: false, proxiable: false, priority: null, data: null, ...record };
     },
-    updateDnsRecord: async () => undefined,
     deleteDnsRecord: async () => undefined,
     getDnsRecord: async () => stored
 }));
@@ -267,13 +268,34 @@ describe("a domain somebody brought", () => {
     beforeEach(() => {
         created.length = 0;
         stored = null;
+        listed = [];
     });
 
     it("edits names at and under that domain only, even though its token reaches the zone", async () => {
-        await zones.saveZoneRecord(scope, null, { ...emptyDraft("A"), name: "api.shop", content: "203.0.113.10" });
+        const saved = await zones.saveZoneRecord(scope, null, { ...emptyDraft("A"), name: "api.shop", content: "203.0.113.10" });
         expect(created).toEqual([{ type: "A", name: "api.shop.example.test", content: "203.0.113.10", ttl: 1, proxied: false }]);
-        await expect(zones.saveZoneRecord(scope, null, { ...emptyDraft("A"), name: "www", content: "203.0.113.10" })).rejects.toThrow(
-            /at or under shop\.example\.test/
+        // The row the table puts in place of the one it showed while waiting.
+        expect(saved).toMatchObject({ id: RECORD_ID, relative: "api.shop", content: "203.0.113.10" });
+        const refused = zones.saveZoneRecord(scope, null, { ...emptyDraft("A"), name: "www", content: "203.0.113.10" });
+        await expect(refused).rejects.toThrow(/highlighted/);
+        await expect(refused).rejects.toMatchObject({ problems: { name: "Must be at or under shop.example.test" } });
+        expect(created).toHaveLength(1);
+    });
+
+    it("checks against the zone as it is now, not as the form last saw it", async () => {
+        listed = [
+            { id: RECORD_ID, type: "A", name: "api.shop.example.test", content: "203.0.113.10", ttl: 1, proxied: false, proxiable: true, priority: null, data: null }
+        ];
+        const duplicate = zones.saveZoneRecord(scope, null, { ...emptyDraft("A"), name: "API.shop.", content: "203.0.113.10" });
+        await expect(duplicate).rejects.toMatchObject({ problems: { content: "This A record is already in the zone" } });
+        const alias = zones.saveZoneRecord(scope, null, { ...emptyDraft("CNAME"), name: "api.shop", content: "edge.example.test" });
+        await expect(alias).rejects.toMatchObject({ problems: { name: expect.stringMatching(/CNAME cannot share its name/) } });
+        // Editing the record is not a duplicate of itself.
+        await zones.saveZoneRecord(scope, RECORD_ID, { ...emptyDraft("A"), name: "api.shop", content: "203.0.113.10", ttl: "300" });
+        expect(created).toHaveLength(1);
+        // And an id that is not in the zone is refused before anything is written.
+        await expect(zones.saveZoneRecord(scope, "ffffffffffffffffffffffffffffffff", { ...emptyDraft("A"), name: "api.shop", content: "203.0.113.11" })).rejects.toThrow(
+            /not in this zone/
         );
         expect(created).toHaveLength(1);
     });

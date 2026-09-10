@@ -19,6 +19,7 @@ import { checkPropagation, type PropagationReport, type QueryType } from "./prop
 import {
     DNS_RECORD_TYPES,
     emptyDraft,
+    isWithin,
     normalizeHostname,
     recordFields,
     relativeName,
@@ -27,13 +28,12 @@ import {
     type DraftProblems
 } from "./record-schema";
 import {
-    createDnsRecord,
     deleteDnsRecord,
     getDnsRecord,
     listDnsRecords,
     listZones,
     resolveZoneForHostname,
-    updateDnsRecord,
+    saveDnsRecord,
     type CfEditableRecord
 } from "@/lib/integrations/cloudflare-api";
 
@@ -124,10 +124,7 @@ export async function instanceTokenAllowed(hostname: string, caller: TokenCaller
 }
 
 function inside(zone: Zone, name: string): boolean {
-    const full = normalizeHostname(name);
-    const bare = full.startsWith("*.") ? full.slice(2) : full;
-    const root = zone.within ?? zone.name;
-    return bare === root || bare.endsWith(`.${root}`);
+    return isWithin(name, zone.within ?? zone.name);
 }
 
 export interface DnsRecordView {
@@ -211,35 +208,42 @@ export async function editableZones(): Promise<{ id: string; name: string }[]> {
     return (await listZones(token)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** The records of a zone this scope may see, in the form the editor reads them. */
+async function scopedRecords(zone: Zone): Promise<DnsRecordView[]> {
+    return (await listDnsRecords(zone.token, zone.id))
+        .filter((record) => inside(zone, record.name))
+        .map((record) => viewOf(record, zone.name));
+}
+
 /** A zone's records, narrowed to what this scope may see. */
 export async function zoneRecords(scope: DnsScope): Promise<ZoneRecords> {
     const zone = await zoneFor(scope);
-    const records = (await listDnsRecords(zone.token, zone.id))
-        .filter((record) => inside(zone, record.name))
-        .sort((a, b) => a.name.localeCompare(b.name) || a.type.localeCompare(b.type));
-    return { zone: { id: zone.id, name: zone.name }, within: zone.within, records: records.map((record) => viewOf(record, zone.name)) };
+    return { zone: { id: zone.id, name: zone.name }, within: zone.within, records: await scopedRecords(zone) };
 }
 
-/** Add a record, or replace one, from the editor's form. */
-export async function saveZoneRecord(scope: DnsScope, recordId: string | null, draft: DnsRecordDraft): Promise<void> {
+/**
+ * Add a record, or replace one, from the editor's form, answering it as the zone
+ * now holds it. Checked with the schema the form checks with, against the records
+ * the zone holds now rather than the ones the form last saw - a record added in
+ * another tab is still a duplicate.
+ */
+export async function saveZoneRecord(
+    scope: DnsScope,
+    recordId: string | null,
+    draft: DnsRecordDraft
+): Promise<DnsRecordView> {
     const zone = await zoneFor(scope);
-    const checked = recordFields(draft, zone.name);
+    const existing = await scopedRecords(zone);
+    if (recordId !== null && !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))) {
+        throw new DnsEditError("That record is not in this zone");
+    }
+    const checked = recordFields(draft, zone.name, { within: zone.within, existing, editingId: recordId });
     if (!checked.ok) {
         const problems = { ...checked.problems };
         for (const field of checked.missing) problems[field] ??= "Required";
         throw new DnsEditError("Check the highlighted fields", problems);
     }
-    if (!inside(zone, checked.record.name)) {
-        throw new DnsEditError(`Only names at or under ${zone.within ?? zone.name} can be edited here`, {
-            name: `Must be at or under ${zone.within ?? zone.name}`
-        });
-    }
-    if (recordId === null) {
-        await createDnsRecord(zone.token, zone.id, checked.record);
-        return;
-    }
-    await requireOwnRecord(zone, recordId);
-    await updateDnsRecord(zone.token, zone.id, recordId, checked.record);
+    return viewOf(await saveDnsRecord(zone.token, zone.id, recordId, checked.record), zone.name);
 }
 
 /** Refuse a record id that is not in this zone, or not within this scope. */
@@ -284,7 +288,7 @@ export async function recordPropagation(scope: DnsScope, recordId: string): Prom
     const zone = await zoneFor(scope);
     const current = await requireOwnRecord(zone, recordId);
     if (!(DNS_RECORD_TYPES as readonly string[]).includes(current.type)) {
-        throw new DnsEditError("Propagation is checked for A, AAAA, CNAME, TXT, MX, SRV and CAA records");
+        throw new DnsEditError(`Propagation is checked for ${DNS_RECORD_TYPES.join(", ")} records`);
     }
     const siblings = (await listDnsRecords(zone.token, zone.id)).filter(
         (record) => record.type === current.type && normalizeHostname(record.name) === normalizeHostname(current.name)

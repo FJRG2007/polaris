@@ -12,6 +12,8 @@
  * not answer is reported as unreachable, never as "the record is missing".
  */
 
+import { txtText } from "./record-schema";
+
 export const RESOLVERS = [
     { id: "cloudflare", label: "Cloudflare (1.1.1.1)", url: "https://cloudflare-dns.com/dns-query" },
     { id: "google", label: "Google (8.8.8.8)", url: "https://dns.google/dns-query" },
@@ -21,7 +23,7 @@ export const RESOLVERS = [
 export type ResolverId = (typeof RESOLVERS)[number]["id"];
 
 /** The record types this reads, with their numbers on the wire. */
-export const QUERY_TYPES = { A: 1, CNAME: 5, MX: 15, TXT: 16, AAAA: 28, SRV: 33, CAA: 257 } as const;
+export const QUERY_TYPES = { A: 1, NS: 2, CNAME: 5, MX: 15, TXT: 16, AAAA: 28, SRV: 33, CAA: 257 } as const;
 export type QueryType = keyof typeof QUERY_TYPES;
 
 const TIMEOUT_MS = 5_000;
@@ -122,6 +124,7 @@ function presentation(message: Uint8Array, type: number, start: number, length: 
             return length === 4 ? Array.from(data).join(".") : null;
         case QUERY_TYPES.AAAA:
             return length === 16 ? ipv6(data) : null;
+        case QUERY_TYPES.NS:
         case QUERY_TYPES.CNAME:
             return readName(message, start).name.toLowerCase();
         case QUERY_TYPES.TXT:
@@ -209,11 +212,7 @@ export interface PropagationReport {
 /** A value as two resolvers are compared on: hostnames without case or a final dot. */
 export function comparable(value: string, type: QueryType): string {
     const trimmed = value.trim();
-    // A TXT value can be written quoted, and a long one as several quoted strings
-    // side by side; either way it is the text inside them, joined.
-    if (type === "TXT") {
-        return /^".*"$/s.test(trimmed) ? trimmed.slice(1, -1).replace(/"\s+"/g, "") : trimmed;
-    }
+    if (type === "TXT") return txtText(trimmed);
     if (type === "CAA") return trimmed;
     if (type === "AAAA") return trimmed.toLowerCase();
     return trimmed.toLowerCase().replace(/\.$/, "");

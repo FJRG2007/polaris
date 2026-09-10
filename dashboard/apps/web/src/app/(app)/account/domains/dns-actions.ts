@@ -29,6 +29,7 @@ import {
     saveZoneRecord,
     zoneRecords,
     type DnsScope,
+    type DnsRecordView,
     type ZoneRecords
 } from "@/lib/dns/zone-records";
 
@@ -99,22 +100,24 @@ export async function saveDnsRecordAction(
     scope: DnsScopeRef,
     recordId: string | null,
     draft: unknown
-): Promise<{ error?: string; problems?: Record<string, string> }> {
+): Promise<{ record?: DnsRecordView; error?: string; problems?: Record<string, string> }> {
     try {
         const resolved = await resolve(scope);
         const parsed = dnsRecordDraftSchema.safeParse(draft);
         if (!parsed.success) return { error: "That record could not be read" };
         if (recordId !== null && typeof recordId !== "string") return { error: "That record could not be read" };
-        await saveZoneRecord(resolved.scope, recordId, parsed.data);
+        // The same schema the form checked with, run again here against the zone
+        // as it is now - see `saveZoneRecord`.
+        const record = await saveZoneRecord(resolved.scope, recordId, parsed.data);
         await recordAudit({
             actorId: resolved.userId,
             orgId: resolved.orgId ?? undefined,
             action: recordId ? "dns.record.update" : "dns.record.create",
             targetType: "dns-record",
-            targetId: recordId ?? undefined,
-            metadata: { type: parsed.data.type, name: parsed.data.name }
+            targetId: record.id,
+            metadata: { type: record.type, name: record.name }
         });
-        return {};
+        return { record };
     } catch (caught) {
         return failure(caught, "Could not save the record");
     }
