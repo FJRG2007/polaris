@@ -6,17 +6,25 @@
 import { MobileNav } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
-import { APP_SECTIONS, OVERVIEW_APP_ID, resolveActiveApp, resolveSubapp } from "@/lib/apps";
+import {
+    APP_SECTIONS,
+    OVERVIEW_APP_ID,
+    resolveActiveApp,
+    resolveSubapp,
+    sectionOffered
+} from "@/lib/apps";
 
 export function AppNavDrawer({
     appIds = [],
     held = [],
+    installed = [],
     isAdmin = false
 }: {
     appIds?: string[];
     /** See `AppSidebar`: the same narrowing, so the drawer and the rail beside
      *  it never offer different things. */
     held?: string[];
+    installed?: string[];
     isAdmin?: boolean;
 }) {
     const pathname = usePathname();
@@ -29,15 +37,12 @@ export function AppNavDrawer({
         !subapp && app.id === OVERVIEW_APP_ID
             ? appIds.some((id) => id !== OVERVIEW_APP_ID)
             : sections.some(
-                  (section) =>
-                      !section.hidden &&
-                      (isAdmin || !section.adminOnly) &&
-                      (isAdmin || !section.needs || held.includes(section.needs))
+                  (section) => !section.hidden && sectionOffered(section, { isAdmin, held, installed })
               );
     if (!hasRail) return null;
     return (
         <MobileNav>
-            <AppSidebar appIds={appIds} held={held} isAdmin={isAdmin} />
+            <AppSidebar appIds={appIds} held={held} installed={installed} isAdmin={isAdmin} />
         </MobileNav>
     );
 }

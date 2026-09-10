@@ -28,6 +28,7 @@ export function ShortcutPicker({
     onOpenChange,
     isAdmin,
     appIds,
+    gate,
     pinned,
     onPick
 }: {
@@ -35,6 +36,8 @@ export function ShortcutPicker({
     onOpenChange: (open: boolean) => void;
     isAdmin: boolean;
     appIds: readonly string[];
+    /** The rail's narrowing, so a screen that is not there cannot be pinned. */
+    gate: { held: readonly string[]; installed: readonly string[] };
     pinned: readonly OverviewShortcut[];
     onPick: (shortcut: OverviewShortcut) => void;
 }) {
@@ -54,8 +57,8 @@ export function ShortcutPicker({
 
     const appKey = appIds.join(",");
     const pool = useMemo(
-        () => [...navigationEntries(isAdmin, appKey ? appKey.split(",") : []), ...resourceEntries(resources)],
-        [isAdmin, appKey, resources]
+        () => [...navigationEntries(isAdmin, appKey ? appKey.split(",") : [], gate), ...resourceEntries(resources)],
+        [isAdmin, appKey, gate, resources]
     );
 
     const fuse = useMemo(

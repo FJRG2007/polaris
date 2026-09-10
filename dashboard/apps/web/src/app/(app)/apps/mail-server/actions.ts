@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as dns from "@/lib/mail-server/dns";
+import { findApp } from "@/lib/apps/catalog";
 import * as relay from "@/lib/mail-server/relay";
 import * as setup from "@/lib/mail-server/setup";
 import { recordAudit } from "@/lib/audit-service";
@@ -25,6 +26,9 @@ import { addAccount } from "@/lib/mailbox/accounts";
 import * as inbound from "@/lib/mail-server/inbound";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as dmarc from "@/lib/mail-server/dmarc-report";
+import { installApp } from "@/lib/apps/install-service";
+import * as appInstall from "@/lib/mail-server/app-install";
+import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { MailServerUnreachable } from "@/lib/mail-server/transport";
 import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
 import { reached, SETUP_STEP_LABELS, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
@@ -53,8 +57,13 @@ function invalid(error: z.ZodError): { error: string } {
     return { error: error.issues[0]?.message ?? "Those details are not valid" };
 }
 
+/** Said by every action below once the app has been uninstalled under an open
+ *  screen: there is nothing left for it to act on. */
+const NOT_INSTALLED = "Mail server is not installed. Install it from the Marketplace first.";
+
 async function actor(): Promise<MailServerActor & { user: SessionUser }> {
     const user = await requirePermission("mailserver.manage");
+    if (!(await appInstall.mailServerAppInstalled())) throw new MailServerAccessError(NOT_INSTALLED);
     return { id: user.id, isAdmin: user.isAdmin, user };
 }
 
@@ -70,6 +79,64 @@ async function server(id: unknown) {
 function refresh(serverId?: string): void {
     revalidatePath("/apps/mail-server");
     if (serverId) revalidatePath(`/apps/mail-server/${serverId}`);
+}
+
+// ---------------------------------------------------------------------------
+// The app itself
+// ---------------------------------------------------------------------------
+
+/** Everything that draws the app or reads whether it is here: this screen, the
+ *  marketplace, and the rail and search in the layout above both. */
+function refreshApp(): void {
+    revalidatePath("/", "layout");
+    revalidatePath("/apps/mail-server");
+    revalidatePath("/apps/marketplace");
+}
+
+/**
+ * Install the app from its own screen, the same install the marketplace makes.
+ * Gated on what installs any marketplace app. Runs nothing: the engine is only
+ * pulled when a server is set up.
+ */
+export async function installMailServerAppAction(): Promise<Result> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const manifest = findApp(appInstall.MAIL_SERVER_APP);
+        if (!manifest) return { error: "Mail server is not in the catalog." };
+        const installedAppId =
+            (await appInstall.adoptMailServerApp()) ??
+            (await installApp(user.id, user.id, defaultInstallInput(manifest))).installedAppId;
+        await recordAudit({ actorId: user.id, action: "apps.install", targetType: "installedApp", targetId: installedAppId });
+        refreshApp();
+        return {};
+    } catch (error) {
+        // Somebody installed it in the same moment, which leaves it installed -
+        // what was asked for.
+        if ((await appInstall.adoptMailServerApp().catch(() => null)) !== null) {
+            refreshApp();
+            return {};
+        }
+        console.error("polaris: installing Mail server failed:", error);
+        return { error: "Mail server could not be installed. Try again in a moment." };
+    }
+}
+
+/** Uninstall the app for the whole Polaris. Refused while any mail server is
+ *  still set up - see `uninstallMailServerApp`. */
+export async function uninstallMailServerAppAction(): Promise<Result> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const removed = await appInstall.uninstallMailServerApp({ id: user.id, isAdmin: user.isAdmin });
+        for (const id of removed) {
+            await recordAudit({ actorId: user.id, action: "apps.uninstall", targetType: "installedApp", targetId: id });
+        }
+        refreshApp();
+        return {};
+    } catch (error) {
+        if (error instanceof appInstall.MailServerAppRefusal) return { error: error.message };
+        console.error("polaris: uninstalling Mail server failed:", error);
+        return { error: "Mail server could not be uninstalled. Try again in a moment." };
+    }
 }
 
 // ---------------------------------------------------------------------------

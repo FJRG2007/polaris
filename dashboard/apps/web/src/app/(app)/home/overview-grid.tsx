@@ -92,7 +92,8 @@ export function OverviewGrid({
     preferences,
     available,
     layout,
-    apps
+    apps,
+    gate
 }: {
     name: string;
     isAdmin: boolean;
@@ -104,6 +105,9 @@ export function OverviewGrid({
      *  account's permissions. */
     layout: OverviewWidgetPreference[];
     apps: OverviewApp[];
+    /** What narrows the screens offered for pinning, the way the rail is
+     *  narrowed (see `SectionGate`). */
+    gate: { held: string[]; installed: string[] };
 }) {
     const [widgets, setWidgets] = useState(layout);
     const [shortcuts, setShortcuts] = useState<OverviewShortcut[]>(preferences.shortcuts);
@@ -472,6 +476,7 @@ export function OverviewGrid({
                 onOpenChange={setPicking}
                 isAdmin={isAdmin}
                 appIds={apps.map((app) => app.id)}
+                gate={gate}
                 pinned={shortcuts}
                 onPick={pin}
             />

@@ -11,12 +11,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mails, Plus, Server } from "lucide-react";
-import { useEffect, useState } from "react";
 import { mailServerSetupSchema } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
+import { useEffect, useState, useTransition } from "react";
+import { Loader2, Mails, Plus, Server } from "lucide-react";
 import { Field, forgetPanelData, PanelError, StatusBadge, usePanelData } from "./ui-bits";
-import { listPlacementsAction, listServersAction, startSetupAction } from "./actions";
+import {
+    listPlacementsAction,
+    listServersAction,
+    startSetupAction,
+    uninstallMailServerAppAction,
+    type MailServerSummary
+} from "./actions";
 import {
     Button,
     Dialog,
@@ -31,14 +37,20 @@ import {
     Skeleton
 } from "@polaris/ui";
 
-export function MailServersView() {
+export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
     const { data, error, loading, reload } = usePanelData("servers", listServersAction);
     const [open, setOpen] = useState(false);
+    const [uninstalling, setUninstalling] = useState(false);
     const servers = data?.servers ?? [];
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2">
+                {canUninstall ? (
+                    <Button size="sm" variant="ghost" onClick={() => setUninstalling(true)}>
+                        Uninstall
+                    </Button>
+                ) : null}
                 <Button size="sm" onClick={() => setOpen(true)}>
                     <Plus />
                     Set up a mail server
@@ -87,7 +99,103 @@ export function MailServersView() {
                 </ul>
             )}
             <SetupDialog open={open} onOpenChange={setOpen} />
+            <UninstallDialog
+                open={uninstalling}
+                onOpenChange={setUninstalling}
+                servers={loading && !data ? null : servers}
+            />
         </div>
+    );
+}
+
+/**
+ * Uninstalling the app, which waits until no mail server is left.
+ *
+ * The servers on this shelf are listed with a way to each, because removing one
+ * is a decision about its mail and belongs on its own page. The server still
+ * refuses while any server exists anywhere - including somebody else's, which
+ * this list cannot show - and the dialog says what it said.
+ */
+function UninstallDialog({
+    open,
+    onOpenChange,
+    servers
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    /** Null while the list is still loading. */
+    servers: readonly MailServerSummary[] | null;
+}) {
+    const [pending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
+    const blocked = servers === null || servers.length > 0;
+
+    function uninstall(): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await uninstallMailServerAppAction();
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            // A full load: the rail and the search drop the app as well.
+            window.location.assign("/apps/mail-server");
+        });
+    }
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!next) setError(null);
+                onOpenChange(next);
+            }}
+        >
+            <DialogContent className="w-[min(32rem,95vw)] max-w-[min(32rem,95vw)]">
+                <DialogHeader>
+                    <DialogTitle>Uninstall Mail server</DialogTitle>
+                    <DialogDescription>
+                        {servers && servers.length > 0
+                            ? "Remove your mail servers first. Each one's page has Remove from Polaris at the bottom of its overview."
+                            : "It leaves the menu and search. Nothing runs for it, so nothing is stopped, and you can install it again from the Marketplace."}
+                    </DialogDescription>
+                </DialogHeader>
+                {servers && servers.length > 0 ? (
+                    <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                        {servers.map((server) => (
+                            <li key={server.id}>
+                                <Link
+                                    href={`/apps/mail-server/${server.id}`}
+                                    className="flex items-center gap-2 px-3 py-2 text-[0.8125rem] transition-colors hover:bg-muted"
+                                >
+                                    <Server className="size-4 text-foreground-subtle" />
+                                    <span className="min-w-0 flex-1 truncate" title={server.hostname}>
+                                        {server.hostname}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">Open</span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
+                {error ? (
+                    <p role="alert" className="text-xs text-danger">
+                        {error}
+                    </p>
+                ) : null}
+                <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                        {blocked ? "Close" : "Cancel"}
+                    </Button>
+                    {blocked ? null : (
+                        <Button type="button" variant="danger" onClick={uninstall} disabled={pending}>
+                            {pending ? <Loader2 className="animate-spin" /> : null}
+                            {pending ? "Uninstalling" : "Uninstall"}
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

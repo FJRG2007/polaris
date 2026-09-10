@@ -21,12 +21,14 @@ import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
+import { MAIL_SERVER_APP, uninstallRefusal as mailServerUninstallRefusal } from "@/lib/mail-server/app-install";
 import {
     appHasCapability,
     findApp,
     isAllowedEnvValue,
     isInstallable,
     normalizeEnvValue,
+    POLARIS_APP_CATALOG,
     tunableEnvVars
 } from "@/lib/apps/catalog";
 
@@ -106,8 +108,10 @@ export async function installApp(
     if (!isInstallable(app)) throw new Error("This app cannot be installed yet");
 
     if (app.singleton) {
+        // An instance-wide app is installed once for everybody, so the question
+        // is whether anybody has, not whether this owner has.
         const existing = await prisma.installedApp.findFirst({
-            where: { ownerId, catalogId: app.id, status: { not: "removed" } }
+            where: { ...(app.instanceWide ? {} : { ownerId }), catalogId: app.id, status: { not: "removed" } }
         });
         if (existing) throw new Error("This app is already installed");
     }
@@ -311,6 +315,23 @@ export async function listInstalledApps(
     }));
 }
 
+/**
+ * The installs of instance-wide apps, whoever made them.
+ *
+ * For the marketplace, which lists what its reader installed: an app that is on
+ * for the whole Polaris is installed as far as every reader is concerned, and
+ * offering a second administrator Install on it would be offering a copy the
+ * install would refuse.
+ */
+export async function instanceWideInstallIds(): Promise<string[]> {
+    const catalogIds = POLARIS_APP_CATALOG.filter((app) => app.instanceWide).map((app) => app.id);
+    const rows = await prisma.installedApp.findMany({
+        where: { catalogId: { in: catalogIds }, status: { not: "removed" } },
+        select: { id: true }
+    });
+    return rows.map((row) => row.id);
+}
+
 /** An installed app that is backed by a deployed service, named as the app. */
 export interface InstalledAppScope {
     /** The service the rules actually attach to. */
@@ -431,6 +452,9 @@ export async function getInstalledAppSettings(ownerId: string, id: string): Prom
 export async function uninstallApp(ownerId: string, id: string): Promise<void> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) throw new Error("Installed app not found");
+    // The mail server's rule holds whichever door the uninstall came through.
+    const refusal = row.catalogId === MAIL_SERVER_APP ? await mailServerUninstallRefusal() : null;
+    if (refusal) throw new Error(refusal);
     if (row.applicationId) {
         try {
             await deleteApplication(row.applicationId, ownerId);

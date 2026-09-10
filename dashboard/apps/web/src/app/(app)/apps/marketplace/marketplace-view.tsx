@@ -28,10 +28,10 @@
 
 import Fuse from "fuse.js";
 import Link from "next/link";
-import { Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { appProvenance } from "@/lib/apps/provenance";
+import { Loader2, Search } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
+import { appProvenance } from "@/lib/apps/provenance";
 import { appInstallInputSchema } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
@@ -75,6 +75,7 @@ const CAPABILITY_LABEL: Record<AppCapability, string> = {
     "game-server": "Game server",
     "camera-hub": "Cameras",
     "home-hub": "Home",
+    "mail-server": "Mail",
     tool: "Tool"
 };
 
@@ -85,12 +86,20 @@ const STATUS_LABEL: Record<string, string> = {
     failed: "Failed"
 };
 
-export function MarketplaceView({ installed }: { installed: InstalledAppView[] }) {
+export function MarketplaceView({
+    installed,
+    initialQuery = ""
+}: {
+    installed: InstalledAppView[];
+    /** What the search starts with - an app's name, when a screen sent somebody
+     *  here to install that app. */
+    initialQuery?: string;
+}) {
     const router = useRouter();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
     const [installingId, setInstallingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [query, setQuery] = useState("");
+    const [query, setQuery] = useState(initialQuery);
     const groups = appsByCategory();
 
     /**
@@ -109,7 +118,11 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
                     setInstallingId(null);
                     return;
                 }
-                router.push(app.opensAt ?? `/apps/installed/${result.installedAppId}`);
+                // An app that opens somewhere of its own usually adds itself to the
+                // switcher or a rail, and those are drawn by the layout - which a
+                // client navigation keeps. A full load brings them along.
+                if (app.opensAt) window.location.assign(app.opensAt);
+                else router.push(`/apps/installed/${result.installedAppId}`);
             })
             .catch(() => {
                 setError("Could not install the app");
@@ -395,15 +408,19 @@ function AppCard({
                         </Link>
                     ) : installable ? (
                         <div className="flex items-center gap-1">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={onConfigure}
-                                disabled={disabled}
-                                title="Choose the server, storage and settings first"
-                            >
-                                Configure
-                            </Button>
+                            {/* A builtin app runs nothing, so there is no server,
+                                storage or setting to choose before installing it. */}
+                            {app.installMethod === "builtin" ? null : (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={onConfigure}
+                                    disabled={disabled}
+                                    title="Choose the server, storage and settings first"
+                                >
+                                    Configure
+                                </Button>
+                            )}
                             <Button size="sm" onClick={onInstall} disabled={disabled}>
                                 {installing && <Loader2 className="size-4 animate-spin" />}
                                 {installing ? "Installing" : "Install"}

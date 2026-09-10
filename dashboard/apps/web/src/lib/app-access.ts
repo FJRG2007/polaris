@@ -142,6 +142,28 @@ export async function heldSectionPermissions({ can }: AppAccessInput): Promise<s
     return verdicts.filter(([, allowed]) => allowed).map(([one]) => one);
 }
 
+/**
+ * Of the marketplace apps the rails name (AppSection.requiresApp), the ones this
+ * Polaris has installed.
+ *
+ * Resolved here for the same reason the permissions are: the rail is drawn in
+ * the browser and the answer is a query. Only the apps some section names are
+ * asked about. Without an install probe - a role preview - every one of them is
+ * treated as present, because the question there is what the grants allow.
+ */
+export async function installedSectionApps({ isInstalled }: AppAccessInput): Promise<string[]> {
+    const named = [
+        ...new Set(
+            Object.values(APP_SECTIONS)
+                .flat()
+                .flatMap((section) => (section.requiresApp ? [section.requiresApp] : []))
+        )
+    ];
+    if (!isInstalled) return named;
+    const verdicts = await Promise.all(named.map(async (one) => [one, await isInstalled(one)] as const));
+    return verdicts.filter(([, present]) => present).map(([one]) => one);
+}
+
 /** The ids of the apps this person may open, for the client components that only
  *  need to filter a list they already hold. */
 export async function reachableAppIds(input: AppAccessInput): Promise<string[]> {

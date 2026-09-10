@@ -111,7 +111,25 @@ function groupRows(rows: readonly Row[]): Group[] {
     return groups;
 }
 
-export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean; appIds: string[] }) {
+/** A list the palette was handed, back from the joined key its memo is keyed
+ *  on. */
+function fromKey(key: string): string[] {
+    return key ? key.split(",") : [];
+}
+
+export function CommandPalette({
+    isAdmin = false,
+    appIds,
+    held = [],
+    installed = []
+}: {
+    isAdmin?: boolean;
+    appIds: string[];
+    /** The same narrowing the rail is drawn with (see `AppSidebar`), so search
+     *  never finds a screen the rail leaves out. */
+    held?: string[];
+    installed?: string[];
+}) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -301,7 +319,16 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
     // Keyed on the joined ids: the array is rebuilt on every render of the layout
     // above, so identity alone would rebuild the index for nothing.
     const appKey = appIds.join(",");
-    const navigation = useMemo(() => navigationEntries(isAdmin, appKey ? appKey.split(",") : []), [isAdmin, appKey]);
+    const heldKey = held.join(",");
+    const installedKey = installed.join(",");
+    const navigation = useMemo(
+        () =>
+            navigationEntries(isAdmin, fromKey(appKey), {
+                held: fromKey(heldKey),
+                installed: fromKey(installedKey)
+            }),
+        [isAdmin, appKey, heldKey, installedKey]
+    );
 
     /** What fuse matches against: everything, or one scope's slice of the index. */
     const pool = useMemo(() => {

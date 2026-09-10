@@ -26,14 +26,15 @@ import * as nav from "@/lib/apps";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
-import { badgeLabel, waitingSays } from "@/lib/notification-badge";
-import { useAppUnread } from "@/components/app-unread";
 import { useOrgNav } from "@/components/use-org-nav";
+import { useAppUnread } from "@/components/app-unread";
 import { useInstalledNav } from "@/components/use-installed-nav";
+import { badgeLabel, waitingSays } from "@/lib/notification-badge";
 
 export function AppSidebar({
     appIds = [],
     held = [],
+    installed: installedApps = [],
     isAdmin = false
 }: {
     appIds?: string[];
@@ -45,6 +46,9 @@ export function AppSidebar({
      * of that can be asked from the browser.
      */
     held?: string[];
+    /** The marketplace apps installed, out of the ones any section requires.
+     *  Resolved on the server for the same reason; absent means none. */
+    installed?: string[];
     isAdmin?: boolean;
 }) {
     const pathname = usePathname();
@@ -79,9 +83,9 @@ export function AppSidebar({
         // then refused on the click. Being told "that page is not open to your
         // role" after following a link the app itself offered is the worst of
         // the three: it advertises something, spends a navigation, and says no
-        // somewhere nobody can act on it.
-        if (section.adminOnly && !isAdmin) return false;
-        if (section.needs && !isAdmin && !held.includes(section.needs)) return false;
+        // somewhere nobody can act on it. A screen for an app nobody installed is
+        // left out the same way.
+        if (!nav.sectionOffered(section, { isAdmin, held, installed: installedApps })) return false;
         // Outside an organization - and inside one before the answer arrives -
         // the baseline rail is the entries that ask for nothing.
         if (!org) return !section.permission;

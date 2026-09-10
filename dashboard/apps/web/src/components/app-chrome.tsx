@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import { AppNav } from "@/components/app-nav";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
-import { heldSectionPermissions, reachableAppNav } from "@/lib/app-access";
+import { heldSectionPermissions, installedSectionApps, reachableAppNav } from "@/lib/app-access";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppUrlProvider } from "@/components/app-url";
 import { CallHolder } from "@/components/call-holder";
@@ -86,6 +86,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         baseUrl,
         apps,
         held,
+        installed,
         scope,
         organizations,
         presence,
@@ -100,6 +101,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         appBaseUrl(),
         reachableAppNav(accessFor(user)),
         heldSectionPermissions(accessFor(user)),
+        installedSectionApps(accessFor(user)),
         resolveScope(user.id),
         scopeChoices(user.id),
         presenceChoiceOf(user.id),
@@ -247,6 +249,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                 <AppNavDrawer
                                                                     appIds={apps.ids}
                                                                     held={held}
+                                                                    installed={installed}
                                                                     isAdmin={user.isAdmin}
                                                                 />
                                                             }
@@ -254,12 +257,15 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                 <CommandPalette
                                                                     isAdmin={user.isAdmin}
                                                                     appIds={apps.ids}
+                                                                    held={held}
+                                                                    installed={installed}
                                                                 />
                                                             }
                                                             sidebar={
                                                                 <AppSidebar
                                                                     appIds={apps.ids}
                                                                     held={held}
+                                                                    installed={installed}
                                                                     isAdmin={user.isAdmin}
                                                                 />
                                                             }

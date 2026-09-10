@@ -16,6 +16,7 @@ import {
     Bot,
     Gamepad2,
     House,
+    Mails,
     MessagesSquare,
     ScanFace,
     Video,
@@ -35,6 +36,7 @@ export type AppCapability =
     | "game-server"
     | "camera-hub"
     | "home-hub"
+    | "mail-server"
     | "tool";
 
 /** How an app is provisioned. `compose-template` runs a compose stack via Deploy;
@@ -156,6 +158,16 @@ export interface AppManifest {
      *  installs or opens the existing one instead of allowing duplicates. */
     singleton?: boolean;
     /**
+     * One install for the whole Polaris rather than one per person who installs
+     * it. Only for a `singleton`.
+     *
+     * An app that turns a feature on - Places, Tools, the mail server - is on for
+     * everybody the moment anybody installs it, because what it gates is read
+     * instance-wide (see `install-presence`). So a second administrator is shown
+     * the one that exists rather than offered a second copy of it.
+     */
+    instanceWide?: boolean;
+    /**
      * The screen this app IS, for one whose install has nothing to manage.
      *
      * Most installs are a container, and their page is the right place to land:
@@ -238,7 +250,28 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
-        singleton: true
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Mail at the operator's own domains. Installing it runs nothing and
+        // downloads nothing: it puts the Mail server screens here, and the
+        // engine is pulled onto a machine only when somebody sets a server up
+        // from inside it - so a Polaris that sends no mail of its own never
+        // carries a mail server it did not ask for.
+        id: "mail-server",
+        name: "Mail server",
+        category: "Messaging",
+        icon: Mails,
+        opensAt: "/apps/mail-server",
+        summary: "Mail at your own domains, with its DNS written and checked for you.",
+        description:
+            "Send and receive mail at your own domains. Polaris writes the SPF, DKIM and DMARC records, checks that they are published, and files the DMARC reports receivers send back. Create mailboxes, aliases and forwards from here. Installing downloads nothing: each mail server you set up runs as a container on the machine you choose, and publishes ports 25, 465, 587, 993 and 4190 there.",
+        installMethod: "builtin",
+        capabilities: ["mail-server"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
     },
     {
         // One app for every game rather than one per game. Installing it turns the
@@ -982,7 +1015,8 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         installMethod: "builtin",
         capabilities: ["home-hub"],
         dashboard: "builtin",
-        singleton: true
+        singleton: true,
+        instanceWide: true
     },
     {
         // The relay every camera is watched through. Never offered on its own: it is
