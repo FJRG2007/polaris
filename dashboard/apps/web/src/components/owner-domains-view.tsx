@@ -16,13 +16,12 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { CopyButton } from "@/components/copy-button";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useDisplayFormat } from "@/components/display-format";
 import { CheckCircle2, Clock, Globe, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, DnsRecordCard, Input } from "@polaris/ui";
 import {
     addOwnerDomainAction,
     checkOwnerDomainAction,
@@ -265,18 +264,19 @@ function DomainCard({
 
                 {!ready && (
                     <div className="flex flex-col gap-2">
-                        <Record
-                            done={domain.verified}
+                        <DnsRecordCard
+                            status={domain.verified ? "done" : "waiting"}
                             type="TXT"
                             name={domain.txtName}
                             value={domain.txtValue}
                             note="Proves the domain is yours."
                         />
-                        <Record
-                            done={domain.wildcardOk}
+                        <DnsRecordCard
+                            status={domain.wildcardOk ? "done" : "waiting"}
                             type="A"
                             name={domain.wildcard}
-                            value={publicIp ?? "this server's public address"}
+                            value={publicIp}
+                            valueFallback="this server's public address, once it is detected"
                             note="Makes every hostname Polaris mints under it arrive here."
                         />
                     </div>
@@ -287,43 +287,5 @@ function DomainCard({
                 </p>
             </CardBody>
         </Card>
-    );
-}
-
-/** One DNS record to publish. The value is copyable because the next thing that
- *  happens to it is being pasted into a registrar's form. */
-function Record({
-    done,
-    type,
-    name,
-    value,
-    note
-}: {
-    done: boolean;
-    type: string;
-    name: string;
-    value: string;
-    note: string;
-}) {
-    return (
-        <div className="border-border bg-surface/40 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-            {done ? (
-                <CheckCircle2 className="text-primary size-4 shrink-0" />
-            ) : (
-                <Clock className="text-muted-foreground size-4 shrink-0" />
-            )}
-            <Badge variant="neutral">{type}</Badge>
-            <code className="min-w-0 flex-1 truncate text-xs" title={name}>
-                {name}
-            </code>
-            <CopyButton value={name} label={`Copy ${name}`} />
-            <code className="text-muted-foreground min-w-0 max-w-full truncate text-xs" title={value}>
-                {value}
-            </code>
-            {/* The address is resolved by the server and is not a fixed string,
-                so only the value that actually is one can be copied. */}
-            {value.includes(" ") ? null : <CopyButton value={value} label={`Copy ${value}`} />}
-            <p className="text-muted-foreground w-full text-xs">{note}</p>
-        </div>
     );
 }

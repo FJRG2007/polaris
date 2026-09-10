@@ -17,7 +17,6 @@
 
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
-import { CopyButton } from "@/components/copy-button";
 import type { ServerEnvironment } from "@polaris/core";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
@@ -34,6 +33,7 @@ import {
     CardHeader,
     CardTitle,
     Checkbox,
+    DnsRecordCard,
     Input,
     Select,
     Skeleton
@@ -1008,24 +1008,33 @@ function DnsStep({
                           : "Polaris could not detect this server's public IP."
                 }
             />
-            <div className="flex flex-col divide-y divide-border/60 rounded-md border border-border/60">
-                {state.records.map((record) => (
-                    <div key={record.wildcard} className="flex flex-col gap-1 p-2 text-xs">
-                        <RecordRow name={record.host} ip={publicIp} done={done.get(record.wildcard) === true} />
-                        <RecordRow name={record.wildcard} ip={publicIp} done={done.get(record.wildcard) === true} />
-                    </div>
-                ))}
+            <div className="grid gap-2 md:grid-cols-2">
+                {state.records.flatMap((record) =>
+                    [record.host, record.wildcard].map((name) => (
+                        <DnsRecordCard
+                            key={name}
+                            type="A"
+                            name={name}
+                            value={publicIp}
+                            valueFallback="your public IP"
+                            status={done.get(record.wildcard) === true ? "done" : "waiting"}
+                        />
+                    ))
+                )}
                 {/* One per game, and said as such: an operator who has never deployed a
                     game server has no reason to guess what `*.mc` is for. Without it
                     every server writes a record of its own, which is the thing that
                     fills a zone up. */}
                 {state.gameRecords.map((record) => (
-                    <div key={record.wildcard} className="flex flex-col gap-1 p-2 text-xs">
-                        <RecordRow name={record.wildcard} ip={publicIp} done={done.get(record.wildcard) === true} />
-                        <span className="text-muted-foreground">
-                            Covers every {record.game} server, so each one costs no DNS record.
-                        </span>
-                    </div>
+                    <DnsRecordCard
+                        key={record.wildcard}
+                        type="A"
+                        name={record.wildcard}
+                        value={publicIp}
+                        valueFallback="your public IP"
+                        status={done.get(record.wildcard) === true ? "done" : "waiting"}
+                        note={`Covers every ${record.game} server, so each one costs no DNS record.`}
+                    />
                 ))}
             </div>
 
@@ -1324,24 +1333,6 @@ function RouterAdviceNote({
                     />
                 )}
             </div>
-        </div>
-    );
-}
-
-/** One record the zone needs. `done` means the check saw this zone's names answer
- *  with this server's address, so the record exists and is pointed correctly. */
-function RecordRow({ name, ip, done }: { name: string; ip: string | null; done: boolean }) {
-    return (
-        <div className="flex items-center gap-2">
-            <Badge variant={done ? "success" : "neutral"}>A</Badge>
-            <code className="flex-1 truncate">{name}</code>
-            <code className="text-muted-foreground">{ip ?? "your public IP"}</code>
-            {done && (
-                <span title="Answering with this server's address" aria-label="Created" role="img">
-                    <CheckCircle2 className="size-3.5 shrink-0 text-success" />
-                </span>
-            )}
-            <CopyButton value={name} />
         </div>
     );
 }

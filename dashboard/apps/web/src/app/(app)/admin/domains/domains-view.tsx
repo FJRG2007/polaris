@@ -41,6 +41,7 @@ import {
     CardBody,
     CardHeader,
     CardTitle,
+    DnsRecordCard,
     Input,
     Select,
     Skeleton
@@ -984,8 +985,14 @@ function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; m
                 <b>Point a wildcard at your server, then Polaris manages every subdomain:</b>
                 <ol className="mt-1 list-decimal space-y-1 pl-4">
                     <li>
-                        Create a DNS record <code>*.{base}</code> of type A pointing at your public IP
-                        {status.publicIp ? ` (${status.publicIp})` : ""}.
+                        Create this record at your DNS provider:
+                        <DnsRecordCard
+                            type="A"
+                            name={`*.${base}`}
+                            value={status.publicIp}
+                            valueFallback="your public IP"
+                            className="mt-1.5"
+                        />
                     </li>
                     <li>
                         Forward ports <code>80</code> and <code>443</code> on your router to this server

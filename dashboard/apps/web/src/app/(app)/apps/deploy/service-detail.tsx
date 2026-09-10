@@ -56,6 +56,7 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    DnsRecordCard,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -2250,17 +2251,25 @@ function defaultLabel(name: string): string {
 /** What the server did about a custom hostname's DNS, when it did anything. */
 type AddDomainDns = Awaited<ReturnType<typeof deployActions.addDomainAction>>["dns"];
 
-/** What is left to do about a custom hostname's DNS, in one line. Null when the name
- *  already answers here, which is the case that needs saying nothing. */
-function dnsAdvice(dns: AddDomainDns, hostname: string): string | null {
+/** What is left to do about a custom hostname's DNS, in one line, and the record to
+ *  create when there is one to create by hand. Null when the name already answers
+ *  here, which is the case that needs saying nothing. */
+function dnsAdvice(
+    dns: AddDomainDns,
+    hostname: string
+): { text: string; record?: { name: string; ip: string; conflict: boolean } } | null {
     if (!dns || dns.status === "unchanged") return null;
     if (dns.status === "created")
-        return `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`;
+        return { text: `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.` };
+    const record = dns.ip ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" } : undefined;
     if (dns.status === "conflict") {
-        return `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`;
+        return {
+            text: `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`,
+            record
+        };
     }
     const target = dns.ip ? ` at ${dns.ip}` : "";
-    return `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`;
+    return { text: `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`, record };
 }
 
 /**
@@ -2492,7 +2501,7 @@ function SettingsTab({
     const [error, setError] = useState<string | null>(null);
     // Kept after a successful add: a custom domain works only once its DNS points here,
     // and whether Polaris managed that itself is the one thing the operator has to know.
-    const [dnsNote, setDnsNote] = useState<string | null>(null);
+    const [dnsNote, setDnsNote] = useState<ReturnType<typeof dnsAdvice>>(null);
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
@@ -3103,7 +3112,15 @@ function SettingsTab({
                                     )}
                                 </div>
                             )}
-                            {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote}</p>}
+                            {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote.text}</p>}
+                            {dnsNote?.record && (
+                                <DnsRecordCard
+                                    type="A"
+                                    name={dnsNote.record.name}
+                                    value={dnsNote.record.ip}
+                                    status={dnsNote.record.conflict ? "conflict" : "waiting"}
+                                />
+                            )}
                             <div className="flex justify-end">
                                 <Button
                                     variant="outline"
