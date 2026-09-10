@@ -310,6 +310,7 @@ model User {
     mailAccounts        MailAccount[]
     mailLabels          MailLabel[]
     mailUploads         MailUpload[]
+    mailTemplates       MailTemplate[]
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -9558,6 +9559,7 @@ model MailAccount {
     spamReputation MailSpamReputation[]
     spamFeedback   MailSpamFeedback[]
     subscriptions  MailSubscription[]
+    templates      MailTemplate[]
 
     @@unique([userId, address])
     @@index([userId, position])
@@ -9993,6 +9995,33 @@ model MailDraft {
 
     @@index([accountId, updatedAt])
     @@index([state, sendAt])
+}
+
+// A message somebody writes often enough to keep: a subject and a body put into
+// the composer from a menu. The same machinery as a signature, with a name and
+// as many of them as somebody wants.
+//
+// Per person, and optionally tied to one mailbox: a support reply belongs to the
+// support address and has no business being offered while writing from a
+// personal one. Null is every mailbox.
+model MailTemplate {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    accountId String?  @db.Uuid
+    name      String
+    subject   String   @default("")
+    // Markdown, the way everything written in Polaris is.
+    body      String   @default("")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    account MailAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    // Two templates called the same thing are two templates nobody can tell
+    // apart in a menu.
+    @@unique([userId, name])
+    @@index([accountId])
 }
 
 // A file somebody attached in the composer.

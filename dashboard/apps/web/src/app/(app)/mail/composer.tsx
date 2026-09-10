@@ -26,11 +26,13 @@
  * and the missing attachment, which are the two mistakes everybody makes.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { RecipientField } from "./recipient-field";
 import { useMail, type ComposerSeed } from "./mail-shell";
 import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
+import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
@@ -38,6 +40,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
     ChevronDown,
     Clock,
+    FileText,
     Loader2,
     Maximize2,
     Minimize2,
@@ -51,6 +54,7 @@ import {
     attachFromAddressAction,
     attachFromDriveAction,
     attachFromMessageAction,
+    listTemplatesAction,
     saveDraftAction,
     sendAction,
     undoSendAction
@@ -580,6 +584,16 @@ export function Composer() {
                             onEmoji={(emoji) => setInsert({ token: Date.now(), text: emoji })}
                         />
 
+                        <TemplateMenu
+                            accountId={accountId}
+                            onPick={(template) => {
+                                setInsert({ token: Date.now(), text: template.body });
+                                // A template's subject fills an empty line and
+                                // never replaces one somebody already wrote.
+                                if (template.subject && !subject.trim()) setSubject(template.subject);
+                            }}
+                        />
+
                         {signature ? (
                             <Button
                                 variant="ghost"
@@ -611,6 +625,69 @@ export function Composer() {
                 />
             ) : null}
         </div>
+    );
+}
+
+/**
+ * Insert a template.
+ *
+ * The list is asked for when the menu opens rather than with the page: most
+ * messages are written without one, and a template made in another tab a minute
+ * ago should be in the list. Only the ones offered for the mailbox this message
+ * goes from are shown - a support reply tied to the support address has no
+ * business in a personal message.
+ */
+function TemplateMenu({
+    accountId,
+    onPick
+}: {
+    accountId: string;
+    onPick: (template: MailTemplateView) => void;
+}) {
+    const [templates, setTemplates] = useState<MailTemplateView[] | null>(null);
+
+    const offered = (templates ?? []).filter(
+        (template) => template.accountId === null || template.accountId === accountId
+    );
+
+    return (
+        <DropdownMenu
+            onOpenChange={(open) => {
+                if (!open) return;
+                void listTemplatesAction().then((answer) => setTemplates(answer.templates));
+            }}
+        >
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Insert a template"
+                    title="Insert a template"
+                >
+                    <FileText className="size-4 shrink-0" aria-hidden />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-w-72">
+                {templates === null ? (
+                    <DropdownMenuItem disabled>
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                        Loading templates
+                    </DropdownMenuItem>
+                ) : offered.length === 0 ? (
+                    <DropdownMenuItem disabled>No templates for this mailbox yet</DropdownMenuItem>
+                ) : (
+                    offered.map((template) => (
+                        <DropdownMenuItem key={template.id} onSelect={() => onPick(template)}>
+                            <span className="truncate" title={template.name}>{template.name}</span>
+                        </DropdownMenuItem>
+                    ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <Link href="/mail/settings/templates">Manage templates</Link>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 

@@ -18,6 +18,7 @@ const SCREENS = [
     { label: "Labels", href: "/mail/settings/labels" },
     { label: "Filters", href: "/mail/settings/rules" },
     { label: "Signature", href: "/mail/settings/signature" },
+    { label: "Templates", href: "/mail/settings/templates" },
     { label: "Privacy", href: "/mail/settings/privacy" },
     { label: "Junk", href: "/mail/settings/junk" },
     { label: "Blocked", href: "/mail/settings/blocked" },

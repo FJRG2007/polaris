@@ -562,6 +562,31 @@ export const mailAttachFromAddressSchema = z.object({
     url: z.string().trim().url().max(2048)
 });
 
+/**
+ * A message template: a name for the menu, and the subject and body it puts into
+ * the composer.
+ *
+ * A body is the only thing a template has to carry - a subject is optional,
+ * because most templates are a paragraph dropped into a reply that already has
+ * one. The ceiling is a letter's, not a newsletter's: a template is text
+ * somebody inserts while writing, and a megabyte of it is a mistake.
+ */
+export const mailTemplateSchema = z.object({
+    name: z
+        .string()
+        .transform(normalizeMailName)
+        .pipe(z.string().min(1, "Give it a name").max(80, "Keep the name under 80 characters")),
+    subject: z.string().transform(normalizeMailName).pipe(z.string().max(500)).default(""),
+    body: z
+        .string()
+        .max(50_000, "That is longer than a template can be")
+        .refine((value) => value.trim().length > 0, { message: "Write what the template says" }),
+    /** Offered only while writing from this mailbox. Null is every mailbox. */
+    accountId: z.string().uuid().nullable().default(null)
+});
+
+export type MailTemplateInput = z.infer<typeof mailTemplateSchema>;
+
 /** Carrying the files of a message being forwarded onto the forward. Whose the
  *  message is, is decided on the server inside the query that finds it. */
 export const mailAttachFromMessageSchema = z.object({

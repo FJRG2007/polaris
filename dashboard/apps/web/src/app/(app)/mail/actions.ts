@@ -35,6 +35,7 @@ import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
+import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
@@ -70,6 +71,7 @@ function failure(
         return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
+    if (caught instanceof templates.MailTemplateNameTaken) return { error: caught.message, field: "name" };
     if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
     return { error: fallback };
@@ -668,6 +670,44 @@ export async function setMailKeysAction(input: unknown) {
         return { keys: parsed.data };
     } catch (caught) {
         return failure(caught, "Those shortcuts could not be saved.");
+    }
+}
+
+/** Every template this person has, for the composer's menu and the settings
+ *  screen. Read when the menu opens rather than with the page, because most
+ *  messages are written without one. */
+export async function listTemplatesAction() {
+    const userId = await actorId();
+    return { templates: await templates.listTemplates(userId) };
+}
+
+export async function saveTemplateAction(templateId: string | null, input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailTemplateSchema.safeParse(input);
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return {
+            error: issue?.message ?? "Check the template.",
+            field: String(issue?.path[0] ?? "")
+        };
+    }
+    try {
+        const id = await templates.saveTemplate(userId, templateId, parsed.data);
+        refresh();
+        return { id };
+    } catch (caught) {
+        return failure(caught, "That template could not be saved.");
+    }
+}
+
+export async function deleteTemplateAction(templateId: string) {
+    const userId = await actorId();
+    try {
+        await templates.deleteTemplate(userId, templateId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That template could not be removed.");
     }
 }
 
