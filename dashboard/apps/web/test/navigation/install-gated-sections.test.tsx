@@ -26,17 +26,23 @@ const mailSection = APP_SECTIONS.apps?.find((section) => section.href === MAIL) 
 describe("whether a section is offered", () => {
     it("leaves an app nobody installed out, for an administrator too", () => {
         expect(sectionOffered(mailSection, { isAdmin: true, held: [], installed: [] })).toBe(false);
-        expect(sectionOffered(mailSection, { isAdmin: true, held: [], installed: ["mail-server"] })).toBe(true);
+        expect(
+            sectionOffered(mailSection, { isAdmin: true, held: [], installed: ["mail-server"] })
+        ).toBe(true);
     });
 
     it("still asks the permission once it is installed", () => {
         const installed = ["mail-server"];
         expect(sectionOffered(mailSection, { isAdmin: false, held: [], installed })).toBe(false);
-        expect(sectionOffered(mailSection, { isAdmin: false, held: ["mailserver.manage"], installed })).toBe(true);
+        expect(
+            sectionOffered(mailSection, { isAdmin: false, held: ["mailserver.manage"], installed })
+        ).toBe(true);
     });
 
     it("changes nothing for a section that needs no app", () => {
-        const deploy = APP_SECTIONS.apps?.find((section) => section.href === "/apps/deploy") as AppSection;
+        const deploy = APP_SECTIONS.apps?.find(
+            (section) => section.href === "/apps/deploy"
+        ) as AppSection;
         expect(sectionOffered(deploy, { isAdmin: false, held: [], installed: [] })).toBe(true);
     });
 });
@@ -55,19 +61,27 @@ describe("which apps the rails can name", () => {
         expect(asked).toContain("mail-server");
         expect(installed).toEqual([]);
         expect(
-            await installedSectionApps({ isAdmin: true, can: async () => true, isInstalled: async () => true })
+            await installedSectionApps({
+                isAdmin: true,
+                can: async () => true,
+                isInstalled: async () => true
+            })
         ).toContain("mail-server");
     });
 
     it("treats every one as present for a role preview, which has no probe", async () => {
-        expect(await installedSectionApps({ isAdmin: false, can: async () => true })).toContain("mail-server");
+        expect(await installedSectionApps({ isAdmin: false, can: async () => true })).toContain(
+            "mail-server"
+        );
     });
 });
 
 describe("the rail", () => {
     it("draws Mail server only once it is installed", () => {
         const without = renderToStaticMarkup(<AppSidebar appIds={ALL_APPS} isAdmin />);
-        const withIt = renderToStaticMarkup(<AppSidebar appIds={ALL_APPS} isAdmin installed={["mail-server"]} />);
+        const withIt = renderToStaticMarkup(
+            <AppSidebar appIds={ALL_APPS} isAdmin installed={["mail-server"]} />
+        );
         expect(without).not.toContain(`href="${MAIL}"`);
         expect(without).toContain('href="/apps/deploy"');
         expect(withIt).toContain(`href="${MAIL}"`);
@@ -85,11 +99,12 @@ describe("the search", () => {
 
     it("does not find it for somebody who cannot manage mail servers", () => {
         expect(hrefs({ held: [], installed: ["mail-server"] }, false)).not.toContain(MAIL);
-        expect(hrefs({ held: ["mailserver.manage"], installed: ["mail-server"] }, false)).toContain(MAIL);
+        expect(hrefs({ held: ["mailserver.manage"], installed: ["mail-server"] }, false)).toContain(
+            MAIL
+        );
     });
 
     it("lists every section when nothing narrows it", () => {
         expect(hrefs()).toContain(MAIL);
     });
 });
-

@@ -21,7 +21,12 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
 import { clearOrgBudgetAction, saveOrgBudgetAction } from "./actions";
 import { useStatementFormat } from "@/components/billing/statement-parts";
-import { budgetLevel, BUDGET_THRESHOLDS, orgBudgetInputSchema, type CurrencyCode } from "@polaris/core";
+import {
+    budgetLevel,
+    BUDGET_THRESHOLDS,
+    orgBudgetInputSchema,
+    type CurrencyCode
+} from "@polaris/core";
 
 type Budget = { amount: number; currency: CurrencyCode };
 
@@ -50,7 +55,8 @@ export function BudgetCard({
     const format = useStatementFormat(saved?.currency ?? currency);
 
     const parsed = useMemo(() => orgBudgetInputSchema.safeParse({ amount: draft }), [draft]);
-    const problem = draft.trim() === "" || parsed.success ? null : (parsed.error.issues[0]?.message ?? null);
+    const problem =
+        draft.trim() === "" || parsed.success ? null : (parsed.error.issues[0]?.message ?? null);
     const matches = saved !== null && saved.currency === currency;
     const unchanged = parsed.success && matches && parsed.data.amount === saved.amount;
 
@@ -60,7 +66,10 @@ export function BudgetCard({
         setSaved({ amount: parsed.data.amount, currency });
         setBusy(true);
         setError("");
-        const result = await runAction(() => saveOrgBudgetAction(orgId, { amount: draft }), setError);
+        const result = await runAction(
+            () => saveOrgBudgetAction(orgId, { amount: draft }),
+            setError
+        );
         setBusy(false);
         if (!result || result.error) {
             setSaved(previous);
@@ -76,7 +85,8 @@ export function BudgetCard({
     const clear = async () => {
         const ok = await confirm({
             title: "Remove the budget?",
-            description: "Nobody will be told when this organization's spending passes 80% or 100% of a month.",
+            description:
+                "Nobody will be told when this organization's spending passes 80% or 100% of a month.",
             confirmLabel: "Remove budget",
             danger: true
         });
@@ -102,10 +112,13 @@ export function BudgetCard({
                 <CardBody className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">Monthly budget</h2>
                     <p className="text-muted-foreground text-xs">
-                        This Polaris has no prices set, so the statement shows usage only and there is nothing to measure
-                        a budget against.{" "}
+                        This Polaris has no prices set, so the statement shows usage only and there
+                        is nothing to measure a budget against.{" "}
                         {canSetPrices ? (
-                            <Link href="/admin/billing" className="text-foreground underline underline-offset-2">
+                            <Link
+                                href="/admin/billing"
+                                className="text-foreground underline underline-offset-2"
+                            >
                                 Set prices
                             </Link>
                         ) : (
@@ -127,15 +140,21 @@ export function BudgetCard({
                     <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-medium">Monthly budget</h2>
                         <p className="text-muted-foreground text-xs">
-                            The people who run this organization&apos;s settings are told when a month reaches{" "}
-                            {BUDGET_THRESHOLDS.map((threshold) => `${threshold}%`).join(" and ")} of it.
+                            The people who run this organization&apos;s settings are told when a
+                            month reaches{" "}
+                            {BUDGET_THRESHOLDS.map((threshold) => `${threshold}%`).join(" and ")} of
+                            it.
                         </p>
                     </div>
                     {matches && share !== null ? (
                         <p
                             className={cn(
                                 "shrink-0 text-sm font-medium tabular-nums",
-                                level >= 100 ? "text-danger" : level >= 80 ? "text-warning-ink" : "text-foreground"
+                                level >= 100
+                                    ? "text-danger"
+                                    : level >= 80
+                                      ? "text-warning-ink"
+                                      : "text-foreground"
                             )}
                         >
                             {format.currency(spent)} of {format.currency(saved.amount)}
@@ -145,8 +164,8 @@ export function BudgetCard({
 
                 {saved && !matches ? (
                     <p className="border-warning-edge bg-warning-soft text-warning-ink rounded-md border px-3 py-2 text-xs">
-                        This budget was set in {saved.currency} and prices are now in {currency}. Set it again in{" "}
-                        {currency} to keep it measured.
+                        This budget was set in {saved.currency} and prices are now in {currency}.
+                        Set it again in {currency} to keep it measured.
                     </p>
                 ) : null}
 
@@ -163,7 +182,11 @@ export function BudgetCard({
                             <div
                                 className={cn(
                                     "h-full rounded-full",
-                                    level >= 100 ? "bg-danger" : level >= 80 ? "bg-warning" : "bg-primary"
+                                    level >= 100
+                                        ? "bg-danger"
+                                        : level >= 80
+                                          ? "bg-warning"
+                                          : "bg-primary"
                                 )}
                                 style={{ width: `${Math.min(100, share)}%` }}
                             />
@@ -194,7 +217,9 @@ export function BudgetCard({
                                     if (event.key === "Enter") void save();
                                 }}
                             />
-                            <span className="text-muted-foreground text-xs">{currency} a month</span>
+                            <span className="text-muted-foreground text-xs">
+                                {currency} a month
+                            </span>
                         </div>
                         {problem ? (
                             <p id="org-budget-error" className="text-danger text-xs">

@@ -26,7 +26,13 @@ import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/a
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
 import { Badge, Button, Checkbox, DnsRecordTable, Input, Select, Skeleton } from "@polaris/ui";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "@/app/(app)/apps/servers/environment-meta";
-import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
+import {
+    clearSetupDraft,
+    isUntouched,
+    readSetupDraft,
+    savedAnswers,
+    writeSetupDraft
+} from "./setup-draft";
 import {
     approachesFor,
     approachOf,
@@ -97,7 +103,9 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
     // The domain the setup would actually use, which is what DNS is looked up for and
     // what the zone previews are built from - a DuckDNS subdomain is a domain too.
     const effectiveBase =
-        strategy === "duckdns" ? duckSub.trim() && `${duckSub.trim()}.duckdns.org` : baseDomain.trim();
+        strategy === "duckdns"
+            ? duckSub.trim() && `${duckSub.trim()}.duckdns.org`
+            : baseDomain.trim();
 
     // Every fresh read is handed on, not just the one after a save: opening the setup
     // re-checks the DNS, and a zone that has started answering moves the dashboard onto
@@ -136,7 +144,9 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                 if (next.zones.baseDomain) setStep(3);
             })
             .catch((caught: unknown) => {
-                setLoadError(caught instanceof Error ? caught.message : "Could not read your setup");
+                setLoadError(
+                    caught instanceof Error ? caught.message : "Could not read your setup"
+                );
             });
     }
 
@@ -195,7 +205,11 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                 actions={
                     <div className="flex items-center gap-1.5">
                         {STEPS.map((title) => (
-                            <span key={title} className="h-1.5 w-6 rounded-full bg-border" title={title} />
+                            <span
+                                key={title}
+                                className="h-1.5 w-6 rounded-full bg-border"
+                                title={title}
+                            />
                         ))}
                     </div>
                 }
@@ -317,7 +331,9 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                     {/* The domain in use, on every step: the answer to "what is this
                         box on" was two steps deep before, so reopening the setup read
                         as though the domain had never been saved. */}
-                    {state.zones.baseDomain && <Badge variant="neutral">{state.zones.baseDomain}</Badge>}
+                    {state.zones.baseDomain && (
+                        <Badge variant="neutral">{state.zones.baseDomain}</Badge>
+                    )}
                     {STEPS.map((title, index) => (
                         <span
                             key={title}
@@ -357,7 +373,11 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                     selected={strategy}
                     tunnelReady={state.cloudflareTunnelReady}
                     lanIp={state.lanIp}
-                    gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)}
+                    gameRules={gameForwardRules(
+                        state.gameServers,
+                        state.portPolicy,
+                        state.portBlocks
+                    )}
                     onSelect={setStrategy}
                 />
             )}
@@ -464,7 +484,9 @@ function EnvironmentStep({
                             type="button"
                             onClick={() => onSelect(option)}
                             className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
-                                selected === option ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
+                                selected === option
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border/60 hover:bg-muted/40"
                             }`}
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
@@ -545,7 +567,9 @@ function StrategyStep({
                                 // re-reading, and doing so must not undo a choice.
                                 onClick={() => !active && onSelect(option.best)}
                                 className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
-                                    active ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
+                                    active
+                                        ? "border-primary bg-primary/5"
+                                        : "border-border/60 hover:bg-muted/40"
                                 }`}
                             >
                                 <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
@@ -561,27 +585,41 @@ function StrategyStep({
                                         </Badge>
                                     )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {option.meta.summary}
+                                </span>
                                 <span className="flex flex-col gap-1 text-xs">
                                     {option.meta.pros.map((line) => (
-                                        <span key={line} className="flex items-start gap-1.5 text-muted-foreground">
-                                            <Check className="mt-0.5 size-3 shrink-0 text-success" /> {line}
+                                        <span
+                                            key={line}
+                                            className="flex items-start gap-1.5 text-muted-foreground"
+                                        >
+                                            <Check className="mt-0.5 size-3 shrink-0 text-success" />{" "}
+                                            {line}
                                         </span>
                                     ))}
                                     {option.meta.cons.map((line) => (
-                                        <span key={line} className="flex items-start gap-1.5 text-muted-foreground">
-                                            <Minus className="mt-0.5 size-3 shrink-0 text-warning" /> {line}
+                                        <span
+                                            key={line}
+                                            className="flex items-start gap-1.5 text-muted-foreground"
+                                        >
+                                            <Minus className="mt-0.5 size-3 shrink-0 text-warning" />{" "}
+                                            {line}
                                         </span>
                                     ))}
                                 </span>
-                                {option.note && <span className="text-xs text-warning">{option.note}</span>}
+                                {option.note && (
+                                    <span className="text-xs text-warning">{option.note}</span>
+                                )}
                             </button>
                         );
                     })}
                 </div>
                 {approach === "ports" && forwardable && (
                     <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                        <p className="font-medium text-foreground">What you have to do in the router</p>
+                        <p className="font-medium text-foreground">
+                            What you have to do in the router
+                        </p>
                         <p>
                             Forward ports 80 and 443 to this server
                             {gameRules.length > 0
@@ -589,17 +627,25 @@ function StrategyStep({
                                     ? ", plus the range your game servers answer in"
                                     : `, plus ${gameRules.length === 1 ? "the port" : "the ports"} your game servers answer on`
                                 : ""}
-                            . Pick your brand for the exact menu names and the values to type - the rest of the setup
-                            works either way, so this can be done afterwards.
+                            . Pick your brand for the exact menu names and the values to type - the
+                            rest of the setup works either way, so this can be done afterwards.
                         </p>
-                        <RouterSteps server={null} lanIp={lanIp} rules={[...FORWARD_RULES, ...gameRules]} />
+                        <RouterSteps
+                            server={null}
+                            lanIp={lanIp}
+                            rules={[...FORWARD_RULES, ...gameRules]}
+                        />
                     </div>
                 )}
             </div>
 
             <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
                 <StepTitle
-                    title={approach === "tunnel" ? "Which tunnel?" : "Which domain do the hostnames come from?"}
+                    title={
+                        approach === "tunnel"
+                            ? "Which tunnel?"
+                            : "Which domain do the hostnames come from?"
+                    }
                     hint="Ordered by what costs least and depends on the fewest others."
                 />
                 <div className="flex flex-col gap-2">
@@ -612,7 +658,9 @@ function StrategyStep({
                                 disabled={!option.available}
                                 onClick={() => onSelect(option.id)}
                                 className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
-                                    active ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
+                                    active
+                                        ? "border-primary bg-primary/5"
+                                        : "border-border/60 hover:bg-muted/40"
                                 } ${option.available ? "" : "cursor-not-allowed opacity-50"}`}
                             >
                                 <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
@@ -625,14 +673,20 @@ function StrategyStep({
                                         // The best on this side, said as such: the overall
                                         // recommendation sits on the other one, and a list
                                         // with no cue at all reads as five equal options.
-                                        option.id === picked?.best && <Badge variant="primary">Best of these</Badge>
+                                        option.id === picked?.best && (
+                                            <Badge variant="primary">Best of these</Badge>
+                                        )
                                     )}
-                                    {option.meta.wildcard && <Badge variant="neutral">Wildcard</Badge>}
+                                    {option.meta.wildcard && (
+                                        <Badge variant="neutral">Wildcard</Badge>
+                                    )}
                                     {option.id === "cloudflare-tunnel" && tunnelReady && (
                                         <Badge variant="neutral">Token connected</Badge>
                                     )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {option.meta.summary}
+                                </span>
                                 <span className="text-xs text-muted-foreground">
                                     Depends on: {option.meta.dependency}
                                 </span>
@@ -642,7 +696,9 @@ function StrategyStep({
                                     </span>
                                 )}
                                 {option.note && (
-                                    <span className={`text-xs ${option.available ? "text-primary" : "text-warning"}`}>
+                                    <span
+                                        className={`text-xs ${option.available ? "text-primary" : "text-warning"}`}
+                                    >
                                         {option.note}
                                     </span>
                                 )}
@@ -697,7 +753,11 @@ function DomainStep({
     function makePrimary(index: number) {
         const scope = zones[index]?.scope;
         if (!scope) return;
-        onZones(zones.map((zone, position) => (zone.scope === scope ? { ...zone, primary: position === index } : zone)));
+        onZones(
+            zones.map((zone, position) =>
+                zone.scope === scope ? { ...zone, primary: position === index } : zone
+            )
+        );
     }
 
     // Only a wildcard strategy has zones to lay out. A tunnel publishes each service
@@ -707,18 +767,29 @@ function DomainStep({
         return (
             <div className="flex flex-col gap-3">
                 <StepTitle
-                    title={meta.needsDomain ? "Set this up under Integrations" : "Nothing to configure"}
-                    hint={meta.needsDomain ? "The tunnel publishes each service itself." : "This option needs no domain and no DNS."}
+                    title={
+                        meta.needsDomain ? "Set this up under Integrations" : "Nothing to configure"
+                    }
+                    hint={
+                        meta.needsDomain
+                            ? "The tunnel publishes each service itself."
+                            : "This option needs no domain and no DNS."
+                    }
                 />
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                     {meta.summary}
                 </p>
                 {meta.needsDomain ? (
-                    <a href="/admin/integrations" className="w-fit text-xs text-primary hover:underline">
+                    <a
+                        href="/admin/integrations"
+                        className="w-fit text-xs text-primary hover:underline"
+                    >
                         Open Integrations
                     </a>
                 ) : (
-                    <p className="text-xs text-muted-foreground">You can come back and point a domain here at any time.</p>
+                    <p className="text-xs text-muted-foreground">
+                        You can come back and point a domain here at any time.
+                    </p>
                 )}
             </div>
         );
@@ -735,7 +806,12 @@ function DomainStep({
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1 text-sm">
                         DuckDNS subdomain
-                        <Input value={duckSub} onChange={(event) => onDuckSub(event.target.value)} placeholder="mypolaris" autoComplete="off" />
+                        <Input
+                            value={duckSub}
+                            onChange={(event) => onDuckSub(event.target.value)}
+                            placeholder="mypolaris"
+                            autoComplete="off"
+                        />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Token
@@ -743,7 +819,11 @@ function DomainStep({
                             type="password"
                             value={duckToken}
                             onChange={(event) => onDuckToken(event.target.value)}
-                            placeholder={hasDuckToken ? "Saved - enter a new token to replace it" : "DuckDNS token"}
+                            placeholder={
+                                hasDuckToken
+                                    ? "Saved - enter a new token to replace it"
+                                    : "DuckDNS token"
+                            }
                             autoComplete="off"
                         />
                     </label>
@@ -758,12 +838,15 @@ function DomainStep({
                         autoComplete="off"
                     />
                     <span className="text-xs text-muted-foreground">
-                        Any domain or subdomain you control - example.com, plr.com, or plr.example.com.
+                        Any domain or subdomain you control - example.com, plr.com, or
+                        plr.example.com.
                     </span>
                 </label>
             )}
 
-            {provider && <ProviderHint provider={provider} cloudflareConnected={cloudflareConnected} />}
+            {provider && (
+                <ProviderHint provider={provider} cloudflareConnected={cloudflareConnected} />
+            )}
 
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
@@ -771,13 +854,18 @@ function DomainStep({
                     <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => onZones([...zones, { label: "", scope: "deploy", primary: false }])}
+                        onClick={() =>
+                            onZones([...zones, { label: "", scope: "deploy", primary: false }])
+                        }
                     >
                         <Plus className="size-4" /> Add zone
                     </Button>
                 </div>
                 {zones.map((zone, index) => (
-                    <div key={index} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
+                    <div
+                        key={index}
+                        className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2"
+                    >
                         <Input
                             value={zone.label}
                             onChange={(event) => updateZone(index, { label: event.target.value })}
@@ -787,7 +875,9 @@ function DomainStep({
                         />
                         <Select
                             value={zone.scope}
-                            onValueChange={(value) => updateZone(index, { scope: value as ZoneRow["scope"] })}
+                            onValueChange={(value) =>
+                                updateZone(index, { scope: value as ZoneRow["scope"] })
+                            }
                             options={[
                                 { value: "polaris", label: "Polaris itself" },
                                 { value: "deploy", label: "Deployed services" }
@@ -795,7 +885,9 @@ function DomainStep({
                             className="w-44"
                         />
                         <code className="flex-1 truncate text-xs text-muted-foreground">
-                            {effectiveBase ? `*.${zone.label ? `${zone.label}.` : ""}${effectiveBase}` : "Enter a domain above"}
+                            {effectiveBase
+                                ? `*.${zone.label ? `${zone.label}.` : ""}${effectiveBase}`
+                                : "Enter a domain above"}
                         </code>
                         {zone.primary ? (
                             <Badge variant="neutral">Default</Badge>
@@ -807,7 +899,9 @@ function DomainStep({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onZones(zones.filter((_, position) => position !== index))}
+                            onClick={() =>
+                                onZones(zones.filter((_, position) => position !== index))
+                            }
                             aria-label="Remove zone"
                         >
                             <Trash2 className="size-4" />
@@ -815,7 +909,8 @@ function DomainStep({
                     </div>
                 ))}
                 <p className="text-xs text-muted-foreground">
-                    Leave a label empty to use the base domain itself. New services get a name in the default deploy zone.
+                    Leave a label empty to use the base domain itself. New services get a name in
+                    the default deploy zone.
                 </p>
             </div>
 
@@ -832,7 +927,8 @@ function DomainStep({
                         Use the Polaris zone for the dashboard too
                     </label>
                     <span className="text-xs text-muted-foreground">
-                        Applied once the zone is seen resolving to this server, so no link breaks in the meantime.
+                        Applied once the zone is seen resolving to this server, so no link breaks in
+                        the meantime.
                     </span>
                 </div>
             )}
@@ -864,7 +960,9 @@ function DnsStep({
         } catch (caught) {
             // Without this the buttons stay disabled forever on any failure, leaving
             // the operator on a dead final step with nothing said.
-            setMessage(caught instanceof Error ? caught.message : "Could not check the DNS records");
+            setMessage(
+                caught instanceof Error ? caught.message : "Could not check the DNS records"
+            );
         }
     }
 
@@ -907,11 +1005,19 @@ function DnsStep({
             const parts = [
                 ...(result.created.length > 0 ? [`${result.created.length} created`] : []),
                 ...(result.replaced.length > 0 ? [`${result.replaced.length} repointed`] : []),
-                ...(result.unchanged.length > 0 ? [`${result.unchanged.length} already correct`] : []),
+                ...(result.unchanged.length > 0
+                    ? [`${result.unchanged.length} already correct`]
+                    : []),
                 ...(result.conflicts.length > 0 ? [`${result.conflicts.length} left alone`] : []),
-                ...(result.failed.length > 0 ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`] : [])
+                ...(result.failed.length > 0
+                    ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`]
+                    : [])
             ];
-            setMessage(parts.length > 0 ? `${parts.join(", ")}.` : "Nothing to do - the records are already in place.");
+            setMessage(
+                parts.length > 0
+                    ? `${parts.join(", ")}.`
+                    : "Nothing to do - the records are already in place."
+            );
             await runCheck();
             // The check above is where a zone is first seen answering, which is what
             // moves the dashboard onto it - so what the server holds has just changed
@@ -938,7 +1044,14 @@ function DnsStep({
     if (state.records.length === 0 || duckdns) {
         return (
             <div className="flex flex-col gap-3">
-                <StepTitle title="Done" hint={duckdns ? "DuckDNS answers for every name under your subdomain." : "This setup needs no DNS records."} />
+                <StepTitle
+                    title="Done"
+                    hint={
+                        duckdns
+                            ? "DuckDNS answers for every name under your subdomain."
+                            : "This setup needs no DNS records."
+                    }
+                />
                 <p className="rounded-md border border-success-edge bg-success-soft px-3 py-2 text-xs text-muted-foreground">
                     {duckdns
                         ? `Nothing to create: ${state.zones.baseDomain} already resolves every subdomain, and Polaris keeps it pointed at this server as your IP changes.`
@@ -946,13 +1059,32 @@ function DnsStep({
                 </p>
                 {duckdns && (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
-                            <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={check}
+                            disabled={busy !== null}
+                        >
+                            <RefreshCw
+                                className={`size-4 ${busy === "check" ? "animate-spin" : ""}`}
+                            />{" "}
+                            Check DNS
                         </Button>
-                        {message && <span className="text-xs text-muted-foreground">{message}</span>}
+                        {message && (
+                            <span className="text-xs text-muted-foreground">{message}</span>
+                        )}
                     </div>
                 )}
-                {duckdns && <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)} />}
+                {duckdns && (
+                    <ZoneResults
+                        report={report}
+                        gameRules={gameForwardRules(
+                            state.gameServers,
+                            state.portPolicy,
+                            state.portBlocks
+                        )}
+                    />
+                )}
             </div>
         );
     }
@@ -965,13 +1097,17 @@ function DnsStep({
     // Proven, not assumed: a zone counts as done only once the check has seen both of
     // its names answer with this server's address.
     const done = new Map(
-        [...(report?.zones ?? []), ...(report?.gameZones ?? [])].map((zone) => [zone.wildcard, zone.ok])
+        [...(report?.zones ?? []), ...(report?.gameZones ?? [])].map((zone) => [
+            zone.wildcard,
+            zone.ok
+        ])
     );
     // The zones proper decide whether the layout is verified, exactly as before. A
     // game's wildcard is counted here only so the step keeps offering to create it -
     // it is not part of what makes the domain work, it is what keeps a zone from
     // filling up one record per game server.
-    const zonesVerified = report !== null && report.zones.length > 0 && report.zones.every((zone) => zone.ok);
+    const zonesVerified =
+        report !== null && report.zones.length > 0 && report.zones.every((zone) => zone.ok);
     const verified = zonesVerified && (report?.gameZones ?? []).every((zone) => zone.ok);
 
     return (
@@ -994,7 +1130,10 @@ function DnsStep({
                             name,
                             value: publicIp,
                             valueFallback: "your public IP",
-                            status: done.get(record.wildcard) === true ? ("done" as const) : ("waiting" as const)
+                            status:
+                                done.get(record.wildcard) === true
+                                    ? ("done" as const)
+                                    : ("waiting" as const)
                         }))
                     ),
                     // One per game, and said as such: an operator who has never deployed a
@@ -1006,17 +1145,23 @@ function DnsStep({
                         name: record.wildcard,
                         value: publicIp,
                         valueFallback: "your public IP",
-                        status: done.get(record.wildcard) === true ? ("done" as const) : ("waiting" as const),
+                        status:
+                            done.get(record.wildcard) === true
+                                ? ("done" as const)
+                                : ("waiting" as const),
                         note: `Covers every ${record.game} server, so each one costs no DNS record.`
                     }))
                 ]}
             />
 
-            {provider && <ProviderHint provider={provider} cloudflareConnected={state.cloudflareConnected} />}
+            {provider && (
+                <ProviderHint provider={provider} cloudflareConnected={state.cloudflareConnected} />
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
-                    <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
+                    <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} />{" "}
+                    Check DNS
                 </Button>
                 {/* Withdrawn once every zone answers with this server's address: there is
                     nothing left to create, and a live button there invites a second run
@@ -1061,13 +1206,14 @@ function DnsStep({
                 <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                     <span className="flex items-start gap-2 text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                        These records already exist and point somewhere else. Polaris left them alone - replacing one
-                        takes whatever answers on it today offline.
+                        These records already exist and point somewhere else. Polaris left them
+                        alone - replacing one takes whatever answers on it today offline.
                     </span>
                     <ul className="flex flex-col gap-0.5 pl-5 text-muted-foreground">
                         {conflicts.map((conflict) => (
                             <li key={conflict.name}>
-                                <code>{conflict.name}</code> - {conflict.content || "unknown address"}
+                                <code>{conflict.name}</code> -{" "}
+                                {conflict.content || "unknown address"}
                             </li>
                         ))}
                     </ul>
@@ -1083,7 +1229,10 @@ function DnsStep({
                 </div>
             )}
 
-            <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)} />
+            <ZoneResults
+                report={report}
+                gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)}
+            />
         </div>
     );
 }
@@ -1097,7 +1246,13 @@ function DnsStep({
  * The token is only ever sent to the server, which stores it encrypted; nothing here
  * keeps a copy once it has been accepted.
  */
-function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: () => Promise<void> }) {
+function CloudflareConnect({
+    zone,
+    onConnected
+}: {
+    zone: string;
+    onConnected: () => Promise<void>;
+}) {
     const [token, setToken] = useState("");
     const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
     const [accountId, setAccountId] = useState("");
@@ -1115,7 +1270,8 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
             scope: "dns",
             ...(accountId ? { accountId } : {})
         }).catch((caught: unknown) => ({
-            error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token",
+            error:
+                caught instanceof Error ? caught.message : "Could not connect the Cloudflare token",
             connected: false,
             accounts: []
         }));
@@ -1147,9 +1303,10 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
     return (
         <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
             <span className="text-muted-foreground">
-                Polaris writes the records through Cloudflare&apos;s API, which needs a token. The link opens
-                Cloudflare with the two permissions it needs already selected - create the token, paste it here,
-                and {zone ? <code>{zone}</code> : "your domain"} is set up without touching a DNS panel.
+                Polaris writes the records through Cloudflare&apos;s API, which needs a token. The
+                link opens Cloudflare with the two permissions it needs already selected - create
+                the token, paste it here, and {zone ? <code>{zone}</code> : "your domain"} is set up
+                without touching a DNS panel.
             </span>
             <a
                 href={CLOUDFLARE_DNS_TOKEN_URL}
@@ -1172,7 +1329,10 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
                     <Select
                         value={accountId}
                         onValueChange={setAccountId}
-                        options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+                        options={accounts.map((account) => ({
+                            value: account.id,
+                            label: account.name
+                        }))}
                     />
                 </label>
             )}
@@ -1194,7 +1354,13 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
  * A provider Polaris does not recognize still names its nameservers - that is usually
  * enough for the operator to recognize who they are with.
  */
-function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProviderInfo; cloudflareConnected: boolean }) {
+function ProviderHint({
+    provider,
+    cloudflareConnected
+}: {
+    provider: DnsProviderInfo;
+    cloudflareConnected: boolean;
+}) {
     const automated = provider.automatable && cloudflareConnected;
     return (
         <div
@@ -1203,7 +1369,9 @@ function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProvider
             }`}
         >
             <span className="flex items-center gap-2 text-muted-foreground">
-                <Globe className={`size-3.5 shrink-0 ${automated ? "text-success" : "text-muted-foreground"}`} />
+                <Globe
+                    className={`size-3.5 shrink-0 ${automated ? "text-success" : "text-muted-foreground"}`}
+                />
                 {provider.label ? (
                     <span>
                         <b className="font-medium text-foreground">{provider.label}</b> answers for{" "}
@@ -1216,8 +1384,9 @@ function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProvider
                     </span>
                 ) : (
                     <span>
-                        <code>{provider.zone}</code> is served by <code>{provider.nameservers[0]}</code>. Create the
-                        records where you manage it.
+                        <code>{provider.zone}</code> is served by{" "}
+                        <code>{provider.nameservers[0]}</code>. Create the records where you manage
+                        it.
                     </span>
                 )}
             </span>
@@ -1251,7 +1420,9 @@ function ZoneResults({
                 <p
                     key={zone.wildcard}
                     className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
-                        zone.ok ? "border-success-edge bg-success-soft text-muted-foreground" : "border-warning-edge bg-warning-soft text-muted-foreground"
+                        zone.ok
+                            ? "border-success-edge bg-success-soft text-muted-foreground"
+                            : "border-warning-edge bg-warning-soft text-muted-foreground"
                     }`}
                 >
                     {zone.ok ? (
@@ -1288,7 +1459,9 @@ function RouterAdviceNote({
                 danger ? "border-danger-edge bg-danger-soft" : "border-warning-edge bg-warning-soft"
             }`}
         >
-            <TriangleAlert className={`mt-0.5 size-3.5 shrink-0 ${danger ? "text-danger" : "text-warning"}`} />
+            <TriangleAlert
+                className={`mt-0.5 size-3.5 shrink-0 ${danger ? "text-danger" : "text-warning"}`}
+            />
             <div className="flex flex-col gap-1 text-muted-foreground">
                 <p className="font-medium text-foreground">{advice.title}</p>
                 <p>{advice.detail}</p>

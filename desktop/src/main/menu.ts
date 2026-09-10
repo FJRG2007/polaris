@@ -71,8 +71,16 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
                 { role: "copy" },
                 { role: "paste" },
                 ...(isMac
-                    ? ([{ role: "pasteAndMatchStyle" }, { role: "delete" }, { role: "selectAll" }] satisfies MenuItemConstructorOptions[])
-                    : ([{ role: "delete" }, { type: "separator" }, { role: "selectAll" }] satisfies MenuItemConstructorOptions[]))
+                    ? ([
+                          { role: "pasteAndMatchStyle" },
+                          { role: "delete" },
+                          { role: "selectAll" }
+                      ] satisfies MenuItemConstructorOptions[])
+                    : ([
+                          { role: "delete" },
+                          { type: "separator" },
+                          { role: "selectAll" }
+                      ] satisfies MenuItemConstructorOptions[]))
             ]
         },
         {
@@ -94,7 +102,10 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
                 { role: "minimize" },
                 { role: "zoom" },
                 ...(isMac
-                    ? ([{ type: "separator" }, { role: "front" }] satisfies MenuItemConstructorOptions[])
+                    ? ([
+                          { type: "separator" },
+                          { role: "front" }
+                      ] satisfies MenuItemConstructorOptions[])
                     : ([{ role: "close" }] satisfies MenuItemConstructorOptions[]))
             ]
         },
@@ -108,7 +119,12 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
                       ] satisfies MenuItemConstructorOptions[])
                     : []),
                 { label: "Open this Polaris in the browser", click: actions.openInBrowser },
-                ...(isMac ? [] : ([{ type: "separator" }, { role: "about" }] satisfies MenuItemConstructorOptions[]))
+                ...(isMac
+                    ? []
+                    : ([
+                          { type: "separator" },
+                          { role: "about" }
+                      ] satisfies MenuItemConstructorOptions[]))
             ]
         }
     ];

@@ -25,7 +25,12 @@ import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { DatabaseTopologyField, hasTopologyChoice, SINGLE_TOPOLOGY, type TopologyValue } from "./database-topology-field";
+import {
+    DatabaseTopologyField,
+    hasTopologyChoice,
+    SINGLE_TOPOLOGY,
+    type TopologyValue
+} from "./database-topology-field";
 import {
     Badge,
     Button,
@@ -731,7 +736,10 @@ function DatabaseConnectionDialog({
                                 >
                                     <CopyRow value={connection.cluster.nodes.join(",")} />
                                 </Field>
-                                <Field label="Nodes reference" hint="Resolves to the list above, for a client that takes every node.">
+                                <Field
+                                    label="Nodes reference"
+                                    hint="Resolves to the list above, for a client that takes every node."
+                                >
                                     <CopyRow value={connection.cluster.reference} />
                                 </Field>
                             </>
@@ -900,7 +908,6 @@ export function NewServiceDialog({
                     <NewUploadForm environmentId={environmentId} onDone={done} />
                 ) : view === "template" ? (
                     <NewTemplateForm environmentId={environmentId} onDone={done} />
-
                 ) : (
                     <NewImageForm environmentId={environmentId} onDone={done} />
                 )}
@@ -1088,7 +1095,12 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                                     </span>
                                 )}
                             </span>
-                            <span className="block truncate text-xs text-muted-foreground" title={template.description}>{template.description}</span>
+                            <span
+                                className="block truncate text-xs text-muted-foreground"
+                                title={template.description}
+                            >
+                                {template.description}
+                            </span>
                         </span>
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
@@ -1103,19 +1115,24 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                 {picked.description} <span className="font-mono text-xs">{picked.image}</span>
             </p>
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={picked.name} />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={picked.name}
+                />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {picked.database && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named after the
-                    service. Its variables point at the database, so no password is copied.
+                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named
+                    after the service. Its variables point at the database, so no password is
+                    copied.
                 </p>
             )}
             {picked.companion && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a second service beside it for the {picked.companion.label}, reachable only from
-                    this environment.
+                    Creates a second service beside it for the {picked.companion.label}, reachable
+                    only from this environment.
                 </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -1438,7 +1455,13 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         </Field>
                     )}
                     <ServerField servers={servers} value={serverId} onChange={setServerId} />
-                    {imported && <RepoConfigPreview imported={imported} use={useRepoConfig} onUse={setUseRepoConfig} />}
+                    {imported && (
+                        <RepoConfigPreview
+                            imported={imported}
+                            use={useRepoConfig}
+                            onUse={setUseRepoConfig}
+                        />
+                    )}
                 </>
             )}
 
@@ -1496,7 +1519,8 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
-    const clusterMasters = engine === "redis" && redisLayout !== SINGLE ? Number(redisLayout) : undefined;
+    const clusterMasters =
+        engine === "redis" && redisLayout !== SINGLE ? Number(redisLayout) : undefined;
     const layout = !hosted && hasTopologyChoice(engine) ? topology : SINGLE_TOPOLOGY;
 
     // Which instances this engine could be placed on. Reloaded when the engine
@@ -1530,7 +1554,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             instanceId: hosted ? instanceId : undefined,
             version: !hosted && version ? version : undefined,
             exposePort:
-                !hosted && clusterMasters === undefined && layout.topology !== "replicaSet" && exposePort.trim()
+                !hosted &&
+                clusterMasters === undefined &&
+                layout.topology !== "replicaSet" &&
+                exposePort.trim()
                     ? Number(exposePort)
                     : undefined,
             databaseName: databaseName.trim() || undefined,
@@ -1582,7 +1609,11 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                             : `Keys are spread over ${clusterMasters} masters on this server, each with a replica that takes over if it stops. Clients connect in cluster mode.`
                     }
                 >
-                    <Select value={redisLayout} onValueChange={setRedisLayout} options={REDIS_TOPOLOGY_OPTIONS} />
+                    <Select
+                        value={redisLayout}
+                        onValueChange={setRedisLayout}
+                        options={REDIS_TOPOLOGY_OPTIONS}
+                    />
                 </Field>
             )}
             {!hosted && <ServerField servers={servers} value={serverId} onChange={setServerId} />}

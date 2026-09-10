@@ -36,11 +36,18 @@ export async function POST(): Promise<Response> {
             actorId: user.id,
             action: "evidence.export",
             targetType: "instance",
-            metadata: { sha256: answer.sha256, generatedAt: report.generatedAt, format: report.format }
+            metadata: {
+                sha256: answer.sha256,
+                generatedAt: report.generatedAt,
+                format: report.format
+            }
         });
         return NextResponse.json(answer, { headers: { "cache-control": "private, no-store" } });
     } catch (caught) {
         console.error("polaris: the compliance evidence could not be exported:", caught);
-        return NextResponse.json({ error: "The evidence could not be exported just now. Try again in a minute." }, { status: 500 });
+        return NextResponse.json(
+            { error: "The evidence could not be exported just now. Try again in a minute." },
+            { status: 500 }
+        );
     }
 }

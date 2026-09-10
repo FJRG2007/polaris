@@ -20,9 +20,12 @@ const settingFindMany = vi.fn();
 const settingFindUnique = vi.fn();
 const snapshots = new Map<string, Record<string, unknown>>();
 const FROZEN_AT = new Date("2026-09-02T08:00:00Z");
-const snapshotFindUnique = vi.fn(async (query: { where: { month: string } }) => snapshots.get(query.where.month) ?? null);
+const snapshotFindUnique = vi.fn(
+    async (query: { where: { month: string } }) => snapshots.get(query.where.month) ?? null
+);
 const snapshotCreateMany = vi.fn(async (query: { data: { month: string }[] }) => {
-    for (const row of query.data) if (!snapshots.has(row.month)) snapshots.set(row.month, { ...row, createdAt: FROZEN_AT });
+    for (const row of query.data)
+        if (!snapshots.has(row.month)) snapshots.set(row.month, { ...row, createdAt: FROZEN_AT });
     return { count: query.data.length };
 });
 
@@ -37,10 +40,18 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const { LOCAL_HOST_SUBJECT } = await import("@/lib/metrics-shared");
-const { readStatement, resolveMonth, BillingRequestError } = await import("../../src/lib/billing/statement");
+const { readStatement, resolveMonth, BillingRequestError } = await import(
+    "../../src/lib/billing/statement"
+);
 
 const NOW = new Date("2026-09-10T11:30:00Z");
-const RATES = { currency: "EUR", cpuHour: 0.1, memoryGbHour: null, storageGbMonth: 1, egressGb: 0.5 };
+const RATES = {
+    currency: "EUR",
+    cpuHour: 0.1,
+    memoryGbHour: null,
+    storageGbMonth: 1,
+    egressGb: 0.5
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -56,7 +67,11 @@ beforeEach(() => {
             environments: [
                 {
                     applications: [
-                        { id: "a1", target: { kind: "local", hostId: null }, volumes: [{ id: "v1" }] }
+                        {
+                            id: "a1",
+                            target: { kind: "local", hostId: null },
+                            volumes: [{ id: "v1" }]
+                        }
                     ]
                 }
             ]
@@ -68,7 +83,13 @@ beforeEach(() => {
             orgId: null,
             org: null,
             owner: { name: null, username: "bo" },
-            environments: [{ applications: [{ id: "a2", target: { kind: "host", hostId: "h1" }, volumes: [] }] }]
+            environments: [
+                {
+                    applications: [
+                        { id: "a2", target: { kind: "host", hostId: "h1" }, volumes: [] }
+                    ]
+                }
+            ]
         }
     ]);
     // The box Polaris runs on has four cores; the server h1 has not said yet.
@@ -169,7 +190,13 @@ describe("reading a month's statement", () => {
         const view = await readStatement({ kind: "all" }, "2026-09", NOW);
         const site = view.statement.lines.find((line) => line.projectId === "p1");
         // 2.04 vCPU-h at 0.10, 10 GB-h of a 720-hour month at 1.00, 1 GB out at 0.50.
-        expect(site?.cost).toEqual({ cpu: 0.2, memory: null, storage: 0.01, egress: 0.5, total: 0.71 });
+        expect(site?.cost).toEqual({
+            cpu: 0.2,
+            memory: null,
+            storage: 0.01,
+            egress: 0.5,
+            total: 0.71
+        });
         expect(view.current).toBe(true);
         expect(view.through).toBe(NOW.toISOString());
         expect(view.monthLabel).toBe("September 2026");
@@ -198,9 +225,15 @@ describe("a month that has ended", () => {
         expect(snapshotCreateMany).toHaveBeenCalledTimes(1);
         expect(first.generatedAt).toBe(FROZEN_AT.toISOString());
 
-        settingFindUnique.mockResolvedValue({ value: JSON.stringify({ ...RATES, currency: "USD", cpuHour: 9 }) });
+        settingFindUnique.mockResolvedValue({
+            value: JSON.stringify({ ...RATES, currency: "USD", cpuHour: 9 })
+        });
         projectFindMany.mockResolvedValue([]);
-        const again = await readStatement({ kind: "all" }, "2026-08", new Date("2026-11-01T00:00:00Z"));
+        const again = await readStatement(
+            { kind: "all" },
+            "2026-08",
+            new Date("2026-11-01T00:00:00Z")
+        );
 
         expect(again.statement).toEqual(first.statement);
         expect(again.statement.rates?.currency).toBe("EUR");

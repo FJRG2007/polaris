@@ -202,7 +202,10 @@ export function autoscaleStep(
     if (replicas < config.min || replicas > config.max) {
         return moved(Math.min(config.max, Math.max(config.min, replicas)), "range");
     }
-    const cpu = reading.cpuPercent !== null && Number.isFinite(reading.cpuPercent) ? reading.cpuPercent : null;
+    const cpu =
+        reading.cpuPercent !== null && Number.isFinite(reading.cpuPercent)
+            ? reading.cpuPercent
+            : null;
     const traffic =
         config.requestsPerCopy !== null &&
         reading.requestsPerMinute !== null &&
@@ -215,9 +218,11 @@ export function autoscaleStep(
     }
     const perCopy = traffic === null ? null : traffic / replicas;
     const cpuHigh = cpu !== null && cpu > config.cpuPercent;
-    const trafficHigh = perCopy !== null && config.requestsPerCopy !== null && perCopy > config.requestsPerCopy;
+    const trafficHigh =
+        perCopy !== null && config.requestsPerCopy !== null && perCopy > config.requestsPerCopy;
     const cpuLow = cpu === null || cpu < config.cpuPercent / 2;
-    const trafficLow = perCopy === null || config.requestsPerCopy === null || perCopy < config.requestsPerCopy / 2;
+    const trafficLow =
+        perCopy === null || config.requestsPerCopy === null || perCopy < config.requestsPerCopy / 2;
 
     const above = cpuHigh || trafficHigh ? state.above + 1 : 0;
     const below = cpuLow && trafficLow ? state.below + 1 : 0;
@@ -232,11 +237,19 @@ export function autoscaleStep(
         const next = Math.min(config.max, Math.max(replicas + 1, byCpu, byTraffic));
         return moved(next, cpuHigh && trafficHigh ? "both" : trafficHigh ? "traffic" : "cpu");
     }
-    if (!cooling && quiet >= AUTOSCALE_IDLE_AFTER && below >= AUTOSCALE_IDLE_AFTER && replicas > config.min) {
+    if (
+        !cooling &&
+        quiet >= AUTOSCALE_IDLE_AFTER &&
+        below >= AUTOSCALE_IDLE_AFTER &&
+        replicas > config.min
+    ) {
         return moved(config.min, "idle");
     }
     if (!cooling && below >= AUTOSCALE_DOWN_AFTER && replicas > config.min) {
-        return moved(replicas - 1, cpu !== null && traffic !== null ? "both" : traffic !== null ? "traffic" : "cpu");
+        return moved(
+            replicas - 1,
+            cpu !== null && traffic !== null ? "both" : traffic !== null ? "traffic" : "cpu"
+        );
     }
     return { replicas, state: { above, below, quiet, changedAt: state.changedAt }, signal: null };
 }

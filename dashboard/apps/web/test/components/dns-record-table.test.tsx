@@ -13,7 +13,14 @@ describe("DnsRecordTable", () => {
     it("shows the type, and a copy button for the name and for the value", () => {
         const html = renderToStaticMarkup(
             <DnsRecordTable
-                records={[{ type: "TXT", name: "_polaris.example.test", value: "polaris-verify=abc", note: "Proves the domain is yours." }]}
+                records={[
+                    {
+                        type: "TXT",
+                        name: "_polaris.example.test",
+                        value: "polaris-verify=abc",
+                        note: "Proves the domain is yours."
+                    }
+                ]}
             />
         );
         for (const column of ["Type", "Name", "Content"]) expect(html).toContain(column);
@@ -25,7 +32,16 @@ describe("DnsRecordTable", () => {
 
     it("offers no copy for a value that is not known yet", () => {
         const html = renderToStaticMarkup(
-            <DnsRecordTable records={[{ type: "A", name: "*.apps.example.test", value: null, valueFallback: "your public IP" }]} />
+            <DnsRecordTable
+                records={[
+                    {
+                        type: "A",
+                        name: "*.apps.example.test",
+                        value: null,
+                        valueFallback: "your public IP"
+                    }
+                ]}
+            />
         );
         expect(html).toContain("your public IP");
         expect(html).not.toContain("Copy value");
@@ -44,14 +60,18 @@ describe("DnsRecordTable", () => {
         expect(html).toContain("Status");
         expect(html).toContain("In place");
         expect(html).toContain("Points elsewhere");
-        expect(renderToStaticMarkup(<DnsRecordTable records={[{ type: "A", name: "a", value: "203.0.113.7" }]} />)).not.toContain(
-            "Status"
-        );
+        expect(
+            renderToStaticMarkup(
+                <DnsRecordTable records={[{ type: "A", name: "a", value: "203.0.113.7" }]} />
+            )
+        ).not.toContain("Status");
     });
 
     it("shows a value whole rather than cut short, since it is copied into another form", () => {
         const value = `v=DKIM1; p=${"A".repeat(300)}`;
-        const html = renderToStaticMarkup(<DnsRecordTable records={[{ type: "TXT", name: "mail._domainkey", value }]} />);
+        const html = renderToStaticMarkup(
+            <DnsRecordTable records={[{ type: "TXT", name: "mail._domainkey", value }]} />
+        );
         expect(html).toContain(`>${value}<`);
         expect(html).not.toContain("truncate");
     });

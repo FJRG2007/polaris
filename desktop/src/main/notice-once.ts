@@ -13,7 +13,7 @@
 export const ONCE_MS = 2 * 60_000;
 
 export class OnceNotices {
-    private readonly said = new Map<string, { readonly announcer: string; readonly at: number; }>();
+    private readonly said = new Map<string, { readonly announcer: string; readonly at: number }>();
 
     constructor(private readonly now: () => number = Date.now) {}
 

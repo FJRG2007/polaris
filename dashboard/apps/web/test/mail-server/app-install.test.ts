@@ -67,7 +67,8 @@ vi.mock("@polaris/db", () => {
         installedApp: {
             findFirst: async ({ where }: { where: Where }) =>
                 oldestFirst(installs).find((row) => matches(row as never, where)) ?? null,
-            findMany: async ({ where }: { where: Where }) => installs.filter((row) => matches(row as never, where)),
+            findMany: async ({ where }: { where: Where }) =>
+                installs.filter((row) => matches(row as never, where)),
             create: async ({ data }: { data: Partial<InstallRow> }) => {
                 const row: InstallRow = {
                     id: `install-${installs.length + 1}`,
@@ -82,7 +83,13 @@ vi.mock("@polaris/db", () => {
                 installs.push(row);
                 return row;
             },
-            update: async ({ where, data }: { where: { id: string }; data: Partial<InstallRow> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Partial<InstallRow>;
+            }) => {
                 const row = installs.find((entry) => entry.id === where.id);
                 if (row) Object.assign(row, data);
                 return row;
@@ -117,7 +124,11 @@ const { findApp, installableApps, isInstallable } = await import("@/lib/apps/cat
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "22222222-2222-4222-8222-222222222222";
 
-function install(ownerId: string, status = "running", catalogId = appInstall.MAIL_SERVER_APP): InstallRow {
+function install(
+    ownerId: string,
+    status = "running",
+    catalogId = appInstall.MAIL_SERVER_APP
+): InstallRow {
     const row: InstallRow = {
         id: `install-${installs.length + 1}`,
         catalogId,
@@ -132,7 +143,11 @@ function install(ownerId: string, status = "running", catalogId = appInstall.MAI
 }
 
 function server(ownerId: string, day: number): void {
-    servers.push({ id: `server-${servers.length + 1}`, ownerId, createdAt: new Date(Date.UTC(2026, 0, day)) });
+    servers.push({
+        id: `server-${servers.length + 1}`,
+        ownerId,
+        createdAt: new Date(Date.UTC(2026, 0, day))
+    });
 }
 
 beforeEach(() => {
@@ -173,7 +188,8 @@ describe("the app in the catalog", () => {
 
     it("says what it gives and what a server costs", () => {
         const text = manifest?.description ?? "";
-        for (const word of ["SPF", "DKIM", "DMARC", "mailboxes", "aliases"]) expect(text).toContain(word);
+        for (const word of ["SPF", "DKIM", "DMARC", "mailboxes", "aliases"])
+            expect(text).toContain(word);
         expect(text).toContain("ports 25, 465, 587, 993 and 4190");
     });
 });
@@ -212,7 +228,12 @@ describe("adopting an install for an instance that already runs one", () => {
         const id = await appInstall.adoptMailServerApp();
         expect(id).not.toBeNull();
         expect(installs).toHaveLength(1);
-        expect(installs[0]).toMatchObject({ id, catalogId: "mail-server", ownerId: ALICE, status: "running" });
+        expect(installs[0]).toMatchObject({
+            id,
+            catalogId: "mail-server",
+            ownerId: ALICE,
+            status: "running"
+        });
     });
 
     it("does nothing a second time", async () => {
@@ -257,22 +278,26 @@ describe("uninstalling", () => {
     it("is refused while a mail server is set up, and says to remove it first", async () => {
         install(ALICE);
         server(ALICE, 1);
-        await expect(appInstall.uninstallMailServerApp({ id: ALICE, isAdmin: true })).rejects.toThrow(
+        await expect(
+            appInstall.uninstallMailServerApp({ id: ALICE, isAdmin: true })
+        ).rejects.toThrow(
             "A mail server is still set up here. Remove it first, then uninstall Mail server."
         );
         server(BOB, 2);
-        await expect(appInstall.uninstallMailServerApp({ id: ALICE, isAdmin: true })).rejects.toThrow(
-            "2 mail servers are still set up here. Remove them first"
-        );
+        await expect(
+            appInstall.uninstallMailServerApp({ id: ALICE, isAdmin: true })
+        ).rejects.toThrow("2 mail servers are still set up here. Remove them first");
         expect(installs[0]?.status).toBe("running");
     });
 
     it("is left to whoever installed it or an administrator", async () => {
         install(ALICE);
-        await expect(appInstall.uninstallMailServerApp({ id: BOB, isAdmin: false })).rejects.toBeInstanceOf(
-            appInstall.MailServerAppRefusal
-        );
-        expect(await appInstall.uninstallMailServerApp({ id: BOB, isAdmin: true })).toEqual(["install-1"]);
+        await expect(
+            appInstall.uninstallMailServerApp({ id: BOB, isAdmin: false })
+        ).rejects.toBeInstanceOf(appInstall.MailServerAppRefusal);
+        expect(await appInstall.uninstallMailServerApp({ id: BOB, isAdmin: true })).toEqual([
+            "install-1"
+        ]);
     });
 
     it("removes every copy, and the app is gone at once", async () => {
@@ -286,15 +311,17 @@ describe("uninstalling", () => {
     });
 
     it("says so when there is nothing to uninstall", async () => {
-        await expect(appInstall.uninstallMailServerApp({ id: ALICE, isAdmin: true })).rejects.toThrow(
-            "Mail server is not installed."
-        );
+        await expect(
+            appInstall.uninstallMailServerApp({ id: ALICE, isAdmin: true })
+        ).rejects.toThrow("Mail server is not installed.");
     });
 
     it("is refused through the generic uninstall as well", async () => {
         const row = install(ALICE);
         server(ALICE, 1);
-        await expect(service.uninstallApp(ALICE, row.id)).rejects.toThrow("A mail server is still set up here.");
+        await expect(service.uninstallApp(ALICE, row.id)).rejects.toThrow(
+            "A mail server is still set up here."
+        );
         expect(row.status).toBe("running");
         servers = [];
         await service.uninstallApp(ALICE, row.id);
@@ -311,20 +338,32 @@ describe("uninstalling", () => {
 });
 
 describe("installing", () => {
-    const input = { catalogId: "mail-server", name: "Mail server", serverId: "local", storage: [], env: [] };
+    const input = {
+        catalogId: "mail-server",
+        name: "Mail server",
+        serverId: "local",
+        storage: [],
+        env: []
+    };
 
     it("records the install and runs nothing", async () => {
         const result = await service.installApp(ALICE, ALICE, input);
         expect(result.applicationId).toBeNull();
         expect(applicationsCreated).toBe(0);
         expect(installs).toHaveLength(1);
-        expect(installs[0]).toMatchObject({ catalogId: "mail-server", ownerId: ALICE, status: "running" });
+        expect(installs[0]).toMatchObject({
+            catalogId: "mail-server",
+            ownerId: ALICE,
+            status: "running"
+        });
         expect(await appInstall.mailServerAppInstalled()).toBe(true);
     });
 
     it("is one install for the whole Polaris, whoever asks second", async () => {
         await service.installApp(ALICE, ALICE, input);
-        await expect(service.installApp(BOB, BOB, input)).rejects.toThrow("This app is already installed");
+        await expect(service.installApp(BOB, BOB, input)).rejects.toThrow(
+            "This app is already installed"
+        );
         expect(installs).toHaveLength(1);
         expect(await service.instanceWideInstallIds()).toEqual(["install-1"]);
     });

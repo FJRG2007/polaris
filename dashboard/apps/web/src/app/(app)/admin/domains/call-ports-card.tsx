@@ -57,7 +57,6 @@ export function CallPortsCard() {
             title="Call ports"
             description="Setting a call up goes through 443 with everything else. The sound does not: it arrives on the two ports below. Most calls need neither forwarded: the call server reaches out first and the reply comes back the way it went. Forward them for the networks where that does not hold."
         >
-
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                     {live.stale ??
@@ -79,9 +78,14 @@ export function CallPortsCard() {
 
             <ul className="flex flex-col divide-y divide-border/60">
                 {reading.ports.map((entry) => (
-                    <li key={`${entry.protocol}-${entry.port}`} className="flex items-center gap-2 py-2">
+                    <li
+                        key={`${entry.protocol}-${entry.port}`}
+                        className="flex items-center gap-2 py-2"
+                    >
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm" title={entry.label}>{entry.label}</p>
+                            <p className="truncate text-sm" title={entry.label}>
+                                {entry.label}
+                            </p>
                             <p className="font-mono text-xs text-muted-foreground">
                                 {entry.port}/{entry.protocol}
                             </p>
@@ -121,7 +125,9 @@ export function CallPortsCard() {
                                 Reached from outside
                             </Badge>
                         ) : (
-                            <Badge className="border-warning-edge text-warning">Not confirmed</Badge>
+                            <Badge className="border-warning-edge text-warning">
+                                Not confirmed
+                            </Badge>
                         )}
                     </li>
                 ))}
@@ -141,8 +147,8 @@ export function CallPortsCard() {
                 already right. */}
             {!reading.running ? (
                 <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    The call server is not answering, so these ports carry nothing yet and
-                    cannot be checked. Chat settings says what it is doing.
+                    The call server is not answering, so these ports carry nothing yet and cannot be
+                    checked. Chat settings says what it is doing.
                 </p>
             ) : reading.confirmed ? null : (
                 <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
@@ -154,7 +160,11 @@ export function CallPortsCard() {
                             "Nothing has arrived on the call ports from outside yet. Forwarding them in the router fixes it, and this ticks itself the moment they work."}
                     </p>
                     <div className="text-muted-foreground">
-                        <RouterSteps server={null} lanIp={reading.lanIp} rules={CALL_FORWARD_RULES} />
+                        <RouterSteps
+                            server={null}
+                            lanIp={reading.lanIp}
+                            rules={CALL_FORWARD_RULES}
+                        />
                     </div>
                 </div>
             )}
@@ -176,13 +186,7 @@ export function CallPortsCard() {
  * the minutes before it notices, and for the person who wants to rule the whole
  * theory in or out now rather than in ten minutes.
  */
-function AddressRow({
-    reading,
-    onDone
-}: {
-    reading: CallPortsReading;
-    onDone: () => void;
-}) {
+function AddressRow({ reading, onDone }: { reading: CallPortsReading; onDone: () => void }) {
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState("");
 
@@ -190,7 +194,9 @@ function AddressRow({
         <div
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
-                reading.addressStale ? "border-warning-edge bg-warning-soft" : "border-border bg-muted/40"
+                reading.addressStale
+                    ? "border-warning-edge bg-warning-soft"
+                    : "border-border bg-muted/40"
             )}
         >
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -200,7 +206,9 @@ function AddressRow({
                         : "The address callers are sent to"}
                 </p>
                 {reading.publicIp && (
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{reading.publicIp}</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                        {reading.publicIp}
+                    </code>
                 )}
             </div>
             <p className="text-muted-foreground">

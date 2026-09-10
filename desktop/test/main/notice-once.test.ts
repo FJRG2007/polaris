@@ -8,7 +8,7 @@ import { ONCE_MS, OnceNotices } from "@/main/notice-once";
 
 const WORDS = "Deployed shop / api\nshop / api is serving the new release.";
 
-function clock(): { now: () => number; advance: (ms: number) => void; } {
+function clock(): { now: () => number; advance: (ms: number) => void } {
     let at = 1_000_000;
     return { now: () => at, advance: (ms) => (at += ms) };
 }

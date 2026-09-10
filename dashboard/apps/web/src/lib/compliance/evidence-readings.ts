@@ -51,16 +51,23 @@ async function readAuthentication(): Promise<evidence.EvidenceReadings["authenti
 
 async function readSessions(now: Date): Promise<evidence.EvidenceReadings["sessions"]> {
     const visible = { user: VISIBLE_USER };
-    const [accounts, shorterLifetime, idleLock, clientBindingOff, addressPinned, loginApproval, open] =
-        await Promise.all([
-            prisma.user.count({ where: VISIBLE_USER }),
-            prisma.userSecurity.count({ where: { ...visible, sessionMaxMinutes: { gt: 0 } } }),
-            prisma.userSecurity.count({ where: { ...visible, idleLockMinutes: { gt: 0 } } }),
-            prisma.userSecurity.count({ where: { ...visible, bindSessionsToClient: false } }),
-            prisma.userSecurity.count({ where: { ...visible, pinSessionsToAddress: { not: "off" } } }),
-            prisma.userSecurity.count({ where: { ...visible, requireLoginApproval: true } }),
-            prisma.session.count({ where: { ...visible, expiresAt: { gt: now } } })
-        ]);
+    const [
+        accounts,
+        shorterLifetime,
+        idleLock,
+        clientBindingOff,
+        addressPinned,
+        loginApproval,
+        open
+    ] = await Promise.all([
+        prisma.user.count({ where: VISIBLE_USER }),
+        prisma.userSecurity.count({ where: { ...visible, sessionMaxMinutes: { gt: 0 } } }),
+        prisma.userSecurity.count({ where: { ...visible, idleLockMinutes: { gt: 0 } } }),
+        prisma.userSecurity.count({ where: { ...visible, bindSessionsToClient: false } }),
+        prisma.userSecurity.count({ where: { ...visible, pinSessionsToAddress: { not: "off" } } }),
+        prisma.userSecurity.count({ where: { ...visible, requireLoginApproval: true } }),
+        prisma.session.count({ where: { ...visible, expiresAt: { gt: now } } })
+    ]);
     return {
         maxAgeSeconds: SESSION_MAX_AGE,
         updateAgeSeconds: SESSION_UPDATE_AGE,
@@ -80,7 +87,11 @@ async function readAdministrators(): Promise<evidence.EvidenceReadings["administ
         orderBy: { name: "asc" },
         select: { id: true, name: true, username: true, email: true, twoFactorEnabled: true }
     });
-    return admins.map((admin) => ({ id: admin.id, name: displayName(admin), secondFactor: admin.twoFactorEnabled }));
+    return admins.map((admin) => ({
+        id: admin.id,
+        name: displayName(admin),
+        secondFactor: admin.twoFactorEnabled
+    }));
 }
 
 async function readAudit(): Promise<evidence.EvidenceReadings["audit"]> {
@@ -187,7 +198,9 @@ async function newestCopiesOfAll(): Promise<Map<string, NewestCopies>> {
 async function readBackups(): Promise<evidence.EvidenceReadings["backups"]> {
     const [total, scheduled, failing, activeKeys, copiesOf, resources] = await Promise.all([
         prisma.protectedResource.count(),
-        prisma.protectedResource.count({ where: { status: "active", plan: { is: { every: { not: "off" } } } } }),
+        prisma.protectedResource.count({
+            where: { status: "active", plan: { is: { every: { not: "off" } } } }
+        }),
         prisma.protectedResource.count({ where: { lastStatus: "failed" } }),
         prisma.backupKey.count({ where: { retiredAt: null } }),
         newestCopiesOfAll(),
@@ -279,10 +292,9 @@ async function readFirewall(now: Date): Promise<evidence.EvidenceReadings["firew
 async function readEdge(): Promise<evidence.EvidenceReadings["edge"]> {
     const apps = await prisma.application.findMany({ select: { edgeConfig: true } });
     const configs = apps.map((app) => core.parseAppEdgeConfig(app.edgeConfig));
-    const headers = Object.fromEntries(core.EDGE_HEADER_PRESETS.map((preset) => [preset, 0])) as Record<
-        core.EdgeHeaderPreset,
-        number
-    >;
+    const headers = Object.fromEntries(
+        core.EDGE_HEADER_PRESETS.map((preset) => [preset, 0])
+    ) as Record<core.EdgeHeaderPreset, number>;
     for (const config of configs) headers[config.headers.preset] += 1;
     return {
         services: configs.length,
@@ -312,7 +324,9 @@ async function readChanges(): Promise<evidence.EvidenceReadings["changes"]> {
             })
         )
     );
-    const actorIds = [...new Set(entries.flatMap((entry) => (entry?.actorId ? [entry.actorId] : [])))];
+    const actorIds = [
+        ...new Set(entries.flatMap((entry) => (entry?.actorId ? [entry.actorId] : [])))
+    ];
     const actors =
         actorIds.length === 0
             ? []

@@ -25,7 +25,9 @@ const STARTED_AT = Date.now();
  *  back to sleep on a log that has not caught up with the visit yet. */
 const wokenAt = new Map<string, number>();
 
-export async function runSleepPass(now = Date.now()): Promise<{ asleep: number; woke: number; slept: number }> {
+export async function runSleepPass(
+    now = Date.now()
+): Promise<{ asleep: number; woke: number; slept: number }> {
     const apps = await prisma.application.findMany({
         where: {
             OR: [{ sleepAfterMinutes: { not: null } }, { asleepSince: { not: null } }],
@@ -73,7 +75,11 @@ export async function runSleepPass(now = Date.now()): Promise<{ asleep: number; 
             asleepSince: app.asleepSince?.getTime() ?? null,
             lastVisit,
             windowStart: log.windowStart,
-            awakeSince: Math.max(STARTED_AT, deployments.get(app.currentDeploymentId as string) ?? 0, wokenAt.get(app.id) ?? 0),
+            awakeSince: Math.max(
+                STARTED_AT,
+                deployments.get(app.currentDeploymentId as string) ?? 0,
+                wokenAt.get(app.id) ?? 0
+            ),
             now
         });
         if (decision === "stay") {
@@ -91,7 +97,10 @@ export async function runSleepPass(now = Date.now()): Promise<{ asleep: number; 
                 asleep += 1;
             }
         } catch (error) {
-            console.error(`polaris: could not ${decision} ${app.id}:`, error instanceof Error ? error.message : error);
+            console.error(
+                `polaris: could not ${decision} ${app.id}:`,
+                error instanceof Error ? error.message : error
+            );
         }
     }
     // The waking page is chosen per route, so the edge follows every change.

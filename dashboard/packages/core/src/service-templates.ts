@@ -65,7 +65,11 @@ export interface TemplatePrepareStep {
     readonly command: string;
     /** Run every `intervalMs` until it exits 0, at most `retries` times, before
      *  the command runs. */
-    readonly readiness: { readonly test: string; readonly intervalMs: number; readonly retries: number };
+    readonly readiness: {
+        readonly test: string;
+        readonly intervalMs: number;
+        readonly retries: number;
+    };
 }
 
 export interface ServiceTemplate extends TemplateService {
@@ -171,7 +175,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         },
         secrets: [],
         volumes: [{ name: "content", mountPath: "/var/lib/ghost/content" }],
-        firstRun: "Open /ghost/ right away and create the owner account - until then anyone who opens it can."
+        firstRun:
+            "Open /ghost/ right away and create the owner account - until then anyone who opens it can."
     },
     {
         id: "gitea",
@@ -196,10 +201,15 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
                 title: "Create the Gitea admin",
                 command:
                     'su-exec git gitea admin user create --admin --username "$GITEA_ADMIN_USERNAME" --password "$GITEA_ADMIN_PASSWORD" --email "$GITEA_ADMIN_EMAIL" --must-change-password=false 2>&1 || true; echo done',
-                readiness: { test: "su-exec git gitea admin user list >/dev/null 2>&1", intervalMs: 3000, retries: 40 }
+                readiness: {
+                    test: "su-exec git gitea admin user list >/dev/null 2>&1",
+                    intervalMs: 3000,
+                    retries: 40
+                }
             }
         ],
-        firstRun: "Once setup has run, sign in as admin with the GITEA_ADMIN_PASSWORD variable. Registration is off."
+        firstRun:
+            "Once setup has run, sign in as admin with the GITEA_ADMIN_PASSWORD variable. Registration is off."
     },
     {
         id: "grafana",
@@ -227,7 +237,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
     {
         id: "kafka",
         name: "Apache Kafka",
-        description: "Event-streaming broker, with a web console for topics, messages and consumer groups.",
+        description:
+            "Event-streaming broker, with a web console for topics, messages and consumer groups.",
         image: "ghcr.io/kafbat/kafka-ui:latest",
         port: 8080,
         env: {
@@ -385,7 +396,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         env: { DATABASE_TYPE: "postgresql", DATABASE_URL: "{{database.DATABASE_URL}}" },
         secrets: ["APP_SECRET"],
         volumes: [],
-        firstRun: "Sign in as admin with the password umami, then change it under Settings, Profile."
+        firstRun:
+            "Sign in as admin with the password umami, then change it under Settings, Profile."
     },
     {
         id: "uptime-kuma",
@@ -397,7 +409,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         secrets: [],
         volumes: [{ name: "data", mountPath: "/app/data" }],
         embedded: true,
-        firstRun: "Create the admin account on the first visit - until then anyone who opens it can."
+        firstRun:
+            "Create the admin account on the first visit - until then anyone who opens it can."
     },
     {
         id: "vaultwarden",
@@ -458,7 +471,11 @@ export function templateVariables(
                 return `\${{${slug}.${key}}}`;
             });
     return [
-        ...Object.entries(service.env).map(([key, value]) => ({ key, value: wire(value), isSecret: false })),
+        ...Object.entries(service.env).map(([key, value]) => ({
+            key,
+            value: wire(value),
+            isSecret: false
+        })),
         ...service.secrets.map((key) => ({ key, value: generate(), isSecret: true }))
     ];
 }
@@ -484,7 +501,12 @@ export interface PrepareExecResult {
 
 export type PrepareOutcome =
     | { readonly ok: true; readonly title: string; readonly output: string }
-    | { readonly ok: false; readonly title: string; readonly reason: string; readonly output: string };
+    | {
+          readonly ok: false;
+          readonly title: string;
+          readonly reason: string;
+          readonly output: string;
+      };
 
 /**
  * Run a template's setup steps, in order, through `exec`.
@@ -522,13 +544,19 @@ export async function runPrepareSteps(
         try {
             result = await exec(step.command);
         } catch (error) {
-            const reason = error instanceof Error && error.message ? error.message : "It could not be run.";
+            const reason =
+                error instanceof Error && error.message ? error.message : "It could not be run.";
             outcomes.push({ ok: false, title: step.title, reason, output: "" });
             return outcomes;
         }
         const output = result.output.trim();
         if (result.code !== 0) {
-            outcomes.push({ ok: false, title: step.title, reason: `It exited with code ${result.code}.`, output });
+            outcomes.push({
+                ok: false,
+                title: step.title,
+                reason: `It exited with code ${result.code}.`,
+                output
+            });
             return outcomes;
         }
         outcomes.push({ ok: true, title: step.title, output });

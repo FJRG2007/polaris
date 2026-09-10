@@ -86,15 +86,24 @@ export function DnsRecordDialog({
 }) {
     const [draft, setDraft] = useState(editing.draft);
     const [attempted, setAttempted] = useState(Boolean(editing.error));
-    const [serverProblems, setServerProblems] = useState<Record<string, string>>(editing.problems ?? {});
+    const [serverProblems, setServerProblems] = useState<Record<string, string>>(
+        editing.problems ?? {}
+    );
     const apex = zone.zone.name;
 
-    const checked = dns.recordFields(draft, apex, { within: zone.within, existing: zone.records, editingId: editing.id });
+    const checked = dns.recordFields(draft, apex, {
+        within: zone.within,
+        existing: zone.records,
+        editingId: editing.id
+    });
     const problems: Record<string, string> = checked.ok ? {} : { ...checked.problems };
     const missing = new Set<string>(checked.ok ? [] : checked.missing);
     const shown = (field: keyof dns.DnsRecordDraft): string | undefined =>
-        serverProblems[field] ?? problems[field] ?? (attempted && missing.has(field) ? "Required" : undefined);
-    const unchanged = editing.id !== null && JSON.stringify(dns.normalizeDraft(draft)) === editing.original;
+        serverProblems[field] ??
+        problems[field] ??
+        (attempted && missing.has(field) ? "Required" : undefined);
+    const unchanged =
+        editing.id !== null && JSON.stringify(dns.normalizeDraft(draft)) === editing.original;
     const blocked = !checked.ok || unchanged;
 
     function set<K extends keyof dns.DnsRecordDraft>(field: K, value: dns.DnsRecordDraft[K]) {
@@ -120,7 +129,11 @@ export function DnsRecordDialog({
 
     const type = draft.type;
     const proxiable = dns.PROXIABLE_TYPES.includes(type);
-    const field = (key: keyof dns.DnsRecordDraft, placeholder: string, extra?: { inputMode?: "numeric" }) => (
+    const field = (
+        key: keyof dns.DnsRecordDraft,
+        placeholder: string,
+        extra?: { inputMode?: "numeric" }
+    ) => (
         <Input
             value={String(draft[key])}
             placeholder={placeholder}
@@ -162,7 +175,11 @@ export function DnsRecordDialog({
                                 disabled={editing.id !== null}
                                 onValueChange={(value) => {
                                     const next = value as dns.DnsRecordType;
-                                    setDraft((current) => ({ ...dns.emptyDraft(next), name: current.name, ttl: current.ttl }));
+                                    setDraft((current) => ({
+                                        ...dns.emptyDraft(next),
+                                        name: current.name,
+                                        ttl: current.ttl
+                                    }));
                                     setAttempted(false);
                                     setServerProblems({});
                                 }}
@@ -185,7 +202,11 @@ export function DnsRecordDialog({
                     </div>
 
                     {CONTENT_LABELS[type] && (
-                        <FormField label={CONTENT_LABELS[type]!} problem={shown("content")} required>
+                        <FormField
+                            label={CONTENT_LABELS[type]!}
+                            problem={shown("content")}
+                            required
+                        >
                             {field("content", CONTENT_PLACEHOLDERS[type] ?? "")}
                         </FormField>
                     )}
@@ -216,7 +237,12 @@ export function DnsRecordDialog({
                                 />
                             </FormField>
                             <FormField label="Value" problem={shown("value")} required>
-                                {field("value", draft.tag === "iodef" ? "mailto:security@example.com" : "letsencrypt.org")}
+                                {field(
+                                    "value",
+                                    draft.tag === "iodef"
+                                        ? "mailto:security@example.com"
+                                        : "letsencrypt.org"
+                                )}
                             </FormField>
                         </div>
                     )}
@@ -224,20 +250,30 @@ export function DnsRecordDialog({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <FormField label="TTL" problem={shown("ttl")}>
                             <Select
-                                value={draft.proxied && proxiable ? String(dns.TTL_AUTO) : draft.ttl}
+                                value={
+                                    draft.proxied && proxiable ? String(dns.TTL_AUTO) : draft.ttl
+                                }
                                 disabled={draft.proxied && proxiable}
                                 onValueChange={(value) => set("ttl", value)}
                                 options={
                                     TTL_OPTIONS.some((option) => option.value === draft.ttl)
                                         ? TTL_OPTIONS
-                                        : [...TTL_OPTIONS, { value: draft.ttl, label: ttlLabel(Number(draft.ttl)) }]
+                                        : [
+                                              ...TTL_OPTIONS,
+                                              {
+                                                  value: draft.ttl,
+                                                  label: ttlLabel(Number(draft.ttl))
+                                              }
+                                          ]
                                 }
                                 aria-label="TTL"
                             />
                         </FormField>
                         {proxiable && (
                             <div className="flex flex-col gap-1.5">
-                                <span className="text-xs font-medium text-muted-foreground">Proxy status</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    Proxy status
+                                </span>
                                 <div className="flex h-8 items-center gap-2 text-sm">
                                     <Switch
                                         checked={draft.proxied}

@@ -37,7 +37,8 @@ export function AppNavDrawer({
         !subapp && app.id === OVERVIEW_APP_ID
             ? appIds.some((id) => id !== OVERVIEW_APP_ID)
             : sections.some(
-                  (section) => !section.hidden && sectionOffered(section, { isAdmin, held, installed })
+                  (section) =>
+                      !section.hidden && sectionOffered(section, { isAdmin, held, installed })
               );
     if (!hasRail) return null;
     return (

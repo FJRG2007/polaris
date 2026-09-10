@@ -45,8 +45,14 @@ export async function readEdgeVisits(): Promise<EdgeVisits> {
 }
 
 /** Every address a service answers on: its enabled domains and its quick tunnel. */
-export function serviceHostnames(app: { id: string; domains: readonly { hostname: string }[] }): string[] {
-    return [...app.domains.map((domain) => domain.hostname.toLowerCase()), tunnelHostForApp(app.id).toLowerCase()];
+export function serviceHostnames(app: {
+    id: string;
+    domains: readonly { hostname: string }[];
+}): string[] {
+    return [
+        ...app.domains.map((domain) => domain.hostname.toLowerCase()),
+        tunnelHostForApp(app.id).toLowerCase()
+    ];
 }
 
 /** When each visit to one of `names` arrived, in log order. */

@@ -16,14 +16,19 @@ import { spawn } from "node:child_process";
 /** The environment Docker is run with: this process's, with the places Docker
  *  is installed to on the end of PATH. Windows installs put Docker on the
  *  system PATH, which a Windows app does get, so it is left alone there. */
-export function dockerEnv(base: NodeJS.ProcessEnv = process.env, platform: string = process.platform): NodeJS.ProcessEnv {
+export function dockerEnv(
+    base: NodeJS.ProcessEnv = process.env,
+    platform: string = process.platform
+): NodeJS.ProcessEnv {
     if (platform === "win32") return base;
     const extra =
         platform === "darwin"
             ? ["/usr/local/bin", "/opt/homebrew/bin", posix.join(homedir(), ".docker", "bin")]
             : ["/usr/local/bin", "/usr/bin", "/snap/bin"];
     const current = (base.PATH ?? "").split(posix.delimiter).filter(Boolean);
-    const path = [...current, ...extra.filter((dir) => !current.includes(dir))].join(posix.delimiter);
+    const path = [...current, ...extra.filter((dir) => !current.includes(dir))].join(
+        posix.delimiter
+    );
     return { ...base, PATH: path };
 }
 
@@ -45,7 +50,11 @@ export interface Run {
 export function run(
     command: string,
     args: readonly string[],
-    options: { readonly cwd?: string; readonly signal?: AbortSignal; readonly onLine?: (line: string) => void; } = {}
+    options: {
+        readonly cwd?: string;
+        readonly signal?: AbortSignal;
+        readonly onLine?: (line: string) => void;
+    } = {}
 ): Promise<Run> {
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
@@ -81,19 +90,28 @@ export function run(
 /**
  * Whether Docker is there and its engine is answering, and if not, what to do.
  */
-export async function dockerReady(): Promise<{ readonly ok: true; } | { readonly ok: false; readonly error: string; }> {
+export async function dockerReady(): Promise<
+    { readonly ok: true } | { readonly ok: false; readonly error: string }
+> {
     try {
         const result = await run("docker", ["version", "--format", "{{.Server.Version}}"], {
             signal: AbortSignal.timeout(20_000)
         });
         if (result.code === 0) return { ok: true };
-        return { ok: false, error: "Docker is installed but its engine is not running. Start Docker, then try again." };
+        return {
+            ok: false,
+            error: "Docker is installed but its engine is not running. Start Docker, then try again."
+        };
     } catch (caught) {
         const code = (caught as NodeJS.ErrnoException).code;
         if (code === "ENOENT") {
-            return { ok: false, error: "Docker is not installed on this computer, so nothing can be built here." };
+            return {
+                ok: false,
+                error: "Docker is not installed on this computer, so nothing can be built here."
+            };
         }
-        if (code === "ABORT_ERR") return { ok: false, error: "Docker did not answer in time. Check that it is running." };
+        if (code === "ABORT_ERR")
+            return { ok: false, error: "Docker did not answer in time. Check that it is running." };
         return { ok: false, error: "Docker could not be started on this computer." };
     }
 }

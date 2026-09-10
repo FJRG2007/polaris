@@ -11,7 +11,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { desktopReleasesUrl } from "@/lib/desktop-release";
 import { InstallAppCard } from "@/components/installed-app";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { arrivedDeployResults, desktopBridge, isDesktopBridge, type PolarisDesktop } from "@/lib/desktop-bridge";
+import {
+    arrivedDeployResults,
+    desktopBridge,
+    isDesktopBridge,
+    type PolarisDesktop
+} from "@/lib/desktop-bridge";
 
 function fakeBridge(overrides: Partial<PolarisDesktop> = {}): PolarisDesktop {
     return {
@@ -63,8 +68,18 @@ describe("notifyDesktop inside the app", () => {
         const bridge = fakeBridge();
         install(bridge);
         const { notifyDesktop } = await import("@/lib/desktop-notify");
-        const shown = await notifyDesktop({ title: "Call from Ada", tag: "call:1", href: "/chat/1", insistent: true });
-        expect(bridge.notify).toHaveBeenCalledWith({ title: "Call from Ada", tag: "call:1", href: "/chat/1", insistent: true });
+        const shown = await notifyDesktop({
+            title: "Call from Ada",
+            tag: "call:1",
+            href: "/chat/1",
+            insistent: true
+        });
+        expect(bridge.notify).toHaveBeenCalledWith({
+            title: "Call from Ada",
+            tag: "call:1",
+            href: "/chat/1",
+            insistent: true
+        });
         shown?.close();
         expect(bridge.closeNotice).toHaveBeenCalledWith("call:1");
     });
@@ -88,7 +103,10 @@ describe("arrivedDeployResults", () => {
             row("read", "deploy.failed", true),
             row("chat", "chat.callMissed")
         ];
-        expect(arrivedDeployResults(seen, rows).map((item) => item.id)).toEqual(["new-ok", "new-fail"]);
+        expect(arrivedDeployResults(seen, rows).map((item) => item.id)).toEqual([
+            "new-ok",
+            "new-fail"
+        ]);
     });
 });
 
@@ -111,12 +129,16 @@ describe("desktopReleasesUrl", () => {
 
 describe("the install card", () => {
     it("offers the desktop download in a browser", () => {
-        const html = renderToStaticMarkup(<InstallAppCard downloadUrl="https://github.com/o/p/releases?q=desktop-v" />);
+        const html = renderToStaticMarkup(
+            <InstallAppCard downloadUrl="https://github.com/o/p/releases?q=desktop-v" />
+        );
         expect(html).toContain('href="https://github.com/o/p/releases?q=desktop-v"');
         expect(html).toContain("Download the desktop app");
     });
 
     it("offers no download when there is no link to give", () => {
-        expect(renderToStaticMarkup(<InstallAppCard downloadUrl={null} />)).not.toContain("Download the desktop app");
+        expect(renderToStaticMarkup(<InstallAppCard downloadUrl={null} />)).not.toContain(
+            "Download the desktop app"
+        );
     });
 });

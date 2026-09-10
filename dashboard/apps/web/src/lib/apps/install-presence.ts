@@ -31,7 +31,8 @@ const cache = new Map<string, { present: boolean; at: number }>();
  * first time they are opened (see `mail-server/app-install`).
  */
 const IMPLIED_BY: Readonly<Record<string, () => Promise<boolean>>> = {
-    "mail-server": async () => (await prisma.mailServer.findFirst({ select: { id: true } })) !== null
+    "mail-server": async () =>
+        (await prisma.mailServer.findFirst({ select: { id: true } })) !== null
 };
 
 /** Whether any non-removed install of this catalog app exists, or anything that

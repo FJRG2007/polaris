@@ -82,7 +82,8 @@ export interface MainFrameStep {
  * one and ends when a page of the Polaris is shown again (`did-navigate`).
  */
 export function mainFrameStep(url: string, serverOrigin: string, trip: boolean): MainFrameStep {
-    if (isServerUrl(url, serverOrigin)) return { verdict: "allow", trip: trip || startsProviderTrip(url, serverOrigin) };
+    if (isServerUrl(url, serverOrigin))
+        return { verdict: "allow", trip: trip || startsProviderTrip(url, serverOrigin) };
     const target = parse(url);
     if (trip && target && WEB.has(target.protocol)) return { verdict: "allow", trip };
     return { verdict: classifyNavigation(url, serverOrigin), trip };
@@ -93,7 +94,11 @@ export function mainFrameStep(url: string, serverOrigin: string, trip: boolean):
  * that is on the Polaris, or, from a page elsewhere, the last page of the
  * Polaris before it. Null when there is nowhere to go.
  */
-export function backIndex(urls: readonly string[], active: number, serverOrigin: string): number | null {
+export function backIndex(
+    urls: readonly string[],
+    active: number,
+    serverOrigin: string
+): number | null {
     const away = !isServerUrl(urls[active] ?? "", serverOrigin);
     for (let index = active - 1; index >= 0; index -= 1) {
         if (isServerUrl(urls[index] ?? "", serverOrigin)) return index;

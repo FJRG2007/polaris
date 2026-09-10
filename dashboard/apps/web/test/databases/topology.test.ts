@@ -13,7 +13,10 @@ import { dbComposeSpec, forCompose, renderComposeYaml } from "@polaris/deploy";
 const mocks = vi.hoisted(() => ({ findFirst: vi.fn(), decrypt: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({ prisma: { managedDatabase: { findFirst: mocks.findFirst } } }));
-vi.mock("@polaris/storage", () => ({ decryptCredentials: mocks.decrypt, encryptCredentials: vi.fn() }));
+vi.mock("@polaris/storage", () => ({
+    decryptCredentials: mocks.decrypt,
+    encryptCredentials: vi.fn()
+}));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@/lib/deploy/runtime", () => ({ getPorts: vi.fn() }));
 vi.mock("@/lib/deploy-service", () => ({
@@ -78,9 +81,13 @@ function mongoServer(options: { usersFrom?: readonly string[] } = {}) {
         const signedIn = argv.includes("-u");
         switch (kind) {
             case "sign-in":
-                return { code: users.has(container) ? 0 : 1, output: users.has(container) ? "1" : "MongoServerError: Authentication failed." };
+                return {
+                    code: users.has(container) ? 0 : 1,
+                    output: users.has(container) ? "1" : "MongoServerError: Authentication failed."
+                };
             case "initiate":
-                if (signedIn && !users.has(container)) return { code: 1, output: "Authentication failed." };
+                if (signedIn && !users.has(container))
+                    return { code: 1, output: "Authentication failed." };
                 initiated.add(container);
                 return { code: 0, output: "1" };
             case "role":
@@ -111,10 +118,18 @@ describe("what each member is deployed with", () => {
             clusterKey: KEY
         })!;
         expect(members.map((member) => member.name)).toEqual([NAME, `${NAME}-m2`, `${NAME}-m3`]);
-        expect(members[0]!.env).toEqual({ MONGO_INITDB_ROOT_USERNAME: "polaris", MONGO_INITDB_ROOT_PASSWORD: "pw", POLARIS_MONGO_KEY: KEY });
+        expect(members[0]!.env).toEqual({
+            MONGO_INITDB_ROOT_USERNAME: "polaris",
+            MONGO_INITDB_ROOT_PASSWORD: "pw",
+            POLARIS_MONGO_KEY: KEY
+        });
         // The others hold no data before the set is initiated, which initiation requires.
         expect(members[1]!.env).toEqual({ POLARIS_MONGO_KEY: KEY });
-        expect(members.map((member) => member.volumeName)).toEqual(["mongo-data-1a2b", "mongo-data-1a2b-m2", "mongo-data-1a2b-m3"]);
+        expect(members.map((member) => member.volumeName)).toEqual([
+            "mongo-data-1a2b",
+            "mongo-data-1a2b-m2",
+            "mongo-data-1a2b-m3"
+        ]);
     });
 
     it("creates no account on a sharded cluster's members, and publishes only its router", () => {
@@ -129,7 +144,9 @@ describe("what each member is deployed with", () => {
         })!;
         expect(members).toHaveLength(10);
         expect(members.every((member) => !("MONGO_INITDB_ROOT_USERNAME" in member.env))).toBe(true);
-        expect(members.filter((member) => member.exposePort !== undefined).map((member) => member.name)).toEqual([NAME]);
+        expect(
+            members.filter((member) => member.exposePort !== undefined).map((member) => member.name)
+        ).toEqual([NAME]);
         expect(members[0]!.volumeName).toBeUndefined();
     });
 
@@ -151,12 +168,22 @@ describe("what each member is deployed with", () => {
             topology: { kind: "replicas", replicas: 2 },
             name: NAME,
             volumeName: "mysql-data",
-            engineEnv: { MYSQL_ROOT_PASSWORD: "pw", MYSQL_DATABASE: "orders", MYSQL_USER: "polaris", MYSQL_PASSWORD: "pw" },
+            engineEnv: {
+                MYSQL_ROOT_PASSWORD: "pw",
+                MYSQL_DATABASE: "orders",
+                MYSQL_USER: "polaris",
+                MYSQL_PASSWORD: "pw"
+            },
             password: "pw",
             exposePort: 3307
         })!;
         expect(members[0]!.env.MYSQL_DATABASE).toBe("orders");
-        expect(members[0]!.command).toEqual(["mysqld", "--server-id=1", "--gtid-mode=ON", "--enforce-gtid-consistency=ON"]);
+        expect(members[0]!.command).toEqual([
+            "mysqld",
+            "--server-id=1",
+            "--gtid-mode=ON",
+            "--enforce-gtid-consistency=ON"
+        ]);
         expect(members[0]!.exposePort).toBe(3307);
         expect(members[1]!.env).toEqual({ MYSQL_ROOT_PASSWORD: "pw" });
         expect(members[2]!.command).toContain("--server-id=3");
@@ -198,7 +225,13 @@ describe("what each member is deployed with", () => {
 
     it("deploys a single instance as the one container it always was", () => {
         expect(
-            topologyMemberPlans({ topology: { kind: "single" }, name: NAME, volumeName: "v", engineEnv: {}, password: "pw" })
+            topologyMemberPlans({
+                topology: { kind: "single" },
+                name: NAME,
+                volumeName: "v",
+                engineEnv: {},
+                password: "pw"
+            })
         ).toBeUndefined();
     });
 
@@ -218,7 +251,11 @@ describe("what each member is deployed with", () => {
 describe("joining a replica set", () => {
     it("waits for every member, then initiates once from the first and waits for it to be primary", async () => {
         const server = mongoServer({ usersFrom: [NAME] });
-        await ensureTopology(server, { name: NAME, topology: { kind: "replicaSet", members: 3 }, admin: ADMIN }, pace());
+        await ensureTopology(
+            server,
+            { name: NAME, topology: { kind: "replicaSet", members: 3 }, admin: ADMIN },
+            pace()
+        );
         expect(server.calls.map((call) => `${call.container} ${call.kind}`)).toEqual([
             `${NAME}-m2 ping`,
             `${NAME}-m3 ping`,
@@ -234,10 +271,16 @@ describe("joining a replica set", () => {
     it("names the member that never started answering", async () => {
         const server = mongoServer({ usersFrom: [NAME] });
         server.runIn.mockImplementation(async (container: string, argv: readonly string[]) =>
-            container === `${NAME}-m3` && kindOf(argv) === "ping" ? { code: 1, output: "connect ECONNREFUSED" } : { code: 0, output: "1" }
+            container === `${NAME}-m3` && kindOf(argv) === "ping"
+                ? { code: 1, output: "connect ECONNREFUSED" }
+                : { code: 0, output: "1" }
         );
         await expect(
-            ensureTopology(server, { name: NAME, topology: { kind: "replicaSet", members: 3 }, admin: ADMIN }, pace())
+            ensureTopology(
+                server,
+                { name: NAME, topology: { kind: "replicaSet", members: 3 }, admin: ADMIN },
+                pace()
+            )
         ).rejects.toThrow(`${NAME}-m3 did not start answering in time`);
     });
 });
@@ -248,7 +291,9 @@ describe("joining a sharded cluster", () => {
     it("initiates the config servers and each shard, gives each shard its account, then creates the cluster's and adds the shards", async () => {
         const server = mongoServer();
         await ensureTopology(server, setup, pace());
-        const steps = server.calls.filter((call) => call.kind !== "ping" && call.kind !== "role" && call.kind !== "sign-in");
+        const steps = server.calls.filter(
+            (call) => call.kind !== "ping" && call.kind !== "role" && call.kind !== "sign-in"
+        );
         expect(steps.map((call) => `${call.container} ${call.kind}`)).toEqual([
             `${NAME}-cfg1 initiate`,
             `${NAME}-sh1-1 initiate`,
@@ -274,7 +319,11 @@ describe("joining a sharded cluster", () => {
         const server = mongoServer({ usersFrom: everyone });
         await ensureTopology(server, setup, pace());
         expect(server.calls.some((call) => call.kind === "create-root")).toBe(false);
-        expect(server.calls.filter((call) => call.kind === "initiate").every((call) => call.argv.includes("-u"))).toBe(true);
+        expect(
+            server.calls
+                .filter((call) => call.kind === "initiate")
+                .every((call) => call.argv.includes("-u"))
+        ).toBe(true);
         expect(server.calls.at(-1)!.kind).toBe("add-shards");
     });
 });
@@ -289,18 +338,27 @@ describe("starting read replicas", () => {
             const kind = kindOf(argv);
             calls.push({ container, kind });
             if (kind === "follow") pointed.add(container);
-            return { code: 0, output: kind === "replica-status" && pointed.has(container) ? status : "" };
+            return {
+                code: 0,
+                output: kind === "replica-status" && pointed.has(container) ? status : ""
+            };
         });
         return { calls, runIn };
     }
 
-    const FOLLOWING = "Replica_IO_Running: Yes\nReplica_SQL_Running: Yes\nSeconds_Behind_Source: 0\n";
+    const FOLLOWING =
+        "Replica_IO_Running: Yes\nReplica_SQL_Running: Yes\nSeconds_Behind_Source: 0\n";
 
     it("creates the replication account on the primary, then points each replica at it", async () => {
         const server = mysqlServer(FOLLOWING);
         await ensureTopology(
             server,
-            { name: NAME, topology: { kind: "replicas", replicas: 2 }, admin: ADMIN, replicationPassword: "replSecret-2" },
+            {
+                name: NAME,
+                topology: { kind: "replicas", replicas: 2 },
+                admin: ADMIN,
+                replicationPassword: "replSecret-2"
+            },
             pace()
         );
         expect(server.calls.map((call) => `${call.container} ${call.kind}`)).toEqual([
@@ -323,7 +381,12 @@ describe("starting read replicas", () => {
         const server = mysqlServer(FOLLOWING, [`${NAME}-replica1`]);
         await ensureTopology(
             server,
-            { name: NAME, topology: { kind: "replicas", replicas: 1 }, admin: ADMIN, replicationPassword: "replSecret-2" },
+            {
+                name: NAME,
+                topology: { kind: "replicas", replicas: 1 },
+                admin: ADMIN,
+                replicationPassword: "replSecret-2"
+            },
             pace()
         );
         expect(server.calls.some((call) => call.kind === "follow")).toBe(false);
@@ -337,10 +400,17 @@ describe("starting read replicas", () => {
         await expect(
             ensureTopology(
                 server,
-                { name: NAME, topology: { kind: "replicas", replicas: 1 }, admin: ADMIN, replicationPassword: "replSecret-2" },
+                {
+                    name: NAME,
+                    topology: { kind: "replicas", replicas: 1 },
+                    admin: ADMIN,
+                    replicationPassword: "replSecret-2"
+                },
                 pace()
             )
-        ).rejects.toThrow(`${NAME}-replica1 is not following the primary: Access denied for user 'polaris_replica'`);
+        ).rejects.toThrow(
+            `${NAME}-replica1 is not following the primary: Access denied for user 'polaris_replica'`
+        );
     });
 });
 
@@ -361,12 +431,21 @@ describe("a rolling upgrade", () => {
             }
             return { code: 0, output: roles.get(container) ?? "other" };
         });
-        await rollMembers({ runIn }, ["a", "b", "c"], ADMIN, async (member) => void order.push(`move ${member}`), pace());
+        await rollMembers(
+            { runIn },
+            ["a", "b", "c"],
+            ADMIN,
+            async (member) => void order.push(`move ${member}`),
+            pace()
+        );
         expect(order).toEqual(["move b", "move c", "step down a", "move a"]);
     });
 
     it("refuses before moving anything when a member is not healthy", async () => {
-        const runIn = vi.fn(async (container: string) => ({ code: 0, output: container === "c" ? "other" : "secondary" }));
+        const runIn = vi.fn(async (container: string) => ({
+            code: 0,
+            output: container === "c" ? "other" : "secondary"
+        }));
         const move = vi.fn(async () => undefined);
         await expect(rollMembers({ runIn }, ["a", "b", "c"], ADMIN, move, pace())).rejects.toThrow(
             "Every member has to be a healthy primary or secondary before an upgrade, and c is not."
@@ -397,7 +476,11 @@ describe("connection strings", () => {
     }
 
     beforeEach(() => {
-        mocks.decrypt.mockReturnValue({ username: "polaris", password: "p@ss", database: "orders" });
+        mocks.decrypt.mockReturnValue({
+            username: "polaris",
+            password: "p@ss",
+            database: "orders"
+        });
     });
 
     it("lists every member of a replica set and names the set", async () => {
@@ -413,13 +496,24 @@ describe("connection strings", () => {
     it("points at a sharded cluster's router alone", async () => {
         mocks.findFirst.mockResolvedValue(row({ topology: "sharded", shards: 2 }));
         const connection = await databaseConnection("db-1", "owner");
-        expect(connection.uri).toBe(`mongodb://polaris:p%40ss@${NAME}:27017/orders?authSource=admin`);
+        expect(connection.uri).toBe(
+            `mongodb://polaris:p%40ss@${NAME}:27017/orders?authSource=admin`
+        );
         expect(connection.replicaSet).toBeNull();
     });
 
     it("reaches a database hosted on a replica set the way its instance is reached", async () => {
         mocks.findFirst.mockResolvedValue(
-            row({ containerName: "", parent: { containerName: NAME, exposePort: null, replicaSet: false, topology: "replicaSet", members: 5 } })
+            row({
+                containerName: "",
+                parent: {
+                    containerName: NAME,
+                    exposePort: null,
+                    replicaSet: false,
+                    topology: "replicaSet",
+                    members: 5
+                }
+            })
         );
         const connection = await databaseConnection("db-1", "owner");
         expect(connection.hosts).toHaveLength(5);
@@ -427,7 +521,9 @@ describe("connection strings", () => {
     });
 
     it("gives a MySQL primary with replicas a read URI over the name they share", async () => {
-        mocks.findFirst.mockResolvedValue(row({ engine: "mysql", topology: "replicas", readReplicas: 2 }));
+        mocks.findFirst.mockResolvedValue(
+            row({ engine: "mysql", topology: "replicas", readReplicas: 2 })
+        );
         const connection = await databaseConnection("db-1", "owner");
         expect(connection.uri).toBe(`mysql://polaris:p%40ss@${NAME}:3306/orders`);
         expect(connection.readUri).toBe(`mysql://polaris:p%40ss@${NAME}-read:3306/orders`);
@@ -436,7 +532,9 @@ describe("connection strings", () => {
     it("keeps a single-member replica set's connection string as it was", async () => {
         mocks.findFirst.mockResolvedValue(row({ replicaSet: true }));
         const connection = await databaseConnection("db-1", "owner");
-        expect(connection.uri).toBe(`mongodb://polaris:p%40ss@${NAME}:27017/orders?authSource=admin&replicaSet=rs0`);
+        expect(connection.uri).toBe(
+            `mongodb://polaris:p%40ss@${NAME}:27017/orders?authSource=admin&replicaSet=rs0`
+        );
         expect(connection.readUri).toBeNull();
     });
 });

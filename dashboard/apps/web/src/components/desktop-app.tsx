@@ -56,7 +56,10 @@ export function DesktopServiceActions({
                     type="button"
                     onClick={() =>
                         void bridge
-                            .openWindow({ path: `/apps/deploy/${projectId}/logs?service=${serviceId}`, title: `Logs - ${label}` })
+                            .openWindow({
+                                path: `/apps/deploy/${projectId}/logs?service=${serviceId}`,
+                                title: `Logs - ${label}`
+                            })
                             .then(report)
                     }
                     aria-label="Follow logs in a window"
@@ -71,7 +74,11 @@ export function DesktopServiceActions({
                     type="button"
                     onClick={() =>
                         void bridge
-                            .pushLocal({ serviceId, name: label, href: `/apps/deploy/${projectId}?service=${serviceId}` })
+                            .pushLocal({
+                                serviceId,
+                                name: label,
+                                href: `/apps/deploy/${projectId}?service=${serviceId}`
+                            })
                             .then(report)
                     }
                     aria-label="Push from this computer"

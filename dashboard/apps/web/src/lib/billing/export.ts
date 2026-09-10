@@ -16,7 +16,13 @@
 import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
 import { recordAudit } from "@/lib/audit-service";
-import { BillingRequestError, readStatement, resolveMonth, type BillingScope, type StatementView } from "./statement";
+import {
+    BillingRequestError,
+    readStatement,
+    resolveMonth,
+    type BillingScope,
+    type StatementView
+} from "./statement";
 
 const CSV_COLUMNS = [
     "month",
@@ -80,8 +86,16 @@ export function statementCsv(view: StatementView): string {
 }
 
 /** The name a statement is saved under: whose, and which month. */
-export function statementFilename(label: string, month: string, format: core.AuditExportFormat): string {
-    const safe = label.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "polaris";
+export function statementFilename(
+    label: string,
+    month: string,
+    format: core.AuditExportFormat
+): string {
+    const safe =
+        label
+            .replace(/[^a-z0-9-]+/gi, "-")
+            .replace(/^-+|-+$/g, "")
+            .toLowerCase() || "polaris";
     return `${safe}-statement-${month}.${format}`;
 }
 
@@ -108,7 +122,10 @@ export async function statementResponse(
     } catch (caught) {
         if (caught instanceof BillingRequestError) return refused(caught.message);
         console.error("polaris: a billing statement could not be read:", caught);
-        return refused("The statement could not be worked out just now. Try again in a moment.", 500);
+        return refused(
+            "The statement could not be worked out just now. Try again in a moment.",
+            500
+        );
     }
 }
 
@@ -125,14 +142,18 @@ export async function statementExportResponse(
     options: { label: string; actorId: string; orgId?: string }
 ): Promise<Response> {
     const parsed = core.billingExportQuerySchema.safeParse(params(request));
-    if (!parsed.success) return refused(parsed.error.issues[0]?.message ?? "Pick a month and a format");
+    if (!parsed.success)
+        return refused(parsed.error.issues[0]?.message ?? "Pick a month and a format");
     let view: StatementView;
     try {
         view = await readStatement(scope, resolveMonth(parsed.data.month));
     } catch (caught) {
         if (caught instanceof BillingRequestError) return refused(caught.message);
         console.error("polaris: a billing statement could not be exported:", caught);
-        return refused("The statement could not be worked out just now. Try again in a moment.", 500);
+        return refused(
+            "The statement could not be worked out just now. Try again in a moment.",
+            500
+        );
     }
 
     const { format } = parsed.data;
@@ -140,13 +161,19 @@ export async function statementExportResponse(
         actorId: options.actorId,
         orgId: options.orgId,
         action: "billing.export",
-        metadata: { scope: scope.kind, month: view.statement.month, format, projects: view.statement.lines.length }
+        metadata: {
+            scope: scope.kind,
+            month: view.statement.month,
+            format,
+            projects: view.statement.lines.length
+        }
     });
 
     const body = format === "csv" ? statementCsv(view) : JSON.stringify(view);
     return new Response(body, {
         headers: {
-            "content-type": format === "csv" ? "text/csv; charset=utf-8" : "application/json; charset=utf-8",
+            "content-type":
+                format === "csv" ? "text/csv; charset=utf-8" : "application/json; charset=utf-8",
             "content-disposition": `attachment; filename="${statementFilename(options.label, view.statement.month, format)}"`,
             "cache-control": "private, no-store",
             "x-content-type-options": "nosniff"

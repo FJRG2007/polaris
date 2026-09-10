@@ -58,7 +58,9 @@ function preferences(preload: string, extra: WebPreferences = {}): WebPreference
 }
 
 function polarisPreferences(): WebPreferences {
-    return preferences("app.js", { additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`] });
+    return preferences("app.js", {
+        additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`]
+    });
 }
 
 function register(contents: WebContents, kind: WindowKind): void {
@@ -88,7 +90,11 @@ function windowOptions(options: BrowserWindowConstructorOptions): BrowserWindowC
  */
 function contain(contents: WebContents, server: () => string | null): void {
     let trip = false;
-    const guard = (event: { preventDefault: () => void; readonly url: string; readonly isMainFrame: boolean; }) => {
+    const guard = (event: {
+        preventDefault: () => void;
+        readonly url: string;
+        readonly isMainFrame: boolean;
+    }) => {
         if (!event.isMainFrame) return;
         const origin = server();
         const step = origin ? mainFrameStep(event.url, origin, trip) : null;
@@ -132,7 +138,7 @@ function contain(contents: WebContents, server: () => string | null): void {
 export function openPolarisWindow(
     url: string,
     server: () => string | null,
-    options: { readonly title?: string; readonly width?: number; readonly height?: number; } = {}
+    options: { readonly title?: string; readonly width?: number; readonly height?: number } = {}
 ): BrowserWindow {
     const window = new BrowserWindow(
         windowOptions({
@@ -157,7 +163,12 @@ export function openPolarisWindow(
 /** A window showing one of this app's own pages. */
 export function openLocalWindow(
     kind: Exclude<WindowKind, "polaris">,
-    options: { readonly title: string; readonly width: number; readonly height: number; readonly parent?: BrowserWindow; }
+    options: {
+        readonly title: string;
+        readonly width: number;
+        readonly height: number;
+        readonly parent?: BrowserWindow;
+    }
 ): BrowserWindow {
     const window = new BrowserWindow(
         windowOptions({

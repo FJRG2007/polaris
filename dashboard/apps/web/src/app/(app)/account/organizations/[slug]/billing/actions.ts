@@ -30,12 +30,19 @@ export async function saveOrgBudgetAction(
 ): Promise<{ budget?: OrgBudget; error?: string }> {
     const user = await requireUser();
     const parsed = orgBudgetInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the amount and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the amount and try again" };
     try {
-        await orgs.requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "settings.manage");
+        await orgs.requireOrgPermission(
+            { id: user.id, isAdmin: user.isAdmin },
+            orgId,
+            "settings.manage"
+        );
         const rates = await getBillingRates();
         if (!rates) {
-            return { error: "This Polaris has no prices set yet, so a budget has nothing to be measured against." };
+            return {
+                error: "This Polaris has no prices set yet, so a budget has nothing to be measured against."
+            };
         }
         const budget: OrgBudget = { amount: parsed.data.amount, currency: rates.currency };
         await setOrgBudget(orgId, budget);
@@ -57,7 +64,11 @@ export async function saveOrgBudgetAction(
 export async function clearOrgBudgetAction(orgId: string): Promise<{ error?: string }> {
     const user = await requireUser();
     try {
-        await orgs.requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "settings.manage");
+        await orgs.requireOrgPermission(
+            { id: user.id, isAdmin: user.isAdmin },
+            orgId,
+            "settings.manage"
+        );
         await clearOrgBudget(orgId);
         await recordAudit({
             actorId: user.id,

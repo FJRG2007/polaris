@@ -36,7 +36,11 @@ export default async function ProjectLogsPage({
     // opens on the environment holding it, with that service selected.
     const service = pick(query.service);
     const environment =
-        (service ? project.environments.find((entry) => entry.applications.some((app) => app.id === service)) : undefined) ??
+        (service
+            ? project.environments.find((entry) =>
+                  entry.applications.some((app) => app.id === service)
+              )
+            : undefined) ??
         project.environments.find((entry) => entry.id === requested) ??
         project.environments.find((entry) => entry.isDefault) ??
         project.environments[0];

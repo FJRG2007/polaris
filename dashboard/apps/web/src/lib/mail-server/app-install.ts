@@ -50,11 +50,16 @@ export function mailServerAppInstalled(): Promise<boolean> {
 export async function adoptMailServerApp(): Promise<string | null> {
     const existing = await currentInstall(prisma);
     if (existing) return existing;
-    const first = await prisma.mailServer.findFirst({ orderBy: { createdAt: "asc" }, select: { ownerId: true } });
+    const first = await prisma.mailServer.findFirst({
+        orderBy: { createdAt: "asc" },
+        select: { ownerId: true }
+    });
     if (!first) return null;
     const adopted = await prisma.$transaction(async (tx) => {
         if (loadEnv().POLARIS_DB_PROVIDER === "postgresql") {
-            await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext('polaris.mail-server.adopt'))");
+            await tx.$executeRawUnsafe(
+                "SELECT pg_advisory_xact_lock(hashtext('polaris.mail-server.adopt'))"
+            );
         }
         const raced = await currentInstall(tx);
         if (raced) return { id: raced, created: false };
@@ -75,9 +80,7 @@ export async function adoptMailServerApp(): Promise<string | null> {
 }
 
 /** The oldest live install row, or null. */
-async function currentInstall(
-    client: Pick<typeof prisma, "installedApp">
-): Promise<string | null> {
+async function currentInstall(client: Pick<typeof prisma, "installedApp">): Promise<string | null> {
     const row = await client.installedApp.findFirst({
         where: { catalogId: MAIL_SERVER_APP, status: { not: "removed" } },
         orderBy: { createdAt: "asc" },
@@ -110,7 +113,10 @@ export async function uninstallRefusal(): Promise<string | null> {
  * goes, so a second copy made before installs were one per Polaris cannot keep
  * the screens alive. Runs nothing down: installing started nothing.
  */
-export async function uninstallMailServerApp(actor: { id: string; isAdmin: boolean }): Promise<string[]> {
+export async function uninstallMailServerApp(actor: {
+    id: string;
+    isAdmin: boolean;
+}): Promise<string[]> {
     const refusal = await uninstallRefusal();
     if (refusal) throw new MailServerAppRefusal(refusal);
     const rows = await prisma.installedApp.findMany({
@@ -119,11 +125,16 @@ export async function uninstallMailServerApp(actor: { id: string; isAdmin: boole
     });
     if (rows.length === 0) throw new MailServerAppRefusal("Mail server is not installed.");
     if (!actor.isAdmin && !rows.some((row) => row.ownerId === actor.id)) {
-        throw new MailServerAppRefusal("Only whoever installed Mail server, or an administrator, can uninstall it.");
+        throw new MailServerAppRefusal(
+            "Only whoever installed Mail server, or an administrator, can uninstall it."
+        );
     }
     const ids = rows.map((row) => row.id);
     // Marked removed rather than deleted, like every other uninstall here.
-    await prisma.installedApp.updateMany({ where: { id: { in: ids } }, data: { status: "removed" } });
+    await prisma.installedApp.updateMany({
+        where: { id: { in: ids } },
+        data: { status: "removed" }
+    });
     invalidateInstallPresence(MAIL_SERVER_APP);
     return ids;
 }

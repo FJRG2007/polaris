@@ -11,14 +11,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/connections/oauth-app", () => ({ oauthClientFor: async () => null }));
 
-const { microsoftAccessToken, MicrosoftAuthExpiredError } = await import("@/lib/connections/microsoft");
+const { microsoftAccessToken, MicrosoftAuthExpiredError } = await import(
+    "@/lib/connections/microsoft"
+);
 
 const CLIENT = { clientId: "client", clientSecret: "secret" };
 
 function answer(status: number, body: unknown): void {
     vi.stubGlobal(
         "fetch",
-        vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }))
+        vi.fn(
+            async () =>
+                new Response(JSON.stringify(body), {
+                    status,
+                    headers: { "content-type": "application/json" }
+                })
+        )
     );
 }
 
@@ -28,7 +36,10 @@ afterEach(() => {
 
 describe("minting a Microsoft access token", () => {
     it("reads a refused grant as a refusal", async () => {
-        answer(400, { error: "invalid_grant", error_description: "AADSTS70000: The grant is expired." });
+        answer(400, {
+            error: "invalid_grant",
+            error_description: "AADSTS70000: The grant is expired."
+        });
         const attempt = microsoftAccessToken(CLIENT, "refresh-400");
         await expect(attempt).rejects.toBeInstanceOf(MicrosoftAuthExpiredError);
         await expect(attempt).rejects.toThrow("invalid_grant");

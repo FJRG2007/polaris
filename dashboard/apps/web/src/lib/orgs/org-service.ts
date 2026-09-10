@@ -305,7 +305,10 @@ export async function orgIdsWhere(
  * asking. Each role is resolved once however many people hold it, and exactly as
  * access is resolved, so the people told are the people who could act on it.
  */
-export async function orgPeopleHolding(orgId: string, permission: core.OrgPermission): Promise<string[]> {
+export async function orgPeopleHolding(
+    orgId: string,
+    permission: core.OrgPermission
+): Promise<string[]> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: { ownerId: true, members: { select: { userId: true, role: true } } }

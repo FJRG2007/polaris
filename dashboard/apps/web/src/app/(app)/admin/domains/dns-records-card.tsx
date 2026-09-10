@@ -36,7 +36,9 @@ export function DnsRecordsCard() {
         let live = true;
         const adopt = (next: Zone[]) => {
             setZones(next);
-            setZoneId((current) => (next.some((zone) => zone.id === current) ? current : (next[0]?.id ?? "")));
+            setZoneId((current) =>
+                next.some((zone) => zone.id === current) ? current : (next[0]?.id ?? "")
+            );
         };
         // Read from an effect rather than the first render: the page is rendered on
         // the server too, where the tab's copy does not exist.

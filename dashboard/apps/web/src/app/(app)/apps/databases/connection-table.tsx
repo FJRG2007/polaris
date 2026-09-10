@@ -53,12 +53,24 @@ export function ConnectionTable({ rows, noMatch, ...row }: ConnectionTableProps)
                         <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                             Name
                         </th>
-                        <th scope="col" className="px-3 py-2 font-medium">Engine</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Where</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Database</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Last used</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Added</th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                            Engine
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                            Where
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                            Database
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                            Status
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                            Last used
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-medium">
+                            Added
+                        </th>
                         <th scope="col" className="px-3 py-2 font-medium">
                             <span className="sr-only">Actions</span>
                         </th>

@@ -26,7 +26,13 @@ vi.mock("@/lib/orgs/org-service", () => ({ orgPeopleHolding }));
 const { sweepBudgets } = await import("../../src/lib/billing/budgets");
 
 const NOW = new Date("2026-09-20T10:00:00Z");
-const RATES = { currency: "EUR", cpuHour: 0.02, memoryGbHour: null, storageGbMonth: null, egressGb: null };
+const RATES = {
+    currency: "EUR",
+    cpuHour: 0.02,
+    memoryGbHour: null,
+    storageGbMonth: null,
+    egressGb: null
+};
 
 function budgetRow(overrides: Record<string, unknown> = {}) {
     return {
@@ -45,7 +51,11 @@ function spending(spent: number) {
         monthLabel: "September 2026",
         statement: {
             owners: [
-                { owner: { kind: "org", id: "o1", name: "Acme", handle: "acme" }, projects: 1, cost: { total: spent } }
+                {
+                    owner: { kind: "org", id: "o1", name: "Acme", handle: "acme" },
+                    projects: 1,
+                    cost: { total: spent }
+                }
             ]
         }
     };
@@ -73,7 +83,9 @@ describe("measuring budgets", () => {
     it("only reads budgets set in the prices' currency", async () => {
         findMany.mockResolvedValue([]);
         await sweepBudgets(NOW);
-        expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { currency: "EUR" } }));
+        expect(findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { currency: "EUR" } })
+        );
         expect(readStatement).not.toHaveBeenCalled();
     });
 
@@ -82,7 +94,11 @@ describe("measuring budgets", () => {
         readStatement.mockResolvedValue(spending(85));
 
         expect(await sweepBudgets(NOW)).toEqual({ checked: 1, announced: 1 });
-        expect(readStatement).toHaveBeenCalledWith({ kind: "orgs", orgIds: ["o1"] }, "2026-09", NOW);
+        expect(readStatement).toHaveBeenCalledWith(
+            { kind: "orgs", orgIds: ["o1"] },
+            "2026-09",
+            NOW
+        );
         expect(orgPeopleHolding).toHaveBeenCalledWith("o1", "settings.manage");
         expect(notify).toHaveBeenCalledTimes(2);
         expect(notify).toHaveBeenCalledWith(
@@ -96,7 +112,13 @@ describe("measuring budgets", () => {
         );
         // Claimed against what was read, so a pass that got there first wins.
         expect(updateMany).toHaveBeenCalledWith({
-            where: { orgId: "o1", amount: 100, currency: "EUR", alertedMonth: null, alertedLevel: 0 },
+            where: {
+                orgId: "o1",
+                amount: 100,
+                currency: "EUR",
+                alertedMonth: null,
+                alertedLevel: 0
+            },
             data: { alertedMonth: "2026-09", alertedLevel: 80 }
         });
     });
@@ -124,7 +146,10 @@ describe("measuring budgets", () => {
         readStatement.mockResolvedValue(spending(130));
         await sweepBudgets(NOW);
         expect(notify).toHaveBeenCalledWith(
-            expect.objectContaining({ level: "danger", title: "Acme has gone past its budget for September 2026" })
+            expect.objectContaining({
+                level: "danger",
+                title: "Acme has gone past its budget for September 2026"
+            })
         );
     });
 

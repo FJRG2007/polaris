@@ -59,7 +59,8 @@ export function topologyMemberPlans(input: TopologyPlanInput): DbMemberPlan[] | 
     const { topology, name } = input;
     if (topology.kind === "single") return undefined;
     const members = topologyMembers(topology, name);
-    const volumeOf = (suffix: string | null) => (suffix === null ? undefined : `${input.volumeName}${suffix}`);
+    const volumeOf = (suffix: string | null) =>
+        suffix === null ? undefined : `${input.volumeName}${suffix}`;
     const imageOf = (member: string) => input.memberImages?.[member];
 
     if (topology.kind === "replicas") {
@@ -68,13 +69,18 @@ export function topologyMemberPlans(input: TopologyPlanInput): DbMemberPlan[] | 
             env: index === 0 ? { ...input.engineEnv } : { MYSQL_ROOT_PASSWORD: input.password },
             command: mysqlMemberCommand(index + 1),
             volumeName: volumeOf(member.volumeSuffix),
-            ...(index === 0 && input.exposePort !== undefined ? { exposePort: input.exposePort } : {}),
+            ...(index === 0 && input.exposePort !== undefined
+                ? { exposePort: input.exposePort }
+                : {}),
             ...(index === 0 ? {} : { aliases: [readHostName(name)] }),
             ...(imageOf(member.name) ? { image: imageOf(member.name) } : {})
         }));
     }
 
-    if (!input.clusterKey) throw new Error("This database's cluster key is missing, so its members could not sign in to each other");
+    if (!input.clusterKey)
+        throw new Error(
+            "This database's cluster key is missing, so its members could not sign in to each other"
+        );
     const key = { [MONGO_KEY_ENV]: input.clusterKey };
     return members.map((member, index) => ({
         name: member.name,
@@ -83,7 +89,9 @@ export function topologyMemberPlans(input: TopologyPlanInput): DbMemberPlan[] | 
         volumeName: volumeOf(member.volumeSuffix),
         // What is published is what clients connect to: a cluster's router. A
         // replica set is never published - see the create schema.
-        ...(member.role === "router" && input.exposePort !== undefined ? { exposePort: input.exposePort } : {}),
+        ...(member.role === "router" && input.exposePort !== undefined
+            ? { exposePort: input.exposePort }
+            : {}),
         ...(imageOf(member.name) ? { image: imageOf(member.name) } : {})
     }));
 }

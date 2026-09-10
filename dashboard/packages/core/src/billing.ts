@@ -171,8 +171,13 @@ function finite(value: number | null): number | null {
  * `cores` is the machine the service ran on, or null when it is not known - in
  * which case the CPU is counted as unmeasured instead of priced at a guess.
  */
-export function meterHour(hour: UsageHour, cores: number | null, cadence: MeterCadence): BillingUsage {
-    const minutes = hour.subjectType === "app" ? cadence.appSampleMinutes : cadence.volumeSampleMinutes;
+export function meterHour(
+    hour: UsageHour,
+    cores: number | null,
+    cadence: MeterCadence
+): BillingUsage {
+    const minutes =
+        hour.subjectType === "app" ? cadence.appSampleMinutes : cadence.volumeSampleMinutes;
     const covered = Math.min(1, Math.max(0, (hour.samples * minutes) / 60));
     if (hour.subjectType === "volume") {
         const disk = finite(hour.diskUsedBytesAvg);
@@ -249,13 +254,20 @@ export function priceUsage(usage: BillingUsage, rates: BillingRates, month: stri
     const memory = part("memoryGbHour");
     const storage = part("storageGbMonth");
     const egress = part("egressGb");
-    const total = [cpu, memory, storage, egress].reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    const total = [cpu, memory, storage, egress].reduce<number>(
+        (sum, value) => sum + (value ?? 0),
+        0
+    );
     return { cpu, memory, storage, egress, total: roundMoney(total, rates.currency) };
 }
 
 /** Two costs, together. Lines of one statement share their prices, so a part that
  *  is unpriced on one is unpriced on all of them. */
-export function addCost(left: BillingCost, right: BillingCost, currency: CurrencyCode): BillingCost {
+export function addCost(
+    left: BillingCost,
+    right: BillingCost,
+    currency: CurrencyCode
+): BillingCost {
     const sum = (a: number | null, b: number | null): number | null =>
         a === null && b === null ? null : roundMoney((a ?? 0) + (b ?? 0), currency);
     return {

@@ -43,7 +43,10 @@ const macSigning = env.APPLE_SIGNING_IDENTITY
  *  certificate file when one is given. */
 const windowsCertificate =
     env.WINDOWS_CERTIFICATE_FILE && existsSync(env.WINDOWS_CERTIFICATE_FILE)
-        ? { certificateFile: env.WINDOWS_CERTIFICATE_FILE, certificatePassword: env.WINDOWS_CERTIFICATE_PASSWORD ?? "" }
+        ? {
+              certificateFile: env.WINDOWS_CERTIFICATE_FILE,
+              certificatePassword: env.WINDOWS_CERTIFICATE_PASSWORD ?? ""
+          }
         : null;
 
 module.exports = {
@@ -66,7 +69,11 @@ module.exports = {
         ignore: (/** @type {string} */ file) => {
             if (!file) return false;
             const relative = file.replace(/^[\\/]/, "").replaceAll("\\", "/");
-            return !(relative === "package.json" || relative === "dist" || relative.startsWith("dist/"));
+            return !(
+                relative === "package.json" ||
+                relative === "dist" ||
+                relative.startsWith("dist/")
+            );
         },
         ...(windowsCertificate ? { windowsSign: windowsCertificate } : {}),
         ...macSigning

@@ -35,7 +35,9 @@ export function canKeepApiKey(): boolean {
 export function readApiKey(server: string): string | null {
     if (!canKeepApiKey()) return null;
     try {
-        const stored = JSON.parse(safeStorage.decryptString(readFileSync(file()))) as Partial<Stored>;
+        const stored = JSON.parse(
+            safeStorage.decryptString(readFileSync(file()))
+        ) as Partial<Stored>;
         return stored.server === server && typeof stored.key === "string" ? stored.key : null;
     } catch {
         return null;
@@ -46,7 +48,11 @@ export function readApiKey(server: string): string | null {
 export function keepApiKey(server: string, key: string): boolean {
     if (!canKeepApiKey()) return false;
     const temp = `${file()}.${process.pid}.tmp`;
-    writeFileSync(temp, safeStorage.encryptString(JSON.stringify({ server, key } satisfies Stored)), { mode: 0o600 });
+    writeFileSync(
+        temp,
+        safeStorage.encryptString(JSON.stringify({ server, key } satisfies Stored)),
+        { mode: 0o600 }
+    );
     renameSync(temp, file());
     return true;
 }

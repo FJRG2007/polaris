@@ -34,20 +34,36 @@ vi.mock("@polaris/db", () => ({
             })
         },
         // Promotion moves the service's current release; a step in place never does.
-        application: { findUnique: vi.fn(async () => promoted()), update: vi.fn(async () => promoted()) },
+        application: {
+            findUnique: vi.fn(async () => promoted()),
+            update: vi.fn(async () => promoted())
+        },
         domain: { deleteMany: vi.fn(async () => ({ count: 0 })) }
     }
 }));
-vi.mock("@/lib/notifications/deploy-events", () => ({ notifyDeployFinished: vi.fn(async () => undefined) }));
+vi.mock("@/lib/notifications/deploy-events", () => ({
+    notifyDeployFinished: vi.fn(async () => undefined)
+}));
 vi.mock("@/lib/deploy/runtime", () => ({
     getPorts: vi.fn(async () => ({ dispose: vi.fn(async () => undefined) })),
     getDriver: vi.fn(() => ({})),
-    toTargetInfo: vi.fn(() => ({ id: "target-1", kind: "local", engine: "compose", proxyNetwork: "polaris" }))
+    toTargetInfo: vi.fn(() => ({
+        id: "target-1",
+        kind: "local",
+        engine: "compose",
+        proxyNetwork: "polaris"
+    }))
 }));
 
 const { executeDeployment } = await import("@/lib/deploy-service");
 
-const TARGET = { id: "target-1", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "polaris" };
+const TARGET = {
+    id: "target-1",
+    kind: "local",
+    hostId: null,
+    runtime: "compose",
+    proxyNetwork: "polaris"
+};
 
 beforeEach(() => {
     row.status = "queued";
@@ -58,11 +74,24 @@ beforeEach(() => {
 describe("a scale step in the serving release's own project", () => {
     it("keeps that release current, with the step's count", async () => {
         const run = async () => ({ ok: true, imageTag: "polaris-release/shop:0123456789ab" });
-        await executeDeployment("dep-step", TARGET as never, "owner-1", run, undefined, [], undefined, undefined, "dep-live");
+        await executeDeployment(
+            "dep-step",
+            TARGET as never,
+            "owner-1",
+            run,
+            undefined,
+            [],
+            undefined,
+            undefined,
+            "dep-live"
+        );
 
         expect(promoted).not.toHaveBeenCalled();
         expect(update).toHaveBeenCalledWith({ where: { id: "dep-live" }, data: { replicas: 4 } });
         // The step's own row records it and never serves anything.
-        expect(update).toHaveBeenCalledWith({ where: { id: "dep-step" }, data: { status: "removed", imageKept: false } });
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "dep-step" },
+            data: { status: "removed", imageKept: false }
+        });
     });
 });

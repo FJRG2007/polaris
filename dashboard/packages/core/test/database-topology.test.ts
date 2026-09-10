@@ -12,7 +12,12 @@ const ENVIRONMENT = "00000000-0000-4000-8000-000000000001";
 const NAME = "shop-orders-1a2b";
 
 function create(input: Partial<core.DatabaseCreateInput>) {
-    return core.databaseCreateSchema.safeParse({ environmentId: ENVIRONMENT, name: "orders", engine: "mongo", ...input });
+    return core.databaseCreateSchema.safeParse({
+        environmentId: ENVIRONMENT,
+        name: "orders",
+        engine: "mongo",
+        ...input
+    });
 }
 
 function messages(input: Partial<core.DatabaseCreateInput>): string[] {
@@ -35,39 +40,61 @@ describe("the create schema's layouts", () => {
     });
 
     it("fills in the sizes a layout left off", () => {
-        expect(core.topologyOf({ topology: "replicaSet" })).toEqual({ kind: "replicaSet", members: 3 });
+        expect(core.topologyOf({ topology: "replicaSet" })).toEqual({
+            kind: "replicaSet",
+            members: 3
+        });
         expect(core.topologyOf({ topology: "sharded" })).toEqual({ kind: "sharded", shards: 2 });
-        expect(core.topologyOf({ topology: "replicas" })).toEqual({ kind: "replicas", replicas: 1 });
+        expect(core.topologyOf({ topology: "replicas" })).toEqual({
+            kind: "replicas",
+            replicas: 1
+        });
     });
 
     it("accepts each layout on the engine it is for", () => {
         expect(create({ topology: "replicaSet", members: 5 }).success).toBe(true);
         expect(create({ topology: "sharded", shards: 4, exposePort: 27018 }).success).toBe(true);
-        expect(create({ engine: "mysql", topology: "replicas", readReplicas: 2 }).success).toBe(true);
+        expect(create({ engine: "mysql", topology: "replicas", readReplicas: 2 }).success).toBe(
+            true
+        );
     });
 
     it("refuses a layout on an engine it is not for", () => {
-        expect(messages({ engine: "postgres", topology: "replicaSet" })[0]).toContain("MongoDB only");
+        expect(messages({ engine: "postgres", topology: "replicaSet" })[0]).toContain(
+            "MongoDB only"
+        );
         expect(messages({ engine: "mongo", topology: "replicas" })[0]).toContain("MySQL only");
         expect(messages({ engine: "mariadb", topology: "replicas" })[0]).toContain("MySQL only");
     });
 
     it("refuses sizes that are not offered, and sizes for another layout", () => {
-        expect(messages({ topology: "replicaSet", members: 4 })).toContain("A replica set has 3 or 5 members");
-        expect(messages({ topology: "sharded", shards: 1 })).toContain("A sharded cluster starts with 2, 3 or 4 shards");
-        expect(messages({ engine: "mysql", topology: "replicas", readReplicas: 3 })).toContain("Add 1 or 2 read replicas");
-        expect(messages({ topology: "single", members: 3 })).toContain("Only a replica set has members to count");
-        expect(messages({ topology: "replicaSet", shards: 2 })).toContain("Only a sharded cluster has shards");
-    });
-
-    it("refuses a layout for a database placed on an existing instance", () => {
-        expect(messages({ topology: "replicaSet", instanceId: "00000000-0000-4000-8000-000000000002" })).toContain(
-            "A database on an existing instance runs the way that instance does"
+        expect(messages({ topology: "replicaSet", members: 4 })).toContain(
+            "A replica set has 3 or 5 members"
+        );
+        expect(messages({ topology: "sharded", shards: 1 })).toContain(
+            "A sharded cluster starts with 2, 3 or 4 shards"
+        );
+        expect(messages({ engine: "mysql", topology: "replicas", readReplicas: 3 })).toContain(
+            "Add 1 or 2 read replicas"
+        );
+        expect(messages({ topology: "single", members: 3 })).toContain(
+            "Only a replica set has members to count"
+        );
+        expect(messages({ topology: "replicaSet", shards: 2 })).toContain(
+            "Only a sharded cluster has shards"
         );
     });
 
+    it("refuses a layout for a database placed on an existing instance", () => {
+        expect(
+            messages({ topology: "replicaSet", instanceId: "00000000-0000-4000-8000-000000000002" })
+        ).toContain("A database on an existing instance runs the way that instance does");
+    });
+
     it("never publishes a replica set, whose members only the environment can name", () => {
-        expect(messages({ topology: "replicaSet", exposePort: 27018 })[0]).toContain("not published");
+        expect(messages({ topology: "replicaSet", exposePort: 27018 })[0]).toContain(
+            "not published"
+        );
     });
 
     it("reads a stored layout back, and treats anything unknown as one container", () => {
@@ -75,8 +102,14 @@ describe("the create schema's layouts", () => {
         expect(stored).toEqual({ topology: "sharded", members: 1, shards: 3, readReplicas: 0 });
         expect(core.resolveTopology(stored)).toEqual({ kind: "sharded", shards: 3 });
         expect(core.resolveTopology({ topology: "galaxy" })).toEqual({ kind: "single" });
-        expect(core.resolveTopology({ topology: "replicaSet", members: 7 })).toEqual({ kind: "replicaSet", members: 3 });
-        expect(core.topologyRequest({ kind: "replicas", replicas: 2 })).toEqual({ topology: "replicas", readReplicas: 2 });
+        expect(core.resolveTopology({ topology: "replicaSet", members: 7 })).toEqual({
+            kind: "replicaSet",
+            members: 3
+        });
+        expect(core.topologyRequest({ kind: "replicas", replicas: 2 })).toEqual({
+            topology: "replicas",
+            readReplicas: 2
+        });
     });
 });
 
@@ -91,12 +124,12 @@ describe("the containers of a layout", () => {
         const members = core.topologyMembers({ kind: "sharded", shards: 2 }, NAME);
         expect(members).toHaveLength(1 + 3 + 6);
         expect(members[0]).toEqual({ name: NAME, role: "router", set: null, volumeSuffix: null });
-        expect(members.filter((member) => member.role === "config").map((member) => member.set)).toEqual(["cfg", "cfg", "cfg"]);
-        expect(members.filter((member) => member.set === "shard2").map((member) => member.name)).toEqual([
-            `${NAME}-sh2-1`,
-            `${NAME}-sh2-2`,
-            `${NAME}-sh2-3`
-        ]);
+        expect(
+            members.filter((member) => member.role === "config").map((member) => member.set)
+        ).toEqual(["cfg", "cfg", "cfg"]);
+        expect(
+            members.filter((member) => member.set === "shard2").map((member) => member.name)
+        ).toEqual([`${NAME}-sh2-1`, `${NAME}-sh2-2`, `${NAME}-sh2-3`]);
     });
 
     it("names a MySQL primary's replicas, and the name they share for reads", () => {
@@ -106,7 +139,9 @@ describe("the containers of a layout", () => {
             [`${NAME}-replica1`, "replica"],
             [`${NAME}-replica2`, "replica"]
         ]);
-        expect(core.topologyAddress({ kind: "replicas", replicas: 2 }, NAME).readHost).toBe(`${NAME}-read`);
+        expect(core.topologyAddress({ kind: "replicas", replicas: 2 }, NAME).readHost).toBe(
+            `${NAME}-read`
+        );
     });
 
     it("cuts a long name in the middle, keeping the hash that tells instances apart", () => {
@@ -122,7 +157,11 @@ describe("the containers of a layout", () => {
             replicaSet: "rs0",
             readHost: null
         });
-        expect(core.topologyAddress({ kind: "sharded", shards: 2 }, NAME)).toEqual({ hosts: [NAME], replicaSet: null, readHost: null });
+        expect(core.topologyAddress({ kind: "sharded", shards: 2 }, NAME)).toEqual({
+            hosts: [NAME],
+            replicaSet: null,
+            readHost: null
+        });
     });
 });
 
@@ -138,7 +177,9 @@ describe("starting MongoDB members", () => {
         expect(script).toContain("printf '%s' \"$POLARIS_MONGO_KEY\" > /etc/polaris-mongo.key");
         expect(script).toContain("chmod 400 /etc/polaris-mongo.key");
         expect(script).toContain("unset POLARIS_MONGO_KEY");
-        expect(script).toContain("exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /etc/polaris-mongo.key");
+        expect(script).toContain(
+            "exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /etc/polaris-mongo.key"
+        );
         expect(hasControl(command)).toBe(false);
     });
 
@@ -148,7 +189,9 @@ describe("starting MongoDB members", () => {
         expect(core.mongoMemberCommand(config, sharded, NAME)[2]).toContain(
             "mongod --configsvr --replSet cfg --port 27017 --dbpath /data/db --bind_ip_all --keyFile"
         );
-        expect(core.mongoMemberCommand(shard, sharded, NAME)[2]).toContain("mongod --shardsvr --replSet shard1 --port 27017 --bind_ip_all");
+        expect(core.mongoMemberCommand(shard, sharded, NAME)[2]).toContain(
+            "mongod --shardsvr --replSet shard1 --port 27017 --bind_ip_all"
+        );
     });
 
     it("points the router at the config server replica set by its seed list", () => {
@@ -156,7 +199,9 @@ describe("starting MongoDB members", () => {
         expect(router).toContain(
             `mongos --configdb cfg/${NAME}-cfg1:27017,${NAME}-cfg2:27017,${NAME}-cfg3:27017 --port 27017 --bind_ip_all --keyFile`
         );
-        expect(hasControl(members.flatMap((member) => core.mongoMemberCommand(member, sharded, NAME)))).toBe(false);
+        expect(
+            hasControl(members.flatMap((member) => core.mongoMemberCommand(member, sharded, NAME)))
+        ).toBe(false);
     });
 
     it("accepts only a key the manual would", () => {
@@ -186,14 +231,23 @@ describe("joining MongoDB members", () => {
     });
 
     it("refuses a member that is not a container name", () => {
-        expect(() => core.mongoSetInitiateCommand(admin, { name: "rs0", hosts: ['x" }); db.dropDatabase(); ({"'] })).toThrow();
+        expect(() =>
+            core.mongoSetInitiateCommand(admin, {
+                name: "rs0",
+                hosts: ['x" }); db.dropDatabase(); ({"']
+            })
+        ).toThrow();
     });
 
     it("adds only the shards the router does not list yet, by their seed lists", () => {
-        const shards = core.mongoSets({ kind: "sharded", shards: 2 }, NAME).filter((set) => !set.configsvr);
+        const shards = core
+            .mongoSets({ kind: "sharded", shards: 2 }, NAME)
+            .filter((set) => !set.configsvr);
         const script = core.mongoAddShardsCommand(admin, shards).argv.at(-1)!;
         expect(script).toContain("listShards: 1");
-        expect(script).toContain(`"shard1/${NAME}-sh1-1:27017,${NAME}-sh1-2:27017,${NAME}-sh1-3:27017"`);
+        expect(script).toContain(
+            `"shard1/${NAME}-sh1-1:27017,${NAME}-sh1-2:27017,${NAME}-sh1-3:27017"`
+        );
         expect(script).toContain("sh.addShard(seed)");
     });
 
@@ -222,21 +276,32 @@ describe("upgrading a replica set", () => {
 
     it("confirms a feature compatibility version from 7.0, as the command requires", () => {
         const admin = { username: "polaris", password: "pw-secret-123" };
-        expect(core.mongoSetFcvCommand(admin, "8").argv.at(-1)).toContain('setFeatureCompatibilityVersion: "8.0", confirm: true');
-        expect(core.mongoSetFcvCommand(admin, "6").argv.at(-1)).toContain('setFeatureCompatibilityVersion: "6.0" }');
+        expect(core.mongoSetFcvCommand(admin, "8").argv.at(-1)).toContain(
+            'setFeatureCompatibilityVersion: "8.0", confirm: true'
+        );
+        expect(core.mongoSetFcvCommand(admin, "6").argv.at(-1)).toContain(
+            'setFeatureCompatibilityVersion: "6.0" }'
+        );
         expect(core.fcvOf("7")).toBe("7.0");
     });
 });
 
 describe("MySQL read replicas", () => {
     it("starts every server with an id of its own and GTIDs on", () => {
-        expect(core.mysqlMemberCommand(1)).toEqual(["mysqld", "--server-id=1", "--gtid-mode=ON", "--enforce-gtid-consistency=ON"]);
+        expect(core.mysqlMemberCommand(1)).toEqual([
+            "mysqld",
+            "--server-id=1",
+            "--gtid-mode=ON",
+            "--enforce-gtid-consistency=ON"
+        ]);
         expect(() => core.mysqlMemberCommand(0)).toThrow();
     });
 
     it("creates the replication account with the one privilege it needs", () => {
         const sql = core.mysqlReplicationUserCommand("rootSecret-1", "replSecret-2").argv.at(-1)!;
-        expect(sql).toContain("CREATE USER IF NOT EXISTS 'polaris_replica'@'%' IDENTIFIED BY 'replSecret-2'");
+        expect(sql).toContain(
+            "CREATE USER IF NOT EXISTS 'polaris_replica'@'%' IDENTIFIED BY 'replSecret-2'"
+        );
         expect(sql).toContain("GRANT REPLICATION SLAVE ON *.* TO 'polaris_replica'@'%'");
     });
 
@@ -244,8 +309,12 @@ describe("MySQL read replicas", () => {
         const [follow, readOnly] = core.mysqlFollowCommands("rootSecret-1", NAME, "replSecret-2");
         const sql = follow!.argv.at(-1)!;
         expect(sql.startsWith("STOP REPLICA;")).toBe(true);
-        expect(sql).toContain(`CHANGE REPLICATION SOURCE TO SOURCE_HOST = '${NAME}', SOURCE_PORT = 3306,`);
-        expect(sql).toContain("SOURCE_AUTO_POSITION = 1, SOURCE_SSL = 1, GET_SOURCE_PUBLIC_KEY = 1;");
+        expect(sql).toContain(
+            `CHANGE REPLICATION SOURCE TO SOURCE_HOST = '${NAME}', SOURCE_PORT = 3306,`
+        );
+        expect(sql).toContain(
+            "SOURCE_AUTO_POSITION = 1, SOURCE_SSL = 1, GET_SOURCE_PUBLIC_KEY = 1;"
+        );
         expect(sql.endsWith("START REPLICA;")).toBe(true);
         expect(readOnly!.argv.at(-1)).toBe("SET PERSIST super_read_only = ON;");
     });
@@ -263,7 +332,11 @@ describe("MySQL read replicas", () => {
         const broken = core.parseReplicaStatus(
             "Replica_IO_Running: Connecting\nReplica_SQL_Running: Yes\nSeconds_Behind_Source: NULL\nLast_IO_Error: error connecting to source\n"
         );
-        expect(broken).toEqual({ following: false, lagSeconds: null, error: "error connecting to source" });
+        expect(broken).toEqual({
+            following: false,
+            lagSeconds: null,
+            error: "error connecting to source"
+        });
     });
 
     it("offers a read URI as a reference of its own", () => {
@@ -285,6 +358,10 @@ describe("MySQL read replicas", () => {
 describe("container commands", () => {
     it("are one line, which both the host daemon and a remote compose file take", () => {
         expect(hasControl(core.mongoReplicaSetCommand())).toBe(false);
-        expect(hasControl(core.pitrRecoveryCommand("2026-09-10T00-00-00Z", new Date("2026-09-10T08:15:30Z")))).toBe(false);
+        expect(
+            hasControl(
+                core.pitrRecoveryCommand("2026-09-10T00-00-00Z", new Date("2026-09-10T08:15:30Z"))
+            )
+        ).toBe(false);
     });
 });

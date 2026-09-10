@@ -45,7 +45,8 @@ export async function machineCores(): Promise<Map<string, number>> {
     const cores = new Map<string, number>();
     for (const row of rows) {
         const count = Number(row.value);
-        if (Number.isInteger(count) && count > 0) cores.set(row.key.slice(KEY_PREFIX.length), count);
+        if (Number.isInteger(count) && count > 0)
+            cores.set(row.key.slice(KEY_PREFIX.length), count);
     }
     return cores;
 }

@@ -20,7 +20,14 @@
 
 import * as core from "@polaris/core";
 import type { RuntimePorts } from "@polaris/deploy";
-import { DatabaseOperationError, instanceContext, lastLine, runStep, withPorts, type InstanceContext } from "./ops";
+import {
+    DatabaseOperationError,
+    instanceContext,
+    lastLine,
+    runStep,
+    withPorts,
+    type InstanceContext
+} from "./ops";
 
 /** The one thing these steps need from a server: running a command in a
  *  container by its name. */
@@ -79,7 +86,11 @@ export async function databaseMembers(databaseId: string, ownerId: string): Prom
 }
 
 /** Join the members of a layout. Nothing to do for a single instance. */
-export async function ensureTopology(ports: TopologyRuntime, setup: TopologySetup, pace: Pace = REAL_PACE): Promise<void> {
+export async function ensureTopology(
+    ports: TopologyRuntime,
+    setup: TopologySetup,
+    pace: Pace = REAL_PACE
+): Promise<void> {
     switch (setup.topology.kind) {
         case "replicaSet":
             return ensureReplicaSet(ports, setup, pace);
@@ -99,14 +110,24 @@ export async function ensureTopology(ports: TopologyRuntime, setup: TopologySetu
  * the primary - a set that has not elected refuses every write, and the first
  * thing after this may well be one.
  */
-async function ensureReplicaSet(ports: TopologyRuntime, setup: TopologySetup, pace: Pace): Promise<void> {
+async function ensureReplicaSet(
+    ports: TopologyRuntime,
+    setup: TopologySetup,
+    pace: Pace
+): Promise<void> {
     const [set] = core.mongoSets(setup.topology, setup.name);
     if (!set) return;
     const [first, ...rest] = set.hosts;
     if (!first) return;
     await waitAnswering(ports, rest, pace);
-    await waitUntil(pace, pace.readyMs, `${first} did not accept its account in time`, () => succeeds(ports, first, core.mongoSignInCommand(setup.admin)));
-    await retrying(pace, () => runStep(ports, first, core.mongoSetInitiateCommand(setup.admin, set), [setup.admin.password]));
+    await waitUntil(pace, pace.readyMs, `${first} did not accept its account in time`, () =>
+        succeeds(ports, first, core.mongoSignInCommand(setup.admin))
+    );
+    await retrying(pace, () =>
+        runStep(ports, first, core.mongoSetInitiateCommand(setup.admin, set), [
+            setup.admin.password
+        ])
+    );
     await waitPrimary(ports, first, pace);
 }
 
@@ -119,7 +140,11 @@ async function ensureReplicaSet(ports: TopologyRuntime, setup: TopologySetup, pa
  * created through the router, which stores it there. Last, every shard the
  * router does not list yet is added.
  */
-async function ensureShardedCluster(ports: TopologyRuntime, setup: TopologySetup, pace: Pace): Promise<void> {
+async function ensureShardedCluster(
+    ports: TopologyRuntime,
+    setup: TopologySetup,
+    pace: Pace
+): Promise<void> {
     const sets = core.mongoSets(setup.topology, setup.name);
     const secrets = [setup.admin.password];
     await waitAnswering(
@@ -130,19 +155,37 @@ async function ensureShardedCluster(ports: TopologyRuntime, setup: TopologySetup
     for (const set of sets) {
         const first = set.hosts[0];
         if (!first) continue;
-        const auth = (await succeeds(ports, first, core.mongoSignInCommand(setup.admin))) ? setup.admin : null;
-        await retrying(pace, () => runStep(ports, first, core.mongoSetInitiateCommand(auth, set), secrets));
+        const auth = (await succeeds(ports, first, core.mongoSignInCommand(setup.admin)))
+            ? setup.admin
+            : null;
+        await retrying(pace, () =>
+            runStep(ports, first, core.mongoSetInitiateCommand(auth, set), secrets)
+        );
         await waitPrimary(ports, first, pace);
         if (!auth && !set.configsvr) {
-            await runStep(ports, first, core.mongoCreateRootCommand(setup.admin, `shard ${set.name}`), secrets);
+            await runStep(
+                ports,
+                first,
+                core.mongoCreateRootCommand(setup.admin, `shard ${set.name}`),
+                secrets
+            );
         }
     }
     await waitAnswering(ports, [setup.name], pace);
     if (!(await succeeds(ports, setup.name, core.mongoSignInCommand(setup.admin)))) {
-        await retrying(pace, () => runStep(ports, setup.name, core.mongoCreateRootCommand(setup.admin, "the cluster"), secrets));
+        await retrying(pace, () =>
+            runStep(
+                ports,
+                setup.name,
+                core.mongoCreateRootCommand(setup.admin, "the cluster"),
+                secrets
+            )
+        );
     }
     const shards = sets.filter((set) => !set.configsvr);
-    await retrying(pace, () => runStep(ports, setup.name, core.mongoAddShardsCommand(setup.admin, shards), secrets));
+    await retrying(pace, () =>
+        runStep(ports, setup.name, core.mongoAddShardsCommand(setup.admin, shards), secrets)
+    );
 }
 
 /**
@@ -151,20 +194,38 @@ async function ensureShardedCluster(ports: TopologyRuntime, setup: TopologySetup
  * really following - a replica that could not connect says why, and that is
  * what gets reported rather than a setup that looked finished.
  */
-async function ensureReadReplicas(ports: TopologyRuntime, setup: TopologySetup, pace: Pace): Promise<void> {
+async function ensureReadReplicas(
+    ports: TopologyRuntime,
+    setup: TopologySetup,
+    pace: Pace
+): Promise<void> {
     const [primary, ...replicas] = core.topologyMembers(setup.topology, setup.name);
     if (!primary) return;
     const password = setup.replicationPassword;
-    if (!password) throw new DatabaseOperationError("This database's replication password is missing, so its replicas cannot follow it.");
+    if (!password)
+        throw new DatabaseOperationError(
+            "This database's replication password is missing, so its replicas cannot follow it."
+        );
     const secrets = [setup.admin.password, password];
     await waitMysql(ports, primary.name, setup.admin.password, pace);
-    await retrying(pace, () => runStep(ports, primary.name, core.mysqlReplicationUserCommand(setup.admin.password, password), secrets));
+    await retrying(pace, () =>
+        runStep(
+            ports,
+            primary.name,
+            core.mysqlReplicationUserCommand(setup.admin.password, password),
+            secrets
+        )
+    );
     for (const replica of replicas) {
         await waitMysql(ports, replica.name, setup.admin.password, pace);
         // A replica already following - every run after its first, since the
         // source it follows is kept in its own tables - is left alone rather
         // than stopped and pointed at the same primary again.
-        const [follow, readOnly] = core.mysqlFollowCommands(setup.admin.password, primary.name, password);
+        const [follow, readOnly] = core.mysqlFollowCommands(
+            setup.admin.password,
+            primary.name,
+            password
+        );
         if (!(await replicaState(ports, replica.name, setup.admin.password))?.following && follow) {
             await retrying(pace, () => runStep(ports, replica.name, follow, secrets));
         }
@@ -190,7 +251,11 @@ async function ensureReadReplicas(ports: TopologyRuntime, setup: TopologySetup, 
 // ---------------------------------------------------------------------------
 
 /** True when a command exits 0 in the container. */
-async function succeeds(ports: TopologyRuntime, container: string, command: core.MaintenanceCommand): Promise<boolean> {
+async function succeeds(
+    ports: TopologyRuntime,
+    container: string,
+    command: core.MaintenanceCommand
+): Promise<boolean> {
     const result = await ports.runIn(container, command.argv).catch(() => null);
     return result?.code === 0;
 }
@@ -205,26 +270,40 @@ async function waitUntil(
     const deadline = pace.now() + ms;
     for (;;) {
         if (await check()) return;
-        if (pace.now() >= deadline) throw new DatabaseOperationError(typeof failure === "string" ? failure : failure());
+        if (pace.now() >= deadline)
+            throw new DatabaseOperationError(typeof failure === "string" ? failure : failure());
         await pace.wait(pace.gapMs);
     }
 }
 
 /** Wait until every one of these MongoDB members answers `ping`. */
-async function waitAnswering(ports: TopologyRuntime, hosts: readonly string[], pace: Pace): Promise<void> {
+async function waitAnswering(
+    ports: TopologyRuntime,
+    hosts: readonly string[],
+    pace: Pace
+): Promise<void> {
     for (const host of hosts) {
-        await waitUntil(pace, pace.readyMs, `${host} did not start answering in time`, () => succeeds(ports, host, core.mongoPingCommand()));
+        await waitUntil(pace, pace.readyMs, `${host} did not start answering in time`, () =>
+            succeeds(ports, host, core.mongoPingCommand())
+        );
     }
 }
 
 /** What a member is in its set right now; `other` when it does not answer. */
-async function roleOf(ports: TopologyRuntime, host: string): Promise<"primary" | "secondary" | "other"> {
+async function roleOf(
+    ports: TopologyRuntime,
+    host: string
+): Promise<"primary" | "secondary" | "other"> {
     const result = await ports.runIn(host, core.mongoRoleCommand().argv).catch(() => null);
     return result?.code === 0 ? core.mongoRoleOf(result.output) : "other";
 }
 
 /** Wait until a member is its set's writable primary. */
-export async function waitPrimary(ports: TopologyRuntime, host: string, pace: Pace = REAL_PACE): Promise<void> {
+export async function waitPrimary(
+    ports: TopologyRuntime,
+    host: string,
+    pace: Pace = REAL_PACE
+): Promise<void> {
     await waitUntil(
         pace,
         pace.settleMs,
@@ -259,17 +338,27 @@ export async function rollMembers(
             `Every member has to be a healthy primary or secondary before an upgrade, and ${unwell.join(", ")} ${unwell.length === 1 ? "is" : "are"} not. Nothing was changed.`
         );
     }
-    const order = [...hosts.filter((host) => roles.get(host) !== "primary"), ...hosts.filter((host) => roles.get(host) === "primary")];
+    const order = [
+        ...hosts.filter((host) => roles.get(host) !== "primary"),
+        ...hosts.filter((host) => roles.get(host) === "primary")
+    ];
     for (const member of order) {
         if ((await roleOf(ports, member)) === "primary") {
             // Its connection may close as it steps down; whether it did is read
             // from the set, not from how the command ended.
             await ports.runIn(member, core.mongoStepDownCommand(admin).argv).catch(() => null);
-            await waitUntil(pace, pace.settleMs, `${member} did not hand the primary over in time`, async () => {
-                if ((await roleOf(ports, member)) === "primary") return false;
-                for (const other of hosts) if (other !== member && (await roleOf(ports, other)) === "primary") return true;
-                return false;
-            });
+            await waitUntil(
+                pace,
+                pace.settleMs,
+                `${member} did not hand the primary over in time`,
+                async () => {
+                    if ((await roleOf(ports, member)) === "primary") return false;
+                    for (const other of hosts)
+                        if (other !== member && (await roleOf(ports, other)) === "primary")
+                            return true;
+                    return false;
+                }
+            );
         }
         await move(member);
         await waitUntil(
@@ -287,14 +376,23 @@ async function replicaState(
     host: string,
     rootPassword: string
 ): Promise<ReturnType<typeof core.parseReplicaStatus> | null> {
-    const result = await ports.runIn(host, core.mysqlReplicaStatusCommand(rootPassword).argv).catch(() => null);
+    const result = await ports
+        .runIn(host, core.mysqlReplicaStatusCommand(rootPassword).argv)
+        .catch(() => null);
     return result && result.code === 0 ? core.parseReplicaStatus(result.output) : null;
 }
 
 /** Wait until a MySQL server answers as root. */
-async function waitMysql(ports: TopologyRuntime, host: string, password: string, pace: Pace): Promise<void> {
+async function waitMysql(
+    ports: TopologyRuntime,
+    host: string,
+    password: string,
+    pace: Pace
+): Promise<void> {
     const probe = core.readinessCommand({ engine: "mysql", username: "root", password });
-    await waitUntil(pace, pace.readyMs, `${host} did not start answering in time`, () => succeeds(ports, host, probe));
+    await waitUntil(pace, pace.readyMs, `${host} did not start answering in time`, () =>
+        succeeds(ports, host, probe)
+    );
 }
 
 /**
@@ -348,24 +446,38 @@ const MONGO_STATES: Readonly<Record<string, string>> = {
  * replica's replication state. A member nothing could be read from is "Not
  * answering" rather than left out, so a set of three always lists three.
  */
-export async function topologyStatus(ports: TopologyRuntime, setup: TopologySetup): Promise<MemberState[]> {
+export async function topologyStatus(
+    ports: TopologyRuntime,
+    setup: TopologySetup
+): Promise<MemberState[]> {
     const members = core.topologyMembers(setup.topology, setup.name);
     const known = new Map<string, { state: string; healthy: boolean }>();
 
     if (setup.topology.kind === "replicaSet" || setup.topology.kind === "sharded") {
         for (const set of core.mongoSets(setup.topology, setup.name)) {
-            for (const [name, state] of await setStates(ports, set, setup.admin)) known.set(name, state);
+            for (const [name, state] of await setStates(ports, set, setup.admin))
+                known.set(name, state);
         }
         if (setup.topology.kind === "sharded") {
             const answering = await succeeds(ports, setup.name, core.mongoPingCommand());
-            known.set(setup.name, { state: answering ? "Routing" : "Not answering", healthy: answering });
+            known.set(setup.name, {
+                state: answering ? "Routing" : "Not answering",
+                healthy: answering
+            });
         }
     } else if (setup.topology.kind === "replicas") {
         const [primary, ...replicas] = members;
         if (primary) {
-            const probe = core.readinessCommand({ engine: "mysql", username: "root", password: setup.admin.password });
+            const probe = core.readinessCommand({
+                engine: "mysql",
+                username: "root",
+                password: setup.admin.password
+            });
             const answering = await succeeds(ports, primary.name, probe);
-            known.set(primary.name, { state: answering ? "Primary" : "Not answering", healthy: answering });
+            known.set(primary.name, {
+                state: answering ? "Primary" : "Not answering",
+                healthy: answering
+            });
         }
         for (const replica of replicas) {
             const state = await replicaState(ports, replica.name, setup.admin.password);
@@ -395,7 +507,9 @@ async function setStates(
     admin: core.MongoAuth
 ): Promise<Map<string, { state: string; healthy: boolean }>> {
     for (const host of set.hosts) {
-        const result = await ports.runIn(host, core.mongoSetStatusCommand(admin).argv).catch(() => null);
+        const result = await ports
+            .runIn(host, core.mongoSetStatusCommand(admin).argv)
+            .catch(() => null);
         const parsed = result?.code === 0 ? core.parseSetStatus(result.output) : null;
         if (!parsed) continue;
         return new Map(
@@ -403,7 +517,9 @@ async function setStates(
                 member.name,
                 {
                     state: MONGO_STATES[member.state] ?? member.state.toLowerCase(),
-                    healthy: member.healthy && (member.state === "PRIMARY" || member.state === "SECONDARY")
+                    healthy:
+                        member.healthy &&
+                        (member.state === "PRIMARY" || member.state === "SECONDARY")
                 }
             ])
         );

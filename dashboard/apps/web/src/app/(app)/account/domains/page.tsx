@@ -30,7 +30,8 @@ export default async function AccountDomainsPage() {
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">Domains</h1>
                 <p className="text-muted-foreground text-sm">
-                    Domains you own, so what you deploy here answers on your own name instead of this Polaris&rsquo;s.
+                    Domains you own, so what you deploy here answers on your own name instead of
+                    this Polaris&rsquo;s.
                 </p>
             </div>
             <OwnerDomainsView

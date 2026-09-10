@@ -59,13 +59,16 @@ function key(subjectType: string, subjectId: string): string {
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
     const out: T[][] = [];
-    for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
+    for (let index = 0; index < items.length; index += size)
+        out.push(items.slice(index, index + size));
     return out;
 }
 
 function average(values: (number | null)[]): number | null {
     const present = values.filter((value): value is number => value !== null);
-    return present.length === 0 ? null : present.reduce((sum, value) => sum + value, 0) / present.length;
+    return present.length === 0
+        ? null
+        : present.reduce((sum, value) => sum + value, 0) / present.length;
 }
 
 /**
@@ -80,7 +83,9 @@ export async function meterSubjects(
     const usage = new Map<string, core.BillingUsage>();
     if (subjects.length === 0 || to <= from) return usage;
 
-    const cores = new Map(subjects.map((subject) => [key(subject.subjectType, subject.subjectId), subject.cores]));
+    const cores = new Map(
+        subjects.map((subject) => [key(subject.subjectType, subject.subjectId), subject.cores])
+    );
     const add = (hour: core.UsageHour): void => {
         const id = key(hour.subjectType, hour.subjectId);
         const metered = core.meterHour(hour, cores.get(id) ?? null, METER_CADENCE);
@@ -96,14 +101,18 @@ export async function meterSubjects(
     );
 
     for (const group of chunks(subjects, CHUNK)) {
-        const apps = group.filter((subject) => subject.subjectType === "app").map((subject) => subject.subjectId);
+        const apps = group
+            .filter((subject) => subject.subjectType === "app")
+            .map((subject) => subject.subjectId);
         const volumes = group
             .filter((subject) => subject.subjectType === "volume")
             .map((subject) => subject.subjectId);
         const where = {
             OR: [
                 ...(apps.length > 0 ? [{ subjectType: "app", subjectId: { in: apps } }] : []),
-                ...(volumes.length > 0 ? [{ subjectType: "volume", subjectId: { in: volumes } }] : [])
+                ...(volumes.length > 0
+                    ? [{ subjectType: "volume", subjectId: { in: volumes } }]
+                    : [])
             ]
         };
 

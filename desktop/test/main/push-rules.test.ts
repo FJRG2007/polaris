@@ -12,7 +12,9 @@ import { classifyHealth, describeNetError, describeProbe, netErrorCode } from "@
 
 describe("apiKeySchema", () => {
     it("takes a whole key, trimmed", () => {
-        expect(apiKeySchema.parse("  plk_Ab3-_x9Z.s3cr3t-Value_  ")).toBe("plk_Ab3-_x9Z.s3cr3t-Value_");
+        expect(apiKeySchema.parse("  plk_Ab3-_x9Z.s3cr3t-Value_  ")).toBe(
+            "plk_Ab3-_x9Z.s3cr3t-Value_"
+        );
     });
 
     it("refuses an empty field, a half-copied key, and something else entirely", () => {
@@ -26,7 +28,12 @@ describe("apiKeySchema", () => {
 
 describe("buildArgs", () => {
     it("builds like the CLI, with the platform only when one was chosen", () => {
-        expect(buildArgs("reg/app:abc", "/work/app", "")).toEqual(["build", "-t", "reg/app:abc", "/work/app"]);
+        expect(buildArgs("reg/app:abc", "/work/app", "")).toEqual([
+            "build",
+            "-t",
+            "reg/app:abc",
+            "/work/app"
+        ]);
         expect(buildArgs("reg/app:abc", "C:\\work\\my app", "linux/amd64")).toEqual([
             "build",
             "-t",
@@ -83,20 +90,34 @@ describe("reachability", () => {
 
     it("explains the common failures in terms of what to do", () => {
         expect(describeNetError("ERR_NAME_NOT_RESOLVED", "polaris.example.com")).toMatch(/typo/);
-        expect(describeNetError("ERR_CONNECTION_REFUSED", "polaris.example.com")).toMatch(/Nothing is answering/);
-        expect(describeNetError("ERR_CERT_AUTHORITY_INVALID", "polaris.example.com")).toMatch(/not trusted/);
-        expect(describeNetError("ERR_INTERNET_DISCONNECTED", "polaris.example.com")).toMatch(/not connected/);
+        expect(describeNetError("ERR_CONNECTION_REFUSED", "polaris.example.com")).toMatch(
+            /Nothing is answering/
+        );
+        expect(describeNetError("ERR_CERT_AUTHORITY_INVALID", "polaris.example.com")).toMatch(
+            /not trusted/
+        );
+        expect(describeNetError("ERR_INTERNET_DISCONNECTED", "polaris.example.com")).toMatch(
+            /not connected/
+        );
         expect(describeNetError("ERR_SOMETHING_NEW", "polaris.example.com")).toBe(
             "Could not reach polaris.example.com (ERR_SOMETHING_NEW)."
         );
-        expect(describeNetError(null, "polaris.example.com")).toBe("Could not reach polaris.example.com.");
+        expect(describeNetError(null, "polaris.example.com")).toBe(
+            "Could not reach polaris.example.com."
+        );
     });
 
     it("recognises Polaris by its health probe", () => {
         expect(classifyHealth(200, { status: "ok" })).toEqual({ ok: true });
-        expect(classifyHealth(503, { status: "error", database: false })).toEqual({ ok: false, reason: "not-ready" });
+        expect(classifyHealth(503, { status: "error", database: false })).toEqual({
+            ok: false,
+            reason: "not-ready"
+        });
         expect(classifyHealth(200, "<html>")).toEqual({ ok: false, reason: "not-polaris" });
-        expect(classifyHealth(404, { error: "Not found" })).toEqual({ ok: false, reason: "not-polaris" });
+        expect(classifyHealth(404, { error: "Not found" })).toEqual({
+            ok: false,
+            reason: "not-polaris"
+        });
         expect(describeProbe({ ok: false, reason: "not-polaris" }, "example.com")).toBe(
             "Something answered at example.com, but it is not Polaris."
         );

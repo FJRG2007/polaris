@@ -28,10 +28,17 @@ const node = {
     legalComments: "none"
 };
 
-await build({ ...node, entryPoints: [join(ROOT, "src/main/index.ts")], outfile: join(DIST, "main/index.js") });
 await build({
     ...node,
-    entryPoints: { app: join(ROOT, "src/preload/app.ts"), local: join(ROOT, "src/preload/local.ts") },
+    entryPoints: [join(ROOT, "src/main/index.ts")],
+    outfile: join(DIST, "main/index.js")
+});
+await build({
+    ...node,
+    entryPoints: {
+        app: join(ROOT, "src/preload/app.ts"),
+        local: join(ROOT, "src/preload/local.ts")
+    },
     outdir: join(DIST, "preload")
 });
 await build({
@@ -43,7 +50,9 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
-    entryPoints: ["connect", "api-key", "push"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
+    entryPoints: ["connect", "api-key", "push"].map((page) =>
+        join(ROOT, "src/renderer", `${page}.ts`)
+    ),
     outdir: join(DIST, "renderer")
 });
 

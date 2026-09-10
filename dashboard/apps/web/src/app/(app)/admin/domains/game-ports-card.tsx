@@ -67,23 +67,32 @@ export function GamePortsCard() {
             title="Game server ports"
             description={
                 <>
-                    Ports 80 and 443 carry every website Polaris serves and not one game client. Each server below
-                    answers on its own port, on its own transport, and nothing above this opens them.
+                    Ports 80 and 443 carry every website Polaris serves and not one game client.
+                    Each server below answers on its own port, on its own transport, and nothing
+                    above this opens them.
                     {reading.policy === "range" ? (
                         <>
                             {" "}
                             Polaris keeps them inside{" "}
-                            <span className="font-mono text-foreground">TCP {describeBlock(reading.blocks.tcp)}</span>{" "}
+                            <span className="font-mono text-foreground">
+                                TCP {describeBlock(reading.blocks.tcp)}
+                            </span>{" "}
                             and{" "}
-                            <span className="font-mono text-foreground">UDP {describeBlock(reading.blocks.udp)}</span>, so
-                            forwarding those two ranges covers the servers you have and the ones you have not created yet.
+                            <span className="font-mono text-foreground">
+                                UDP {describeBlock(reading.blocks.udp)}
+                            </span>
+                            , so forwarding those two ranges covers the servers you have and the
+                            ones you have not created yet.
                         </>
                     ) : null}
                 </>
             }
         >
-
-            <PortPolicyForm policy={reading.policy} blocks={reading.blocks} onSaved={live.refresh} />
+            <PortPolicyForm
+                policy={reading.policy}
+                blocks={reading.blocks}
+                onSaved={live.refresh}
+            />
 
             <GamePortsLive
                 reading={reading}

@@ -23,7 +23,15 @@ const prisma = {
         count: countBy({ twoFactorEnabled: 8, passkeys: 2 }, 10),
         findMany: vi.fn(async ({ where }: { where: Where }) =>
             "isAdmin" in where
-                ? [{ id: "u1", name: "", username: "ada", email: "ada@example.com", twoFactorEnabled: false }]
+                ? [
+                      {
+                          id: "u1",
+                          name: "",
+                          username: "ada",
+                          email: "ada@example.com",
+                          twoFactorEnabled: false
+                      }
+                  ]
                 : [{ id: "u1", name: "", username: "ada", email: "ada@example.com" }]
         )
     },
@@ -113,22 +121,37 @@ const prisma = {
     wafBan: { count: vi.fn(async () => 3) },
     application: {
         findMany: vi.fn(async () => [
-            { edgeConfig: JSON.stringify({ rateLimits: [{ average: 10, burst: 20 }], headers: { preset: "strict" } }) },
+            {
+                edgeConfig: JSON.stringify({
+                    rateLimits: [{ average: 10, burst: 20 }],
+                    headers: { preset: "strict" }
+                })
+            },
             { edgeConfig: "{}" }
         ])
     },
     auditLog: {
         findFirst: vi.fn(async ({ where }: { where: { action: { in: string[] } } }) =>
             where.action.in.includes("instance.security.updated")
-                ? { at: new Date("2026-09-01T00:00:00.000Z"), action: "instance.security.updated", actorId: "u1" }
+                ? {
+                      at: new Date("2026-09-01T00:00:00.000Z"),
+                      action: "instance.security.updated",
+                      actorId: "u1"
+                  }
                 : null
         )
     }
 };
 
 vi.mock("@polaris/db", () => ({ prisma, VISIBLE_USER }));
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_BUILD_SHA: "0123456789abcdef0123" }) }));
-vi.mock("@polaris/auth", () => ({ MIN_PASSWORD_LENGTH: 10, SESSION_MAX_AGE: 604_800, SESSION_UPDATE_AGE: 86_400 }));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_BUILD_SHA: "0123456789abcdef0123" })
+}));
+vi.mock("@polaris/auth", () => ({
+    MIN_PASSWORD_LENGTH: 10,
+    SESSION_MAX_AGE: 604_800,
+    SESSION_UPDATE_AGE: 86_400
+}));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example.com" }));
 vi.mock("@/lib/auth-mail", () => ({ getAuthMailStatus: async () => ({ channelId: null }) }));
 vi.mock("@/lib/instance-security", () => ({
@@ -170,14 +193,19 @@ const { readEvidence } = await import("@/lib/compliance/evidence-readings");
 const NOW = new Date("2026-09-10T12:00:00.000Z");
 
 function value(report: Awaited<ReturnType<typeof readEvidence>>, area: string, id: string) {
-    return report.sections.find((section) => section.id === area)?.facts.find((fact) => fact.id === id)?.value;
+    return report.sections
+        .find((section) => section.id === area)
+        ?.facts.find((fact) => fact.id === id)?.value;
 }
 
 describe("gathering the evidence", () => {
     it("stamps the instance and the moment", async () => {
         const report = await readEvidence(NOW);
         expect(report.generatedAt).toBe(NOW.toISOString());
-        expect(report.instance).toEqual({ url: "https://polaris.example.com", build: "0123456789ab" });
+        expect(report.instance).toEqual({
+            url: "https://polaris.example.com",
+            build: "0123456789ab"
+        });
     });
 
     it("counts accounts that can sign in, and second factors among them", async () => {
@@ -214,7 +242,9 @@ describe("gathering the evidence", () => {
             "No copy yet"
         ]);
         expect(prisma.recoveryPointCopy.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { pointId: { in: ["p1", "p3"] }, status: "available" } })
+            expect.objectContaining({
+                where: { pointId: { in: ["p1", "p3"] }, status: "available" }
+            })
         );
     });
 
@@ -232,7 +262,10 @@ describe("gathering the evidence", () => {
     it("reads one newest point per item rather than every point", async () => {
         await readEvidence(NOW);
         expect(prisma.recoveryPoint.groupBy).toHaveBeenCalledWith(
-            expect.objectContaining({ by: ["resourceId"], where: expect.objectContaining({ resourceId: { in: ["r1", "r3"] } }) })
+            expect.objectContaining({
+                by: ["resourceId"],
+                where: expect.objectContaining({ resourceId: { in: ["r1", "r3"] } })
+            })
         );
         for (const call of prisma.recoveryPoint.findMany.mock.calls as unknown as [Where][]) {
             expect(call[0]).not.toHaveProperty("distinct");

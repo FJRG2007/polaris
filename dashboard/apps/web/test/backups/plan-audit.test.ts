@@ -18,7 +18,10 @@ vi.mock("@/lib/backups/service", () => ({ runBackup: async () => undefined }));
 
 const { savePlanAction } = await import("@/app/(app)/apps/backups/actions");
 
-const DESTINATIONS = ["00000000-0000-4000-8000-0000000000d1", "00000000-0000-4000-8000-0000000000d2"];
+const DESTINATIONS = [
+    "00000000-0000-4000-8000-0000000000d1",
+    "00000000-0000-4000-8000-0000000000d2"
+];
 const PLAN = {
     name: "Nightly",
     every: "daily",
@@ -54,7 +57,9 @@ describe("saving a backup plan", () => {
 
     it("records an existing plan as changed", async () => {
         await savePlanAction(PLAN, "00000000-0000-4000-8000-0000000000a1");
-        const metadata = recordAudit.mock.calls[0]?.[0]?.metadata as Record<string, unknown> | undefined;
+        const metadata = recordAudit.mock.calls[0]?.[0]?.metadata as
+            | Record<string, unknown>
+            | undefined;
         expect(metadata?.mode).toBe("update");
     });
 });

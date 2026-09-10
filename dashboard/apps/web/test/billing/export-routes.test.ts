@@ -21,12 +21,16 @@ class BillingRequestError extends Error {}
 vi.mock("@/lib/api-session", () => ({ apiAdmin, apiUser }));
 vi.mock("@/lib/orgs/activity-access", () => ({ orgReaderWith }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit }));
-vi.mock("@/lib/billing/budgets", () => ({ budgetsIn: async () => new Map(), getOrgBudget: async () => null }));
+vi.mock("@/lib/billing/budgets", () => ({
+    budgetsIn: async () => new Map(),
+    getOrgBudget: async () => null
+}));
 vi.mock("@/lib/billing/statement", () => ({
     BillingRequestError,
     readStatement,
     resolveMonth: (month: string | undefined) => {
-        if (month === "1999-01") throw new BillingRequestError("No figures are kept for that month");
+        if (month === "1999-01")
+            throw new BillingRequestError("No figures are kept for that month");
         return month ?? "2026-09";
     }
 }));
@@ -37,18 +41,30 @@ const orgExport = await import("../../src/app/api/orgs/[slug]/billing/export/rou
 const orgRead = await import("../../src/app/api/orgs/[slug]/billing/route");
 
 const OWNER = { kind: "org", id: "o1", name: "=Acme", handle: "acme" } as const;
-const USAGE = { cpuHours: 12.5, memoryGbHours: 100, storageGbHours: 720, egressGb: 3, cpuUnmeasuredHours: 0 };
+const USAGE = {
+    cpuHours: 12.5,
+    memoryGbHours: 100,
+    storageGbHours: 720,
+    egressGb: 3,
+    cpuUnmeasuredHours: 0
+};
 
 /** A statement with one line, the shape `readStatement` answers with. */
 function view(month: string) {
     return {
         statement: {
             month,
-            rates: { currency: "EUR", cpuHour: 0.02, memoryGbHour: null, storageGbMonth: 0.1, egressGb: null },
+            rates: {
+                currency: "EUR",
+                cpuHour: 0.02,
+                memoryGbHour: null,
+                storageGbMonth: 0.1,
+                egressGb: null
+            },
             lines: [
                 {
                     projectId: "p1",
-                    projectName: "=HYPERLINK(\"x\")",
+                    projectName: '=HYPERLINK("x")',
                     owner: OWNER,
                     usage: USAGE,
                     cost: { cpu: 0.25, memory: null, storage: 0.1, egress: null, total: 0.35 }
@@ -67,8 +83,10 @@ function view(month: string) {
     };
 }
 
-const forbidden = () => new Response(JSON.stringify({ error: "You do not have access to that" }), { status: 403 });
-const signedOut = () => new Response(JSON.stringify({ error: "Sign in to continue" }), { status: 401 });
+const forbidden = () =>
+    new Response(JSON.stringify({ error: "You do not have access to that" }), { status: 403 });
+const signedOut = () =>
+    new Response(JSON.stringify({ error: "Sign in to continue" }), { status: 401 });
 const slug = (value: string) => ({ params: Promise.resolve({ slug: value }) });
 
 beforeEach(() => {
@@ -83,18 +101,24 @@ beforeEach(() => {
 describe("the instance's statement", () => {
     it("is refused to somebody who is not an administrator, before anything is read", async () => {
         apiAdmin.mockResolvedValue(forbidden());
-        const answer = await adminExport.GET(new Request("http://localhost/api/admin/billing/export?month=2026-09"));
+        const answer = await adminExport.GET(
+            new Request("http://localhost/api/admin/billing/export?month=2026-09")
+        );
         expect(answer.status).toBe(403);
         expect(readStatement).not.toHaveBeenCalled();
         expect(recordAudit).not.toHaveBeenCalled();
 
-        const read = await adminRead.GET(new Request("http://localhost/api/admin/billing?month=2026-09"));
+        const read = await adminRead.GET(
+            new Request("http://localhost/api/admin/billing?month=2026-09")
+        );
         expect(read.status).toBe(403);
     });
 
     it("is refused to nobody signed in", async () => {
         apiAdmin.mockResolvedValue(signedOut());
-        const answer = await adminExport.GET(new Request("http://localhost/api/admin/billing/export"));
+        const answer = await adminExport.GET(
+            new Request("http://localhost/api/admin/billing/export")
+        );
         expect(answer.status).toBe(401);
     });
 
@@ -105,14 +129,16 @@ describe("the instance's statement", () => {
         );
         expect(answer.status).toBe(200);
         expect(answer.headers.get("content-type")).toContain("text/csv");
-        expect(answer.headers.get("content-disposition")).toBe('attachment; filename="polaris-statement-2026-09.csv"');
+        expect(answer.headers.get("content-disposition")).toBe(
+            'attachment; filename="polaris-statement-2026-09.csv"'
+        );
         expect(readStatement).toHaveBeenCalledWith({ kind: "all" }, "2026-09");
 
         const [header, row] = (await answer.text()).split("\r\n");
         expect(header).toContain("project_id,project,cpu_vcpu_hours");
         // A name somebody typed that starts with `=` is text, not a formula.
         expect(row).toContain("'=Acme");
-        expect(row).toContain("\"'=HYPERLINK(\"\"x\"\")\"");
+        expect(row).toContain('"\'=HYPERLINK(""x"")"');
         expect(row).toContain("12.5000,100.0000,1.0000,3.0000,EUR,0.25,,0.10,,0.35");
 
         expect(recordAudit).toHaveBeenCalledWith(
@@ -132,9 +158,13 @@ describe("the instance's statement", () => {
 
     it("refuses a month nothing is kept for, and a format it does not write", async () => {
         apiAdmin.mockResolvedValue({ id: "admin1", isAdmin: true });
-        const old = await adminExport.GET(new Request("http://localhost/api/admin/billing/export?month=1999-01"));
+        const old = await adminExport.GET(
+            new Request("http://localhost/api/admin/billing/export?month=1999-01")
+        );
         expect(old.status).toBe(400);
-        const odd = await adminExport.GET(new Request("http://localhost/api/admin/billing/export?format=xlsx"));
+        const odd = await adminExport.GET(
+            new Request("http://localhost/api/admin/billing/export?format=xlsx")
+        );
         expect(odd.status).toBe(400);
         expect(recordAudit).not.toHaveBeenCalled();
     });
@@ -149,16 +179,26 @@ describe("an organization's statement", () => {
             slug("acme")
         );
         expect(answer.status).toBe(404);
-        expect(orgReaderWith).toHaveBeenCalledWith({ id: "u1", isAdmin: false }, "acme", "settings.manage");
+        expect(orgReaderWith).toHaveBeenCalledWith(
+            { id: "u1", isAdmin: false },
+            "acme",
+            "settings.manage"
+        );
         expect(readStatement).not.toHaveBeenCalled();
 
-        const read = await orgRead.GET(new Request("http://localhost/api/orgs/acme/billing"), slug("acme"));
+        const read = await orgRead.GET(
+            new Request("http://localhost/api/orgs/acme/billing"),
+            slug("acme")
+        );
         expect(read.status).toBe(404);
     });
 
     it("is refused to nobody signed in", async () => {
         apiUser.mockResolvedValue(signedOut());
-        const answer = await orgExport.GET(new Request("http://localhost/api/orgs/acme/billing/export"), slug("acme"));
+        const answer = await orgExport.GET(
+            new Request("http://localhost/api/orgs/acme/billing/export"),
+            slug("acme")
+        );
         expect(answer.status).toBe(401);
         expect(orgReaderWith).not.toHaveBeenCalled();
     });
@@ -171,7 +211,9 @@ describe("an organization's statement", () => {
             slug("acme")
         );
         expect(answer.status).toBe(200);
-        expect(answer.headers.get("content-disposition")).toBe('attachment; filename="acme-statement-2026-09.csv"');
+        expect(answer.headers.get("content-disposition")).toBe(
+            'attachment; filename="acme-statement-2026-09.csv"'
+        );
         expect(readStatement).toHaveBeenCalledWith({ kind: "orgs", orgIds: ["o1"] }, "2026-09");
         expect(recordAudit).toHaveBeenCalledWith(
             expect.objectContaining({ actorId: "u1", orgId: "o1", action: "billing.export" })

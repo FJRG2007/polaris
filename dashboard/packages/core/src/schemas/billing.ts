@@ -59,7 +59,10 @@ const priceField = z
     .transform(normalizeAmount)
     .refine((value) => value === "" || AMOUNT_PATTERN.test(value), "Enter an amount like 0.012")
     .transform((value) => (value === "" ? null : Number(value)))
-    .refine((value) => value === null || value <= BILLING_AMOUNT_MAX, "That is more than Polaris can price");
+    .refine(
+        (value) => value === null || value <= BILLING_AMOUNT_MAX,
+        "That is more than Polaris can price"
+    );
 
 /** The prices, one per thing that is measured. Each is in `currency`. */
 export interface BillingRates {
@@ -154,10 +157,7 @@ export type OrgBudgetInput = z.input<typeof orgBudgetInputSchema>;
  *  are added up from. */
 export const BILLING_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-export const billingMonthField = z
-    .string()
-    .trim()
-    .regex(BILLING_MONTH_PATTERN, "Pick a month");
+export const billingMonthField = z.string().trim().regex(BILLING_MONTH_PATTERN, "Pick a month");
 
 /** What a statement read asks for: a month, or this one when none is given. */
 export const billingStatementQuerySchema = z.object({

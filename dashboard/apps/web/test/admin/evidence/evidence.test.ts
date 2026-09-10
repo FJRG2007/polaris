@@ -13,13 +13,20 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 const SRC = resolve(__dirname, "../../../src");
 const APP_ROUTES = join(SRC, "app/(app)");
 
-function section(report: evidence.EvidenceReport, id: evidence.EvidenceArea): evidence.EvidenceSection {
+function section(
+    report: evidence.EvidenceReport,
+    id: evidence.EvidenceArea
+): evidence.EvidenceSection {
     const found = report.sections.find((entry) => entry.id === id);
     if (!found) throw new Error(`no ${id} section`);
     return found;
 }
 
-function fact(report: evidence.EvidenceReport, area: evidence.EvidenceArea, id: string): evidence.EvidenceFact {
+function fact(
+    report: evidence.EvidenceReport,
+    area: evidence.EvidenceArea,
+    id: string
+): evidence.EvidenceFact {
     const found = section(report, area).facts.find((entry) => entry.id === id);
     if (!found) throw new Error(`no ${area}/${id} fact`);
     return found;
@@ -39,7 +46,10 @@ describe("the evidence report", () => {
         const report = evidence.buildEvidence(readings());
         expect(report.format).toBe(evidence.EVIDENCE_FORMAT);
         expect(report.generatedAt).toBe(NOW.toISOString());
-        expect(report.instance).toEqual({ url: "https://polaris.example.com", build: "abc123def456" });
+        expect(report.instance).toEqual({
+            url: "https://polaris.example.com",
+            build: "abc123def456"
+        });
         expect(report.sections.map((entry) => entry.id)).toEqual([...evidence.EVIDENCE_AREAS]);
         expect(report.outsidePolaris.length).toBeGreaterThan(0);
     });
@@ -59,7 +69,9 @@ describe("the evidence report", () => {
             value: true,
             text: "Required of every account"
         });
-        expect(fact(strict, "authentication", "second-factor.accepted").text).toBe("Authenticator app, Email code");
+        expect(fact(strict, "authentication", "second-factor.accepted").text).toBe(
+            "Authenticator app, Email code"
+        );
         expect(fact(strict, "authentication", "accounts.second-factor")).toMatchObject({
             text: "12 of 12 active accounts",
             attention: false
@@ -92,7 +104,9 @@ describe("the evidence report", () => {
 
     it("writes the session lifetime in whole units and counts the per-account bindings", () => {
         const report = evidence.buildEvidence(readings());
-        expect(fact(report, "sessions", "session.lifetime").text).toBe("7 days, renewed at most once a day");
+        expect(fact(report, "sessions", "session.lifetime").text).toBe(
+            "7 days, renewed at most once a day"
+        );
         expect(fact(report, "sessions", "session.client-binding").text).toBe("11 of 12 accounts");
         expect(fact(report, "sessions", "session.open").text).toBe("17 sessions");
     });
@@ -100,14 +114,23 @@ describe("the evidence report", () => {
     it("lists each administrator and flags one without a second factor", () => {
         const base = readings();
         const report = evidence.buildEvidence(
-            readings({ administrators: [...base.administrators, { id: "a3", name: "Cy", secondFactor: false }] })
+            readings({
+                administrators: [
+                    ...base.administrators,
+                    { id: "a3", name: "Cy", secondFactor: false }
+                ]
+            })
         );
         const admins = section(report, "administrators");
         expect(fact(report, "administrators", "admins.without-second-factor")).toMatchObject({
             value: 1,
             attention: true
         });
-        expect(admins.rows?.items.map((row) => row.label)).toEqual(["Ada Admin", "Bo Operator", "Cy"]);
+        expect(admins.rows?.items.map((row) => row.label)).toEqual([
+            "Ada Admin",
+            "Bo Operator",
+            "Cy"
+        ]);
         expect(admins.rows?.items[2]?.href).toBe("/admin/users/a3");
         expect(admins.rows?.items[2]?.facts[0]).toMatchObject({ text: "No", attention: true });
     });
@@ -118,8 +141,13 @@ describe("the evidence report", () => {
             value: "2026-09-10T03:00:00.000Z",
             date: true
         });
-        expect(fact(intact, "audit", "audit.last-check-result").text).toBe("Intact across 5000 entries");
-        expect(fact(intact, "audit", "audit.retention-days")).toMatchObject({ value: 365, text: "A year" });
+        expect(fact(intact, "audit", "audit.last-check-result").text).toBe(
+            "Intact across 5000 entries"
+        );
+        expect(fact(intact, "audit", "audit.retention-days")).toMatchObject({
+            value: 365,
+            text: "A year"
+        });
 
         const base = readings();
         const broken = evidence.buildEvidence(
@@ -140,8 +168,13 @@ describe("the evidence report", () => {
             attention: true
         });
 
-        const never = evidence.buildEvidence(readings({ audit: { ...base.audit, lastVerification: null } }));
-        expect(fact(never, "audit", "audit.last-check")).toMatchObject({ value: null, text: "Not checked yet" });
+        const never = evidence.buildEvidence(
+            readings({ audit: { ...base.audit, lastVerification: null } })
+        );
+        expect(fact(never, "audit", "audit.last-check")).toMatchObject({
+            value: null,
+            text: "Not checked yet"
+        });
     });
 
     it("tells an encrypted backup from a partly encrypted one, and one with no copy yet", () => {
@@ -158,14 +191,32 @@ describe("the evidence report", () => {
                     activeKeys: 1,
                     items: [
                         item,
-                        { ...item, id: "b2", name: "World", every: null, sealed: 1, clear: 1, lastStatus: "failed" },
-                        { ...item, id: "b3", name: "Fresh", every: "weekly", sealed: 0, clear: 0, lastSuccessAt: null, lastStatus: null }
+                        {
+                            ...item,
+                            id: "b2",
+                            name: "World",
+                            every: null,
+                            sealed: 1,
+                            clear: 1,
+                            lastStatus: "failed"
+                        },
+                        {
+                            ...item,
+                            id: "b3",
+                            name: "Fresh",
+                            every: "weekly",
+                            sealed: 0,
+                            clear: 0,
+                            lastSuccessAt: null,
+                            lastStatus: null
+                        }
                     ]
                 }
             })
         );
         const rows = section(report, "backups").rows?.items ?? [];
-        const cell = (index: number, id: string) => rows[index]?.facts.find((entry) => entry.id === id);
+        const cell = (index: number, id: string) =>
+            rows[index]?.facts.find((entry) => entry.id === id);
         expect(cell(0, "encrypted")).toMatchObject({ text: "Yes", attention: false });
         expect(cell(0, "schedule")?.text).toBe("Every day");
         expect(cell(1, "encrypted")).toMatchObject({ text: "Partly", attention: true });
@@ -175,17 +226,34 @@ describe("the evidence report", () => {
         expect(cell(2, "last-success")).toMatchObject({ value: null, text: "Never" });
         expect(fact(report, "backups", "backups.encrypted").text).toBe("1 of 2 items with a copy");
         expect(fact(report, "backups", "backups.scheduled").text).toBe("2 of 3 items");
-        expect(fact(report, "backups", "backups.failing")).toMatchObject({ value: 1, attention: true });
+        expect(fact(report, "backups", "backups.failing")).toMatchObject({
+            value: 1,
+            attention: true
+        });
     });
 
     it("says when the listed backups are not all of them, and counts every item regardless", () => {
         const base = readings();
         const report = evidence.buildEvidence(
-            readings({ backups: { ...base.backups, total: 250, scheduled: 240, failing: 9, withCopy: 230, encrypted: 229 } })
+            readings({
+                backups: {
+                    ...base.backups,
+                    total: 250,
+                    scheduled: 240,
+                    failing: 9,
+                    withCopy: 230,
+                    encrypted: 229
+                }
+            })
         );
-        expect(section(report, "backups").notes.join(" ")).toMatch(/1 most recently backed-up items of 250/);
+        expect(section(report, "backups").notes.join(" ")).toMatch(
+            /1 most recently backed-up items of 250/
+        );
         expect(fact(report, "backups", "backups.scheduled").text).toBe("240 of 250 items");
-        expect(fact(report, "backups", "backups.failing")).toMatchObject({ value: 9, attention: true });
+        expect(fact(report, "backups", "backups.failing")).toMatchObject({
+            value: 9,
+            attention: true
+        });
         expect(fact(report, "backups", "backups.encrypted")).toMatchObject({
             text: "229 of 230 items with a copy",
             attention: true
@@ -200,13 +268,22 @@ describe("the evidence report", () => {
                 tls: {
                     ...base.tls,
                     plainHttp: 1,
-                    managed: { ...base.tls.managed, expiries: ["2026-09-15T00:00:00.000Z", "2026-12-01T00:00:00.000Z"] }
+                    managed: {
+                        ...base.tls.managed,
+                        expiries: ["2026-09-15T00:00:00.000Z", "2026-12-01T00:00:00.000Z"]
+                    }
                 }
             })
         );
-        expect(fact(report, "secrets", "secrets.clear")).toMatchObject({ value: 2, attention: true });
+        expect(fact(report, "secrets", "secrets.clear")).toMatchObject({
+            value: 2,
+            attention: true
+        });
         expect(fact(report, "tls", "tls.plain-http").attention).toBe(true);
-        expect(fact(report, "tls", "tls.managed-expiring")).toMatchObject({ value: 1, attention: true });
+        expect(fact(report, "tls", "tls.managed-expiring")).toMatchObject({
+            value: 1,
+            attention: true
+        });
         expect(fact(report, "tls", "tls.with-certificate").text).toBe("10 of 10 domains in use");
     });
 

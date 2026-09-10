@@ -40,7 +40,11 @@ const { createDatabase, databaseConnection, databaseClusterNodes, deployDatabase
     "../../src/lib/database-service"
 );
 
-const NODES = databaseClusterNodes({ engine: "redis", containerName: "shop-cache-ab12", clusterMasters: 3 })!;
+const NODES = databaseClusterNodes({
+    engine: "redis",
+    containerName: "shop-cache-ab12",
+    clusterMasters: 3
+})!;
 
 /** A first node that answers each script the way `answer` says, recording them. */
 function node(answer: (script: string, call: number) => { code: number; output: string }) {
@@ -54,7 +58,11 @@ function node(answer: (script: string, call: number) => { code: number; output: 
     };
 }
 
-const context = { container: NODES[0]!, admin: { username: "polaris", password: PASSWORD, database: "cache" }, cluster: NODES };
+const context = {
+    container: NODES[0]!,
+    admin: { username: "polaris", password: PASSWORD, database: "cache" },
+    cluster: NODES
+};
 
 describe("the nodes of a cluster", () => {
     it("are the database's own container first, then numbered, six for three masters", () => {
@@ -69,9 +77,15 @@ describe("the nodes of a cluster", () => {
     });
 
     it("are none for a single Redis, another engine, or one never deployed", () => {
-        expect(databaseClusterNodes({ engine: "redis", containerName: "c", clusterMasters: null })).toBeNull();
-        expect(databaseClusterNodes({ engine: "postgres", containerName: "c", clusterMasters: 3 })).toBeNull();
-        expect(databaseClusterNodes({ engine: "redis", containerName: "", clusterMasters: 3 })).toBeNull();
+        expect(
+            databaseClusterNodes({ engine: "redis", containerName: "c", clusterMasters: null })
+        ).toBeNull();
+        expect(
+            databaseClusterNodes({ engine: "postgres", containerName: "c", clusterMasters: 3 })
+        ).toBeNull();
+        expect(
+            databaseClusterNodes({ engine: "redis", containerName: "", clusterMasters: 3 })
+        ).toBeNull();
     });
 });
 
@@ -83,7 +97,10 @@ describe("ensureRedisCluster", () => {
                 pings += 1;
                 return { code: pings === 1 ? 1 : 0, output: "" };
             }
-            return { code: 0, output: script.includes("--cluster create") ? "[OK] All 16384 slots covered." : "" };
+            return {
+                code: 0,
+                output: script.includes("--cluster create") ? "[OK] All 16384 slots covered." : ""
+            };
         });
         await ensureRedisCluster(first, context, async () => undefined);
 
@@ -94,7 +111,13 @@ describe("ensureRedisCluster", () => {
             if (script.includes("grep -qx")) return "settled";
             return "report";
         });
-        expect(steps).toEqual(["every node answers", "every node answers", "create", "settled", "report"]);
+        expect(steps).toEqual([
+            "every node answers",
+            "every node answers",
+            "create",
+            "settled",
+            "report"
+        ]);
         for (const [container] of first.runIn.mock.calls) expect(container).toBe("shop-cache-ab12");
         for (const argv of first.calls) {
             expect(argv.slice(0, 4)).toEqual(["env", `REDISCLI_AUTH=${PASSWORD}`, "sh", "-c"]);
@@ -126,7 +149,13 @@ describe("a cluster on a swarm", () => {
 
     it("is refused when it is asked for, since its nodes are joined by their container names", async () => {
         await expect(
-            createDatabase(OWNER, { environmentId: ENV, name: "cache", engine: "redis", clusterMasters: 3, targetId: "target-1" })
+            createDatabase(OWNER, {
+                environmentId: ENV,
+                name: "cache",
+                engine: "redis",
+                clusterMasters: 3,
+                targetId: "target-1"
+            })
         ).rejects.toThrow("deploys through a swarm");
     });
 

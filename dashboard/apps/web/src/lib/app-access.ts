@@ -160,7 +160,9 @@ export async function installedSectionApps({ isInstalled }: AppAccessInput): Pro
         )
     ];
     if (!isInstalled) return named;
-    const verdicts = await Promise.all(named.map(async (one) => [one, await isInstalled(one)] as const));
+    const verdicts = await Promise.all(
+        named.map(async (one) => [one, await isInstalled(one)] as const)
+    );
     return verdicts.filter(([, present]) => present).map(([one]) => one);
 }
 

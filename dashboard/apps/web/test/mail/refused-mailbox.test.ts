@@ -89,7 +89,13 @@ vi.mock("@polaris/db", () => ({
                 );
             }),
             updateMany: vi.fn(
-                async ({ where, data }: { where: { id: { in: string[] } }; data: Partial<Notice> }) => {
+                async ({
+                    where,
+                    data
+                }: {
+                    where: { id: { in: string[] } };
+                    data: Partial<Notice>;
+                }) => {
                     const hit = state.notices.filter((notice) => where.id.in.includes(notice.id));
                     for (const notice of hit) Object.assign(notice, data);
                     return { count: hit.length };
@@ -100,7 +106,12 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/notifications/dispatch", () => ({
-    notify: async (input: { userId: string; event: string; title: string; href?: string | null }) => {
+    notify: async (input: {
+        userId: string;
+        event: string;
+        title: string;
+        href?: string | null;
+    }) => {
         state.notified.push(input);
     }
 }));
@@ -171,7 +182,10 @@ function notice(accountId: string, overrides: Partial<Notice> = {}): Notice {
 describe("a mailbox the server stops accepting", () => {
     it("is paused and its owner is told, with the way to fix it", async () => {
         const row = mailbox();
-        await recordCredentialRefusal(row.id, "The mail server refused this account's credentials.");
+        await recordCredentialRefusal(
+            row.id,
+            "The mail server refused this account's credentials."
+        );
 
         expect(row.state).toBe("auth");
         expect(row.stateDetail).toBe("The mail server refused this account's credentials.");

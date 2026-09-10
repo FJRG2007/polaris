@@ -12,7 +12,9 @@ import {
 } from "@/app/(app)/apps/deploy/database-topology-field";
 
 function render(engine: string, value = SINGLE_TOPOLOGY): string {
-    return renderToStaticMarkup(<DatabaseTopologyField engine={engine} value={value} onChange={() => undefined} />);
+    return renderToStaticMarkup(
+        <DatabaseTopologyField engine={engine} value={value} onChange={() => undefined} />
+    );
 }
 
 describe("the layout field", () => {
@@ -33,7 +35,9 @@ describe("the layout field", () => {
     it("counts a sharded cluster's containers and says what it does not get yet", () => {
         const html = render("mongo", { topology: "sharded", shards: 2 });
         expect(html).toContain("10 containers");
-        expect(html).toContain("Each collection stays on one shard until your application shards it with a shard key");
+        expect(html).toContain(
+            "Each collection stays on one shard until your application shards it with a shard key"
+        );
         expect(html).toContain("Backups and version changes are not offered for it yet.");
     });
 

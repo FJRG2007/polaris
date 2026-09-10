@@ -23,7 +23,14 @@ import {
 } from "../src/index.js";
 
 const ENV = "0192f1e2-7b5c-7d3e-8f00-000000000001";
-const NODES = ["cache-ab12", "cache-ab12-n2", "cache-ab12-n3", "cache-ab12-n4", "cache-ab12-n5", "cache-ab12-n6"];
+const NODES = [
+    "cache-ab12",
+    "cache-ab12-n2",
+    "cache-ab12-n3",
+    "cache-ab12-n4",
+    "cache-ab12-n5",
+    "cache-ab12-n6"
+];
 
 describe("a request for a cluster", () => {
     const base = { environmentId: ENV, name: "cache", engine: "redis" as const };
@@ -46,13 +53,21 @@ describe("a request for a cluster", () => {
     });
 
     it("is refused for an engine that is not Redis", () => {
-        const result = databaseCreateSchema.safeParse({ ...base, engine: "postgres", clusterMasters: 3 });
+        const result = databaseCreateSchema.safeParse({
+            ...base,
+            engine: "postgres",
+            clusterMasters: 3
+        });
         expect(result.success).toBe(false);
         expect(result.error?.issues[0]?.path).toEqual(["clusterMasters"]);
     });
 
     it("cannot be published on one port", () => {
-        const result = databaseCreateSchema.safeParse({ ...base, clusterMasters: 3, exposePort: 6380 });
+        const result = databaseCreateSchema.safeParse({
+            ...base,
+            clusterMasters: 3,
+            exposePort: 6380
+        });
         expect(result.success).toBe(false);
         expect(result.error?.issues[0]?.path).toEqual(["exposePort"]);
     });
@@ -60,7 +75,12 @@ describe("a request for a cluster", () => {
 
 describe("a node's command", () => {
     it("adds the cluster settings, with the password as masterauth too", () => {
-        const command = redisClusterServerCommand("s3cret-password", "default", undefined, "cache-ab12-n2");
+        const command = redisClusterServerCommand(
+            "s3cret-password",
+            "default",
+            undefined,
+            "cache-ab12-n2"
+        );
         expect(command.slice(0, 3)).toEqual(["redis-server", "--requirepass", "s3cret-password"]);
         const flag = (name: string) => command[command.indexOf(name) + 1];
         expect(flag("--masterauth")).toBe("s3cret-password");
@@ -79,7 +99,9 @@ describe("a node's command", () => {
     });
 
     it("refuses a hostname Redis could not announce", () => {
-        expect(() => redisClusterServerCommand("pw-long-enough", "default", undefined, "bad name")).toThrow();
+        expect(() =>
+            redisClusterServerCommand("pw-long-enough", "default", undefined, "bad name")
+        ).toThrow();
     });
 });
 
@@ -162,7 +184,10 @@ describe("creating the cluster", () => {
 
 describe("reaching the cluster", () => {
     it("gives every node as a seed", () => {
-        expect(redisClusterSeeds(NODES.slice(0, 2))).toEqual(["cache-ab12:6379", "cache-ab12-n2:6379"]);
+        expect(redisClusterSeeds(NODES.slice(0, 2))).toEqual([
+            "cache-ab12:6379",
+            "cache-ab12-n2:6379"
+        ]);
     });
 
     it("adds the node list to a cluster's reference keys", () => {

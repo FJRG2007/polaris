@@ -65,17 +65,21 @@ interface Zone {
 
 async function zoneFor(scope: DnsScope): Promise<Zone> {
     if (scope.kind === "instance") {
-        if (!CF_ID.test(scope.zoneId)) throw new DnsEditError("That zone is not one this Polaris can edit");
+        if (!CF_ID.test(scope.zoneId))
+            throw new DnsEditError("That zone is not one this Polaris can edit");
         const token = await loadCloudflareToken();
         if (!token) throw new DnsEditError("Connect a Cloudflare token under Integrations first");
         const zone = (await listZones(token)).find((entry) => entry.id === scope.zoneId);
-        if (!zone) throw new DnsEditError("That zone is not one this Polaris's Cloudflare token can edit");
+        if (!zone)
+            throw new DnsEditError("That zone is not one this Polaris's Cloudflare token can edit");
         return { token, id: zone.id, name: zone.name, within: null };
     }
     const row = await prisma.ownerDomain.findFirst({
         where: {
             id: scope.domainId,
-            ...(scope.owner.kind === "user" ? { userId: scope.owner.id } : { orgId: scope.owner.id }),
+            ...(scope.owner.kind === "user"
+                ? { userId: scope.owner.id }
+                : { orgId: scope.owner.id }),
             verifiedAt: { not: null }
         },
         select: { domain: true, dnsToken: true }
@@ -97,7 +101,10 @@ export interface TokenCaller {
  * The closest domain at or above `hostname` that one of these owners has proven,
  * or null when there is none.
  */
-export async function provenDomainOf(hostname: string, owners: readonly DomainOwner[]): Promise<string | null> {
+export async function provenDomainOf(
+    hostname: string,
+    owners: readonly DomainOwner[]
+): Promise<string | null> {
     const labels = normalizeHostname(hostname).replace(/^\*\./, "").split(".");
     const candidates = labels.slice(0, -1).map((_, index) => labels.slice(index).join("."));
     if (candidates.length === 0 || owners.length === 0) return null;
@@ -105,7 +112,9 @@ export async function provenDomainOf(hostname: string, owners: readonly DomainOw
         where: {
             domain: { in: candidates },
             verifiedAt: { not: null },
-            OR: owners.map((owner) => (owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id }))
+            OR: owners.map((owner) =>
+                owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id }
+            )
         },
         select: { domain: true }
     });
@@ -118,7 +127,10 @@ export async function provenDomainOf(hostname: string, owners: readonly DomainOw
  * edits any zone the token reaches, and anybody else only names at or under a
  * domain they - or the organization they act for - have proven.
  */
-export async function instanceTokenAllowed(hostname: string, caller: TokenCaller): Promise<boolean> {
+export async function instanceTokenAllowed(
+    hostname: string,
+    caller: TokenCaller
+): Promise<boolean> {
     if (caller.isAdmin) return true;
     return (await provenDomainOf(hostname, caller.owners)) !== null;
 }
@@ -174,7 +186,11 @@ function draftOf(record: CfEditableRecord, zone: string): DnsRecordDraft | null 
                 value: typeof record.data?.value === "string" ? record.data.value : ""
             };
         case "MX":
-            return { ...draft, content: record.content, priority: record.priority === null ? "" : String(record.priority) };
+            return {
+                ...draft,
+                content: record.content,
+                priority: record.priority === null ? "" : String(record.priority)
+            };
         default:
             return { ...draft, content: record.content };
     }
@@ -218,7 +234,11 @@ async function scopedRecords(zone: Zone): Promise<DnsRecordView[]> {
 /** A zone's records, narrowed to what this scope may see. */
 export async function zoneRecords(scope: DnsScope): Promise<ZoneRecords> {
     const zone = await zoneFor(scope);
-    return { zone: { id: zone.id, name: zone.name }, within: zone.within, records: await scopedRecords(zone) };
+    return {
+        zone: { id: zone.id, name: zone.name },
+        within: zone.within,
+        records: await scopedRecords(zone)
+    };
 }
 
 /**
@@ -234,10 +254,17 @@ export async function saveZoneRecord(
 ): Promise<DnsRecordView> {
     const zone = await zoneFor(scope);
     const existing = await scopedRecords(zone);
-    if (recordId !== null && !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))) {
+    if (
+        recordId !== null &&
+        !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))
+    ) {
         throw new DnsEditError("That record is not in this zone");
     }
-    const checked = recordFields(draft, zone.name, { within: zone.within, existing, editingId: recordId });
+    const checked = recordFields(draft, zone.name, {
+        within: zone.within,
+        existing,
+        editingId: recordId
+    });
     if (!checked.ok) {
         const problems = { ...checked.problems };
         for (const field of checked.missing) problems[field] ??= "Required";
@@ -247,10 +274,14 @@ export async function saveZoneRecord(
 }
 
 /** Refuse a record id that is not in this zone, or not within this scope. */
-async function requireOwnRecord(zone: Zone, recordId: string): Promise<{ type: string; name: string }> {
+async function requireOwnRecord(
+    zone: Zone,
+    recordId: string
+): Promise<{ type: string; name: string }> {
     if (!CF_ID.test(recordId)) throw new DnsEditError("That record is not in this zone");
     const current = await getDnsRecord(zone.token, zone.id, recordId);
-    if (!current || !inside(zone, current.name)) throw new DnsEditError("That record is not in this zone");
+    if (!current || !inside(zone, current.name))
+        throw new DnsEditError("That record is not in this zone");
     return current;
 }
 
@@ -263,7 +294,9 @@ export async function deleteZoneRecord(scope: DnsScope, recordId: string): Promi
 /** The values a resolver should give for a record once the change has reached it,
  *  in the form it gives them - or null when there is nothing to expect: a proxied
  *  record answers with Cloudflare's own addresses rather than its content. */
-export function expectedValues(record: Pick<CfEditableRecord, "type" | "content" | "proxied" | "priority" | "data">): string[] | null {
+export function expectedValues(
+    record: Pick<CfEditableRecord, "type" | "content" | "proxied" | "priority" | "data">
+): string[] | null {
     if (record.proxied) return null;
     switch (record.type) {
         case "MX":
@@ -273,7 +306,9 @@ export function expectedValues(record: Pick<CfEditableRecord, "type" | "content"
                 `${numberOf(record.data?.priority)} ${numberOf(record.data?.weight)} ${numberOf(record.data?.port)} ${normalizeHostname(String(record.data?.target ?? ""))}`
             ];
         case "CAA":
-            return [`${numberOf(record.data?.flags) || "0"} ${String(record.data?.tag ?? "")} "${String(record.data?.value ?? "")}"`];
+            return [
+                `${numberOf(record.data?.flags) || "0"} ${String(record.data?.tag ?? "")} "${String(record.data?.value ?? "")}"`
+            ];
         default:
             return [record.content];
     }
@@ -284,14 +319,19 @@ export function expectedValues(record: Pick<CfEditableRecord, "type" | "content"
  * holds them, against what each public resolver answers. All of them rather than
  * the one, because a resolver answers with the whole set at a name.
  */
-export async function recordPropagation(scope: DnsScope, recordId: string): Promise<PropagationReport> {
+export async function recordPropagation(
+    scope: DnsScope,
+    recordId: string
+): Promise<PropagationReport> {
     const zone = await zoneFor(scope);
     const current = await requireOwnRecord(zone, recordId);
     if (!(DNS_RECORD_TYPES as readonly string[]).includes(current.type)) {
         throw new DnsEditError(`Propagation is checked for ${DNS_RECORD_TYPES.join(", ")} records`);
     }
     const siblings = (await listDnsRecords(zone.token, zone.id)).filter(
-        (record) => record.type === current.type && normalizeHostname(record.name) === normalizeHostname(current.name)
+        (record) =>
+            record.type === current.type &&
+            normalizeHostname(record.name) === normalizeHostname(current.name)
     );
     const expected = siblings.some((record) => record.proxied)
         ? null

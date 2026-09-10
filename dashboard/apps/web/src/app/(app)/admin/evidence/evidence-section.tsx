@@ -14,10 +14,18 @@ import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { factText, type EvidenceFact, type EvidenceSection } from "@/lib/compliance/evidence";
 
 /** A value, with the flag that says it is worth a second look. */
-function FactValue({ fact, formatDate }: { fact: EvidenceFact; formatDate: (iso: string) => string }) {
+function FactValue({
+    fact,
+    formatDate
+}: {
+    fact: EvidenceFact;
+    formatDate: (iso: string) => string;
+}) {
     return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
-            <span className={fact.attention ? "text-warning-ink" : undefined}>{factText(fact, formatDate)}</span>
+            <span className={fact.attention ? "text-warning-ink" : undefined}>
+                {factText(fact, formatDate)}
+            </span>
             {fact.attention ? <Badge variant="warning">Review</Badge> : null}
         </span>
     );
@@ -43,7 +51,10 @@ export function EvidenceSectionCard({
                     {section.where.map((where, index) => (
                         <span key={where.label}>
                             {index > 0 ? ", " : null}
-                            <Link href={where.href} className="text-foreground underline-offset-2 hover:underline">
+                            <Link
+                                href={where.href}
+                                className="text-foreground underline-offset-2 hover:underline"
+                            >
                                 {where.label}
                             </Link>
                         </span>
@@ -57,7 +68,9 @@ export function EvidenceSectionCard({
                             key={fact.id}
                             className="flex flex-col gap-0.5 border-t border-border py-2 first:border-t-0 first:pt-0 sm:flex-row sm:items-baseline sm:gap-4"
                         >
-                            <dt className="text-muted-foreground sm:w-2/5 sm:shrink-0">{fact.label}</dt>
+                            <dt className="text-muted-foreground sm:w-2/5 sm:shrink-0">
+                                {fact.label}
+                            </dt>
                             <dd className="min-w-0 break-words">
                                 <FactValue fact={fact} formatDate={formatDate} />
                             </dd>
@@ -90,15 +103,27 @@ export function EvidenceSectionCard({
                                 </thead>
                                 <tbody>
                                     {rows.items.map((row) => (
-                                        <tr key={row.id} className="border-b border-border last:border-b-0">
+                                        <tr
+                                            key={row.id}
+                                            className="border-b border-border last:border-b-0"
+                                        >
                                             <td className="px-3 py-2">
-                                                <Link href={row.href} className="font-medium hover:underline">
+                                                <Link
+                                                    href={row.href}
+                                                    className="font-medium hover:underline"
+                                                >
                                                     {row.label}
                                                 </Link>
                                             </td>
                                             {row.facts.map((fact) => (
-                                                <td key={fact.id} className="whitespace-nowrap px-3 py-2">
-                                                    <FactValue fact={fact} formatDate={formatDate} />
+                                                <td
+                                                    key={fact.id}
+                                                    className="whitespace-nowrap px-3 py-2"
+                                                >
+                                                    <FactValue
+                                                        fact={fact}
+                                                        formatDate={formatDate}
+                                                    />
                                                 </td>
                                             ))}
                                         </tr>
@@ -114,13 +139,18 @@ export function EvidenceSectionCard({
                         <p>
                             Last changed {formatDate(change.at)} by{" "}
                             {change.actorId && change.actorExists ? (
-                                <Link href={`/admin/users/${change.actorId}`} className="text-foreground hover:underline">
+                                <Link
+                                    href={`/admin/users/${change.actorId}`}
+                                    className="text-foreground hover:underline"
+                                >
                                     {change.actorName}
                                 </Link>
                             ) : (
                                 <span className="text-foreground">{change.actorName}</span>
                             )}{" "}
-                            <span className="font-mono text-foreground-subtle">{change.action}</span>
+                            <span className="font-mono text-foreground-subtle">
+                                {change.action}
+                            </span>
                         </p>
                     ) : (
                         <p>No change to this is recorded in the audit trail.</p>

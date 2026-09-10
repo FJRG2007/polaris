@@ -22,7 +22,11 @@ const GRANTED = new Set([
     "display-capture"
 ]);
 
-export function allowPermission(permission: string, requestingUrl: string, serverOrigin: string | null): boolean {
+export function allowPermission(
+    permission: string,
+    requestingUrl: string,
+    serverOrigin: string | null
+): boolean {
     if (!serverOrigin || !GRANTED.has(permission)) return false;
     try {
         return new URL(requestingUrl).origin === serverOrigin;

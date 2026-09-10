@@ -15,12 +15,17 @@ const { log, findMany, setApplicationAsleep } = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     prisma: { application: { findMany }, deployment: { findMany: async () => [] } }
 }));
-vi.mock("@/lib/deploy-service", () => ({ setApplicationAsleep, syncAppRoutes: async () => undefined }));
+vi.mock("@/lib/deploy-service", () => ({
+    setApplicationAsleep,
+    syncAppRoutes: async () => undefined
+}));
 vi.mock("@/lib/edge-access-log", () => ({
     EDGE_LOG_RECENT_WINDOW_BYTES: 1024,
     readEdgeLogWindow: async () => ({ text: log.text, truncated: false })
 }));
-vi.mock("@/lib/deploy/quick-tunnel-service", () => ({ tunnelHostForApp: (id: string) => `${id}.tunnel.test` }));
+vi.mock("@/lib/deploy/quick-tunnel-service", () => ({
+    tunnelHostForApp: (id: string) => `${id}.tunnel.test`
+}));
 
 const { runSleepPass } = await import("@/lib/deploy/sleep-service");
 

@@ -15,14 +15,20 @@ vi.mock("@/lib/edge-access-log", () => ({
     EDGE_LOG_RECENT_WINDOW_BYTES: 1024,
     readEdgeLogWindow: async () => ({ text: log.text, truncated: log.truncated })
 }));
-vi.mock("@/lib/deploy/quick-tunnel-service", () => ({ tunnelHostForApp: (id: string) => `${id}.tunnel.test` }));
+vi.mock("@/lib/deploy/quick-tunnel-service", () => ({
+    tunnelHostForApp: (id: string) => `${id}.tunnel.test`
+}));
 
 const { readEdgeVisits, serviceHostnames, visitTimes } = await import("@/lib/deploy/edge-visits");
 
 const NOW = Date.parse("2026-09-10T12:00:00Z");
 
 /** One line as Traefik writes it. */
-function line(secondsAgo: number, host: string | null, extra: Record<string, unknown> = {}): string {
+function line(
+    secondsAgo: number,
+    host: string | null,
+    extra: Record<string, unknown> = {}
+): string {
     return JSON.stringify({
         StartUTC: new Date(NOW - secondsAgo * 1000).toISOString(),
         RequestHost: host,
@@ -40,7 +46,10 @@ beforeEach(() => {
 });
 
 describe("the edge's visits", () => {
-    const shop = { id: "app-1", domains: [{ hostname: "Shop.Example.com" }, { hostname: "*.preview.example.com" }] };
+    const shop = {
+        id: "app-1",
+        domains: [{ hostname: "Shop.Example.com" }, { hostname: "*.preview.example.com" }]
+    };
 
     it("counts every request to any of a service's addresses", async () => {
         log.text = [
@@ -65,14 +74,22 @@ describe("the edge's visits", () => {
     });
 
     it("starts the window at the oldest request of any kind", async () => {
-        log.text = [line(600, null), line(300, "other.example.com"), line(5, "shop.example.com")].join("\n");
+        log.text = [
+            line(600, null),
+            line(300, "other.example.com"),
+            line(5, "shop.example.com")
+        ].join("\n");
         const visits = await readEdgeVisits();
         expect(visits.windowStart).toBe(NOW - 600_000);
         expect(visitTimes(visits, serviceHostnames(shop))).toEqual([NOW - 5_000]);
     });
 
     it("knows nothing when there is no log", async () => {
-        await expect(readEdgeVisits()).resolves.toEqual({ visits: [], windowStart: null, truncated: false });
+        await expect(readEdgeVisits()).resolves.toEqual({
+            visits: [],
+            windowStart: null,
+            truncated: false
+        });
     });
 
     it("says when the window is short because the log holds more than was read", async () => {

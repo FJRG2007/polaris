@@ -65,7 +65,8 @@ export function offeredMonths(now: Date = new Date()): string[] {
 export function resolveMonth(requested: string | undefined, now: Date = new Date()): string {
     const months = offeredMonths(now);
     const month = requested ?? core.billingMonthOf(now);
-    if (!months.includes(month)) throw new BillingRequestError("No figures are kept for that month");
+    if (!months.includes(month))
+        throw new BillingRequestError("No figures are kept for that month");
     return month;
 }
 
@@ -95,7 +96,10 @@ function ownerOf(project: {
 }
 
 /** The running month's statement, so far. */
-export async function readMonthToDate(scope: BillingScope, now: Date = new Date()): Promise<StatementView> {
+export async function readMonthToDate(
+    scope: BillingScope,
+    now: Date = new Date()
+): Promise<StatementView> {
     return readStatement(scope, core.billingMonthOf(now), now);
 }
 
@@ -105,7 +109,8 @@ const SETTLE_MS = 3_600_000;
 
 /** Whether a project on a frozen month's statement is in the scope asked for. */
 function inScope(scope: BillingScope, project: core.MeteredProject): boolean {
-    if (scope.kind === "orgs") return project.owner.kind === "org" && scope.orgIds.includes(project.owner.id);
+    if (scope.kind === "orgs")
+        return project.owner.kind === "org" && scope.orgIds.includes(project.owner.id);
     if (scope.kind === "project") return project.projectId === scope.projectId;
     return true;
 }
@@ -130,7 +135,10 @@ export async function readStatement(
     if (!range) throw new BillingRequestError("Pick a month");
 
     const through = new Date(Math.min(range.to.getTime(), now.getTime()));
-    const frozen = now.getTime() >= range.to.getTime() + SETTLE_MS ? await frozenMonth(month, range, now) : null;
+    const frozen =
+        now.getTime() >= range.to.getTime() + SETTLE_MS
+            ? await frozenMonth(month, range, now)
+            : null;
     const [projects, rates] = frozen
         ? [frozen.projects.filter((project) => inScope(scope, project)), frozen.rates]
         : await Promise.all([meterProjects(scope, range.from, through), getBillingRates()]);
@@ -162,7 +170,12 @@ async function frozenMonth(
     month: string,
     range: { from: Date; to: Date },
     now: Date
-): Promise<{ projects: core.MeteredProject[]; rates: core.BillingRates | null; keptFrom: Date | null; createdAt: Date }> {
+): Promise<{
+    projects: core.MeteredProject[];
+    rates: core.BillingRates | null;
+    keptFrom: Date | null;
+    createdAt: Date;
+}> {
     let held = await prisma.statementSnapshot.findUnique({ where: { month } });
     if (!held) {
         const [projects, rates] = await Promise.all([
@@ -193,7 +206,11 @@ async function frozenMonth(
 }
 
 /** Every project in scope, with what its services and volumes used in [from, to). */
-async function meterProjects(scope: BillingScope, from: Date, to: Date): Promise<core.MeteredProject[]> {
+async function meterProjects(
+    scope: BillingScope,
+    from: Date,
+    to: Date
+): Promise<core.MeteredProject[]> {
     const [projects, cores] = await Promise.all([
         prisma.project.findMany({
             where: projectWhere(scope),
@@ -229,8 +246,14 @@ async function meterProjects(scope: BillingScope, from: Date, to: Date): Promise
                 // The machine a service runs on, under the id its load is kept
                 // as: the box Polaris is on has a reserved one.
                 const machine =
-                    app.target.kind === "local" || !app.target.hostId ? LOCAL_HOST_SUBJECT : app.target.hostId;
-                subjects.push({ subjectType: "app", subjectId: app.id, cores: cores.get(machine) ?? null });
+                    app.target.kind === "local" || !app.target.hostId
+                        ? LOCAL_HOST_SUBJECT
+                        : app.target.hostId;
+                subjects.push({
+                    subjectType: "app",
+                    subjectId: app.id,
+                    cores: cores.get(machine) ?? null
+                });
                 projectOf.set(`app:${app.id}`, project.id);
                 for (const volume of app.volumes) {
                     subjects.push({ subjectType: "volume", subjectId: volume.id, cores: null });
@@ -245,7 +268,10 @@ async function meterProjects(scope: BillingScope, from: Date, to: Date): Promise
     for (const [subject, usage] of used) {
         const projectId = projectOf.get(subject);
         if (!projectId) continue;
-        byProject.set(projectId, core.addUsage(byProject.get(projectId) ?? core.EMPTY_USAGE, usage));
+        byProject.set(
+            projectId,
+            core.addUsage(byProject.get(projectId) ?? core.EMPTY_USAGE, usage)
+        );
     }
 
     return projects.map((project) => ({

@@ -10,7 +10,9 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { CHANNELS, VERSION_ARGUMENT, type PolarisDesktop } from "@/shared/bridge";
 
-const version = process.argv.find((arg) => arg.startsWith(VERSION_ARGUMENT))?.slice(VERSION_ARGUMENT.length) ?? "";
+const version =
+    process.argv.find((arg) => arg.startsWith(VERSION_ARGUMENT))?.slice(VERSION_ARGUMENT.length) ??
+    "";
 
 const bridge: PolarisDesktop = {
     version,

@@ -23,7 +23,10 @@ import {
     type OwnerDomainPolicy
 } from "@/lib/owner-domains-policy";
 
-const OPTIONS = OWNER_DOMAIN_MODES.map((mode) => ({ value: mode, label: OWNER_DOMAIN_LABELS[mode] }));
+const OPTIONS = OWNER_DOMAIN_MODES.map((mode) => ({
+    value: mode,
+    label: OWNER_DOMAIN_LABELS[mode]
+}));
 
 export function OwnerDomainsCard({
     policy,
@@ -93,7 +96,9 @@ export function OwnerDomainsCard({
                     Save
                 </Button>
                 <p className="text-muted-foreground w-full text-xs">
-                    {!capValid ? "Enter a whole number, or 0 for no limit." : OWNER_DOMAIN_HINTS[mode]}
+                    {!capValid
+                        ? "Enter a whole number, or 0 for no limit."
+                        : OWNER_DOMAIN_HINTS[mode]}
                     {capValid && parsedCap === 0 ? " No limit on how many each may hold." : ""}
                 </p>
                 {error && (

@@ -53,16 +53,24 @@ export function PageSection({
                 )}
             >
                 <div className="min-w-0">
-                    <h2 className="flex items-center gap-2 text-[14px] font-semibold tracking-tight">{title}</h2>
+                    <h2 className="flex items-center gap-2 text-[14px] font-semibold tracking-tight">
+                        {title}
+                    </h2>
                     {description ? (
-                        <p className="mt-0.5 max-w-3xl text-[0.8125rem] text-muted-foreground">{description}</p>
+                        <p className="mt-0.5 max-w-3xl text-[0.8125rem] text-muted-foreground">
+                            {description}
+                        </p>
                     ) : null}
                 </div>
-                {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+                {actions ? (
+                    <div className="flex flex-wrap items-center gap-2">{actions}</div>
+                ) : null}
             </div>
             {/* Beside its heading a section is a form or prose, which reads badly
                 stretched across a wide screen; a wide one is a table, which does not. */}
-            <div className={cn("flex min-w-0 flex-col gap-4", !wide && "max-w-3xl")}>{children}</div>
+            <div className={cn("flex min-w-0 flex-col gap-4", !wide && "max-w-3xl")}>
+                {children}
+            </div>
         </section>
     );
 }

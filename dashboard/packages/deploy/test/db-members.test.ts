@@ -21,9 +21,19 @@ function plan(overrides: Partial<DbDeployPlan> = {}): DbDeployPlan {
         dataPath: "/data/db",
         limits: { cpus: 1, memoryMb: 512 },
         members: [
-            { name: "shop-orders-1a2b", env: { A: "1" }, command: ["sh", "-c", "exec mongod"], volumeName: "mongo-data-1a2b3c4d" },
+            {
+                name: "shop-orders-1a2b",
+                env: { A: "1" },
+                command: ["sh", "-c", "exec mongod"],
+                volumeName: "mongo-data-1a2b3c4d"
+            },
             { name: "shop-orders-1a2b-m2", env: { B: "2" }, volumeName: "mongo-data-1a2b3c4d-m2" },
-            { name: "shop-orders-1a2b-m3", env: { B: "2" }, volumeName: "mongo-data-1a2b3c4d-m3", image: "mongo:8" }
+            {
+                name: "shop-orders-1a2b-m3",
+                env: { B: "2" },
+                volumeName: "mongo-data-1a2b3c4d-m3",
+                image: "mongo:8"
+            }
         ],
         ...overrides
     };
@@ -43,8 +53,14 @@ describe("dbComposeSpec with members", () => {
 
     it("gives every member with data a volume of its own at the data path", () => {
         const spec = dbComposeSpec(plan(), NETWORK);
-        expect(spec.volumes).toEqual(["mongo-data-1a2b3c4d", "mongo-data-1a2b3c4d-m2", "mongo-data-1a2b3c4d-m3"]);
-        expect(spec.services[1]!.volumes).toEqual([{ source: "mongo-data-1a2b3c4d-m2", target: "/data/db", kind: "volume" }]);
+        expect(spec.volumes).toEqual([
+            "mongo-data-1a2b3c4d",
+            "mongo-data-1a2b3c4d-m2",
+            "mongo-data-1a2b3c4d-m3"
+        ]);
+        expect(spec.services[1]!.volumes).toEqual([
+            { source: "mongo-data-1a2b3c4d-m2", target: "/data/db", kind: "volume" }
+        ]);
     });
 
     it("keeps each member's own environment, command and image, and the plan's limits", () => {
@@ -80,7 +96,12 @@ describe("dbComposeSpec with members", () => {
                 image: "mysql:8",
                 members: [
                     { name: "shop-orders-1a2b", env: {}, volumeName: "v" },
-                    { name: "shop-orders-1a2b-replica1", env: {}, volumeName: "v-r1", aliases: ["shop-orders-1a2b-read"] }
+                    {
+                        name: "shop-orders-1a2b-replica1",
+                        env: {},
+                        volumeName: "v-r1",
+                        aliases: ["shop-orders-1a2b-read"]
+                    }
                 ]
             }),
             NETWORK
@@ -95,11 +116,18 @@ describe("dbComposeSpec with members", () => {
     it("refuses members that would collide, or a plan whose own name is not one of them", () => {
         expect(() =>
             dbComposeSpec(
-                plan({ members: [{ name: "shop-orders-1a2b", env: {} }, { name: "shop-orders-1a2b", env: {} }] }),
+                plan({
+                    members: [
+                        { name: "shop-orders-1a2b", env: {} },
+                        { name: "shop-orders-1a2b", env: {} }
+                    ]
+                }),
                 NETWORK
             )
         ).toThrow("cannot share a name");
-        expect(() => dbComposeSpec(plan({ members: [{ name: "other", env: {} }] }), NETWORK)).toThrow("must be one of its members");
+        expect(() =>
+            dbComposeSpec(plan({ members: [{ name: "other", env: {} }] }), NETWORK)
+        ).toThrow("must be one of its members");
     });
 
     it("pulls every image the members run, once each", () => {
@@ -108,20 +136,28 @@ describe("dbComposeSpec with members", () => {
     });
 
     it("fetches every image again, except in a rolling upgrade's step, which runs what the host has", () => {
-        expect(dbComposeSpec(plan(), NETWORK).services.map((service) => service.pullPolicy)).toEqual([
-            "always",
-            "always",
-            "always"
-        ]);
+        expect(
+            dbComposeSpec(plan(), NETWORK).services.map((service) => service.pullPolicy)
+        ).toEqual(["always", "always", "always"]);
         const rolling = dbComposeSpec(plan({ keepImages: true }), NETWORK);
-        expect(rolling.services.map((service) => service.pullPolicy)).toEqual(["missing", "missing", "missing"]);
-        expect(renderComposeYaml(rolling, "/var/lib/polaris/volumes", "/mnt/polaris")).toContain('pull_policy: "missing"');
+        expect(rolling.services.map((service) => service.pullPolicy)).toEqual([
+            "missing",
+            "missing",
+            "missing"
+        ]);
+        expect(renderComposeYaml(rolling, "/var/lib/polaris/volumes", "/mnt/polaris")).toContain(
+            'pull_policy: "missing"'
+        );
     });
 
     it("is still one container without members", () => {
         const spec = dbComposeSpec(plan({ members: undefined }), NETWORK);
         expect(spec.services).toHaveLength(1);
-        expect(spec.services[0]!.volumes[0]).toEqual({ source: "mongo-data-1a2b3c4d", target: "/data/db", kind: "volume" });
+        expect(spec.services[0]!.volumes[0]).toEqual({
+            source: "mongo-data-1a2b3c4d",
+            target: "/data/db",
+            kind: "volume"
+        });
     });
 });
 
@@ -130,7 +166,9 @@ describe("deploying the members", () => {
         const ports = {
             pull: vi.fn(async () => undefined),
             composeUp: vi.fn(async () => undefined),
-            ...(present ? { hasImage: vi.fn(async (image: string) => present.includes(image)) } : {})
+            ...(present
+                ? { hasImage: vi.fn(async (image: string) => present.includes(image)) }
+                : {})
         };
         const ctx = {
             ports,
@@ -164,7 +202,15 @@ describe("deploying the members", () => {
 describe("forCompose", () => {
     it("refuses a command with a line break, naming the service", () => {
         const spec = dbComposeSpec(
-            plan({ members: [{ name: "shop-orders-1a2b", env: {}, command: ["sh", "-c", "set -e\nexec mongod"] }] }),
+            plan({
+                members: [
+                    {
+                        name: "shop-orders-1a2b",
+                        env: {},
+                        command: ["sh", "-c", "set -e\nexec mongod"]
+                    }
+                ]
+            }),
             NETWORK
         );
         expect(() => forCompose(spec)).toThrow("shop-orders-1a2b's command holds a line break");
@@ -172,7 +218,15 @@ describe("forCompose", () => {
 
     it("passes a one-line command through, escaped for compose", () => {
         const spec = dbComposeSpec(
-            plan({ members: [{ name: "shop-orders-1a2b", env: {}, command: ["sh", "-c", 'printf "%s" "$KEY"'] }] }),
+            plan({
+                members: [
+                    {
+                        name: "shop-orders-1a2b",
+                        env: {},
+                        command: ["sh", "-c", 'printf "%s" "$KEY"']
+                    }
+                ]
+            }),
             NETWORK
         );
         expect(forCompose(spec).services[0]!.command).toEqual(["sh", "-c", 'printf "%s" "$$KEY"']);

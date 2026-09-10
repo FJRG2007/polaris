@@ -10,7 +10,15 @@ import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import { FolderRefusal, listFolder, zipEntries, zipFolder } from "@/main/folder-zip";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { EMPTY_FOLDER, FOLDER_TOO_LARGE, MAX_FOLDER, MAX_ZIP, ZIP_TOO_LARGE, formatBytes, skipped } from "@/main/zip-rules";
+import {
+    EMPTY_FOLDER,
+    FOLDER_TOO_LARGE,
+    MAX_FOLDER,
+    MAX_ZIP,
+    ZIP_TOO_LARGE,
+    formatBytes,
+    skipped
+} from "@/main/zip-rules";
 
 describe("skipped", () => {
     it("leaves out node_modules, .git and __MACOSX at any depth, with everything under them", () => {
@@ -42,15 +50,24 @@ describe("parity with the dashboard's browser zipper", () => {
         "utf8"
     );
     const mine = readFileSync(join(__dirname, "../../src/main/zip-rules.ts"), "utf8");
-    const line = (source: string, pattern: RegExp) => pattern.exec(source)?.[0]?.replace(/^export /, "");
+    const line = (source: string, pattern: RegExp) =>
+        pattern.exec(source)?.[0]?.replace(/^export /, "");
 
     it("skips the same entries and keeps the same limits", () => {
-        for (const pattern of [/(export )?const SKIPPED = .*;/, /(export )?const MAX_ZIP = .*;/, /(export )?const MAX_FOLDER = .*;/]) {
+        for (const pattern of [
+            /(export )?const SKIPPED = .*;/,
+            /(export )?const MAX_ZIP = .*;/,
+            /(export )?const MAX_FOLDER = .*;/
+        ]) {
             expect(line(mine, pattern)).toBeDefined();
             expect(line(mine, pattern)).toBe(line(browser, pattern));
         }
-        expect(browser).toContain('path.split("/").some((segment) => SKIPPED.has(segment)) || path.endsWith(".DS_Store")');
-        expect(mine).toContain('path.split("/").some((segment) => SKIPPED.has(segment)) || path.endsWith(".DS_Store")');
+        expect(browser).toContain(
+            'path.split("/").some((segment) => SKIPPED.has(segment)) || path.endsWith(".DS_Store")'
+        );
+        expect(mine).toContain(
+            'path.split("/").some((segment) => SKIPPED.has(segment)) || path.endsWith(".DS_Store")'
+        );
     });
 });
 
@@ -76,7 +93,13 @@ describe("zipFolder", () => {
     function project(): string {
         root = mkdtempSync(join(tmpdir(), "polaris-zip-"));
         const app = join(root, "my-app");
-        for (const dir of ["src/lib", "node_modules/react", ".git/objects", "packages/web/node_modules/x", ".github"]) {
+        for (const dir of [
+            "src/lib",
+            "node_modules/react",
+            ".git/objects",
+            "packages/web/node_modules/x",
+            ".github"
+        ]) {
             mkdirSync(join(app, dir), { recursive: true });
         }
         writeFileSync(join(app, "package.json"), '{"name":"my-app"}');
@@ -179,7 +202,8 @@ describe("zipFolder", () => {
         const size = MAX_ZIP + 1024;
         const chunk = new Uint8Array(1024 * 1024).map(() => Math.floor(Math.random() * 256));
         const bytes = new Uint8Array(size);
-        for (let at = 0; at < size; at += chunk.length) bytes.set(chunk.subarray(0, Math.min(chunk.length, size - at)), at);
+        for (let at = 0; at < size; at += chunk.length)
+            bytes.set(chunk.subarray(0, Math.min(chunk.length, size - at)), at);
         writeFileSync(file, bytes);
         await expect(
             zipEntries([{ path: "big/noise.bin", file, size, mtime: new Date() }])

@@ -14,7 +14,9 @@ import { AUTOSCALE_IDLE_AFTER, AUTOSCALE_SIGNALS, AUTOSCALED_ACTION_PREFIX } fro
  * says what happened, without the why.
  */
 function autoscaleReason(action: string, up: boolean): string {
-    const signal = AUTOSCALE_SIGNALS.find((known) => action === `${AUTOSCALED_ACTION_PREFIX}${known}`);
+    const signal = AUTOSCALE_SIGNALS.find(
+        (known) => action === `${AUTOSCALED_ACTION_PREFIX}${known}`
+    );
     switch (signal) {
         case undefined:
             return "";
@@ -27,7 +29,9 @@ function autoscaleReason(action: string, up: boolean): string {
         case "traffic":
             return up ? ": requests were over their target" : ": requests stayed low";
         case "both":
-            return up ? ": CPU and requests were over their targets" : ": CPU and requests stayed low";
+            return up
+                ? ": CPU and requests were over their targets"
+                : ": CPU and requests stayed low";
     }
 }
 
@@ -61,7 +65,9 @@ export function describeServiceEvent(line: ActivityLine): string {
         case "variable":
             // The name, never the value: a feed anybody with the service open can
             // read is not where a secret goes.
-            return line.toValue ? `${who} changed the ${line.toValue} variable` : `${who} changed a variable`;
+            return line.toValue
+                ? `${who} changed the ${line.toValue} variable`
+                : `${who} changed a variable`;
         case "variables-imported":
             return `${who} imported ${line.toValue ?? "some"} variables`;
         case "variable-removed":

@@ -44,7 +44,12 @@ export async function setOrgBudget(orgId: string, budget: OrgBudget): Promise<vo
     await prisma.organizationBudget.upsert({
         where: { orgId },
         create: { orgId, amount: budget.amount, currency: budget.currency },
-        update: { amount: budget.amount, currency: budget.currency, alertedMonth: null, alertedLevel: 0 }
+        update: {
+            amount: budget.amount,
+            currency: budget.currency,
+            alertedMonth: null,
+            alertedLevel: 0
+        }
     });
 }
 
@@ -71,7 +76,9 @@ export async function budgetsIn(currency: core.CurrencyCode): Promise<Map<string
  * asks. The announcement is written down before anybody is told, so a pass that
  * dies half-way through its recipients does not tell the first ones twice.
  */
-export async function sweepBudgets(now: Date = new Date()): Promise<{ checked: number; announced: number }> {
+export async function sweepBudgets(
+    now: Date = new Date()
+): Promise<{ checked: number; announced: number }> {
     const rates = await getBillingRates();
     if (!rates) return { checked: 0, announced: 0 };
     const budgets = await prisma.organizationBudget.findMany({
@@ -87,7 +94,11 @@ export async function sweepBudgets(now: Date = new Date()): Promise<{ checked: n
     if (budgets.length === 0) return { checked: 0, announced: 0 };
 
     const month = core.billingMonthOf(now);
-    const view = await readStatement({ kind: "orgs", orgIds: budgets.map((budget) => budget.orgId) }, month, now);
+    const view = await readStatement(
+        { kind: "orgs", orgIds: budgets.map((budget) => budget.orgId) },
+        month,
+        now
+    );
     const spentBy = new Map(
         view.statement.owners
             .filter((entry) => entry.owner.kind === "org")
@@ -121,7 +132,10 @@ export async function sweepBudgets(now: Date = new Date()): Promise<{ checked: n
         });
         if (claimed.count === 0) continue;
 
-        const format = core.createDisplayFormat({ ...core.DISPLAY_DEFAULTS, currency: rates.currency });
+        const format = core.createDisplayFormat({
+            ...core.DISPLAY_DEFAULTS,
+            currency: rates.currency
+        });
         const title =
             due >= 100
                 ? `${budget.org.name} has gone past its budget for ${view.monthLabel}`

@@ -49,8 +49,11 @@ function yesNo(value: boolean): string {
 }
 
 function authentication(readings: EvidenceReadings): SectionDraft {
-    const { policy, mailReady, accounts, withSecondFactor, withPasskey, minPasswordLength } = readings.authentication;
-    const accepted = policy.acceptedFactors.map((factor) => core.SECOND_FACTOR_ENROLLMENT_INFO[factor].label);
+    const { policy, mailReady, accounts, withSecondFactor, withPasskey, minPasswordLength } =
+        readings.authentication;
+    const accepted = policy.acceptedFactors.map(
+        (factor) => core.SECOND_FACTOR_ENROLLMENT_INFO[factor].label
+    );
     return {
         id: "authentication",
         title: "Sign-in and second factor",
@@ -102,7 +105,9 @@ function authentication(readings: EvidenceReadings): SectionDraft {
         ],
         notes:
             policy.acceptedFactors.includes("email") && !mailReady
-                ? ["Email codes are accepted, but no email channel is set, so only the authenticator can be armed."]
+                ? [
+                      "Email codes are accepted, but no email channel is set, so only the authenticator can be armed."
+                  ]
                 : []
     };
 }
@@ -171,7 +176,12 @@ function administrators(readings: EvidenceReadings): SectionDraft {
         title: "Administrators",
         where: [{ label: "Management > Users", href: "/admin/users" }],
         facts: [
-            { id: "admins.count", label: "Administrators", value: admins.length, text: count(admins.length, "account") },
+            {
+                id: "admins.count",
+                label: "Administrators",
+                value: admins.length,
+                text: count(admins.length, "account")
+            },
             {
                 id: "admins.without-second-factor",
                 label: "Administrators without a second factor",
@@ -234,7 +244,10 @@ function audit(readings: EvidenceReadings): SectionDraft {
                 id: "audit.sealed",
                 label: "Entries sealed into the chain",
                 value: a.sealed,
-                text: a.pending > 0 ? `${a.sealed}, with ${a.pending} waiting to be sealed` : String(a.sealed)
+                text:
+                    a.pending > 0
+                        ? `${a.sealed}, with ${a.pending} waiting to be sealed`
+                        : String(a.sealed)
             },
             {
                 id: "audit.last-check",
@@ -274,18 +287,26 @@ function scheduleText(item: BackupReading): string {
     if (item.status === "paused") return "Paused";
     if (item.status === "missing") return "Source gone";
     if (!isScheduled(item)) return "On demand only";
-    return BACKUP_EVERY_OPTIONS.find((option) => option.value === item.every)?.label ?? String(item.every);
+    return (
+        BACKUP_EVERY_OPTIONS.find((option) => option.value === item.every)?.label ??
+        String(item.every)
+    );
 }
 
 /** Whether the newest copy of an item is encrypted everywhere it is stored. */
 function encryptionOf(item: BackupReading): { value: string; text: string; attention: boolean } {
-    if (item.sealed + item.clear === 0) return { value: "none", text: "No copy yet", attention: false };
+    if (item.sealed + item.clear === 0)
+        return { value: "none", text: "No copy yet", attention: false };
     if (item.clear === 0) return { value: "all", text: "Yes", attention: false };
     if (item.sealed === 0) return { value: "no", text: "No", attention: true };
     return { value: "some", text: "Partly", attention: true };
 }
 
-const LAST_RESULT_TEXT: Readonly<Record<string, string>> = { ok: "OK", partial: "Partial", failed: "Failed" };
+const LAST_RESULT_TEXT: Readonly<Record<string, string>> = {
+    ok: "OK",
+    partial: "Partial",
+    failed: "Failed"
+};
 
 function backups(readings: EvidenceReadings): SectionDraft {
     const b = readings.backups;
@@ -294,7 +315,12 @@ function backups(readings: EvidenceReadings): SectionDraft {
         title: "Backups",
         where: [{ label: "Backups", href: "/apps/backups" }],
         facts: [
-            { id: "backups.protected", label: "Protected items", value: b.total, text: String(b.total) },
+            {
+                id: "backups.protected",
+                label: "Protected items",
+                value: b.total,
+                text: String(b.total)
+            },
             {
                 id: "backups.scheduled",
                 label: "On a schedule",
@@ -332,8 +358,18 @@ function backups(readings: EvidenceReadings): SectionDraft {
                     label: item.name,
                     href: `/apps/backups/${item.id}`,
                     facts: [
-                        { id: "kind", label: "Kind", value: item.kind, text: resourceKindLabel(item.kind) },
-                        { id: "schedule", label: "Schedule", value: item.every ?? "off", text: scheduleText(item) },
+                        {
+                            id: "kind",
+                            label: "Kind",
+                            value: item.kind,
+                            text: resourceKindLabel(item.kind)
+                        },
+                        {
+                            id: "schedule",
+                            label: "Schedule",
+                            value: item.every ?? "off",
+                            text: scheduleText(item)
+                        },
                         { id: "encrypted", label: "Encrypted", ...encryption },
                         {
                             id: "last-success",
@@ -347,7 +383,9 @@ function backups(readings: EvidenceReadings): SectionDraft {
                             id: "last-result",
                             label: "Last run",
                             value: item.lastStatus,
-                            text: item.lastStatus ? (LAST_RESULT_TEXT[item.lastStatus] ?? item.lastStatus) : "Not run yet",
+                            text: item.lastStatus
+                                ? (LAST_RESULT_TEXT[item.lastStatus] ?? item.lastStatus)
+                                : "Not run yet",
                             attention: item.lastStatus === "failed" || item.lastStatus === "partial"
                         }
                     ]
@@ -488,7 +526,9 @@ function firewall(readings: EvidenceReadings): SectionDraft {
                 id: "firewall.instance-packs",
                 label: "Rule packs on every service",
                 value: f.instancePacks,
-                text: f.instanceDefaults ? `${f.instancePacks}, the defaults` : String(f.instancePacks)
+                text: f.instanceDefaults
+                    ? `${f.instancePacks}, the defaults`
+                    : String(f.instancePacks)
             },
             {
                 id: "firewall.polaris-packs",
@@ -500,7 +540,10 @@ function firewall(readings: EvidenceReadings): SectionDraft {
                 id: "firewall.injection-off",
                 label: "SQL injection and cross-site scripting checks",
                 value: f.injectionOffScopes,
-                text: f.injectionOffScopes === 0 ? "On everywhere" : `Off in ${count(f.injectionOffScopes, "scope")}`,
+                text:
+                    f.injectionOffScopes === 0
+                        ? "On everywhere"
+                        : `Off in ${count(f.injectionOffScopes, "scope")}`,
                 attention: f.injectionOffScopes > 0
             },
             {
@@ -551,7 +594,12 @@ function rateLimits(readings: EvidenceReadings): SectionDraft {
                 value: e.rateLimited,
                 text: share(e.rateLimited, e.services, "service")
             },
-            { id: "rate.rules", label: "Rate limits in force", value: e.rateRules, text: String(e.rateRules) },
+            {
+                id: "rate.rules",
+                label: "Rate limits in force",
+                value: e.rateRules,
+                text: String(e.rateRules)
+            },
             {
                 id: "rate.concurrency",
                 label: "Services with a cap on requests at once",
@@ -565,7 +613,9 @@ function rateLimits(readings: EvidenceReadings): SectionDraft {
                 text: share(e.challenged, e.services, "service")
             }
         ],
-        notes: ["The limits Polaris puts on its own codes and link passwords are built in, not settings, and are not counted here."]
+        notes: [
+            "The limits Polaris puts on its own codes and link passwords are built in, not settings, and are not counted here."
+        ]
     };
 }
 

@@ -38,7 +38,12 @@ import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
 import { clearConnectionFailure, describeFailure, recordConnectionFailure } from "./attention";
 import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
-import { ConnectionClaimedError, ConnectionLimitError, saveConnection, signInConnection } from "./store";
+import {
+    ConnectionClaimedError,
+    ConnectionLimitError,
+    saveConnection,
+    signInConnection
+} from "./store";
 import {
     connectionAuthorizeUrl,
     connectionCallbackUrl,
@@ -108,7 +113,12 @@ interface FlowState {
     target?: string;
 }
 
-function backToConnections(origin: string, provider: string, outcome: LinkOutcome, screen?: string): URL {
+function backToConnections(
+    origin: string,
+    provider: string,
+    outcome: LinkOutcome,
+    screen?: string
+): URL {
     const url = new URL(screen ?? CONNECTIONS_SCREEN, origin);
     url.searchParams.set("provider", provider);
     url.searchParams.set("connection", outcome);
@@ -234,7 +244,12 @@ function moveOnto(request: Request, origin: string): Response | null {
  */
 function beginSteam(origin: string, mode: ConnectionMode, target?: string): Response {
     const state = randomBytes(16).toString("hex");
-    const payload: FlowState = { provider: STEAM_PROVIDER, mode, state, ...(target ? { target } : {}) };
+    const payload: FlowState = {
+        provider: STEAM_PROVIDER,
+        mode,
+        state,
+        ...(target ? { target } : {})
+    };
     const returnTo = new URL(connectionCallbackUrl(STEAM_PROVIDER, origin));
     returnTo.searchParams.set("state", state);
 
@@ -263,11 +278,20 @@ export async function startConnectionLink(request: Request, provider: string): P
     // Refused here and not only on the card that offers it: the card is a link, and
     // a link is something anybody can type. Administrators pass while the service is
     // unproven because somebody has to be the first one through it.
-    if (!findConnectionProvider(provider) || !(await connectionLinkAvailable(provider, { admin: user.isAdmin }))) {
-        return NextResponse.redirect(backToConnections(await connectionFlowOrigin(), provider, "unavailable"));
+    if (
+        !findConnectionProvider(provider) ||
+        !(await connectionLinkAvailable(provider, { admin: user.isAdmin }))
+    ) {
+        return NextResponse.redirect(
+            backToConnections(await connectionFlowOrigin(), provider, "unavailable")
+        );
     }
     const scope = url.searchParams.get("scope");
-    return begin(request, provider, scope === "storage" ? "storage" : scope === "mail" ? "mail" : "link");
+    return begin(
+        request,
+        provider,
+        scope === "storage" ? "storage" : scope === "mail" ? "mail" : "link"
+    );
 }
 
 /**
@@ -281,10 +305,17 @@ export async function startConnectionLink(request: Request, provider: string): P
 export async function startConnectionSignIn(request: Request, provider: string): Promise<Response> {
     const url = new URL(request.url);
     if (!(await connectionSignInOffered(provider))) {
-        return NextResponse.redirect(backToLogin(await connectionFlowOrigin(), provider, "unavailable"));
+        return NextResponse.redirect(
+            backToLogin(await connectionFlowOrigin(), provider, "unavailable")
+        );
     }
-    const throttle = await rateLimit(`connection-signin:${(await clientIp()) ?? "unknown"}`, SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
-    if (!throttle.ok) return NextResponse.redirect(backToLogin(await connectionFlowOrigin(), provider, "error"));
+    const throttle = await rateLimit(
+        `connection-signin:${(await clientIp()) ?? "unknown"}`,
+        SIGN_IN_LIMIT,
+        SIGN_IN_WINDOW_MS
+    );
+    if (!throttle.ok)
+        return NextResponse.redirect(backToLogin(await connectionFlowOrigin(), provider, "error"));
 
     return begin(request, provider, "signin", safeTarget(url.searchParams.get("redirect")));
 }
@@ -296,7 +327,10 @@ export async function startConnectionSignIn(request: Request, provider: string):
  * started, never by anything in the URL - which is what stops a code minted on
  * the connections screen from being redeemed as a sign-in.
  */
-export async function finishConnectionCallback(request: Request, provider: string): Promise<Response> {
+export async function finishConnectionCallback(
+    request: Request,
+    provider: string
+): Promise<Response> {
     const url = new URL(request.url);
     const origin = await connectionFlowOrigin();
     const held = readState(request);
@@ -332,9 +366,16 @@ export async function finishConnectionCallback(request: Request, provider: strin
  * is gets the same refusal as one with no cookie at all.
  */
 async function finishSteam(url: URL, origin: string, held: FlowState | null): Promise<Response> {
-    if (url.searchParams.get("openid.mode") === "cancel") return endLink(origin, STEAM_PROVIDER, "cancelled");
+    if (url.searchParams.get("openid.mode") === "cancel")
+        return endLink(origin, STEAM_PROVIDER, "cancelled");
     const state = url.searchParams.get("state");
-    if (!held || held.provider !== STEAM_PROVIDER || held.mode === "signin" || !state || held.state !== state) {
+    if (
+        !held ||
+        held.provider !== STEAM_PROVIDER ||
+        held.mode === "signin" ||
+        !state ||
+        held.state !== state
+    ) {
         return endLink(origin, STEAM_PROVIDER, "state_error");
     }
     const user = await requireUser();
@@ -358,7 +399,8 @@ async function finishSteam(url: URL, origin: string, held: FlowState | null): Pr
         });
         return endLink(origin, STEAM_PROVIDER, "linked");
     } catch (caught) {
-        if (caught instanceof ConnectionClaimedError) return endLink(origin, STEAM_PROVIDER, "taken");
+        if (caught instanceof ConnectionClaimedError)
+            return endLink(origin, STEAM_PROVIDER, "taken");
         if (caught instanceof ConnectionLimitError) return endLink(origin, STEAM_PROVIDER, "limit");
         return endLink(origin, STEAM_PROVIDER, "error");
     }
@@ -377,7 +419,12 @@ async function finishLink(
     if (!client) return endLink(origin, provider, "unavailable", screen);
 
     try {
-        const authorized = await exchangeConnectionCode(provider, client, code, connectionCallbackUrl(provider, origin));
+        const authorized = await exchangeConnectionCode(
+            provider,
+            client,
+            code,
+            connectionCallbackUrl(provider, origin)
+        );
         const saved = await saveConnection(user.id, {
             provider,
             accountId: authorized.accountId,
@@ -407,8 +454,10 @@ async function finishLink(
     } catch (caught) {
         // The two refusals somebody can actually do something about are named;
         // everything else is a provider that did not complete the authorization.
-        if (caught instanceof ConnectionClaimedError) return endLink(origin, provider, "taken", screen);
-        if (caught instanceof ConnectionLimitError) return endLink(origin, provider, "limit", screen);
+        if (caught instanceof ConnectionClaimedError)
+            return endLink(origin, provider, "taken", screen);
+        if (caught instanceof ConnectionLimitError)
+            return endLink(origin, provider, "limit", screen);
         // Those two are this person's to resolve. This one is the operator's, and
         // they are not the person standing at the redirect - so they are told.
         await recordConnectionFailure(provider, describeFailure(caught));
@@ -439,14 +488,22 @@ async function finishSignIn(
     code: string,
     target: string | undefined
 ): Promise<Response> {
-    if (!(await connectionSignInOffered(provider))) return endSignIn(origin, provider, "unavailable");
+    if (!(await connectionSignInOffered(provider)))
+        return endSignIn(origin, provider, "unavailable");
 
     const client = await connectionOAuthClient(provider);
     if (!client) return endSignIn(origin, provider, "unavailable");
 
     let accountId: string;
     try {
-        accountId = (await connectionIdentity(provider, client, code, connectionCallbackUrl(provider, origin))).accountId;
+        accountId = (
+            await connectionIdentity(
+                provider,
+                client,
+                code,
+                connectionCallbackUrl(provider, origin)
+            )
+        ).accountId;
     } catch (caught) {
         // An application that refuses a sign-in is as broken as one that refuses
         // a link, and the person it refused is signed out - so they have no way
@@ -469,7 +526,11 @@ async function finishSignIn(
     try {
         issued = await signInWithConnection(
             auth,
-            { userId: match.userId, provider, challenge: await connectionSignInChallenged(match.userId) },
+            {
+                userId: match.userId,
+                provider,
+                challenge: await connectionSignInChallenged(match.userId)
+            },
             request.headers
         );
     } catch {
@@ -478,9 +539,10 @@ async function finishSignIn(
         return endSignIn(origin, provider, "error");
     }
     const response = NextResponse.redirect(
-        new URL(issued.challenged ? CHALLENGE_SCREEN : target ?? DEFAULT_TARGET, origin)
+        new URL(issued.challenged ? CHALLENGE_SCREEN : (target ?? DEFAULT_TARGET), origin)
     );
-    for (const cookie of issued.cookies) response.cookies.set(cookie.name, cookie.value, cookie.options);
+    for (const cookie of issued.cookies)
+        response.cookies.set(cookie.name, cookie.value, cookie.options);
     response.cookies.delete(STATE_COOKIE);
     return response;
 }
@@ -493,7 +555,12 @@ async function finishSignIn(
  * connections list, which would leave them to find their way back. It is never
  * read from the request: that would make this an open redirect.
  */
-function endLink(origin: string, provider: string, outcome: LinkOutcome, screen?: string): Response {
+function endLink(
+    origin: string,
+    provider: string,
+    outcome: LinkOutcome,
+    screen?: string
+): Response {
     const response = NextResponse.redirect(backToConnections(origin, provider, outcome, screen));
     response.cookies.delete(STATE_COOKIE);
     return response;

@@ -21,7 +21,14 @@ import { Zip, ZipDeflate } from "fflate";
 import { createReadStream } from "node:fs";
 import { basename, join, sep } from "node:path";
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
-import { EMPTY_FOLDER, FOLDER_TOO_LARGE, MAX_FOLDER, MAX_ZIP, ZIP_TOO_LARGE, skipped } from "./zip-rules";
+import {
+    EMPTY_FOLDER,
+    FOLDER_TOO_LARGE,
+    MAX_FOLDER,
+    MAX_ZIP,
+    ZIP_TOO_LARGE,
+    skipped
+} from "./zip-rules";
 
 /** A refusal whose message is written for the person who picked the folder. */
 export class FolderRefusal extends Error {}
@@ -70,7 +77,8 @@ export async function listFolder(root: string): Promise<FolderEntry[]> {
                 if (info.isFile()) {
                     add(path, target, info);
                 } else if (info.isDirectory()) {
-                    if (linkedFolders.has(target) || chain.some((folder) => inside(folder, target))) continue;
+                    if (linkedFolders.has(target) || chain.some((folder) => inside(folder, target)))
+                        continue;
                     linkedFolders.add(target);
                     await walk(target, path, [...chain, target]);
                 }
@@ -78,7 +86,11 @@ export async function listFolder(root: string): Promise<FolderEntry[]> {
         }
     }
 
-    function add(path: string, file: string, info: { readonly size: number; readonly mtime: Date; }): void {
+    function add(
+        path: string,
+        file: string,
+        info: { readonly size: number; readonly mtime: Date }
+    ): void {
         total += info.size;
         if (total > MAX_FOLDER) throw new FolderRefusal(FOLDER_TOO_LARGE);
         entries.push({ path, file, size: info.size, mtime: info.mtime });

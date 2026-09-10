@@ -61,15 +61,25 @@ describe("a clustered database's compose spec", () => {
             const spec = dbComposeSpec(plan(masters), PROXY);
             expect(spec.project).toBe("polaris-db-abcd1234");
             expect(spec.services).toHaveLength(masters * 2);
-            expect(spec.services.map((service) => service.name)).toEqual(clusterNodeNames(NAME, masters * 2));
+            expect(spec.services.map((service) => service.name)).toEqual(
+                clusterNodeNames(NAME, masters * 2)
+            );
             expect(spec.volumes).toEqual(clusterNodeNames(VOLUME, masters * 2));
             spec.services.forEach((service, index) => {
                 expect(service.image).toBe("redis:8-alpine");
                 expect(service.pullPolicy).toBe("always");
                 expect(service.volumes).toEqual([
-                    { source: clusterNodeNames(VOLUME, masters * 2)[index], target: "/data", kind: "volume" }
+                    {
+                        source: clusterNodeNames(VOLUME, masters * 2)[index],
+                        target: "/data",
+                        kind: "volume"
+                    }
                 ]);
-                expect(service.command).toEqual(["redis-server", "--cluster-announce-hostname", service.name]);
+                expect(service.command).toEqual([
+                    "redis-server",
+                    "--cluster-announce-hostname",
+                    service.name
+                ]);
                 expect(service.memoryMb).toBe(512);
                 expect(service.restart).toBe("unless-stopped");
             });
@@ -89,7 +99,11 @@ describe("a clustered database's compose spec", () => {
     });
 
     it("renders one service per node, each with its container name and volume", () => {
-        const yaml = renderComposeYaml(dbComposeSpec(plan(3), PROXY), "/var/lib/polaris/volumes", "/mnt");
+        const yaml = renderComposeYaml(
+            dbComposeSpec(plan(3), PROXY),
+            "/var/lib/polaris/volumes",
+            "/mnt"
+        );
         for (const [index, name] of clusterNodeNames(NAME, 6).entries()) {
             expect(yaml).toContain(`  ${name}:\n`);
             expect(yaml).toContain(`container_name: "${name}"`);

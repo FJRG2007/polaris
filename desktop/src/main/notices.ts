@@ -34,7 +34,8 @@ export interface Notice {
 /** Show one. Answers false where the system has no notifications. */
 export function showNotice(notice: Notice): boolean {
     if (!Notification.isSupported()) return false;
-    if (notice.once && said.repeated(notice.tag, `${notice.title}\n${notice.body ?? ""}`)) return true;
+    if (notice.once && said.repeated(notice.tag, `${notice.title}\n${notice.body ?? ""}`))
+        return true;
     live.get(notice.tag)?.close();
     const shown = new Notification({
         title: notice.title,
