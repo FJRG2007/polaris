@@ -209,6 +209,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                     kind: volume.kind
                 })),
                 labels,
+                ...(plan.command && plan.command.length > 0 ? { command: [...plan.command] } : {}),
                 networks,
                 ...(plan.alias && plan.alias !== plan.ref.name ? { aliases: [plan.alias] } : {}),
                 extraHosts: [HOST_GATEWAY],

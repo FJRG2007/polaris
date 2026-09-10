@@ -134,6 +134,9 @@ export interface AppDeployPlan {
     /** The most CPU (cores) and memory (MB) the container may use. Absent is no
      *  limit. */
     readonly limits?: ResourceLimits;
+    /** Arguments that replace the image's own command, handed over as they are
+     *  rather than through a shell. Absent runs what the image says. */
+    readonly command?: readonly string[];
 }
 
 /** Resource ceilings for one container. */
