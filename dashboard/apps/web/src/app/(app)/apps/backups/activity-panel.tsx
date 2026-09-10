@@ -86,7 +86,13 @@ export function ActivityPanel() {
                                         <span className="font-medium">{job.resourceName ?? "something removed"}</span>
                                     )}
                                     <span className="ml-2 text-xs text-muted-foreground">
-                                        {job.trigger === "scheduled" ? "on a schedule" : "by hand"}
+                                        {job.trigger === "scheduled"
+                                            ? "on a schedule"
+                                            : job.trigger === "pre-restore"
+                                              ? "before a restore"
+                                              : job.trigger === "pre-upgrade"
+                                                ? "before an upgrade"
+                                                : "by hand"}
                                     </span>
                                     {job.error ? <p className="text-xs text-danger">{job.error}</p> : null}
                                 </td>

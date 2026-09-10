@@ -135,7 +135,13 @@ async function policyFor(planId: string | null): Promise<RetentionPolicy> {
  */
 export async function runBackup(
     resourceId: string,
-    options: { trigger?: "manual" | "scheduled"; actorUserId?: string } = {}
+    /** `pre-restore` and `pre-upgrade` are the safety copies taken before an
+     *  operation that replaces a database's contents, so the history says why a
+     *  copy exists that nobody asked for by hand. */
+    options: {
+        trigger?: "manual" | "scheduled" | "pre-restore" | "pre-upgrade";
+        actorUserId?: string;
+    } = {}
 ): Promise<BackupOutcome> {
     const row = await prisma.protectedResource.findUnique({
         where: { id: resourceId },

@@ -27,48 +27,78 @@ import { deployLogPath, enqueueOnTarget, executeDeployment } from "./deploy-serv
 import {
     createDatabaseCommands,
     databaseCreateSchema,
-    DB_ENGINE_INFO,
+    databaseDataPath,
     dropDatabaseCommands,
+    isStorageEngine,
+    mongoReplicaSetCommand,
+    pitrHostFolder,
+    pitrRecoveryCommand,
+    pitrServerCommand,
+    redisServerCommand,
+    DB_ENGINE_INFO,
+    MONGO_REPLICA_SET,
+    PITR_MOUNT,
     type ContainerCommand,
     type DatabaseCreate,
     type DatabaseGrant,
     type DbEngine,
-    type DbPrivilege
+    type DbPrivilege,
+    type ManagedEngine,
+    type RedisMode
 } from "@polaris/core";
 
 export type { DbEngine };
 
-interface DbCredentials {
+export interface DbCredentials {
     username: string;
     password: string;
     database: string;
 }
 
+/** What decides the command an instance runs with, beyond its credentials. */
+interface EngineRow {
+    readonly version: string;
+    readonly mode: string;
+    readonly maxMemoryMb: number | null;
+    readonly replicaSet: boolean;
+    readonly pitr: boolean;
+    readonly recoveryBase: string | null;
+    readonly recoveryTarget: Date | null;
+}
+
 interface EngineSpec {
     readonly defaultVersion: string;
-    readonly dataPath: string;
     readonly port: number;
     image(version: string): string;
     env(creds: DbCredentials): Record<string, string>;
-    /** Entrypoint arguments, for an engine that is not configured by environment. */
-    command?(creds: DbCredentials): string[];
+    /** Entrypoint arguments, for an engine that is not configured by environment
+     *  or whose settings (a Redis mode, a replica set, archiving) live there. */
+    command?(creds: DbCredentials, row: EngineRow): string[] | undefined;
 }
 
-const ENGINES: Record<DbEngine, EngineSpec> = {
+const ENGINES: Record<ManagedEngine, EngineSpec> = {
     postgres: {
         defaultVersion: "16",
-        dataPath: "/var/lib/postgresql/data",
         port: 5432,
         image: (version) => `postgres:${version}-alpine`,
         env: (creds) => ({
             POSTGRES_USER: creds.username,
             POSTGRES_PASSWORD: creds.password,
             POSTGRES_DB: creds.database
-        })
+        }),
+        // A recovered instance starts by unpacking its base backup and replaying
+        // the archive; an archiving one passes the archive settings. Neither is
+        // stored in the data folder, so what the instance does is what its row
+        // says on every start.
+        command: (_creds, row) =>
+            row.recoveryBase && row.recoveryTarget
+                ? pitrRecoveryCommand(row.recoveryBase, row.recoveryTarget)
+                : row.pitr
+                  ? pitrServerCommand()
+                  : undefined
     },
     mysql: {
         defaultVersion: "8",
-        dataPath: "/var/lib/mysql",
         port: 3306,
         image: (version) => `mysql:${version}`,
         env: (creds) => ({
@@ -80,7 +110,6 @@ const ENGINES: Record<DbEngine, EngineSpec> = {
     },
     mariadb: {
         defaultVersion: "11",
-        dataPath: "/var/lib/mysql",
         port: 3306,
         image: (version) => `mariadb:${version}`,
         env: (creds) => ({
@@ -92,18 +121,17 @@ const ENGINES: Record<DbEngine, EngineSpec> = {
     },
     mongo: {
         defaultVersion: "7",
-        dataPath: "/data/db",
         port: 27017,
         image: (version) => `mongo:${version}`,
         env: (creds) => ({
             MONGO_INITDB_ROOT_USERNAME: creds.username,
             MONGO_INITDB_ROOT_PASSWORD: creds.password,
             MONGO_INITDB_DATABASE: creds.database
-        })
+        }),
+        command: (_creds, row) => (row.replicaSet ? mongoReplicaSetCommand() : undefined)
     },
     redis: {
         defaultVersion: "7",
-        dataPath: "/data",
         port: 6379,
         image: (version) => `redis:${version}-alpine`,
         // The official image reads no password from the environment at all, so
@@ -111,15 +139,59 @@ const ENGINES: Record<DbEngine, EngineSpec> = {
         // network. `--requirepass` is how the image documents enabling auth, and
         // is what actually makes the stored password mean something.
         env: () => ({}),
-        command: (creds) => ["redis-server", "--requirepass", creds.password]
+        command: (creds, row) =>
+            redisServerCommand(creds.password, row.mode as RedisMode, row.maxMemoryMb ?? undefined)
+    },
+    seaweedfs: {
+        defaultVersion: "4.46",
+        port: 8333,
+        image: (version) => `chrislusf/seaweedfs:${version}`,
+        // The gateway's own fallback identity: until a filer configuration
+        // exists it is the only one, so the store never answers anonymously -
+        // SeaweedFS allows everything when no identity is configured at all.
+        // Provisioning then writes the same identity into the filer
+        // configuration, where the per-bucket keys join it.
+        env: (creds) => ({
+            AWS_ACCESS_KEY_ID: creds.username,
+            AWS_SECRET_ACCESS_KEY: creds.password
+        }),
+        // The image's entrypoint adds `-dir=/data` to `server`.
+        command: () => ["server", "-s3", "-s3.port=8333"]
     }
 };
+
+/** The spec for a stored engine, or a clear refusal for one this build lacks. */
+function engineSpec(engine: string): EngineSpec {
+    const spec = ENGINES[engine as ManagedEngine];
+    if (!spec) throw new Error(`Polaris cannot run a ${engine} instance`);
+    return spec;
+}
+
+/** The image a version of an engine runs - what a new instance of it would get. */
+export function engineImage(engine: string, version: string): string {
+    return engineSpec(engine).image(version);
+}
 
 /** A URL-safe generated secret for database credentials. The alphabet is
  *  base64url, so it never contains a quote or a backslash and always satisfies
  *  what the statement builder accepts. */
 function generatePassword(): string {
     return randomBytes(24).toString("base64url");
+}
+
+/** An S3 access key id: twenty upper-case letters and digits, the shape every
+ *  client and log already expects one to have. */
+export function generateAccessKey(): string {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    const bytes = randomBytes(16);
+    let key = "PLRS";
+    for (const byte of bytes) key += alphabet[byte % alphabet.length];
+    return key;
+}
+
+/** An S3 secret key: forty URL-safe characters. */
+export function generateSecretKey(): string {
+    return randomBytes(30).toString("base64url");
 }
 
 /**
@@ -148,7 +220,7 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     const target = await prisma.deployTarget.findFirst({ where: { id: input.targetId, ownerId } });
     if (!target) throw new Error("Deploy target not found");
 
-    const spec = ENGINES[parsed.engine];
+    const spec = engineSpec(parsed.engine);
     const slug = slugify(parsed.name);
     if (!slug) throw new Error("Database name must contain letters or digits");
     // The slug identifies the service in its environment. Saying so beats the
@@ -169,11 +241,16 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     if (parent?.parentId) throw new Error("That database is itself hosted on an instance");
 
     const version = parent ? parent.version : parsed.version?.trim() || spec.defaultVersion;
-    const creds: DbCredentials = {
-        username: parsed.username ?? (parent ? toIdentifier(slug) : "polaris"),
-        password: parsed.password ?? generatePassword(),
-        database: parsed.databaseName ?? toIdentifier(slug)
-    };
+    // An object store's account is an S3 key pair: the access key id is the
+    // "username" and the secret the "password", so everything that reads the
+    // stored credentials reads a store's the same way.
+    const creds: DbCredentials = isStorageEngine(parsed.engine)
+        ? { username: generateAccessKey(), password: generateSecretKey(), database: "" }
+        : {
+              username: parsed.username ?? (parent ? toIdentifier(slug) : "polaris"),
+              password: parsed.password ?? generatePassword(),
+              database: parsed.databaseName ?? toIdentifier(slug)
+          };
     const blob = encryptCredentials(creds, loadEnv().POLARIS_MASTER_KEY);
 
     return prisma.managedDatabase.create({
@@ -278,25 +355,35 @@ export interface DatabaseConnection {
 export async function databaseConnection(databaseId: string, ownerId: string): Promise<DatabaseConnection> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        include: { parent: { select: { containerName: true, exposePort: true } } }
+        include: { parent: { select: { containerName: true, exposePort: true, replicaSet: true } } }
     });
     if (!row) throw new Error("Database not found");
     const host = row.parent ? row.parent.containerName : row.containerName;
     if (!host) throw new Error("This database has not been provisioned yet");
 
     const creds = await databaseCredentials(databaseId, ownerId);
-    const engine = row.engine as DbEngine;
-    const port = ENGINES[engine].port;
+    const engine = row.engine as ManagedEngine;
+    const port = engineSpec(engine).port;
     const user = encodeURIComponent(creds.username);
     const secret = encodeURIComponent(creds.password);
+    // A dedicated MongoDB instance's account is the root account the image
+    // creates, which lives in `admin`; a database hosted on an instance has its
+    // account created inside itself. The URI used to name the database for
+    // both, which a dedicated instance's own account could not sign in with.
+    const mongoParams = [
+        `authSource=${row.parent ? creds.database : "admin"}`,
+        ...((row.parent ? row.parent.replicaSet : row.replicaSet) ? [`replicaSet=${MONGO_REPLICA_SET}`] : [])
+    ].join("&");
     const uri =
-        engine === "redis"
-            ? `redis://:${secret}@${host}:${port}`
-            : engine === "mongo"
-              ? `mongodb://${user}:${secret}@${host}:${port}/${creds.database}?authSource=${creds.database}`
-              : engine === "postgres"
-                ? `postgresql://${user}:${secret}@${host}:${port}/${creds.database}`
-                : `mysql://${user}:${secret}@${host}:${port}/${creds.database}`;
+        engine === "seaweedfs"
+            ? `http://${host}:${port}`
+            : engine === "redis"
+              ? `redis://:${secret}@${host}:${port}`
+              : engine === "mongo"
+                ? `mongodb://${user}:${secret}@${host}:${port}/${creds.database}?${mongoParams}`
+                : engine === "postgres"
+                  ? `postgresql://${user}:${secret}@${host}:${port}/${creds.database}`
+                  : `mysql://${user}:${secret}@${host}:${port}/${creds.database}`;
 
     return {
         host,
@@ -317,7 +404,7 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
  * database (a role but no database) is worth reporting rather than leaving to be
  * discovered by the first connection.
  */
-async function provisionInInstance(databaseId: string, ownerId: string): Promise<void> {
+export async function provisionInInstance(databaseId: string, ownerId: string): Promise<void> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         include: { parent: { include: { target: true } } }
@@ -392,10 +479,13 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         return deployment.id;
     }
 
-    const spec = ENGINES[db.engine as DbEngine];
+    const spec = engineSpec(db.engine);
     const creds = await databaseCredentials(databaseId, ownerId);
     const name = serviceName(db.environment.project.slug, db.slug, db.id);
-    const volumeName = `${db.engine}-data-${shortHash(db.id, 8)}`;
+    // The stored volume wins over the derived one: an upgrade moves an instance
+    // onto a new volume and keeps the old one to fall back to, and a redeploy
+    // must not quietly move it back.
+    const volumeName = db.volumeName || `${db.engine}-data-${shortHash(db.id, 8)}`;
     const project = `polaris-db-${shortHash(db.id, 8)}`;
 
     // Persist the resolved container name and volume so later reads/connections
@@ -405,14 +495,18 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         data: { containerName: name, volumeName, status: "provisioning" }
     });
 
+    // The archive folder is mounted into an archiving instance and into one
+    // recovered from it - the recovered one reads the original's archive.
+    const archiveOf = db.recoveredFromId ?? (db.pitr ? db.id : null);
     const plan: DbDeployPlan = {
         ref: { name, project },
         image: db.image,
         env: spec.env(creds),
-        command: spec.command?.(creds),
+        command: spec.command?.(creds, db),
         volumeName,
-        dataPath: spec.dataPath,
+        dataPath: databaseDataPath(db.engine, db.version),
         exposePort: db.exposePort ?? undefined,
+        ...(archiveOf ? { extraVolumes: [{ source: pitrHostFolder(archiveOf), target: PITR_MOUNT, kind: "bind" as const }] } : {}),
         // Nothing routes to a database, so in an isolated environment it leaves the
         // proxy network entirely: the services beside it reach it on their own
         // network, and the daemon attaches the dashboard there for the data browser.
@@ -445,14 +539,62 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
             plan.image ? [plan.image] : []
         );
         const final = await prisma.deployment.findUnique({ where: { id: deployment.id }, select: { status: true } });
+        const running = final?.status === "running";
         await prisma.managedDatabase.update({
             where: { id: db.id },
-            data: { status: final?.status === "running" ? "running" : "failed" }
+            data: { status: running ? "running" : "failed" }
         });
+        // What an engine needs once it answers and a compose file cannot say: the
+        // object store's identities, a replica set's initiation, the archive's
+        // first base backup. Its own failures are recorded on the instance's
+        // operations, never on the deploy - the container did come up. Not
+        // awaited: it waits for the engine to answer and may take a base backup,
+        // and the server's deploy queue is not what should wait on that.
+        if (running) {
+            void import("./database-ops/provision")
+                .then(({ afterProvision }) => afterProvision(db.id, ownerId))
+                .catch((error: unknown) => {
+                    console.error(`database: post-provision steps for ${db.slug} failed:`, error);
+                });
+        }
     });
     // Reference kept for symmetry with app deploys (log path is by deployment id).
     void deployLogPath(deployment.id);
     return deployment.id;
+}
+
+/** How long a deploy is waited on by an operation that cannot continue without
+ *  it - an upgrade, a recovery. Long enough for a first pull on a slow line. */
+const DEPLOY_WAIT_MS = 20 * 60_000;
+
+/**
+ * Deploy a database and wait for the verdict: null when it is running, or why
+ * it is not. For the operations that have to know - an upgrade cannot load data
+ * into a container that never came up, and must fall back if it did not.
+ */
+export async function deployDatabaseAndWait(
+    databaseId: string,
+    ownerId: string,
+    userId: string
+): Promise<string | null> {
+    let deploymentId: string;
+    try {
+        deploymentId = await deployDatabase(databaseId, ownerId, userId);
+    } catch (caught) {
+        return caught instanceof Error ? caught.message : "the deploy could not be started";
+    }
+    const deadline = Date.now() + DEPLOY_WAIT_MS;
+    while (Date.now() < deadline) {
+        const row = await prisma.deployment.findUnique({
+            where: { id: deploymentId },
+            select: { status: true, error: true }
+        });
+        if (row && !["queued", "deploying", "building"].includes(row.status)) {
+            return row.status === "running" ? null : (row.error ?? `the deploy ended ${row.status}`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    return "the deploy did not finish in time";
 }
 
 /**

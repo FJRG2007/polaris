@@ -76,6 +76,9 @@ describe("the work Polaris runs on a schedule", () => {
             "backups",
             "chat-scheduled",
             "connection-health",
+            // Two passes would take two base backups of the same instance, and
+            // two replication checks could each find a copy stopped and start one.
+            "database-archives",
             "game-health",
             "game-schedules",
             "home-availability",
@@ -92,6 +95,7 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would read the same DMARC report mailbox at once.
             "mail-server",
             "mail-sync",
+            "object-replication",
             // A capture stores the lines after the newest one it has; two at once
             // would both read the same newest line and store what follows twice.
             "runtime-logs",

@@ -22,8 +22,9 @@
  *    were signed.
  *
  * Deliberately narrow: POST with a JSON body, which is what both the JSON-protocol
- * services and the REST ones here use. No presigned URLs, no chunked payloads, no
- * session-token-less assumptions beyond a temporary credential carrying one.
+ * services and the REST ones here use, and query-string presigned URLs for the
+ * object stores Polaris runs. No chunked payloads, no session-token-less
+ * assumptions beyond a temporary credential carrying one.
  *
  * Pure, and server-only - it holds somebody's secret key.
  */
@@ -148,6 +149,75 @@ export function signAwsRequest(input: {
         },
         body
     };
+}
+
+/**
+ * AWS's URI encoding: every byte but the unreserved characters, upper-case hex.
+ * `encodeURIComponent` leaves `!'()*` alone, which AWS does not - a key with a
+ * parenthesis would sign one string and send another.
+ */
+function awsEncode(value: string, keepSlash = false): string {
+    return Array.from(Buffer.from(value, "utf8"))
+        .map((byte) => {
+            const char = String.fromCharCode(byte);
+            if (/[A-Za-z0-9\-._~]/.test(char) || (keepSlash && char === "/")) return char;
+            return `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+        })
+        .join("");
+}
+
+/**
+ * A presigned URL: the signature travels in the query string instead of a
+ * header, so whoever holds the URL can make that one request - a download or an
+ * upload of one object - until it expires, without the key that signed it.
+ *
+ * Only `host` is signed and the payload is `UNSIGNED-PAYLOAD`, as S3 defines for
+ * a URL handed to a browser that cannot know the body's hash in advance. The
+ * object key is encoded segment by segment, its slashes kept, because S3 signs
+ * the path exactly as it is sent.
+ */
+export function presignAwsUrl(input: {
+    readonly credentials: AwsCredentials;
+    readonly service?: string;
+    /** `http` for a store reached on a private network, `https` otherwise. */
+    readonly protocol?: "http" | "https";
+    /** Host and, when it is not the protocol's default, `:port`. */
+    readonly host: string;
+    /** The path, unencoded: `/bucket/key`. */
+    readonly path: string;
+    readonly method?: "GET" | "PUT" | "HEAD" | "DELETE";
+    /** Seconds, 1 to 604800 (seven days, SigV4's ceiling). */
+    readonly expiresIn: number;
+    readonly now?: Date;
+}): string {
+    const { credentials, service = "s3", protocol = "https", host, path, method = "GET", expiresIn, now = new Date() } = input;
+    if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 604_800) {
+        throw new Error("A presigned URL lasts between one second and seven days");
+    }
+    const { full, day } = stamps(now);
+    const scope = `${day}/${credentials.region}/${service}/aws4_request`;
+    const params: [string, string][] = [
+        ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
+        ["X-Amz-Credential", `${credentials.accessKeyId}/${scope}`],
+        ["X-Amz-Date", full],
+        ["X-Amz-Expires", String(expiresIn)],
+        ["X-Amz-SignedHeaders", "host"],
+        ...(credentials.sessionToken ? ([["X-Amz-Security-Token", credentials.sessionToken]] as [string, string][]) : [])
+    ];
+    const query = params
+        .map(([key, value]) => [awsEncode(key), awsEncode(value)] as const)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, value]) => `${key}=${value}`)
+        .join("&");
+    const canonicalPath = awsEncode(path.startsWith("/") ? path : `/${path}`, true);
+    const canonicalRequest = [method, canonicalPath, query, `host:${host}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
+    const stringToSign = ["AWS4-HMAC-SHA256", full, scope, sha256(canonicalRequest)].join("\n");
+    const dateKey = hmac(`AWS4${credentials.secretAccessKey}`, day);
+    const regionKey = hmac(dateKey, credentials.region);
+    const serviceKey = hmac(regionKey, service);
+    const signingKey = hmac(serviceKey, "aws4_request");
+    const signature = createHmac("sha256", signingKey).update(stringToSign, "utf8").digest("hex");
+    return `${protocol}://${host}${canonicalPath}?${query}&X-Amz-Signature=${signature}`;
 }
 
 /** The host an AWS service answers on in one region. Their own convention, and

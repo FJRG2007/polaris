@@ -283,9 +283,12 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                         <DialogHeader>
                             <DialogTitle>Put this copy back?</DialogTitle>
                             <DialogDescription>
-                                The copy in {restoring.where} will be written over what is there now. For a game
-                                world it lands as a new level beside the one being played, so nothing is lost until
-                                you switch to it. For anything else, the current data is replaced.
+                                The copy in {restoring.where} will be written over what is there now.{" "}
+                                {resource?.kind === "minecraft-world"
+                                    ? "It lands as a new level beside the one being played, so nothing is lost until you switch to it."
+                                    : resource?.kind === "managed-database"
+                                      ? "A copy of the database as it is now is taken first and kept in this history; if that copy fails, nothing is restored."
+                                      : "The current data is replaced."}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex justify-end gap-2">

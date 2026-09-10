@@ -9,7 +9,8 @@
  *   that describe it rather than being set on it: `POLARIS_PRIVATE_DOMAIN` (the
  *   name other containers reach it by), `PORT`, `POLARIS_PUBLIC_DOMAIN` and
  *   `POLARIS_PUBLIC_URL`.
- * - a managed database answers with how to connect to it (`databaseReferenceKeys`).
+ * - a managed database answers with how to connect to it (`databaseReferenceKeys`),
+ *   and an object store with its endpoint and S3 keys the same way.
  *
  * Only names that actually appear are read, so a service with no references
  * costs nothing, and one that names a database costs one credential decrypt.

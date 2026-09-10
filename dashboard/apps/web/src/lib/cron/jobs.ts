@@ -634,6 +634,36 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // nothing left to do.
         leaseMs: null,
         run: liftExpiredSuspensions
+    },
+    {
+        key: "database-upgrades",
+        // A minute, because a maintenance window is picked to the minute.
+        everyMs: MINUTE,
+        // Unleased: each upgrade is claimed by moving its row out of "scheduled",
+        // so a second runner finds nothing left to start.
+        leaseMs: null,
+        run: async () => (await import("@/lib/database-ops/upgrade")).sweepDueUpgrades()
+    },
+    {
+        key: "database-archives",
+        // Hourly: a base backup is taken for each archiving instance once its
+        // newest is a day old, so an instance whose day comes round mid-hour
+        // waits at most an hour, and the log keeps it recoverable meanwhile.
+        everyMs: HOUR,
+        // Leased past the gap: a base backup of a large instance takes a while,
+        // and two runners would take two.
+        leaseMs: 3 * HOUR,
+        run: async () => (await import("@/lib/database-ops/pitr")).sweepArchives()
+    },
+    {
+        key: "object-replication",
+        // Five minutes: how long a bucket replication can be down after its
+        // store's container was recreated before it is started again.
+        everyMs: 5 * MINUTE,
+        // Leased: two runners checking the same process at once could both find
+        // it stopped and start two.
+        leaseMs: 10 * MINUTE,
+        run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
     }
 ];
 

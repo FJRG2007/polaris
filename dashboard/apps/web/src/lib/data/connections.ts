@@ -424,6 +424,9 @@ export async function managedAddress(
         }
     });
     if (!row) throw new DataConnectionError("That database is not there any more.");
+    if (!core.isDbEngine(row.engine)) {
+        throw new DataConnectionError("An object store is browsed from its Buckets panel, not as a database.");
+    }
 
     const credentials = await databaseCredentials(databaseId, userId);
     const engine = row.engine as DataEngine;
@@ -431,13 +434,14 @@ export async function managedAddress(
     const container = row.parent ? row.parent.containerName : row.containerName;
     const published = (row.parent ? row.parent.exposePort : row.exposePort) ?? null;
     const local = row.target.kind === "local" || !row.target.host?.address;
+    const hosted = row.parent !== null;
 
     if (local && container) {
-        return address(engine, container, enginePort, credentials, readOnly);
+        return address(engine, container, enginePort, credentials, readOnly, hosted);
     }
     if (published) {
         const host = local ? "127.0.0.1" : (row.target.host?.address as string);
-        return address(engine, host, published, credentials, readOnly);
+        return address(engine, host, published, credentials, readOnly, hosted);
     }
     throw new DataConnectionError(
         "This database runs on another server and is not published on a port, so Polaris cannot reach it from here. Publish it on a port from the database's own screen, then open it again."
@@ -449,7 +453,8 @@ function address(
     host: string,
     port: number,
     credentials: { username: string; password: string; database: string },
-    readOnly: boolean
+    readOnly: boolean,
+    hosted: boolean
 ): DataAddress {
     return {
         engine,
@@ -458,10 +463,10 @@ function address(
         database: credentials.database,
         username: engine === "redis" ? null : credentials.username,
         password: credentials.password,
-        // Polaris creates a Mongo database's account inside that database, so
-        // that is where it signs in - `admin`, the default everywhere else,
-        // does not know it.
-        authSource: engine === "mongo" ? credentials.database : null,
+        // A Mongo database hosted on an instance has its account created inside
+        // itself, so that is where it signs in; a dedicated instance's account
+        // is the root account the image creates, which lives in `admin`.
+        authSource: engine === "mongo" ? (hosted ? credentials.database : "admin") : null,
         tls: false,
         readOnly
     };

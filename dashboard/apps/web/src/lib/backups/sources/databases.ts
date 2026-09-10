@@ -13,6 +13,7 @@
  */
 
 import { join } from "node:path";
+import { rm } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
 import { buildSelector } from "../schemas";
@@ -21,6 +22,8 @@ import { prisma, Prisma } from "@polaris/db";
 import { pipeline } from "node:stream/promises";
 import { getPorts } from "@/lib/deploy/runtime";
 import { databaseConnection } from "@/lib/database-service";
+import { restoreDumpInto } from "@/lib/database-ops/restore";
+import { instanceContext, startOperation } from "@/lib/database-ops/ops";
 import {
     SourceUnavailableError,
     shellQuote,
@@ -65,12 +68,14 @@ const DUMPERS = {
     },
     mongo: {
         extension: "archive.gz",
-        argv: (db: string, user: string, password: string) => [
+        // A dedicated instance's account is root, in `admin`; a database hosted on
+        // an instance has its account created inside itself - see `authDatabase`.
+        argv: (db: string, user: string, password: string, authDb = "admin") => [
             "mongodump",
             `--db=${db}`,
             `--username=${user}`,
             `--password=${password}`,
-            "--authenticationDatabase=admin",
+            `--authenticationDatabase=${authDb}`,
             "--archive",
             "--gzip"
         ]
@@ -201,12 +206,63 @@ export const managedDatabaseSource: BackupSource = {
             database: connection.database,
             username: connection.username,
             password: connection.password,
+            authDatabase: row.parentId ? connection.database : "admin",
             label: resource.name || row.name
         });
+    },
+
+    /**
+     * Put a copy back into the running instance.
+     *
+     * A copy of what is there NOW is taken first, through the ordinary backup
+     * engine, so it lands in the same destinations and the same history as any
+     * other - and if it cannot be taken, nothing is restored: replacing a
+     * database with no way back is not something to do on a button press.
+     * Then the dump is applied by the same path an upgrade and a copy use.
+     */
+    async restore(
+        resource: SourceResource,
+        body: ReadableStream<Uint8Array>,
+        metadata: Record<string, unknown>,
+        actorId: string
+    ): Promise<void> {
+        const id = resource.selector.split(":")[1];
+        if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
+        const { runBackup } = await import("../service");
+        const safety = await runBackup(resource.id, { trigger: "pre-restore", actorUserId: actorId });
+        if (safety.status === "failed") {
+            const why = safety.failures.map((failure) => `${failure.destination}: ${failure.reason}`).join("; ");
+            throw new SourceUnavailableError(
+                `Nothing was restored: a copy of what is there now could not be taken first${why ? ` (${why})` : ""}.`
+            );
+        }
+
+        const dir = await stageDir();
+        const staged = join(dir, "restore");
+        try {
+            await pipeline(Readable.fromWeb(body as import("node:stream/web").ReadableStream), createWriteStream(staged));
+            const context = await instanceContext(id, resource.ownerId);
+            const operation = await startOperation(id, "restore", actorId);
+            try {
+                await restoreDumpInto(context, { local: staged }, {
+                    operation,
+                    // Only MongoDB names the database inside the dump; a copy of
+                    // the same database restores into itself either way.
+                    ...(typeof metadata.database === "string" && metadata.database
+                        ? { sourceDatabase: metadata.database }
+                        : {})
+                });
+                await operation.succeed();
+            } catch (error) {
+                throw new SourceUnavailableError(await operation.fail(error));
+            }
+        } finally {
+            await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+        }
     }
 };
 
-interface DumpRequest {
+export interface DumpRequest {
     readonly ownerId: string;
     readonly targetId: string;
     readonly engine: Engine;
@@ -216,6 +272,14 @@ interface DumpRequest {
     readonly label: string;
     /** Dump inside a container that is already running. */
     readonly container: string;
+    /** MongoDB only: where the account signs in - `admin` for a dedicated
+     *  instance's root account, the database itself for a hosted one. */
+    readonly authDatabase?: string;
+}
+
+/** The engines a dump can be taken of. */
+export function isDumpableEngine(value: unknown): value is Engine {
+    return isEngine(value);
 }
 
 /**
@@ -227,7 +291,7 @@ interface DumpRequest {
  * file is removed whether the read succeeded or not - a failed backup that fills
  * the database's own disk is worse than no backup.
  */
-async function dumpInContainer(request: DumpRequest): Promise<StagedArtifact> {
+export async function dumpInContainer(request: DumpRequest): Promise<StagedArtifact> {
     const dumper = DUMPERS[request.engine];
     const at = new Date();
     const safeLabel = request.label.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 60) || "database";
@@ -243,12 +307,25 @@ async function dumpInContainer(request: DumpRequest): Promise<StagedArtifact> {
     const ports = await getPorts(target, request.ownerId);
     const container = request.container;
     try {
-        const argv = [...dumper.argv(request.database, request.username, request.password)];
+        const argv =
+            request.engine === "mongo"
+                ? [...DUMPERS.mongo.argv(request.database, request.username, request.password, request.authDatabase)]
+                : [...dumper.argv(request.database, request.username, request.password)];
+        // redis-cli exits 0 on an error reply, so the answer itself is checked:
+        // a refused SAVE must not be followed by copying a stale snapshot.
         const command =
             request.engine === "redis"
-                ? ["sh", "-c", `redis-cli --no-auth-warning SAVE && cp /data/dump.rdb ${inContainer}`]
+                ? ["sh", "-c", `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`]
                 : ["sh", "-c", `${argv.map(shellQuote).join(" ")} > ${inContainer}`];
-        const environment = request.engine === "postgres" ? { PGPASSWORD: request.password } : {};
+        // Redis is started with `--requirepass`, so an unauthenticated SAVE was
+        // refused and the copy that followed was whatever snapshot Redis had last
+        // written on its own schedule - or nothing at all.
+        const environment =
+            request.engine === "postgres"
+                ? { PGPASSWORD: request.password }
+                : request.engine === "redis"
+                  ? { REDISCLI_AUTH: request.password }
+                  : {};
         const result = await ports.runIn(
             container,
             Object.keys(environment).length > 0
