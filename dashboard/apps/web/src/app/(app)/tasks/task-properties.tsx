@@ -200,7 +200,7 @@ export function PropertyRows({
                         className="min-w-[12rem] flex-1 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong disabled:opacity-50"
                     />
                     {waitingOn > 0 && (
-                        <span className="text-[0.6875rem] text-amber-600">
+                        <span className="text-[0.6875rem] text-warning">
                             Waiting on {waitingOn} unfinished {waitingOn === 1 ? "task" : "tasks"}
                         </span>
                     )}

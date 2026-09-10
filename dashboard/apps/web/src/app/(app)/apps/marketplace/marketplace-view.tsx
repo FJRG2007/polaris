@@ -292,8 +292,8 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                                     </div>
                                     <Badge
                                         className={cn(
-                                            item.status === "failed" && "border-danger/40 text-danger",
-                                            item.status === "running" && "border-success/40 text-success"
+                                            item.status === "failed" && "border-danger-edge text-danger",
+                                            item.status === "running" && "border-success-edge text-success"
                                         )}
                                     >
                                         {STATUS_LABEL[item.status] ?? item.status}

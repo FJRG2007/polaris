@@ -95,7 +95,7 @@ function Step({
                 <span
                     aria-hidden
                     className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border ${
-                        done ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : "border-white/15"
+                        done ? "border-success-edge bg-success-soft text-success-ink" : "border-white/15"
                     }`}
                 >
                     {done ? <Check className="size-3.5 shrink-0" /> : null}

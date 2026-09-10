@@ -98,7 +98,7 @@ export function TimesheetView({
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -112,7 +112,7 @@ export function TimesheetView({
                 </Card>
                 <Card>
                     <CardBody className="p-4">
-                        <p className="text-2xl font-semibold leading-none text-emerald-500">
+                        <p className="text-2xl font-semibold leading-none text-success">
                             {core.formatTrackedSeconds(sheet.billable)}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">Billable</p>
@@ -149,7 +149,7 @@ export function TimesheetView({
                                         </span>
                                         <span className="truncate">{entry.taskName}</span>
                                         {entry.billable && (
-                                            <span className="shrink-0 text-[0.625rem] text-emerald-500">billable</span>
+                                            <span className="shrink-0 text-[0.625rem] text-success">billable</span>
                                         )}
                                     </Link>
                                     <p className="truncate text-[0.6875rem] text-muted-foreground">

@@ -371,7 +371,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 {error && (
                     <p
                         role="alert"
-                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
                     >
                         {error}
                     </p>
@@ -817,7 +817,7 @@ function RowsPanel({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -1199,7 +1199,7 @@ function QueryPanel({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}

@@ -112,7 +112,7 @@ export function ProjectDetail({
         <ProjectAccessProvider capabilities={capabilities}>
             <div className="flex w-full flex-col gap-4">
                 {!localReady && canManage && (
-                    <div className="rounded-lg border border-warning-edge bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-muted-foreground">
                         The local host is not ready to build and deploy. This needs the full edition
                         with a running{" "}
                         <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">

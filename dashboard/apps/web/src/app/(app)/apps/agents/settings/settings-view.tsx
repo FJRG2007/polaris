@@ -71,7 +71,7 @@ export function SettingsView({
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {rows.map((row) => (
                 <AgentDefaultsCard

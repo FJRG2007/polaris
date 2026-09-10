@@ -249,7 +249,7 @@ export function ModelKeysView({
                 just happened, and a muted line under the heading reads as part of
                 the page's own copy. */}
             {notice ? (
-                <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-200/90">
+                <p className="rounded-lg border border-warning-edge bg-warning-soft px-3 py-2 text-sm text-warning-ink">
                     {notice}
                 </p>
             ) : null}

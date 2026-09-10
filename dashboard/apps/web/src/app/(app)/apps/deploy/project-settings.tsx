@@ -110,7 +110,7 @@ export function SettingsCard({
         <section
             className={cn(
                 "flex flex-col gap-3 rounded-lg border p-4",
-                tone === "danger" ? "border-danger-edge bg-danger/5" : "border-border/60"
+                tone === "danger" ? "border-danger-edge bg-danger-soft" : "border-border/60"
             )}
         >
             <div>

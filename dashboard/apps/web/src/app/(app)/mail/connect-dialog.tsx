@@ -314,7 +314,7 @@ export function ConnectMailboxDialog({
                                 without it that service's form reads as
                                 everything being fine. */}
                             {discovery.note ? (
-                                <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-[12px]">
+                                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[12px]">
                                     {discovery.note}
                                 </p>
                             ) : null}

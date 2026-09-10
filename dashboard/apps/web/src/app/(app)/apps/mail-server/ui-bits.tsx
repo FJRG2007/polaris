@@ -139,7 +139,7 @@ export function StatusBadge({ status }: { status: string }) {
 /** A sentence a panel could not load past. */
 export function PanelError({ message, onRetry }: { message: string; onRetry?: () => void }) {
     return (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[0.8125rem] text-danger">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-[0.8125rem] text-danger-ink">
             <span>{message}</span>
             {onRetry ? (
                 <button type="button" className="shrink-0 text-xs font-medium underline" onClick={onRetry}>

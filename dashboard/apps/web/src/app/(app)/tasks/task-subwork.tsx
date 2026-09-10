@@ -712,9 +712,9 @@ export function DependencySection({
     const row = (edge: DependencyView) => (
         <li key={edge.id} className="flex items-center gap-2 px-3 py-2">
             {edge.finished ? (
-                <Check className="size-3.5 shrink-0 text-emerald-500" />
+                <Check className="size-3.5 shrink-0 text-success" />
             ) : (
-                <Ban className="size-3.5 shrink-0 text-amber-500" />
+                <Ban className="size-3.5 shrink-0 text-warning" />
             )}
             <button
                 type="button"

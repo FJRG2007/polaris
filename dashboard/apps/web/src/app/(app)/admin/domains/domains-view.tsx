@@ -572,7 +572,7 @@ function Suggestion({
  */
 function ErrorNote({ message }: { message: string }) {
     return (
-        <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+        <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {message}
         </p>
     );
@@ -900,7 +900,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 </div>
 
                 {status.natted && status.mode === "auto" && (
-                    <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                         This looks like a server behind NAT: free subdomains point at the LAN IP ({status.subdomainIp}) and
                         only work on your network. For public access, choose a wildcard domain or a tunnel below.
@@ -1037,7 +1037,7 @@ function GuidanceNote({ children, ok }: { children: ReactNode; ok?: boolean }) {
     return (
         <div
             className={`rounded-md border px-3 py-2 text-xs text-muted-foreground ${
-                ok ? "border-success/30 bg-success/5" : "border-border/60 bg-surface/40"
+                ok ? "border-success-edge bg-success-soft" : "border-border/60 bg-surface/40"
             }`}
         >
             {children}

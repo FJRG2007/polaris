@@ -314,7 +314,7 @@ function VersionsSection({
                 </p>
             ) : null}
             {upgrade.state === "failed" && upgrade.error ? (
-                <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                <p className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
                     The last upgrade did not go through: {upgrade.error}
                 </p>
             ) : null}
@@ -984,7 +984,7 @@ function BucketCard({
                     </div>
                 ))}
                 {secret ? (
-                    <div className="flex flex-col gap-1 rounded-md border border-warning/40 bg-warning/10 p-2">
+                    <div className="flex flex-col gap-1 rounded-md border border-warning-edge bg-warning-soft p-2">
                         <p className="text-xs text-warning">Copy the secret now. It is not shown again.</p>
                         <CopyRow value={secret.accessKey} />
                         <CopyRow value={secret.secretKey} />

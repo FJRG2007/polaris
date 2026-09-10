@@ -206,7 +206,7 @@ export function ProjectGlanceBar({
                     <Link
                         href={serviceHref(firstAttention.applicationId)}
                         title={attention.map((entry) => `${entry.service}: ${entry.reasons.join(", ")}`).join("\n")}
-                        className={cn(statusChipClass("danger"), "hover:bg-danger/20")}
+                        className={cn(statusChipClass("danger"), "hover:bg-danger-soft")}
                     >
                         <CircleAlert className="size-3" />
                         {attention.length === 1

@@ -76,7 +76,7 @@ export function HandStrip({ call }: { call: CallState }) {
     return (
         <>
             {announcement}
-            <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                 <Hand className="size-4 shrink-0 text-warning" />
                 <span aria-hidden="true" className="shrink-0 font-medium">
                     {handsSummary(hands)}

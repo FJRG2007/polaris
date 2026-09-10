@@ -53,7 +53,7 @@ export function UnasMetrics({
             {/* These readings are the last ones that arrived, so say so rather
                 than letting a device that went offline keep looking healthy. */}
             {stale ? (
-                <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
                         Showing the last reading{updatedAt !== null ? ` from ${format.time(updatedAt)}` : ""}. {stale}
@@ -62,7 +62,7 @@ export function UnasMetrics({
             ) : null}
 
             {atRisk ? (
-                <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
                         Storage is at risk. Check the pool below - a degraded RAID keeps serving data but has no

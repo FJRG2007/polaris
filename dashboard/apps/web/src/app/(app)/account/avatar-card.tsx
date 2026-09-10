@@ -444,7 +444,7 @@ export function PictureEditor({
                                 onClick={() => run(action)}
                                 className={cn(
                                     "flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted",
-                                    action.danger && "text-danger hover:bg-danger/10"
+                                    action.danger && "text-danger hover:bg-danger-soft"
                                 )}
                             >
                                 <action.Icon className="size-4 shrink-0" />

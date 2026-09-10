@@ -111,7 +111,7 @@ export function AddressRulesPage({
 
                 {overlap ? <p className="text-xs text-danger">&quot;{overlap}&quot; is in both lists.</p> : null}
                 {wouldLockOut ? (
-                    <p className="flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+                    <p className="flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
                         <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
                         This allowlist does not include the address you are reading this over ({callerIp}). Saving it
                         will shut you out of everything in this scope.

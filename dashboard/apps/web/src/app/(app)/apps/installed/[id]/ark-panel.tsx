@@ -600,7 +600,7 @@ function ConnectCard({
                 {access !== null &&
                     access.closed &&
                     access.players.every((player) => player.appliedAt === null) && (
-                        <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                        <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                             <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
                             <div className="flex flex-col items-start gap-1 text-xs">
                                 <p className="font-medium text-foreground">Nobody can join yet</p>
@@ -622,7 +622,7 @@ function ConnectCard({
                     )}
 
                 {reach && !reach.ok && reach.actionable && (
-                    <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                    <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div className="flex flex-col gap-1 text-xs">
                             <p className="font-medium text-foreground">{reach.title}</p>
@@ -737,10 +737,10 @@ function StatusBadge({ status, running }: { status: ArkStatus | null; running: b
     if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
     if (label === "Starting")
-        return <Badge className="border-warning/40 text-warning">Starting</Badge>;
+        return <Badge className="border-warning-edge text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;
     return (
-        <Badge className="border-success/40 text-success">
+        <Badge className="border-success-edge text-success">
             {status?.players.length} / {status?.max ?? "?"} online
         </Badge>
     );
@@ -1089,7 +1089,7 @@ function PlayersTab({
                 nothing in the game says why. It is also the state a server lands
                 in when the last person on the list is removed. */}
             {access !== null && access.closed && listed === 0 && (
-                <Card className="border-warning/40 bg-warning/5">
+                <Card className="border-warning-edge bg-warning-soft">
                     <CardBody className="flex flex-col gap-1">
                         <p className="flex items-center gap-2 text-sm font-medium">
                             <Users className="size-4 text-warning" />

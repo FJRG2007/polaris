@@ -142,7 +142,7 @@ function Frame({ frame }: { frame: StackFrame }) {
                                 // The line that threw, marked rather than only
                                 // centred: a snippet scrolled sideways loses the
                                 // middle, and this is the row it was opened for.
-                                row.threw && "bg-danger/15 font-medium text-foreground"
+                                row.threw && "bg-danger-soft font-medium text-foreground"
                             )}
                         >
                             <span className="w-10 shrink-0 select-none text-right text-muted-foreground">

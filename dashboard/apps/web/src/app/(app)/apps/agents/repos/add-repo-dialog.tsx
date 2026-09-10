@@ -180,7 +180,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                     </div>
 
                     {excluded ? (
-                        <p className="text-xs text-amber-400">
+                        <p className="text-xs text-warning">
                             {repo?.private ? "Private" : "Public"} repositories are turned off for
                             this account. Turn them back on under Agents settings, or the agent will
                             never run here.
@@ -213,7 +213,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                     }
                                 />
                                 {providers.length === 0 ? (
-                                    <p className="text-xs text-amber-400">
+                                    <p className="text-xs text-warning">
                                         Connect a model provider under Integrations first.
                                     </p>
                                 ) : null}
@@ -249,7 +249,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                         </>
                     ) : null}
 
-                    {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 
                 <DialogFooter>

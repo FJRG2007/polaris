@@ -123,7 +123,7 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
                     />
                 ) : null}
 
-                {error ? <p className="text-xs text-red-400">{error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );

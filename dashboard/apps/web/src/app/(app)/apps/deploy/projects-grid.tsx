@@ -142,7 +142,7 @@ export function ProjectsGrid({
             )}
 
             {!localReady && canManage && (
-                <div className="rounded-lg border border-warning-edge bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-muted-foreground">
                     The local host is not ready to build and deploy. This needs the full edition with a running{" "}
                     <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>. Remote
                     servers added in the Servers view work regardless.

@@ -620,7 +620,7 @@ function ConnectCard({
                     reports - so this is above everything else on the card, because
                     nothing else on it is true while this is. */}
                 {status?.crashLoop && (
-                    <div className="flex w-full items-start gap-2 rounded-md border border-danger/40 bg-danger/5 px-3 py-2">
+                    <div className="flex w-full items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
                         <div className="flex flex-col items-start gap-1 text-xs">
                             <p className="font-medium text-foreground">This server keeps failing to start</p>
@@ -663,7 +663,7 @@ function ConnectCard({
                     state a brand-new server is in, and the operator standing here
                     with the address copied is exactly who has to be told. */}
                 {access !== null && access.rules.length === 0 && (
-                    <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                    <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                         <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div className="flex flex-col items-start gap-1 text-xs">
                             <p className="font-medium text-foreground">Nobody can join yet</p>
@@ -687,7 +687,7 @@ function ConnectCard({
                     port rides on nothing the domain setup opened, so this is where
                     an operator finds out - not from a friend timing out. */}
                 {reach && !reach.ok && reach.actionable && (
-                    <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                    <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div className="flex flex-col gap-1 text-xs">
                             <p className="font-medium text-foreground">{reach.title}</p>
@@ -761,10 +761,10 @@ function StatusBadge({ status, running }: { status: MinecraftStatus | null; runn
     if (label === null) return <Skeleton className="h-6 w-20" />;
     if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting") return <Badge className="border-warning/40 text-warning">Starting</Badge>;
+    if (label === "Starting") return <Badge className="border-warning-edge text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;
     return (
-        <Badge className="border-success/40 text-success">
+        <Badge className="border-success-edge text-success">
             {status?.players.online} / {status?.players.max} online
         </Badge>
     );

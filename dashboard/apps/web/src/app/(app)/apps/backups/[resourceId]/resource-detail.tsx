@@ -150,7 +150,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {resource?.lastStatus === "partial" ? (
-                <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
                     The last copy landed in some destinations but not all. What did land is still restorable.
                 </p>
             ) : null}

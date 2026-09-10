@@ -24,10 +24,10 @@ const PLATFORM: Record<string, { icon: LucideIcon; label: string }> = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-    connected: "border-success/40 text-success",
-    connecting: "border-warning/40 text-warning",
-    error: "border-danger/40 text-danger",
-    disconnected: "border-danger/40 text-danger"
+    connected: "border-success-edge text-success",
+    connecting: "border-warning-edge text-warning",
+    error: "border-danger-edge text-danger",
+    disconnected: "border-danger-edge text-danger"
 };
 
 function platformLabel(channel: ChannelView): string {

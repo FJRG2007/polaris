@@ -177,7 +177,7 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                                         aria-label={`Delete ${group.name}`}
                                         title="Delete"
                                         onClick={() => setConfirmDelete(group)}
-                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>

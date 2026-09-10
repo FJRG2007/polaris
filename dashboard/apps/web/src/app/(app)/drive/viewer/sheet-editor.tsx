@@ -210,7 +210,7 @@ export function SheetEditor({
                 </div>
             </div>
             {exportExtension && editable ? (
-                <p className="border-b border-border bg-warning/5 px-3 py-1.5 text-xs text-muted-foreground">
+                <p className="border-b border-border bg-warning-soft px-3 py-1.5 text-xs text-muted-foreground">
                     {sourceExtension.toUpperCase()} files are saved as a converted .xlsx copy; the
                     original is left untouched.
                 </p>

@@ -239,7 +239,7 @@ export function AccessDialog({
                 {error && (
                     <p
                         role="alert"
-                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
                     >
                         {error}
                     </p>
@@ -327,7 +327,7 @@ export function AccessDialog({
                                                     );
                                                     await reload();
                                                 }}
-                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                                             >
                                                 <Trash2 className="size-4 shrink-0" />
                                             </button>
@@ -464,7 +464,7 @@ export function AccessDialog({
                                                         );
                                                         await reloadTeams();
                                                     }}
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
                                                 </button>

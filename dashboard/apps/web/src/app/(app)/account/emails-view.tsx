@@ -114,9 +114,9 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                             {entry.primary ? <Badge variant="primary">Primary</Badge> : null}
                             {entry.recovery ? <Badge>Recovery</Badge> : null}
                             {entry.verified ? (
-                                <Badge className="border-success/40 text-success">Verified</Badge>
+                                <Badge className="border-success-edge text-success">Verified</Badge>
                             ) : (
-                                <Badge className="border-warning/40 text-warning">Unverified</Badge>
+                                <Badge className="border-warning-edge text-warning">Unverified</Badge>
                             )}
                             {entry.verified ? null : (
                                 <Button

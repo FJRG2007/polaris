@@ -147,7 +147,7 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                         });
                                         if (ok) await act(() => deletePrivacyListAction(list.id));
                                     }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
                                 >
                                     <Trash2 className="size-4 shrink-0" />
                                 </button>

@@ -360,7 +360,7 @@ export function OverviewGrid({
             </div>
 
             {failure ? (
-                <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {failure}
                 </p>
             ) : null}

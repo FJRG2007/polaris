@@ -529,7 +529,7 @@ function SettingsTab({
 
             {canManage && (
                 <>
-                    <div className="flex flex-col gap-3 rounded-lg border border-danger-edge bg-danger/5 p-3">
+                    <div className="flex flex-col gap-3 rounded-lg border border-danger-edge bg-danger-soft p-3">
                         <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
                             <TriangleAlert className="size-4" /> Danger
                         </p>

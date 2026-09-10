@@ -61,7 +61,7 @@ function ProjectCard({ project, href }: { project: GridProject; href: string }) 
                         <span
                             className={cn(
                                 "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
-                                failing ? "bg-danger/10 text-danger" : "bg-muted text-muted-foreground"
+                                failing ? "bg-danger-soft text-danger-ink" : "bg-muted text-muted-foreground"
                             )}
                         >
                             {failing ? <Bug className="size-4" /> : <CircleCheck className="size-4" />}

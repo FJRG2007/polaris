@@ -68,7 +68,7 @@ export function AccountsView({
                 </p>
             ) : null}
             {outcome === "not_public" ? (
-                <p className="rounded-md border border-danger/40 bg-card px-3 py-2 text-[13px] text-danger">
+                <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
                     {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} had nowhere to send
                     you back to. Polaris is only reachable on this network, and an address like that
                     is one they refuse.{" "}
@@ -81,7 +81,7 @@ export function AccountsView({
                     )}
                 </p>
             ) : outcome && outcome !== "linked" ? (
-                <p className="rounded-md border border-danger/40 bg-card px-3 py-2 text-[13px] text-danger">
+                <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
                     That authorization did not finish. Nothing was changed.
                 </p>
             ) : null}

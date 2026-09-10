@@ -163,7 +163,7 @@ export function NoteShareDialog({
                             </div>
 
                             {!share.usable.ok && (
-                                <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
+                                <p className="rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
                                     Nobody can open this link right now: it is {share.usable.reason}.
                                 </p>
                             )}

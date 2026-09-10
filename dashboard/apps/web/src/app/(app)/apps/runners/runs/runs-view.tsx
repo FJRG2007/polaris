@@ -244,7 +244,7 @@ function Reason({
         <p
             className={cn(
                 "flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
-                tone === "warning" ? "border-warning/40 bg-warning/5" : "border-danger/40 bg-danger/5"
+                tone === "warning" ? "border-warning-edge bg-warning-soft" : "border-danger-edge bg-danger-soft"
             )}
         >
             {icon}

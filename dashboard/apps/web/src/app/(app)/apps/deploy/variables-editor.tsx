@@ -243,7 +243,7 @@ export function VariablesEditor({
             {notice === "pending" && (
                 <div
                     role="status"
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning-edge bg-warning/5 px-3 py-2"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning-edge bg-warning-soft px-3 py-2"
                 >
                     <p className="min-w-0 flex-1 basis-56 text-xs text-muted-foreground">
                         Saved. What is running keeps the old values until {redeployTarget} redeploys.

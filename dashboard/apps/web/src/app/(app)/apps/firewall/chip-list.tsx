@@ -88,7 +88,7 @@ export function ChipList({
                         <span
                             key={entry}
                             className={`inline-flex max-w-full items-center gap-1 rounded-md px-2 py-1 text-xs ${
-                                accent === "deny" ? "bg-danger/10 text-danger" : "bg-muted text-foreground"
+                                accent === "deny" ? "bg-danger-soft text-danger-ink" : "bg-muted text-foreground"
                             }`}
                         >
                             <span className="truncate [overflow-wrap:anywhere]" title={entry}>

@@ -109,7 +109,7 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                 </div>
                 {error ? <PanelError message={error} /> : null}
                 {detail.status === "failed" && detail.error ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <span className="text-[0.8125rem] text-danger">{detail.error}</span>
                         <Button size="sm" onClick={() => void resume(null)} disabled={busy}>
                             Run setup again from here

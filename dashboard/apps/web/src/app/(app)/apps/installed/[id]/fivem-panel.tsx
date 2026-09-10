@@ -473,9 +473,9 @@ function StatusBadge({ status, running }: { status: FivemStatus | null; running:
     if (label === null) return <Skeleton className="h-6 w-20" />;
     if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting") return <Badge className="border-warning/40 text-warning">Starting</Badge>;
+    if (label === "Starting") return <Badge className="border-warning-edge text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;
-    return <Badge className="border-success/40 text-success">Online</Badge>;
+    return <Badge className="border-success-edge text-success">Online</Badge>;
 }
 
 /** The address with the port on it, which is what a FiveM player actually types -

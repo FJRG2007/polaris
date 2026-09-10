@@ -79,7 +79,7 @@ export function GamePortsLive({
                         </div>
                         {server.confirmed ? (
                             <Badge
-                                className="border-success/40 text-success"
+                                className="border-success-edge text-success"
                                 title={
                                     server.confirmedAt
                                         ? `Last answered from outside on ${new Date(server.confirmedAt).toLocaleString()}`
@@ -89,7 +89,7 @@ export function GamePortsLive({
                                 Reached from outside
                             </Badge>
                         ) : server.running ? (
-                            <Badge className="border-warning/40 text-warning">Not confirmed</Badge>
+                            <Badge className="border-warning-edge text-warning">Not confirmed</Badge>
                         ) : (
                             // Neither reached nor unreachable: nothing was measured, because
                             // there was nothing behind the port to measure. Saying "not
@@ -106,7 +106,7 @@ export function GamePortsLive({
                 <div
                     className={
                         advice.actionable
-                            ? "flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs"
+                            ? "flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs"
                             : "flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs"
                     }
                 >

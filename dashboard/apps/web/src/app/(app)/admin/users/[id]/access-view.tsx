@@ -281,9 +281,9 @@ function ResourcesCard({
                                         <span className="truncate text-sm" title={grant.resourceLabel}>{grant.resourceLabel}</span>
                                         <Badge>{grant.kindLabel}</Badge>
                                         {grant.effect === "deny" && (
-                                            <Badge className="border-danger/40 text-danger">deny</Badge>
+                                            <Badge className="border-danger-edge text-danger">deny</Badge>
                                         )}
-                                        {grant.expired && <Badge className="border-danger/40 text-danger">ended</Badge>}
+                                        {grant.expired && <Badge className="border-danger-edge text-danger">ended</Badge>}
                                         {grant.canShare && <Badge>can invite others</Badge>}
                                     </div>
                                     <span className="text-xs text-muted-foreground">

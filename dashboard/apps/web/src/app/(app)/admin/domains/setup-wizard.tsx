@@ -218,7 +218,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                 <CardBody className="flex flex-col gap-4">
                     {loadError ? (
                         <>
-                            <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+                            <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
                                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {loadError}
                             </p>
                             <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
@@ -413,7 +413,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                 )}
 
                 {error && (
-                    <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+                    <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {error}
                     </p>
                 )}
@@ -961,7 +961,7 @@ function DnsStep({
         return (
             <div className="flex flex-col gap-3">
                 <StepTitle title="Done" hint={duckdns ? "DuckDNS answers for every name under your subdomain." : "This setup needs no DNS records."} />
-                <p className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-xs text-muted-foreground">
+                <p className="rounded-md border border-success-edge bg-success-soft px-3 py-2 text-xs text-muted-foreground">
                     {duckdns
                         ? `Nothing to create: ${state.zones.baseDomain} already resolves every subdomain, and Polaris keeps it pointed at this server as your IP changes.`
                         : "Services get their hostname the moment they are deployed."}
@@ -1084,7 +1084,7 @@ function DnsStep({
             {message && <p className="text-xs text-muted-foreground">{message}</p>}
 
             {conflicts.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+                <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                     <span className="flex items-start gap-2 text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                         These records already exist and point somewhere else. Polaris left them alone - replacing one
@@ -1225,7 +1225,7 @@ function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProvider
     return (
         <div
             className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs ${
-                automated ? "border-success/30 bg-success/5" : "border-border/60 bg-surface/40"
+                automated ? "border-success-edge bg-success-soft" : "border-border/60 bg-surface/40"
             }`}
         >
             <span className="flex items-center gap-2 text-muted-foreground">
@@ -1277,7 +1277,7 @@ function ZoneResults({
                 <p
                     key={zone.wildcard}
                     className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
-                        zone.ok ? "border-success/30 bg-success/5 text-muted-foreground" : "border-warning/30 bg-warning/5 text-muted-foreground"
+                        zone.ok ? "border-success-edge bg-success-soft text-muted-foreground" : "border-warning-edge bg-warning-soft text-muted-foreground"
                     }`}
                 >
                     {zone.ok ? (
@@ -1311,7 +1311,7 @@ function RouterAdviceNote({
     return (
         <div
             className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
-                danger ? "border-danger/30 bg-danger/5" : "border-warning/30 bg-warning/5"
+                danger ? "border-danger-edge bg-danger-soft" : "border-warning-edge bg-warning-soft"
             }`}
         >
             <TriangleAlert className={`mt-0.5 size-3.5 shrink-0 ${danger ? "text-danger" : "text-warning"}`} />

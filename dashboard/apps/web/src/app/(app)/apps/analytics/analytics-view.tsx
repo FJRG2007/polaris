@@ -152,7 +152,7 @@ export function AnalyticsView({
                         </span>
                     ) : null}
                     {data && data.view.online > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success-ink">
                             <span className="size-1.5 animate-pulse rounded-full bg-success" />
                             {grouped(data.view.online)} online
                         </span>
@@ -163,7 +163,7 @@ export function AnalyticsView({
             </div>
 
             {failure ? (
-                <p className="rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger">{failure}</p>
+                <p className="rounded-md border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">{failure}</p>
             ) : null}
 
             {nothingToMeasure ? (

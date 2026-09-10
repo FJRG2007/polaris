@@ -75,7 +75,7 @@ export function NoAudioNotice({
     return (
         <p
             role="status"
-            className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning"
+            className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-ink"
         >
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span>

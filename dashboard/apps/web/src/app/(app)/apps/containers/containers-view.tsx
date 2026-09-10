@@ -282,7 +282,7 @@ export function ContainersView({
 
             <section className="min-w-0">
                 {localDiagnostic ? (
-                    <div className="mb-4 rounded-md border border-warning/40 bg-warning/10 p-4 text-sm">
+                    <div className="mb-4 rounded-md border border-warning-edge bg-warning-soft p-4 text-sm">
                         <p className="font-medium">The local Docker host is not available yet</p>
                         <p className="mt-1 text-muted-foreground">{localDiagnostic.reason}</p>
                         <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -312,12 +312,12 @@ export function ContainersView({
                 ) : (
                     <>
                         {(actionError ?? error) ? (
-                            <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                            <div className="mb-4 rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
                                 {actionError ?? error}
                             </div>
                         ) : null}
                         {!actionError && !error && stale ? (
-                            <div className="mb-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+                            <div className="mb-4 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
                                 Showing the last reading. {stale}
                             </div>
                         ) : null}

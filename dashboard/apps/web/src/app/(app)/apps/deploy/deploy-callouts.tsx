@@ -100,7 +100,7 @@ function Callout({
             role={tone === "danger" ? "alert" : "status"}
             className={cn(
                 "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border p-3",
-                tone === "danger" ? "border-danger-edge bg-danger/5" : "border-border bg-card"
+                tone === "danger" ? "border-danger-edge bg-danger-soft" : "border-border bg-card"
             )}
         >
             <span className={cn("flex size-4 self-start pt-0.5", tone === "danger" ? "text-danger-ink" : "text-primary")}>

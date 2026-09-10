@@ -269,7 +269,7 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
     }
 
     return (
-        <Card className="border-warning/40">
+        <Card className="border-warning-edge">
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-start gap-3">
                     <ShieldQuestion className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />

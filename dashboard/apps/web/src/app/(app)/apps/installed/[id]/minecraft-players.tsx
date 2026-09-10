@@ -312,7 +312,7 @@ export function MinecraftPlayers({
                 nothing anywhere saying why. It is also the state a server lands in
                 when its first player was removed, so it is worth naming loudly. */}
             {access !== null && registered === 0 && (
-                <Card className="border-warning/40 bg-warning/5">
+                <Card className="border-warning-edge bg-warning-soft">
                     <CardBody className="flex flex-col gap-1">
                         <p className="flex items-center gap-2 text-sm font-medium">
                             <Users className="size-4 text-warning" />

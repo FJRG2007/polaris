@@ -208,7 +208,7 @@ const TONE_TEXT: Record<Tone, string> = {
 const TONE_BORDER: Record<Tone, string> = {
     success: "border-border hover:border-muted-foreground/40",
     warning: "border-border hover:border-muted-foreground/40",
-    danger: "border-danger-edge hover:border-danger/60",
+    danger: "border-danger-edge hover:border-danger-edge",
     idle: "border-border hover:border-muted-foreground/40"
 };
 

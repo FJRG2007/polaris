@@ -35,7 +35,7 @@ function Notice() {
     return (
         <div
             role="status"
-            className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3"
+            className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-warning-edge bg-warning-soft p-3"
         >
             <p className="min-w-0 text-sm">
                 That page is not open to your role. This is where your access starts.

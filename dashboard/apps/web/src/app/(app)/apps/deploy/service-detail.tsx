@@ -859,7 +859,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                 className={cn(
                                                     "flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-muted-foreground/40",
                                                     failed
-                                                        ? "border-danger-edge bg-danger/5"
+                                                        ? "border-danger-edge bg-danger-soft"
                                                         : "border-border/60"
                                                 )}
                                             >
@@ -3547,7 +3547,7 @@ function DangerSection({
     return (
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-danger">Danger</h3>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger/5 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft p-3">
                 <span className="min-w-0">
                     <span className="text-sm font-medium">Delete service</span>
                     <span className="block text-xs text-muted-foreground">

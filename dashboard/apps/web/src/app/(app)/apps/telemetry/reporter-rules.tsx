@@ -167,7 +167,7 @@ export function ReporterRules({
             </button>
 
             {project.refused.count > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning/10 px-2.5 py-2 text-xs text-warning-foreground">
+                <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning-foreground">
                     <span className="min-w-0 flex-1">
                         {project.refused.count === 1
                             ? "One report was turned away"

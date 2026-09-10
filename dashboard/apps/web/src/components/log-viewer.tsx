@@ -21,8 +21,8 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "reac
 import { formatLogTime, parseLog, type LogEntry, type LogLevel } from "@/lib/log-lines";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
-    error: "text-red-400",
-    warn: "text-amber-300",
+    error: "text-danger",
+    warn: "text-warning",
     info: "text-sky-400",
     default: "text-zinc-300"
 };
@@ -146,7 +146,7 @@ export function LogViewer({
                     className="ml-auto shrink-0"
                 >
                     {copiedAll ? (
-                        <Check className="size-4 text-emerald-400" />
+                        <Check className="size-4 text-success" />
                     ) : (
                         <Copy className="size-4" />
                     )}
@@ -242,7 +242,7 @@ function LogRow({ entry, gutter, withDates }: { entry: LogEntry; gutter: boolean
                 className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
                 {copied ? (
-                    <Check className="size-3.5 text-emerald-400" />
+                    <Check className="size-3.5 text-success" />
                 ) : (
                     <Copy className="size-3.5" />
                 )}

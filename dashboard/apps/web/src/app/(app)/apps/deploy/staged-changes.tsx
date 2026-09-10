@@ -269,7 +269,7 @@ export function StagedChangesBanner({
                         </ul>
 
                         {failures.length > 0 && (
-                            <div className="rounded-md border border-danger-edge bg-danger/5 px-3 py-2">
+                            <div className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                                 <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
                                     <TriangleAlert className="size-4" />
                                     Some changes could not be applied

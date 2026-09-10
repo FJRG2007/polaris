@@ -339,11 +339,11 @@ export function ContainerView({
             </div>
 
             {error ? (
-                <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                <div className="rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
                     {error}
                 </div>
             ) : detailStale ? (
-                <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+                <div className="rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
                     Showing what was last read. {detailStale}
                 </div>
             ) : null}
@@ -936,7 +936,7 @@ function Notice({ tone, children }: { tone: "danger" | "muted"; children: ReactN
             className={cn(
                 "rounded-md border p-3 text-sm",
                 tone === "danger"
-                    ? "border-danger/40 bg-danger/10 text-danger"
+                    ? "border-danger-edge bg-danger-soft text-danger-ink"
                     : "border-border bg-card text-muted-foreground"
             )}
         >

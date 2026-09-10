@@ -152,7 +152,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             {AGENT_SHELL_POLICY_NOTES[shell]}
                         </p>
                         {!repo.isPrivate && shell === "enabled" ? (
-                            <p className="text-xs text-amber-400">
+                            <p className="text-xs text-warning">
                                 This repository is public, so anybody can open a pull request the
                                 agent then reads. A full shell hands whatever it runs the provider
                                 keys in its environment.
@@ -170,7 +170,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         onGate={setGate}
                     />
 
-                    {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 
                 <DialogFooter>

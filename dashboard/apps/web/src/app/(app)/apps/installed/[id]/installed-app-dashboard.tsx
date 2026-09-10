@@ -197,8 +197,8 @@ export function InstalledAppDashboard({
                         <Badge
                             className={cn(
                                 (app.applicationStatus === "failed" || liveStatus === "Not running") &&
-                                    "border-danger/40 text-danger",
-                                running && liveStatus !== "Not running" && "border-success/40 text-success"
+                                    "border-danger-edge text-danger",
+                                running && liveStatus !== "Not running" && "border-success-edge text-success"
                             )}
                         >
                             {liveStatus ??

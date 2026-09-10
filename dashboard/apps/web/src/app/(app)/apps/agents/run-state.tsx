@@ -8,9 +8,9 @@ import { AGENT_RUN_STATE_LABELS, type AgentRunState } from "@polaris/core";
 export function RunState({ state }: { state: AgentRunState }) {
     const tone =
         state === "succeeded"
-            ? "text-emerald-400"
+            ? "text-success"
             : state === "failed"
-              ? "text-red-400"
+              ? "text-danger"
               : state === "cancelled"
                 ? "text-muted-foreground"
                 : "text-sky-400";

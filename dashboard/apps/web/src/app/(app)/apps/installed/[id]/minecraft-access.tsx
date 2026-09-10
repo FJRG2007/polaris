@@ -180,7 +180,7 @@ function AccessRow({
                     <span className="truncate text-sm" title={entry.label}>{entry.label}</span>
                     {isOwner && <Badge>owner</Badge>}
                     {entry.canShare && !isOwner && <Badge>can invite others</Badge>}
-                    {entry.expired && <Badge className="border-danger/40 text-danger">ended</Badge>}
+                    {entry.expired && <Badge className="border-danger-edge text-danger">ended</Badge>}
                 </div>
                 <span className="text-xs text-muted-foreground">
                     {isOwner ? "Everything on this server" : summarize(entry.actions)}

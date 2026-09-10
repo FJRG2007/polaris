@@ -95,9 +95,9 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                         <Phone className="size-4 shrink-0 text-muted-foreground" />
                         <span className="truncate text-sm">{phone.phone}</span>
                         {phone.verified ? (
-                            <Badge className="border-success/40 text-success">Confirmed</Badge>
+                            <Badge className="border-success-edge text-success">Confirmed</Badge>
                         ) : (
-                            <Badge className="border-warning/40 text-warning">Unconfirmed</Badge>
+                            <Badge className="border-warning-edge text-warning">Unconfirmed</Badge>
                         )}
                     </div>
                 ) : null}

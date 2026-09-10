@@ -190,7 +190,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
  */
 function FailureNote({ failure, onRetry }: { failure: Failure; onRetry: () => void }) {
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             <p className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 {failure.kind === "refused" ? (

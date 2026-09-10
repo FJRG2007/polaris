@@ -171,7 +171,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     return (
         <div className="flex flex-col gap-3">
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}

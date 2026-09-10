@@ -270,7 +270,7 @@ export function VolumeForm({
                 </div>
             )}
 
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
             <div className="flex items-center justify-end gap-2">
                 {onCancel && (
                     <Button variant="ghost" size="sm" onClick={onCancel} disabled={pending}>

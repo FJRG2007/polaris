@@ -798,7 +798,7 @@ function MessageCard({
                                 act on; "a link says bank.example.com and goes
                                 to evil.example.ru" is. */}
                             {message.spamReason ? (
-                                <p className="mb-3 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-[12px] text-foreground">
+                                <p className="mb-3 flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-1.5 text-[12px] text-foreground">
                                     <ShieldAlert
                                         className="mt-px size-3.5 shrink-0 text-warning"
                                         aria-hidden

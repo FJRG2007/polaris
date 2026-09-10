@@ -183,9 +183,9 @@ export function WatchSubjectDetail({
                                         className={cn(
                                             "shrink-0 rounded-full border px-2 py-0.5 text-xs",
                                             alarm.state === "alarm"
-                                                ? "border-danger/40 text-danger"
+                                                ? "border-danger-edge text-danger"
                                                 : alarm.state === "ok"
-                                                  ? "border-success/40 text-success"
+                                                  ? "border-success-edge text-success"
                                                   : "border-border/60 text-muted-foreground"
                                         )}
                                     >

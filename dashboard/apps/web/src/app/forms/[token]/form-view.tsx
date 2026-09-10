@@ -57,7 +57,7 @@ export function PublicForm({
         return (
             <Card className="mx-auto w-full max-w-lg">
                 <CardBody className="flex flex-col items-center gap-3 p-8 text-center">
-                    <CircleCheck className="size-8 text-emerald-500" />
+                    <CircleCheck className="size-8 text-success" />
                     <p className="text-sm">{sent}</p>
                 </CardBody>
             </Card>
@@ -147,7 +147,7 @@ export function PublicForm({
                 })}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                         {error}
                     </p>
                 )}

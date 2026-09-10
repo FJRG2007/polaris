@@ -111,7 +111,7 @@ export function PeopleView({
         <PlainNames>
             <div className="flex flex-col gap-4">
                 {error && (
-                    <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                    <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
                         {error}
                     </p>
                 )}
@@ -260,7 +260,7 @@ export function PeopleView({
                                                                         : `Remove ${member.name}`
                                                                 }
                                                                 title={self ? "Leave" : "Remove"}
-                                                                className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                                                className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                                                 onClick={async () => {
                                                                     const ok = await confirm({
                                                                         title: self
@@ -364,7 +364,7 @@ export function PeopleView({
                                                 type="button"
                                                 title="Withdraw"
                                                 aria-label={`Withdraw the invitation to ${invite.email}`}
-                                                className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                                className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                                 onClick={async () => {
                                                     const ok = await confirm({
                                                         title: `Withdraw the invitation to ${invite.email}?`,
@@ -414,7 +414,7 @@ export function PeopleView({
                                             type="button"
                                             title="Withdraw"
                                             aria-label={`Withdraw the invitation to ${invitation.name}`}
-                                            className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                            className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                             onClick={async () => {
                                                 const ok = await confirm({
                                                     title: `Withdraw the invitation to ${invitation.name}?`,

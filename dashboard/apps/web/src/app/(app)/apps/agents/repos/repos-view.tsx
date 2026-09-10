@@ -39,7 +39,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setAdding(true)}>
@@ -85,7 +85,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     </Badge>
                                                 ) : null}
                                             </div>
-                                            {repo.error ? <p className="mt-1 text-xs text-red-400">{repo.error}</p> : null}
+                                            {repo.error ? <p className="mt-1 text-xs text-danger">{repo.error}</p> : null}
                                         </td>
                                         <td
                                             className="whitespace-nowrap px-4 py-3 text-muted-foreground"
@@ -112,9 +112,9 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     }
                                                 >
                                                     {repo.workflowInstalledAt ? (
-                                                        <Check className="size-3 shrink-0 text-emerald-400" />
+                                                        <Check className="size-3 shrink-0 text-success" />
                                                     ) : (
-                                                        <TriangleAlert className="size-3 shrink-0 text-amber-400" />
+                                                        <TriangleAlert className="size-3 shrink-0 text-warning" />
                                                     )}
                                                     Workflow
                                                 </a>

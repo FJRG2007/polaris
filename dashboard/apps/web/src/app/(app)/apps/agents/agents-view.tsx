@@ -39,7 +39,7 @@ export function AgentsOverview({ repos, runs }: { repos: AgentRepoView[]; runs: 
                                     <Badge variant="neutral">{AGENT_EXECUTION_LABELS[repo.execution]}</Badge>
                                 )}
                                 {repo.error ? (
-                                    <span title={repo.error} className="text-xs text-red-400">
+                                    <span title={repo.error} className="text-xs text-danger">
                                         Problem
                                     </span>
                                 ) : null}

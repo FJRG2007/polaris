@@ -209,7 +209,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                     </div>
                 </div>
                 {card.alarms > 0 && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger/30 bg-danger/10 px-2 py-0.5 text-[0.625rem] font-medium text-danger">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-edge bg-danger-soft px-2 py-0.5 text-[0.625rem] font-medium text-danger-ink">
                         <Bell className="size-3" /> {card.alarms}
                     </span>
                 )}

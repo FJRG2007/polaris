@@ -53,7 +53,7 @@ export function AuditIntegrity() {
         <div
             className={
                 broken
-                    ? "flex flex-wrap items-center gap-3 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2.5 text-sm"
+                    ? "flex flex-wrap items-center gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2.5 text-sm"
                     : "flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"
             }
         >

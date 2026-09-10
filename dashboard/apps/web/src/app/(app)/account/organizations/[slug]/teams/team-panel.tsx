@@ -115,7 +115,7 @@ export function TeamPanel({
                 {error && (
                     <p
                         role="alert"
-                        className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                        className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
                     >
                         {error}
                     </p>
@@ -194,7 +194,7 @@ export function TeamPanel({
                                                         ? "Leave"
                                                         : "Remove"
                                                 }
-                                                className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                                className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                                 onClick={async () => {
                                                     if (!teamId) return;
                                                     await runAction(

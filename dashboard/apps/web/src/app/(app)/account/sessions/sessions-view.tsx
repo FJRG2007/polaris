@@ -142,7 +142,7 @@ export function SessionsView({
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {pending.length > 0 ? (
-                <Card className="border-warning/40">
+                <Card className="border-warning-edge">
                     <CardBody className="flex flex-col gap-3">
                         <div>
                             <h2 className="text-sm font-medium">Waiting for your approval</h2>

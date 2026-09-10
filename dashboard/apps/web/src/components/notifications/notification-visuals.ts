@@ -9,7 +9,7 @@ import type { NotificationAudience, NotificationLevel } from "@/lib/notification
 /** Icon and accent color for a notification's severity. */
 export function levelStyle(level: NotificationLevel, type: string): { Icon: LucideIcon; color: string } {
     if (level === "danger") return { Icon: ShieldAlert, color: "text-danger" };
-    if (level === "warning") return { Icon: AlertTriangle, color: "text-amber-500" };
+    if (level === "warning") return { Icon: AlertTriangle, color: "text-warning" };
     if (level === "success") return { Icon: type.startsWith("scan") ? ShieldCheck : CheckCheck, color: "text-success" };
     return { Icon: Info, color: "text-muted-foreground" };
 }

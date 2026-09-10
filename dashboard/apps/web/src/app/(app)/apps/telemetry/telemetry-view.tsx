@@ -208,7 +208,7 @@ export function TelemetryView({
                     action={<NewProject onDone={load} />}
                 />
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                         {error}
                     </p>
                 )}
@@ -240,7 +240,7 @@ export function TelemetryView({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}

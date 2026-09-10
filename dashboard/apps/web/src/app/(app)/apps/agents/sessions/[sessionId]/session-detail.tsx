@@ -33,10 +33,10 @@ const REFRESH_MS = 3000;
 const TONE: Record<core.AgentSessionState, string> = {
     starting: "text-muted-foreground",
     working: "text-violet-400",
-    waiting: "text-amber-400",
+    waiting: "text-warning",
     idle: "text-foreground",
     stopped: "text-muted-foreground",
-    failed: "text-red-400"
+    failed: "text-danger"
 };
 
 /** How each event reads on the strip. Written as what happened rather than as the
@@ -290,7 +290,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                             {boot.map((step) => (
                                 <li key={step.key} className="flex items-center gap-2 text-xs">
                                     {step.state === "done" ? (
-                                        <Check className="size-3.5 shrink-0 text-emerald-400" />
+                                        <Check className="size-3.5 shrink-0 text-success" />
                                     ) : step.state === "doing" ? (
                                         <Loader2 className="text-primary size-3.5 shrink-0 animate-spin" />
                                     ) : (
@@ -320,12 +320,12 @@ export function SessionDetail({ session, events, messages }: Props) {
             ) : null}
 
             {session.error ? (
-                <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-300">
+                <div className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>{session.error}</span>
                 </div>
             ) : null}
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {attached ? (
                 <Card>

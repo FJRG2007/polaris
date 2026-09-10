@@ -103,7 +103,7 @@ export function OwnerDomainsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
                     {error}
                 </p>
             )}

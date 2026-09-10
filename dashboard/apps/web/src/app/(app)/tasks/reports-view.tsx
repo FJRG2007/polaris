@@ -70,7 +70,7 @@ export function ReportsView({
                 <Stat
                     label="Completed this week"
                     value={summary.completedThisWeek}
-                    tone="text-emerald-500"
+                    tone="text-success"
                     icon={CircleCheck}
                 />
                 <Stat

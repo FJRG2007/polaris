@@ -48,8 +48,8 @@ const TARGET_LABEL: Record<AlarmTargetType, string> = { application: "App", host
 const STATE_LABEL: Record<string, string> = { ok: "OK", alarm: "Alarm", insufficient: "No data" };
 
 function stateTone(state: string): string | undefined {
-    if (state === "alarm") return "border-danger/40 text-danger";
-    if (state === "ok") return "border-success/40 text-success";
+    if (state === "alarm") return "border-danger-edge text-danger";
+    if (state === "ok") return "border-success-edge text-success";
     return undefined;
 }
 
@@ -168,7 +168,7 @@ export function WatchView({
                     <div className="flex flex-col gap-1">
                         {initialEvents.map((event) => (
                             <div key={event.id} className="flex items-center gap-2 text-sm">
-                                <Badge className={cn(event.kind === "triggered" ? "border-danger/40 text-danger" : "border-success/40 text-success")}>
+                                <Badge className={cn(event.kind === "triggered" ? "border-danger-edge text-danger" : "border-success-edge text-success")}>
                                     {event.kind === "triggered" ? "Fired" : "Cleared"}
                                 </Badge>
                                 <span className="font-medium">{event.alarmName}</span>

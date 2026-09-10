@@ -116,7 +116,7 @@ export function CallPortsCard() {
                                 </Badge>
                             ) : reading.confirmed ? (
                                 <Badge
-                                    className="border-success/40 text-success"
+                                    className="border-success-edge text-success"
                                     title={
                                         reading.confirmedAt
                                             ? `Last answered from outside on ${new Date(reading.confirmedAt).toLocaleString()}`
@@ -126,7 +126,7 @@ export function CallPortsCard() {
                                     Reached from outside
                                 </Badge>
                             ) : (
-                                <Badge className="border-warning/40 text-warning">Not confirmed</Badge>
+                                <Badge className="border-warning-edge text-warning">Not confirmed</Badge>
                             )}
                         </li>
                     ))}
@@ -150,7 +150,7 @@ export function CallPortsCard() {
                         cannot be checked. Chat settings says what it is doing.
                     </p>
                 ) : reading.confirmed ? null : (
-                    <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+                    <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                         <p className="font-medium text-foreground">
                             Calls only reach this network so far
                         </p>
@@ -196,7 +196,7 @@ function AddressRow({
         <div
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
-                reading.addressStale ? "border-warning/40 bg-warning/5" : "border-border bg-muted/40"
+                reading.addressStale ? "border-warning-edge bg-warning-soft" : "border-border bg-muted/40"
             )}
         >
             <div className="flex flex-wrap items-center justify-between gap-2">

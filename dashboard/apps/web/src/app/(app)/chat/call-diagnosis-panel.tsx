@@ -52,7 +52,7 @@ export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
             }
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
-                theirs ? "border-border bg-muted/40" : "border-warning/40 bg-warning/10"
+                theirs ? "border-border bg-muted/40" : "border-warning-edge bg-warning-soft"
             )}
         >
             <p

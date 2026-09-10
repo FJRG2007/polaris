@@ -925,7 +925,7 @@ export function DueBadge({
         bucket === "overdue"
             ? "text-danger"
             : bucket === "today"
-              ? "text-amber-500"
+              ? "text-warning"
               : "text-muted-foreground";
     return (
         <span
@@ -964,7 +964,7 @@ export function BlockedMarker({
 
     return (
         <span className="inline-flex shrink-0" title={label} aria-label={label} role="img">
-            <Ban aria-hidden className="size-3.5 shrink-0 text-amber-500" />
+            <Ban aria-hidden className="size-3.5 shrink-0 text-warning" />
         </span>
     );
 }

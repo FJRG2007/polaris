@@ -109,7 +109,7 @@ export function ServersView({
             ) : null}
 
             {unset.length > 0 ? (
-                <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+                <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     Set where{" "}
                     {unset.length === 1 ? (
@@ -371,7 +371,7 @@ function RemovalOutcome({
         <div
             className={`flex flex-col gap-1.5 rounded-md border px-3 py-2 text-xs ${
                 warnings.length > 0
-                    ? "border-warning/30 bg-warning/5"
+                    ? "border-warning-edge bg-warning-soft"
                     : "border-border bg-surface/60"
             }`}
         >

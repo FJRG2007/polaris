@@ -307,7 +307,7 @@ export function DevicesView({
                 .map((account) => (
                     <div
                         key={account.id}
-                        className="flex flex-wrap items-center gap-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2"
+                        className="flex flex-wrap items-center gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2"
                     >
                         <p className="flex-1 text-sm text-danger">
                             {account.status === "unauthorized"
@@ -324,7 +324,7 @@ export function DevicesView({
                 ))}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -376,7 +376,7 @@ export function DevicesView({
                                                           : kinds.stateLabel(device.kind, device.state)}
                                                 </Badge>
                                                 {device.batteryCritical && (
-                                                    <Badge className="shrink-0 gap-1 border-danger/30 bg-danger/10 text-danger">
+                                                    <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
                                                         <BatteryLow className="size-3 shrink-0" />
                                                         Battery
                                                     </Badge>

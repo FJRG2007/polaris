@@ -120,7 +120,7 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
 export function WorldMessage({ view }: { view: WorldView | null }) {
     if (!view?.message) return null;
     return (
-        <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+        <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             {view.message}
         </p>
     );
@@ -412,7 +412,7 @@ function NewWorldDialog({
                         </span>
                     </label>
 
-                    <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+                    <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span className="text-muted-foreground">
                             The server restarts to generate it, so anybody playing is disconnected. The map it is on now

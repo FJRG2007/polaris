@@ -138,7 +138,7 @@ function UnasSection({ connection }: { connection: ConnectionSummary }) {
     }
     if (error) {
         return (
-            <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+            <div className="rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
                 {error}
             </div>
         );

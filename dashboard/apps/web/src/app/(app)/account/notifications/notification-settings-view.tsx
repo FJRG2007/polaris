@@ -80,7 +80,7 @@ export function NotificationSettingsView({
     return (
         <div className="flex flex-col gap-4">
             {error ? (
-                <p className="flex items-center gap-2 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p className="flex items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     <AlertTriangle className="size-4 shrink-0" />
                     {error}
                 </p>

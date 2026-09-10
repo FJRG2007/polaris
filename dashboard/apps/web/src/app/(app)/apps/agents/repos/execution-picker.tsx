@@ -59,7 +59,7 @@ export function ExecutionPicker({
             <p className="text-xs text-muted-foreground">{AGENT_EXECUTION_NOTES[value]}</p>
 
             {advice && advice.execution === value ? (
-                <p className="flex items-start gap-1.5 text-xs text-emerald-400">
+                <p className="flex items-start gap-1.5 text-xs text-success">
                     <Sparkles className="mt-0.5 size-3.5 shrink-0" />
                     {advice.reason}
                 </p>
@@ -70,7 +70,7 @@ export function ExecutionPicker({
             ) : null}
 
             {blocked[value] ? (
-                <p className="text-xs text-amber-400">
+                <p className="text-xs text-warning">
                     {blocked[value]} {fix(value)}
                 </p>
             ) : null}
@@ -92,14 +92,14 @@ export function ExecutionPicker({
                             }))}
                         />
                         {poolId && !covering.has(poolId) ? (
-                            <p className="text-xs text-amber-400">
+                            <p className="text-xs text-warning">
                                 Widen that pool&apos;s scope to include this repository under Apps &gt; Runners, or its
                                 jobs will queue forever.
                             </p>
                         ) : null}
                     </div>
                 ) : (
-                    <p className="text-xs text-amber-400">
+                    <p className="text-xs text-warning">
                         You have no runner pools yet. Create one under Apps &gt; Runners, then pick it here.
                     </p>
                 )
