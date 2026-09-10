@@ -66,7 +66,8 @@ export function parseLog(raw: string): LogEntry[] {
  * against the clock on the wall rather than against UTC, and on the reader's own
  * clock format. Anything unparseable is left exactly as it arrived.
  */
-export function formatLogTime(stamp: string, format: DisplayFormat): string {
+export function formatLogTime(stamp: string, format: DisplayFormat, withDate = false): string {
     const date = new Date(stamp);
-    return Number.isNaN(date.getTime()) ? stamp : format.time(date, { seconds: true });
+    if (Number.isNaN(date.getTime())) return stamp;
+    return withDate ? format.dateTime(date, { seconds: true }) : format.time(date, { seconds: true });
 }

@@ -22,6 +22,7 @@ import type { HttpLogEntry } from "@polaris/deploy";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { useParams, useRouter } from "next/navigation";
+import { RuntimeLogs } from "@/components/runtime-logs";
 import { describeServiceEvent } from "./service-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
@@ -1236,8 +1237,9 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
 }
 
 /**
- * Live runtime stdout/stderr of the app's container - what the app prints while
- * running, distinct from the build log. Polled while the tab is open.
+ * Live runtime stdout/stderr of every container of the app - what it prints while
+ * running, distinct from the build log - followed as it prints, with what was
+ * kept over the last week one switch away.
  *
  * A deployment that has not finished has no container to read, and one that
  * failed never got one. Both used to surface whatever the engine said about the
@@ -1254,46 +1256,9 @@ function RuntimeLogView({
     deployment: DepSummary | null;
     onSeeBuild: () => void;
 }) {
-    const [log, setLog] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const pending = deployment !== null && !isSettled(deployment);
     const failed =
         deployment !== null && ["failed", "cancelled", "rolled_back"].includes(deployment.status);
-
-    useEffect(() => {
-        // Nothing to poll for: there is no container behind either state.
-        if (pending || failed) return;
-        let active = true;
-        let timer: ReturnType<typeof setTimeout>;
-        async function poll(): Promise<void> {
-            if (typeof document !== "undefined" && document.hidden) {
-                timer = setTimeout(poll, 3000);
-                return;
-            }
-            try {
-                const res = await fetch(`/api/deploy/apps/${appId}/logs?tail=500`, {
-                    cache: "no-store"
-                });
-                if (!active) return;
-                if (res.ok) {
-                    const data = (await res.json()) as { log: string };
-                    setLog(data.log ?? "");
-                    setError(null);
-                } else {
-                    const data = (await res.json().catch(() => null)) as { error?: string } | null;
-                    setError(data?.error ?? "Could not read runtime logs");
-                }
-            } catch {
-                if (active) setError("Could not read runtime logs");
-            }
-            if (active) timer = setTimeout(poll, 2500);
-        }
-        void poll();
-        return () => {
-            active = false;
-            clearTimeout(timer);
-        };
-    }, [appId, pending, failed]);
 
     if (pending || failed) {
         return (
@@ -1310,19 +1275,7 @@ function RuntimeLogView({
             </div>
         );
     }
-    if (error) return <Empty text={error} />;
-    if (log === null) return <Loading />;
-    if (!log.trim()) {
-        return (
-            <Empty text="No runtime logs yet. The container may have just started, or writes nothing to stdout." />
-        );
-    }
-    return (
-        <div className="flex flex-col gap-2">
-            <LivePill />
-            <LogViewer log={log} name={`${appId}-runtime`} searchable className="h-[26rem]" />
-        </div>
-    );
+    return <RuntimeLogs serviceIds={[appId]} name={`${appId}-runtime`} className="h-[26rem]" />;
 }
 
 /** Color an HTTP status by its class: 2xx ok, 3xx redirect, 4xx client, 5xx server. */
