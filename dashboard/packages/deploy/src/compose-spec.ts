@@ -73,6 +73,9 @@ export interface ComposeSpecService {
     readonly volumes: ComposeSpecVolume[];
     readonly labels: Record<string, string>;
     readonly command?: string[];
+    /** Replaces the image's own entrypoint - a maintenance container running a
+     *  script beside the program its image is built around. */
+    readonly entrypoint?: string[];
     readonly networks: string[];
     /** Other names the container answers to on every network it joins (see
      *  `AppDeployPlan.alias`). */
@@ -99,6 +102,9 @@ export interface ComposeSpec {
     readonly services: ComposeSpecService[];
     readonly volumes: string[];
     readonly networks: string[];
+    /** Volumes that already exist, by their exact names, mounted but never owned:
+     *  a maintenance container reaching a stopped service's data. */
+    readonly externalVolumes?: string[];
 }
 
 /**
@@ -137,6 +143,7 @@ export function forCompose(spec: ComposeSpec): ComposeSpec {
             env: composeValues(service.env),
             labels: composeValues(service.labels),
             command: service.command?.map(composeValue),
+            entrypoint: service.entrypoint?.map(composeValue),
             healthcheck: service.healthcheck
                 ? { ...service.healthcheck, test: service.healthcheck.test.map(composeValue) }
                 : undefined
@@ -418,6 +425,9 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
             lines.push("    extra_hosts:");
             for (const entry of service.extraHosts) lines.push(`      - ${yamlQuote(entry)}`);
         }
+        if (service.entrypoint && service.entrypoint.length > 0) {
+            lines.push(`    entrypoint: [${service.entrypoint.map(yamlQuote).join(", ")}]`);
+        }
         if (service.command && service.command.length > 0) {
             lines.push(`    command: [${service.command.map(yamlQuote).join(", ")}]`);
         }
@@ -434,9 +444,11 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
         lines.push("networks:");
         for (const net of spec.networks) lines.push(`  ${net}:\n    external: true`);
     }
-    if (spec.volumes.length > 0) {
+    const external = spec.externalVolumes ?? [];
+    if (spec.volumes.length > 0 || external.length > 0) {
         lines.push("volumes:");
         for (const volume of spec.volumes) lines.push(`  ${volume}:`);
+        for (const volume of external) lines.push(`  ${volume}:\n    external: true`);
     }
     return `${lines.join("\n")}\n`;
 }

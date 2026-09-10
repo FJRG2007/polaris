@@ -8,6 +8,7 @@
 
 import type { BackupSource } from "./types";
 import type { ResourceKind } from "../kinds";
+import { mailServerSource } from "./mail-server";
 import { minecraftWorldSource } from "./minecraft";
 import { deployVolumeSource, nasPathSource } from "./files";
 import { managedDatabaseSource, polarisDatabaseSource } from "./databases";
@@ -17,6 +18,7 @@ const SOURCES: Readonly<Record<ResourceKind, BackupSource>> = {
     "managed-database": managedDatabaseSource,
     "minecraft-world": minecraftWorldSource,
     "deploy-volume": deployVolumeSource,
+    "mail-server": mailServerSource,
     "nas-path": nasPathSource
 };
 

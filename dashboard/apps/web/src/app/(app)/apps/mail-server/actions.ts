@@ -25,8 +25,8 @@ import { addAccount } from "@/lib/mailbox/accounts";
 import * as inbound from "@/lib/mail-server/inbound";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as dmarc from "@/lib/mail-server/dmarc-report";
-import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
 import { MailServerUnreachable } from "@/lib/mail-server/transport";
+import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
 import { reached, SETUP_STEP_LABELS, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
 import { listServers, MailServerAccessError, requireServer, type MailServerActor } from "@/lib/mail-server/access";
 
@@ -596,20 +596,20 @@ export async function collectReportsAction(serverId: string): Promise<Result<{ f
     }
 }
 
-export async function backupsAction(serverId: string): Promise<Result<{ volumes: backup.MailBackupView[] }>> {
+export async function backupsAction(serverId: string): Promise<Result<{ backups: backup.MailBackupView }>> {
     try {
         const { row } = await server(serverId);
-        return { volumes: await backup.mailBackups(row) };
+        return { backups: await backup.mailBackups(row) };
     } catch (error) {
         return failed(error);
     }
 }
 
-export async function protectAction(serverId: string): Promise<Result<{ count: number }>> {
+export async function protectAction(serverId: string): Promise<Result<{ resourceId: string }>> {
     try {
         const { who, row } = await server(serverId);
-        const count = await backup.protectMailServer(who.id, row);
-        return { count };
+        const resourceId = await backup.protectMailServer(who.id, row);
+        return { resourceId };
     } catch (error) {
         return failed(error);
     }

@@ -219,7 +219,7 @@ export const nasPathSource: BackupSource = {
  * be mangled by the first one that is not valid UTF-8, and a command line has a
  * length limit an archive passes immediately - hence the chunking.
  */
-async function writeThroughShell(
+export async function writeThroughShell(
     ports: { runIn(container: string, argv: readonly string[]): Promise<{ code: number; output: string }> },
     container: string,
     path: string,

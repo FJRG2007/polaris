@@ -68,6 +68,7 @@ export const protectTargetSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("managed-database"), databaseId: z.string().uuid() }),
     z.object({ kind: z.literal("minecraft-world"), installedAppId: z.string().uuid() }),
     z.object({ kind: z.literal("deploy-volume"), volumeId: z.string().uuid() }),
+    z.object({ kind: z.literal("mail-server"), serverId: z.string().uuid() }),
     z.object({
         kind: z.literal("nas-path"),
         connectionId: z.string().uuid(),
@@ -88,6 +89,8 @@ export function targetSelector(target: ProtectTarget): string {
             return buildSelector("minecraft-world", [target.installedAppId]);
         case "deploy-volume":
             return buildSelector("deploy-volume", [target.volumeId]);
+        case "mail-server":
+            return buildSelector("mail-server", [target.serverId]);
         case "nas-path":
             return buildSelector("nas-path", [target.connectionId, target.path]);
     }

@@ -27,7 +27,7 @@ use crate::security::{self, PathError};
 
 /// A deploy request: one compose project made of one or more services.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DeploySpec {
     pub project: String,
     pub services: Vec<ServiceSpec>,
@@ -37,6 +37,12 @@ pub struct DeploySpec {
     /// External networks the services join (the shared proxy network).
     #[serde(default)]
     pub networks: Vec<String>,
+    /// Volumes that already exist, named exactly, which this project mounts but
+    /// never owns: a maintenance container reaching another service's data while
+    /// that service is stopped. Declared `external`, so nothing here creates,
+    /// renames or removes them.
+    #[serde(default)]
+    pub external_volumes: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,6 +65,10 @@ pub struct ServiceSpec {
     pub labels: BTreeMap<String, String>,
     #[serde(default)]
     pub command: Vec<String>,
+    /// Replaces the image's own entrypoint. Only a maintenance container sets it,
+    /// to run a script beside the program the image is built around.
+    #[serde(default)]
+    pub entrypoint: Vec<String>,
     #[serde(default)]
     pub networks: Vec<String>,
     /// Other names the container answers to on every network it joins: the service's
@@ -162,7 +172,7 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                 ));
             }
         }
-        for arg in &service.command {
+        for arg in service.command.iter().chain(service.entrypoint.iter()) {
             if has_control(arg) {
                 return Err("command arguments must not contain control characters".into());
             }
@@ -217,10 +227,13 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
             return Err(format!("invalid network name: {net}"));
         }
     }
-    for vol in &spec.volumes {
+    for vol in spec.volumes.iter().chain(spec.external_volumes.iter()) {
         if !valid_name(vol) {
             return Err(format!("invalid volume name: {vol}"));
         }
+    }
+    if spec.external_volumes.iter().any(|vol| spec.volumes.contains(vol)) {
+        return Err("a volume cannot be both owned and external".into());
     }
     Ok(())
 }
@@ -385,6 +398,10 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
                 out.push_str(&format!("      - {dep}\n"));
             }
         }
+        if !service.entrypoint.is_empty() {
+            let parts: Vec<String> = service.entrypoint.iter().map(|c| yaml_quote(c)).collect();
+            out.push_str(&format!("    entrypoint: [{}]\n", parts.join(", ")));
+        }
         if !service.command.is_empty() {
             let parts: Vec<String> = service.command.iter().map(|c| yaml_quote(c)).collect();
             out.push_str(&format!("    command: [{}]\n", parts.join(", ")));
@@ -414,10 +431,13 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             out.push_str(&format!("  {net}:\n    external: true\n"));
         }
     }
-    if !spec.volumes.is_empty() {
+    if !spec.volumes.is_empty() || !spec.external_volumes.is_empty() {
         out.push_str("volumes:\n");
         for vol in &spec.volumes {
             out.push_str(&format!("  {vol}:\n"));
+        }
+        for vol in &spec.external_volumes {
+            out.push_str(&format!("  {vol}:\n    external: true\n"));
         }
     }
     out
@@ -1276,6 +1296,35 @@ mod tests {
         // An untagged image, or not a manifest at all, names nothing to accept.
         assert_eq!(parse_manifest_tags(br#"[{"RepoTags":null}]"#), None);
         assert_eq!(parse_manifest_tags(b"not json"), None);
+    }
+
+    #[test]
+    fn a_maintenance_container_mounts_what_it_does_not_own() {
+        // Another project's volumes by their exact names, declared external so
+        // this project never creates or removes them, and a script in place of
+        // the image's own entrypoint. Neither is rendered when absent.
+        let config = test_config();
+        let maintenance = spec(
+            r#"{"project":"polaris-mailexport-1","services":[{"name":"polaris-mailexport-1","image":"stalwartlabs/stalwart:v0.16","entrypoint":["/bin/sh","-c"],"command":["echo ok"],"volumes":[{"source":"polaris-abc_stalwart-data","target":"/var/lib/stalwart","kind":"volume"}],"restart":"no"}],"externalVolumes":["polaris-abc_stalwart-data"]}"#,
+        );
+        assert!(validate_spec(&maintenance, &config).is_ok());
+        let rendered = render_compose(&maintenance, &config);
+        assert!(rendered.contains("    entrypoint: [\"/bin/sh\", \"-c\"]\n"));
+        assert!(rendered.contains("  polaris-abc_stalwart-data:\n    external: true\n"));
+
+        let both = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx"}],"volumes":["data"],"externalVolumes":["data"]}"#,
+        );
+        assert!(validate_spec(&both, &config).is_err());
+        let control = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","entrypoint":["sh\n"]}]}"#,
+        );
+        assert!(validate_spec(&control, &config).is_err());
+
+        let plain = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx"}]}"#);
+        let rendered = render_compose(&plain, &config);
+        assert!(!rendered.contains("entrypoint"));
+        assert!(!rendered.contains("volumes:"));
     }
 
     #[test]

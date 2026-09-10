@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Backing the server up: its two volumes, protected in Backups like any other
- * service's data, where copies are scheduled, kept and restored.
+ * Backing the server up: protected in Backups as one thing, where copies are
+ * scheduled, kept, encrypted and restored.
  */
 
 import Link from "next/link";
 import { useState } from "react";
 import { Archive } from "lucide-react";
+import { PanelError, usePanelData } from "../ui-bits";
 import { RelativeTime } from "@/components/relative-time";
 import { backupsAction, protectAction } from "../actions";
-import { Mono, PanelError, usePanelData } from "../ui-bits";
 import { Badge, Button, EmptyState, Skeleton } from "@polaris/ui";
 
 export function BackupsTab({ serverId }: { serverId: string }) {
@@ -27,67 +27,72 @@ export function BackupsTab({ serverId }: { serverId: string }) {
         await panel.reload();
     }
 
-    const volumes = panel.data?.volumes ?? [];
-    const unprotected = volumes.filter((volume) => !volume.resourceId).length;
+    const backups = panel.data?.backups;
 
     return (
         <div className="flex flex-col gap-4">
             <p className="text-xs text-muted-foreground">
-                Copies are taken while the server runs, so one made during heavy delivery can miss the last few messages. Restoring puts a volume
-                back as it was when copied.
+                Each copy is the engine&apos;s own export, taken with the server paused for as long as it runs, so every
+                mailbox is caught at the same moment. Mail sent meanwhile is retried by the sender. Restoring pauses it
+                again and puts the whole server back.
             </p>
             {error ? <PanelError message={error} /> : null}
-            {!panel.data ? (
+            {!backups ? (
                 panel.error ? (
                     <PanelError message={panel.error} onRetry={() => void panel.reload()} />
                 ) : (
-                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-20 w-full" />
                 )
-            ) : volumes.length === 0 ? (
-                <EmptyState icon={<Archive />} title="No volumes yet" description="They exist once setup has created the service." />
+            ) : !backups.ready ? (
+                <EmptyState icon={<Archive />} title="Not running yet" description="It can be protected once setup has finished." />
             ) : (
-                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
-                    {volumes.map((volume) => (
-                        <li key={volume.volumeId} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                            <div className="flex min-w-0 flex-1 flex-col">
-                                <span className="text-[0.8125rem] text-foreground">{volume.volume}</span>
-                                <Mono className="text-muted-foreground">{volume.mountPath}</Mono>
-                            </div>
-                            {volume.resourceId ? (
-                                <>
-                                    <span className="text-xs text-muted-foreground">
-                                        {volume.lastBackupAt ? (
-                                            <>
-                                                Last copy <RelativeTime iso={volume.lastBackupAt} />, {volume.copyCount} kept
-                                            </>
-                                        ) : (
-                                            "No copy yet"
-                                        )}
-                                    </span>
-                                    {volume.lastStatus === "failed" ? (
-                                        <Badge variant="danger" title={volume.lastError ?? undefined}>
-                                            Last copy failed
-                                        </Badge>
-                                    ) : (
-                                        <Badge variant="success">Protected</Badge>
-                                    )}
-                                    <Button asChild size="sm" variant="outline">
-                                        <Link href={`/apps/backups/${volume.resourceId}`}>Copies and restore</Link>
-                                    </Button>
-                                </>
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2">
+                    <span className="min-w-0 flex-1 text-[0.8125rem] text-foreground">Whole server</span>
+                    {backups.resourceId ? (
+                        <>
+                            <span className="text-xs text-muted-foreground">
+                                {backups.lastBackupAt ? (
+                                    <>
+                                        Last copy <RelativeTime iso={backups.lastBackupAt} />, {backups.copyCount} kept
+                                    </>
+                                ) : (
+                                    "No copy yet"
+                                )}
+                            </span>
+                            {backups.lastStatus === "failed" ? (
+                                <Badge variant="danger" title={backups.lastError ?? undefined}>
+                                    Last copy failed
+                                </Badge>
                             ) : (
-                                <Badge>Not protected</Badge>
+                                <Badge variant="success">Protected</Badge>
                             )}
-                        </li>
-                    ))}
-                </ul>
-            )}
-            {unprotected > 0 ? (
-                <div>
-                    <Button size="sm" onClick={() => void protect()} disabled={pending}>
-                        {pending ? "Protecting..." : "Protect with Backups"}
-                    </Button>
+                            <Button asChild size="sm" variant="outline">
+                                <Link href={`/apps/backups/${backups.resourceId}`}>Copies and restore</Link>
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Badge>Not protected</Badge>
+                            <Button size="sm" onClick={() => void protect()} disabled={pending}>
+                                {pending ? "Protecting..." : "Protect with Backups"}
+                            </Button>
+                        </>
+                    )}
                 </div>
+            )}
+            {backups && backups.volumeResources.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                    Its volumes are also still copied as files, from before:{" "}
+                    {backups.volumeResources.map((resource, index) => (
+                        <span key={resource.id}>
+                            {index > 0 ? ", " : ""}
+                            <Link href={`/apps/backups/${resource.id}`} className="text-primary hover:underline">
+                                {resource.name}
+                            </Link>
+                        </span>
+                    ))}
+                    .
+                </p>
             ) : null}
         </div>
     );
