@@ -836,6 +836,9 @@ fn deploy_fs_read<R: Read>(req: &Request, body: &mut R) -> Response {
 
 /// The most output a one-shot exec may report back. These commands answer with a
 /// status line or an error, so anything past this is a runaway, not a result.
+/// Only consumed by the unix `run_in_container`, so it is dead code on a
+/// non-unix build.
+#[cfg_attr(not(unix), allow(dead_code))]
 const EXEC_RUN_MAX_OUTPUT: usize = 16 * 1024;
 
 /// Run a command inside a container, wait for it, and report how it went.
@@ -902,6 +905,10 @@ fn run_in_container(container: &str, argv: &[String]) -> std::io::Result<(i32, S
 /// character, and the cap almost never does: a container writes whatever it
 /// likes, and decoding that leniently leaves a three-byte replacement wherever
 /// the stream was not valid UTF-8. Cutting blind aborts the daemon.
+///
+/// Only called from the unix `run_in_container`, so it is dead code on a
+/// non-unix build.
+#[cfg_attr(not(unix), allow(dead_code))]
 fn truncate_on_char_boundary(text: &mut String, max: usize) {
     if text.len() <= max {
         return;
@@ -1208,6 +1215,9 @@ enum MountError {
     /// operator nothing, while "Host is down" or "Permission denied" names the
     /// thing they have to go and fix. Only the helper's own diagnostic goes in
     /// here - a host-side io::Error or path stays on the daemon's stderr.
+    /// Only constructed by the unix `run_mount`/`run_umount`, so it is dead
+    /// code on a non-unix build.
+    #[cfg_attr(not(unix), allow(dead_code))]
     Failed(String),
 }
 
