@@ -6,6 +6,15 @@
  */
 
 export { slugify, shortHash, serviceName, imageTag } from "./naming.js";
+export {
+    RELEASE_LABEL,
+    RELEASE_REPOSITORY,
+    isReleaseImage,
+    pinDockerfile,
+    releaseImage,
+    singleFileTar
+} from "./release-image.js";
+export { RELEASE_IMAGE_GONE } from "./runtime/release.js";
 export { magicDomain, releaseDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
 export {
     defaultZones,

@@ -10,6 +10,7 @@
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import { appComposeSpec, dbComposeSpec, forSwarm } from "../compose-spec.js";
+import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -30,7 +31,15 @@ export class SwarmRuntime implements RuntimeDriver {
     public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         let imageTag: string;
-        if (plan.build.method === "image") {
+        let kept: string | null;
+        try {
+            kept = await rollbackImageOf(plan, ctx);
+        } catch (error) {
+            return { ok: false, error: error instanceof Error ? error.message : RELEASE_IMAGE_GONE };
+        }
+        if (kept) {
+            imageTag = kept;
+        } else if (plan.build.method === "image") {
             if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
             imageTag = plan.build.imageRef;
             await ctx.ports.pull(imageTag, sink);
@@ -53,6 +62,8 @@ export class SwarmRuntime implements RuntimeDriver {
         } else {
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the swarm runtime` };
         }
+        // Kept under the release's own name before it runs - see the compose runtime.
+        if (!kept) imageTag = await pinRelease(imageTag, plan, ctx);
         const spec = forSwarm(appComposeSpec(plan, imageTag, ctx.target.proxyNetwork));
         try {
             await ctx.ports.stackUp(spec, sink);

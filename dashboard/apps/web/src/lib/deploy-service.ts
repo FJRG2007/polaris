@@ -36,12 +36,6 @@ import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
-import {
-    deployHostname,
-    deployZoneHosts,
-    isBaseZoneKey,
-    type ZoneMintFailure
-} from "./domain-zones";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
 import {
@@ -50,19 +44,26 @@ import {
     stopQuickTunnel
 } from "./deploy/quick-tunnel-service";
 import {
-    githubCloneIdentity,
-    githubCloneProblem,
-    githubRepoReach,
-    githubTokenForOwner
-} from "./github-access";
+    deployHostname,
+    deployZoneHosts,
+    isBaseZoneKey,
+    type ZoneMintFailure
+} from "./domain-zones";
 import {
     announceDeployFinished,
     announceDeployQueued,
     announceDeployStarted
 } from "./deploy/github-deployment";
 import {
+    githubCloneIdentity,
+    githubCloneProblem,
+    githubRepoReach,
+    githubTokenForOwner
+} from "./github-access";
+import {
     KEPT_RELEASES,
     currentReleaseRef,
+    imagesOutsideWindow,
     keepsReleases,
     portSubject,
     releaseMarker,
@@ -71,7 +72,9 @@ import {
 } from "./deploy/releases";
 import {
     bucketHttpMetrics,
+    isReleaseImage,
     normalizeRoot,
+    releaseImage,
     normalizeZoneName,
     parseHttpLogs,
     parseWatchPaths,
@@ -2225,12 +2228,15 @@ export async function deployApplication(
         commitSha?: string;
         authorName?: string;
         authorAvatarUrl?: string;
-    }
+    },
+    /** A rollback: run this earlier release's kept image instead of building. */
+    rollback?: RollbackSource
 ): Promise<string> {
-    const { plan, target, gitSource, buildCommands, keepsHistory } = await buildAppPlan(
-        applicationId,
-        ownerId
-    );
+    const built = await buildAppPlan(applicationId, ownerId);
+    const { plan, target, buildCommands, keepsHistory } = built;
+    // A rollback runs an image that already exists, so there is no source to
+    // reach and nothing to clone.
+    const gitSource = rollback ? undefined : built.gitSource;
 
     // Asked before anything is started, and refused here rather than eight
     // minutes later at the clone.
@@ -2249,10 +2255,11 @@ export async function deployApplication(
     // Resolve the commit + author so the deployment shows who shipped it, Railway-
     // style. The provided meta (webhook / poller) wins; otherwise resolve the branch
     // head from GitHub. Best-effort - a private repo without a token just has none.
-    let commitMessage = meta?.commitMessage?.trim() || null;
-    let commitSha = meta?.commitSha || null;
-    let authorName = meta?.authorName ?? null;
-    let authorAvatarUrl = meta?.authorAvatarUrl ?? null;
+    // A rollback carries the commit of the release it goes back to.
+    let commitMessage = (rollback?.commitMessage ?? meta?.commitMessage)?.trim() || null;
+    let commitSha = (rollback ? rollback.commitSha : meta?.commitSha) || null;
+    let authorName = rollback ? rollback.authorName : (meta?.authorName ?? null);
+    let authorAvatarUrl = rollback ? rollback.authorAvatarUrl : (meta?.authorAvatarUrl ?? null);
     if (gitSource && !authorAvatarUrl) {
         const parsed = parseGithubRepo(gitSource.repoUrl);
         if (parsed) {
@@ -2283,7 +2290,8 @@ export async function deployApplication(
             commitSha,
             authorName,
             authorAvatarUrl,
-            isolated: keepsHistory
+            isolated: keepsHistory,
+            rollbackOfId: rollback?.deploymentId ?? null
         }
     });
     // Put it in the commit's deployment box before anything else happens, so a
@@ -2304,14 +2312,169 @@ export async function deployApplication(
         });
         planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
     }
+    // Every release is kept under a name of its own so it can be run again later
+    // exactly as it was; a rollback runs one of those instead of making one. The
+    // build also goes at the commit it names, when there is one - the branch head
+    // can have moved on since whatever announced this deploy.
+    planned = {
+        ...planned,
+        build: {
+            ...planned.build,
+            ...(rollback
+                ? { rollbackImage: rollback.imageTag }
+                : {
+                      release: {
+                          image: releaseImage(planned.ref.name, deployment.id),
+                          deploymentId: deployment.id
+                      }
+                  })
+        }
+    };
+    const pinnedSource = gitSource && commitSha ? { ...gitSource, commitSha } : gitSource;
     // The app keeps pointing at the previous successful release until this one
     // actually succeeds (see executeDeployment) - so history never shows a build
     // as "current" before it finishes, and the old version stays active until the
     // new one is up (zero-downtime cutover, the way Railway does it).
     queue.enqueue(target.id, () =>
-        runDeployment(deployment.id, planned, target, ownerId, gitSource, buildCommands)
+        runDeployment(deployment.id, planned, target, ownerId, pinnedSource, buildCommands)
     );
     return deployment.id;
+}
+
+/** What a rollback carries over from the release it goes back to. */
+export interface RollbackSource {
+    readonly deploymentId: string;
+    readonly imageTag: string;
+    readonly commitSha: string | null;
+    readonly commitMessage: string | null;
+    readonly authorName: string | null;
+    readonly authorAvatarUrl: string | null;
+}
+
+/**
+ * Put an earlier release back in front of traffic, instantly.
+ *
+ * Instant because nothing is fetched or built: the release's own pinned image
+ * is still on the server (`imageKept`), and the rollback runs it through the
+ * ordinary pipeline, so it gets its own deployment row, its own log, the same
+ * promotion and the same address - and the release it replaced can itself be
+ * rolled back to. What comes back is the code; the variables are today's,
+ * because they are shared with every other release and changing them is a
+ * decision of its own.
+ *
+ * Refused with the reason when the image is no longer kept, which is what the
+ * screen offers instead: deploying that commit again.
+ */
+export async function rollbackToDeployment(
+    deploymentId: string,
+    ownerId: string,
+    userId: string
+): Promise<{ deploymentId: string; applicationId: string; commitSha: string | null }> {
+    const source = await prisma.deployment.findFirst({
+        where: { id: deploymentId, deployableType: "application" },
+        select: {
+            id: true,
+            deployableId: true,
+            status: true,
+            imageTag: true,
+            imageKept: true,
+            commitSha: true,
+            commitMessage: true,
+            authorName: true,
+            authorAvatarUrl: true
+        }
+    });
+    if (!source) throw new Error("Deployment not found");
+    await requireOwnedApplication(source.deployableId, ownerId);
+    if (!source.imageKept || !isReleaseImage(source.imageTag)) {
+        throw new Error(
+            "That release's image is no longer kept on the server, so it cannot be rolled back to instantly. Deploy its commit again instead."
+        );
+    }
+    const app = await prisma.application.findUnique({
+        where: { id: source.deployableId },
+        select: { currentDeploymentId: true }
+    });
+    if (app?.currentDeploymentId === source.id) throw new Error("That release is already live.");
+    const started = await deployApplication(source.deployableId, ownerId, userId, undefined, {
+        deploymentId: source.id,
+        imageTag: source.imageTag,
+        commitSha: source.commitSha,
+        commitMessage: source.commitMessage,
+        authorName: source.authorName,
+        authorAvatarUrl: source.authorAvatarUrl
+    });
+    return { deploymentId: started, applicationId: source.deployableId, commitSha: source.commitSha };
+}
+
+/** Keep a release's image past the window, or let the window have it again. */
+export async function setDeploymentPinned(
+    deploymentId: string,
+    ownerId: string,
+    pinned: boolean
+): Promise<void> {
+    const deployment = await prisma.deployment.findFirst({
+        where: { id: deploymentId, deployableType: "application" },
+        select: { deployableId: true, imageKept: true }
+    });
+    if (!deployment) throw new Error("Deployment not found");
+    await requireOwnedApplication(deployment.deployableId, ownerId);
+    if (pinned && !deployment.imageKept) {
+        throw new Error("That release's image is no longer kept, so there is nothing to pin.");
+    }
+    await prisma.deployment.update({ where: { id: deploymentId }, data: { pinned } });
+    if (!pinned) await pruneReleaseImages(deployment.deployableId).catch(() => undefined);
+}
+
+/**
+ * How many releases of one service keep their image for an instant rollback,
+ * newest first, besides the one that is live and any somebody pinned. Enough to
+ * reach back past a bad afternoon; few enough that a service deployed forty
+ * times a day does not fill its server with images.
+ */
+export const ROLLBACK_WINDOW = 5;
+
+/**
+ * Remove the kept images that have fallen out of the window.
+ *
+ * Counted in images rather than rows, because a rollback runs an image another
+ * deployment already kept: two rows, one image, and removing it for the older
+ * row would pull it out from under the newer one. An image stays while any row
+ * that should keep it still does. A removal that fails leaves the row kept, so
+ * the next promotion tries again rather than the screen offering a rollback to
+ * an image that is gone.
+ */
+async function pruneReleaseImages(applicationId: string): Promise<void> {
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { currentDeploymentId: true, target: true, environment: { select: { project: { select: { ownerId: true } } } } }
+    });
+    if (!app) return;
+    const rows = await prisma.deployment.findMany({
+        where: { deployableType: "application", deployableId: applicationId, imageKept: true },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, imageTag: true, pinned: true }
+    });
+    const gone = imagesOutsideWindow(rows, app.currentDeploymentId, ROLLBACK_WINDOW);
+    if (gone.length === 0) return;
+    const ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
+    try {
+        for (const image of gone) {
+            if (!isReleaseImage(image)) continue;
+            try {
+                await ports.removeImage?.(image);
+            } catch (error) {
+                console.error("polaris: a kept release image could not be removed:", error);
+                continue;
+            }
+            await prisma.deployment.updateMany({
+                where: { deployableType: "application", deployableId: applicationId, imageTag: image },
+                data: { imageKept: false, pinned: false }
+            });
+        }
+    } finally {
+        await ports.dispose().catch(() => undefined);
+    }
 }
 
 /** A deploy that has not finished in this long is reported as failed to whoever is
@@ -2366,6 +2529,16 @@ export interface DeploymentSummary {
     commitUrl: string | null;
     /** The hostname this release answers on while it is kept, if it has one. */
     hostname: string | null;
+    /** Whether this release can be put back live instantly from its kept image. */
+    rollbackable: boolean;
+    /** Whether its image is still kept on the server (the live one included). */
+    imageKept: boolean;
+    /** Kept past the rollback window until somebody unpins it. */
+    pinned: boolean;
+    /** The release this one rolled back to, when it was a rollback. */
+    rollbackOfId: string | null;
+    /** How long it took from starting to finishing, when it has finished. */
+    durationMs: number | null;
 }
 
 /**
@@ -2492,7 +2665,12 @@ export async function listDeployments(
             commitMessage: true,
             commitSha: true,
             authorName: true,
-            authorAvatarUrl: true
+            authorAvatarUrl: true,
+            imageKept: true,
+            pinned: true,
+            rollbackOfId: true,
+            startedAt: true,
+            finishedAt: true
         }
     });
     // The hostname a kept release answers on. Only releases that are still up have
@@ -2521,7 +2699,15 @@ export async function listDeployments(
         authorName: row.authorName,
         authorAvatarUrl: row.authorAvatarUrl,
         commitUrl: repoUrl && row.commitSha ? commitUrl(repoUrl, row.commitSha) : null,
-        hostname: hostnames.get(row.id) ?? null
+        hostname: hostnames.get(row.id) ?? null,
+        rollbackable: row.imageKept && row.id !== app.currentDeploymentId,
+        imageKept: row.imageKept,
+        pinned: row.pinned,
+        rollbackOfId: row.rollbackOfId,
+        durationMs:
+            row.startedAt && row.finishedAt
+                ? row.finishedAt.getTime() - row.startedAt.getTime()
+                : null
     }));
 }
 
@@ -3093,6 +3279,9 @@ export async function executeDeployment(
         await settleDeployment(deploymentId, {
             status: result.ok ? "running" : "failed",
             imageTag: result.imageTag,
+            // Kept only when what ran is a pinned release image; a release that
+            // could not be pinned deployed all the same, with nothing to roll to.
+            imageKept: result.ok && isReleaseImage(result.imageTag),
             error: result.error,
             finishedAt: new Date()
         });
@@ -3130,7 +3319,13 @@ export async function executeDeployment(
  */
 async function settleDeployment(
     deploymentId: string,
-    data: { status: string; imageTag?: string; error?: string | null; finishedAt: Date }
+    data: {
+        status: string;
+        imageTag?: string;
+        imageKept?: boolean;
+        error?: string | null;
+        finishedAt: Date;
+    }
 ): Promise<boolean> {
     const written = await prisma.deployment.updateMany({
         where: { id: deploymentId, status: { notIn: [...TERMINAL_DEPLOY_STATUSES] } },
@@ -3204,6 +3399,9 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
     });
     await retireOldReleases(dep.deployableId).catch((error) => {
         console.error("polaris: could not retire superseded releases:", error);
+    });
+    await pruneReleaseImages(dep.deployableId).catch((error) => {
+        console.error("polaris: could not tidy the kept release images:", error);
     });
     // Refresh the edge routes so a domain whose first deploy just came up starts
     // serving, and any host-port change is reflected.

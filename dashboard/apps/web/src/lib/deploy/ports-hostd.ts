@@ -6,9 +6,10 @@
  */
 
 import { Readable } from "node:stream";
+import { isReleaseImage } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
-import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
+import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client: HostdClient;
@@ -73,6 +74,27 @@ export class HostdPorts implements RuntimePorts {
 
     public async inspectImage(image: string): Promise<number[]> {
         return this.client.inspectImage(image);
+    }
+
+    /** The daemon answers an inspect of an image it does not have with an error,
+     *  which is the whole of the question a rollback needs asked. */
+    public async hasImage(image: string): Promise<boolean> {
+        return this.client.inspectImage(image).then(
+            () => true,
+            () => false
+        );
+    }
+
+    /** Through the daemon's allowlist, which reaches only images under the release
+     *  repository - checked here as well, so a refusal is ours and says why. A 404
+     *  is success: the image the caller wanted gone is gone. */
+    public async removeImage(image: string): Promise<void> {
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be removed");
+        const response = await this.client.dockerRequest("DELETE", `/images/${image}`);
+        if (response.status === 404) return;
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`the image could not be removed (${response.status})`);
+        }
     }
 
     public async login(registry: string, username: string, password: string): Promise<void> {

@@ -9,8 +9,8 @@
 import type { Client } from "ssh2";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
-import { parseReclaimedBytes, quoteArg, renderComposeYaml, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
+import { isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -94,10 +94,81 @@ export class SshPorts implements RuntimePorts {
         await this.run(`docker stack rm ${quoteArg(project)}`, onOutput);
     }
 
-    public async build(): Promise<string> {
-        // Remote build from a tar context streamed over an exec channel is a
-        // follow-up; the remote path currently deploys prebuilt images.
-        throw new Error("remote build is not yet supported");
+    /**
+     * Build an image on the server from a tar context streamed over the channel.
+     *
+     * The context rides the encrypted channel's stdin, the same way a registry
+     * password does, so nothing is staged on the server for Polaris to clean up:
+     * `docker build -` reads it straight in. Nixpacks needs a directory, so for it
+     * the tar is unpacked into a private temporary one that goes whatever the
+     * build does - and a server without nixpacks says so rather than failing on a
+     * command it does not have.
+     *
+     * The Dockerfile path and the root directory are confined the way the local
+     * daemon confines them: a value that climbs out of the context would let a
+     * build read whatever else is on that disk.
+     */
+    public async build(request: BuildRequest, onOutput?: OutputSink): Promise<string> {
+        const dockerfile = request.dockerfile ?? "Dockerfile";
+        const root = request.root ?? "";
+        if (!confinedPath(dockerfile) || (root !== "" && !confinedPath(root))) {
+            throw new Error("the build path leaves its context");
+        }
+        const script =
+            request.builder === "nixpacks"
+                ? [
+                      "set -e",
+                      'command -v nixpacks >/dev/null 2>&1 || { echo "nixpacks is not installed on this server" >&2; exit 127; }',
+                      "d=$(mktemp -d)",
+                      "trap 'rm -rf \"$d\"' EXIT",
+                      'tar -x -C "$d"',
+                      `nixpacks build "$d"/${quoteArg(root || ".")} --name ${quoteArg(request.tag)}`
+                  ].join("\n")
+                : `docker build -t ${quoteArg(request.tag)} -f ${quoteArg(dockerfile)} -`;
+        const client = await this.connect();
+        await new Promise<void>((resolve, reject) => {
+            client.exec(script, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let code: number | null = null;
+                channel.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.stderr.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () =>
+                    code === 0 ? resolve() : reject(new Error(`the build exited with code ${code ?? -1}`))
+                );
+                channel.on("error", reject);
+                const tar = request.contextTar;
+                tar.on("error", (tarError: Error) => {
+                    channel.close();
+                    reject(tarError);
+                });
+                tar.pipe(channel);
+            });
+        });
+        return request.tag;
+    }
+
+    /** Take a pinned release image off the server once it has fallen out of the
+     *  kept window. Nothing else is ever handed here: the name is checked against
+     *  the release naming before it reaches a shell. Not forced, so an image a
+     *  container still runs is refused by the engine rather than pulled out from
+     *  under it. */
+    public async removeImage(image: string): Promise<void> {
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be removed");
+        await this.run(`docker image rm ${quoteArg(image)}`);
+    }
+
+    /** `docker image inspect` exits non-zero for an image the machine lacks. */
+    public async hasImage(image: string): Promise<boolean> {
+        return this.run(`docker image inspect --format '{{.Id}}' ${quoteArg(image)}`).then(
+            () => true,
+            () => false
+        );
     }
 
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
@@ -401,6 +472,18 @@ export class SshPorts implements RuntimePorts {
             throw new Error(`remote command exited with code ${result.code}`);
         }
     }
+}
+
+/** A path that stays inside the build context: relative, no parent steps, no
+ *  control characters. The same rule the local daemon applies to both values. */
+function confinedPath(path: string): boolean {
+    return (
+        path.length > 0 &&
+        !path.startsWith("/") &&
+        !path.startsWith("\\") &&
+        !path.split(/[\\/]/).includes("..") &&
+        !/[\u0000-\u001f\u007f]/.test(path)
+    );
 }
 
 /** Parse docker's `ExposedPorts` map ({"5601/tcp":{},"53/udp":{}}) into the sorted

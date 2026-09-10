@@ -100,6 +100,17 @@ export interface RuntimePorts {
      *  can default the container port to what the image actually listens on. Empty
      *  when the image declares none or inspection is unavailable. */
     inspectImage(image: string): Promise<number[]>;
+    /**
+     * Remove a pinned release image once it has fallen out of the kept window.
+     * Only ever handed a name `isReleaseImage` accepts; never forced, so an image
+     * a container still runs is refused by the engine. Optional, because an
+     * older host daemon has no route for it - the image then simply stays.
+     */
+    removeImage?(image: string): Promise<void>;
+    /** Whether an image is present on the machine, asked before a rollback runs a
+     *  kept image so a missing one is refused in words rather than by a failed
+     *  pull of a name no registry has. Optional for the same reason as above. */
+    hasImage?(image: string): Promise<boolean>;
     /** Authenticate to a private registry (`docker login`) so a following pull can
      *  access it. An empty registry targets Docker Hub. The password is sent out of
      *  band (stdin / request body), never on the command line. */

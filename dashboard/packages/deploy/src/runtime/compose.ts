@@ -12,6 +12,7 @@ import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import type {
     AppDeployPlan,
@@ -77,24 +78,28 @@ function reasonOf(error: unknown, fallback: string): string {
  * fetched once more and the same spec goes up. Only for this one failure, only
  * once, and only when there is an image to re-fetch - a locally built one has
  * nowhere to be fetched from, and repeating anything else would just fail twice.
+ *
+ * `refetch` is how the image is got back, not only which one: a pulled image
+ * that was pinned as a release runs under a name no registry has, so getting it
+ * back is the pull of what it was pinned from and the pin again.
  */
 async function composeUpRetryingLease(
     ctx: RuntimeContext,
     spec: ComposeSpec,
     sink: OutputSink,
-    pullable: string | null
+    refetch: { readonly image: string; readonly again: () => Promise<void> } | null
 ): Promise<void> {
     try {
         await ctx.ports.composeUp(spec, sink);
     } catch (error) {
         const said = reasonOf(error, "");
-        if (!pullable || !isStaleImageLease(said)) throw error;
+        if (!refetch || !isStaleImageLease(said)) throw error;
         ctx.log(
             Buffer.from(
-                `The image store lost the image it had just fetched; fetching ${pullable} again and starting once more.\n`
+                `The image store lost the image it had just fetched; fetching ${refetch.image} again and starting once more.\n`
             )
         );
-        await ctx.ports.pull(pullable, sink);
+        await refetch.again();
         await ctx.ports.composeUp(spec, sink);
     }
 }
@@ -196,7 +201,15 @@ export class ComposeRuntime implements RuntimeDriver {
         // a step with no output of its own (mounting a share) looks like a hang.
         const step = timer(ctx);
         let imageTag: string;
-        if (plan.build.method === "image") {
+        let kept: string | null;
+        try {
+            kept = await rollbackImageOf(plan, ctx);
+        } catch (error) {
+            return fail(ctx, reasonOf(error, RELEASE_IMAGE_GONE));
+        }
+        if (kept) {
+            imageTag = kept;
+        } else if (plan.build.method === "image") {
             if (!plan.build.imageRef) return fail(ctx, "an image source needs an image reference");
             imageTag = plan.build.imageRef;
             const done = step(`Pulling ${plan.build.imageRef}`);
@@ -252,6 +265,10 @@ export class ComposeRuntime implements RuntimeDriver {
             return fail(ctx, `build method "${plan.build.method}" is not yet supported on the compose runtime`);
         }
 
+        // Kept under the release's own name before it runs, so the container is
+        // on the immutable image and a rollback later finds exactly this.
+        if (!kept) imageTag = await pinRelease(imageTag, plan, ctx);
+
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
         const spec = appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork);
         // Establish any NAS mounts the volumes bind onto, before the container comes
@@ -281,7 +298,21 @@ export class ComposeRuntime implements RuntimeDriver {
         }
         const started = step("Starting the containers");
         try {
-            await composeUpRetryingLease(ctx, spec, sink, plan.build.method === "image" ? imageTag : null);
+            // Only an image a registry can hand out again is worth re-fetching. A
+            // pinned one is got back by pulling its source and pinning it again; a
+            // built or rolled-back one exists nowhere but this machine.
+            const source = plan.build.imageRef;
+            const refetch =
+                !kept && plan.build.method === "image" && source
+                    ? {
+                          image: source,
+                          again: async () => {
+                              await ctx.ports.pull(source, sink);
+                              if (imageTag !== source) await pinRelease(source, plan, ctx);
+                          }
+                      }
+                    : null;
+            await composeUpRetryingLease(ctx, spec, sink, refetch);
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
@@ -334,7 +365,10 @@ export class ComposeRuntime implements RuntimeDriver {
         await ctx.ports.pull(plan.image, sink);
         const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
         try {
-            await composeUpRetryingLease(ctx, spec, sink, plan.image);
+            await composeUpRetryingLease(ctx, spec, sink, {
+                image: plan.image,
+                again: () => ctx.ports.pull(plan.image, sink)
+            });
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));
         }

@@ -12,25 +12,25 @@ import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
 import { TerminalPanel } from "./terminal-panel";
+import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
+import { useParams, useRouter } from "next/navigation";
 import { describeServiceEvent } from "./service-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
-import { useProjectCan } from "./access-context";
-import { useParams, useRouter } from "next/navigation";
-import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
-import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
+import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import {
     CONSUMPTION_METRICS,
@@ -79,6 +79,8 @@ import {
     Maximize2,
     Minimize2,
     MoreVertical,
+    Pin,
+    PinOff,
     Play,
     Plus,
     RotateCw,
@@ -87,6 +89,7 @@ import {
     ShieldCheck,
     Square,
     Trash2,
+    Undo2,
     X
 } from "lucide-react";
 
@@ -317,10 +320,41 @@ function DeployAvatar({ app, deployment }: { app: ProjectApp; deployment?: DepSu
     );
 }
 
-/** Deployment subtitle: relative time, optional author, and the source. */
+/** Deployment subtitle: relative time, optional author, the source, and how long
+ *  it took once it has finished. A rollback says so instead of naming a source,
+ *  since nothing was fetched from one. */
 function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: DisplayFormat): string {
     const by = deployment.authorName ? ` by ${deployment.authorName}` : "";
-    return `${relativeTime(deployment.createdAt, format)}${by} via ${sourceLabel(app)}`;
+    const via = deployment.rollbackOfId ? " - rolled back" : ` via ${sourceLabel(app)}`;
+    const took = deployment.durationMs !== null ? ` - took ${duration(deployment.durationMs)}` : "";
+    return `${relativeTime(deployment.createdAt, format)}${by}${via}${took}`;
+}
+
+/** A deploy's length the way a person says it: "48s", "3m 12s". */
+function duration(ms: number): string {
+    const seconds = Math.max(0, Math.round(ms / 1000));
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    return seconds % 60 === 0 ? `${minutes}m` : `${minutes}m ${seconds % 60}s`;
+}
+
+/** Whether a version can be put back instantly, and whether it is being kept
+ *  past the window. Only for versions that are not live: the live one is the
+ *  one everything else would be rolled back from. */
+function KeptChip({ deployment }: { deployment: DepSummary }) {
+    if (deployment.isCurrent || !deployment.imageKept) return null;
+    return (
+        <span
+            title={
+                deployment.pinned
+                    ? "Kept until you stop keeping it - roll back to it at any time"
+                    : "Its image is still on the server - roll back to it instantly"
+            }
+            className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[0.6875rem] font-medium text-primary"
+        >
+            {deployment.pinned ? "Pinned" : "Instant rollback"}
+        </span>
+    );
 }
 
 /** The address one kept version answers on, beside the service's own. Only a
@@ -415,6 +449,20 @@ function DeploymentMenu({
         });
     }
 
+    /** Put this release back live from its kept image, and follow the new
+     *  deployment the way a redeploy does. */
+    function rollBack() {
+        startTransition(async () => {
+            const result = await deployActions
+                .rollbackDeploymentAction(deployment.id)
+                .catch(() => ({ error: "Could not roll back to that release", deploymentId: undefined }));
+            setError(result.error ?? null);
+            onAct();
+            onChanged();
+            if (result.deploymentId) onDeployStarted(result.deploymentId);
+        });
+    }
+
     // Every item in this menu ships or tears down a release, so with no standing
     // to do that there is no menu - not one that opens onto nothing.
     if (!can("deploy.run")) return null;
@@ -441,9 +489,30 @@ function DeploymentMenu({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                {deployment.rollbackable && (
+                    <DropdownMenuItem onSelect={rollBack}>
+                        <Undo2 className="size-4" /> Roll back to this version
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={redeploy}>
-                    <RotateCw className="size-4" /> Redeploy
+                    <RotateCw className="size-4" /> {isActive ? "Redeploy" : "Deploy latest source"}
                 </DropdownMenuItem>
+                {deployment.imageKept && (
+                    <DropdownMenuItem
+                        onSelect={() =>
+                            run(() =>
+                                deployActions.pinDeploymentAction(deployment.id, !deployment.pinned)
+                            )
+                        }
+                    >
+                        {deployment.pinned ? (
+                            <PinOff className="size-4" />
+                        ) : (
+                            <Pin className="size-4" />
+                        )}
+                        {deployment.pinned ? "Stop keeping this version" : "Keep this version"}
+                    </DropdownMenuItem>
+                )}
                 {isActive && (
                     <>
                         <DropdownMenuItem
@@ -714,6 +783,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                         {deploySubtitle(deployment, app, format)}
                                                     </p>
                                                 </div>
+                                                <KeptChip deployment={deployment} />
                                                 <ReleaseLink deployment={deployment} />
                                                 {/* A deploy still in flight is listed
                                                     here, so this is where it is stopped

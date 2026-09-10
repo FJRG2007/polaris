@@ -92,6 +92,38 @@ export function portSubject(appId: string, current: { id: string; isolated: bool
     return current?.isolated ? current.id : appId;
 }
 
+/**
+ * Which kept release images have fallen out of a service's rollback window.
+ *
+ * `rows` are the service's deployments that still have a kept image, newest
+ * first. The live one and any pinned one always stay; after them the newest
+ * `window` distinct images stay. Counted in images rather than rows because a
+ * rollback runs an image another deployment already kept - two rows, one image,
+ * and removing it for the older row would pull it out from under the newer.
+ */
+export function imagesOutsideWindow(
+    rows: readonly { id: string; imageTag: string | null; pinned: boolean }[],
+    currentId: string | null,
+    window: number
+): string[] {
+    const keep = new Set<string>();
+    for (const row of rows) {
+        if (row.imageTag && (row.id === currentId || row.pinned)) keep.add(row.imageTag);
+    }
+    let counted = 0;
+    for (const row of rows) {
+        if (!row.imageTag || keep.has(row.imageTag)) continue;
+        if (counted >= window) continue;
+        keep.add(row.imageTag);
+        counted += 1;
+    }
+    return [
+        ...new Set(
+            rows.flatMap((row) => (row.imageTag && !keep.has(row.imageTag) ? [row.imageTag] : []))
+        )
+    ];
+}
+
 /** The shape any caller needs loaded to resolve which release is serving. */
 export interface ReleaseSubject {
     id: string;

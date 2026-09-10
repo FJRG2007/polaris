@@ -37,16 +37,16 @@ import {
     type DeployZoneOption
 } from "@/lib/domain-zones";
 import {
+    getCloudflareAccountStatus,
+    type CloudflareAccountStatus
+} from "@/lib/integrations/cloudflare-account-service";
+import {
     listVolumes,
     createVolume,
     updateVolume,
     deleteVolume,
     type VolumeView
 } from "@/lib/deploy-volume-service";
-import {
-    getCloudflareAccountStatus,
-    type CloudflareAccountStatus
-} from "@/lib/integrations/cloudflare-account-service";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -762,6 +762,60 @@ export async function cancelDeploymentAction(deploymentId: string): Promise<{ er
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not stop the deployment"
+        };
+    }
+}
+
+/** Put an earlier release back live from its kept image - see
+ *  `rollbackToDeployment`. The same capability a deploy needs, because it is
+ *  one: a different version goes in front of the same traffic. */
+export async function rollbackDeploymentAction(
+    deploymentId: string
+): Promise<{ error?: string; deploymentId?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
+        const started = await deployService.rollbackToDeployment(
+            deploymentId,
+            access.ownerId,
+            user.id
+        );
+        await recordServiceEvent(
+            user.id,
+            started.applicationId,
+            "deploy.app.rollback",
+            "rolled back",
+            { to: started.commitSha?.slice(0, 7) ?? deploymentId }
+        );
+        revalidatePath(DEPLOY_PATH);
+        return { deploymentId: started.deploymentId };
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "Could not roll back to that release"
+        };
+    }
+}
+
+/** Keep a release's image past the rollback window, or give it back to it. */
+export async function pinDeploymentAction(
+    deploymentId: string,
+    pinned: boolean
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
+        await deployService.setDeploymentPinned(deploymentId, access.ownerId, pinned);
+        await recordAudit({
+            actorId: user.id,
+            action: pinned ? "deploy.app.pin" : "deploy.app.unpin",
+            targetType: "deployment",
+            targetId: deploymentId
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change that release"
         };
     }
 }

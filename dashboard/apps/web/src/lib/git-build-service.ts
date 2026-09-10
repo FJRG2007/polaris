@@ -50,6 +50,15 @@ export interface GitSource {
      * authorized - is one only they can answer.
      */
     explain?: () => Promise<string | null>;
+    /**
+     * The exact commit to build, when one is known.
+     *
+     * A push announces a commit, and the build used to clone whatever the branch
+     * head was by the time the queue reached it - so two pushes a minute apart
+     * could both build the second one, and the first deployment would carry a
+     * commit it never ran. With this the clone is moved to the named commit.
+     */
+    commitSha?: string;
 }
 
 /** What the service says about building itself, over and above what is detected.
@@ -256,6 +265,20 @@ export function gitBuildContext(
             throw new Error(more ? `${refusal} ${more}` : refusal);
         }
 
+        // Moved to the commit this deploy is for, when the branch has gone past
+        // it. Fetched on its own, one commit deep, with the same credential - a
+        // forge answers a fetch of a commit reachable from its branches.
+        if (source.commitSha) {
+            try {
+                await checkoutCommit(dir, source, watched);
+            } catch (error) {
+                await rm(dir, { recursive: true, force: true });
+                throw new Error(
+                    `Commit ${source.commitSha.slice(0, 7)} could not be fetched: ${error instanceof Error ? error.message : "the fetch failed"}`
+                );
+            }
+        }
+
         // Best-effort: a repository that defeats detection still deploys exactly as
         // it did before, with the builder left to its own devices.
         let configured: { root?: string; dockerfile?: string } = {};
@@ -292,6 +315,33 @@ export function cloneRefusal(said: string, source: GitSource): string | null {
     return source.authHeader
         ? `${repo} refused the connected account. It may no longer have access to the repository, or the account may need linking again under Connected accounts.`
         : `${repo} needs an account: it is private, or it is not there. Connect the account that can see it under Connected accounts, then deploy again.`;
+}
+
+/** A full or abbreviated commit id, and nothing git would read as an option. */
+const COMMIT_ID = /^[0-9a-f]{7,64}$/i;
+
+/**
+ * Put a fresh shallow clone on one named commit.
+ *
+ * Nothing is fetched when the branch head already is that commit, which is the
+ * ordinary case: the deploy was started by the push that made it the head.
+ */
+async function checkoutCommit(
+    dir: string,
+    source: GitSource,
+    onOutput: (chunk: Buffer) => void
+): Promise<void> {
+    const sha = source.commitSha ?? "";
+    if (!COMMIT_ID.test(sha)) throw new Error("that is not a commit id");
+    let head = "";
+    await runCommand("git", ["-C", dir, "rev-parse", "HEAD"], (chunk) => {
+        head += chunk.toString("utf8");
+    });
+    if (head.trim().toLowerCase().startsWith(sha.toLowerCase())) return;
+    const config = source.authHeader ? ["-c", `http.extraHeader=${source.authHeader}`] : [];
+    onOutput(Buffer.from(`The branch has moved on; building ${sha.slice(0, 7)} as this deploy asked.\n`));
+    await runCommand("git", [...config, "-C", dir, "fetch", "--depth", "1", "origin", sha], onOutput, NO_PROMPTS);
+    await runCommand("git", ["-C", dir, "checkout", "--detach", "FETCH_HEAD"], onOutput, NO_PROMPTS);
 }
 
 function runCommand(

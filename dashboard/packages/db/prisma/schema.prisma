@@ -624,7 +624,6 @@ model NoteFolder {
     @@index([parentId])
 }
 
-
 // The account somebody named to take over their own if they die.
 //
 // One row per account, and only ever written by the account itself: naming a
@@ -4076,6 +4075,16 @@ model Deployment {
     // write to it.
     githubRepo         String?
     githubDeploymentId String?
+    // True while the image in `imageTag` is a pinned release image still on the
+    // target, which is what makes rolling back to this release instant. Cleared
+    // when the image falls out of the kept window and is removed, so the screen
+    // offers a rollback only where one can actually happen.
+    imageKept      Boolean   @default(false)
+    // Kept regardless of the window, until somebody unpins it.
+    pinned         Boolean   @default(false)
+    // The deployment this one rolled back to, when it was a rollback rather
+    // than a build. Its image is that deployment's image.
+    rollbackOfId   String?   @db.Uuid
     triggeredById  String?   @db.Uuid
     startedAt      DateTime?
     finishedAt     DateTime?
