@@ -2,6 +2,7 @@ import { PageHeader } from "@polaris/ui";
 import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
 import { SettingsView } from "./settings-view";
+import { TransferCard } from "./transfer-card";
 import { getUpdateSource } from "@/lib/update-source";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
 import { getLegalContact, publicUrls } from "@/lib/legal/service";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
  * `/api/admin/settings/overview`.
  */
 export default async function SettingsPage() {
-    await requireAdmin();
+    const user = await requireAdmin();
     const env = loadEnv();
     const [policy, source, contact, publicPages] = await Promise.all([
         getAutoUpdatePolicy(),
@@ -48,6 +49,7 @@ export default async function SettingsPage() {
                     autoUpdate: env.POLARIS_AUTO_UPDATE
                 }}
             />
+            <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>
     );
 }
