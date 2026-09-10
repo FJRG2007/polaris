@@ -22,6 +22,7 @@ import {
     generateDockerfile,
     GENERATED_DOCKERFILE,
     INSTALL_ENV,
+    LANGUAGE_FILES,
     nixpacksConfig,
     type BuildContext,
     type PackageManifest,
@@ -72,6 +73,33 @@ export interface BuildCommands {
     /** The port the plan publishes, so a generated image listens where the
      *  deployment expects it rather than on the framework's own default. */
     port?: number;
+    /** Build Python, Go, Rust, PHP, Ruby, Java, Elixir and static sites from a
+     *  generated image as well (see `DetectOptions.languages`). */
+    languages?: boolean;
+    /** The runtime version the service set ("20", "3.11", "1.22"). */
+    runtimeVersion?: string | null;
+    /** Where a built site's files are, relative to the service's directory, when
+     *  the framework's own default is not it. */
+    outputDirectory?: string | null;
+}
+
+/** The most of one manifest read for detection. A manifest is a few kilobytes; a
+ *  file this size named like one is not something detection should hold. */
+const MANIFEST_LIMIT = 64 * 1024;
+
+/** The text of the detection manifests present in a directory. */
+async function readTexts(directory: string, files: readonly string[]): Promise<Record<string, string>> {
+    const texts: Record<string, string> = {};
+    for (const name of LANGUAGE_FILES) {
+        if (!files.includes(name)) continue;
+        try {
+            const text = await readFile(join(directory, name), "utf8");
+            if (text.length <= MANIFEST_LIMIT) texts[name] = text;
+        } catch {
+            // Unreadable is the same as absent here.
+        }
+    }
+    return texts;
 }
 
 /**
@@ -136,10 +164,13 @@ async function snapshot(dir: string, rootDirectory: string | undefined): Promise
     const segments = (rootDirectory ?? "").split("/").filter(Boolean);
     const paths = ["", ...segments.map((_, at) => segments.slice(0, at + 1).join("/"))];
     const levels = await Promise.all(
-        paths.map(async (path) => {
+        paths.map(async (path, at) => {
             const directory = path ? join(dir, path) : dir;
             const [files, manifest] = await Promise.all([listDirectory(directory), readManifest(directory)]);
-            return { path, files, manifest };
+            // Only the service's own directory is read for the other languages'
+            // manifests; the levels above it only matter to a JavaScript workspace.
+            const texts = at === paths.length - 1 ? await readTexts(directory, files) : undefined;
+            return { path, files, manifest, texts };
         })
     );
     return { levels };
@@ -152,14 +183,18 @@ async function snapshot(dir: string, rootDirectory: string | undefined): Promise
  * A repository that ships its own nixpacks.toml is left alone: it has said what it
  * wants more precisely than any detection can, and overwriting it would be Polaris
  * quietly winning an argument with the person who wrote it.
+ *
+ * Exported for its test, which runs it against a directory rather than a clone.
  */
-async function configureBuild(
+export async function configureBuild(
     dir: string,
     commands: BuildCommands,
     log: (line: string) => void
 ): Promise<{ root?: string; dockerfile?: string }> {
     const rootDirectory = commands.rootDirectory || undefined;
-    const detected = await snapshot(dir, rootDirectory).then(detectBuild);
+    const detected = await snapshot(dir, rootDirectory).then((found) =>
+        detectBuild(found, { languages: commands.languages, runtimeVersion: commands.runtimeVersion })
+    );
     const buildRoot = detected?.buildRoot ?? rootDirectory ?? "";
     const configDir = buildRoot ? join(dir, buildRoot) : dir;
 
@@ -174,7 +209,12 @@ async function configureBuild(
         const overridden = {
             install: commands.installCommand || detected.image.install,
             build: commands.buildCommand || detected.image.build,
-            start: commands.startCommand || detected.image.start
+            start: commands.startCommand || detected.image.start,
+            // Only a built site has an output directory to point elsewhere.
+            staticDirectory:
+                detected.image.staticDirectory !== null && commands.outputDirectory
+                    ? commands.outputDirectory
+                    : detected.image.staticDirectory
         };
         await writeFile(
             join(dir, GENERATED_DOCKERFILE),

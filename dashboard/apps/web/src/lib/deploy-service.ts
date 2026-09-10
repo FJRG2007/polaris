@@ -561,6 +561,10 @@ export interface CreateApplicationInput {
      *  screen passes false, so what somebody deploys there is reached through the
      *  edge and nothing else. */
     publishPort?: boolean;
+    /** How it builds: commands and settings picked up from the repository. */
+    buildConfig?: Record<string, unknown>;
+    /** How many copies run, from a config file that said. */
+    replicas?: number;
 }
 
 export async function createApplication(ownerId: string, input: CreateApplicationInput) {
@@ -584,7 +588,9 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             autoDeploy: input.autoDeploy ?? false,
             deployBranch: input.deployBranch ?? null,
             keepReleases: input.keepReleases ?? false,
-            publishPort: input.publishPort ?? true
+            publishPort: input.publishPort ?? true,
+            ...(input.buildConfig ? { buildConfig: JSON.stringify(input.buildConfig) } : {}),
+            ...(input.replicas ? { replicas: input.replicas } : {})
         }
     });
     // Stack-specific rule packs are decided here, at the one moment the stack is
@@ -2500,7 +2506,13 @@ async function buildAppPlan(
                   port: containerPort,
                   installCommand: stringOrNull(build.installCommand),
                   buildCommand: stringOrNull(build.buildCommand),
-                  startCommand: stringOrNull(build.startCommand)
+                  startCommand: stringOrNull(build.startCommand),
+                  outputDirectory: stringOrNull(build.outputDirectory),
+                  runtimeVersion: stringOrNull(build.runtimeVersion),
+                  // Set on every service created since the other languages were
+                  // detected, and on one that names its own runtime version. A
+                  // service the builder already deploys stays on the builder.
+                  languages: build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
               }
             : undefined;
     return {
@@ -3429,6 +3441,8 @@ export async function setApplicationSourcePaths(
         installCommand?: string | null;
         buildCommand?: string | null;
         startCommand?: string | null;
+        outputDirectory?: string | null;
+        runtimeVersion?: string | null;
     }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
@@ -3445,10 +3459,13 @@ export async function setApplicationSourcePaths(
     // this service is built, not where it is. Cleared back to undefined when blank,
     // which is what hands the phase back to detection.
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
-    for (const key of ["installCommand", "buildCommand", "startCommand"] as const) {
+    for (const key of ["installCommand", "buildCommand", "startCommand", "runtimeVersion"] as const) {
         const value = paths[key];
         if (value !== undefined) build[key] = value?.trim() || undefined;
     }
+    // Relative to the service's directory, like the root directory is to the
+    // repository's, so it goes through the same normalizer.
+    if (paths.outputDirectory !== undefined) build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
 
     await prisma.application.update({
         where: { id: app.id },

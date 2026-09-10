@@ -9,6 +9,8 @@
  */
 
 import { FilesPanel } from "./files-panel";
+import { RepoConfigPreview } from "./repo-config-preview";
+import type { ImportedConfig } from "@polaris/deploy";
 import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
@@ -122,6 +124,10 @@ export interface ProjectSummary {
             installCommand: string | null;
             buildCommand: string | null;
             startCommand: string | null;
+            /** The runtime version it builds on, when the service names one. */
+            runtimeVersion: string | null;
+            /** Where a built site's files end up, when not the framework's default. */
+            outputDirectory: string | null;
             /** The container port the app listens on (for the IP:port link and routes). */
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
@@ -1077,6 +1083,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [dockerfilePath, setDockerfilePath] = useState("Dockerfile");
     const [rootDirectory, setRootDirectory] = useState("");
     const [framework, setFramework] = useState<string | null>(null);
+    const [imported, setImported] = useState<ImportedConfig | null>(null);
+    const [useRepoConfig, setUseRepoConfig] = useState(true);
     const [inspecting, setInspecting] = useState(false);
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
@@ -1100,6 +1108,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         setName(repo.fullName.split("/")[1] ?? "");
         setBranch(repo.defaultBranch);
         setFramework(null);
+        setImported(null);
+        setUseRepoConfig(true);
         setInspecting(true);
         const [owner, repoName] = repo.fullName.split("/");
         void deployActions
@@ -1112,6 +1122,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 setBuilder(inspection.builder);
                 setDockerfilePath(inspection.dockerfile ?? "Dockerfile");
                 setFramework(inspection.framework);
+                setImported(inspection.imported);
             })
             .catch(() => undefined)
             .finally(() => setInspecting(false));
@@ -1150,7 +1161,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 rootDirectory: rootDirectory.trim() || undefined,
                 // Only a GitHub repository can be cloned with the stored credentials.
                 provider: connected && choice.fullName ? "github" : undefined,
-                serverId
+                serverId,
+                useRepoConfig: imported !== null && useRepoConfig
             });
             if (result.error) setError(result.error);
             else onDone();
@@ -1265,6 +1277,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         </Field>
                     )}
                     <ServerField servers={servers} value={serverId} onChange={setServerId} />
+                    {imported && <RepoConfigPreview imported={imported} use={useRepoConfig} onUse={setUseRepoConfig} />}
                 </>
             )}
 

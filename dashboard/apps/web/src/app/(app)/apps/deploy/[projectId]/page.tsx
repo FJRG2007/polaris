@@ -139,6 +139,8 @@ export default async function DeployProjectPage({
                 installCommand: storedText(app.buildConfig, "installCommand"),
                 buildCommand: storedText(app.buildConfig, "buildCommand"),
                 startCommand: storedText(app.buildConfig, "startCommand"),
+                runtimeVersion: storedText(app.buildConfig, "runtimeVersion"),
+                outputDirectory: storedText(app.buildConfig, "outputDirectory"),
                 port: portOf(app.sourceConfig),
                 // None for a service whose port is kept closed: it has no address of
                 // its own on the machine, only its domains. A kept release is still

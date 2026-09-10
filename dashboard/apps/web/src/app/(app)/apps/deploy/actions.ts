@@ -17,6 +17,7 @@ import * as activity from "@/lib/activity/activity";
 import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
 import type { DomainOwner } from "@/lib/owner-domains";
+import { parseGithubRepo } from "@/lib/repo-reference";
 import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
 import * as environments from "@/lib/deploy/environments";
@@ -30,8 +31,9 @@ import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
+import { applyImportedAfterCreate, importedCreate } from "@/lib/deploy/repo-import";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
-import { inspectGithubRepo, type GithubRepo, type RepoInspection } from "@/lib/github-service";
+import { inspectGithubRepo, readGithubRepoSetup, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import {
     getDomainZones,
     isBaseZoneKey,
@@ -107,6 +109,7 @@ import {
     environmentCreateSchema,
     DB_ENGINES,
     normalizeRelPath,
+    runtimeVersionSchema,
     type DatabaseCreateInput,
     type DeployVolumeInput,
     type DeployVolumeUpdateInput,
@@ -341,7 +344,10 @@ export async function createApplicationAction(input: {
     provider?: string;
     port?: number;
     serverId?: string;
-}): Promise<{ error?: string; deploymentId?: string }> {
+    /** Take the settings the repository's own deploy files set (railway.json,
+     *  render.yaml, netlify.toml, vercel.json, Procfile, app.json). */
+    useRepoConfig?: boolean;
+}): Promise<{ error?: string; deploymentId?: string; needs?: string[] }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
     if (!name) return { error: "An application name is required" };
@@ -397,6 +403,28 @@ export async function createApplicationAction(input: {
         // unless the project has turned that default off in its flags.
         const flags = await getFlagsForEnvironment(input.environmentId);
         const branch = input.branch?.trim() || undefined;
+        // What the repository's own deploy files set, read as the creator - only a
+        // GitHub repository can be read before it is cloned.
+        const github = isGit && input.provider === "github" ? parseGithubRepo(sourceConfig.repoUrl as string) : null;
+        const setup =
+            github && branch && input.useRepoConfig !== false
+                ? await readGithubRepoSetup(
+                      github.owner,
+                      github.repo,
+                      branch,
+                      (sourceConfig.rootDirectory as string | undefined) ?? "",
+                      await githubTokenForUser(user.id, github.owner)
+                  ).catch(() => null)
+                : null;
+        const fromRepo = isGit
+            ? importedCreate(setup?.imported ?? null, {
+                  rootDirectory: input.rootDirectory,
+                  dockerfilePath: input.dockerfilePath,
+                  builder: isNixpacks ? "nixpacks" : "dockerfile"
+              })
+            : null;
+        if (fromRepo?.rootDirectory) sourceConfig.rootDirectory = fromRepo.rootDirectory;
+        if (fromRepo?.dockerfilePath) sourceConfig.dockerfilePath = fromRepo.dockerfilePath;
         const app = await deployService.createApplication(owner, {
             environmentId: input.environmentId,
             targetId: target.id,
@@ -408,8 +436,12 @@ export async function createApplicationAction(input: {
             keepReleases: flags.keepReleasesByDefault,
             // Reached through the edge only, until somebody deliberately opens its port
             // on the machine's own address. Closed is the default a firewall should have.
-            publishPort: false
+            publishPort: false,
+            ...(fromRepo ? { buildConfig: fromRepo.buildConfig } : {}),
+            // A service that keeps its previous deployments runs one copy of each.
+            ...(fromRepo?.replicas && !flags.keepReleasesByDefault ? { replicas: fromRepo.replicas } : {})
         });
+        const needs = await applyImportedAfterCreate(app.id, owner, setup?.imported ?? null);
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.create",
@@ -442,7 +474,7 @@ export async function createApplicationAction(input: {
             // Surfaced on the app's next manual deploy; creation still succeeds.
         }
         revalidatePath(DEPLOY_PATH);
-        return { deploymentId };
+        return { deploymentId, ...(needs.length > 0 ? { needs } : {}) };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not create the application"
@@ -822,8 +854,17 @@ export async function setAppSourcePathsAction(input: {
     installCommand?: string;
     buildCommand?: string;
     startCommand?: string;
+    runtimeVersion?: string;
+    outputDirectory?: string;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
+    // Blank clears it; anything else has to be a version an image can be named by.
+    const runtimeVersion = input.runtimeVersion?.trim()
+        ? runtimeVersionSchema.safeParse(input.runtimeVersion)
+        : null;
+    if (runtimeVersion && !runtimeVersion.success) {
+        return { error: runtimeVersion.error.issues[0]?.message ?? "Check the runtime version" };
+    }
     try {
         const access = await requireApplicationAccess(
             input.applicationId,
@@ -835,7 +876,9 @@ export async function setAppSourcePathsAction(input: {
             dockerfilePath: input.dockerfilePath,
             installCommand: input.installCommand,
             buildCommand: input.buildCommand,
-            startCommand: input.startCommand
+            startCommand: input.startCommand,
+            ...(input.runtimeVersion !== undefined ? { runtimeVersion: runtimeVersion?.data ?? "" } : {}),
+            ...(input.outputDirectory !== undefined ? { outputDirectory: input.outputDirectory } : {})
         });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -1747,7 +1790,7 @@ export async function inspectRepoAction(input: {
         const token = await githubTokenForUser(user.id, input.owner);
         return await inspectGithubRepo(input.owner, input.repo, input.branch, token);
     } catch {
-        return { dockerfile: null, framework: null, builder: "nixpacks" };
+        return { dockerfile: null, framework: null, builder: "nixpacks", imported: null };
     }
 }
 

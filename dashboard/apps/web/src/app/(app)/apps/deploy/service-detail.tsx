@@ -40,7 +40,7 @@ import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
-import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
+import { isTunnelHostname, runtimeVersionSchema, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import {
     CONSUMPTION_METRICS,
@@ -2484,6 +2484,12 @@ function SettingsTab({
     const [installCommand, setInstallCommand] = useState(app.installCommand ?? "");
     const [buildCommand, setBuildCommand] = useState(app.buildCommand ?? "");
     const [startCommand, setStartCommand] = useState(app.startCommand ?? "");
+    const [runtimeVersion, setRuntimeVersion] = useState(app.runtimeVersion ?? "");
+    const [outputDirectory, setOutputDirectory] = useState(app.outputDirectory ?? "");
+    // Checked as it is typed, against the schema the server applies.
+    const runtimeVersionProblem = runtimeVersion.trim()
+        ? (runtimeVersionSchema.safeParse(runtimeVersion).error?.issues[0]?.message ?? null)
+        : null;
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
     // Empty means "not pinned": the deploy detects the container port from the image
     // (see buildAppPlan). Only a value the user types here pins it.
@@ -2618,13 +2624,19 @@ function SettingsTab({
                 }
             }
             if (isGit) {
+                if (runtimeVersionProblem) {
+                    setError(runtimeVersionProblem);
+                    return;
+                }
                 const paths = await deployActions.setAppSourcePathsAction({
                     applicationId: app.id,
                     rootDirectory: rootDirectory.trim(),
                     dockerfilePath: dockerfilePath.trim(),
                     installCommand: installCommand.trim(),
                     buildCommand: buildCommand.trim(),
-                    startCommand: startCommand.trim()
+                    startCommand: startCommand.trim(),
+                    runtimeVersion: runtimeVersion.trim(),
+                    outputDirectory: outputDirectory.trim()
                 });
                 if (paths.error) {
                     setError(paths.error);
@@ -3255,6 +3267,35 @@ function SettingsTab({
                                 autoCorrect="off"
                                 spellCheck={false}
                             />
+                        </label>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Runtime version
+                            <Input
+                                value={runtimeVersion}
+                                onChange={(event) => setRuntimeVersion(event.target.value)}
+                                placeholder="22, 3.12, 1.23"
+                                aria-invalid={runtimeVersionProblem !== null}
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                            <span className={runtimeVersionProblem ? "text-danger" : undefined}>
+                                {runtimeVersionProblem ?? "Node, Python, Go, Ruby, PHP or Java version to build on."}
+                            </span>
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Output directory
+                            <Input
+                                value={outputDirectory}
+                                onChange={(event) => setOutputDirectory(event.target.value)}
+                                placeholder="dist"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                            <span>For a built site, where its files end up.</span>
                         </label>
                     </div>
                 </section>

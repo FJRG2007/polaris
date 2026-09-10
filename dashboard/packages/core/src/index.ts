@@ -108,6 +108,7 @@ export * from "./vault-items.js";
 export * from "./vault-cards.js";
 export * from "./schemas/storage.js";
 export * from "./schemas/deploy.js";
+export * from "./schemas/build-settings.js";
 export * from "./edge-config.js";
 export * from "./schemas/database.js";
 export * from "./schemas/database-statements.js";

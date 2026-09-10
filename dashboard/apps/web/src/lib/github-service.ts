@@ -14,6 +14,15 @@
 
 import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "./integration-service";
+import {
+    CONFIG_FILES,
+    detectBuild,
+    importDeployConfig,
+    importedAnything,
+    LANGUAGE_FILES,
+    type ImportedConfig,
+    type PackageManifest
+} from "@polaris/deploy";
 
 const PROVIDER = "github";
 const API = "https://api.github.com";
@@ -995,27 +1004,122 @@ export interface RepoInspection {
     framework: string | null;
     /** The build strategy to default to. */
     builder: "dockerfile" | "nixpacks";
+    /** What the repository's own deploy files set, for the form to show before
+     *  anything is created. Null when it has none. */
+    imported: ImportedConfig | null;
 }
 
-/** Framework hints keyed by a package.json dependency name. */
-const JS_FRAMEWORKS: Array<[string, string]> = [
-    ["next", "Next.js"],
-    ["nuxt", "Nuxt"],
-    ["@remix-run/react", "Remix"],
-    ["astro", "Astro"],
-    ["@angular/core", "Angular"],
-    ["@sveltejs/kit", "SvelteKit"],
-    ["vue", "Vue"],
-    ["react", "React"],
-    ["vite", "Vite"],
-    ["express", "Express"],
-    ["fastify", "Fastify"]
-];
+/** The most of one file read from a repository for detection. */
+const REPO_FILE_LIMIT = 64 * 1024;
+
+/** Every file and directory in a branch, by path. Empty on any API hiccup. */
+async function repoTree(owner: string, repo: string, branch: string, headers: HeadersInit): Promise<Map<string, "blob" | "tree">> {
+    const entries = new Map<string, "blob" | "tree">();
+    try {
+        const res = await fetch(`${API}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
+            headers,
+            cache: "no-store"
+        });
+        if (!res.ok) return entries;
+        const body = (await res.json()) as { tree?: Array<{ path?: string; type?: string }> };
+        for (const entry of body.tree ?? []) {
+            if (entry.path && (entry.type === "blob" || entry.type === "tree")) entries.set(entry.path, entry.type);
+        }
+    } catch {
+        // Nothing known about the tree.
+    }
+    return entries;
+}
+
+/** One file's text, or undefined when it cannot be read or is too big to be a
+ *  manifest. */
+async function repoText(owner: string, repo: string, branch: string, path: string, headers: HeadersInit): Promise<string | undefined> {
+    try {
+        const res = await fetch(
+            `${API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(branch)}`,
+            { headers, cache: "no-store" }
+        );
+        if (!res.ok) return undefined;
+        const body = (await res.json()) as { content?: string; size?: number };
+        if (!body.content || (body.size ?? 0) > REPO_FILE_LIMIT) return undefined;
+        return Buffer.from(body.content, "base64").toString("utf8");
+    } catch {
+        return undefined;
+    }
+}
+
+/** The files and folders directly inside one directory of the tree. */
+function namesIn(tree: Map<string, "blob" | "tree">, directory: string): string[] {
+    const prefix = directory ? `${directory}/` : "";
+    return [...tree.keys()].filter((path) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/")).map((path) => path.slice(prefix.length));
+}
+
+/** What a repository says about deploying it, read at the repository root and at
+ *  the service's own directory - the service's directory winning where both say
+ *  something. */
+export interface RepoSetup {
+    readonly framework: string | null;
+    readonly imported: ImportedConfig;
+}
+
+async function readRepoSetupFrom(
+    owner: string,
+    repo: string,
+    branch: string,
+    rootDirectory: string,
+    tree: Map<string, "blob" | "tree">,
+    headers: HeadersInit
+): Promise<RepoSetup> {
+    const wanted = new Set<string>([...CONFIG_FILES, ...LANGUAGE_FILES, "package.json"]);
+    const directories = [...new Set(["", rootDirectory])];
+    const texts: Record<string, string> = {};
+    let serviceTexts: Record<string, string> = {};
+    for (const directory of directories) {
+        const found: Record<string, string> = {};
+        const present = namesIn(tree, directory).filter((name) => wanted.has(name) && tree.get(directory ? `${directory}/${name}` : name) === "blob");
+        await Promise.all(
+            present.map(async (name) => {
+                const text = await repoText(owner, repo, branch, directory ? `${directory}/${name}` : name, headers);
+                if (text !== undefined) found[name] = text;
+            })
+        );
+        Object.assign(texts, found);
+        if (directory === rootDirectory) serviceTexts = found;
+    }
+    let manifest: PackageManifest | undefined;
+    try {
+        manifest = serviceTexts["package.json"] ? (JSON.parse(serviceTexts["package.json"]) as PackageManifest) : undefined;
+    } catch {
+        manifest = undefined;
+    }
+    const detected = detectBuild(
+        { levels: [{ path: rootDirectory, files: namesIn(tree, rootDirectory), manifest, texts: serviceTexts }] },
+        { languages: true }
+    );
+    return {
+        framework: detected?.framework ?? (manifest ? "Node.js" : null),
+        imported: importDeployConfig(texts)
+    };
+}
+
+/** Read what a GitHub repository says about deploying the service at `rootDirectory`. */
+export async function readGithubRepoSetup(
+    owner: string,
+    repo: string,
+    branch: string,
+    rootDirectory: string,
+    token: string | null
+): Promise<RepoSetup | null> {
+    const headers = optionalAuthHeaders(token);
+    const tree = await repoTree(owner, repo, branch, headers);
+    if (tree.size === 0) return null;
+    return readRepoSetupFrom(owner, repo, branch, rootDirectory, tree, headers);
+}
 
 /**
- * Inspect a repo to auto-configure a deploy: find a Dockerfile and detect the
- * framework (like Vercel/Railway) so the build needs no Dockerfile. Best-effort -
- * returns nulls on any API hiccup and defaults to a nixpacks (auto) build.
+ * Inspect a repo to auto-configure a deploy: find a Dockerfile, detect the stack,
+ * and read what its own deploy files set. Best-effort - returns nulls on any API
+ * hiccup and defaults to a nixpacks (auto) build.
  *
  * Reads the tree as whoever asked, for the same reason resolving a name does: the
  * file list of a private repository is its contents by another route.
@@ -1027,55 +1131,16 @@ export async function inspectGithubRepo(
     token: string | null
 ): Promise<RepoInspection> {
     const headers = optionalAuthHeaders(token);
-
-    let paths: string[] = [];
-    try {
-        const res = await fetch(
-            `${API}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-            { headers, cache: "no-store" }
-        );
-        if (res.ok) {
-            const body = (await res.json()) as { tree?: Array<{ path?: string; type?: string }> };
-            paths = (body.tree ?? []).filter((entry) => entry.type === "blob").map((entry) => entry.path ?? "");
-        }
-    } catch {
-        // fall through with no paths
-    }
-
+    const tree = await repoTree(owner, repo, branch, headers);
+    const paths = [...tree].filter(([, type]) => type === "blob").map(([path]) => path);
     const dockerfile = paths.find((p) => p === "Dockerfile") ?? paths.find((p) => p.endsWith("/Dockerfile")) ?? null;
-    const has = (name: string) => paths.some((p) => p === name || p.endsWith(`/${name}`));
-
-    let framework: string | null = null;
-    if (paths.includes("package.json")) {
-        framework = "Node.js";
-        try {
-            const res = await fetch(
-                `${API}/repos/${owner}/${repo}/contents/package.json?ref=${encodeURIComponent(branch)}`,
-                { headers, cache: "no-store" }
-            );
-            if (res.ok) {
-                const body = (await res.json()) as { content?: string };
-                const json = body.content
-                    ? (JSON.parse(Buffer.from(body.content, "base64").toString("utf8")) as {
-                          dependencies?: Record<string, string>;
-                          devDependencies?: Record<string, string>;
-                      })
-                    : {};
-                const deps = { ...json.dependencies, ...json.devDependencies };
-                const match = JS_FRAMEWORKS.find(([dep]) => dep in deps);
-                if (match) framework = match[1];
-            }
-        } catch {
-            // keep the generic Node.js label
-        }
-    } else if (has("requirements.txt") || has("pyproject.toml") || has("Pipfile")) framework = "Python";
-    else if (has("go.mod")) framework = "Go";
-    else if (has("Cargo.toml")) framework = "Rust";
-    else if (has("Gemfile")) framework = "Ruby";
-    else if (has("composer.json")) framework = "PHP";
-    else if (has("pom.xml") || has("build.gradle")) framework = "Java";
-
-    return { dockerfile, framework, builder: dockerfile ? "dockerfile" : "nixpacks" };
+    const setup = tree.size > 0 ? await readRepoSetupFrom(owner, repo, branch, "", tree, headers) : null;
+    return {
+        dockerfile,
+        framework: setup?.framework ?? null,
+        builder: dockerfile ? "dockerfile" : "nixpacks",
+        imported: setup && importedAnything(setup.imported) ? setup.imported : null
+    };
 }
 
 /**
