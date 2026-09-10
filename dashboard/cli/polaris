@@ -551,6 +551,16 @@ deploy_env() {
     esac
 }
 
+# The variables command for what must stay secret: every value it sets is
+# stored encrypted and never shown back, and a plain one is refused rather than
+# quietly written in the clear.
+deploy_secrets() {
+    for arg in "$@"; do
+        [ "$arg" = "--plain" ] && die "a secret is never plain - use 'polaris env set ... --plain' for a plain variable"
+    done
+    deploy_env "$@"
+}
+
 deploy_domains() {
     load_credentials
     sub=${1:-list}
@@ -604,13 +614,13 @@ completion_bash() {
 _polaris() {
     local cur=${COMP_WORDS[COMP_CWORD]}
     local prev=${COMP_WORDS[COMP_CWORD-1]}
-    local commands="setup token status ps doctor logs start stop restart update login logout whoami projects deploy deployments build-log rollback env domains completion help"
+    local commands="setup token status ps doctor logs start stop restart update login logout whoami projects deploy deployments build-log rollback env secrets domains completion help"
     if [ "$COMP_CWORD" -eq 1 ]; then
         COMPREPLY=($(compgen -W "$commands" -- "$cur"))
         return
     fi
     case "${COMP_WORDS[1]}" in
-        env)
+        env | secrets)
             if [ "$COMP_CWORD" -eq 2 ]; then COMPREPLY=($(compgen -W "list set unset import" -- "$cur")); return; fi ;;
         domains)
             if [ "$COMP_CWORD" -eq 2 ]; then COMPREPLY=($(compgen -W "list add remove" -- "$cur")); return; fi ;;
@@ -623,7 +633,7 @@ _polaris() {
         --dockerfile) COMPREPLY=($(compgen -f -- "$cur")); return ;;
     esac
     case "${COMP_WORDS[1]}" in
-        deploy | deployments | logs | status | restart | stop | start | env | domains)
+        deploy | deployments | logs | status | restart | stop | start | env | secrets | domains)
             COMPREPLY=($(compgen -W "$(polaris projects --quiet 2>/dev/null)" -- "$cur")) ;;
     esac
 }
@@ -667,6 +677,7 @@ case "$cmd" in
     build-log) deploy_build_log "$@" ;;
     rollback) deploy_rollback "$@" ;;
     env) deploy_env "$@" ;;
+    secrets) deploy_secrets "$@" ;;
     domains) deploy_domains "$@" ;;
     completion)
         [ "${1:-bash}" = "bash" ] || die "only bash completion is available"
@@ -704,6 +715,8 @@ Deploy (from anywhere, with an API key):
   polaris restart|stop|start <service>
   polaris env list|set|unset|import <service> ...
                   set KEY=VALUE [--plain]   unset KEY   import <file|-> [--plain]
+  polaris secrets list|set|unset|import <service> ...
+                                       The same, always encrypted and never shown back
   polaris domains list|add|remove <service> ...
                   add [hostname] [--port N] [--cert le|internal|none]   remove <hostname|id>
   polaris completion bash              Tab completion (eval it in ~/.bashrc)

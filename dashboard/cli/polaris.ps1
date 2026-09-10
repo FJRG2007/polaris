@@ -730,6 +730,11 @@ switch ($Command) {
     "build-log" { Show-BuildLog (Get-ApiContext) $Rest }
     "rollback" { Invoke-Rollback (Get-ApiContext) $Rest }
     "env" { Invoke-Env (Get-ApiContext) $Rest }
+    "secrets" {
+        # Every value set here is stored encrypted and never shown back.
+        if ($Rest -contains "--plain") { Stop-WithError "a secret is never plain - use 'polaris env set ... --plain' for a plain variable" }
+        Invoke-Env (Get-ApiContext) $Rest
+    }
     "domains" { Invoke-Domains (Get-ApiContext) $Rest }
     "update" {
         $installer = Join-Path $installDir "dashboard\scripts\install.ps1"
@@ -776,6 +781,8 @@ Deploy (from anywhere, with an API key):
   polaris restart|stop|start <service>
   polaris env list|set|unset|import <service> ...
                   set KEY=VALUE [--plain]   unset KEY   import <file> [--plain]
+  polaris secrets list|set|unset|import <service> ...
+                                       The same, always encrypted and never shown back
   polaris domains list|add|remove <service> ...
                   add [hostname] [--port N] [--cert le|internal|none]   remove <hostname|id>
 
