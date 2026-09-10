@@ -17,7 +17,9 @@ export async function GET(): Promise<Response> {
     // Expire every Polaris cookie (prefix "polaris" - the session token, its
     // cache, any CSRF cookie). Set-Cookie is written straight onto the response so
     // it applies even though we return a raw Response.
-    const headers = new Headers({ location: "/oauth/login" });
+    // Never stored: a browser replays a cached redirect without its Set-Cookie, which
+    // would be a reset that clears nothing.
+    const headers = new Headers({ location: "/oauth/login", "cache-control": "no-store" });
     for (const cookie of store.getAll()) {
         if (cookie.name.startsWith("polaris")) {
             headers.append("set-cookie", `${cookie.name}=; Path=/; Max-Age=0`);

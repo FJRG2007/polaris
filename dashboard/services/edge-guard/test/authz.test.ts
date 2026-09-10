@@ -368,6 +368,28 @@ describe("evaluate - login callback", () => {
         expect(decision.status).toBe(302);
         expect(decision).toMatchObject({ location: expect.stringContaining("/edge/authorize") });
     });
+
+    it("sends a stale callback round the login to where it was headed, not back to itself", () => {
+        // A callback replayed the next day carries a token that expired overnight. If
+        // its own URL became the return trip, Polaris would mint a fresh token only to
+        // land on the stale one again, forever.
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
+        const stale = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW - 60 }, SECRET);
+        const uri = `/edge/callback?token=${stale}&redirect=${encodeURIComponent(`https://${HOST}/dash`)}`;
+        const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri }, cfg);
+        const location = new URL((decision as { location: string }).location);
+        expect(location.pathname).toBe("/edge/authorize");
+        expect(location.searchParams.get("redirect")).toBe(`https://${HOST}/dash`);
+    });
+
+    it("never returns a visitor to the callback, whichever token carries them there", () => {
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
+        const fresh = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW + 3600 }, SECRET);
+        const nested = `https://${HOST}/edge/callback?token=old&redirect=${encodeURIComponent(`https://${HOST}/dash`)}`;
+        const uri = `/edge/callback?token=${fresh}&redirect=${encodeURIComponent(nested)}`;
+        const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri }, cfg);
+        expect(decision).toMatchObject({ status: 302, location: `https://${HOST}/` });
+    });
 });
 
 describe("evaluate - address intelligence", () => {

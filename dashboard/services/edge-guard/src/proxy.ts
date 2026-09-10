@@ -29,6 +29,7 @@
 
 import { sendVacant } from "./vacant.js";
 import type { Duplex } from "node:stream";
+import { sendRedirect } from "./redirect.js";
 import { sendBlocked } from "./block-page.js";
 import { connect as netConnect } from "node:net";
 import { sendChallenge } from "./challenge-page.js";
@@ -225,10 +226,7 @@ export function createProxyServer(config: () => GuardConfig): Server {
             return;
         }
         if (decision.status === 302) {
-            const headers: Record<string, string> = { location: decision.location };
-            if (decision.setCookie) headers["set-cookie"] = decision.setCookie;
-            res.writeHead(302, headers);
-            res.end();
+            sendRedirect(res, decision.location, decision.setCookie);
             return;
         }
         if (decision.status === 503) {

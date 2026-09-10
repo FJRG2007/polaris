@@ -284,3 +284,21 @@ describe("the firewall still applies", () => {
         expect(body).toContain("203.0.113.5");
     });
 });
+
+describe("the login handoff", () => {
+    it("is never stored, so a tab reopened the next day cannot replay it", async () => {
+        const response = await fetch(`${proxyUrl}/dash`, {
+            redirect: "manual",
+            headers: {
+                [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": "app.example.com",
+                "x-polaris-waf": encodeGuardRule({ deny: [], requireLogin: true, emailObfuscation: true, rules: [] })
+            }
+        });
+
+        expect(response.status).toBe(302);
+        expect(response.headers.get("location")).toContain("/edge/authorize");
+        expect(response.headers.get("cache-control")).toBe("no-store");
+    });
+});

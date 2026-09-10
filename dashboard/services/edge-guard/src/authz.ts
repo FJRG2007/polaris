@@ -158,19 +158,31 @@ function originalUrl(req: GuardRequest, proto: string): string | undefined {
  * reach. The rule is rewritten whenever routes are published, so it follows the address
  * the operator actually configured.
  */
-function loginRedirect(cfg: GuardConfig, req: GuardRequest, proto: string, rule: GuardRule): string {
+function loginRedirect(
+    cfg: GuardConfig,
+    req: GuardRequest,
+    proto: string,
+    rule: GuardRule,
+    returnTo = originalUrl(req, proto)
+): string {
     const base = rule.loginUrl ?? cfg.authorizeUrl;
-    const original = originalUrl(req, proto) ?? base;
-    return `${base}/edge/authorize?redirect=${encodeURIComponent(original)}`;
+    return `${base}/edge/authorize?redirect=${encodeURIComponent(returnTo ?? base)}`;
 }
 
-/** Confine a post-login redirect to the app's own host, so the guard is never an
- *  open redirector. Falls back to the app root. */
+/**
+ * Confine a post-login redirect to the app's own host, so the guard is never an
+ * open redirector. Falls back to the app root.
+ *
+ * Never back to the callback itself: a return trip to `/edge/callback` replays
+ * whatever token that URL carried, and once it has expired the callback sends the
+ * visitor round the login again with the same return trip - a loop no fresh token
+ * can end, because the fresh one is spent on the way to the stale one.
+ */
 function sameHostRedirect(target: string | null, proto: string, host: string): string {
     if (target) {
         try {
             const url = new URL(target);
-            if (url.host === host) return url.toString();
+            if (url.host === host && url.pathname !== CALLBACK_PATH) return url.toString();
         } catch {
             // Not an absolute URL; fall through to the root.
         }
@@ -317,7 +329,10 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
                     setCookie: buildCookie(cfg.cookieName, token, proto === "https", maxAge)
                 };
             }
-            return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+            // Round the login again, back to where the visitor was headed - not to this
+            // URL, whose token is the thing that just failed.
+            const headedFor = sameHostRedirect(uri.searchParams.get("redirect"), proto, host);
+            return { status: 302, location: loginRedirect(cfg, req, proto, rule, headedFor) };
         }
         const token = readCookie(req.cookie, cfg.cookieName);
         const verified = verifyEdgeToken(token, cfg.secret, cfg.now, host);

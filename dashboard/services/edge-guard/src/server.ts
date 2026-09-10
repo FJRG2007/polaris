@@ -6,6 +6,7 @@
  * forwardAuth check, so Traefik can point at `/authz` (or any path) uniformly.
  */
 
+import { sendRedirect } from "./redirect.js";
 import { sendBlocked } from "./block-page.js";
 import { sendChallenge } from "./challenge-page.js";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
@@ -57,10 +58,7 @@ export function createGuardServer(config: () => GuardConfig): Server {
             config()
         );
         if (decision.status === 302) {
-            const headers: Record<string, string> = { location: decision.location };
-            if (decision.setCookie) headers["set-cookie"] = decision.setCookie;
-            res.writeHead(302, headers);
-            res.end();
+            sendRedirect(res, decision.location, decision.setCookie);
             return;
         }
         if (decision.status === 503) {
