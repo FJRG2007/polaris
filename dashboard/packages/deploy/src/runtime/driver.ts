@@ -87,6 +87,13 @@ export interface AppDeployPlan {
      * dials - but nothing outside Docker can open it.
      */
     readonly private?: boolean;
+    /**
+     * A second name the container answers to on the proxy network: the service's
+     * own, carried by a release that runs beside the one it replaces. Everything that
+     * reaches the service by that name - the edge, a tunnel, another service - goes
+     * on reaching it while the container behind it changes.
+     */
+    readonly alias?: string;
     /** Rate limits, concurrency, security headers, redirects and rewrites, written into
      *  the edge labels beside the WAF so a remote server's own edge applies them. */
     readonly edge?: AppEdgeConfig;

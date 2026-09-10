@@ -66,9 +66,10 @@ import {
     currentReleaseRef,
     imagesOutsideWindow,
     keepsReleases,
+    markerOf,
     portSubject,
-    releaseMarker,
     releaseRef,
+    runsCutover,
     serviceRef
 } from "./deploy/releases";
 import {
@@ -1193,6 +1194,9 @@ export async function syncAppRoutes(): Promise<void> {
             await prisma.deployment.findMany({
                 where: {
                     isolated: true,
+                    // A change-over release answers to the service's own name, so it is
+                    // reached the way the service always was.
+                    cutover: false,
                     id: {
                         in: domains
                             .map((domain) => domain.application.currentDeploymentId)
@@ -1272,6 +1276,7 @@ export async function syncAppRoutes(): Promise<void> {
                 await prisma.deployment.findMany({
                     where: {
                         isolated: true,
+                        cutover: false,
                         id: {
                             in: localTunnelApps
                                 .map((app) => app.currentDeploymentId)
@@ -2130,6 +2135,8 @@ async function buildAppPlan(
     gitSource?: GitSource;
     buildCommands?: BuildCommands;
     keepsHistory: boolean;
+    /** Whether a deploy starts beside the running release and changes over. */
+    cutover: boolean;
     /** Variable references nothing in the environment answers, as written. */
     unresolved: string[];
 }> {
@@ -2147,7 +2154,15 @@ async function buildAppPlan(
     const project = app.environment.project;
     const base = serviceRef(project.slug, app.slug, app.id);
     const kept = release !== undefined && keepsReleases(app);
-    const ref = kept ? releaseRef(base, releaseMarker(release)) : base;
+    // Beside the running release only for the change-over, answering to the
+    // service's own name as well (see `runsCutover`).
+    const cutover = release !== undefined && !kept && runsCutover(app);
+    const ref =
+        release && kept
+            ? releaseRef(base, markerOf(release))
+            : release && cutover
+              ? releaseRef(base, markerOf({ id: release.id, cutover: true }))
+              : base;
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
     // References to other services and databases are read here, inside this
@@ -2294,6 +2309,7 @@ async function buildAppPlan(
         // release: those are each reached on a port of their own, which is the whole
         // of how the release beside the current one stays reachable.
         private: !app.publishPort && !kept,
+        ...(cutover ? { alias: base.name } : {}),
         edge,
         ...(extraPorts.length > 0 ? { extraPorts } : {}),
         // When the user has not pinned a container port, the value above is a guess
@@ -2405,6 +2421,7 @@ async function buildAppPlan(
         gitSource,
         buildCommands,
         keepsHistory: keepsReleases(app),
+        cutover: runsCutover(app),
         unresolved: references.unresolved
     };
 }
@@ -2545,7 +2562,7 @@ async function systemEnv(
         POLARIS_ENVIRONMENT_NAME: app.environment.name,
         POLARIS_SERVICE_ID: app.id,
         POLARIS_SERVICE_NAME: app.name,
-        POLARIS_PRIVATE_DOMAIN: release.name,
+        POLARIS_PRIVATE_DOMAIN: release.address,
         ...(domain ? { POLARIS_PUBLIC_DOMAIN: domain } : {}),
         ...(app.environment.branch ? { POLARIS_GIT_BRANCH: app.environment.branch } : {}),
         ...(app.environment.pullRequest !== null
@@ -2605,7 +2622,7 @@ export async function deployApplication(
     rollback?: RollbackSource
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
-    const { plan, target, buildCommands, keepsHistory } = built;
+    const { plan, target, buildCommands, keepsHistory, cutover } = built;
     // A service started with `${{postgres.DATABASE_URL}}` as its literal
     // connection string fails in words that name nothing Polaris could have told
     // it, so the deploy is refused here instead, naming the reference.
@@ -2670,7 +2687,8 @@ export async function deployApplication(
             commitSha,
             authorName,
             authorAvatarUrl,
-            isolated: keepsHistory,
+            isolated: keepsHistory || cutover,
+            cutover,
             // Only a rollback points back at the release it restored; a variable
             // change re-runs the live one and is not a step back.
             rollbackOfId:
@@ -2684,16 +2702,18 @@ export async function deployApplication(
     // id it records is what the states after it are posted against, and a build
     // that started first would find nothing to post against.
     await announceDeployQueued(deployment.id);
-    // A service that keeps its history needs the release's own hostname and its own
-    // project before the plan is handed to the runtime, so the container comes up
-    // answering on it. Only that case pays for the second plan.
+    // A release that runs beside the one before it needs a project and names of its
+    // own before the plan is handed to the runtime, and one that keeps its history
+    // also the hostname it will answer on. Only those cases pay for the second plan.
     let planned = plan;
-    if (keepsHistory) {
+    if (keepsHistory || cutover) {
         const release = { id: deployment.id, commitSha };
-        await ensureReleaseDomain(applicationId, release).catch((error) => {
-            console.error("polaris: could not name this release:", error);
-            return null;
-        });
+        if (keepsHistory) {
+            await ensureReleaseDomain(applicationId, release).catch((error) => {
+                console.error("polaris: could not name this release:", error);
+                return null;
+            });
+        }
         planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
     }
     // Every release is kept under a name of its own so it can be run again later
@@ -3411,7 +3431,7 @@ async function releaseCurrentOnly(applicationId: string, ownerId: string): Promi
                 status: { in: ["running", "stopped"] },
                 isolated: true
             },
-            select: { id: true, commitSha: true }
+            select: { id: true, commitSha: true, cutover: true }
         })
     ).filter((release) => release.id !== app.currentDeploymentId);
     if (superseded.length === 0) return;
@@ -3420,7 +3440,7 @@ async function releaseCurrentOnly(applicationId: string, ownerId: string): Promi
     try {
         for (const release of superseded) {
             await ports
-                .composeDown(releaseRef(base, releaseMarker(release)).project)
+                .composeDown(releaseRef(base, markerOf(release)).project)
                 .catch(() => undefined);
         }
     } finally {
@@ -3622,7 +3642,7 @@ export async function connectorOrigin(appId: string): Promise<string | null> {
     const isolated = app.currentDeploymentId
         ? Boolean(
               await prisma.deployment.findFirst({
-                  where: { id: app.currentDeploymentId, isolated: true },
+                  where: { id: app.currentDeploymentId, isolated: true, cutover: false },
                   select: { id: true }
               })
           )
@@ -3843,7 +3863,7 @@ export async function executeDeployment(
             finishedAt: new Date()
         });
         if (result.ok) await promoteDeployment(deploymentId);
-        else await dropReleaseDomain(deploymentId);
+        else await abandonRelease(deploymentId, ports).catch(() => undefined);
         await notifyDeployFinished({ deploymentId, ownerId, ok: result.ok });
     } catch (error) {
         if (controller.signal.aborted) {
@@ -3856,7 +3876,7 @@ export async function executeDeployment(
             error: error instanceof Error ? error.message : "deploy failed",
             finishedAt: new Date()
         });
-        await dropReleaseDomain(deploymentId);
+        await abandonRelease(deploymentId, ports).catch(() => undefined);
         await notifyDeployFinished({ deploymentId, ownerId, ok: false });
     } finally {
         clearTimeout(deadline);
@@ -3912,7 +3932,7 @@ async function settleCancelled(
             : "Cancelled",
         finishedAt: new Date()
     });
-    await dropReleaseDomain(deploymentId);
+    await abandonRelease(deploymentId).catch(() => undefined);
     // Only when this call is the one that settled it: a cancel from the UI has already
     // told whoever was watching, and saying it twice reads as two failed deploys.
     if (settled) await notifyDeployFinished({ deploymentId, ownerId, ok: false });
@@ -3939,6 +3959,17 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
         where: { id: dep.deployableId },
         select: { keepReleases: true }
     });
+    // What was serving until now, read before it is marked superseded: a change-over
+    // takes it down once the new release has the traffic.
+    const replaced = await prisma.deployment.findMany({
+        where: {
+            deployableType: "application",
+            deployableId: dep.deployableId,
+            status: "running",
+            id: { not: deploymentId }
+        },
+        select: { id: true, commitSha: true, isolated: true, cutover: true }
+    });
     if (!app?.keepReleases) {
         await prisma.deployment.updateMany({
             where: {
@@ -3963,6 +3994,92 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
     // Refresh the edge routes so a domain whose first deploy just came up starts
     // serving, and any host-port change is reflected.
     await syncAppRoutes().catch(() => undefined);
+    // Last, once the edge already points wherever it now points.
+    await retireReplaced(dep.deployableId, replaced).catch((error) => {
+        console.error("polaris: could not take the replaced release down:", error);
+    });
+}
+
+/** How long a replaced release keeps answering after the change-over, for the
+ *  requests already on their way to it. */
+const CUTOVER_DRAIN_MS = 5_000;
+
+/**
+ * Take down what a deploy replaced, wherever it ran.
+ *
+ * For a service that does not keep its releases, everything that was serving
+ * before goes: a change-over copy, the service's own project the first change-over
+ * leaves behind, or a release left running when keeping them was turned off. For
+ * one that does, only change-over copies go - the kept ones are
+ * `retireOldReleases`' window. Nothing that resolves to the project now serving is
+ * ever taken down, which is what an ordinary redeploy in place resolves to.
+ *
+ * After a short wait: the replaced release has been answering beside the new one
+ * under the same name, and the requests already in flight to it get to finish.
+ */
+async function retireReplaced(
+    applicationId: string,
+    replaced: readonly { id: string; commitSha: string | null; isolated: boolean; cutover: boolean }[]
+): Promise<void> {
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!app) return;
+    const serving = await currentReleaseRef(app);
+    const base = serviceRef(app.environment.project.slug, app.slug, app.id);
+    const projects = new Set(
+        replaced.flatMap((row) =>
+            // A service that keeps its releases keeps them; only a change-over copy
+            // beside them goes.
+            app.keepReleases && !row.cutover
+                ? []
+                : [row.isolated ? releaseRef(base, markerOf(row)).project : base.project]
+        )
+    );
+    // Whatever resolves to what is serving now stays - an ordinary redeploy in
+    // place replaces the project it came from.
+    projects.delete(serving.project);
+    if (projects.size === 0) return;
+    await new Promise((resolve) => setTimeout(resolve, CUTOVER_DRAIN_MS));
+    const ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
+    try {
+        for (const project of projects) await ports.composeDown(project).catch(() => undefined);
+    } finally {
+        await ports.dispose().catch(() => undefined);
+    }
+    await prisma.deployment.updateMany({
+        where: { id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) }, status: "running" },
+        data: { status: "removed", finishedAt: new Date() }
+    });
+}
+
+/**
+ * A change-over release that did not come up: its own project goes, so nothing is
+ * left crash-looping under the service's name beside the release still serving.
+ * Never the project that is serving. Anything else a failed deploy leaves (the
+ * hostname a kept release was given) goes as it always has.
+ */
+async function abandonRelease(deploymentId: string, open?: RuntimePorts): Promise<void> {
+    await dropReleaseDomain(deploymentId);
+    const row = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { id: true, commitSha: true, cutover: true, deployableId: true }
+    });
+    if (!row?.cutover) return;
+    const app = await prisma.application.findUnique({
+        where: { id: row.deployableId },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!app) return;
+    const project = releaseRef(serviceRef(app.environment.project.slug, app.slug, app.id), markerOf(row)).project;
+    if (project === (await currentReleaseRef(app)).project) return;
+    const ports = open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
+    try {
+        await ports.composeDown(project).catch(() => undefined);
+    } finally {
+        if (!open) await ports.dispose().catch(() => undefined);
+    }
 }
 
 /**
@@ -3984,7 +4101,7 @@ async function ensureReleaseDomain(
         select: { hostname: true, targetPort: true, certResolver: true, pathPrefix: true }
     });
     if (!stable) return null;
-    const hostname = releaseDomain(stable.hostname, releaseMarker(release));
+    const hostname = releaseDomain(stable.hostname, markerOf(release));
     if (!hostname) return null;
     // Re-deploying the same commit lands on the same hostname; point the existing
     // record at the new build rather than failing on the unique hostname.
@@ -4032,10 +4149,11 @@ async function retireOldReleases(applicationId: string): Promise<void> {
     const current = app?.currentDeploymentId
         ? await prisma.deployment.findUnique({
               where: { id: app.currentDeploymentId },
-              select: { isolated: true }
+              select: { isolated: true, cutover: true }
           })
         : null;
-    if (!app || !current?.isolated) return;
+    // A change-over release is not a kept one: what it replaced goes in `retireReplaced`.
+    if (!app || !current?.isolated || current.cutover) return;
     const kept = await prisma.deployment.findMany({
         where: {
             deployableType: "application",
@@ -4044,7 +4162,7 @@ async function retireOldReleases(applicationId: string): Promise<void> {
             isolated: true
         },
         orderBy: { createdAt: "desc" },
-        select: { id: true, commitSha: true }
+        select: { id: true, commitSha: true, cutover: true }
     });
     const retiring = kept
         .slice(KEPT_RELEASES)
@@ -4059,7 +4177,7 @@ async function retireOldReleases(applicationId: string): Promise<void> {
         await ports.composeDown(base.project).catch(() => undefined);
         for (const release of retiring) {
             await ports
-                .composeDown(releaseRef(base, releaseMarker(release)).project)
+                .composeDown(releaseRef(base, markerOf(release)).project)
                 .catch(() => undefined);
             await prisma.domain.deleteMany({ where: { applicationId, deploymentId: release.id } });
             await prisma.deployment.update({
@@ -4089,11 +4207,11 @@ async function downAllReleases(
             deployableId: app.id,
             status: { in: ["running", "stopped"] }
         },
-        select: { id: true, commitSha: true }
+        select: { id: true, commitSha: true, cutover: true }
     });
     const projects = [
         base.project,
-        ...releases.map((release) => releaseRef(base, releaseMarker(release)).project)
+        ...releases.map((release) => releaseRef(base, markerOf(release)).project)
     ];
     for (const project of [...new Set(projects)]) {
         if (swarm) await ports.stackDown(project).catch(() => undefined);

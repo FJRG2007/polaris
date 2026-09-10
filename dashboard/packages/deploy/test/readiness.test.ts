@@ -5,7 +5,8 @@
  * as a successful deploy and promoted, which moved the edge onto a dead service.
  * These pin the verdicts: exited, crash-looping and unhealthy fail with a reason;
  * healthy and steadily running pass; a machine that cannot report state is not
- * held up. The clock is injected, so nothing here actually waits.
+ * held up. The clock is injected, so nothing here actually waits. And a release
+ * standing beside the one it replaces answers to the service's own name.
  */
 
 import { describe, expect, it } from "vitest";
@@ -120,5 +121,35 @@ describe("a swarm update", () => {
     it("keeps stop-first for a service with a volume, so two tasks never share its files", () => {
         const yaml = renderComposeYaml(forSwarm(spec([{ source: "data", target: "/data", kind: "volume" }])), "/v", "/m");
         expect(yaml).not.toContain("start-first");
+    });
+});
+
+describe("a release beside the one it replaces", () => {
+    const service = (aliases?: string[]): ComposeSpec => ({
+        project: "p-abc1234",
+        services: [
+            {
+                name: "web-abc1234",
+                image: "nginx",
+                env: {},
+                ports: [],
+                volumes: [],
+                labels: {},
+                networks: ["polaris-proxy", "hub"],
+                ...(aliases ? { aliases } : {})
+            }
+        ],
+        volumes: [],
+        networks: ["polaris-proxy", "hub"]
+    });
+
+    it("answers to the service's own name on the proxy network", () => {
+        const yaml = renderComposeYaml(service(["web"]), "/v", "/m");
+        expect(yaml).toContain('      polaris-proxy:\n        aliases:\n          - "web"\n      hub: {}');
+    });
+
+    it("keeps the plain network list when it carries no alias", () => {
+        const yaml = renderComposeYaml(service(), "/v", "/m");
+        expect(yaml).toContain("    networks:\n      - polaris-proxy\n      - hub");
     });
 });

@@ -145,7 +145,7 @@ async function describeService(application: {
     const domain = application.domains.find((one) => one.kind !== "lan") ?? application.domains[0];
     const containerPort = port ?? domain?.targetPort ?? (application.sourceType === "image" ? 80 : 3000);
     return {
-        POLARIS_PRIVATE_DOMAIN: release.name,
+        POLARIS_PRIVATE_DOMAIN: release.address,
         PORT: String(containerPort),
         POLARIS_PUBLIC_DOMAIN: domain?.hostname ?? "",
         POLARIS_PUBLIC_URL: domain ? `https://${domain.hostname}` : ""

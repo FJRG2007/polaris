@@ -12,14 +12,13 @@
  */
 
 import { PERSONAL_KIND } from "@polaris/core";
-import { serviceName } from "@polaris/deploy";
 import { prisma, type Prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
-import { currentReleaseRef } from "./deploy/releases";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
 import { getDriverForConnection, getUnasMetrics } from "./storage-service";
+import { currentReleaseRef, servingContainerNames } from "./deploy/releases";
 import {
     hostDockerDriver,
     HOST_DOCKER_PREFIX,
@@ -86,12 +85,9 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
                           key.slice("host:".length),
                           first.environment.project.ownerId
                       );
-            const names = new Map(
-                group.map((app) => [
-                    app.id,
-                    serviceName(app.environment.project.slug, app.slug, app.id)
-                ])
-            );
+            // The container serving each service right now, which is not the
+            // service's own name once a release runs in a project of its own.
+            const names = await servingContainerNames(group);
             const samples = await driver.statsMany([...names.values()]);
             for (const app of group) {
                 const stats = samples.get(names.get(app.id) ?? "");

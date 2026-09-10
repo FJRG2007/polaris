@@ -80,6 +80,51 @@ export function keepsReleases(app: {
 }
 
 /**
+ * Whether a deploy of this service starts the new version beside the running one
+ * and changes over once it is serving, instead of replacing it in place.
+ *
+ * The new release runs in a project of its own under a name of its own, and also
+ * answers to the service's own name on the proxy network - which is how the edge,
+ * a tunnel and every other service find it - so the change-over moves no address
+ * at all. The one it replaced is taken down once the new one is serving.
+ *
+ * Only where two copies can run at once without stepping on each other: no
+ * volume (both would hold the same files), nothing published on the host (both
+ * would want the same port), one replica, and not a compose file of the owner's
+ * own, whose names are its own business. On this host, where the edge follows the
+ * domain records; a remote server's labels would have both copies claiming the
+ * address. A service that keeps its releases already runs them side by side.
+ */
+export function runsCutover(app: {
+    keepReleases: boolean;
+    publishPort: boolean;
+    replicas: number;
+    sourceType: string;
+    sourceConfig: string;
+    volumes: readonly unknown[];
+    target: { kind: string; runtime: string };
+}): boolean {
+    if (app.keepReleases || app.publishPort || app.replicas > 1 || app.sourceType === "compose") return false;
+    if (app.volumes.length > 0 || app.target.kind !== "local" || app.target.runtime !== "compose") return false;
+    try {
+        const source = JSON.parse(app.sourceConfig) as { extraPorts?: unknown };
+        return !Array.isArray(source.extraPorts) || source.extraPorts.length === 0;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The marker a release's project and container carry. A change-over release is
+ * named after the deployment itself, so a redeploy of the same commit still comes
+ * up beside the one it replaces rather than on top of it; a kept release is named
+ * after its commit, which is also what its hostname carries.
+ */
+export function markerOf(deployment: { id: string; commitSha?: string | null; cutover?: boolean }): string {
+    return deployment.cutover ? releaseMarker({ id: deployment.id }) : releaseMarker(deployment);
+}
+
+/**
  * What a service's published host port is derived from: the release serving it
  * when that release runs in a project of its own (each such release publishes on a
  * port of its own), else the service itself. Keeps the direct IP:port link and the
@@ -136,6 +181,9 @@ export interface ReleaseSubject {
 export interface ServingRelease extends ReleaseRef {
     /** What the published host port is derived from (see `portSubject`). */
     readonly portSubject: string;
+    /** The name other containers reach it by: the service's own wherever that
+     *  answers - a change-over release carries it as an alias - else the release's. */
+    readonly address: string;
 }
 
 /**
@@ -150,9 +198,39 @@ export async function currentReleaseRef(app: ReleaseSubject): Promise<ServingRel
     const current = app.currentDeploymentId
         ? await prisma.deployment.findUnique({
               where: { id: app.currentDeploymentId },
-              select: { id: true, commitSha: true, isolated: true }
+              select: { id: true, commitSha: true, isolated: true, cutover: true }
           })
         : null;
-    if (!current?.isolated) return { ...base, portSubject: app.id };
-    return { ...releaseRef(base, releaseMarker(current)), portSubject: current.id };
+    if (!current?.isolated) return { ...base, portSubject: app.id, address: base.name };
+    const release = releaseRef(base, markerOf(current));
+    // A change-over release publishes nothing, so the service's own port is the one
+    // any link names, and it answers to the service's own name.
+    return current.cutover
+        ? { ...release, portSubject: app.id, address: base.name }
+        : { ...release, portSubject: current.id, address: release.name };
+}
+
+/**
+ * The container each service is served from right now, for many services at once:
+ * one query for all of them rather than `currentReleaseRef` per service, for a
+ * caller that walks every service on a machine.
+ */
+export async function servingContainerNames(apps: readonly ReleaseSubject[]): Promise<Map<string, string>> {
+    const ids = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
+    const releases = new Map(
+        (ids.length > 0
+            ? await prisma.deployment.findMany({
+                  where: { id: { in: ids }, isolated: true },
+                  select: { id: true, commitSha: true, cutover: true }
+              })
+            : []
+        ).map((row) => [row.id, row])
+    );
+    return new Map(
+        apps.map((app) => {
+            const base = serviceRef(app.environment.project.slug, app.slug, app.id);
+            const current = app.currentDeploymentId ? releases.get(app.currentDeploymentId) : undefined;
+            return [app.id, current ? releaseRef(base, markerOf(current)).name : base.name];
+        })
+    );
 }

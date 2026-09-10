@@ -61,6 +61,11 @@ pub struct ServiceSpec {
     pub command: Vec<String>,
     #[serde(default)]
     pub networks: Vec<String>,
+    /// Other names the container answers to on its first network: the service's
+    /// own, carried by a release running beside the one it replaces, so whatever
+    /// reaches the service by that name keeps reaching it across the change.
+    #[serde(default)]
+    pub aliases: Vec<String>,
     /// Names this container can reach that DNS cannot answer, as `name:address`.
     /// Always carries `host.docker.internal:host-gateway`: a container Polaris
     /// starts routinely talks to something the host publishes - the camera relay,
@@ -175,6 +180,14 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
         for net in &service.networks {
             if !valid_name(net) {
                 return Err(format!("invalid network name: {net}"));
+            }
+        }
+        if !service.aliases.is_empty() && service.networks.is_empty() {
+            return Err(format!("aliases for {} need a network to answer on", service.name));
+        }
+        for alias in &service.aliases {
+            if !valid_name(alias) {
+                return Err(format!("invalid network alias: {alias}"));
             }
         }
         for dep in &service.depends_on {
@@ -341,8 +354,23 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         }
         if !service.networks.is_empty() {
             out.push_str("    networks:\n");
-            for net in &service.networks {
-                out.push_str(&format!("      - {net}\n"));
+            if service.aliases.is_empty() {
+                for net in &service.networks {
+                    out.push_str(&format!("      - {net}\n"));
+                }
+            } else {
+                // The mapping form, which is the only one that can carry aliases;
+                // they go on the first network, which is the proxy network.
+                for (index, net) in service.networks.iter().enumerate() {
+                    if index == 0 {
+                        out.push_str(&format!("      {net}:\n        aliases:\n"));
+                        for alias in &service.aliases {
+                            out.push_str(&format!("          - {}\n", yaml_quote(alias)));
+                        }
+                    } else {
+                        out.push_str(&format!("      {net}: {{}}\n"));
+                    }
+                }
             }
         }
         if !service.extra_hosts.is_empty() {
@@ -1122,6 +1150,28 @@ mod tests {
 
         let plain = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx"}]}"#);
         assert!(!render_compose(&plain, &config).contains("deploy:"));
+    }
+
+    #[test]
+    fn an_alias_rides_on_the_first_network() {
+        // A release standing beside the one it replaces answers to the service's
+        // own name too, and only on the proxy network; any other network is joined
+        // plainly. Without aliases the list form is unchanged.
+        let config = test_config();
+        let aliased = spec(
+            r#"{"project":"p","services":[{"name":"web-abc1234","image":"nginx","networks":["polaris-proxy","hub"],"aliases":["web"]}],"networks":["polaris-proxy","hub"]}"#,
+        );
+        assert!(validate_spec(&aliased, &config).is_ok());
+        let rendered = render_compose(&aliased, &config);
+        assert!(rendered.contains("      polaris-proxy:\n        aliases:\n          - \"web\"\n"));
+        assert!(rendered.contains("      hub: {}\n"));
+
+        let bad = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["polaris-proxy"],"aliases":["Not Valid"]}]}"#,
+        );
+        assert!(validate_spec(&bad, &config).is_err());
+        let orphan = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","aliases":["web2"]}]}"#);
+        assert!(validate_spec(&orphan, &config).is_err());
     }
 
     #[test]

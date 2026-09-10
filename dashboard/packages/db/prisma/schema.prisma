@@ -4191,6 +4191,11 @@ model Deployment {
     // derived, because it decides which container and port serve this release -
     // and that must not change under it when the setting is turned off later.
     isolated       Boolean   @default(false)
+    // True when it stood beside the release before it only for the change-over: it
+    // answers to the service's own name as well as its own, and the release it
+    // replaced is taken down once this one is serving. Named after the deployment
+    // rather than its commit, so redeploying one commit still gets a fresh container.
+    cutover        Boolean   @default(false)
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
     // The GitHub Deployment this release was announced as, so its state can be

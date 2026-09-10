@@ -74,6 +74,9 @@ export interface ComposeSpecService {
     readonly labels: Record<string, string>;
     readonly command?: string[];
     readonly networks: string[];
+    /** Other names the container answers to on its first network (see
+     *  `AppDeployPlan.alias`). */
+    readonly aliases?: string[];
     /** Names this container can reach that DNS cannot answer, as `name:address`.
      *  One of them is always here - see `HOST_GATEWAY`. */
     readonly extraHosts?: string[];
@@ -191,6 +194,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 })),
                 labels,
                 networks,
+                ...(plan.alias && plan.alias !== plan.ref.name ? { aliases: [plan.alias] } : {}),
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
@@ -247,6 +251,22 @@ export function swarmDeployLines(service: Pick<ComposeSpecService, "replicas" | 
         );
     }
     return lines;
+}
+
+/** A service's `networks:` block: a plain list, or - when it carries aliases - the
+ *  mapping form, with the aliases on its first network. The daemon renders the same. */
+export function serviceNetworkLines(service: Pick<ComposeSpecService, "networks" | "aliases">): string[] {
+    if (service.networks.length === 0) return [];
+    const aliases = service.aliases ?? [];
+    if (aliases.length === 0) return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
+    const [first, ...rest] = service.networks;
+    return [
+        "    networks:",
+        `      ${first}:`,
+        "        aliases:",
+        ...aliases.map((alias) => `          - ${yamlQuote(alias)}`),
+        ...rest.map((net) => `      ${net}: {}`)
+    ];
 }
 
 /** Build the structured spec for a managed-database deployment. */
@@ -330,10 +350,7 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
                 lines.push(`      - ${yamlQuote(`${key}=${value}`)}`);
             }
         }
-        if (service.networks.length > 0) {
-            lines.push("    networks:");
-            for (const net of service.networks) lines.push(`      - ${net}`);
-        }
+        lines.push(...serviceNetworkLines(service));
         if (service.extraHosts && service.extraHosts.length > 0) {
             lines.push("    extra_hosts:");
             for (const entry of service.extraHosts) lines.push(`      - ${yamlQuote(entry)}`);
