@@ -41,6 +41,7 @@ import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
+import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
 import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
@@ -390,6 +391,28 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: MINUTE,
         leaseMs: 5 * MINUTE,
         run: () => runAutoscale()
+    },
+    {
+        key: "runtime-logs",
+        // Every minute. What a service printed is kept by reading its tail and
+        // storing what is new, so the gap between passes is the most a service
+        // can print before the middle of it is lost, and a minute is what keeps
+        // that gap to a tail's worth for anything but a flood.
+        everyMs: Number(process.env.POLARIS_RUNTIME_LOG_CAPTURE_MS) || MINUTE,
+        // Leased: each pass reads the newest line kept and stores what follows
+        // it, so two passes at once would both store the same lines.
+        leaseMs: 5 * MINUTE,
+        run: captureRuntimeLogs
+    },
+    {
+        key: "runtime-logs-prune",
+        // Hourly. The bounds are a week and a count per service, and a pass that
+        // runs an hour late removes the same lines.
+        everyMs: Number(process.env.POLARIS_RUNTIME_LOG_PRUNE_MS) || HOUR,
+        // Unleased: two runners delete the same lines and one of them counts
+        // zero.
+        leaseMs: null,
+        run: async () => ({ removed: await pruneRuntimeLogs() })
     },
     {
         key: "chat-scheduled",

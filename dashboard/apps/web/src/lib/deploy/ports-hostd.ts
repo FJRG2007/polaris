@@ -143,6 +143,23 @@ export class HostdPorts implements RuntimePorts {
         await drain(res, onData);
     }
 
+    /**
+     * Through the daemon's read-only container listing, filtered by the labels
+     * compose and swarm put on what they start. Two questions rather than one
+     * filter: label filters combine with AND, and a container carries one of the
+     * two labels, never both.
+     */
+    public async listContainers(project: string): Promise<string[]> {
+        const names = new Set<string>();
+        for (const label of [`com.docker.compose.project=${project}`, `com.docker.stack.namespace=${project}`]) {
+            const filters = encodeURIComponent(JSON.stringify({ label: [label], status: ["running"] }));
+            const response = await this.client.dockerRequest("GET", `/containers/json?filters=${filters}`);
+            if (response.status < 200 || response.status >= 300) continue;
+            for (const name of containerNames(response.body)) names.add(name);
+        }
+        return [...names].sort();
+    }
+
     public async diskUsage(ref: string, path: string): Promise<number | null> {
         try {
             // `du -sk` is in every busybox and coreutils, and reports kilobytes -
@@ -283,6 +300,28 @@ function collect(stream: Readable): Promise<string> {
         stream.on("data", (chunk: Buffer) => chunks.push(chunk));
         stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
         stream.on("error", reject);
+    });
+}
+
+/**
+ * The names out of a Docker `/containers/json` answer, without the leading slash
+ * the engine puts on each. Anything that does not parse, or is not shaped like a
+ * container list, is an empty answer rather than an error: the caller falls back
+ * to the one name it already knows.
+ */
+export function containerNames(body: string): string[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry) => {
+        const names = (entry as { Names?: unknown }).Names;
+        if (!Array.isArray(names)) return [];
+        const first = names.find((name): name is string => typeof name === "string");
+        return first ? [first.replace(/^\//, "")] : [];
     });
 }
 

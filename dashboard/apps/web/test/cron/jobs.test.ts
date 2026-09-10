@@ -90,6 +90,9 @@ describe("the work Polaris runs on a schedule", () => {
             "mail-categories",
             "mail-send",
             "mail-sync",
+            // A capture stores the lines after the newest one it has; two at once
+            // would both read the same newest line and store what follows twice.
+            "runtime-logs",
             // Two passes would both see the same streak and both add a copy.
             "service-autoscale",
             "task-reminders",

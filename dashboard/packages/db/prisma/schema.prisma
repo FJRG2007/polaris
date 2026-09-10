@@ -4001,6 +4001,7 @@ model Application {
     domains     Domain[]
     volumes     Volume[]
     crons       ServiceCron[]
+    runtimeLogs RuntimeLogLine[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
@@ -4068,6 +4069,31 @@ model ServiceCronRun {
     cron ServiceCron @relation(fields: [cronId], references: [id], onDelete: Cascade)
 
     @@index([cronId, startedAt])
+}
+
+// A line a running service printed, kept so its output outlives the container.
+// A container's own log goes with it on every deploy, and a crash at night was
+// otherwise only readable if nobody had redeployed since. Filled by a capture
+// that reads each running container's tail once a minute, and bounded twice -
+// by age and by a per-service count - by a scheduled prune.
+model RuntimeLogLine {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    applicationId String   @db.Uuid
+    // Which container printed it: a service has one, or one per replica.
+    container     String
+    // docker's own stamp, fraction padded to nanoseconds, so it sorts as text in
+    // the order it happened and is what the capture compares to know what it
+    // already has.
+    stamp         String
+    // The same moment as a timestamp, for the time filter and the retention.
+    at            DateTime
+    text          String
+
+    application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@index([applicationId, stamp])
+    @@index([applicationId, container, stamp])
+    @@index([at])
 }
 
 // A service this project runs somewhere that is not Polaris.

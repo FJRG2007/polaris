@@ -360,6 +360,20 @@ export class SshPorts implements RuntimePorts {
         await execCommand(client, parts.join(" "), { pty: true, onStdout: onData, onStderr: onData });
     }
 
+    /** `docker ps` by the compose and swarm labels, names only. The project name
+     *  is quoted like every other value that reaches the remote shell. */
+    public async listContainers(project: string): Promise<string[]> {
+        const names = new Set<string>();
+        for (const label of [`com.docker.compose.project=${project}`, `com.docker.stack.namespace=${project}`]) {
+            let out = "";
+            await this.run(`docker ps --filter ${quoteArg(`label=${label}`)} --format ${quoteArg("{{.Names}}")}`, (chunk) => {
+                out += chunk.toString("utf8");
+            }).catch(() => undefined);
+            for (const name of out.split("\n").map((line) => line.trim())) if (name) names.add(name);
+        }
+        return [...names].sort();
+    }
+
     public async diskUsage(ref: string, path: string): Promise<number | null> {
         let out = "";
         try {

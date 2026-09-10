@@ -127,6 +127,14 @@ export interface RuntimePorts {
      *  only the apps whose mount had to be re-established (e.g. after a host reboot). */
     ensureMount(spec: MountTarget): Promise<boolean>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
+    /**
+     * The running containers a compose project or swarm stack has, by name.
+     *
+     * A service is one container today and several once it has replicas, and
+     * everything that reads its output has to read all of them. Optional: where it
+     * is missing, or answers nothing, the service's own container name is used.
+     */
+    listContainers?(project: string): Promise<string[]>;
     /** Bytes in use under a path inside a running container, for volume usage
      *  history. Resolves null rather than throwing when it cannot be measured -
      *  a stopped container is the ordinary case, not an error worth a stack. */
