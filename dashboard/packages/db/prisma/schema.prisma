@@ -10228,3 +10228,125 @@ model MailAutoReply {
     @@unique([accountId, address])
     @@index([repliedAt])
 }
+
+// A mail server Polaris runs, as opposed to one of the mailboxes above, which
+// somebody else runs.
+//
+// The engine is a Deploy service (`applicationId`), so its container, volumes,
+// logs and restarts are Deploy's; this row is what only a mail server has: the
+// name it answers to, how far its setup got, the credential Polaris manages it
+// with, where it relays through, and the last checks of its ports and DNS.
+// Domains, mailboxes, aliases and forwards live in the engine and are read from
+// it, never mirrored here - a copy is what drifts.
+model MailServer {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    ownerId       String   @db.Uuid
+    // The organization it serves, or null for somebody's own. Set from the shelf
+    // that was open when it was set up, and never moved.
+    orgId         String?  @db.Uuid
+    // Where the engine runs: "local", or the id of an enrolled server. Kept
+    // because setup creates the service in a later step than the one that asked.
+    placement     String   @default("local")
+    // The Deploy service the engine runs as; null until setup creates it.
+    applicationId String?  @db.Uuid
+    // The server's own name: its certificate, its SMTP greeting, the MX target.
+    hostname      String
+    // The first domain it was set up to receive mail for.
+    primaryDomain String
+    // setting-up | ready | failed | down (was ready, and the last sweep found
+    // the engine not answering)
+    status        String   @default("setting-up")
+    // The last setup step that finished, so running setup again resumes from
+    // there instead of starting a second server.
+    step          String   @default("")
+    // What setup said, newest last, bounded - the screen reads it back while
+    // setup runs.
+    log           String   @default("")
+    error         String?
+    // The password of the account Polaris manages the engine with, sealed with
+    // the master key. Never shown.
+    adminSecret      Bytes?
+    adminSecretNonce Bytes?
+    adminSecretKeyId String?
+    // The key the engine signs its webhook with, sealed the same way.
+    hookSecret      Bytes?
+    hookSecretNonce Bytes?
+    hookSecretKeyId String?
+    // The outbound relay as JSON (provider, host, port, username), or "" for
+    // sending straight to each recipient's server. Its secret is sealed apart.
+    relay            String   @default("")
+    relaySecret      Bytes?
+    relaySecretNonce Bytes?
+    relaySecretKeyId String?
+    // The password of the mailbox DMARC aggregate reports arrive in, sealed.
+    // Polaris reads that mailbox and files what it finds; nobody signs in to it.
+    reportsSecret      Bytes?
+    reportsSecretNonce Bytes?
+    reportsSecretKeyId String?
+    // When that mailbox was last read, and what stopped the read if it failed.
+    reportsCheckedAt   DateTime?
+    reportsError       String?
+    // The email channel Polaris sends its own mail through it with.
+    channelId     String?  @db.Uuid
+    // The last port probe and DNS scan, as JSON, so the screen opens on the
+    // answer rather than a spinner.
+    lastPorts     String   @default("")
+    lastDns       String   @default("")
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    rules   MailInboundRule[]
+    reports MailDmarcReport[]
+
+    @@index([ownerId])
+    @@index([orgId])
+    @@index([applicationId])
+}
+
+// A rule that turns a message arriving at the mail server into a Polaris
+// notification for the server's owner. Matched on what the engine's event says;
+// see `inboundRuleMatches` for the guards that keep a rule from becoming a flood.
+model MailInboundRule {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    serverId    String    @db.Uuid
+    name        String
+    // Wildcard patterns, "" for any.
+    recipient   String    @default("")
+    sender      String    @default("")
+    includeSpam Boolean   @default(false)
+    enabled     Boolean   @default(true)
+    // When it last raised a notification.
+    lastFiredAt     DateTime?
+    // The current window of the per-rule ceiling and the matches counted in it:
+    // the last guard against a loop.
+    windowStartedAt DateTime?
+    windowCount     Int       @default(0)
+    createdAt   DateTime  @default(now())
+
+    server MailServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+    @@index([serverId])
+}
+
+// One DMARC aggregate report a receiver sent about one of the server's domains.
+// Kept as read, so the screen can total them per sending address over any range.
+model MailDmarcReport {
+    id       String   @id @default(uuid(7)) @db.Uuid
+    serverId String   @db.Uuid
+    // Who sent it and its own id for it: the same report delivered twice is one row.
+    orgName  String
+    reportId String
+    domain   String
+    beginAt  DateTime
+    endAt    DateTime
+    // The rows as JSON (see DmarcRow in @polaris/core).
+    rows     Json     @default("[]")
+    messages Int      @default(0)
+    failed   Int      @default(0)
+    createdAt DateTime @default(now())
+
+    server MailServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+    @@unique([serverId, orgName, reportId])
+    @@index([serverId, endAt])
+}

@@ -43,6 +43,7 @@ export const NOTIFICATION_GROUPS = [
     "security",
     "drive",
     "places",
+    "mail",
     "network",
     "people",
     "system"
@@ -57,6 +58,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     security: "Security",
     drive: "Drive",
     places: "Places",
+    mail: "Mail server",
     network: "Network",
     people: "People",
     system: "Polaris"
@@ -424,6 +426,22 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         // housekeeping has already run and not been enough, so what is left is
         // data only a person can decide about - and the next thing that happens
         // is a deploy or a recording failing.
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "mailserver.inbound",
+        group: "mail",
+        label: "Mail matched a rule",
+        description: "A message arrived at a mail server you run and matched one of its rules.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "mailserver.attention",
+        group: "mail",
+        label: "A mail server needs attention",
+        description: "A mail server you run stopped answering, or answers again.",
+        level: "warning",
         defaults: { inapp: true, email: true }
     },
     {
