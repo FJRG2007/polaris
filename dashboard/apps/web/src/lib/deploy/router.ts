@@ -63,6 +63,9 @@ export interface AppRoute {
     /** Asked of every copy every few seconds; one that stops answering it is left
      *  out until it answers again. Only with more than one copy to fall back on. */
     readonly healthPath?: string;
+    /** A share of the traffic sent to a kept release instead of the current one,
+     *  each visitor staying on whichever version answered them first. */
+    readonly canary?: { readonly upstream: string; readonly percent: number };
     /** WAF IP allowlists (one per configured scope). A request must satisfy every
      *  list, so each becomes a chained `ipAllowList` middleware. Empty/omitted =
      *  no allowlist restriction. */
@@ -268,6 +271,7 @@ function proxied(route: AppRoute, options: RenderOptions): boolean {
         // The guard's proxy dials the one origin its header names, so a service with
         // several copies is balanced here instead - and goes unobfuscated.
         (route.dialHosts?.length ?? 0) <= 1 &&
+        route.canary === undefined &&
         (process.env.POLARIS_AUTH_SECRET ?? "") !== "" &&
         options.proxyAvailable !== false
     );
@@ -694,7 +698,9 @@ export function renderDynamicConfig(
         // A proxied route dials the guard instead of the app; the app's own address
         // travels in the signed header above, so the guard is the only thing that
         // learns it.
-        services.push(serviceBlock(name, route, proxied(route, options) ? guardProxyUrl() : `http://${dial}`));
+        const upstream = proxied(route, options) ? guardProxyUrl() : `http://${dial}`;
+        if (route.canary) services.push(...canaryBlocks(name, route, route.canary, upstream));
+        else services.push(serviceBlock(name, route, upstream));
     }
     // Last, so it loses the length-ranked tie to every app router above it.
     if (zones.length > 0) routers.push(...vacantRouters(zones, defs));
@@ -737,6 +743,42 @@ function serviceBlock(name: string, route: AppRoute, upstream: string): string {
         );
     }
     return lines.join("\n");
+}
+
+/** The cookie that keeps a visitor on the version - current or canary - that
+ *  answered them first. */
+export const RELEASE_COOKIE = "polaris_release";
+
+/**
+ * A route split between the current release and a canary: a weighted service over
+ * the two, sticky so a visitor never flips between versions mid-session, each half
+ * a service of its own.
+ */
+function canaryBlocks(
+    name: string,
+    route: AppRoute,
+    canary: NonNullable<AppRoute["canary"]>,
+    upstream: string
+): string[] {
+    const percent = Math.min(50, Math.max(1, Math.round(canary.percent)));
+    return [
+        [
+            `    ${name}:`,
+            "      weighted:",
+            "        services:",
+            `          - name: ${name}-current`,
+            `            weight: ${100 - percent}`,
+            `          - name: ${name}-canary`,
+            `            weight: ${percent}`,
+            "        sticky:",
+            "          cookie:",
+            `            name: ${RELEASE_COOKIE}`,
+            "            httpOnly: true",
+            "            sameSite: lax"
+        ].join("\n"),
+        serviceBlock(`${name}-current`, route, upstream),
+        `    ${name}-canary:\n      loadBalancer:\n        servers:\n          - url: ${yamlQuote(canary.upstream)}`
+    ];
 }
 
 /** The file in the edge's watched directory that holds every deployed app's route. */

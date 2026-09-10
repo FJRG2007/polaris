@@ -43,6 +43,13 @@ import {
     type CloudflareAccountStatus
 } from "@/lib/integrations/cloudflare-account-service";
 import {
+    envVarScope,
+    listEnvVars,
+    revealEnvVar,
+    type EnvScope,
+    type EnvVarView
+} from "@/lib/env-var-service";
+import {
     listVolumes,
     createVolume,
     updateVolume,
@@ -75,13 +82,6 @@ import {
     type DatabaseConnection,
     type DbEngine
 } from "@/lib/database-service";
-import {
-    envVarScope,
-    listEnvVars,
-    revealEnvVar,
-    type EnvScope,
-    type EnvVarView
-} from "@/lib/env-var-service";
 import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
@@ -763,6 +763,33 @@ export async function pinDeploymentAction(
         return {
             error: caught instanceof Error ? caught.message : "Could not change that release"
         };
+    }
+}
+
+/** Send a share of a service's traffic to one of its kept releases, or stop. The
+ *  capability a deploy needs, because a version goes in front of real traffic. */
+export async function setDeploymentTrafficAction(
+    deploymentId: string,
+    percent: number | null
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    if (percent !== null && (!Number.isInteger(percent) || percent < 1 || percent > 50)) {
+        return { error: "A share of the traffic is between 1 and 50 percent" };
+    }
+    try {
+        const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
+        await deployService.setDeploymentCanary(deploymentId, access.ownerId, percent);
+        await recordDeployAudit({
+            actorId: user.id,
+            action: percent === null ? "deploy.app.canary.stop" : "deploy.app.canary",
+            targetType: "deployment",
+            targetId: deploymentId,
+            metadata: { percent }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change where the traffic goes" };
     }
 }
 

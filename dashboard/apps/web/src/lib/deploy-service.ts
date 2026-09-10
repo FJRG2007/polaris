@@ -23,10 +23,10 @@ import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
 import { appBaseUrl, getPublicIp } from "./domain-service";
+import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { LocalRouter, type AppRoute } from "./deploy/router";
-import { balancedOver, copiesOf } from "./deploy/replicas";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
@@ -1084,12 +1084,16 @@ export async function setApplicationEdgeConfig(
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true }
+        select: { id: true, edgeConfig: true }
     });
     if (!app) throw new Error("Application not found");
+    // How traffic is spread over copies and releases is set from Scaling and from
+    // the deployments, not from this screen, so what those saved is kept.
+    const stored = parseAppEdgeConfig(app.edgeConfig);
+    const next = { ...appEdgeConfigSchema.parse(config), balancing: stored.balancing, canary: stored.canary };
     await prisma.application.update({
         where: { id: app.id },
-        data: { edgeConfig: JSON.stringify(appEdgeConfigSchema.parse(config)) }
+        data: { edgeConfig: JSON.stringify(next) }
     });
     await syncAppRoutes();
 }
@@ -1230,6 +1234,20 @@ export async function syncAppRoutes(): Promise<void> {
                 select: { id: true }
             })
         ).map((deployment) => deployment.id)
+    );
+    // The kept releases a share of traffic is sent to, and only while each is a
+    // kept release still running: a canary that was retired, promoted or taken down
+    // routes nothing, whatever the setting still says.
+    const canaryIds = [...edgeOf.values()].flatMap((fields) => (fields.edge?.canary ? [fields.edge.canary.deploymentId] : []));
+    const liveCanaries = new Set(
+        canaryIds.length === 0
+            ? []
+            : (
+                  await prisma.deployment.findMany({
+                      where: { id: { in: canaryIds }, status: "running", isolated: true, cutover: false },
+                      select: { id: true }
+                  })
+              ).map((row) => row.id)
     );
     const localIp = await localDialHost();
     // Everything this machine's own edge answers for: the apps that run here, plus
@@ -1376,6 +1394,12 @@ export async function syncAppRoutes(): Promise<void> {
                     ? containerPortOf({ ...domain.application, domains: [domain] })
                     : hostPortForApp(dialTarget(domain, isolated)),
                 ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
+                ...canaryRoute(
+                    edgeOf.get(domain.applicationId)?.edge?.canary,
+                    liveCanaries,
+                    own ? domain.application.currentDeploymentId : null,
+                    localIp
+                ),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 presets: rule.presets,
@@ -1429,6 +1453,24 @@ export async function syncAppRoutes(): Promise<void> {
     // serving whatever it was already serving, and no reason for the routes on this
     // machine to be left unwritten.
     await pushRemoteRoutes(remoteDomains, edgeOf);
+}
+
+/**
+ * The canary half of a service's own route: its kept release, reached on the port
+ * that release publishes. Nothing when there is no canary, when it is not a kept
+ * release still running, when it is the current release itself, or when the route
+ * is not the service's own address (`current` null).
+ */
+function canaryRoute(
+    canary: AppEdgeConfig["canary"] | undefined,
+    live: ReadonlySet<string>,
+    current: string | null,
+    localIp: string
+): Pick<AppRoute, "canary"> {
+    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId)) return {};
+    return {
+        canary: { upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`, percent: canary.percent }
+    };
 }
 
 /** The per-service edge settings a route carries, resolved once per service. */
@@ -2940,6 +2982,45 @@ export async function setDeploymentPinned(
 }
 
 /**
+ * Send `percent` of a service's traffic to one of its kept releases, or stop
+ * (`null`). The release has to be one that is kept running beside the current
+ * one - that is what it is reached on - and not the current one itself. The edge
+ * is republished at once; a visitor stays on whichever version answered them.
+ */
+export async function setDeploymentCanary(
+    deploymentId: string,
+    ownerId: string,
+    percent: number | null
+): Promise<void> {
+    const deployment = await prisma.deployment.findFirst({
+        where: { id: deploymentId, deployableType: "application" },
+        select: { deployableId: true, status: true, isolated: true, cutover: true }
+    });
+    if (!deployment) throw new Error("Deployment not found");
+    const app = await prisma.application.findFirst({
+        where: { id: deployment.deployableId, environment: { project: { ownerId } } },
+        select: { id: true, currentDeploymentId: true, edgeConfig: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const edge = parseAppEdgeConfig(app.edgeConfig);
+    if (percent === null) {
+        if (edge.canary?.deploymentId !== deploymentId) return;
+        edge.canary = null;
+    } else {
+        if (deploymentId === app.currentDeploymentId) throw new Error("That is the release already serving everybody.");
+        if (deployment.status !== "running" || !deployment.isolated || deployment.cutover) {
+            throw new Error("Only a previous deployment that is kept running can take a share of the traffic.");
+        }
+        if (!Number.isInteger(percent) || percent < 1 || percent > 50) {
+            throw new Error("A share of the traffic is between 1 and 50 percent.");
+        }
+        edge.canary = { deploymentId, percent };
+    }
+    await prisma.application.update({ where: { id: app.id }, data: { edgeConfig: JSON.stringify(edge) } });
+    await syncAppRoutes();
+}
+
+/**
  * How many releases of one service keep their image for an instant rollback,
  * newest first, besides the one that is live and any somebody pinned. Enough to
  * reach back past a bad afternoon; few enough that a service deployed forty
@@ -3054,6 +3135,11 @@ export interface DeploymentSummary {
     trigger: DeploymentTrigger | null;
     /** How long it took from starting to finishing, when it has finished. */
     durationMs: number | null;
+    /** Whether a share of the traffic can be sent to it: a kept release still
+     *  running beside the current one. */
+    canTakeTraffic: boolean;
+    /** The share of the traffic it is being sent, when it is the canary. */
+    trafficPercent: number | null;
 }
 
 /**
@@ -3157,9 +3243,10 @@ export async function listDeployments(
 ): Promise<DeploymentSummary[]> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true, currentDeploymentId: true, sourceConfig: true }
+        select: { id: true, currentDeploymentId: true, sourceConfig: true, edgeConfig: true }
     });
     if (!app) throw new Error("Application not found");
+    const canary = parseAppEdgeConfig(app.edgeConfig).canary;
     const repoUrl = (() => {
         try {
             const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
@@ -3186,7 +3273,9 @@ export async function listDeployments(
             rollbackOfId: true,
             trigger: true,
             startedAt: true,
-            finishedAt: true
+            finishedAt: true,
+            isolated: true,
+            cutover: true
         }
     });
     // The hostname a kept release answers on. Only releases that are still up have
@@ -3224,7 +3313,10 @@ export async function listDeployments(
         durationMs:
             row.startedAt && row.finishedAt
                 ? row.finishedAt.getTime() - row.startedAt.getTime()
-                : null
+                : null,
+        canTakeTraffic:
+            row.status === "running" && row.isolated && !row.cutover && row.id !== app.currentDeploymentId,
+        trafficPercent: canary?.deploymentId === row.id ? canary.percent : null
     }));
 }
 

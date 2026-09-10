@@ -9,7 +9,6 @@
 
 import Link from "next/link";
 import { CronPanel } from "./cron-panel";
-import { ScalingSection } from "./scaling-section";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
@@ -17,6 +16,7 @@ import { DomainCdnButton } from "./domain-cdn";
 import { EdgeSettings } from "./edge-settings";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
+import { ScalingSection } from "./scaling-section";
 import { relativeTime } from "@/lib/relative-time";
 import { DeployCallouts } from "./deploy-callouts";
 import { LogViewer } from "@/components/log-viewer";
@@ -97,6 +97,7 @@ import {
     ScrollText,
     Search,
     ShieldCheck,
+    Split,
     Square,
     Trash2,
     Undo2,
@@ -567,6 +568,25 @@ function DeploymentMenu({
                         {deployment.pinned ? "Stop keeping this version" : "Keep this version"}
                     </DropdownMenuItem>
                 )}
+                {deployment.canTakeTraffic &&
+                    (deployment.trafficPercent !== null ? (
+                        <DropdownMenuItem
+                            onSelect={() => run(() => deployActions.setDeploymentTrafficAction(deployment.id, null))}
+                        >
+                            <Split className="size-4" /> Stop sending {deployment.trafficPercent}% of traffic here
+                        </DropdownMenuItem>
+                    ) : (
+                        [10, 50].map((percent) => (
+                            <DropdownMenuItem
+                                key={percent}
+                                onSelect={() =>
+                                    run(() => deployActions.setDeploymentTrafficAction(deployment.id, percent))
+                                }
+                            >
+                                <Split className="size-4" /> Send {percent}% of traffic here
+                            </DropdownMenuItem>
+                        ))
+                    ))}
                 {isActive && (
                     <>
                         <DropdownMenuItem

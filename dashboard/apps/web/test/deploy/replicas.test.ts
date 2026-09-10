@@ -1,7 +1,8 @@
 /**
  * A service with more than one copy: the edge is given each copy by name and
  * balances between them, pins a visitor when asked, and leaves out a copy that
- * fails its health path. And the cases that must stay at one copy say why.
+ * fails its health path. And the cases that must stay at one copy say why, and a
+ * share of the traffic split off to a kept release by weight.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -114,5 +115,35 @@ describe("the balancing setting", () => {
 
     it("reads a config written before balancing existed as none", () => {
         expect(parseAppEdgeConfig("{}").balancing).toEqual({ sticky: false, healthPath: null });
+    });
+});
+
+describe("a share of the traffic sent to a kept release", () => {
+    const route = { id: "d1", hostname: "shop.example.com", certResolver: "le", dialHost: "10.0.0.2", dialPort: 21000 };
+
+    it("splits the service by weight, pinning each visitor to one version", () => {
+        const config = renderDynamicConfig([{ ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 10 } }]);
+        const split = service(config, "polaris-app-d1");
+        expect(split).toContain("weighted:");
+        expect(split).toContain("- name: polaris-app-d1-current\n            weight: 90");
+        expect(split).toContain("- name: polaris-app-d1-canary\n            weight: 10");
+        expect(split).toContain("name: polaris_release");
+        expect(service(config, "polaris-app-d1-canary")).toContain('- url: "http://10.0.0.2:23456"');
+        expect(service(config, "polaris-app-d1-current")).toContain('- url: "http://10.0.0.2:21000"');
+    });
+
+    it("never sends more than half", () => {
+        const config = renderDynamicConfig([{ ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 90 } }]);
+        expect(service(config, "polaris-app-d1")).toContain("- name: polaris-app-d1-canary\n            weight: 50");
+    });
+
+    it("keeps the canary only while it validates, and reads an old config as none", () => {
+        const id = "019f9000-1111-7000-8000-222233334444";
+        expect(parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 10 } })).canary).toEqual({
+            deploymentId: id,
+            percent: 10
+        });
+        expect(parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 80 } })).canary).toBeNull();
+        expect(parseAppEdgeConfig("{}").canary).toBeNull();
     });
 });

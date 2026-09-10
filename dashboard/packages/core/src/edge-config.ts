@@ -299,6 +299,18 @@ export const edgeBalancingSchema = z.object({
 });
 export type EdgeBalancing = z.infer<typeof edgeBalancingSchema>;
 
+/**
+ * A share of a service's traffic sent to one of its kept releases rather than the
+ * current one - a canary. Each visitor stays on whichever version first answered
+ * them. At most half: past that the canary is the release, and promoting it is the
+ * honest way to say so.
+ */
+export const edgeCanarySchema = z.object({
+    deploymentId: z.string().uuid(),
+    percent: z.number().int().min(1).max(50)
+});
+export type EdgeCanary = z.infer<typeof edgeCanarySchema>;
+
 export const appEdgeConfigSchema = z.object({
     rateLimits: z.array(edgeRateLimitSchema).max(EDGE_RATE_LIMITS_MAX).default([]),
     /** Requests in flight at once; 0 is no cap. */
@@ -308,7 +320,8 @@ export const appEdgeConfigSchema = z.object({
     headers: edgeHeadersSchema.default({ preset: "off", custom: [] }),
     redirects: z.array(edgeRedirectSchema).max(EDGE_REDIRECTS_MAX).default([]),
     rewrites: z.array(edgeRewriteSchema).max(EDGE_REWRITES_MAX).default([]),
-    balancing: edgeBalancingSchema.default({ sticky: false, healthPath: null })
+    balancing: edgeBalancingSchema.default({ sticky: false, healthPath: null }),
+    canary: edgeCanarySchema.nullable().default(null)
 });
 export type AppEdgeConfig = z.infer<typeof appEdgeConfigSchema>;
 
@@ -343,6 +356,7 @@ export function parseAppEdgeConfig(raw: string | null | undefined): AppEdgeConfi
     const scope = z.enum(EDGE_CONCURRENCY_SCOPES).safeParse(obj.concurrencyScope);
     const challenge = z.enum(EDGE_CHALLENGE_MODES).safeParse(obj.challenge);
     const balancing = edgeBalancingSchema.safeParse(obj.balancing ?? {});
+    const canary = edgeCanarySchema.safeParse(obj.canary);
     return {
         rateLimits: each(obj.rateLimits, edgeRateLimitSchema, EDGE_RATE_LIMITS_MAX),
         concurrency: concurrency.success ? concurrency.data : 0,
@@ -351,7 +365,8 @@ export function parseAppEdgeConfig(raw: string | null | undefined): AppEdgeConfi
         headers: headers.success ? headers.data : EMPTY_EDGE_CONFIG.headers,
         redirects: each(obj.redirects, edgeRedirectSchema, EDGE_REDIRECTS_MAX),
         rewrites: each(obj.rewrites, edgeRewriteSchema, EDGE_REWRITES_MAX),
-        balancing: balancing.success ? balancing.data : EMPTY_EDGE_CONFIG.balancing
+        balancing: balancing.success ? balancing.data : EMPTY_EDGE_CONFIG.balancing,
+        canary: canary.success ? canary.data : null
     };
 }
 
