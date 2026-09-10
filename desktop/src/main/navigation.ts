@@ -9,9 +9,19 @@
  * bridge. Only the configured Polaris is loaded in a window; every other web
  * address is opened in the system browser, and anything that is not a web
  * address is dropped.
+ *
+ * One exception: a round trip to an outside provider that the Polaris itself
+ * starts (linking an account, or signing in with one). Its state cookie lives in
+ * this app's session, so the provider's pages have to be shown here and the
+ * callback has to land here. From the moment the Polaris sends the window out
+ * until a page of the Polaris is shown again, the main frame may go anywhere on
+ * the web. The bridge still answers only a main frame on the Polaris (`ipc`).
  */
 
 const WEB = new Set(["http:", "https:"]);
+
+/** The Polaris routes that send the window to a provider and expect it back. */
+const PROVIDER_TRIP = /^\/api\/connections\/[a-z0-9_-]+\/(link|signin)$/;
 
 /** Schemes handed to the operating system: web pages, and a mail link, which
  *  opens the mail app. Nothing else - a `file:` or UNC path, or a custom scheme,
@@ -52,6 +62,44 @@ export function classifyNavigation(url: string, serverOrigin: string): Navigatio
     if (isServerUrl(url, serverOrigin)) return "allow";
     if (isSafeExternalUrl(url)) return "external";
     return "block";
+}
+
+/** Whether a URL is the Polaris sending the window out to a provider. */
+export function startsProviderTrip(url: string, serverOrigin: string): boolean {
+    const target = parse(url);
+    return Boolean(target && isServerUrl(url, serverOrigin) && PROVIDER_TRIP.test(target.pathname));
+}
+
+export interface MainFrameStep {
+    readonly verdict: NavigationVerdict;
+    /** Whether the window is out on a provider's round trip after this step. */
+    readonly trip: boolean;
+}
+
+/**
+ * A navigation or redirect of the main frame, given whether the window is out on
+ * a provider's round trip. A trip starts on one of the Polaris routes that begin
+ * one and ends when a page of the Polaris is shown again (`did-navigate`).
+ */
+export function mainFrameStep(url: string, serverOrigin: string, trip: boolean): MainFrameStep {
+    if (isServerUrl(url, serverOrigin)) return { verdict: "allow", trip: trip || startsProviderTrip(url, serverOrigin) };
+    const target = parse(url);
+    if (trip && target && WEB.has(target.protocol)) return { verdict: "allow", trip };
+    return { verdict: classifyNavigation(url, serverOrigin), trip };
+}
+
+/**
+ * Where Back goes from the history entry at `active`: the entry before it when
+ * that is on the Polaris, or, from a page elsewhere, the last page of the
+ * Polaris before it. Null when there is nowhere to go.
+ */
+export function backIndex(urls: readonly string[], active: number, serverOrigin: string): number | null {
+    const away = !isServerUrl(urls[active] ?? "", serverOrigin);
+    for (let index = active - 1; index >= 0; index -= 1) {
+        if (isServerUrl(urls[index] ?? "", serverOrigin)) return index;
+        if (!away) return null;
+    }
+    return null;
 }
 
 /**

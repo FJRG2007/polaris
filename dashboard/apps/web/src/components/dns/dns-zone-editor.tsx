@@ -13,8 +13,9 @@
  * Every write is shown before Cloudflare answers. An added or changed record is
  * in the table at once, dimmed until it is stored; a deleted one is gone at once.
  * A refusal puts the table back as it was - and for an add or an edit, reopens
- * the form with what was typed and the reason - and every success reads the zone
- * again, so what is on screen ends up being what Cloudflare holds.
+ * the form with what was typed and the reason, or says so above the table when
+ * another form is open by then - and every write, stored or refused, reads the
+ * zone again, so what is on screen ends up being what Cloudflare holds.
  *
  * Used for a zone an administrator reaches through this Polaris's Cloudflare
  * token and for a domain somebody brought with a token of its own; the actions
@@ -23,7 +24,7 @@
 
 import * as view from "@/lib/dns/records-view";
 import { DnsRecordsTable } from "./dns-records-table";
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { Plus, RefreshCw, Search, X } from "lucide-react";
 import { PropagationPanel } from "./dns-propagation-panel";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { DnsRecordView, ZoneRecords } from "@/lib/dns/zone-records";
@@ -40,6 +41,11 @@ import {
 
 /** Ids for rows added before Cloudflare has given them one. */
 let pendingSequence = 0;
+
+/** One number per opened form, so a form opened again starts from what it is given. */
+let sessionSequence = 0;
+
+type EditorSession = RecordEditing & { readonly session: number };
 
 /**
  * `scope` is the zone to edit, or null while the page is still finding out which:
@@ -73,10 +79,13 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
 
     const [filters, setFilters] = useState<view.RecordFilters>(view.NO_RECORD_FILTERS);
     const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
-    const [editing, setEditing] = useState<RecordEditing | null>(null);
+    const [editing, setEditing] = useState<EditorSession | null>(null);
+    const [refused, setRefused] = useState<{ editing: RecordEditing; message: string } | null>(null);
     const [deleting, setDeleting] = useState<DnsRecordView | null>(null);
     const [checking, setChecking] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const editingRef = useRef(editing);
+    editingRef.current = editing;
 
     // The zone as it is now, for writes that land after other writes have moved it.
     const zoneRef = useRef(live.data);
@@ -102,9 +111,19 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
     const types = useMemo(() => view.recordTypesIn(all ?? []), [all]);
     const narrowed = filters.type !== view.ALL_TYPES || filters.search.trim() !== "";
 
+    function openForm(next: RecordEditing) {
+        setEditing({ ...next, session: (sessionSequence += 1) });
+    }
+
     function openEditor(record: DnsRecordView | null) {
         const draft = record?.draft ?? emptyDraft("A");
-        setEditing({ id: record?.id ?? null, draft, original: JSON.stringify(normalizeDraft(draft)) });
+        openForm({ id: record?.id ?? null, draft, original: JSON.stringify(normalizeDraft(draft)) });
+    }
+
+    function reopenRefused() {
+        if (!refused) return;
+        openForm(refused.editing);
+        setRefused(null);
     }
 
     /** Put the record in the table, send it, and settle the row on the answer. */
@@ -139,11 +158,21 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                         ? zone.records.map((record) => (record.id === id ? original : record))
                         : zone.records.filter((record) => record.id !== id)
                 }));
-                setEditing({
+                live.refresh();
+                const refusal = {
                     ...opened,
                     draft,
                     error: result.error ?? "Could not save the record",
                     problems: result.problems
+                };
+                if (!editingRef.current) {
+                    openForm(refusal);
+                    return;
+                }
+                const reason = Object.values(result.problems ?? {})[0] ?? refusal.error;
+                setRefused({
+                    editing: refusal,
+                    message: `The ${fields.type} record ${optimistic.relative} was not saved: ${reason}`
                 });
             });
     }
@@ -158,16 +187,15 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
         void deleteDnsRecordAction(scope, record.id)
             .catch(() => ({ error: "Could not delete the record" }))
             .then((result) => {
-                if (!result.error) {
-                    live.refresh();
-                    return;
+                if (result.error) {
+                    update((zone) =>
+                        zone.records.some((entry) => entry.id === record.id)
+                            ? zone
+                            : { ...zone, records: [...zone.records, record] }
+                    );
+                    setError(result.error);
                 }
-                update((zone) =>
-                    zone.records.some((entry) => entry.id === record.id)
-                        ? zone
-                        : { ...zone, records: [...zone.records, record] }
-                );
-                setError(result.error);
+                live.refresh();
             });
     }
 
@@ -220,6 +248,27 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                 </p>
             ) : null}
 
+            {refused ? (
+                <div
+                    role="alert"
+                    className="flex items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
+                    <span className="min-w-0 flex-1">{refused.message}</span>
+                    <Button size="sm" variant="ghost" onClick={reopenRefused}>
+                        Edit again
+                    </Button>
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setRefused(null)}
+                        aria-label="Dismiss"
+                        title="Dismiss"
+                    >
+                        <X className="size-4" />
+                    </Button>
+                </div>
+            ) : null}
+
             <p className="text-xs text-muted-foreground" aria-live="polite">
                 {!zone || !shown
                     ? "Reading the records..."
@@ -260,6 +309,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
 
             {zone && editing && (
                 <DnsRecordDialog
+                    key={editing.session}
                     zone={zone}
                     editing={editing}
                     onClose={() => setEditing(null)}

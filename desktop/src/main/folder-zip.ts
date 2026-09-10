@@ -8,14 +8,19 @@
  * `node_modules` is a hundred thousand files read only to be thrown away. Walking
  * it from here prunes those folders without opening them.
  *
- * Links are not followed. The zip is sent to a server, and a link inside a
- * project to somewhere else on the disk would send that too.
+ * A link is followed only when it leads to somewhere inside the picked folder.
+ * The zip is sent to a server, and a link inside a project to somewhere else on
+ * the disk would send that too. Followed at all because Windows reports a file
+ * OneDrive keeps online-only as a link, and a project in a synced Documents
+ * folder would otherwise arrive with files missing. A link back into a folder
+ * it sits in, or to a folder already walked through a link, is skipped, so a
+ * loop of links ends.
  */
 
 import { Zip, ZipDeflate } from "fflate";
-import { basename, join } from "node:path";
 import { createReadStream } from "node:fs";
-import { lstat, readdir } from "node:fs/promises";
+import { basename, join, sep } from "node:path";
+import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { EMPTY_FOLDER, FOLDER_TOO_LARGE, MAX_FOLDER, MAX_ZIP, ZIP_TOO_LARGE, skipped } from "./zip-rules";
 
 /** A refusal whose message is written for the person who picked the folder. */
@@ -35,30 +40,52 @@ export interface ZippedFolder {
     readonly zip: Uint8Array;
 }
 
+/** Whether a real path is `folder` or somewhere under it. */
+function inside(path: string, folder: string): boolean {
+    return path === folder || path.startsWith(folder.endsWith(sep) ? folder : `${folder}${sep}`);
+}
+
 /** Every file that goes into the zip, refusing a folder that holds too much. */
 export async function listFolder(root: string): Promise<FolderEntry[]> {
     const name = basename(root);
     const entries: FolderEntry[] = [];
     let total = 0;
+    const top = await realpath(root);
+    const linkedFolders = new Set<string>();
 
-    async function walk(dir: string, prefix: string): Promise<void> {
+    /** `chain` holds the real path of every folder on the way down, `dir`'s last. */
+    async function walk(dir: string, prefix: string, chain: readonly string[]): Promise<void> {
         for (const entry of await readdir(dir, { withFileTypes: true })) {
             const path = `${prefix}/${entry.name}`;
             if (skipped(path)) continue;
             const file = join(dir, entry.name);
             if (entry.isDirectory()) {
-                await walk(file, path);
+                await walk(file, path, [...chain, join(chain.at(-1) ?? top, entry.name)]);
             } else if (entry.isFile()) {
-                const stat = await lstat(file);
-                total += stat.size;
-                if (total > MAX_FOLDER) throw new FolderRefusal(FOLDER_TOO_LARGE);
-                entries.push({ path, file, size: stat.size, mtime: stat.mtime });
+                add(path, file, await lstat(file));
+            } else if (entry.isSymbolicLink()) {
+                const target = await realpath(file).catch(() => null);
+                if (!target || !inside(target, top)) continue;
+                const info = await stat(target);
+                if (info.isFile()) {
+                    add(path, target, info);
+                } else if (info.isDirectory()) {
+                    if (linkedFolders.has(target) || chain.some((folder) => inside(folder, target))) continue;
+                    linkedFolders.add(target);
+                    await walk(target, path, [...chain, target]);
+                }
             }
         }
     }
 
+    function add(path: string, file: string, info: { readonly size: number; readonly mtime: Date; }): void {
+        total += info.size;
+        if (total > MAX_FOLDER) throw new FolderRefusal(FOLDER_TOO_LARGE);
+        entries.push({ path, file, size: info.size, mtime: info.mtime });
+    }
+
     if (skipped(name)) throw new FolderRefusal(EMPTY_FOLDER);
-    await walk(root, name);
+    await walk(root, name, [top]);
     if (entries.length === 0) throw new FolderRefusal(EMPTY_FOLDER);
     return entries;
 }

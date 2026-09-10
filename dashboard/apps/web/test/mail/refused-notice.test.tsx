@@ -20,6 +20,7 @@ import { RefusedMailboxes, refusedNotices } from "@/app/(app)/mail/refused-notic
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const updates: unknown[] = [];
+const shelves: string[] = [];
 /** When the servers answer. Resolved at once unless a test holds it open to
  *  look at the screen in between. */
 const held: { answer: Promise<void> } = { answer: Promise.resolve() };
@@ -40,6 +41,13 @@ vi.mock("@/app/(app)/mail/actions", () => ({
     }
 }));
 
+vi.mock("@/app/(app)/scope-actions", () => ({
+    setWorkspaceScopeAction: async (value: string) => {
+        shelves.push(value);
+        return {};
+    }
+}));
+
 beforeAll(() => {
     globalThis.ResizeObserver ??= class {
         observe() {}
@@ -55,6 +63,7 @@ beforeAll(() => {
 afterEach(() => {
     cleanup();
     updates.length = 0;
+    shelves.length = 0;
 });
 
 function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
@@ -176,6 +185,26 @@ describe("the edit form it opens", () => {
         expect(save.disabled).toBe(true);
     });
 
+    it("asks for the password again once the servers or the login change", () => {
+        open(account({ state: "ok" }));
+        fireEvent.click(screen.getByRole("button", { name: /Server settings/ }));
+        fireEvent.change(screen.getByLabelText("Login, if it is not the address"), {
+            target: { value: "someone-else" }
+        });
+        const save = screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement;
+        expect(screen.queryByPlaceholderText("Leave blank to keep the current one")).toBeNull();
+        expect(screen.getByText("The servers or login changed, so enter the password again.")).toBeTruthy();
+        expect(save.disabled).toBe(true);
+
+        fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "new-secret" } });
+        expect(save.disabled).toBe(false);
+
+        // Put back, the saved password is the one kept again.
+        fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "" } });
+        fireEvent.change(screen.getByLabelText("Login, if it is not the address"), { target: { value: "" } });
+        expect(screen.getByPlaceholderText("Leave blank to keep the current one")).toBeTruthy();
+    });
+
     it("offers an authorized mailbox the way to authorize it again, not a password", () => {
         open(account({ auth: "oauth", service: "gmail", connectionId: null }));
         expect(screen.getByRole("link", { name: "Reconnect with Google" })).toBeTruthy();
@@ -184,7 +213,7 @@ describe("the edit form it opens", () => {
 });
 
 describe("the mailboxes screen the notice lands on", () => {
-    function screenFor(target: MailAccountView, editNow = "") {
+    function screenFor(target: MailAccountView, editNow = "", moveShelf: string | null = null) {
         render(
             <ToastProvider>
                 <AccountsView
@@ -197,10 +226,24 @@ describe("the mailboxes screen the notice lands on", () => {
                     outcome=""
                     outcomeProvider=""
                     editNow={editNow}
+                    moveShelf={moveShelf}
                 />
             </ToastProvider>
         );
     }
+
+    it("opens a mailbox from another shelf, and moves the header to it", async () => {
+        const target = account();
+        screenFor(target, target.id, "org:0190c1d2-0000-7000-8000-0000000000aa");
+        expect(screen.getByRole("dialog")).toBeTruthy();
+        await waitFor(() => expect(shelves).toEqual(["org:0190c1d2-0000-7000-8000-0000000000aa"]));
+    });
+
+    it("leaves the header alone for a mailbox on the shelf already open", () => {
+        const target = account();
+        screenFor(target, target.id);
+        expect(shelves).toEqual([]);
+    });
 
     it("opens the named mailbox's form, on the password box", () => {
         const target = account();

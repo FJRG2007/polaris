@@ -96,9 +96,19 @@ describe("measuring budgets", () => {
         );
         // Claimed against what was read, so a pass that got there first wins.
         expect(updateMany).toHaveBeenCalledWith({
-            where: { orgId: "o1", alertedMonth: null, alertedLevel: 0 },
+            where: { orgId: "o1", amount: 100, currency: "EUR", alertedMonth: null, alertedLevel: 0 },
             data: { alertedMonth: "2026-09", alertedLevel: 80 }
         });
+    });
+
+    it("stays quiet when the budget was changed while it was being measured", async () => {
+        findMany.mockResolvedValue([budgetRow()]);
+        readStatement.mockResolvedValue(spending(90));
+        updateMany.mockImplementation(async ({ where }: { where: { amount: number } }) => ({
+            count: where.amount === 500 ? 1 : 0
+        }));
+        expect(await sweepBudgets(NOW)).toEqual({ checked: 1, announced: 0 });
+        expect(notify).not.toHaveBeenCalled();
     });
 
     it("says nothing again for a threshold already announced this month", async () => {

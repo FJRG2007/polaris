@@ -473,7 +473,7 @@ export async function createApplicationAction(input: {
             // Reached through the edge only, until somebody deliberately opens its port
             // on the machine's own address. Closed is the default a firewall should have.
             publishPort: false,
-            safeHeaders: true,
+            safeHeaders: !template?.embedded,
             ...(fromRepo ? { buildConfig: fromRepo.buildConfig } : {}),
             // A service that keeps its previous deployments runs one copy of each.
             ...(fromRepo?.replicas && !flags.keepReleasesByDefault ? { replicas: fromRepo.replicas } : {})

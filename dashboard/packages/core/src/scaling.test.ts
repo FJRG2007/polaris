@@ -233,6 +233,14 @@ describe("requestRate", () => {
         expect(requestRate([], null, NOW)).toBeNull();
         expect(requestRate([at(2)], at(3), NOW)).toBeNull();
     });
+
+    it("reads a busy log cut short by the size read over the seconds it holds", () => {
+        // Three seconds of log, cut at the byte cap: 6 requests in them is 120 a minute.
+        const times = Array.from({ length: 6 }, (_, index) => at(index * 0.5));
+        expect(requestRate(times, at(3), NOW, true)).toBe(120);
+        expect(requestRate([], null, NOW, true)).toBeNull();
+        expect(requestRate([NOW], NOW, NOW, true)).toBeNull();
+    });
 });
 
 describe("the autoscale setting", () => {

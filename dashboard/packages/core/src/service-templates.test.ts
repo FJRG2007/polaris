@@ -84,6 +84,11 @@ describe("the template list", () => {
             for (const entry of vars) expect(entry.value, `${template.id}: ${entry.key}`).not.toMatch(/(^|[^$])\{\{/);
         }
     });
+
+    it("marks the apps other sites frame, and only those", () => {
+        const embedded = SERVICE_TEMPLATES.filter((template) => template.embedded).map((template) => template.id);
+        expect(embedded.sort()).toEqual(["grafana", "metabase", "n8n", "uptime-kuma"]);
+    });
 });
 
 describe("the templates added with a database, a companion or setup", () => {

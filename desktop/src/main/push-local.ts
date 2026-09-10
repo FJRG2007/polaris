@@ -152,20 +152,27 @@ class Push {
         const server = this.host.server();
         if (!server) return { ok: false, error: "Choose the Polaris to push to first." };
         if (!this.folder) return { ok: false, error: "Choose the folder to build first." };
+        const abort = new AbortController();
+        this.abort = abort;
         const folderStat = await stat(this.folder).catch(() => null);
-        if (!folderStat?.isDirectory()) return { ok: false, error: "That folder is not there any more. Choose it again." };
+        if (!folderStat?.isDirectory() || abort.signal.aborted) {
+            this.abort = null;
+            return abort.signal.aborted
+                ? { ok: false, error: "Cancelled." }
+                : { ok: false, error: "That folder is not there any more. Choose it again." };
+        }
 
         this.platform = platform;
         rememberPushChoice(this.target.serviceId, { folder: this.folder, platform });
-        const abort = new AbortController();
-        this.abort = abort;
         let scratch: string | null = null;
         try {
             this.enter("checking");
             const docker = await dockerReady();
+            if (abort.signal.aborted) return this.finish(false, "Cancelled.", "cancelled");
             if (!docker.ok) return this.finish(false, docker.error);
 
-            const key = await apiKeyFor(server, this.window);
+            const key = await apiKeyFor(server, this.window, abort.signal);
+            if (abort.signal.aborted) return this.finish(false, "Cancelled.", "cancelled");
             if (!key) return this.finish(false, "Pushing needs an API key. Nothing was built.", "ready");
             const caller: Caller = { server, key };
             const { repository } = await callJson(

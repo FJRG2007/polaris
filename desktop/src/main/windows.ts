@@ -4,8 +4,9 @@
  * Two kinds of page, never mixed in one window:
  *
  * - **Polaris windows** load the configured instance and carry the dashboard's
- *   bridge. Their main frame may only ever be on that origin (see
- *   `navigation`); a link anywhere else opens in the system browser, and a new
+ *   bridge. Their main frame stays on that origin, but for a provider's round
+ *   trip the instance starts (see `navigation`); a link anywhere else opens in
+ *   the system browser, and a new
  *   window the dashboard opens on its own origin is another Polaris window
  *   under the same rules.
  * - **Local windows** show a page this app ships - the address form, the key
@@ -15,8 +16,8 @@
  */
 
 import { join } from "node:path";
-import { classifyNavigation } from "./navigation";
 import { VERSION_ARGUMENT } from "@/shared/bridge";
+import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
     app,
     BrowserWindow,
@@ -81,18 +82,29 @@ function windowOptions(options: BrowserWindowConstructorOptions): BrowserWindowC
 /**
  * Hold a Polaris window to its origin: the main frame stays on the server,
  * anything else on the web goes to the system browser, and nothing else goes
- * anywhere. Read per event, so a changed server applies at once.
+ * anywhere - except during a provider's round trip the server started (see
+ * `navigation`). Frames inside the page are the page's business. Read per
+ * event, so a changed server applies at once.
  */
 function contain(contents: WebContents, server: () => string | null): void {
-    const guard = (event: { preventDefault: () => void; }, url: string) => {
+    let trip = false;
+    const guard = (event: { preventDefault: () => void; readonly url: string; readonly isMainFrame: boolean; }) => {
+        if (!event.isMainFrame) return;
         const origin = server();
-        const verdict = origin ? classifyNavigation(url, origin) : "block";
-        if (verdict === "allow") return;
+        const step = origin ? mainFrameStep(event.url, origin, trip) : null;
+        trip = step?.trip ?? false;
+        if (step?.verdict === "allow") return;
         event.preventDefault();
-        if (verdict === "external") void shell.openExternal(url);
+        if (step?.verdict === "external") void shell.openExternal(event.url);
     };
     contents.on("will-navigate", guard);
     contents.on("will-redirect", guard);
+    contents.on("did-navigate", (_event, url) => {
+        const origin = server();
+        if (!trip || !origin || !isServerUrl(url, origin)) return;
+        trip = false;
+        contents.navigationHistory.clear();
+    });
     contents.setWindowOpenHandler(({ url }) => {
         const origin = server();
         const verdict = origin ? classifyNavigation(url, origin) : "block";

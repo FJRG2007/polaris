@@ -30,10 +30,21 @@ interface Row {
     lastOkAt: Date | null;
 }
 
+interface Notice {
+    id: string;
+    userId: string;
+    type: string;
+    metadata: string | null;
+    readAt: Date | null;
+    actionRequired: boolean;
+}
+
 const state = {
     rows: [] as Row[],
     notified: [] as { userId: string; event: string; title: string; href?: string | null }[],
-    synced: [] as { id: string; force: boolean }[]
+    synced: [] as { id: string; force: boolean }[],
+    notices: [] as Notice[],
+    noticeReads: 0
 };
 
 type Where = { id?: string; connectionId?: string; state?: string | { not: string } };
@@ -65,6 +76,24 @@ vi.mock("@polaris/db", () => ({
             ),
             findMany: vi.fn(async ({ where }: { where: Where }) =>
                 state.rows.filter((row) => matches(row, where))
+            )
+        },
+        notification: {
+            findMany: vi.fn(async ({ where }: { where: { userId: string; type: string } }) => {
+                state.noticeReads += 1;
+                return state.notices.filter(
+                    (notice) =>
+                        notice.userId === where.userId &&
+                        notice.type === where.type &&
+                        (notice.readAt === null || notice.actionRequired)
+                );
+            }),
+            updateMany: vi.fn(
+                async ({ where, data }: { where: { id: { in: string[] } }; data: Partial<Notice> }) => {
+                    const hit = state.notices.filter((notice) => where.id.in.includes(notice.id));
+                    for (const notice of hit) Object.assign(notice, data);
+                    return { count: hit.length };
+                }
             )
         }
     }
@@ -121,7 +150,23 @@ beforeEach(() => {
     state.rows = [];
     state.notified = [];
     state.synced = [];
+    state.notices = [];
+    state.noticeReads = 0;
 });
+
+function notice(accountId: string, overrides: Partial<Notice> = {}): Notice {
+    const row: Notice = {
+        id: `notice-${state.notices.length + 1}`,
+        userId: "usr_ana",
+        type: "mail.account.refused",
+        metadata: JSON.stringify({ accountId }),
+        readAt: null,
+        actionRequired: true,
+        ...overrides
+    };
+    state.notices.push(row);
+    return row;
+}
 
 describe("a mailbox the server stops accepting", () => {
     it("is paused and its owner is told, with the way to fix it", async () => {
@@ -165,6 +210,29 @@ describe("a mailbox the server stops accepting", () => {
         await recordCredentialRefusal(row.id, "refused");
         expect(row.state).toBe("auth");
         expect(state.notified).toHaveLength(2);
+    });
+
+    it("takes the notice off the bell once a pass works again, and only that mailbox's", async () => {
+        const row = mailbox();
+        await recordCredentialRefusal(row.id, "refused");
+        const mine = notice(row.id, { readAt: new Date("2026-09-10T09:00:00Z") });
+        const other = notice("0190c1d2-0000-7000-8000-000000000002");
+        const unrelated = notice(row.id, { type: "mail.arrived" });
+
+        await recordAccountState(row.id, "ok");
+
+        expect(mine.actionRequired).toBe(false);
+        expect(mine.readAt).toBeInstanceOf(Date);
+        expect(other).toMatchObject({ readAt: null, actionRequired: true });
+        expect(unrelated).toMatchObject({ readAt: null, actionRequired: true });
+    });
+
+    it("does not look at the bell on every pass of a mailbox that was already working", async () => {
+        const row = mailbox();
+        await recordAccountState(row.id, "ok");
+        await recordAccountState(row.id, "ok");
+        expect(row.state).toBe("ok");
+        expect(state.noticeReads).toBe(0);
     });
 
     it("is not announced for a mailbox that is not there any more", async () => {

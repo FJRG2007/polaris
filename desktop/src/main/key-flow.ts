@@ -29,20 +29,37 @@ function settle(key: string | null): void {
 }
 
 /** The key for this Polaris, asking for it when there is none. Null when the
- *  person closed the form. */
-export function apiKeyFor(server: string, parent?: BrowserWindow): Promise<string | null> {
+ *  person closed the form, or when `signal` aborted while it was open - the
+ *  form then closes unless another push is still waiting on it. */
+export function apiKeyFor(server: string, parent?: BrowserWindow, signal?: AbortSignal): Promise<string | null> {
+    if (signal?.aborted) return Promise.resolve(null);
     if (remembered?.server === server) return Promise.resolve(remembered.key);
     const kept = readApiKey(server);
     if (kept) return Promise.resolve(kept);
     return new Promise((resolve) => {
+        const give = (key: string | null) => {
+            signal?.removeEventListener("abort", abandon);
+            resolve(key);
+        };
+        const abandon = () => {
+            const current = asking;
+            const at = current ? current.waiting.indexOf(give) : -1;
+            if (!current || at < 0) return;
+            current.waiting.splice(at, 1);
+            resolve(null);
+            if (current.waiting.length === 0) current.window.close();
+        };
+        signal?.addEventListener("abort", abandon, { once: true });
         if (asking?.server === server) {
-            asking.waiting.push(resolve);
+            asking.waiting.push(give);
             asking.window.focus();
             return;
         }
-        asking?.window.close();
+        const replaced = asking;
+        settle(null);
+        replaced?.window.close();
         const window = openLocalWindow("api-key", { title: "API key - Polaris", width: 520, height: 470, parent });
-        asking = { server, window, waiting: [resolve] };
+        asking = { server, window, waiting: [give] };
         window.on("closed", () => {
             if (asking?.window === window) settle(null);
         });

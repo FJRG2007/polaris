@@ -16,6 +16,42 @@ import { z } from "zod";
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 
+/** Names that only resolve inside a network: mDNS, common router suffixes, and
+ *  the ones reserved for private use. */
+const OWN_NETWORK_SUFFIXES = [".local", ".lan", ".home.arpa", ".internal", ".localhost"];
+
+function isPrivateIpv4(host: string): boolean {
+    const parts = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)?.slice(1).map(Number);
+    if (!parts) return false;
+    const [a = -1, b = -1] = parts;
+    return (
+        a === 10 ||
+        a === 127 ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 169 && b === 254) ||
+        (a === 100 && b >= 64 && b <= 127)
+    );
+}
+
+function isPrivateIpv6(host: string): boolean {
+    const address = host.replace(/^\[|\]$/g, "");
+    return address === "::1" || /^f[cd][0-9a-f]{2}:/.test(address) || /^fe[89ab][0-9a-f]:/.test(address);
+}
+
+/**
+ * Whether a host, as `URL` normalizes it, can only be reached from the network
+ * this computer is on: loopback, the private and shared (CGNAT, which is where
+ * Tailscale lives) IPv4 ranges, link-local, IPv6 unique-local, a name with no
+ * dot, or a name under a suffix no public DNS answers for.
+ */
+export function isOwnNetworkHost(hostname: string): boolean {
+    const host = hostname.toLowerCase().replace(/\.$/, "");
+    if (host.startsWith("[")) return isPrivateIpv6(host);
+    if (/^[\d.]+$/.test(host)) return isPrivateIpv4(host);
+    return !host.includes(".") || OWN_NETWORK_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 /**
  * The text as it should be read: trimmed, and taken as https when no scheme was
  * typed. The schema below still decides whether the result is an address.
@@ -48,6 +84,13 @@ export const serverAddressSchema = z
         }
         if (!url.hostname || /\s/.test(text)) {
             ctx.addIssue({ code: "custom", message: "That is not an address. It looks like https://polaris.example.com." });
+            return z.NEVER;
+        }
+        if (url.protocol === "http:" && !isOwnNetworkHost(url.hostname)) {
+            ctx.addIssue({
+                code: "custom",
+                message: "An address on the internet needs https://. http:// works only on your own network."
+            });
             return z.NEVER;
         }
         if (url.username || url.password) {

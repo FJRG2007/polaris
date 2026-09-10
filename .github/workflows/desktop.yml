@@ -9,7 +9,8 @@ name: Desktop
 #
 # Unsigned unless the signing secrets exist (see desktop/README.md for their
 # names). Secrets are handed only to the step that signs, never to `npm ci`,
-# which runs third-party install scripts.
+# which runs third-party install scripts, and only on a `desktop-v*` tag or on
+# main: a run by hand from any other branch builds unsigned.
 #
 # Node 22 on purpose: the packager's zip extractor stops silently, reporting
 # success, on newer Node, and the installers come out empty.
@@ -110,6 +111,7 @@ jobs:
 
       - name: Which signing secrets exist
         id: signing
+        if: startsWith(github.ref, 'refs/tags/desktop-v') || github.ref == 'refs/heads/main'
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -146,11 +148,11 @@ jobs:
 
       - name: Build the installers
         env:
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ steps.signing.outputs.windows == 'true' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           npm run build
           npx electron-forge make --arch=${{ matrix.arch }}

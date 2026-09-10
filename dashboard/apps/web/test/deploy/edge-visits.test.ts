@@ -9,11 +9,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { log } = vi.hoisted(() => ({ log: { text: "" } }));
+const { log } = vi.hoisted(() => ({ log: { text: "", truncated: false } }));
 
 vi.mock("@/lib/edge-access-log", () => ({
     EDGE_LOG_RECENT_WINDOW_BYTES: 1024,
-    readEdgeLogTail: async () => log.text
+    readEdgeLogWindow: async () => ({ text: log.text, truncated: log.truncated })
 }));
 vi.mock("@/lib/deploy/quick-tunnel-service", () => ({ tunnelHostForApp: (id: string) => `${id}.tunnel.test` }));
 
@@ -36,6 +36,7 @@ function line(secondsAgo: number, host: string | null, extra: Record<string, unk
 
 beforeEach(() => {
     log.text = "";
+    log.truncated = false;
 });
 
 describe("the edge's visits", () => {
@@ -71,6 +72,14 @@ describe("the edge's visits", () => {
     });
 
     it("knows nothing when there is no log", async () => {
-        await expect(readEdgeVisits()).resolves.toEqual({ visits: [], windowStart: null });
+        await expect(readEdgeVisits()).resolves.toEqual({ visits: [], windowStart: null, truncated: false });
+    });
+
+    it("says when the window is short because the log holds more than was read", async () => {
+        log.text = [line(3, "shop.example.com"), line(1, "shop.example.com")].join("\n");
+        log.truncated = true;
+        const visits = await readEdgeVisits();
+        expect(visits.truncated).toBe(true);
+        expect(visits.windowStart).toBe(NOW - 3_000);
     });
 });

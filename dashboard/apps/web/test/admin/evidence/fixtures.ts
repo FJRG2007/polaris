@@ -43,6 +43,10 @@ export function readings(overrides: Partial<EvidenceReadings> = {}): EvidenceRea
         },
         backups: {
             total: 1,
+            scheduled: 1,
+            failing: 0,
+            withCopy: 1,
+            encrypted: 1,
             activeKeys: 1,
             items: [
                 {

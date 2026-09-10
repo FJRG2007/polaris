@@ -621,20 +621,31 @@ function Invoke-Power {
     Write-Host "$Action done."
 }
 
+# `polaris env`, or `polaris secrets` when $Noun says so - which lists and
+# removes secret variables only.
 function Invoke-Env {
-    param([hashtable]$Context, [string[]]$Arguments)
+    param([hashtable]$Context, [string[]]$Arguments, [string]$Noun = "env")
     $positional = Get-Positional $Arguments
     $sub = if ($positional.Count -gt 0) { $positional[0] } else { "list" }
     $id = Resolve-Service $Context $(if ($positional.Count -gt 1) { $positional[1] } else { "" })
     $secret = -not ($Arguments -contains "--plain")
+    $plainFlag = if ($Noun -eq "secrets") { "" } else { " [--plain]" }
     switch ($sub) {
         "list" {
-            (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/variables").variables | ForEach-Object {
-                [pscustomobject]@{ Key = $_.key; Value = if ($_.isSecret) { "(secret)" } else { $_.value }; Id = $_.id }
-            } | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+            $variables = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/variables").variables
+            if ($Noun -eq "secrets") {
+                $variables | Where-Object { $_.isSecret } | ForEach-Object {
+                    [pscustomobject]@{ Key = $_.key }
+                } | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+            }
+            else {
+                $variables | ForEach-Object {
+                    [pscustomobject]@{ Key = $_.key; Value = if ($_.isSecret) { "(secret)" } else { $_.value }; Id = $_.id }
+                } | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+            }
         }
         "set" {
-            if ($positional.Count -lt 3 -or $positional[2] -notmatch "=") { Stop-WithError "usage: polaris env set <service> KEY=VALUE [--plain]" }
+            if ($positional.Count -lt 3 -or $positional[2] -notmatch "=") { Stop-WithError "usage: polaris $Noun set <service> KEY=VALUE$plainFlag" }
             $split = $positional[2].IndexOf("=")
             $key = $positional[2].Substring(0, $split)
             $value = $positional[2].Substring($split + 1)
@@ -642,20 +653,21 @@ function Invoke-Env {
             Write-Host "saved $key"
         }
         "unset" {
-            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris env unset <service> KEY" }
+            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris $Noun unset <service> KEY" }
             $match = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/variables").variables | Where-Object { $_.key -eq $positional[2] }
             if (-not $match) { Stop-WithError "$($positional[2]) is not set on that service" }
+            if ($Noun -eq "secrets" -and -not $match.isSecret) { Stop-WithError "$($positional[2]) is a plain variable - use 'polaris env unset' to remove it" }
             Invoke-Api $Context "DELETE" "/api/v1/deploy/variables/$($match.id)" | Out-Null
             Write-Host "removed $($positional[2])"
         }
         "import" {
-            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris env import <service> <file> [--plain]" }
+            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris $Noun import <service> <file>$plainFlag" }
             if (-not (Test-Path $positional[2])) { Stop-WithError "cannot read $($positional[2])" }
             $text = Get-Content $positional[2] -Raw
             $answer = Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/variables/import" @{ text = $text; secret = $secret }
             Write-Host "imported $($answer.count)"
         }
-        default { Stop-WithError "unknown 'env' command '$sub' - list, set, unset or import" }
+        default { Stop-WithError "unknown '$Noun' command '$sub' - list, set, unset or import" }
     }
 }
 
@@ -733,7 +745,7 @@ switch ($Command) {
     "secrets" {
         # Every value set here is stored encrypted and never shown back.
         if ($Rest -contains "--plain") { Stop-WithError "a secret is never plain - use 'polaris env set ... --plain' for a plain variable" }
-        Invoke-Env (Get-ApiContext) $Rest
+        Invoke-Env (Get-ApiContext) $Rest "secrets"
     }
     "domains" { Invoke-Domains (Get-ApiContext) $Rest }
     "update" {
@@ -782,7 +794,8 @@ Deploy (from anywhere, with an API key):
   polaris env list|set|unset|import <service> ...
                   set KEY=VALUE [--plain]   unset KEY   import <file> [--plain]
   polaris secrets list|set|unset|import <service> ...
-                                       The same, always encrypted and never shown back
+                                       Secret variables only: stored encrypted, listed
+                                       by name, never shown back
   polaris domains list|add|remove <service> ...
                   add [hostname] [--port N] [--cert le|internal|none]   remove <hostname|id>
 

@@ -25,6 +25,9 @@ interface InstallRow {
 let installs: InstallRow[];
 let servers: { id: string; ownerId: string; createdAt: Date }[];
 let applicationsCreated: number;
+let locked: string[];
+/** One transaction at a time, the way the advisory lock makes them on Postgres. */
+let queue: Promise<unknown>;
 
 type Where = Record<string, unknown>;
 
@@ -45,8 +48,22 @@ function oldestFirst<T extends { createdAt: Date }>(rows: T[]): T[] {
     return [...rows].sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
 }
 
-vi.mock("@polaris/db", () => ({
-    prisma: {
+vi.mock("@polaris/config", async (original) => ({
+    ...(await original<typeof import("@polaris/config")>()),
+    loadEnv: () => ({ POLARIS_DB_PROVIDER: "postgresql" })
+}));
+
+vi.mock("@polaris/db", () => {
+    const prisma = {
+        $transaction: async (work: (tx: unknown) => Promise<unknown>): Promise<unknown> => {
+            const turn = queue.then(() => work(prisma));
+            queue = turn.catch(() => undefined);
+            return turn;
+        },
+        $executeRawUnsafe: async (sql: string) => {
+            locked.push(sql);
+            return 1;
+        },
         installedApp: {
             findFirst: async ({ where }: { where: Where }) =>
                 oldestFirst(installs).find((row) => matches(row as never, where)) ?? null,
@@ -86,8 +103,9 @@ vi.mock("@polaris/db", () => ({
                 return { id: "never" };
             }
         }
-    }
-}));
+    };
+    return { prisma };
+});
 
 const appInstall = await import("@/lib/mail-server/app-install");
 const presence = await import("@/lib/apps/install-presence");
@@ -121,6 +139,8 @@ beforeEach(() => {
     installs = [];
     servers = [];
     applicationsCreated = 0;
+    locked = [];
+    queue = Promise.resolve();
     presence.invalidateInstallPresence();
 });
 
@@ -208,6 +228,17 @@ describe("adopting an install for an instance that already runs one", () => {
         expect(installs).toHaveLength(1);
     });
 
+    it("records one install when two screens open together", async () => {
+        server(ALICE, 1);
+        const [first, second] = await Promise.all([
+            appInstall.adoptMailServerApp(),
+            appInstall.adoptMailServerApp()
+        ]);
+        expect(installs).toHaveLength(1);
+        expect(second).toBe(first);
+        expect(locked[0]).toContain("pg_advisory_xact_lock");
+    });
+
     it("adopts nothing where there is nothing to adopt", async () => {
         expect(await appInstall.adoptMailServerApp()).toBeNull();
         expect(installs).toHaveLength(0);
@@ -268,6 +299,14 @@ describe("uninstalling", () => {
         servers = [];
         await service.uninstallApp(ALICE, row.id);
         expect(row.status).toBe("removed");
+    });
+
+    it("removes every copy through the generic uninstall too", async () => {
+        const row = install(ALICE);
+        install(BOB);
+        await service.uninstallApp(ALICE, row.id);
+        expect(installs.map((entry) => entry.status)).toEqual(["removed", "removed"]);
+        expect(await appInstall.mailServerAppInstalled()).toBe(false);
     });
 });
 

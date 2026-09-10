@@ -79,11 +79,20 @@ export function normalizeHostname(value: string): string {
 /** The types whose content is a hostname. */
 const HOSTNAME_CONTENT: readonly DnsRecordType[] = ["CNAME", "MX", "NS"];
 
+/** The root itself as a target: an MX that takes no mail (RFC 7505), or an SRV
+ *  service that is not offered here (RFC 2782). */
+export const NO_TARGET = ".";
+
+/** A target as it is stored: a hostname normalized, or the root kept as `.`. */
+function normalizeTarget(value: string): string {
+    return value.trim() === NO_TARGET ? NO_TARGET : normalizeHostname(value);
+}
+
 /**
  * A draft in the form it is checked and stored in: every field trimmed, names
- * and hostnames in lower case with no final dot, TXT text left as typed inside.
- * The one normalizer the form (as a field is left) and the server (before
- * checking) both run.
+ * and hostnames in lower case with no final dot (a target that is only `.` stays
+ * `.`), TXT text left as typed inside. The one normalizer the form (as a field is
+ * left) and the server (before checking) both run.
  */
 export function normalizeDraft(draft: DnsRecordDraft): DnsRecordDraft {
     const content = draft.content.trim();
@@ -91,7 +100,7 @@ export function normalizeDraft(draft: DnsRecordDraft): DnsRecordDraft {
         ...draft,
         name: normalizeHostname(draft.name),
         content: HOSTNAME_CONTENT.includes(draft.type)
-            ? normalizeHostname(content)
+            ? normalizeTarget(content)
             : draft.type === "TXT"
               ? content
               : content.toLowerCase(),
@@ -99,7 +108,7 @@ export function normalizeDraft(draft: DnsRecordDraft): DnsRecordDraft {
         priority: draft.priority.trim(),
         weight: draft.weight.trim(),
         port: draft.port.trim(),
-        target: normalizeHostname(draft.target),
+        target: normalizeTarget(draft.target),
         flags: draft.flags.trim(),
         tag: draft.tag.trim().toLowerCase(),
         value: draft.value.trim()
@@ -149,6 +158,13 @@ export function isRecordName(name: string): boolean {
 export function isTargetHostname(value: string): boolean {
     if (value.length === 0 || value.length > 253) return false;
     return value.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
+}
+
+/** What a CNAME may point at: a hostname, or a name with underscore labels such
+ *  as a DKIM key (`selector1._domainkey.example.com`) or a certificate
+ *  validation (`_x1.acm-validations.aws`). No wildcard. */
+export function isAliasTarget(value: string): boolean {
+    return isRecordName(value) && !value.split(".").includes("*");
 }
 
 /** The text of a TXT value: a value written quoted, or as several quoted strings
@@ -313,7 +329,7 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
                     break;
                 case "CNAME":
                     if (!need("content")) break;
-                    if (!isTargetHostname(draft.content)) fail("content", "A hostname, like app.example.com");
+                    if (!isAliasTarget(draft.content)) fail("content", "A hostname, like app.example.com");
                     else if (draft.content === name) fail("content", "A name cannot point at itself");
                     break;
                 case "NS":
@@ -325,13 +341,15 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
                     else if (draft.content.length > TXT_MAX) fail("content", `At most ${TXT_MAX} characters`);
                     break;
                 case "MX":
-                    if (need("content") && !isTargetHostname(draft.content)) {
+                    if (need("content") && draft.content !== NO_TARGET && !isTargetHostname(draft.content)) {
                         fail("content", "The mail server's hostname, like mx.example.com");
                     }
                     port("priority");
                     break;
                 case "SRV":
-                    if (need("target") && !isTargetHostname(draft.target)) fail("target", "The hostname the service runs on");
+                    if (need("target") && draft.target !== NO_TARGET && !isTargetHostname(draft.target)) {
+                        fail("target", "The hostname the service runs on");
+                    }
                     port("priority");
                     port("weight");
                     port("port");

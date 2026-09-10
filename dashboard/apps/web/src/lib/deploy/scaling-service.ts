@@ -2,15 +2,15 @@
  * How many copies of a service run, the range they move in by themselves, and how
  * the edge spreads traffic over them.
  *
- * A new count reaches the running service the way a changed variable does: the
- * live release is started again from its kept image. A service whose deploys change
- * over beside the running release gets the new count as a whole set of copies
- * beside the old ones, which go once every new copy is serving; anywhere else
- * nothing that did not change is recreated - the first copy is left as it is and
- * the others come or go. Either way the edge goes on dialling the copies the
- * serving release has until the new one is promoted. So a count moved by hand and
- * one moved by the autoscaler take the same path, and both leave a row in the
- * history saying the service was scaled.
+ * A new count reaches the running service from the live release's kept image, as a
+ * scale step: the copies are added or removed where the serving release runs - its
+ * own project, for a service whose deploys change over - and nothing that did not
+ * change is recreated. It never starts a second set beside the first, which on a
+ * busy service would be twice its containers at the moment it most needs room. New
+ * copies are dialled once every one is serving, and copies going away stop being
+ * dialled before they go. So a count moved by hand and one moved by the autoscaler
+ * take the same path, and both leave a row in the history saying the service was
+ * scaled.
  */
 
 import { prisma } from "@polaris/db";
@@ -172,13 +172,13 @@ export async function setServiceScaling(
     await syncAppRoutes().catch(() => undefined);
     const limitsChanged = input.limits.cpus !== app.cpuLimit || input.limits.memoryMb !== app.memoryLimitMb;
     if ((replicas === app.replicas && !limitsChanged) || !app.currentDeploymentId) return { redeployed: false };
-    await restartFromKeptImage(applicationId, ownerId, userId, replicas === app.replicas ? "settings" : "scale");
+    await restartFromKeptImage(applicationId, ownerId, userId, limitsChanged ? "settings" : "scale");
     return { redeployed: true };
 }
 
 /**
  * Move a running service to `replicas` copies, for the autoscaler: the count is
- * written and the live release started again, with nothing else touched.
+ * written and the live release scaled to it, with nothing else touched.
  */
 export async function scaleService(
     applicationId: string,

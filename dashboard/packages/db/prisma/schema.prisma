@@ -5027,6 +5027,25 @@ model OrganizationBudget {
     org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
 
+// A month that has ended, as the whole instance's statement had it the first
+// time it was read afterwards: every project's usage, who owned it and what it
+// was called then, and the prices it was worked out at.
+//
+// Without this a closed month is worked out again on every read from today's
+// prices, projects and owners, so a statement already exported changes after a
+// price or currency is changed or a project is deleted. Each scope's statement
+// is built from this row, so the instance's and an organization's agree.
+model StatementSnapshot {
+    month     String    @id
+    // The price card as JSON, read back like the stored one; null when none was set.
+    rates     String?
+    // The metered projects as JSON (see MeteredProject in @polaris/core).
+    projects  String    @default("[]")
+    // When the month began before the oldest figure kept at the time, that figure.
+    keptFrom  DateTime?
+    createdAt DateTime  @default(now())
+}
+
 // What one of an organization's roles may do.
 //
 // Rows rather than a fixed ladder because "admin" means something different in a

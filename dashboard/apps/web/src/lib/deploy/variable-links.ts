@@ -30,7 +30,7 @@ export interface VariableLink {
 const SERVICE_KEYS = ["POLARIS_PRIVATE_DOMAIN", "PORT", "POLARIS_PUBLIC_DOMAIN", "POLARIS_PUBLIC_URL"];
 
 /** The keys a managed database answers to; the values do not matter here. */
-function databaseKeys(engine: string, cluster: boolean): Set<string> {
+function databaseKeys(engine: string, cluster: boolean, readable: boolean): Set<string> {
     return new Set(
         Object.keys(
             core.databaseReferenceKeys({
@@ -41,7 +41,8 @@ function databaseKeys(engine: string, cluster: boolean): Set<string> {
                 username: "",
                 password: "",
                 uri: "",
-                clusterNodes: cluster ? [""] : null
+                clusterNodes: cluster ? [""] : null,
+                readUri: readable ? "-" : null
             })
         )
     );
@@ -77,7 +78,14 @@ export async function variableLinks(
         prisma.application.findMany({ where: { environmentId }, select: { id: true, slug: true, name: true } }),
         prisma.managedDatabase.findMany({
             where: { environmentId },
-            select: { slug: true, name: true, engine: true, clusterMasters: true }
+            select: {
+                slug: true,
+                name: true,
+                engine: true,
+                clusterMasters: true,
+                topology: true,
+                parent: { select: { topology: true } }
+            }
         }),
         prisma.envVar.findMany({ where: { scopeType: "environment", scopeId: environmentId }, select: { key: true } })
     ]);
@@ -112,7 +120,11 @@ export async function variableLinks(
             return {
                 ...base,
                 target: { kind: "database", label: database.name },
-                keyKnown: databaseKeys(database.engine, database.clusterMasters !== null).has(reference.key)
+                keyKnown: databaseKeys(
+                    database.engine,
+                    database.clusterMasters !== null,
+                    core.resolveTopology(database.parent ?? database).kind === "replicas"
+                ).has(reference.key)
             };
         }
         return { ...base, target: null, keyKnown: false };

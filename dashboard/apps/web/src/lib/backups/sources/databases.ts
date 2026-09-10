@@ -49,6 +49,7 @@ const DUMPERS = {
         argv: (db: string, user: string, password: string) => [
             "mysqldump",
             "--single-transaction",
+            "--set-gtid-purged=OFF",
             "--routines",
             "--triggers",
             `-u${user}`,

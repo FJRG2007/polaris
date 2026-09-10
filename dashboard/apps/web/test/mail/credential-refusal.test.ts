@@ -61,6 +61,16 @@ describe("what counts as a refused credential", () => {
         expect(isCredentialRefusal(imapRefusal("UNAVAILABLE", "Try again later"))).toBe(false);
     });
 
+    it("reads a reply whose code is not a refusal's by what it says", () => {
+        expect(isCredentialRefusal(imapRefusal("ALERT", "Too many simultaneous connections. (Failure)"))).toBe(
+            false
+        );
+        expect(isCredentialRefusal(imapRefusal("ALERT", "Invalid credentials (Failure)"))).toBe(true);
+        expect(
+            isCredentialRefusal(imapRefusal("ALERT", "Please log in via your web browser (Failure)"))
+        ).toBe(true);
+    });
+
     it("does not call a socket that closed during LOGIN a refusal", () => {
         // imapflow stamps `authenticationFailed` on this too.
         const dropped = Object.assign(new Error("Connection not available"), {

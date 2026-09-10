@@ -18,7 +18,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/deploy-service", () => ({ setApplicationAsleep, syncAppRoutes: async () => undefined }));
 vi.mock("@/lib/edge-access-log", () => ({
     EDGE_LOG_RECENT_WINDOW_BYTES: 1024,
-    readEdgeLogTail: async () => log.text
+    readEdgeLogWindow: async () => ({ text: log.text, truncated: false })
 }));
 vi.mock("@/lib/deploy/quick-tunnel-service", () => ({ tunnelHostForApp: (id: string) => `${id}.tunnel.test` }));
 

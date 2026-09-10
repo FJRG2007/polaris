@@ -10,8 +10,8 @@
  * of its argument is refused before it is built into one.
  */
 
-import { describe, expect, it } from "vitest";
 import * as core from "../src/index.js";
+import { describe, expect, it } from "vitest";
 
 const POSTGRES: core.RestoreTarget = {
     engine: "postgres",
@@ -283,5 +283,13 @@ describe("copying from elsewhere", () => {
         expect(mysql.argv[2]).not.toContain("hunter22");
         expect(mysql.argv.at(-1)).toBe("hunter22");
         expect(mysql.describe).not.toContain("hunter22");
+    });
+
+    it("leaves GTID statements out of a MySQL dump, and asks nothing of MariaDB's tool it lacks", () => {
+        const mysql = core.externalDumpCommand(core.parseExternalSource("mysql://u:p@h/db", "mysql")!, "/tmp/x");
+        expect(mysql.argv[2]).toContain("mysqldump --single-transaction --set-gtid-purged=OFF ");
+        const mariadb = core.externalDumpCommand(core.parseExternalSource("mysql://u:p@h/db", "mariadb")!, "/tmp/x");
+        expect(mariadb.argv[2]).toContain("mariadb-dump --single-transaction ");
+        expect(mariadb.argv[2]).not.toContain("gtid");
     });
 });

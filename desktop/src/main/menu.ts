@@ -1,6 +1,7 @@
 /**
- * The application menu: File (Change server, Reload, Forget API key), Edit,
- * View, Window and Help.
+ * The application menu: File (Change server, Back, Reload, Forget API key),
+ * Edit, View, Window and Help - which also offers a newer version once one is
+ * out.
  *
  * Installed on every platform. macOS draws it in the menu bar; Windows and Linux
  * draw it in the window. Electron's roles bring the right labels, shortcuts and
@@ -12,6 +13,7 @@ import { app, Menu, type MenuItemConstructorOptions } from "electron";
 
 export interface MenuActions {
     readonly changeServer: () => void;
+    readonly back: () => void;
     readonly reload: () => void;
     readonly forgetApiKey: () => void;
     readonly openApiKeys: () => void;
@@ -20,7 +22,13 @@ export interface MenuActions {
 
 const isMac = process.platform === "darwin";
 
-export function installMenu(actions: MenuActions): void {
+/** A newer version to offer, and how to get it. */
+export interface MenuUpdate {
+    readonly version: string;
+    readonly open: () => void;
+}
+
+export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
     const template: MenuItemConstructorOptions[] = [
         ...(isMac
             ? ([
@@ -44,6 +52,7 @@ export function installMenu(actions: MenuActions): void {
             label: "File",
             submenu: [
                 { label: "Change server...", click: actions.changeServer },
+                { label: "Back", accelerator: isMac ? "Cmd+[" : "Alt+Left", click: actions.back },
                 { label: "Reload", accelerator: "CmdOrCtrl+R", click: actions.reload },
                 { type: "separator" },
                 { label: "API keys", click: actions.openApiKeys },
@@ -92,6 +101,12 @@ export function installMenu(actions: MenuActions): void {
         {
             role: "help",
             submenu: [
+                ...(update
+                    ? ([
+                          { label: `Download Polaris ${update.version}...`, click: update.open },
+                          { type: "separator" }
+                      ] satisfies MenuItemConstructorOptions[])
+                    : []),
                 { label: "Open this Polaris in the browser", click: actions.openInBrowser },
                 ...(isMac ? [] : ([{ type: "separator" }, { role: "about" }] satisfies MenuItemConstructorOptions[]))
             ]

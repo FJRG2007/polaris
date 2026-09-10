@@ -34,13 +34,18 @@ import { decryptSecret } from "@polaris/storage";
 import { setEnvVars } from "@/lib/env-var-service";
 import { readCredential } from "@/lib/connections/store";
 import { carriable, isPublicKey, repoFromSourceConfig } from "@/lib/deploy/migrate-rules";
-import { createApplication, deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import {
     ProviderError,
     type ProviderDriver,
     type ProviderRef,
     type ServiceSource
 } from "@/lib/deploy/providers/contract";
+import {
+    createApplication,
+    deployApplication,
+    setApplicationRunning,
+    ensureApplicationDomain
+} from "@/lib/deploy-service";
 import {
     addExternalService,
     isProvider,
@@ -447,6 +452,8 @@ export async function moveHome(
         isSecret: !isPublicKey(key)
     }));
     const copied = entries.length > 0 ? await setEnvVars("application", application.id, owner, entries) : 0;
+
+    await ensureApplicationDomain(application.id, owner).catch(() => undefined);
 
     if (input.deployNow) {
         // Started and not waited for: a build is minutes long and this answers a

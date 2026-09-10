@@ -44,8 +44,10 @@ export interface ComposeSpecHealth {
  * "never" is the other half of that: an image built on this host exists nowhere
  * else, so compose must not try to fetch it - with "always" the deploy would fail
  * on a tag no registry has.
+ *
+ * "missing" is for a database's rolling upgrade (`DbDeployPlan.keepImages`).
  */
-export type ComposePullPolicy = "always" | "never";
+export type ComposePullPolicy = "always" | "never" | "missing";
 
 /**
  * The name a container calls the machine it is running on.
@@ -313,30 +315,30 @@ function numberedNames(name: string, count: number, tag: string): string[] {
  * copy name - so the edge, which dials the service's copies by those names, finds
  * the new copies beside the old ones and only the new ones once the old are gone,
  * with no route rewritten in between.
+ *
+ * When it runs fewer copies than the route still dials (`dialled`: the release it
+ * replaces ran more), the copy names past its own count are answered as well, by
+ * its copies in turn. The edge drops those names only once it takes the file that
+ * names fewer, which an edge frozen on its last good one never does, so the old
+ * copy behind such a name can go without its share of the requests going to a
+ * name nothing answers.
  */
-export function expandReplicas(spec: ComposeSpec): ComposeSpec {
+export function expandReplicas(spec: ComposeSpec, dialled = 1): ComposeSpec {
     return {
         ...spec,
         services: spec.services.flatMap(({ replicas, ...service }) => {
-            if (!replicas || replicas <= 1) return [service];
-            const [, ...copies] = replicaNames(service.name, replicas);
+            const count = replicas && replicas > 1 ? replicas : 1;
             const shared = service.aliases ?? [];
-            const numbered = shared.map((alias) => replicaNames(alias, replicas));
-            return [
-                service,
-                ...copies.map((name, index) => ({
-                    ...service,
-                    name,
-                    ports: [],
-                    aliases: [
-                        ...new Set([
-                            ...shared,
-                            service.name,
-                            ...numbered.map((names) => names[index + 1]!)
-                        ])
-                    ]
-                }))
-            ];
+            const numbered = shared.map((alias) => replicaNames(alias, Math.max(count, dialled)));
+            const answered = (index: number) =>
+                numbered.flatMap((names) => names.filter((_, at) => at > 0 && at % count === index));
+            return replicaNames(service.name, count).map((name, index) => {
+                const extra = answered(index);
+                if (index === 0) {
+                    return extra.length > 0 ? { ...service, aliases: [...new Set([...shared, ...extra])] } : service;
+                }
+                return { ...service, name, ports: [], aliases: [...new Set([...shared, service.name, ...extra])] };
+            });
         })
     };
 }
@@ -414,7 +416,7 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
             services: plan.nodes.map((node) => ({
                 name: node.name,
                 image: plan.image,
-                pullPolicy: "always" as const,
+                pullPolicy: dbPullPolicy(plan),
                 env: { ...plan.env },
                 command: [...node.command],
                 ports: [],
@@ -436,7 +438,7 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
             {
                 name: plan.ref.name,
                 image: plan.image,
-                pullPolicy: "always",
+                pullPolicy: dbPullPolicy(plan),
                 env: { ...plan.env },
                 command: plan.command ? [...plan.command] : undefined,
                 ports,
@@ -481,7 +483,7 @@ function dbMembersSpec(plan: DbDeployPlan, members: readonly DbMemberPlan[], net
             return {
                 name: member.name,
                 image,
-                pullPolicy: "always",
+                pullPolicy: dbPullPolicy(plan),
                 env: { ...member.env },
                 command: member.command ? [...member.command] : undefined,
                 ports: member.exposePort !== undefined ? [{ host: member.exposePort, container: defaultDbPort(image) }] : [],
@@ -503,6 +505,10 @@ function dbMembersSpec(plan: DbDeployPlan, members: readonly DbMemberPlan[], net
  *  on two at a time, and each has to be on the host before compose starts. */
 export function dbPlanImages(plan: DbDeployPlan): string[] {
     return [...new Set([plan.image, ...(plan.members ?? []).map((member) => member.image ?? plan.image)].filter(Boolean))];
+}
+
+function dbPullPolicy(plan: DbDeployPlan): ComposePullPolicy {
+    return plan.keepImages ? "missing" : "always";
 }
 
 /** A plan's limits as spec fields, leaving out the ones it does not set. */

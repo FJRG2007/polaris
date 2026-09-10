@@ -102,6 +102,8 @@ export interface ManagedOption {
     /** False when Polaris cannot open a socket to it from here, with the reason
      *  said in the form rather than discovered on the first query. */
     readonly reachable: boolean;
+    /** Set when the browser cannot open it wherever it runs, and says why. */
+    readonly refusal: string | null;
 }
 
 /**
@@ -120,6 +122,7 @@ export async function listManagedOptions(userId: string): Promise<ManagedOption[
             engine: true,
             containerName: true,
             exposePort: true,
+            clusterMasters: true,
             environment: {
                 select: { name: true, project: { select: { name: true } } }
             },
@@ -137,7 +140,8 @@ export async function listManagedOptions(userId: string): Promise<ManagedOption[
             name: row.name,
             engine: row.engine as DataEngine,
             where: `${row.environment.project.name} / ${row.environment.name}`,
-            reachable: Boolean((local && container) || published)
+            reachable: Boolean((local && container) || published),
+            refusal: isRedisCluster(row) ? REDIS_CLUSTER : null
         };
     });
 }
@@ -171,6 +175,13 @@ export async function listConnections(userId: string): Promise<DataConnectionVie
  *  database Polaris runs cannot be opened. */
 const UNREACHABLE =
     "Runs on another server and is not published on a port, so Polaris cannot reach it from here.";
+
+const REDIS_CLUSTER =
+    "A Redis cluster spreads its keys over several masters, and the browser reads one server at a time, so it cannot open one.";
+
+function isRedisCluster(row: { readonly engine: string; readonly clusterMasters: number | null }): boolean {
+    return row.engine === "redis" && Boolean(row.clusterMasters);
+}
 
 /**
  * Everything this account can open, saved or not.
@@ -206,7 +217,7 @@ export async function listOpenable(userId: string): Promise<DataConnectionView[]
             // enough to write to it.
             readOnly: true,
             tls: false,
-            note: entry.reachable ? null : UNREACHABLE,
+            note: entry.refusal ?? (entry.reachable ? null : UNREACHABLE),
             unreachable: !entry.reachable,
             lastUsedAt: null,
             createdAt: null
@@ -285,6 +296,11 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
         // Proves the account may reach it, by the same rule the deploy screens
         // use - a database id in a form is a request, not a permission.
         await databaseCredentials(parsed.managedDatabaseId, userId);
+        const target = await prisma.managedDatabase.findFirst({
+            where: { id: parsed.managedDatabaseId },
+            select: { engine: true, clusterMasters: true }
+        });
+        if (target && isRedisCluster(target)) throw new DataConnectionError(REDIS_CLUSTER);
     }
 
     const secret =
@@ -433,6 +449,7 @@ export async function managedAddress(
     if (!core.isDbEngine(row.engine)) {
         throw new DataConnectionError("An object store is browsed from its Buckets panel, not as a database.");
     }
+    if (isRedisCluster(row)) throw new DataConnectionError(REDIS_CLUSTER);
 
     const credentials = await databaseCredentials(databaseId, userId);
     const engine = row.engine as DataEngine;

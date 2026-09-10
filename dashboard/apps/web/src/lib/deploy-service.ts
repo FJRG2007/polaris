@@ -568,8 +568,8 @@ export interface CreateApplicationInput {
     /** Start with the security headers that go in front of any app without
      *  breaking it (HSTS, no sniffing, a sane referrer, same-site framing - see
      *  `recommended` in core's edge config). For what somebody deploys; a catalog
-     *  app another page may embed starts with none, as every service made before
-     *  this did. */
+     *  app or a template another page may embed starts with none, as every
+     *  service made before this did. */
     safeHeaders?: boolean;
     /** How it builds: commands and settings picked up from the repository. */
     buildConfig?: Record<string, unknown>;
@@ -2438,6 +2438,14 @@ async function buildAppPlan(
         )
     ).filter((mount): mount is NonNullable<typeof mount> => mount !== null);
 
+    const replaced =
+        cutover && app.currentDeploymentId && app.currentDeploymentId !== release.id
+            ? await prisma.deployment.findUnique({
+                  where: { id: app.currentDeploymentId },
+                  select: { replicas: true }
+              })
+            : null;
+
     const plan: AppDeployPlan = {
         ref,
         mounts,
@@ -2454,6 +2462,7 @@ async function buildAppPlan(
         // of how the release beside the current one stays reachable.
         private: !app.publishPort && !kept,
         ...(cutover ? { alias: base.name } : {}),
+        ...(replaced?.replicas ? { aliasCopies: replaced.replicas } : {}),
         edge,
         ...(extraPorts.length > 0 ? { extraPorts } : {}),
         // When the user has not pinned a container port, the value above is a guess
@@ -2825,7 +2834,15 @@ export async function deployApplication(
     rollback?: RollbackSource
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
-    const { plan, target, buildCommands, keepsHistory, cutover } = built;
+    const { plan, target, buildCommands, keepsHistory } = built;
+    const scaled =
+        rollback?.kind === "scale"
+            ? await prisma.deployment.findUnique({
+                  where: { id: rollback.deploymentId },
+                  select: { id: true, commitSha: true, cutover: true }
+              })
+            : null;
+    const cutover = built.cutover && !scaled;
     // A service started with `${{postgres.DATABASE_URL}}` as its literal
     // connection string fails in words that name nothing Polaris could have told
     // it, so the deploy is refused here instead, naming the reference.
@@ -2931,6 +2948,8 @@ export async function deployApplication(
             });
         }
         planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
+    } else if (scaled?.cutover) {
+        planned = (await buildAppPlan(applicationId, ownerId, scaled)).plan;
     }
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
@@ -2965,7 +2984,8 @@ export async function deployApplication(
             ownerId,
             pinnedSource ?? (uploadArchive ? { archive: uploadArchive } : undefined),
             buildCommands,
-            builder ?? undefined
+            builder ?? undefined,
+            scaled ? { releaseId: scaled.id, inPlace: scaled.cutover } : undefined
         )
     );
     return deployment.id;
@@ -3849,7 +3869,10 @@ function runDeployment(
     ownerId: string,
     source?: BuildSource,
     buildCommands?: BuildCommands,
-    builder?: BuildMachine
+    builder?: BuildMachine,
+    /** The release a scale step adds or removes copies of, and whether that happens
+     *  in its own project, where it stays the release serving. */
+    scaling?: { readonly releaseId: string; readonly inPlace: boolean }
 ): Promise<void> {
     // Only an image source pulls a registry image that may need a login.
     const pullImages =
@@ -3858,21 +3881,62 @@ function runDeployment(
         deploymentId,
         target,
         ownerId,
-        (ctx, driver) =>
-            driver.deployApplication(plan, ctx).then(async (result) => {
-                if (result.ok && result.detectedPort) {
-                    await rememberDetectedPort(deploymentId, result.detectedPort);
-                }
-                return result;
-            }),
+        async (ctx, driver) => {
+            const refused = scaling ? await prepareScale(scaling.releaseId, plan.replicas) : null;
+            if (refused) {
+                ctx.log(Buffer.from(`==> Failed: ${refused}\n`));
+                return { ok: false, error: refused };
+            }
+            const result = await driver.deployApplication(plan, ctx);
+            if (result.ok && result.detectedPort) {
+                await rememberDetectedPort(deploymentId, result.detectedPort);
+            }
+            return result;
+        },
         source,
         pullImages,
         buildCommands,
-        builder
+        builder,
+        scaling?.inPlace ? scaling.releaseId : undefined
     ).finally(async () => {
         // An uploaded release is loaded onto its machine by now, or never will be.
         if (plan.build.prebuilt) await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
     });
+}
+
+/**
+ * Ready a scale step, or say why it cannot run.
+ *
+ * Refused when the release it was planned against is no longer the one serving:
+ * a deploy ahead of it in the queue replaced that release, and running the step
+ * would bring the old one back. Otherwise, when it goes down to fewer copies, the
+ * edge is pointed at that many first, so the copies it removes are no longer
+ * dialled by the time they go.
+ */
+async function prepareScale(releaseId: string, replicas: number): Promise<string | null> {
+    const serving = await prisma.application.count({ where: { currentDeploymentId: releaseId } });
+    if (serving === 0) {
+        return "The release this was to scale was replaced by a deploy that ran first. Scaling again applies the count to the one serving now.";
+    }
+    const release = await prisma.deployment.findUnique({ where: { id: releaseId }, select: { replicas: true } });
+    if (release?.replicas && replicas < release.replicas) {
+        await prisma.deployment.update({ where: { id: releaseId }, data: { replicas } });
+        await syncAppRoutes().catch(() => undefined);
+    }
+    return null;
+}
+
+/**
+ * Finish a scale step that added or removed copies of the release serving its
+ * service, in that release's own project. That release stays the one serving,
+ * now with the step's count, which the edge dials from here on; the step's row
+ * is the record of it and never serves anything itself.
+ */
+async function settleScaleInPlace(deploymentId: string, releaseId: string): Promise<void> {
+    const step = await prisma.deployment.findUnique({ where: { id: deploymentId }, select: { replicas: true } });
+    await prisma.deployment.update({ where: { id: releaseId }, data: { replicas: step?.replicas ?? null } });
+    await prisma.deployment.update({ where: { id: deploymentId }, data: { status: "removed", imageKept: false } });
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /** Where a build from source comes from: a repository, or an uploaded folder's
@@ -4088,7 +4152,10 @@ export async function executeDeployment(
     pullImages: string[] = [],
     buildCommands?: BuildCommands,
     /** The machine a build from source runs on, when it is not this target. */
-    builder?: BuildMachine
+    builder?: BuildMachine,
+    /** The release a scale step changed in its own project, which stays current
+     *  rather than giving way to this deployment (see `settleScaleInPlace`). */
+    scaledRelease?: string
 ): Promise<void> {
     // Cancelled while it waited its turn on the target's queue. Nothing has started,
     // so there is nothing to unwind - and starting now would ignore the operator.
@@ -4189,7 +4256,8 @@ export async function executeDeployment(
             error: result.error,
             finishedAt: new Date()
         });
-        if (result.ok) await promoteDeployment(deploymentId);
+        if (result.ok && scaledRelease) await settleScaleInPlace(deploymentId, scaledRelease);
+        else if (result.ok) await promoteDeployment(deploymentId);
         else await abandonRelease(deploymentId, ports).catch(() => undefined);
         await notifyDeployFinished({ deploymentId, ownerId, ok: result.ok });
     } catch (error) {

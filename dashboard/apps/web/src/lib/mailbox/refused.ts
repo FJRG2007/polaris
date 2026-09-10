@@ -11,11 +11,14 @@
  *   the conditional update is the lock, so a mailbox refused on every retry for
  *   a week is one notification, and two passes landing together are still one.
  * - **Pick up again.** A pass that works puts the row back to `ok`
- *   (`recordAccountState`), and the next refusal after that is news again.
+ *   (`recordAccountState`), the notice is answered, and the next refusal after
+ *   that is news again.
  */
 
 import { prisma } from "@polaris/db";
 import { refusedMailboxHref } from "./refusals";
+
+const REFUSED_EVENT = "mail.account.refused";
 
 /**
  * Write down that the server refused this mailbox, and tell its owner if that
@@ -54,7 +57,7 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
         const { notify } = await import("@/lib/notifications/dispatch");
         await notify({
             userId: account.userId,
-            event: "mail.account.refused",
+            event: REFUSED_EVENT,
             title: authorized
                 ? `${account.address} needs connecting again`
                 : `${account.address} stopped accepting its password`,
@@ -69,6 +72,46 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
         // The row already says it, and the rail and the list draw that. A bell
         // that could not be written is not worth failing the pass over.
         console.error("polaris: a refused mailbox could not be announced:", caught);
+    }
+}
+
+/**
+ * Mark the notices about a mailbox's refusal answered: read, and no longer
+ * waiting on anybody.
+ *
+ * Called when the mailbox works again and when it is gone. Either way nothing
+ * is left to fix, and "Action needed" standing on the bell after the password
+ * was updated is a chore the reader cannot get rid of. Best effort: a tidied
+ * bell is not worth failing a save or a sync pass over.
+ */
+export async function settleRefusalNotices(userId: string, accountId: string): Promise<void> {
+    try {
+        const open = await prisma.notification.findMany({
+            where: {
+                userId,
+                type: REFUSED_EVENT,
+                OR: [{ readAt: null }, { actionRequired: true }]
+            },
+            select: { id: true, metadata: true }
+        });
+        const about = open.filter((row) => noticeIsAbout(row.metadata, accountId)).map((row) => row.id);
+        if (about.length === 0) return;
+        await prisma.notification.updateMany({
+            where: { id: { in: about } },
+            data: { readAt: new Date(), actionRequired: false }
+        });
+    } catch (caught) {
+        console.error("polaris: a refused mailbox's notice could not be cleared:", caught);
+    }
+}
+
+function noticeIsAbout(metadata: string | null, accountId: string): boolean {
+    if (!metadata) return false;
+    try {
+        const parsed: unknown = JSON.parse(metadata);
+        return (parsed as { accountId?: unknown } | null)?.accountId === accountId;
+    } catch {
+        return false;
     }
 }
 

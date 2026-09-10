@@ -31,6 +31,7 @@ const REFUSAL_PHRASES = [
     "application-specific password required",
     "username and password not accepted",
     "web login required",
+    "log in via your web browser",
     "logindisabled",
     "login is disabled",
     "authenticate failed"
@@ -103,12 +104,11 @@ export function isCredentialRefusal(caught: unknown): boolean {
     if (failure.authenticationFailed === true) {
         // imapflow marks a socket that closed half way through LOGIN the same
         // way as a refusal, so the marker alone is not enough: the server has to
-        // have answered, or said something that reads as no.
-        return (
-            failure.responseStatus === "NO" ||
-            failure.responseStatus === "BAD" ||
-            mentionsRefusal(textOf(failure))
-        );
+        // have answered, or said something that reads as no. An answer with a
+        // code that is not a refusal's - `[ALERT] Too many simultaneous
+        // connections` - is judged by what it says.
+        const answered = failure.responseStatus === "NO" || failure.responseStatus === "BAD";
+        return (answered && imapCode === "") || mentionsRefusal(textOf(failure));
     }
     return mentionsRefusal(textOf(failure));
 }
@@ -145,9 +145,10 @@ export interface MailPassState {
  * a backoff with no counter to keep: every failed try moves `lastSyncAt` on, and
  * the refusal gets older, so the tries get further apart on their own - about
  * ten in the first day and one a day from the third, where a mailbox somebody had
- * open was tried every twenty seconds before. Tried at all, rather than parked for good, because a token
- * endpoint that did not answer reads as a refusal too, and a mailbox that never
- * recovered from one bad minute would be the same silence this exists to end.
+ * open was tried every twenty seconds before. Tried at all, rather than parked
+ * for good, because a refusal can end without anybody touching Polaris - a
+ * provider lifting a lock, an administrator restoring a login - and a mailbox
+ * that never noticed would be the same silence this exists to end.
  */
 export function refusedRetryDelayMs(account: MailPassState): number {
     const since = (account.lastOkAt ?? account.createdAt).getTime();

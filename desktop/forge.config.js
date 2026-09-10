@@ -8,6 +8,9 @@
  */
 
 const path = require("node:path");
+const { FusesPlugin } = require("@electron-forge/plugin-fuses");
+const { FuseV1Options, FuseVersion } = require("@electron/fuses");
+const { LINUX_LAUNCHER } = require("./build/linux-launcher.cjs");
 const { chmodSync, existsSync, renameSync, writeFileSync } = require("node:fs");
 
 const ICON = path.join(__dirname, "assets", "icon");
@@ -69,40 +72,34 @@ module.exports = {
         ...macSigning
     },
     hooks: {
-        /**
-         * Linux: where the system forbids unprivileged user namespaces (Ubuntu
-         * 24.04 and later by default) and the SUID helper cannot be used (an
-         * AppImage is mounted nosuid), Chromium's sandbox cannot start and the app
-         * aborts before its first window. The launcher adds --no-sandbox in exactly
-         * those cases and nowhere else; everywhere the sandbox can run, it runs.
-         */
+        /** Linux: the executable is replaced by the launcher (build/linux-launcher.cjs),
+         *  which decides whether Chromium's sandbox can start on this system. */
         postPackage: async (_config, options) => {
             if (options.platform !== "linux") return;
             for (const out of options.outputPaths) {
                 const exe = path.join(out, "polaris");
                 if (!existsSync(exe)) continue;
                 renameSync(exe, path.join(out, "polaris.bin"));
-                writeFileSync(
-                    exe,
-                    [
-                        "#!/bin/sh",
-                        'self="$0"',
-                        'case "$self" in */*) ;; *) self="$(command -v -- "$self")" || self="$0";; esac',
-                        'dir="$(dirname "$(readlink -f "$self")")"',
-                        'if { [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" = "1" ] &&',
-                        '     [ "$(cat /sys/module/apparmor/parameters/enabled 2>/dev/null)" = "Y" ]; } ||',
-                        '   [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" = "0" ] ||',
-                        '   [ "$(cat /proc/sys/user/max_user_namespaces 2>/dev/null)" = "0" ]; then',
-                        '  set -- --no-sandbox "$@"',
-                        "fi",
-                        'exec "$dir/polaris.bin" "$@"',
-                        ""
-                    ].join("\n")
-                );
+                writeFileSync(exe, LINUX_LAUNCHER);
                 chmodSync(exe, 0o755);
             }
         }
     },
+    plugins: [
+        // Switches compiled into the Electron binary: it cannot be run as plain
+        // Node or be handed Node options or an inspector from outside, and it
+        // loads only the app.asar it shipped with, checked against the digest
+        // packaged into it (Windows and macOS).
+        new FusesPlugin({
+            version: FuseVersion.V1,
+            [FuseV1Options.RunAsNode]: false,
+            [FuseV1Options.EnableCookieEncryption]: true,
+            [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+            [FuseV1Options.EnableNodeCliInspectArguments]: false,
+            [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+            [FuseV1Options.OnlyLoadAppFromAsar]: true
+        })
+    ],
     makers: [
         {
             name: "@electron-forge/maker-squirrel",

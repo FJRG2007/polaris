@@ -47,6 +47,49 @@ describe("serverAddressSchema", () => {
         expect(refusal("javascript://alert(1)")).toMatch(/starts with https:\/\//);
     });
 
+    it("takes http:// for a host on this network", () => {
+        for (const address of [
+            "http://localhost:3000",
+            "http://polaris",
+            "http://polaris.local",
+            "http://polaris.lan",
+            "http://nas.home.arpa",
+            "http://polaris.internal",
+            "http://app.localhost",
+            "http://127.0.0.1",
+            "http://10.0.0.5",
+            "http://172.16.0.1",
+            "http://172.31.255.255",
+            "http://192.168.1.20:3000",
+            "http://169.254.10.1",
+            "http://100.101.102.103",
+            "http://[::1]:3000",
+            "http://[fd12:3456::1]",
+            "http://[fe80::1]"
+        ]) {
+            expect(refusal(address), address).toBeUndefined();
+        }
+    });
+
+    it("refuses http:// for a host on the internet, and says https:// is needed", () => {
+        for (const address of [
+            "http://polaris.example.com",
+            "http://8.8.8.8",
+            "http://172.32.0.1",
+            "http://100.128.0.1",
+            "http://192.169.0.1",
+            "http://[2001:db8::1]",
+            "http://[fd::1]",
+            "http://local.example.com",
+            "http://0x0a000001.example.com"
+        ]) {
+            expect(refusal(address), address).toBe(
+                "An address on the internet needs https://. http:// works only on your own network."
+            );
+        }
+        expect(serverAddressSchema.parse("https://polaris.example.com")).toBe("https://polaris.example.com");
+    });
+
     it("refuses what is not an address", () => {
         expect(refusal("https://")).toMatch(/not an address/);
         expect(refusal("polaris example com")).toMatch(/not an address/);
@@ -69,6 +112,7 @@ describe("readServerAddress", () => {
     it("reads back a stored origin, and nothing else", () => {
         expect(readServerAddress("https://polaris.example.com")).toBe("https://polaris.example.com");
         expect(readServerAddress("https://polaris.example.com/home")).toBeNull();
+        expect(readServerAddress("http://polaris.example.com")).toBeNull();
         expect(readServerAddress(42)).toBeNull();
         expect(readServerAddress(null)).toBeNull();
     });

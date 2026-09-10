@@ -14,7 +14,7 @@
 import { parseHttpLogs } from "@polaris/deploy";
 import { tunnelHostForApp } from "./quick-tunnel-service";
 import { countsAsVisit, hostnameCovers } from "@polaris/core";
-import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
+import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogWindow } from "@/lib/edge-access-log";
 
 export interface EdgeVisits {
     /** Every request that counts as a visit: when, in epoch ms, and the host it
@@ -23,11 +23,15 @@ export interface EdgeVisits {
     /** The oldest request the window holds at all, visit or not, in epoch ms;
      *  null when it holds none - no log, or nothing written to it yet. */
     readonly windowStart: number | null;
+    /** Whether the log holds more than was read, so a window that starts late is
+     *  a busy log cut at the size read rather than a new one. */
+    readonly truncated: boolean;
 }
 
 /** One read of the edge's recent log. */
 export async function readEdgeVisits(): Promise<EdgeVisits> {
-    const entries = parseHttpLogs(await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES));
+    const { text, truncated } = await readEdgeLogWindow(EDGE_LOG_RECENT_WINDOW_BYTES);
+    const entries = parseHttpLogs(text);
     const visits: { at: number; host: string }[] = [];
     let windowStart: number | null = null;
     for (const entry of entries) {
@@ -37,7 +41,7 @@ export async function readEdgeVisits(): Promise<EdgeVisits> {
         if (!entry.host || !countsAsVisit(entry)) continue;
         visits.push({ at, host: entry.host.toLowerCase().split(":")[0] ?? "" });
     }
-    return { visits, windowStart };
+    return { visits, windowStart, truncated };
 }
 
 /** Every address a service answers on: its enabled domains and its quick tunnel. */

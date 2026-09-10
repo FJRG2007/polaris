@@ -1010,12 +1010,13 @@ export function externalDumpCommand(source: ExternalSource, file: string): Maint
     }
     if (source.engine === "mysql" || source.engine === "mariadb") {
         const tool = source.engine === "mysql" ? "mysqldump" : "mariadb-dump";
+        const gtid = source.engine === "mysql" ? " --set-gtid-purged=OFF" : "";
         return {
             argv: [
                 "sh",
                 "-c",
                 strictPipe(
-                    `${tool} --single-transaction --routines --triggers -h "$1" -P "$2" -u "$3" -p"$6" "$4"`,
+                    `${tool} --single-transaction${gtid} --routines --triggers -h "$1" -P "$2" -u "$3" -p"$6" "$4"`,
                     'gzip > "$5"',
                     "$5.failed"
                 ),

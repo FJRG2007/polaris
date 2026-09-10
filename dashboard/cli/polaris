@@ -513,16 +513,44 @@ deploy_power() {
 }
 
 deploy_env() {
+    variables env "$@"
+}
+
+# The variables command for what must stay secret: every value it sets is
+# stored encrypted and never shown back, and a plain one is refused rather than
+# quietly written in the clear. It lists and removes secret variables only.
+deploy_secrets() {
+    for arg in "$@"; do
+        [ "$arg" = "--plain" ] && die "a secret is never plain - use 'polaris env set ... --plain' for a plain variable"
+    done
+    variables secrets "$@"
+}
+
+# `polaris env` and `polaris secrets`, named by the first argument. The text
+# listing marks a secret's value as "(secret)", which is how `secrets` tells
+# one from a plain variable.
+variables() {
+    noun=$1
+    shift
     load_credentials
     sub=${1:-list}
     [ "$#" -gt 0 ] && shift
     id=$(pick_service "${1:-}")
     [ "$#" -gt 0 ] && shift
     secret=true
+    plain_flag=" [--plain]"
+    [ "$noun" = "secrets" ] && plain_flag=""
     case "$sub" in
-        list) api GET "/api/v1/deploy/services/$id/variables?format=text" ;;
+        list)
+            table=$(api GET "/api/v1/deploy/services/$id/variables?format=text")
+            if [ "$noun" = "secrets" ]; then
+                printf '%s\n' "$table" | awk -F '\t' 'NR==1 {print "KEY"; next} $2=="(secret)" {print $1}'
+            else
+                printf '%s\n' "$table"
+            fi
+            ;;
         set)
-            [ "$#" -gt 0 ] || die "usage: polaris env set <service> KEY=VALUE [--plain]"
+            [ "$#" -gt 0 ] || die "usage: polaris $noun set <service> KEY=VALUE$plain_flag"
             pair=$1
             [ "${2:-}" = "--plain" ] && secret=false
             key=${pair%%=*}
@@ -533,13 +561,18 @@ deploy_env() {
                 "{\"key\":\"$(printf '%s' "$key" | json_escape)\",\"value\":\"$escaped\",\"secret\":$secret}"
             ;;
         unset)
-            [ "$#" -gt 0 ] || die "usage: polaris env unset <service> KEY"
-            var=$(api GET "/api/v1/deploy/services/$id/variables?format=text" | awk -F '\t' -v key="$1" 'NR>1 && $1==key {print $3}')
-            [ -n "$var" ] || die "$1 is not set on that service"
-            api DELETE "/api/v1/deploy/variables/$var?format=text"
+            [ "$#" -gt 0 ] || die "usage: polaris $noun unset <service> KEY"
+            table=$(api GET "/api/v1/deploy/services/$id/variables?format=text")
+            row=$(printf '%s\n' "$table" |
+                awk -F '\t' -v key="$1" 'NR>1 && $1==key {kind = $2=="(secret)" ? "secret" : "plain"; print kind, $3; exit}')
+            [ -n "$row" ] || die "$1 is not set on that service"
+            if [ "$noun" = "secrets" ] && [ "${row%% *}" != "secret" ]; then
+                die "$1 is a plain variable - use 'polaris env unset' to remove it"
+            fi
+            api DELETE "/api/v1/deploy/variables/${row#* }?format=text"
             ;;
         import)
-            [ "$#" -gt 0 ] || die "usage: polaris env import <service> <file|-> [--plain]"
+            [ "$#" -gt 0 ] || die "usage: polaris $noun import <service> <file|->$plain_flag"
             file=$1
             [ "${2:-}" = "--plain" ] && secret=false
             if [ "$file" = "-" ]; then text=$(cat); else text=$(cat "$file") || die "cannot read $file"; fi
@@ -547,18 +580,8 @@ deploy_env() {
             api_json POST "/api/v1/deploy/services/$id/variables/import?format=text" \
                 "{\"text\":\"$escaped\",\"secret\":$secret}"
             ;;
-        *) die "unknown 'env' command '$sub' - list, set, unset or import" ;;
+        *) die "unknown '$noun' command '$sub' - list, set, unset or import" ;;
     esac
-}
-
-# The variables command for what must stay secret: every value it sets is
-# stored encrypted and never shown back, and a plain one is refused rather than
-# quietly written in the clear.
-deploy_secrets() {
-    for arg in "$@"; do
-        [ "$arg" = "--plain" ] && die "a secret is never plain - use 'polaris env set ... --plain' for a plain variable"
-    done
-    deploy_env "$@"
 }
 
 deploy_domains() {
@@ -716,7 +739,8 @@ Deploy (from anywhere, with an API key):
   polaris env list|set|unset|import <service> ...
                   set KEY=VALUE [--plain]   unset KEY   import <file|-> [--plain]
   polaris secrets list|set|unset|import <service> ...
-                                       The same, always encrypted and never shown back
+                                       Secret variables only: stored encrypted, listed
+                                       by name, never shown back
   polaris domains list|add|remove <service> ...
                   add [hostname] [--port N] [--cert le|internal|none]   remove <hostname|id>
   polaris completion bash              Tab completion (eval it in ~/.bashrc)

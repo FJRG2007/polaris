@@ -5,8 +5,9 @@
  * The daemon's spec and the remote YAML are both read from it.
  */
 
-import { describe, expect, it } from "vitest";
-import type { DbDeployPlan } from "../src/runtime/driver.js";
+import { describe, expect, it, vi } from "vitest";
+import { ComposeRuntime } from "../src/runtime/compose.js";
+import type { DbDeployPlan, RuntimeContext } from "../src/runtime/driver.js";
 import { dbComposeSpec, dbPlanImages, forCompose, renderComposeYaml } from "../src/compose-spec.js";
 
 const NETWORK = "polaris-proxy";
@@ -106,10 +107,57 @@ describe("dbComposeSpec with members", () => {
         expect(dbPlanImages(plan({ members: undefined }))).toEqual(["mongo:7"]);
     });
 
+    it("fetches every image again, except in a rolling upgrade's step, which runs what the host has", () => {
+        expect(dbComposeSpec(plan(), NETWORK).services.map((service) => service.pullPolicy)).toEqual([
+            "always",
+            "always",
+            "always"
+        ]);
+        const rolling = dbComposeSpec(plan({ keepImages: true }), NETWORK);
+        expect(rolling.services.map((service) => service.pullPolicy)).toEqual(["missing", "missing", "missing"]);
+        expect(renderComposeYaml(rolling, "/var/lib/polaris/volumes", "/mnt/polaris")).toContain('pull_policy: "missing"');
+    });
+
     it("is still one container without members", () => {
         const spec = dbComposeSpec(plan({ members: undefined }), NETWORK);
         expect(spec.services).toHaveLength(1);
         expect(spec.services[0]!.volumes[0]).toEqual({ source: "mongo-data-1a2b3c4d", target: "/data/db", kind: "volume" });
+    });
+});
+
+describe("deploying the members", () => {
+    function context(present: readonly string[] | null) {
+        const ports = {
+            pull: vi.fn(async () => undefined),
+            composeUp: vi.fn(async () => undefined),
+            ...(present ? { hasImage: vi.fn(async (image: string) => present.includes(image)) } : {})
+        };
+        const ctx = {
+            ports,
+            target: { id: "local", kind: "local", engine: "compose", proxyNetwork: NETWORK },
+            log: () => undefined
+        } as unknown as RuntimeContext;
+        return { ctx, ports };
+    }
+
+    it("pulls every image first on an ordinary deploy", async () => {
+        const { ctx, ports } = context(["mongo:7", "mongo:8"]);
+        await new ComposeRuntime().deployDatabase(plan(), ctx);
+        expect(ports.pull.mock.calls.map(([image]) => image)).toEqual(["mongo:7", "mongo:8"]);
+    });
+
+    it("pulls none the host has during a rolling upgrade, so a moved tag restarts no other member", async () => {
+        const { ctx, ports } = context(["mongo:7"]);
+        const result = await new ComposeRuntime().deployDatabase(plan({ keepImages: true }), ctx);
+        expect(result.ok).toBe(true);
+        expect(ports.pull.mock.calls.map(([image]) => image)).toEqual(["mongo:8"]);
+    });
+
+    it("leaves the fetch to compose when the host cannot say what it has", async () => {
+        const { ctx, ports } = context(null);
+        await new ComposeRuntime().deployDatabase(plan({ keepImages: true }), ctx);
+        expect(ports.pull).not.toHaveBeenCalled();
+        expect(ports.composeUp).toHaveBeenCalledTimes(1);
     });
 });
 

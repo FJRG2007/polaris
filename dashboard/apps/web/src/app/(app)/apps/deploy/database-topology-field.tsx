@@ -75,7 +75,7 @@ export function DatabaseTopologyField({
                 topology.kind === "replicaSet"
                     ? `${containers} members on this server, finding each other by name. Connection strings list them all.`
                     : topology.kind === "sharded"
-                      ? `A config server set of ${core.MONGO_CLUSTER_SET_SIZE}, ${topology.shards} shards of ${core.MONGO_CLUSTER_SET_SIZE} members and a router: ${containers} containers. Backups and version changes are not offered for it yet.`
+                      ? `A config server set of ${core.MONGO_CLUSTER_SET_SIZE}, ${topology.shards} shards of ${core.MONGO_CLUSTER_SET_SIZE} members and a router: ${containers} containers. Each collection stays on one shard until your application shards it with a shard key (shardCollection). Backups and version changes are not offered for it yet.`
                       : "One container."
             }
         >

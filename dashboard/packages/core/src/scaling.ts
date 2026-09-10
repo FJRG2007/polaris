@@ -118,12 +118,20 @@ export function trafficRefusal(app: { target: { kind: string } }): string | null
  * than a minute in the part that is read - and scaled to a minute. Null when the
  * log holds nothing at all (not mounted, not written yet) or too little of the
  * minute to judge by: that is not knowing, which is not the same as no traffic.
+ * Except where the read was `truncated`: a log that holds more than was read
+ * covers so little because it is that busy, and the rate over what it does
+ * cover is the reading.
  */
-export function requestRate(times: readonly number[], windowStart: number | null, now: number): number | null {
+export function requestRate(
+    times: readonly number[],
+    windowStart: number | null,
+    now: number,
+    truncated = false
+): number | null {
     if (windowStart === null) return null;
     const from = Math.max(windowStart, now - AUTOSCALE_TRAFFIC_WINDOW_MS);
     const span = now - from;
-    if (span < AUTOSCALE_TRAFFIC_MIN_SPAN_MS) return null;
+    if (span <= 0 || (span < AUTOSCALE_TRAFFIC_MIN_SPAN_MS && !truncated)) return null;
     let count = 0;
     for (const at of times) if (at >= from && at <= now) count += 1;
     return (count * 60_000) / span;

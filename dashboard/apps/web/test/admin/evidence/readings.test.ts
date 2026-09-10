@@ -40,27 +40,51 @@ const prisma = {
         )
     },
     session: { count: vi.fn(async () => 21) },
+    // 250 items in all; only r1 and r2 are listed, and r3 - past the list - has
+    // a newest copy that is sealed everywhere.
     protectedResource: {
-        count: vi.fn(async () => 2),
-        findMany: vi.fn(async () => [
-            {
-                id: "r1",
-                name: "Volume",
-                kind: "deploy-volume",
-                status: "active",
-                lastBackupAt: new Date("2026-09-09T00:00:00.000Z"),
-                lastStatus: "ok",
-                plan: { every: "daily" }
-            },
-            { id: "r2", name: "World", kind: "minecraft-world", status: "active", lastBackupAt: null, lastStatus: null, plan: null }
-        ])
+        count: countBy({ status: 180, lastStatus: 7 }, 250),
+        findMany: vi.fn(async ({ where }: { where?: Where } = {}) =>
+            where && "points" in where
+                ? [{ id: "r1" }, { id: "r3" }]
+                : [
+                      {
+                          id: "r1",
+                          name: "Volume",
+                          kind: "deploy-volume",
+                          status: "active",
+                          lastBackupAt: new Date("2026-09-09T00:00:00.000Z"),
+                          lastStatus: "ok",
+                          plan: { every: "daily" }
+                      },
+                      {
+                          id: "r2",
+                          name: "World",
+                          kind: "minecraft-world",
+                          status: "active",
+                          lastBackupAt: null,
+                          lastStatus: null,
+                          plan: null
+                      }
+                  ]
+        )
     },
     backupKey: { count: vi.fn(async () => 1) },
-    recoveryPoint: { findMany: vi.fn(async () => [{ id: "p1", resourceId: "r1" }]) },
+    recoveryPoint: {
+        groupBy: vi.fn(async () => [
+            { resourceId: "r1", _max: { takenAt: new Date("2026-09-09T00:00:00.000Z") } },
+            { resourceId: "r3", _max: { takenAt: new Date("2026-08-01T00:00:00.000Z") } }
+        ]),
+        findMany: vi.fn(async () => [
+            { id: "p1", resourceId: "r1" },
+            { id: "p3", resourceId: "r3" }
+        ])
+    },
     recoveryPointCopy: {
         findMany: vi.fn(async () => [
             { pointId: "p1", sealedWith: "k1", path: "a.tar.sealed" },
-            { pointId: "p1", sealedWith: null, path: "b.tar" }
+            { pointId: "p1", sealedWith: null, path: "b.tar" },
+            { pointId: "p3", sealedWith: "k1", path: "c.tar.sealed" }
         ])
     },
     // Secret variables: 6 in all, one of them with no encrypted value; 9 plain.
@@ -190,8 +214,29 @@ describe("gathering the evidence", () => {
             "No copy yet"
         ]);
         expect(prisma.recoveryPointCopy.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { pointId: { in: ["p1"] }, status: "available" } })
+            expect.objectContaining({ where: { pointId: { in: ["p1", "p3"] }, status: "available" } })
         );
+    });
+
+    it("counts the backup figures over every item, not only the listed ones", async () => {
+        const report = await readEvidence(NOW);
+        expect(value(report, "backups", "backups.protected")).toBe(250);
+        expect(value(report, "backups", "backups.scheduled")).toBe(180);
+        expect(value(report, "backups", "backups.failing")).toBe(7);
+        expect(value(report, "backups", "backups.encrypted")).toBe(1);
+        expect(prisma.protectedResource.count).toHaveBeenCalledWith({
+            where: { status: "active", plan: { is: { every: { not: "off" } } } }
+        });
+    });
+
+    it("reads one newest point per item rather than every point", async () => {
+        await readEvidence(NOW);
+        expect(prisma.recoveryPoint.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({ by: ["resourceId"], where: expect.objectContaining({ resourceId: { in: ["r1", "r3"] } }) })
+        );
+        for (const call of prisma.recoveryPoint.findMany.mock.calls as unknown as [Where][]) {
+            expect(call[0]).not.toHaveProperty("distinct");
+        }
     });
 
     it("reads TLS, the edge and the retention the way they are stored", async () => {

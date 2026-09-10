@@ -142,6 +142,7 @@ describe("deleting a record", () => {
 
         expect(await screen.findByText("Cloudflare refused the change")).toBeTruthy();
         expect(screen.getByText("203.0.113.10")).toBeTruthy();
+        expect(actions.zoneRecordsAction).toHaveBeenCalledTimes(2);
     });
 });
 
@@ -170,6 +171,25 @@ describe("adding a record", () => {
         expect(within(reopened).getByDisplayValue("203.0.113.20")).toBeTruthy();
     });
 
+    it("reads the zone again after a refusal, since Cloudflare may have stored it anyway", async () => {
+        actions.saveDnsRecordAction.mockResolvedValue({ error: "Could not save the record" });
+        await mount();
+
+        fireEvent.click(screen.getAllByRole("button", { name: /Add record/ })[0]!);
+        const form = await screen.findByRole("dialog");
+        const [name, content] = within(form).getAllByRole("textbox");
+        fireEvent.change(name!, { target: { value: "api" } });
+        fireEvent.change(content!, { target: { value: "203.0.113.20" } });
+        actions.zoneRecordsAction.mockResolvedValue({
+            zone: { ...zone, records: [...zone.records, view("r3", "A", "api", "203.0.113.20")] }
+        });
+        fireEvent.click(within(form).getByRole("button", { name: "Add record" }));
+
+        expect(await screen.findByText("Could not save the record")).toBeTruthy();
+        expect(actions.zoneRecordsAction).toHaveBeenCalledTimes(2);
+        expect(await screen.findByText("203.0.113.20", { selector: "code" })).toBeTruthy();
+    });
+
     it("refuses a copy of a record already in the zone as it is typed", async () => {
         await mount();
         fireEvent.click(screen.getAllByRole("button", { name: /Add record/ })[0]!);
@@ -181,5 +201,50 @@ describe("adding a record", () => {
         expect(within(form).getByText("This A record is already in the zone")).toBeTruthy();
         fireEvent.click(within(form).getByRole("button", { name: "Add record" }));
         expect(actions.saveDnsRecordAction).not.toHaveBeenCalled();
+    });
+});
+
+describe("changing a record", () => {
+    it("never reopens a refused edit over a form opened since, and keeps what was typed for later", async () => {
+        const answer = deferred<{ error?: string; problems?: Record<string, string> }>();
+        actions.saveDnsRecordAction
+            .mockReturnValueOnce(answer.promise)
+            .mockResolvedValue({ record: view("r2", "TXT", "_dmarc", "v=DMARC1; p=reject") });
+        await mount();
+
+        fireEvent.click(screen.getByRole("button", { name: "Edit the A record www" }));
+        const first = await screen.findByRole("dialog");
+        fireEvent.change(within(first).getAllByRole("textbox")[1]!, { target: { value: "203.0.113.11" } });
+        fireEvent.click(within(first).getByRole("button", { name: "Save" }));
+        expect(actions.saveDnsRecordAction).toHaveBeenLastCalledWith(scope, "r1", expect.objectContaining({ content: "203.0.113.11" }));
+
+        // Another record is opened while the first is still being sent.
+        fireEvent.click(screen.getByRole("button", { name: "Edit the TXT record _dmarc" }));
+        const second = await screen.findByRole("dialog");
+        await act(async () => answer.resolve({ error: "Check the highlighted fields", problems: { content: "Refused by Cloudflare" } }));
+
+        // The open form is still the TXT record's, with its own value.
+        const open = screen.getByRole("dialog");
+        expect(open).toBe(second);
+        expect(within(open).getByDisplayValue("v=DMARC1; p=none")).toBeTruthy();
+        expect(within(open).queryByDisplayValue("203.0.113.11")).toBeNull();
+        expect(screen.getByText("The A record www was not saved: Refused by Cloudflare")).toBeTruthy();
+
+        // Saving it writes the TXT record, never over the refused A record.
+        fireEvent.change(within(open).getAllByRole("textbox")[1]!, { target: { value: "v=DMARC1; p=reject" } });
+        fireEvent.click(within(open).getByRole("button", { name: "Save" }));
+        expect(actions.saveDnsRecordAction).toHaveBeenLastCalledWith(
+            scope,
+            "r2",
+            expect.objectContaining({ type: "TXT", content: "v=DMARC1; p=reject" })
+        );
+        await act(async () => undefined);
+        expect(screen.queryByRole("dialog")).toBeNull();
+
+        // The refused edit is still there to finish, with what was typed and why.
+        fireEvent.click(screen.getByRole("button", { name: "Edit again" }));
+        const reopened = await screen.findByRole("dialog");
+        expect(within(reopened).getByDisplayValue("203.0.113.11")).toBeTruthy();
+        expect(within(reopened).getByText("Refused by Cloudflare")).toBeTruthy();
     });
 });

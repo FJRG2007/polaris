@@ -78,6 +78,10 @@ export interface ServiceTemplate extends TemplateService {
     readonly database?: TemplateDatabase;
     readonly companion?: TemplateCompanion;
     readonly prepare?: readonly TemplatePrepareStep[];
+    /** Other sites frame what it serves - a shared dashboard, a status page, an
+     *  embedded form - so it starts without the recommended headers, whose
+     *  same-site framing would break those embeds, the way a catalog app does. */
+    readonly embedded?: boolean;
 }
 
 /** The value a template writes for the service's own public address. */
@@ -206,6 +210,7 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         env: { GF_SERVER_ROOT_URL: PUBLIC_URL_PLACEHOLDER },
         secrets: [],
         volumes: [{ name: "data", mountPath: "/var/lib/grafana" }],
+        embedded: true,
         firstRun: "The first sign-in is admin / admin, and it asks for a new password."
     },
     {
@@ -283,6 +288,7 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         env: { MB_DB_FILE: "/metabase-data/metabase.db", MB_SITE_URL: PUBLIC_URL_PLACEHOLDER },
         secrets: ["MB_ENCRYPTION_SECRET_KEY"],
         volumes: [{ name: "data", mountPath: "/metabase-data" }],
+        embedded: true,
         firstRun: "Create the admin account on the first visit."
     },
     {
@@ -330,6 +336,7 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         },
         secrets: ["N8N_ENCRYPTION_KEY"],
         volumes: [{ name: "data", mountPath: "/home/node/.n8n" }],
+        embedded: true,
         firstRun: "Create the owner account on the first visit."
     },
     {
@@ -389,6 +396,7 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         env: {},
         secrets: [],
         volumes: [{ name: "data", mountPath: "/app/data" }],
+        embedded: true,
         firstRun: "Create the admin account on the first visit - until then anyone who opens it can."
     },
     {

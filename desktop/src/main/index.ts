@@ -14,16 +14,19 @@
  */
 
 import { registerIpc } from "./ipc";
-import { installMenu } from "./menu";
+import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
-import { serverPath } from "./navigation";
 import { pushRunning } from "./push-local";
-import { allowPermission } from "./permissions";
+import { watchForUpdates } from "./updates";
 import type { Outcome } from "@/shared/bridge";
+import { allowPermission } from "./permissions";
 import { handledSquirrelEvent } from "./squirrel";
+import { installScreenShare } from "./screen-share";
+import { installMenu, type MenuActions } from "./menu";
 import { serverAddress, setServerAddress } from "./settings";
-import { openLocalWindow, openPolarisWindow } from "./windows";
 import { serverAddressSchema } from "@/shared/server-address";
+import { backIndex, isServerUrl, serverPath } from "./navigation";
+import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, session, shell } from "electron";
 import { classifyHealth, describeNetError, describeProbe, netErrorCode } from "./reachability";
 
@@ -57,9 +60,9 @@ function showPolaris(path?: string): void {
 function openMain(url: string): void {
     const window = openPolarisWindow(url, server);
     main = window;
-    window.webContents.on("did-fail-load", (_event, code, description, _url, isMainFrame) => {
+    window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
         // -3 is a load that another one replaced: a redirect, a click, nothing wrong.
-        if (!isMainFrame || code === -3 || !current) return;
+        if (!isMainFrame || code === -3 || !current || !isServerUrl(url, current)) return;
         loadError = describeNetError(netErrorCode(description), new URL(current).host);
         openConnect();
         window.close();
@@ -102,6 +105,17 @@ async function probe(origin: string): Promise<string | null> {
         if ((caught as Error).name === "TimeoutError") return describeNetError("ERR_TIMED_OUT", host);
         return describeNetError(netErrorCode(String(caught)), host);
     }
+}
+
+/** Back in the focused Polaris window, never onto a page that is not the Polaris
+ *  (see `backIndex`). */
+function goBack(): void {
+    const contents = BrowserWindow.getFocusedWindow()?.webContents;
+    if (!contents || !current || kindOf(contents) !== "polaris") return;
+    const history = contents.navigationHistory;
+    const urls = history.getAllEntries().map((entry) => entry.url);
+    const index = backIndex(urls, history.getActiveIndex(), current);
+    if (index !== null) history.goToIndex(index);
 }
 
 async function connectSubmit(raw: unknown): Promise<Outcome> {
@@ -150,8 +164,11 @@ function start(): void {
             connectSubmit
         });
 
-        installMenu({
+        installScreenShare(server);
+
+        const menu: MenuActions = {
             changeServer: openConnect,
+            back: goBack,
             reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
             forgetApiKey: () => {
                 dropApiKey();
@@ -165,6 +182,17 @@ function start(): void {
             openInBrowser: () => {
                 if (current) void shell.openExternal(current);
             }
+        };
+        installMenu(menu);
+        watchForUpdates((update) => {
+            const open = () => void shell.openExternal(update.page);
+            installMenu(menu, { version: update.version, open });
+            showNotice({
+                title: `Polaris ${update.version} is available`,
+                body: "Open its download page from here or from the Help menu.",
+                tag: "desktop-update",
+                onClick: open
+            });
         });
 
         if (current) openMain(`${current}${START}`);

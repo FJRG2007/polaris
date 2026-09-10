@@ -74,6 +74,29 @@ describe("variableLinks", () => {
         expect(links.v5).toBeUndefined();
     });
 
+    it("knows the read URL of a MySQL primary with read replicas, and of a database hosted on one", async () => {
+        databaseFindMany.mockResolvedValue([
+            { slug: "orders", name: "Orders", engine: "mysql", clusterMasters: null, topology: "replicas", parent: null },
+            { slug: "billing", name: "Billing", engine: "mysql", clusterMasters: null, topology: "single", parent: { topology: "replicas" } },
+            { slug: "plain", name: "Plain", engine: "mysql", clusterMasters: null, topology: "single", parent: null }
+        ]);
+        envVarFindMany.mockReset().mockImplementation(async (query: { where: { scopeType: string } }) =>
+            query.where.scopeType === "environment"
+                ? []
+                : [
+                      { id: "v1", isSecret: false, value: "${{orders.READ_URL}}" },
+                      { id: "v2", isSecret: false, value: "${{billing.MYSQL_READ_URL}}" },
+                      { id: "v3", isSecret: false, value: "${{plain.READ_URL}}" }
+                  ]
+        );
+
+        const links = await variableLinks("application", "web");
+
+        expect(links.v1?.[0]?.keyKnown).toBe(true);
+        expect(links.v2?.[0]?.keyKnown).toBe(true);
+        expect(links.v3?.[0]).toMatchObject({ target: { kind: "database" }, keyKnown: false });
+    });
+
     it("reads nothing else when no variable holds a reference", async () => {
         envVarFindMany.mockReset().mockResolvedValue([{ id: "v1", isSecret: false, value: "plain" }]);
         applicationFindMany.mockClear();

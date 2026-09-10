@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
 import { findApp } from "@/lib/apps/catalog";
 import { invalidateInstallPresence, isAppInstalled } from "@/lib/apps/install-presence";
 
@@ -47,26 +48,42 @@ export function mailServerAppInstalled(): Promise<boolean> {
  * marketplace.
  */
 export async function adoptMailServerApp(): Promise<string | null> {
-    const existing = await prisma.installedApp.findFirst({
+    const existing = await currentInstall(prisma);
+    if (existing) return existing;
+    const first = await prisma.mailServer.findFirst({ orderBy: { createdAt: "asc" }, select: { ownerId: true } });
+    if (!first) return null;
+    const adopted = await prisma.$transaction(async (tx) => {
+        if (loadEnv().POLARIS_DB_PROVIDER === "postgresql") {
+            await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext('polaris.mail-server.adopt'))");
+        }
+        const raced = await currentInstall(tx);
+        if (raced) return { id: raced, created: false };
+        const created = await tx.installedApp.create({
+            data: {
+                catalogId: MAIL_SERVER_APP,
+                ownerId: first.ownerId,
+                name: findApp(MAIL_SERVER_APP)?.name ?? "Mail server",
+                status: "running",
+                installedById: first.ownerId
+            },
+            select: { id: true }
+        });
+        return { id: created.id, created: true };
+    });
+    if (adopted.created) invalidateInstallPresence(MAIL_SERVER_APP);
+    return adopted.id;
+}
+
+/** The oldest live install row, or null. */
+async function currentInstall(
+    client: Pick<typeof prisma, "installedApp">
+): Promise<string | null> {
+    const row = await client.installedApp.findFirst({
         where: { catalogId: MAIL_SERVER_APP, status: { not: "removed" } },
         orderBy: { createdAt: "asc" },
         select: { id: true }
     });
-    if (existing) return existing.id;
-    const first = await prisma.mailServer.findFirst({ orderBy: { createdAt: "asc" }, select: { ownerId: true } });
-    if (!first) return null;
-    const created = await prisma.installedApp.create({
-        data: {
-            catalogId: MAIL_SERVER_APP,
-            ownerId: first.ownerId,
-            name: findApp(MAIL_SERVER_APP)?.name ?? "Mail server",
-            status: "running",
-            installedById: first.ownerId
-        },
-        select: { id: true }
-    });
-    invalidateInstallPresence(MAIL_SERVER_APP);
-    return created.id;
+    return row?.id ?? null;
 }
 
 /**

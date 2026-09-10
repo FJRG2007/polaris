@@ -12,10 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/deploy-service", () => ({ restartFromKeptImage: vi.fn(), syncAppRoutes: vi.fn() }));
 
+const { prisma } = await import("@polaris/db");
 const { parseAppEdgeConfig } = await import("@polaris/core");
 const { expandReplicas, replicaNames } = await import("@polaris/deploy");
+const { restartFromKeptImage, syncAppRoutes } = await import("@/lib/deploy-service");
 const { balancedOver, copiesOf } = await import("@/lib/deploy/replicas");
-const { singleCopyReason } = await import("@/lib/deploy/scaling-service");
+const { setServiceScaling, singleCopyReason } = await import("@/lib/deploy/scaling-service");
 const { renderDynamicConfig } = await import("@/lib/deploy/router");
 
 /** The block of text belonging to one router or service, by its name. */
@@ -97,26 +99,29 @@ describe("copiesOf", () => {
 describe("changing over a service with several copies", () => {
     /** A release started beside the running one, the way the pipeline plans it:
      *  under names of its own, answering to the service's by alias. */
-    const release = (service: string, marker: string, replicas: number) =>
-        expandReplicas({
-            project: `p-${marker}`,
-            services: [
-                {
-                    // Cut the way `releaseRef` cuts it: the marker whole.
-                    name: `${service.slice(0, 63 - marker.length - 1)}-${marker}`,
-                    image: "shop:release",
-                    env: {},
-                    ports: [],
-                    volumes: [],
-                    labels: { "traefik.enable": "true" },
-                    networks: ["polaris-proxy"],
-                    aliases: [service],
-                    replicas
-                }
-            ],
-            volumes: [],
-            networks: ["polaris-proxy"]
-        }).services;
+    const release = (service: string, marker: string, replicas: number, dialled?: number) =>
+        expandReplicas(
+            {
+                project: `p-${marker}`,
+                services: [
+                    {
+                        // Cut the way `releaseRef` cuts it: the marker whole.
+                        name: `${service.slice(0, 63 - marker.length - 1)}-${marker}`,
+                        image: "shop:release",
+                        env: {},
+                        ports: [],
+                        volumes: [],
+                        labels: { "traefik.enable": "true" },
+                        networks: ["polaris-proxy"],
+                        aliases: [service],
+                        replicas
+                    }
+                ],
+                volumes: [],
+                networks: ["polaris-proxy"]
+            },
+            dialled
+        ).services;
 
     /** Everything one container answers to on the proxy network. */
     const answersTo = (copy: { name: string; aliases?: string[] }) => [copy.name, ...(copy.aliases ?? [])];
@@ -147,6 +152,27 @@ describe("changing over a service with several copies", () => {
             for (const name of answersTo(copy)) expect(name.length).toBeLessThanOrEqual(63);
         }
     });
+
+    it("answers every name a route still dials when it runs fewer copies than the one it replaces", () => {
+        // Three copies to two: until the edge takes the file naming two - and an edge
+        // frozen on its last good one never does - the third name is still dialled.
+        const route = copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")!;
+        const copies = release("web", "abc1234", 2, 3);
+        expect(copies.map((copy) => copy.name)).toEqual(["web-abc1234", "web-abc1234-r2"]);
+        for (const name of route.slice(1)) {
+            expect(copies.filter((copy) => answersTo(copy).includes(name))).toHaveLength(1);
+        }
+        expect(copies[0]?.aliases).toEqual(["web", "web-r3"]);
+        // Down to one copy, which answers for all three.
+        expect(answersTo(release("web", "abc1234", 1, 3)[0]!)).toEqual(expect.arrayContaining(route));
+    });
+
+    it("answers only its own names when the release it replaces ran no more copies", () => {
+        const copies = release("web", "abc1234", 2, 2);
+        expect(copies[0]?.aliases).toEqual(["web"]);
+        expect(copies[1]?.aliases).toEqual(["web", "web-abc1234", "web-r2"]);
+        expect(release("web", "abc1234", 3, 1)).toEqual(release("web", "abc1234", 3));
+    });
 });
 
 describe("balancedOver", () => {
@@ -173,6 +199,46 @@ describe("singleCopyReason", () => {
         expect(singleCopyReason({ ...plain, _count: { volumes: 1 } })).toMatch(/volume/);
         expect(singleCopyReason({ ...plain, sourceType: "compose" })).toMatch(/compose file/);
         expect(singleCopyReason({ ...plain, keepReleases: true })).toMatch(/previous deployments/);
+    });
+});
+
+describe("saving a new count", () => {
+    const app = {
+        replicas: 2,
+        autoscale: null,
+        cpuLimit: null,
+        memoryLimitMb: null,
+        sleepAfterMinutes: null,
+        asleepSince: null,
+        edgeConfig: null,
+        keepReleases: false,
+        sourceType: "image",
+        currentDeploymentId: "dep-1",
+        target: { runtime: "compose", kind: "local" },
+        _count: { volumes: 0 }
+    };
+    const input = {
+        replicas: 3,
+        autoscale: null,
+        balancing: { sticky: false, healthPath: null },
+        limits: { cpus: null, memoryMb: null },
+        sleepAfterMinutes: null
+    };
+
+    beforeEach(() => {
+        Object.assign(prisma, { application: { findFirst: async () => app, update: async () => app } });
+        vi.mocked(syncAppRoutes).mockResolvedValue(undefined);
+        vi.mocked(restartFromKeptImage).mockClear();
+    });
+
+    it("scales the release serving it rather than changing it over", async () => {
+        await expect(setServiceScaling("app-1", "owner-1", "user-1", input)).resolves.toEqual({ redeployed: true });
+        expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", "user-1", "scale");
+    });
+
+    it("changes over when new limits come with it, since every copy is recreated", async () => {
+        await setServiceScaling("app-1", "owner-1", "user-1", { ...input, limits: { cpus: 1, memoryMb: null } });
+        expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", "user-1", "settings");
     });
 });
 

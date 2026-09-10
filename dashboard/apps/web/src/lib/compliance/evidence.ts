@@ -224,6 +224,14 @@ export interface EvidenceReadings {
     };
     readonly backups: {
         readonly total: number;
+        /** Counted over every item, not only the listed ones. */
+        readonly scheduled: number;
+        readonly failing: number;
+        /** Items whose newest copy is stored somewhere, and those of them stored
+         *  encrypted everywhere. */
+        readonly withCopy: number;
+        readonly encrypted: number;
+        /** The most recently backed-up items, at most `EVIDENCE_ROWS_MAX`. */
         readonly items: readonly BackupReading[];
         /** Keys new copies can be sealed under (not retired). */
         readonly activeKeys: number;

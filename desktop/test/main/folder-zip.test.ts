@@ -121,6 +121,49 @@ describe("zipFolder", () => {
         expect(names).not.toContain("my-app/linked.txt");
     });
 
+    it("follows a link to a file inside the folder", async () => {
+        const app = project();
+        try {
+            symlinkSync(join(app, "src/index.ts"), join(app, "entry.ts"));
+        } catch {
+            return;
+        }
+        const entries = await listFolder(app);
+        expect(entries.map((entry) => entry.path)).toContain("my-app/entry.ts");
+        const files = unzipSync(await zipEntries(entries));
+        expect(strFromU8(files["my-app/entry.ts"] as Uint8Array)).toBe("export const a = 1;\n");
+    });
+
+    it("follows a link to a folder inside the folder, and not one outside it", async () => {
+        const app = project();
+        const outside = join(root as string, "elsewhere");
+        mkdirSync(outside);
+        writeFileSync(join(outside, "secret.txt"), "do not send");
+        // A junction is a link Windows lets anybody make; elsewhere the type is ignored.
+        symlinkSync(join(app, "src/lib"), join(app, "shared"), "junction");
+        symlinkSync(outside, join(app, "outside"), "junction");
+        const names = (await listFolder(app)).map((entry) => entry.path);
+        expect(names).toContain("my-app/shared/util.ts");
+        expect(names).toContain("my-app/src/lib/util.ts");
+        expect(names.some((name) => name.startsWith("my-app/outside"))).toBe(false);
+    });
+
+    it("ends a loop of links", async () => {
+        const app = project();
+        symlinkSync(app, join(app, "src/lib/up"), "junction");
+        symlinkSync(join(app, "src"), join(app, "src/lib/again"), "junction");
+        mkdirSync(join(app, "a"));
+        mkdirSync(join(app, "b"));
+        writeFileSync(join(app, "b/b.txt"), "b");
+        symlinkSync(join(app, "b"), join(app, "a/to-b"), "junction");
+        symlinkSync(join(app, "a"), join(app, "b/to-a"), "junction");
+        const names = (await listFolder(app)).map((entry) => entry.path);
+        expect(names.some((name) => name.includes("/up/") || name.includes("/again/"))).toBe(false);
+        expect(names).toContain("my-app/b/b.txt");
+        expect(names).toContain("my-app/a/to-b/b.txt");
+        expect(new Set(names).size).toBe(names.length);
+    });
+
     it("refuses a folder with nothing to send", async () => {
         root = mkdtempSync(join(tmpdir(), "polaris-zip-"));
         const empty = join(root, "empty");

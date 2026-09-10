@@ -18,13 +18,21 @@ const rollupFindMany = vi.fn();
 const sampleFindMany = vi.fn();
 const settingFindMany = vi.fn();
 const settingFindUnique = vi.fn();
+const snapshots = new Map<string, Record<string, unknown>>();
+const FROZEN_AT = new Date("2026-09-02T08:00:00Z");
+const snapshotFindUnique = vi.fn(async (query: { where: { month: string } }) => snapshots.get(query.where.month) ?? null);
+const snapshotCreateMany = vi.fn(async (query: { data: { month: string }[] }) => {
+    for (const row of query.data) if (!snapshots.has(row.month)) snapshots.set(row.month, { ...row, createdAt: FROZEN_AT });
+    return { count: query.data.length };
+});
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         project: { findMany: projectFindMany },
         metricRollup: { aggregate: rollupAggregate, findMany: rollupFindMany },
         metricSample: { findMany: sampleFindMany },
-        setting: { findMany: settingFindMany, findUnique: settingFindUnique }
+        setting: { findMany: settingFindMany, findUnique: settingFindUnique },
+        statementSnapshot: { findUnique: snapshotFindUnique, createMany: snapshotCreateMany }
     }
 }));
 
@@ -36,6 +44,7 @@ const RATES = { currency: "EUR", cpuHour: 0.1, memoryGbHour: null, storageGbMont
 
 beforeEach(() => {
     vi.clearAllMocks();
+    snapshots.clear();
     projectFindMany.mockResolvedValue([
         {
             id: "p1",
@@ -180,6 +189,38 @@ describe("reading a month's statement", () => {
         const view = await readStatement({ kind: "all" }, "2026-06", NOW);
         expect(view.keptFrom).not.toBeNull();
         expect(view.current).toBe(false);
+    });
+});
+
+describe("a month that has ended", () => {
+    it("is frozen the first time it is read, and read back unchanged after the prices and projects change", async () => {
+        const first = await readStatement({ kind: "all" }, "2026-08", NOW);
+        expect(snapshotCreateMany).toHaveBeenCalledTimes(1);
+        expect(first.generatedAt).toBe(FROZEN_AT.toISOString());
+
+        settingFindUnique.mockResolvedValue({ value: JSON.stringify({ ...RATES, currency: "USD", cpuHour: 9 }) });
+        projectFindMany.mockResolvedValue([]);
+        const again = await readStatement({ kind: "all" }, "2026-08", new Date("2026-11-01T00:00:00Z"));
+
+        expect(again.statement).toEqual(first.statement);
+        expect(again.statement.rates?.currency).toBe("EUR");
+        expect(projectFindMany).toHaveBeenCalledTimes(1);
+        expect(snapshotCreateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives each scope its own projects from the one frozen month", async () => {
+        await readStatement({ kind: "all" }, "2026-08", NOW);
+        const org = await readStatement({ kind: "orgs", orgIds: ["o1"] }, "2026-08", NOW);
+        expect(org.statement.lines.map((line) => line.projectId)).toEqual(["p1"]);
+        expect(projectFindMany).toHaveBeenCalledTimes(1);
+        expect(projectFindMany.mock.calls[0]?.[0]?.where).toEqual({});
+    });
+
+    it("stays live until its last readings have landed, and the running month is never frozen", async () => {
+        await readStatement({ kind: "all" }, "2026-09", NOW);
+        await readStatement({ kind: "all" }, "2026-08", new Date("2026-09-01T00:10:00Z"));
+        expect(snapshotFindUnique).not.toHaveBeenCalled();
+        expect(snapshotCreateMany).not.toHaveBeenCalled();
     });
 });
 

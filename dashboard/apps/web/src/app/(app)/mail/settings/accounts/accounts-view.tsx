@@ -29,6 +29,7 @@ import { useRouter } from "next/navigation";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Switch, cn, useToast } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import { AlertTriangle, CheckCircle2, Mail, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -48,7 +49,8 @@ export function AccountsView({
     outcome,
     outcomeProvider,
     connectNow = false,
-    editNow = ""
+    editNow = "",
+    moveShelf = null
 }: {
     accounts: MailAccountView[];
     links: LinkedAccount[];
@@ -66,8 +68,27 @@ export function AccountsView({
      * opens on its password box, because that is the field they came to fill.
      */
     editNow?: string;
+    /**
+     * The shelf the mailbox `editNow` names is on, when the header is on a
+     * different one. The list is already that shelf's; the header is moved to
+     * match, so the two do not disagree about which mailboxes these are.
+     */
+    moveShelf?: string | null;
 }) {
     const router = useRouter();
+    const movedTo = useRef<string | null>(null);
+    useEffect(() => {
+        if (!moveShelf) {
+            movedTo.current = null;
+            return;
+        }
+        if (movedTo.current === moveShelf) return;
+        movedTo.current = moveShelf;
+        void setWorkspaceScopeAction(moveShelf).then(
+            () => router.refresh(),
+            () => undefined
+        );
+    }, [moveShelf, router]);
     const [adding, setAdding] = useState(connectNow);
     const [editing, setEditing] = useState<{ id: string; focusPassword: boolean } | null>(() => {
         const asked = accounts.find((account) => account.id === editNow);

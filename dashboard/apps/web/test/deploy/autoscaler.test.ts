@@ -10,27 +10,30 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { log, findMany, scaleService, recordDeployAudit, record, readEdgeLogTail, cpu } = vi.hoisted(() => {
-    const log = { text: "" };
+const { log, findMany, serving, scaleService, recordDeployAudit, record, readEdgeLogWindow, cpu } = vi.hoisted(() => {
+    const log = { text: "", truncated: false };
     return {
         log,
         findMany: vi.fn(),
+        serving: vi.fn(async (): Promise<{ id: string; replicas: number | null }[]> => []),
         scaleService: vi.fn(async () => undefined),
         recordDeployAudit: vi.fn(async () => undefined),
         record: vi.fn(async () => undefined),
-        readEdgeLogTail: vi.fn(async () => log.text),
+        readEdgeLogWindow: vi.fn(async () => ({ text: log.text, truncated: log.truncated })),
         cpu: { percent: 5 }
     };
 });
 
-vi.mock("@polaris/db", () => ({ prisma: { application: { findMany }, deployment: { count: async () => 0 } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: { application: { findMany }, deployment: { count: async () => 0, findMany: serving } }
+}));
 vi.mock("@/lib/deploy/releases", () => ({
     servingContainerNames: async (apps: { id: string }[]) => new Map(apps.map((app) => [app.id, `${app.id}-web`]))
 }));
 vi.mock("@/lib/deploy/scaling-service", () => ({ scaleService, singleCopyReason: () => null }));
 vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit }));
 vi.mock("@/lib/activity/activity", () => ({ record }));
-vi.mock("@/lib/edge-access-log", () => ({ EDGE_LOG_RECENT_WINDOW_BYTES: 1024, readEdgeLogTail }));
+vi.mock("@/lib/edge-access-log", () => ({ EDGE_LOG_RECENT_WINDOW_BYTES: 1024, readEdgeLogWindow }));
 vi.mock("@/lib/deploy/quick-tunnel-service", () => ({ tunnelHostForApp: (id: string) => `${id}.tunnel.test` }));
 vi.mock("@/lib/docker-service", () => {
     const driver = () => ({
@@ -87,6 +90,8 @@ function traffic(at: number, count: number): string {
 beforeEach(() => {
     vi.clearAllMocks();
     cpu.percent = 5;
+    log.truncated = false;
+    serving.mockResolvedValue([]);
 });
 
 describe("the autoscaler on traffic", () => {
@@ -124,14 +129,14 @@ describe("the autoscaler on traffic", () => {
         ]);
         log.text = traffic(NOW, 10);
         await runAutoscale(NOW);
-        expect(readEdgeLogTail).toHaveBeenCalledTimes(1);
+        expect(readEdgeLogWindow).toHaveBeenCalledTimes(1);
     });
 
     it("never reads the log for a service without a traffic target", async () => {
         findMany.mockResolvedValue([service("app-old", { min: 1, max: 4, cpuPercent: 50 })]);
         log.text = traffic(NOW, 10_000);
         for (let tick = 0; tick < 3; tick++) await runAutoscale(NOW + tick * 60_000);
-        expect(readEdgeLogTail).not.toHaveBeenCalled();
+        expect(readEdgeLogWindow).not.toHaveBeenCalled();
         expect(scaleService).not.toHaveBeenCalled();
     });
 
@@ -142,8 +147,49 @@ describe("the autoscaler on traffic", () => {
         cpu.percent = 80;
         log.text = traffic(NOW, 10_000);
         for (let tick = 0; tick < 3; tick++) await runAutoscale(NOW + tick * 60_000);
-        expect(readEdgeLogTail).not.toHaveBeenCalled();
+        expect(readEdgeLogWindow).not.toHaveBeenCalled();
         expect(scaleService).toHaveBeenCalledWith("app-remote", "owner-1", 2);
         expect(record).toHaveBeenCalledWith(expect.objectContaining({ action: "autoscaled-cpu" }));
+    });
+
+    it("counts a log so busy that the part read holds only seconds", async () => {
+        /** `count` requests in the five seconds before `at`, and nothing older. */
+        const burst = (at: number, count: number) =>
+            Array.from({ length: count }, (_, index) =>
+                JSON.stringify({
+                    StartUTC: new Date(at - 5_000 + index * 50).toISOString(),
+                    RequestHost: "shop.example.com",
+                    RequestMethod: "GET",
+                    RequestPath: "/",
+                    DownstreamStatus: 200,
+                    "request_User-Agent": "Mozilla/5.0"
+                })
+            ).join("\n");
+        findMany.mockResolvedValue([service("app-cut", { min: 1, max: 4, cpuPercent: 50, requestsPerCopy: 100 })]);
+        log.truncated = true;
+        for (let tick = 0; tick < 3; tick++) {
+            const at = NOW + tick * 60_000;
+            log.text = burst(at, 100);
+            await runAutoscale(at);
+        }
+        expect(scaleService).toHaveBeenCalledWith("app-cut", "owner-1", 4);
+        expect(record).toHaveBeenCalledWith(expect.objectContaining({ action: "autoscaled-traffic" }));
+    });
+
+    it("steps from the copies the serving release runs, not the count it is set to", async () => {
+        // Set to three by a change-over that never came up: two are still serving.
+        findMany.mockResolvedValue([
+            { ...service("app-short", { min: 1, max: 4, cpuPercent: 50, requestsPerCopy: 100 }), replicas: 3 }
+        ]);
+        serving.mockResolvedValue([{ id: "app-short-deployment", replicas: 2 }]);
+        for (let tick = 0; tick < 3; tick++) {
+            const at = NOW + tick * 60_000;
+            log.text = traffic(at, 250);
+            await runAutoscale(at);
+        }
+        expect(scaleService).toHaveBeenCalledWith("app-short", "owner-1", 3);
+        expect(recordDeployAudit).toHaveBeenCalledWith(
+            expect.objectContaining({ metadata: expect.objectContaining({ from: 2, to: 3 }) })
+        );
     });
 });

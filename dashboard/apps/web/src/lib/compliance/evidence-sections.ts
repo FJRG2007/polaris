@@ -289,11 +289,6 @@ const LAST_RESULT_TEXT: Readonly<Record<string, string>> = { ok: "OK", partial: 
 
 function backups(readings: EvidenceReadings): SectionDraft {
     const b = readings.backups;
-    // Counted over the listed items; a note says so when that is not all of them.
-    const scheduled = b.items.filter(isScheduled).length;
-    const failing = b.items.filter((item) => item.lastStatus === "failed").length;
-    const withCopy = b.items.filter((item) => item.sealed + item.clear > 0);
-    const encrypted = withCopy.filter((item) => item.clear === 0).length;
     return {
         id: "backups",
         title: "Backups",
@@ -303,22 +298,22 @@ function backups(readings: EvidenceReadings): SectionDraft {
             {
                 id: "backups.scheduled",
                 label: "On a schedule",
-                value: scheduled,
-                text: share(scheduled, b.items.length, "item")
+                value: b.scheduled,
+                text: share(b.scheduled, b.total, "item")
             },
             {
                 id: "backups.encrypted",
                 label: "Newest copy encrypted everywhere it is kept",
-                value: encrypted,
-                text: share(encrypted, withCopy.length, "item with a copy", "items with a copy"),
-                attention: encrypted < withCopy.length
+                value: b.encrypted,
+                text: share(b.encrypted, b.withCopy, "item with a copy", "items with a copy"),
+                attention: b.encrypted < b.withCopy
             },
             {
                 id: "backups.failing",
                 label: "Last run failed",
-                value: failing,
-                text: count(failing, "item"),
-                attention: failing > 0
+                value: b.failing,
+                text: count(b.failing, "item"),
+                attention: b.failing > 0
             },
             {
                 id: "backups.keys",
@@ -362,7 +357,9 @@ function backups(readings: EvidenceReadings): SectionDraft {
         notes: [
             "A copy kept on the disk of the thing it protects is written unencrypted by design; every copy that leaves it is encrypted.",
             ...(b.total > b.items.length
-                ? [`The figures above cover the ${b.items.length} most recently backed-up items of ${b.total}.`]
+                ? [
+                      `The list shows the ${b.items.length} most recently backed-up items of ${b.total}; the figures above count them all.`
+                  ]
                 : [])
         ]
     };

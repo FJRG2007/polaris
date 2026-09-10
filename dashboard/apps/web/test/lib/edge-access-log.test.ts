@@ -15,8 +15,8 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readEdgeLogTail, trimEdgeLog } from "@/lib/edge-access-log";
 import { mkdtemp, readFile, writeFile, stat } from "node:fs/promises";
+import { readEdgeLogTail, readEdgeLogWindow, trimEdgeLog } from "@/lib/edge-access-log";
 
 /** One log line of a known size, so a fixture's shape is arithmetic rather than
  *  a guess. */
@@ -81,6 +81,15 @@ describe("reading the tail", () => {
     it("is empty rather than an error when there is no log at all", async () => {
         pointAt(join(tmpdir(), "polaris-no-such-log", "access.log"));
         expect(await readEdgeLogTail(1024)).toBe("");
+    });
+
+    it("says when the window was cut short by its size rather than by the log's start", async () => {
+        const { path } = await fixture(1000);
+        pointAt(path);
+        expect((await readEdgeLogWindow(200)).truncated).toBe(true);
+        expect((await readEdgeLogWindow(1024 * 1024)).truncated).toBe(false);
+        pointAt(join(tmpdir(), "polaris-no-such-log", "access.log"));
+        expect(await readEdgeLogWindow(1024)).toEqual({ text: "", truncated: false });
     });
 });
 

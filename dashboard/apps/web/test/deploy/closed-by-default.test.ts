@@ -33,11 +33,11 @@ describe("the port a new service publishes", () => {
 
     it("starts what somebody deploys with the headers any app survives", async () => {
         // Production defaults for a new service: HSTS, nosniff, a sane referrer,
-        // same-site framing. Existing services keep theirs; catalog apps that
-        // another page may embed start with none.
+        // same-site framing. Existing services keep theirs; catalog apps and the
+        // templates that another page may embed start with none.
         const service = await read("lib/deploy-service.ts");
         expect(service).toContain('edgeConfig: JSON.stringify({ headers: { preset: "recommended" } })');
-        expect(await read("app/(app)/apps/deploy/actions.ts")).toContain("safeHeaders: true");
+        expect(await read("app/(app)/apps/deploy/actions.ts")).toContain("safeHeaders: !template?.embedded");
         expect(await read("lib/deploy/template-setup.ts")).toContain("safeHeaders: true");
         expect(await read("lib/deploy/migrate.ts")).toContain("safeHeaders: true");
     });

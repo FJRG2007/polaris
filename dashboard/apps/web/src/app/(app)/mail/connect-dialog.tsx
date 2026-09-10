@@ -24,8 +24,9 @@
  * fields, the same checks as they are typed, and the same rule on the server -
  * nothing is stored until both servers accept it. What differs is only what a
  * change means: the address is shown rather than asked for, the password box is
- * empty and empty keeps the one stored, and an authorized mailbox is offered the
- * way to authorize it again instead of a password.
+ * empty and empty keeps the one stored - until the servers or the login change,
+ * when it has to be typed again - and an authorized mailbox is offered the way to
+ * authorize it again instead of a password.
  */
 
 import Link from "next/link";
@@ -411,9 +412,24 @@ export function ConnectMailboxDialog({
     useEffect(() => {
         if (serversBroken) setShowServers(true);
     }, [serversBroken]);
+    /** Whether the servers or the login differ from the ones the saved password
+     *  was entered for. The saved one is never sent anywhere else, so the box
+     *  has to be filled again. */
+    const sent = checked.success ? checked.data : shape;
+    const movesServers =
+        editing !== undefined &&
+        (sent.username !== editing.username ||
+            sent.imap.host !== editing.imapHost ||
+            sent.imap.port !== editing.imapPort ||
+            sent.imap.security !== editing.imapSecurity ||
+            sent.smtp.host !== editing.smtpHost ||
+            sent.smtp.port !== editing.smtpPort ||
+            sent.smtp.security !== editing.smtpSecurity);
     /** Whether a blank password box is a kept password rather than a missing
-     *  one: only for a mailbox that has one stored to keep. */
-    const keepsPassword = editing?.auth === "password";
+     *  one: only for a mailbox that has one stored to keep, on the servers it
+     *  was saved for. */
+    const retypesPassword = editing?.auth === "password" && movesServers;
+    const keepsPassword = editing?.auth === "password" && !movesServers;
     const ready =
         valid &&
         !already &&
@@ -604,13 +620,24 @@ export function ConnectMailboxDialog({
                                             keepsPassword ? "Leave blank to keep the current one" : undefined
                                         }
                                         aria-invalid={field === "password" ? true : undefined}
-                                        aria-describedby={keepsPassword ? "mailbox-password-kept" : undefined}
+                                        aria-describedby={
+                                            keepsPassword || retypesPassword
+                                                ? "mailbox-password-kept"
+                                                : undefined
+                                        }
                                         onChange={(event) => {
                                             setPassword(event.target.value);
                                             if (field === "password") setField("");
                                         }}
                                     />
-                                    {keepsPassword ? (
+                                    {retypesPassword ? (
+                                        <span
+                                            id="mailbox-password-kept"
+                                            className="mt-1 block text-[12px] text-foreground-subtle"
+                                        >
+                                            The servers or login changed, so enter the password again.
+                                        </span>
+                                    ) : keepsPassword ? (
                                         <span
                                             id="mailbox-password-kept"
                                             className={cn(

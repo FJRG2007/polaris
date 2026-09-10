@@ -7,8 +7,12 @@
  * the ones adding one keeps, because the failure they prevent is the same - a
  * mailbox that silently stops syncing because of something typed on a form.
  *
- * - **Blank keeps the password.** Fixing a server name must not mean typing a
- *   password nobody remembers, and the stored one is what gets tried.
+ * - **Blank keeps the password, on the servers it was entered for.** Saving a
+ *   refused mailbox again must not mean typing a password nobody remembers, and
+ *   the stored one is what gets tried. A different server or login is not one
+ *   it was entered for, and the stored password never goes there: somebody who
+ *   holds a mailbox an organization handed out could otherwise point it at a
+ *   server of their own and read the organization's password off the wire.
  * - **Nothing refused is stored.** A new password the server says no to comes
  *   back on the form, and the one that worked stays.
  * - **The address is not up for change.** It is what the mailbox is; a
@@ -28,7 +32,8 @@ const state = {
     refuse: "" as "" | "imap" | "smtp",
     written: [] as Record<string, unknown>[],
     synced: [] as { id: string; force: boolean }[],
-    audited: [] as Record<string, unknown>[]
+    audited: [] as Record<string, unknown>[],
+    notices: [] as { id: string; userId: string; metadata: string; readAt: Date | null; actionRequired: boolean }[]
 };
 
 class FakeAuthError extends Error {}
@@ -40,6 +45,11 @@ vi.mock("@polaris/db", () => ({
                 state.written.push(data);
                 Object.assign(state.row ?? {}, data);
                 return state.row;
+            }),
+            delete: vi.fn(async () => {
+                const gone = state.row;
+                state.row = null;
+                return gone;
             })
         },
         userConnection: {
@@ -47,6 +57,20 @@ vi.mock("@polaris/db", () => ({
                 where.id === "0190c1d2-0000-7000-8000-0000000000c1"
                     ? { id: where.id, provider: "google", scope: "mail" }
                     : null
+            )
+        },
+        notification: {
+            findMany: vi.fn(async ({ where }: { where: { userId: string } }) =>
+                state.notices.filter(
+                    (notice) => notice.userId === where.userId && (!notice.readAt || notice.actionRequired)
+                )
+            ),
+            updateMany: vi.fn(
+                async ({ where, data }: { where: { id: { in: string[] } }; data: Record<string, unknown> }) => {
+                    const hit = state.notices.filter((notice) => where.id.in.includes(notice.id));
+                    for (const notice of hit) Object.assign(notice, data);
+                    return { count: hit.length };
+                }
             )
         }
     }
@@ -94,7 +118,7 @@ vi.mock("@/lib/audit-service", () => ({
     }
 }));
 
-const { MailSetupError, updateAccount } = await import("@/lib/mailbox/accounts");
+const { MailSetupError, removeAccount, updateAccount } = await import("@/lib/mailbox/accounts");
 
 const ID = "0190c1d2-0000-7000-8000-000000000001";
 
@@ -152,21 +176,98 @@ beforeEach(() => {
     state.written = [];
     state.synced = [];
     state.audited = [];
+    state.notices = [];
 });
 
 describe("changing a connected mailbox", () => {
     it("keeps the stored password when the box is left blank, and tries that one", async () => {
-        stored();
-        await updateAccount("usr_ana", ID, edit({ imap: { host: "mail.example.com", port: 993, security: "tls" } }));
+        stored({ state: "auth", stateDetail: "The mail server refused this account's credentials." });
+        await updateAccount("usr_ana", ID, edit({ label: "Work" }));
 
         expect(state.tried.map((one) => one.server)).toEqual(["imap", "smtp"]);
         expect(state.tried[0]?.encryptedSecret).toBe(STORED);
-        expect(state.tried[0]?.imapHost).toBe("mail.example.com");
+        expect(state.tried[0]?.imapHost).toBe("imap.example.com");
         const written = state.written[0] ?? {};
-        expect(written.imapHost).toBe("mail.example.com");
+        expect(written.state).toBe("ok");
         // The same bytes are not written back over themselves.
         expect("encryptedSecret" in written).toBe(false);
-        expect(state.audited[0]?.metadata).toMatchObject({ credential: "kept" });
+        expect(state.audited[0]?.metadata).toMatchObject({ credential: "kept", servers: "kept" });
+    });
+
+    it.each([
+        ["the incoming server", { imap: { host: "mail.attacker.example", port: 993, security: "tls" } }],
+        ["the incoming port", { imap: { host: "imap.example.com", port: 143, security: "tls" } }],
+        ["the incoming security", { imap: { host: "imap.example.com", port: 993, security: "none" } }],
+        ["the outgoing server", { smtp: { host: "smtp.attacker.example", port: 465, security: "tls" } }],
+        ["the outgoing port", { smtp: { host: "smtp.example.com", port: 587, security: "tls" } }],
+        ["the outgoing security", { smtp: { host: "smtp.example.com", port: 465, security: "starttls" } }],
+        ["the login", { username: "someone-else" }]
+    ])("asks for the password again when %s changes, and sends the stored one nowhere", async (_, change) => {
+        stored();
+        const attempt = updateAccount("usr_ana", ID, edit(change));
+        await expect(attempt).rejects.toBeInstanceOf(MailSetupError);
+        await expect(attempt).rejects.toMatchObject({
+            field: "password",
+            message: "The servers or login changed, so enter the password again."
+        });
+        expect(state.tried).toHaveLength(0);
+        expect(state.written).toHaveLength(0);
+        expect(state.audited).toHaveLength(0);
+    });
+
+    it("asks again for a refused mailbox moved to another server too", async () => {
+        stored({ state: "auth" });
+        const attempt = updateAccount(
+            "usr_ana",
+            ID,
+            edit({ imap: { host: "mail.example.com", port: 993, security: "tls" } })
+        );
+        await expect(attempt).rejects.toMatchObject({ field: "password" });
+        expect(state.tried).toHaveLength(0);
+    });
+
+    it("moves to another server with the password typed for it", async () => {
+        stored();
+        await updateAccount(
+            "usr_ana",
+            ID,
+            edit({ password: "new-secret", imap: { host: "mail.example.com", port: 993, security: "tls" } })
+        );
+
+        expect(state.tried[0]?.imapHost).toBe("mail.example.com");
+        expect(new TextDecoder().decode(state.tried[0]?.encryptedSecret as Uint8Array)).toBe("sealed:new-secret");
+        expect(state.written[0]?.imapHost).toBe("mail.example.com");
+        expect(state.audited[0]?.metadata).toMatchObject({ credential: "replaced", servers: "changed" });
+    });
+
+    it("answers the refusal notice once the mailbox works again", async () => {
+        stored({ state: "auth" });
+        state.notices = [
+            { id: "n1", userId: "usr_ana", metadata: JSON.stringify({ accountId: ID }), readAt: null, actionRequired: true },
+            {
+                id: "n2",
+                userId: "usr_ana",
+                metadata: JSON.stringify({ accountId: "0190c1d2-0000-7000-8000-000000000002" }),
+                readAt: null,
+                actionRequired: true
+            }
+        ];
+        await updateAccount("usr_ana", ID, edit({ password: "new-secret" }));
+
+        expect(state.notices[0]).toMatchObject({ actionRequired: false });
+        expect(state.notices[0]?.readAt).toBeInstanceOf(Date);
+        // Another mailbox's refusal is still waiting on its own fix.
+        expect(state.notices[1]).toMatchObject({ readAt: null, actionRequired: true });
+    });
+
+    it("answers the refusal notice when the mailbox is removed", async () => {
+        stored({ state: "auth" });
+        state.notices = [
+            { id: "n1", userId: "usr_ana", metadata: JSON.stringify({ accountId: ID }), readAt: null, actionRequired: true }
+        ];
+        await removeAccount("usr_ana", ID);
+        expect(state.notices[0]).toMatchObject({ actionRequired: false });
+        expect(state.notices[0]?.readAt).toBeInstanceOf(Date);
     });
 
     it("stores a new password only once both servers take it", async () => {

@@ -6,7 +6,8 @@
  * never read from the request - so no month or format a reader asks for can
  * widen what a statement covers. The same rule the audit reader keeps.
  *
- * Projects are attributed to whoever owns them now. A project moved between
+ * Projects are attributed to whoever owns them now - or, for a month that has
+ * ended, whoever owned them when it was frozen. A project moved between
  * organizations mid-month is on its current owner's statement for the whole
  * month; a service deleted during the month took its history with it, so what
  * it used is on nobody's.
@@ -98,12 +99,27 @@ export async function readMonthToDate(scope: BillingScope, now: Date = new Date(
     return readStatement(scope, core.billingMonthOf(now), now);
 }
 
+/** How long after a month ends its last readings may still be landing. Past it,
+ *  the month is frozen the next time it is read. */
+const SETTLE_MS = 3_600_000;
+
+/** Whether a project on a frozen month's statement is in the scope asked for. */
+function inScope(scope: BillingScope, project: core.MeteredProject): boolean {
+    if (scope.kind === "orgs") return project.owner.kind === "org" && scope.orgIds.includes(project.owner.id);
+    if (scope.kind === "project") return project.projectId === scope.projectId;
+    return true;
+}
+
 /**
  * The statement for one scope and month.
  *
  * Every project in scope has a line, including one that used nothing: a
  * statement that leaves a project off reads as a project somebody forgot, and
  * "nothing" is an answer the person paying wants to see.
+ *
+ * A month that has ended is frozen the first time it is read after it settles:
+ * the whole instance's projects and prices are kept as they were then, and every
+ * read after that is built from them, so an exported month never changes.
  */
 export async function readStatement(
     scope: BillingScope,
@@ -112,9 +128,73 @@ export async function readStatement(
 ): Promise<StatementView> {
     const range = core.billingMonthRange(month);
     if (!range) throw new BillingRequestError("Pick a month");
-    const through = new Date(Math.min(range.to.getTime(), now.getTime()));
 
-    const [projects, cores, rates] = await Promise.all([
+    const through = new Date(Math.min(range.to.getTime(), now.getTime()));
+    const frozen = now.getTime() >= range.to.getTime() + SETTLE_MS ? await frozenMonth(month, range, now) : null;
+    const [projects, rates] = frozen
+        ? [frozen.projects.filter((project) => inScope(scope, project)), frozen.rates]
+        : await Promise.all([meterProjects(scope, range.from, through), getBillingRates()]);
+    const keptFrom = frozen ? frozen.keptFrom : keptFromAt(range.from, now);
+
+    return {
+        statement: core.buildStatement(month, projects, rates),
+        monthLabel: core.billingMonthLabel(month),
+        months: offeredMonths(now),
+        current: now < range.to,
+        through: through.toISOString(),
+        keptFrom: keptFrom?.toISOString() ?? null,
+        generatedAt: (frozen?.createdAt ?? now).toISOString()
+    };
+}
+
+/** The oldest figure kept as of `at`, when the month began before it. */
+function keptFromAt(from: Date, at: Date): Date | null {
+    const oldestKept = at.getTime() - ROLLUP_RETENTION_MS;
+    return from.getTime() < oldestKept ? new Date(oldestKept) : null;
+}
+
+/**
+ * A closed month as it was frozen, freezing it now if nobody has read it since
+ * it settled. Two first reads at once both work it out, and both answer with
+ * whichever was kept.
+ */
+async function frozenMonth(
+    month: string,
+    range: { from: Date; to: Date },
+    now: Date
+): Promise<{ projects: core.MeteredProject[]; rates: core.BillingRates | null; keptFrom: Date | null; createdAt: Date }> {
+    let held = await prisma.statementSnapshot.findUnique({ where: { month } });
+    if (!held) {
+        const [projects, rates] = await Promise.all([
+            meterProjects({ kind: "all" }, range.from, range.to),
+            getBillingRates()
+        ]);
+        await prisma.statementSnapshot.createMany({
+            data: [
+                {
+                    month,
+                    rates: rates ? JSON.stringify(rates) : null,
+                    projects: JSON.stringify(projects),
+                    keptFrom: keptFromAt(range.from, now)
+                }
+            ],
+            skipDuplicates: true
+        });
+        held = await prisma.statementSnapshot.findUnique({ where: { month } });
+        if (!held) throw new Error(`the statement for ${month} was not kept`);
+    }
+    const projects: unknown = JSON.parse(held.projects);
+    return {
+        projects: Array.isArray(projects) ? (projects as core.MeteredProject[]) : [],
+        rates: core.storedBillingRates(held.rates),
+        keptFrom: held.keptFrom,
+        createdAt: held.createdAt
+    };
+}
+
+/** Every project in scope, with what its services and volumes used in [from, to). */
+async function meterProjects(scope: BillingScope, from: Date, to: Date): Promise<core.MeteredProject[]> {
+    const [projects, cores] = await Promise.all([
         prisma.project.findMany({
             where: projectWhere(scope),
             select: {
@@ -137,8 +217,7 @@ export async function readStatement(
                 }
             }
         }),
-        machineCores(),
-        getBillingRates()
+        machineCores()
     ]);
 
     // Each subject, and the project it is billed to.
@@ -161,7 +240,7 @@ export async function readStatement(
         }
     }
 
-    const used = await meterSubjects(subjects, range.from, through);
+    const used = await meterSubjects(subjects, from, to);
     const byProject = new Map<string, core.BillingUsage>();
     for (const [subject, usage] of used) {
         const projectId = projectOf.get(subject);
@@ -169,25 +248,10 @@ export async function readStatement(
         byProject.set(projectId, core.addUsage(byProject.get(projectId) ?? core.EMPTY_USAGE, usage));
     }
 
-    const statement = core.buildStatement(
-        month,
-        projects.map((project) => ({
-            projectId: project.id,
-            projectName: project.name,
-            owner: ownerOf(project),
-            usage: byProject.get(project.id) ?? core.EMPTY_USAGE
-        })),
-        rates
-    );
-
-    const oldestKept = now.getTime() - ROLLUP_RETENTION_MS;
-    return {
-        statement,
-        monthLabel: core.billingMonthLabel(month),
-        months: offeredMonths(now),
-        current: now < range.to,
-        through: through.toISOString(),
-        keptFrom: range.from.getTime() < oldestKept ? new Date(oldestKept).toISOString() : null,
-        generatedAt: now.toISOString()
-    };
+    return projects.map((project) => ({
+        projectId: project.id,
+        projectName: project.name,
+        owner: ownerOf(project),
+        usage: byProject.get(project.id) ?? core.EMPTY_USAGE
+    }));
 }

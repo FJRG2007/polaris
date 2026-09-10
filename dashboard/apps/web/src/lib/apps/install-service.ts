@@ -448,7 +448,8 @@ export async function getInstalledAppSettings(ownerId: string, id: string): Prom
 }
 
 /** Remove an installed app: tear down its Deploy application (best effort, it may
- *  already be gone) and mark the install removed so it drops out of the lists. */
+ *  already be gone) and mark the install removed so it drops out of the lists.
+ *  An instance-wide app is one install for everybody, so every copy of it goes. */
 export async function uninstallApp(ownerId: string, id: string): Promise<void> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) throw new Error("Installed app not found");
@@ -463,6 +464,13 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
         }
     }
     await prisma.installedApp.update({ where: { id: row.id }, data: { status: "removed" } });
+    const app = findApp(row.catalogId);
+    if (app?.singleton && app.instanceWide) {
+        await prisma.installedApp.updateMany({
+            where: { catalogId: row.catalogId, status: { not: "removed" } },
+            data: { status: "removed" }
+        });
+    }
     invalidateInstallPresence(row.catalogId);
     // Forget any cached bridge endpoint so the inbox reflects the removal at once.
     if (row.catalogId === "messaging-bridge") invalidateBridgeCache();

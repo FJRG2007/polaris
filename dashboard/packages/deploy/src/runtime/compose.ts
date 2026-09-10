@@ -8,11 +8,11 @@
 
 import type { OutputSink } from "../ports.js";
 import { parseContainerState } from "./status.js";
-import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
 import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { tailIntoLog, waitUntilServing } from "./readiness.js";
+import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
@@ -284,7 +284,10 @@ export class ComposeRuntime implements RuntimeDriver {
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
         // One service per copy, since compose cannot scale a named container.
-        const spec = expandReplicas(appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork));
+        const spec = expandReplicas(
+            appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork),
+            effectivePlan.aliasCopies
+        );
         // Establish any NAS mounts the volumes bind onto, before the container comes
         // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.
         // Which share was being mounted when it went wrong. A deploy can bind
@@ -398,13 +401,18 @@ export class ComposeRuntime implements RuntimeDriver {
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
-        for (const image of dbPlanImages(plan)) await ctx.ports.pull(image, sink);
+        for (const image of dbPlanImages(plan)) {
+            if (plan.keepImages && (await ctx.ports.hasImage?.(image).catch(() => true)) !== false) continue;
+            await ctx.ports.pull(image, sink);
+        }
         const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
         try {
-            await composeUpRetryingLease(ctx, spec, sink, {
-                image: plan.image,
-                again: () => ctx.ports.pull(plan.image, sink)
-            });
+            await composeUpRetryingLease(
+                ctx,
+                spec,
+                sink,
+                plan.keepImages ? null : { image: plan.image, again: () => ctx.ports.pull(plan.image, sink) }
+            );
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));
         }

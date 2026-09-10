@@ -9,11 +9,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const DB = "0192f1e2-7b5c-7d3e-8f00-00000000000a";
 const OWNER = "0192f1e2-7b5c-7d3e-8f00-00000000000b";
+const ENV = "0192f1e2-7b5c-7d3e-8f00-00000000000c";
 const PASSWORD = "cluster-secret-password";
 
 const mocks = vi.hoisted(() => ({ findFirst: vi.fn() }));
 
-vi.mock("@polaris/db", () => ({ prisma: { managedDatabase: { findFirst: mocks.findFirst } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        managedDatabase: { findFirst: mocks.findFirst },
+        environment: { findFirst: async () => ({ id: ENV }) },
+        deployTarget: { findFirst: async () => ({ id: "target-1", runtime: "swarm" }) }
+    }
+}));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "unused" }) }));
 vi.mock("@polaris/storage", () => ({
     encryptCredentials: vi.fn(),
@@ -29,7 +36,9 @@ vi.mock("@/lib/deploy-service", () => ({
 vi.mock("@/lib/deploy/service-networks", () => ({ networksForService: vi.fn() }));
 
 const { ensureRedisCluster } = await import("../../src/lib/database-ops/redis-cluster");
-const { databaseConnection, databaseClusterNodes } = await import("../../src/lib/database-service");
+const { createDatabase, databaseConnection, databaseClusterNodes, deployDatabase } = await import(
+    "../../src/lib/database-service"
+);
 
 const NODES = databaseClusterNodes({ engine: "redis", containerName: "shop-cache-ab12", clusterMasters: 3 })!;
 
@@ -109,6 +118,30 @@ describe("ensureRedisCluster", () => {
         const first = node(() => ({ code: 0, output: "" }));
         await ensureRedisCluster(first, { ...context, cluster: null }, async () => undefined);
         expect(first.runIn).not.toHaveBeenCalled();
+    });
+});
+
+describe("a cluster on a swarm", () => {
+    beforeEach(() => mocks.findFirst.mockReset());
+
+    it("is refused when it is asked for, since its nodes are joined by their container names", async () => {
+        await expect(
+            createDatabase(OWNER, { environmentId: ENV, name: "cache", engine: "redis", clusterMasters: 3, targetId: "target-1" })
+        ).rejects.toThrow("deploys through a swarm");
+    });
+
+    it("is refused when one is deployed there", async () => {
+        mocks.findFirst.mockResolvedValue({
+            id: DB,
+            slug: "cache",
+            engine: "redis",
+            clusterMasters: 3,
+            parentId: null,
+            topology: "single",
+            environment: { project: { slug: "shop" } },
+            target: { id: "target-1", runtime: "swarm" }
+        });
+        await expect(deployDatabase(DB, OWNER, OWNER)).rejects.toThrow("deploys through a swarm");
     });
 });
 

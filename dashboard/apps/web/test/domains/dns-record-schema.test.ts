@@ -82,6 +82,26 @@ describe("each type's own rules", () => {
         expect(problem(draft({ type: "NS", name: "lab", content: "*.example.net" }), "content")).toMatch(/nameserver/);
     });
 
+    it("lets a CNAME point at a name with underscore labels, and nothing else does", () => {
+        for (const target of ["selector1-contoso-com._domainkey.contoso.onmicrosoft.com", "_x1.acm-validations.aws"]) {
+            expect(problem(draft({ type: "CNAME", name: "selector1._domainkey", content: target }), "content")).toBeUndefined();
+        }
+        expect(problem(draft({ type: "CNAME", content: "*.example.net" }), "content")).toMatch(/hostname/);
+        expect(problem(draft({ type: "CNAME", content: "_" }), "content")).toMatch(/hostname/);
+        expect(problem(draft({ type: "NS", name: "lab", content: "_ns.example.net" }), "content")).toMatch(/nameserver/);
+    });
+
+    it("takes . as an MX that accepts no mail and an SRV service that is not offered", () => {
+        expect(dns.normalizeDraft(draft({ type: "MX", content: " . " })).content).toBe(".");
+        expect(dns.recordFields(draft({ type: "MX", name: "@", content: ".", priority: "0" }), zone)).toMatchObject({
+            ok: true,
+            record: { type: "MX", content: ".", priority: 0 }
+        });
+        const srv = draft({ type: "SRV", name: "_imap._tcp", target: ".", priority: "0", weight: "0", port: "0" });
+        expect(dns.recordFields(srv, zone)).toMatchObject({ ok: true, record: { data: { target: "." } } });
+        expect(problem(draft({ type: "CNAME", content: "." }), "content")).toMatch(/hostname/);
+    });
+
     it("keeps the domain's own nameservers Cloudflare's", () => {
         expect(problem(draft({ type: "NS", name: "@", content: "ns1.example.net" }), "name")).toMatch(/set by Cloudflare/);
     });

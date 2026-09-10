@@ -99,6 +99,7 @@ export async function copySources(databaseId: string, ownerId: string) {
             engine: { in: engines },
             // A cluster cannot be dumped as one database (see `copyInto`).
             clusterMasters: null,
+            NOT: [{ topology: "sharded" }, { parent: { topology: "sharded" } }],
             environment: { projectId: row.environment.projectId, project: { ownerId } },
             OR: [{ containerName: { not: "" } }, { parent: { containerName: { not: "" } } }]
         },

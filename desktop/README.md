@@ -17,19 +17,27 @@ nothing to download.
 
 ## Using it
 
-The first run asks for the address you open Polaris at. Pushing asks once for an
-API key with the Deploy scope (Account > API keys); the key is encrypted by the
-operating system's password store (Keychain, Windows DPAPI, or the desktop's
-secret service on Linux) and never written in plain text. On a Linux desktop
-with no secret service, it is kept only until the app quits.
+The first run asks for the address you open Polaris at: https://, or http:// for
+an address only your own network reaches (a private IP, a name with no dot, or
+one ending in `.local`, `.lan`, `.home.arpa` or `.internal`). Pushing asks once
+for an API key with the Deploy scope (Account > API keys); the key is encrypted
+by the operating system's password store (Keychain, Windows DPAPI, or the
+desktop's secret service on Linux) and never written in plain text. On a Linux
+desktop with no secret service, it is kept only until the app quits.
 
-Signing in with GitHub or Google opens the system browser, since the window only
-ever loads the instance's own address. Sign in with your password in the app, or
-with the QR code on the sign-in page.
+The window only ever loads the instance's own address, with one exception:
+connecting an outside account, or signing in with one, goes through the
+provider's pages in the window, since that is where the sign-in it started
+lives. File > Back returns to Polaris from a provider's page. Any other address
+opens in the system browser.
+
+When a newer version is released, a notice says so and the Help menu offers its
+download page.
 
 On Linux systems that forbid unprivileged user namespaces (Ubuntu 24.04 and
-later by default), Chromium's sandbox cannot start, so the launcher starts the
-app without it on those systems and only there.
+later by default), the .deb uses Chromium's setuid sandbox helper instead. The
+AppImage cannot, so on those systems, and only there, it starts without the
+sandbox.
 
 ## Developing
 
@@ -56,7 +64,8 @@ Push a tag `desktop-v<version>` matching `version` in `package.json`.
 attaches them to the tag's release. It can also be run by hand, which keeps the
 installers as workflow artifacts.
 
-Builds are unsigned unless these repository secrets exist:
+Builds are unsigned unless these repository secrets exist. They are only used on
+a `desktop-v*` tag or on `main`; a run by hand from another branch is unsigned.
 
 | Secret | Used for |
 | --- | --- |

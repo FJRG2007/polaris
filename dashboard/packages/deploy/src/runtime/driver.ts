@@ -112,6 +112,11 @@ export interface AppDeployPlan {
      * on reaching it while the container behind it changes.
      */
     readonly alias?: string;
+    /** How many copies the release it replaces runs, when that is more than this
+     *  one does: the route goes on naming that many of the alias's copies until
+     *  the edge takes a new file, so this release answers to all of them (see
+     *  `expandReplicas`). */
+    readonly aliasCopies?: number;
     /** Rate limits, concurrency, security headers, redirects and rewrites, written into
      *  the edge labels beside the WAF so a remote server's own edge applies them. */
     readonly edge?: AppEdgeConfig;
@@ -193,6 +198,13 @@ export interface DbDeployPlan {
      * one container.
      */
     readonly members?: readonly DbMemberPlan[];
+    /**
+     * Run the images already on the host rather than fetching them again: a
+     * rolling upgrade's step, which must recreate only the member it moves.
+     * Compose recreates every container whose tag now names another image, so a
+     * fresh pull of the tag the other members run would restart all of them.
+     */
+    readonly keepImages?: boolean;
 }
 
 /** One node of a clustered database. */

@@ -56,7 +56,7 @@ vi.mock("@/lib/database-service", () => ({
     databaseCredentials: async () => ({ username: "app", password: "app-secret", database: "app" })
 }));
 
-const { addressOf, listOpenable } = await import("@/lib/data/connections");
+const { addressOf, listManagedOptions, listOpenable, saveConnection } = await import("@/lib/data/connections");
 
 /** A database Polaris runs, on the machine Polaris runs on. */
 function managedRow(overrides: Record<string, unknown> = {}) {
@@ -114,6 +114,16 @@ describe("what the browser lists", () => {
         // Said as a fact as well as a sentence, so the list can mark it without
         // reading the prose.
         expect(entry.unreachable).toBe(true);
+    });
+
+    it("says a Redis cluster cannot be opened, in the list and in the form", async () => {
+        managed = [managedRow({ engine: "redis", clusterMasters: 3 })];
+
+        const [entry] = await listOpenable(ALICE);
+        const [option] = await listManagedOptions(ALICE);
+
+        expect(entry.note).toContain("A Redis cluster spreads its keys over several masters");
+        expect(option.refusal).toBe(entry.note);
     });
 
     it("lists a database a saved connection already points at once", async () => {
@@ -181,6 +191,21 @@ describe("resolving an offered id", () => {
             password: "app-secret",
             readOnly: true
         });
+    });
+
+    it("refuses to open a Redis cluster as one server, or to save a connection to one", async () => {
+        managed = [managedRow({ engine: "redis", clusterMasters: 3 })];
+
+        await expect(addressOf(ALICE, `managed:${DB}`)).rejects.toThrow(/Redis cluster/);
+        await expect(
+            saveConnection(ALICE, { name: "Cache", engine: "redis", managedDatabaseId: DB })
+        ).rejects.toThrow(/Redis cluster/);
+    });
+
+    it("opens a single Redis as before", async () => {
+        managed = [managedRow({ engine: "redis", clusterMasters: null })];
+
+        await expect(addressOf(ALICE, `managed:${DB}`)).resolves.toMatchObject({ engine: "redis", host: "polaris-app-db" });
     });
 
     it("refuses a managed id this account does not reach", async () => {

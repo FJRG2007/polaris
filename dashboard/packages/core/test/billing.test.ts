@@ -232,6 +232,12 @@ describe("what people type", () => {
         expect(schemas.normalizeAmount("")).toBe("");
     });
 
+    it("leaves a comma after the point as typed, so the amount is refused", () => {
+        expect(schemas.normalizeAmount("1.250,00")).toBe("1.250,00");
+        expect(schemas.orgBudgetInputSchema.safeParse({ amount: "1.250,00" }).success).toBe(false);
+        expect(schemas.orgBudgetInputSchema.parse({ amount: "1,250.00" })).toEqual({ amount: 1250 });
+    });
+
     it("takes a price card with blanks for what is not charged", () => {
         const parsed = schemas.billingRatesInputSchema.parse({
             currency: "USD",

@@ -33,6 +33,7 @@ describe("the layout field", () => {
     it("counts a sharded cluster's containers and says what it does not get yet", () => {
         const html = render("mongo", { topology: "sharded", shards: 2 });
         expect(html).toContain("10 containers");
+        expect(html).toContain("Each collection stays on one shard until your application shards it with a shard key");
         expect(html).toContain("Backups and version changes are not offered for it yet.");
     });
 

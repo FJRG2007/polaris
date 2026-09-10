@@ -40,13 +40,16 @@ const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,6})?$/;
  *
  * Spaces and underscores are digit grouping, and go. A comma is the decimal
  * separator when it is the only mark in the number ("12,5") and grouping when a
- * point is there as well ("1,250.00"). Nothing else is changed: a value that is
+ * point comes after it ("1,250.00"). A comma after the point ("1.250,00") could
+ * mean either, so it is left as typed. Nothing else is changed: a value that is
  * still not a number after this is refused, not repaired.
  */
 export function normalizeAmount(raw: string): string {
     const compact = raw.trim().replace(/[\s_]/g, "");
-    if (compact.includes(".")) return compact.replace(/,/g, "");
-    return compact.replace(",", ".");
+    const point = compact.indexOf(".");
+    if (point === -1) return compact.replace(",", ".");
+    if (compact.includes(",", point)) return compact;
+    return compact.replace(/,/g, "");
 }
 
 /** A price field: empty means "not charged", anything else a non-negative amount. */

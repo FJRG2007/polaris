@@ -102,18 +102,95 @@ async function readAudit(): Promise<evidence.EvidenceReadings["audit"]> {
     };
 }
 
+/** An item's newest usable point, by how many of its stored copies are sealed. */
+interface NewestCopies {
+    sealed: number;
+    clear: number;
+}
+
+const USABLE_POINT = { status: { in: ["available", "partial"] } };
+
+/**
+ * The newest usable point's stored copies of each of these items. An item with
+ * no stored copy is absent.
+ *
+ * Three steps, each one row per item or per copy: the newest point's time, the
+ * point taken then, and its copies - rather than every point of every item.
+ */
+async function newestCopies(resourceIds: readonly string[]): Promise<Map<string, NewestCopies>> {
+    const copies = new Map<string, NewestCopies>();
+    if (resourceIds.length === 0) return copies;
+    const newest = await prisma.recoveryPoint.groupBy({
+        by: ["resourceId"],
+        where: { ...USABLE_POINT, resourceId: { in: [...resourceIds] } },
+        _max: { takenAt: true }
+    });
+    const taken = newest.flatMap((group) =>
+        group._max.takenAt ? [{ resourceId: group.resourceId, takenAt: group._max.takenAt }] : []
+    );
+    if (taken.length === 0) return copies;
+    const points = await prisma.recoveryPoint.findMany({
+        where: { ...USABLE_POINT, OR: taken },
+        select: { id: true, resourceId: true }
+    });
+    const resourceOf = new Map<string, string>();
+    const picked = new Set<string>();
+    for (const point of points) {
+        if (picked.has(point.resourceId)) continue;
+        picked.add(point.resourceId);
+        resourceOf.set(point.id, point.resourceId);
+    }
+    const stored = await prisma.recoveryPointCopy.findMany({
+        where: { pointId: { in: [...resourceOf.keys()] }, status: "available" },
+        select: { pointId: true, sealedWith: true, path: true }
+    });
+    for (const copy of stored) {
+        const resourceId = resourceOf.get(copy.pointId);
+        if (!resourceId) continue;
+        const held = copies.get(resourceId) ?? { sealed: 0, clear: 0 };
+        if (isSealedCopy(copy)) held.sealed += 1;
+        else held.clear += 1;
+        copies.set(resourceId, held);
+    }
+    return copies;
+}
+
+/** Every item's newest copies, read a page of items at a time. */
+async function newestCopiesOfAll(): Promise<Map<string, NewestCopies>> {
+    const all = new Map<string, NewestCopies>();
+    let cursor: string | null = null;
+    for (;;) {
+        const page: { id: string }[] = await prisma.protectedResource.findMany({
+            where: { points: { some: USABLE_POINT } },
+            orderBy: { id: "asc" },
+            take: evidence.EVIDENCE_ROWS_MAX,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+            select: { id: true }
+        });
+        for (const [resourceId, held] of await newestCopies(page.map((resource) => resource.id))) {
+            all.set(resourceId, held);
+        }
+        const last = page.at(-1);
+        if (page.length < evidence.EVIDENCE_ROWS_MAX || !last) return all;
+        cursor = last.id;
+    }
+}
+
 /**
  * The protected items, newest backup first, each with whether its newest copy is
- * encrypted everywhere it was written.
+ * encrypted everywhere it was written, and the same figures over every item.
  *
  * Only the newest usable point of each item is looked at: that is the copy a
  * restore would reach for, and it answers "are the backups encrypted" for the
  * item as it is now rather than for a copy taken before sealing existed.
  */
 async function readBackups(): Promise<evidence.EvidenceReadings["backups"]> {
-    const [total, activeKeys, resources] = await Promise.all([
+    const [total, scheduled, failing, activeKeys, copiesOf, resources] = await Promise.all([
         prisma.protectedResource.count(),
+        prisma.protectedResource.count({ where: { status: "active", plan: { is: { every: { not: "off" } } } } }),
+        prisma.protectedResource.count({ where: { lastStatus: "failed" } }),
         prisma.backupKey.count({ where: { retiredAt: null } }),
+        newestCopiesOfAll(),
         prisma.protectedResource.findMany({
             orderBy: [{ lastBackupAt: { sort: "desc", nulls: "last" } }, { name: "asc" }],
             take: evidence.EVIDENCE_ROWS_MAX,
@@ -128,33 +205,16 @@ async function readBackups(): Promise<evidence.EvidenceReadings["backups"]> {
             }
         })
     ]);
-    // Two steps, so only the newest point's copies are read rather than every
-    // point's: the first narrows to one point per item, the second reads its copies.
-    const newest = await prisma.recoveryPoint.findMany({
-        where: { resourceId: { in: resources.map((resource) => resource.id) }, status: { in: ["available", "partial"] } },
-        orderBy: { takenAt: "desc" },
-        distinct: ["resourceId"],
-        select: { id: true, resourceId: true }
-    });
-    const stored = await prisma.recoveryPointCopy.findMany({
-        where: { pointId: { in: newest.map((point) => point.id) }, status: "available" },
-        select: { pointId: true, sealedWith: true, path: true }
-    });
-    const resourceOf = new Map(newest.map((point) => [point.id, point.resourceId]));
-    const copiesOf = new Map<string, { sealedWith: string | null; path: string }[]>();
-    for (const copy of stored) {
-        const resourceId = resourceOf.get(copy.pointId);
-        if (!resourceId) continue;
-        const list = copiesOf.get(resourceId) ?? [];
-        list.push(copy);
-        copiesOf.set(resourceId, list);
-    }
+    const kept = [...copiesOf.values()];
     return {
         total,
+        scheduled,
+        failing,
+        withCopy: kept.length,
+        encrypted: kept.filter((held) => held.clear === 0).length,
         activeKeys,
         items: resources.map((resource) => {
-            const copies = copiesOf.get(resource.id) ?? [];
-            const sealed = copies.filter(isSealedCopy).length;
+            const held = copiesOf.get(resource.id);
             return {
                 id: resource.id,
                 name: resource.name,
@@ -163,8 +223,8 @@ async function readBackups(): Promise<evidence.EvidenceReadings["backups"]> {
                 every: resource.plan?.every ?? null,
                 lastSuccessAt: resource.lastBackupAt?.toISOString() ?? null,
                 lastStatus: resource.lastStatus,
-                sealed,
-                clear: copies.length - sealed
+                sealed: held?.sealed ?? 0,
+                clear: held?.clear ?? 0
             };
         })
     };

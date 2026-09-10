@@ -56,6 +56,22 @@ async function averageCpu(
     }
 }
 
+/**
+ * How many copies the release serving each service runs, by that release's id:
+ * what it was started with, where that was recorded. The count a service is set to
+ * moves before the release carrying it is serving, and stays moved when that
+ * release never comes up.
+ */
+async function servingCopies(apps: readonly { currentDeploymentId: string | null }[]): Promise<Map<string, number>> {
+    const ids = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
+    if (ids.length === 0) return new Map();
+    const rows = await prisma.deployment.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, replicas: true }
+    });
+    return new Map(rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : [])));
+}
+
 export async function runAutoscale(now = Date.now()): Promise<{ checked: number; scaled: number }> {
     const apps = await prisma.application.findMany({
         where: { autoscale: { not: null }, currentDeploymentId: { not: null }, desiredState: "running" },
@@ -69,6 +85,7 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
     let checked = 0;
     let scaled = 0;
     const names = await servingContainerNames(apps);
+    const copies = await servingCopies(apps);
     // Read on the first service that needs it, and not at all when none does.
     let log: Promise<EdgeVisits> | null = null;
     for (const app of apps) {
@@ -85,25 +102,31 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
         });
         if (inFlight > 0) continue;
         checked += 1;
+        const running = copies.get(app.currentDeploymentId ?? "") ?? app.replicas;
         const primary = names.get(app.id);
         const cpu = primary
-            ? await averageCpu(app, replicaNames(primary, app.replicas)).catch(() => null)
+            ? await averageCpu(app, replicaNames(primary, running)).catch(() => null)
             : null;
         let requests: number | null = null;
         if (config.requestsPerCopy !== null && trafficRefusal(app) === null) {
-            log ??= readEdgeVisits().catch(() => ({ visits: [], windowStart: null }));
+            log ??= readEdgeVisits().catch(() => ({ visits: [], windowStart: null, truncated: false }));
             const visits = await log;
-            requests = requestRate(visitTimes(visits, serviceHostnames(app)), visits.windowStart, now);
+            requests = requestRate(
+                visitTimes(visits, serviceHostnames(app)),
+                visits.windowStart,
+                now,
+                visits.truncated
+            );
         }
         const step = autoscaleStep(
             config,
-            app.replicas,
+            running,
             { cpuPercent: cpu, requestsPerMinute: requests },
             states.get(app.id) ?? AUTOSCALE_IDLE,
             now
         );
         states.set(app.id, step.state);
-        if (step.replicas === app.replicas || step.signal === null) continue;
+        if (step.replicas === running || step.signal === null) continue;
         try {
             await scaleService(app.id, app.environment.project.ownerId, step.replicas);
             scaled += 1;
@@ -114,7 +137,7 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
                 targetType: "application",
                 targetId: app.id,
                 metadata: {
-                    from: app.replicas,
+                    from: running,
                     to: step.replicas,
                     signal: step.signal,
                     cpuPercent: cpu,
@@ -129,7 +152,7 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
                     subjectId: app.id,
                     userId: null,
                     action: `${AUTOSCALED_ACTION_PREFIX}${step.signal}`,
-                    fromValue: String(app.replicas),
+                    fromValue: String(running),
                     toValue: String(step.replicas)
                 })
                 .catch(() => undefined);

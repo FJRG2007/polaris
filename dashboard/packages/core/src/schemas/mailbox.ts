@@ -231,9 +231,9 @@ export type MailAccountPatch = z.infer<typeof mailAccountPatchSchema>;
  * copy. Somebody whose sign-in name changed changes the login instead; a new
  * address is added as a new mailbox.
  *
- * A blank password keeps the one already stored, so fixing a server name does
- * not mean typing a password nobody remembers. Whether there is one to keep is
- * the server's question, because only it knows what is stored.
+ * A blank password keeps the one already stored, for the servers and login it
+ * was entered for - a change to any of them needs it typed again. Whether there
+ * is one to keep is the server's question, because only it knows what is stored.
  */
 export const mailAccountUpdateSchema = z
     .object({

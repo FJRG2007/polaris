@@ -118,10 +118,13 @@ export function useLiveRead<T>({
     // the new one's - but the mount's own key is already seeded, and re-reading it
     // here would wipe a server-supplied `initial` that no snapshot backs.
     const seededFor = useRef(cacheKey);
+    const started = useRef(0);
+    const shown = useRef(0);
 
     useEffect(() => {
         if (seededFor.current === cacheKey) return;
         seededFor.current = cacheKey;
+        shown.current = started.current + 1;
         const kept = read<T>(cacheKey);
         latest.current = kept?.value ?? null;
         setData(kept?.value ?? null);
@@ -131,10 +134,16 @@ export function useLiveRead<T>({
 
     const refresh = useCallback(() => {
         const controller = new AbortController();
+        const turn = (started.current += 1);
+        const current = (): boolean => {
+            if (controller.signal.aborted || turn < shown.current) return false;
+            shown.current = turn;
+            return true;
+        };
         setRefreshing(true);
         void load(controller.signal)
             .then((value) => {
-                if (controller.signal.aborted) return;
+                if (!current()) return;
                 // Only what differs becomes a new reference, so an unchanged
                 // panel does not re-render and nothing flickers.
                 const merged =
@@ -146,19 +155,20 @@ export function useLiveRead<T>({
                 writeSnapshot(cacheKey, merged);
             })
             .catch((caught: unknown) => {
-                if (controller.signal.aborted) return;
+                if (!current()) return;
                 // A failed refresh leaves the last good reading on screen rather
                 // than blanking a panel that was fine a moment ago.
                 setError(caught instanceof Error ? caught.message : "Unable to reach the device");
             })
             .finally(() => {
-                if (!controller.signal.aborted) setRefreshing(false);
+                if (!controller.signal.aborted && turn === started.current) setRefreshing(false);
             });
         return () => controller.abort();
     }, [load, cacheKey]);
 
     const replace = useCallback(
         (value: T) => {
+            shown.current = started.current + 1;
             latest.current = value;
             setData(value);
             setUpdatedAt(Date.now());

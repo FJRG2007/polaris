@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import { syncAccount } from "./sync";
 import * as core from "@polaris/core";
 import { MailAuthError } from "./credentials";
+import { settleRefusalNotices } from "./refused";
 import { recordAudit } from "@/lib/audit-service";
 import { ownedAccount, ownedAccounts } from "./access";
 import { grantsMailAccess, sealMailSecret } from "./credentials";
@@ -294,10 +295,12 @@ async function tryServer(check: () => Promise<void>, field: string): Promise<voi
  * mailbox syncing.
  *
  * A blank password keeps the stored one, and it is that stored one that is
- * tried. When only the name, the label or the colour changed, nothing is tried
- * at all: renaming a mailbox must not fail because its server is having a bad
- * minute. A refused mailbox is always tried, because pressing save on it is
- * somebody asking whether it works now.
+ * tried - but only against the servers and login it was entered for. A change to
+ * any of them needs the password typed again: a stored secret is never sent to a
+ * server nobody entered it for. When only the name, the label or the colour
+ * changed, nothing is tried at all: renaming a mailbox must not fail because its
+ * server is having a bad minute. A refused mailbox is always tried, because
+ * pressing save on it is somebody asking whether it works now.
  *
  * The address is not changed here - see `mailAccountUpdateSchema` for why.
  */
@@ -309,11 +312,7 @@ export async function updateAccount(
     const account = await ownedAccount(userId, accountId);
     const named = { displayName: update.displayName, label: update.label, color: update.color };
 
-    const reconnecting =
-        update.password !== "" ||
-        account.state === "auth" ||
-        update.auth !== account.auth ||
-        (update.auth === "oauth" && update.connectionId !== account.connectionId) ||
+    const movesServers =
         update.username !== account.username ||
         update.imap.host !== account.imapHost ||
         update.imap.port !== account.imapPort ||
@@ -321,6 +320,12 @@ export async function updateAccount(
         update.smtp.host !== account.smtpHost ||
         update.smtp.port !== account.smtpPort ||
         update.smtp.security !== account.smtpSecurity;
+    const reconnecting =
+        update.password !== "" ||
+        account.state === "auth" ||
+        update.auth !== account.auth ||
+        (update.auth === "oauth" && update.connectionId !== account.connectionId) ||
+        movesServers;
 
     if (!reconnecting) {
         await prisma.mailAccount.update({ where: { id: accountId }, data: named });
@@ -334,6 +339,12 @@ export async function updateAccount(
     const keeps = update.auth === "password" && update.password === "";
     if (keeps && (account.auth !== "password" || !account.encryptedSecret)) {
         throw new MailSetupError("Enter the password for this mailbox.", "password");
+    }
+    if (keeps && movesServers) {
+        throw new MailSetupError(
+            "The servers or login changed, so enter the password again.",
+            "password"
+        );
     }
     const secret =
         update.auth === "oauth"
@@ -381,6 +392,7 @@ export async function updateAccount(
             lastOkAt: new Date()
         }
     });
+    await settleRefusalNotices(account.userId, accountId);
 
     await recordAudit({
         actorId: userId,
@@ -391,7 +403,8 @@ export async function updateAccount(
         metadata: {
             address: account.address,
             auth: update.auth,
-            credential: update.auth === "oauth" ? "authorization" : keeps ? "kept" : "replaced"
+            credential: update.auth === "oauth" ? "authorization" : keeps ? "kept" : "replaced",
+            servers: movesServers ? "changed" : "kept"
         }
     });
 
@@ -495,6 +508,7 @@ export async function setVacation(
 export async function removeAccount(userId: string, accountId: string): Promise<void> {
     const account = await ownedAccount(userId, accountId);
     await prisma.mailAccount.delete({ where: { id: accountId } });
+    await settleRefusalNotices(account.userId, accountId);
     await recordAudit({
         actorId: userId,
         action: "mail.account.remove",
@@ -523,19 +537,33 @@ export async function reorderAccounts(
 }
 
 /** Write down what the last conversation with the server came to, so the rail
- *  can say so without asking again. */
+ *  can say so without asking again. A mailbox that was not working and now is
+ *  has its refusal notices answered, so the bell stops asking for a fix. */
 export async function recordAccountState(
     accountId: string,
     state: "ok" | "auth" | "unreachable",
     detail = ""
 ): Promise<void> {
-    await prisma.mailAccount.update({
-        where: { id: accountId },
-        data: {
-            state,
-            stateDetail: detail,
-            lastSyncAt: new Date(),
-            ...(state === "ok" ? { lastOkAt: new Date() } : {})
-        }
-    });
+    const now = new Date();
+    const data = {
+        state,
+        stateDetail: detail,
+        lastSyncAt: now,
+        ...(state === "ok" ? { lastOkAt: now } : {})
+    };
+    if (state === "ok") {
+        const steady = await prisma.mailAccount.updateMany({
+            where: { id: accountId, state: "ok" },
+            data
+        });
+        if (steady.count > 0) return;
+        const recovered = await prisma.mailAccount.update({
+            where: { id: accountId },
+            data,
+            select: { userId: true }
+        });
+        await settleRefusalNotices(recovered.userId, accountId);
+        return;
+    }
+    await prisma.mailAccount.update({ where: { id: accountId }, data });
 }

@@ -112,6 +112,8 @@ export async function sweepBudgets(now: Date = new Date()): Promise<{ checked: n
         const claimed = await prisma.organizationBudget.updateMany({
             where: {
                 orgId: budget.orgId,
+                amount: budget.amount,
+                currency: rates.currency,
                 alertedMonth: budget.alertedMonth,
                 alertedLevel: budget.alertedLevel
             },

@@ -235,7 +235,9 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     if (!environment) throw new Error("Environment not found");
     const target = await prisma.deployTarget.findFirst({ where: { id: input.targetId, ownerId } });
     if (!target) throw new Error("Deploy target not found");
-    if (topology.kind !== "single" && target.runtime === "swarm") throw new Error(SWARM_REFUSAL);
+    if ((topology.kind !== "single" || parsed.clusterMasters) && target.runtime === "swarm") {
+        throw new Error(SWARM_REFUSAL);
+    }
 
     const spec = engineSpec(parsed.engine);
     const slug = slugify(parsed.name);
@@ -305,7 +307,7 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
  *  members are joined by running commands in each one by its container name,
  *  and a swarm names its containers itself. */
 const SWARM_REFUSAL =
-    "That server deploys through a swarm, which names each container itself. A replica set, a sharded cluster or read replicas are joined by their names, so choose a server that runs plain containers.";
+    "That server deploys through a swarm, which names each container itself. A replica set, a sharded cluster, read replicas or a Redis cluster are joined by their names, so choose a server that runs plain containers.";
 
 /** An instance the caller owns that can host more databases. */
 async function instanceFor(id: string, ownerId: string) {
@@ -570,7 +572,9 @@ export async function deployDatabase(
 
     const spec = engineSpec(db.engine);
     const topology = core.resolveTopology(db);
-    if (topology.kind !== "single" && db.target.runtime === "swarm") throw new Error(SWARM_REFUSAL);
+    if ((topology.kind !== "single" || (db.engine === "redis" && db.clusterMasters)) && db.target.runtime === "swarm") {
+        throw new Error(SWARM_REFUSAL);
+    }
     const creds = await databaseCredentials(databaseId, ownerId);
     const name = serviceName(db.environment.project.slug, db.slug, db.id);
     // The stored volume wins over the derived one: an upgrade moves an instance
@@ -627,6 +631,7 @@ export async function deployDatabase(
             exposePort: db.exposePort ?? undefined,
             memberImages: options.memberImages
         }),
+        ...(options.memberImages ? { keepImages: true } : {}),
         // Nothing routes to a database, so in an isolated environment it leaves the
         // proxy network entirely: the services beside it reach it on their own
         // network, and the daemon attaches the dashboard there for the data browser.

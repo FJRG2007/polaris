@@ -151,6 +151,10 @@ describe("the evidence report", () => {
             readings({
                 backups: {
                     total: 3,
+                    scheduled: 2,
+                    failing: 1,
+                    withCopy: 2,
+                    encrypted: 1,
                     activeKeys: 1,
                     items: [
                         item,
@@ -174,10 +178,18 @@ describe("the evidence report", () => {
         expect(fact(report, "backups", "backups.failing")).toMatchObject({ value: 1, attention: true });
     });
 
-    it("says when the listed backups are not all of them", () => {
+    it("says when the listed backups are not all of them, and counts every item regardless", () => {
         const base = readings();
-        const report = evidence.buildEvidence(readings({ backups: { ...base.backups, total: 250 } }));
+        const report = evidence.buildEvidence(
+            readings({ backups: { ...base.backups, total: 250, scheduled: 240, failing: 9, withCopy: 230, encrypted: 229 } })
+        );
         expect(section(report, "backups").notes.join(" ")).toMatch(/1 most recently backed-up items of 250/);
+        expect(fact(report, "backups", "backups.scheduled").text).toBe("240 of 250 items");
+        expect(fact(report, "backups", "backups.failing")).toMatchObject({ value: 9, attention: true });
+        expect(fact(report, "backups", "backups.encrypted")).toMatchObject({
+            text: "229 of 230 items with a copy",
+            attention: true
+        });
     });
 
     it("flags a secret stored in the clear, plain HTTP, and a certificate close to expiring", () => {

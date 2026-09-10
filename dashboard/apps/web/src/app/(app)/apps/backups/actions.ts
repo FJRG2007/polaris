@@ -154,7 +154,14 @@ export async function savePlanAction(input: unknown, planId?: string): Promise<R
             action: "backup.plan.save",
             targetType: "backup-plan",
             targetId: saved.id,
-            metadata: { every: parsed.data.every, keepLast: parsed.data.keepLast, keepDays: parsed.data.keepDays }
+            metadata: {
+                mode: planId ? "update" : "create",
+                every: parsed.data.every,
+                keepLast: parsed.data.keepLast,
+                keepDays: parsed.data.keepDays,
+                maxBytes: parsed.data.maxBytes,
+                destinationIds: parsed.data.destinationIds
+            }
         });
         revalidatePath("/apps/backups");
         return saved;
