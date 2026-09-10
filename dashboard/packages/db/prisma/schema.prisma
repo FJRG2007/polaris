@@ -3972,6 +3972,10 @@ model Application {
     // updates scan last found for the live release - a newer image digest behind
     // its tag, or commits on its branch it does not have. Null until scanned.
     updateCheck         String?
+    // The most CPU (in cores) and memory (in MB) each copy may use; null is no
+    // limit. Applied the next time it is started.
+    cpuLimit            Float?
+    memoryLimitMb       Int?
     // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
     currentDeploymentId String?   @db.Uuid
     // Auto-deploy on git push (Vercel-style): redeploy when a matching commit lands.
@@ -4180,6 +4184,10 @@ model ManagedDatabase {
     containerName       String
     // Optional published TCP port for external access via a per-db forwarder.
     exposePort          Int?
+    // The most CPU (in cores) and memory (in MB) the container may use; null is
+    // no limit. Applied the next time it is started.
+    cpuLimit            Float?
+    memoryLimitMb       Int?
     // Set when this is a logical database living inside another instance's
     // container rather than one of its own. It then has no image, volume or
     // container: it is reached through its parent's, with its own credentials.

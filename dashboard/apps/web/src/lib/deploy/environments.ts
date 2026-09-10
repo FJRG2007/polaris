@@ -135,6 +135,8 @@ export async function cloneEnvironment(
                 buildConfig: application.buildConfig,
                 healthcheck: application.healthcheck,
                 replicas: application.replicas,
+                cpuLimit: application.cpuLimit,
+                memoryLimitMb: application.memoryLimitMb,
                 commitFilter: application.commitFilter,
                 watchPaths: application.watchPaths,
                 // The edge settings and whether the port is open come over too:

@@ -44,6 +44,8 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
             : null,
         redis: engine === "redis" && !hosted ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb } : null,
         mongo: engine === "mongo" && !hosted ? { replicaSet: row.replicaSet } : null,
+        // A hosted database runs in its parent's container, so the parent's limits are its own.
+        limits: hosted ? null : { cpus: row.cpuLimit, memoryMb: row.memoryLimitMb },
         pitr: engine === "postgres" && dedicated ? await pitrWindow(databaseId, ownerId) : null,
         recovery: row.recoveryTarget
             ? { from: recoveredFrom?.name ?? null, target: row.recoveryTarget.toISOString() }

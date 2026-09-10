@@ -70,6 +70,7 @@ export type {
     DeployResult,
     RuntimeStatus,
     HealthcheckSpec,
+    ResourceLimits,
     MountTarget
 } from "./runtime/driver.js";
 export {
@@ -77,6 +78,7 @@ export {
     dbComposeSpec,
     defaultDbPort,
     expandReplicas,
+    deployBlockLines,
     forCompose,
     replicaNames,
     composeValue,

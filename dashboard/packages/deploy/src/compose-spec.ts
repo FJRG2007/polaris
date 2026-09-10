@@ -7,7 +7,7 @@
  */
 
 import { traefikLabels } from "./traefik.js";
-import type { AppDeployPlan, DbDeployPlan } from "./runtime/driver.js";
+import type { AppDeployPlan, DbDeployPlan, ResourceLimits } from "./runtime/driver.js";
 
 export interface ComposeSpecPort {
     readonly host: number;
@@ -95,6 +95,10 @@ export interface ComposeSpecService {
      * service with a volume, where two tasks at once would share its files.
      */
     readonly rollingUpdate?: boolean;
+    /** The most CPU, in cores, and memory, in MB, the container may use. Absent is
+     *  no limit. */
+    readonly cpus?: number;
+    readonly memoryMb?: number;
 }
 
 export interface ComposeSpec {
@@ -210,6 +214,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
+                ...limitFields(plan.limits),
                 healthcheck: plan.healthcheck
                     ? {
                           test: [...plan.healthcheck.test],
@@ -287,11 +292,31 @@ export function expandReplicas(spec: ComposeSpec): ComposeSpec {
     };
 }
 
-/** The `deploy:` block of a swarm service, or none when it needs nothing there. */
-export function swarmDeployLines(service: Pick<ComposeSpecService, "replicas" | "rollingUpdate">): string[] {
+/** A CPU limit as compose writes it: a quoted decimal, never an exponent. */
+function cpusValue(cpus: number): string {
+    return String(Math.round(cpus * 100) / 100);
+}
+
+/**
+ * A service's `deploy:` block, or none when it needs nothing there: swarm's
+ * replicas and start-first update, and the resource limits - which plain compose
+ * reads from the same place, so one block serves both engines.
+ */
+export function deployBlockLines(
+    service: Pick<ComposeSpecService, "replicas" | "rollingUpdate" | "cpus" | "memoryMb">
+): string[] {
     const replicated = service.replicas !== undefined && service.replicas > 1;
-    if (!replicated && !service.rollingUpdate) return [];
-    const lines = ["    deploy:", "      mode: replicated", `      replicas: ${replicated ? service.replicas : 1}`];
+    const limited = service.cpus !== undefined || service.memoryMb !== undefined;
+    if (!replicated && !service.rollingUpdate && !limited) return [];
+    const lines = ["    deploy:"];
+    if (replicated || service.rollingUpdate) {
+        lines.push("      mode: replicated", `      replicas: ${replicated ? service.replicas : 1}`);
+    }
+    if (limited) {
+        lines.push("      resources:", "        limits:");
+        if (service.cpus !== undefined) lines.push(`          cpus: "${cpusValue(service.cpus)}"`);
+        if (service.memoryMb !== undefined) lines.push(`          memory: ${service.memoryMb}M`);
+    }
     if (service.rollingUpdate) {
         lines.push(
             "      update_config:",
@@ -348,7 +373,8 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 labels: {},
                 networks,
                 extraHosts: [HOST_GATEWAY],
-                restart: "unless-stopped"
+                restart: "unless-stopped",
+                ...limitFields(plan.limits)
             }
         ],
         volumes: [
@@ -356,6 +382,14 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
             ...(plan.extraVolumes ?? []).filter((volume) => volume.kind === "volume").map((volume) => volume.source)
         ],
         networks
+    };
+}
+
+/** A plan's limits as spec fields, leaving out the ones it does not set. */
+function limitFields(limits: ResourceLimits | undefined): Pick<ComposeSpecService, "cpus" | "memoryMb"> {
+    return {
+        ...(limits?.cpus !== undefined ? { cpus: limits.cpus } : {}),
+        ...(limits?.memoryMb !== undefined ? { memoryMb: limits.memoryMb } : {})
     };
 }
 
@@ -438,7 +472,7 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
             if (service.healthcheck.retries) lines.push(`      retries: ${service.healthcheck.retries}`);
             if (service.healthcheck.startPeriod) lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
         }
-        lines.push(...swarmDeployLines(service));
+        lines.push(...deployBlockLines(service));
     }
     if (spec.networks.length > 0) {
         lines.push("networks:");

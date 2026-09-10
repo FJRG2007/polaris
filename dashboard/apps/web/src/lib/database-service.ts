@@ -23,7 +23,7 @@ import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
-import { deployLogPath, enqueueOnTarget, executeDeployment } from "./deploy-service";
+import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
 import {
     createDatabaseCommands,
     databaseCreateSchema,
@@ -506,6 +506,7 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         volumeName,
         dataPath: databaseDataPath(db.engine, db.version),
         exposePort: db.exposePort ?? undefined,
+        limits: limitsOf(db),
         ...(archiveOf ? { extraVolumes: [{ source: pitrHostFolder(archiveOf), target: PITR_MOUNT, kind: "bind" as const }] } : {}),
         // Nothing routes to a database, so in an isolated environment it leaves the
         // proxy network entirely: the services beside it reach it on their own

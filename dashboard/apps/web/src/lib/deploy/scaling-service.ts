@@ -16,6 +16,7 @@ import {
     parseAutoscale,
     type Autoscale,
     type EdgeBalancing,
+    type ResourceLimitsInput,
     type ServiceScaling
 } from "@polaris/core";
 
@@ -23,6 +24,8 @@ export interface ServiceScalingView {
     readonly replicas: number;
     readonly autoscale: Autoscale | null;
     readonly balancing: EdgeBalancing;
+    /** The most CPU and memory each copy may use. */
+    readonly limits: ResourceLimitsInput;
     /** Why this service runs one copy whatever is asked, when it has to. */
     readonly single: string | null;
     readonly engine: "compose" | "swarm";
@@ -31,6 +34,8 @@ export interface ServiceScalingView {
 type ScalableApp = {
     replicas: number;
     autoscale: string | null;
+    cpuLimit: number | null;
+    memoryLimitMb: number | null;
     edgeConfig: string | null;
     keepReleases: boolean;
     sourceType: string;
@@ -42,6 +47,8 @@ type ScalableApp = {
 const SCALABLE_SELECT = {
     replicas: true,
     autoscale: true,
+    cpuLimit: true,
+    memoryLimitMb: true,
     edgeConfig: true,
     keepReleases: true,
     sourceType: true,
@@ -77,15 +84,16 @@ export async function getServiceScaling(applicationId: string, ownerId: string):
         replicas: app.replicas,
         autoscale: parseAutoscale(app.autoscale),
         balancing: parseAppEdgeConfig(app.edgeConfig).balancing,
+        limits: { cpus: app.cpuLimit, memoryMb: app.memoryLimitMb },
         single: singleCopyReason(app),
         engine: app.target.runtime === "swarm" ? "swarm" : "compose"
     };
 }
 
 /**
- * Save a service's scaling and balancing, and apply them.
+ * Save a service's scaling, balancing and resource limits, and apply them.
  *
- * The count is started straight away when the service is running; the balancing
+ * A new count or new limits start the running release again straight away; the balancing
  * is the edge's, so it is republished rather than redeployed. Autoscaling starts
  * from wherever the count is and is kept inside its range from the next reading.
  */
@@ -93,7 +101,7 @@ export async function setServiceScaling(
     applicationId: string,
     ownerId: string,
     userId: string,
-    input: ServiceScaling & { balancing: EdgeBalancing }
+    input: ServiceScaling & { balancing: EdgeBalancing; limits: ResourceLimitsInput }
 ): Promise<{ redeployed: boolean }> {
     const app = await loadApp(applicationId, ownerId);
     const single = singleCopyReason(app);
@@ -109,12 +117,15 @@ export async function setServiceScaling(
         data: {
             replicas,
             autoscale: input.autoscale ? JSON.stringify(input.autoscale) : null,
+            cpuLimit: input.limits.cpus,
+            memoryLimitMb: input.limits.memoryMb,
             edgeConfig: JSON.stringify({ ...edge, balancing: input.balancing })
         }
     });
     await syncAppRoutes().catch(() => undefined);
-    if (replicas === app.replicas || !app.currentDeploymentId) return { redeployed: false };
-    await restartFromKeptImage(applicationId, ownerId, userId, "scale");
+    const limitsChanged = input.limits.cpus !== app.cpuLimit || input.limits.memoryMb !== app.memoryLimitMb;
+    if ((replicas === app.replicas && !limitsChanged) || !app.currentDeploymentId) return { redeployed: false };
+    await restartFromKeptImage(applicationId, ownerId, userId, replicas === app.replicas ? "settings" : "scale");
     return { redeployed: true };
 }
 

@@ -1,12 +1,12 @@
 /**
- * Settings that change the command an instance runs with: how Redis keeps what
- * it holds, and whether MongoDB runs as a replica set. Each is stored on the
- * instance and applied by deploying it again, so the setting and what the
- * container does can never disagree.
+ * Settings that change how an instance runs: how Redis keeps what it holds,
+ * whether MongoDB runs as a replica set, and the CPU and memory its container may
+ * use. Each is stored on the instance and applied by deploying it again, so the
+ * setting and what the container does can never disagree.
  */
 
 import { prisma } from "@polaris/db";
-import type { RedisMode } from "@polaris/core";
+import type { RedisMode, ResourceLimitsInput } from "@polaris/core";
 import { ensureMongoReplicaSet } from "./provision";
 import { deployDatabase, deployDatabaseAndWait } from "@/lib/database-service";
 import { DatabaseOperationError, instanceContext, lastLine, runStep, waitReady, withPorts } from "./ops";
@@ -123,4 +123,29 @@ export async function setMongoReplicaSet(
         const context = await instanceContext(databaseId, ownerId);
         await withPorts(context, (ports) => ensureMongoReplicaSet(ports, context));
     }
+}
+
+/**
+ * The most CPU and memory an instance's container may use. Applied by deploying
+ * it again when it is running; stored for its first start otherwise.
+ */
+export async function setDatabaseLimits(
+    databaseId: string,
+    ownerId: string,
+    userId: string,
+    limits: ResourceLimitsInput
+): Promise<{ deploymentId: string | null }> {
+    const row = await prisma.managedDatabase.findFirst({
+        where: { id: databaseId, environment: { project: { ownerId } } },
+        select: { parentId: true, containerName: true, cpuLimit: true, memoryLimitMb: true }
+    });
+    if (!row) throw new DatabaseOperationError("That database is not there any more.");
+    if (row.parentId) throw new DatabaseOperationError("This database lives inside another instance; change the instance.");
+    if (row.cpuLimit === limits.cpus && row.memoryLimitMb === limits.memoryMb) return { deploymentId: null };
+    await prisma.managedDatabase.update({
+        where: { id: databaseId },
+        data: { cpuLimit: limits.cpus, memoryLimitMb: limits.memoryMb }
+    });
+    if (!row.containerName) return { deploymentId: null };
+    return { deploymentId: await deployDatabase(databaseId, ownerId, userId) };
 }

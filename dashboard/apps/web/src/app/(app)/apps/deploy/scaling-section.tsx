@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * A service's copies and how traffic is spread over them.
+ * A service's copies, what each may use, and how traffic is spread over them.
  *
- * The count applies as soon as it is saved: the running release is started again
+ * A count or a limit applies as soon as it is saved: the running release is started again
  * from its kept image, so nothing is rebuilt and the copies already running stay
  * up. The form checks every field against the same schema the server does, as it
  * is typed.
@@ -24,6 +24,8 @@ interface Draft {
     cpuPercent: string;
     sticky: boolean;
     healthPath: string;
+    cpus: string;
+    memoryMb: string;
 }
 
 function draftOf(view: ServiceScalingView): Draft {
@@ -34,7 +36,9 @@ function draftOf(view: ServiceScalingView): Draft {
         max: String(view.autoscale?.max ?? Math.max(2, view.replicas)),
         cpuPercent: String(view.autoscale?.cpuPercent ?? 50),
         sticky: view.balancing.sticky,
-        healthPath: view.balancing.healthPath ?? ""
+        healthPath: view.balancing.healthPath ?? "",
+        cpus: view.limits.cpus === null ? "" : String(view.limits.cpus),
+        memoryMb: view.limits.memoryMb === null ? "" : String(view.limits.memoryMb)
     };
 }
 
@@ -45,10 +49,15 @@ function parse(draft: Draft) {
         autoscale: draft.autoscale
             ? { min: Number(draft.min), max: Number(draft.max), cpuPercent: Number(draft.cpuPercent) }
             : null,
-        balancing: { sticky: draft.sticky, healthPath: draft.healthPath.trim() || null }
+        balancing: { sticky: draft.sticky, healthPath: draft.healthPath.trim() || null },
+        // Blank is no limit, not zero.
+        limits: {
+            cpus: draft.cpus.trim() ? Number(draft.cpus) : null,
+            memoryMb: draft.memoryMb.trim() ? Number(draft.memoryMb) : null
+        }
     };
     const parsed = core.serviceScalingSchema
-        .extend({ balancing: core.edgeBalancingSchema })
+        .extend({ balancing: core.edgeBalancingSchema, limits: core.resourceLimitsSchema })
         .safeParse(input);
     return parsed.success
         ? { input: parsed.data, problem: null }
@@ -91,7 +100,7 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                 setError(result.error);
                 return;
             }
-            setNote(result.redeployed ? "Saved. The service is being started again with the new count." : "Saved.");
+            setNote(result.redeployed ? "Saved. The service is being started again with the new settings." : "Saved.");
             onChanged();
         });
     }
@@ -179,6 +188,40 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                             </label>
                         </div>
                     )}
+
+                    <div className="flex flex-col gap-1">
+                        <span className="font-medium">Resources per copy</span>
+                        <div className="flex flex-wrap gap-3">
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">CPU (cores)</span>
+                                <Input
+                                    type="number"
+                                    min={0.05}
+                                    step={0.05}
+                                    value={draft.cpus}
+                                    onChange={(event) => set({ cpus: event.target.value })}
+                                    placeholder="No limit"
+                                    className="w-28"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">Memory (MB)</span>
+                                <Input
+                                    type="number"
+                                    min={16}
+                                    step={64}
+                                    value={draft.memoryMb}
+                                    onChange={(event) => set({ memoryMb: event.target.value })}
+                                    placeholder="No limit"
+                                    className="w-28"
+                                />
+                            </label>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            A copy past its memory is stopped and started again; one past its CPU is slowed.
+                            Blank = no limit.
+                        </span>
+                    </div>
 
                     <div className="flex items-start justify-between gap-3">
                         <span>

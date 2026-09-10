@@ -95,7 +95,18 @@ pub struct ServiceSpec {
     /// with a volume, where two tasks at once would share its files.
     #[serde(default)]
     pub rolling_update: bool,
+    /// The most CPU, in cores, the container may use. Absent is no limit.
+    #[serde(default)]
+    pub cpus: Option<f64>,
+    /// The most memory, in MB, the container may use. Absent is no limit.
+    #[serde(default)]
+    pub memory_mb: Option<u32>,
 }
+
+/// The range a CPU limit may take, in cores.
+const CPU_LIMIT_RANGE: std::ops::RangeInclusive<f64> = 0.05..=256.0;
+/// The range a memory limit may take, in MB.
+const MEMORY_LIMIT_RANGE: std::ops::RangeInclusive<u32> = 16..=4_194_304;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -221,6 +232,16 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                 }
             }
         }
+        if let Some(cpus) = service.cpus {
+            if !cpus.is_finite() || !CPU_LIMIT_RANGE.contains(&cpus) {
+                return Err(format!("cpu limit for {} must be between 0.05 and 256", service.name));
+            }
+        }
+        if let Some(memory) = service.memory_mb {
+            if !MEMORY_LIMIT_RANGE.contains(&memory) {
+                return Err(format!("memory limit for {} must be between 16 and 4194304 MB", service.name));
+            }
+        }
     }
     for net in &spec.networks {
         if !valid_name(net) {
@@ -273,19 +294,36 @@ fn validate_volume(volume: &VolumeSpec, config: &Config) -> Result<(), String> {
     }
 }
 
-/// The `deploy:` block of a swarm service: the replica count when it is more than
-/// one, and a start-first update that rolls itself back when asked for. Empty when
-/// neither applies, which is what plain compose deploys have always rendered. The
-/// same shape as the dashboard's own renderer for remote servers.
-fn swarm_deploy_block(replicas: Option<u32>, rolling_update: bool) -> String {
+/// The `deploy:` block of a service: swarm's replica count and start-first update,
+/// and the resource limits - which plain compose reads from the same place, so one
+/// block serves both engines. Empty when none of them applies, which is what plain
+/// compose deploys have always rendered. The same shape as the dashboard's own
+/// renderer for remote servers.
+fn deploy_block(service: &ServiceSpec) -> String {
+    let replicas = service.replicas;
+    let rolling_update = service.rolling_update;
     let replicated = replicas.is_some_and(|count| count > 1);
-    if !replicated && !rolling_update {
+    let limited = service.cpus.is_some() || service.memory_mb.is_some();
+    if !replicated && !rolling_update && !limited {
         return String::new();
     }
-    let mut out = format!(
-        "    deploy:\n      mode: replicated\n      replicas: {}\n",
-        if replicated { replicas.unwrap_or(1) } else { 1 }
-    );
+    let mut out = String::from("    deploy:\n");
+    if replicated || rolling_update {
+        out.push_str(&format!(
+            "      mode: replicated\n      replicas: {}\n",
+            if replicated { replicas.unwrap_or(1) } else { 1 }
+        ));
+    }
+    if limited {
+        out.push_str("      resources:\n        limits:\n");
+        if let Some(cpus) = service.cpus {
+            // Validated finite and in range; written as a quoted decimal.
+            out.push_str(&format!("          cpus: \"{}\"\n", (cpus * 100.0).round() / 100.0));
+        }
+        if let Some(memory) = service.memory_mb {
+            out.push_str(&format!("          memory: {memory}M\n"));
+        }
+    }
     if rolling_update {
         out.push_str(
             "      update_config:\n        order: start-first\n        failure_action: rollback\n        monitor: 30s\n      rollback_config:\n        order: start-first\n",
@@ -420,10 +458,7 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
                 out.push_str(&format!("      start_period: {start}s\n"));
             }
         }
-        out.push_str(&swarm_deploy_block(
-            service.replicas,
-            service.rolling_update,
-        ));
+        out.push_str(&deploy_block(service));
     }
     if !spec.networks.is_empty() {
         out.push_str("networks:\n");
@@ -1325,6 +1360,26 @@ mod tests {
         let rendered = render_compose(&plain, &config);
         assert!(!rendered.contains("entrypoint"));
         assert!(!rendered.contains("volumes:"));
+    }
+
+    #[test]
+    fn resource_limits_render_under_deploy_and_stay_in_range() {
+        // Plain compose and swarm both read the limits from `deploy.resources`, so
+        // they render there whatever the engine; a value outside the range is
+        // refused rather than handed to the engine.
+        let config = test_config();
+        let limited = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":0.5,"memoryMb":512}]}"#,
+        );
+        assert!(validate_spec(&limited, &config).is_ok());
+        let rendered = render_compose(&limited, &config);
+        assert!(rendered.contains("    deploy:\n      resources:\n        limits:\n          cpus: \"0.5\"\n          memory: 512M\n"));
+        assert!(!rendered.contains("mode: replicated"));
+
+        let too_small = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","memoryMb":4}]}"#);
+        assert!(validate_spec(&too_small, &config).is_err());
+        let too_many = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":1000.0}]}"#);
+        assert!(validate_spec(&too_many, &config).is_err());
     }
 
     #[test]

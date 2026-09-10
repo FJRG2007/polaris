@@ -131,6 +131,15 @@ export interface AppDeployPlan {
     }[];
     /** JSON healthcheck spec (or null for none). */
     readonly healthcheck?: HealthcheckSpec;
+    /** The most CPU (cores) and memory (MB) the container may use. Absent is no
+     *  limit. */
+    readonly limits?: ResourceLimits;
+}
+
+/** Resource ceilings for one container. */
+export interface ResourceLimits {
+    readonly cpus?: number;
+    readonly memoryMb?: number;
 }
 
 export interface HealthcheckSpec {
@@ -161,6 +170,9 @@ export interface DbDeployPlan {
         readonly target: string;
         readonly kind: "bind" | "volume";
     }[];
+    /** The most CPU (cores) and memory (MB) the container may use. Absent is no
+     *  limit. */
+    readonly limits?: ResourceLimits;
 }
 
 export interface DeployResult {

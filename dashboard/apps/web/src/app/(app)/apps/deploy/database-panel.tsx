@@ -95,7 +95,9 @@ export function DatabaseManageDialog({
     const tabs: { value: Tab; label: string }[] = overview
         ? [
               ...(overview.upgrade ? [{ value: "versions" as const, label: "Version" }] : []),
-              ...(overview.redis || overview.mongo ? [{ value: "settings" as const, label: "Settings" }] : []),
+              ...(overview.redis || overview.mongo || overview.limits
+                  ? [{ value: "settings" as const, label: "Settings" }]
+                  : []),
               ...(overview.pitr ? [{ value: "pitr" as const, label: "Point in time" }] : []),
               ...(!overview.storage ? [{ value: "copy" as const, label: "Copy data in" }] : []),
               ...(overview.storage ? [{ value: "buckets" as const, label: "Buckets" }] : []),
@@ -173,7 +175,10 @@ export function DatabaseManageDialog({
                         ) : current === "versions" && overview.upgrade ? (
                             <VersionsSection overview={overview} manage={manage} ask={ask} onChanged={load} />
                         ) : current === "settings" ? (
-                            <SettingsSection overview={overview} manage={manage} ask={ask} />
+                            <div className="flex flex-col gap-5">
+                                <LimitsSection overview={overview} manage={manage} ask={ask} />
+                                <SettingsSection overview={overview} manage={manage} ask={ask} />
+                            </div>
                         ) : current === "pitr" && overview.pitr ? (
                             <PitrSection overview={overview} manage={manage} ask={ask} />
                         ) : current === "copy" ? (
@@ -392,6 +397,74 @@ function VersionsSection({
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
+
+/** The most CPU and memory the instance's container may use, applied by
+ *  starting it again. Blank is no limit. */
+function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
+    const limits = overview.limits;
+    const [cpus, setCpus] = useState(limits?.cpus == null ? "" : String(limits.cpus));
+    const [memory, setMemory] = useState(limits?.memoryMb == null ? "" : String(limits.memoryMb));
+    if (!limits) return null;
+    const next = {
+        cpus: cpus.trim() ? Number(cpus) : null,
+        memoryMb: memory.trim() ? Number(memory) : null
+    };
+    const parsed = core.resourceLimitsSchema.safeParse(next);
+    const changed = next.cpus !== limits.cpus || next.memoryMb !== limits.memoryMb;
+    return (
+        <Section title="Resources" hint="Past its memory the database is stopped and started again; past its CPU it is slowed. Blank = no limit.">
+            <div className="flex flex-wrap gap-3">
+                <label className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">CPU (cores)</span>
+                    <Input
+                        type="number"
+                        min={0.05}
+                        step={0.05}
+                        value={cpus}
+                        disabled={!manage}
+                        onChange={(event) => setCpus(event.target.value)}
+                        placeholder="No limit"
+                        className="w-28"
+                    />
+                </label>
+                <label className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">Memory (MB)</span>
+                    <Input
+                        type="number"
+                        min={16}
+                        step={64}
+                        value={memory}
+                        disabled={!manage}
+                        onChange={(event) => setMemory(event.target.value)}
+                        placeholder="No limit"
+                        className="w-28"
+                    />
+                </label>
+            </div>
+            {!parsed.success ? (
+                <p className="text-xs text-danger">{parsed.error.issues[0]?.message ?? "Check these limits"}</p>
+            ) : null}
+            {manage ? (
+                <div>
+                    <Button
+                        size="sm"
+                        disabled={!changed || !parsed.success}
+                        onClick={() =>
+                            ask({
+                                title: "Apply the new limits?",
+                                body: "The database is started again with them. Connections drop for the few seconds that takes.",
+                                label: "Apply",
+                                run: () => actions.setDatabaseLimitsAction({ databaseId: overview.id, ...next })
+                            })
+                        }
+                    >
+                        Apply
+                    </Button>
+                </div>
+            ) : null}
+        </Section>
+    );
+}
 
 function SettingsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
     const redis = overview.redis;

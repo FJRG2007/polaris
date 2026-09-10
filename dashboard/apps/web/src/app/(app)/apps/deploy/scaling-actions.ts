@@ -16,7 +16,10 @@ import { requireApplicationAccess } from "@/lib/deploy-project-access";
 
 const DEPLOY_PATH = "/apps/deploy";
 
-const scalingInputSchema = core.serviceScalingSchema.extend({ balancing: core.edgeBalancingSchema });
+const scalingInputSchema = core.serviceScalingSchema.extend({
+    balancing: core.edgeBalancingSchema,
+    limits: core.resourceLimitsSchema
+});
 
 function failure(caught: unknown, fallback: string): { error: string } {
     return { error: caught instanceof Error ? caught.message : fallback };
@@ -53,7 +56,9 @@ export async function saveServiceScalingAction(
                 replicas: parsed.data.replicas,
                 autoscale: parsed.data.autoscale,
                 sticky: parsed.data.balancing.sticky,
-                healthPath: parsed.data.balancing.healthPath
+                healthPath: parsed.data.balancing.healthPath,
+                cpus: parsed.data.limits.cpus,
+                memoryMb: parsed.data.limits.memoryMb
             }
         });
         revalidatePath(DEPLOY_PATH);

@@ -2180,6 +2180,8 @@ export async function duplicateApplication(
             buildConfig: app.buildConfig,
             healthcheck: app.healthcheck,
             replicas: app.replicas,
+            cpuLimit: app.cpuLimit,
+            memoryLimitMb: app.memoryLimitMb,
             deployBranch: app.deployBranch,
             commitFilter: app.commitFilter,
             keepReleases: app.keepReleases,
@@ -2428,6 +2430,7 @@ async function buildAppPlan(
         },
         env,
         replicas: app.replicas,
+        limits: limitsOf(app),
         // Extra external networks the service joins: a locally-installed messaging
         // hub joins the dedicated web<->hub network to reach the web's ingest by DNS.
         extraNetworks: isLocalHub ? [HUB_NETWORK] : undefined,
@@ -2537,6 +2540,15 @@ async function buildAppPlan(
         keepsHistory: keepsReleases(app),
         cutover: runsCutover(app),
         unresolved: references.unresolved
+    };
+}
+
+/** A service's or database's stored ceilings as a plan carries them. */
+export function limitsOf(row: { cpuLimit: number | null; memoryLimitMb: number | null }): AppDeployPlan["limits"] {
+    if (row.cpuLimit === null && row.memoryLimitMb === null) return undefined;
+    return {
+        ...(row.cpuLimit !== null ? { cpus: row.cpuLimit } : {}),
+        ...(row.memoryLimitMb !== null ? { memoryMb: row.memoryLimitMb } : {})
     };
 }
 

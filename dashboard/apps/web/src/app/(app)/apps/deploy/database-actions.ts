@@ -175,6 +175,23 @@ export async function setMongoReplicaSetAction(input: z.input<typeof core.mongoR
     }
 }
 
+const databaseLimitsSchema = core.resourceLimitsSchema.extend({ databaseId: z.string().uuid() });
+
+export async function setDatabaseLimitsAction(input: z.input<typeof databaseLimitsSchema>): Promise<Result> {
+    const parsed = databaseLimitsSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data.databaseId);
+        const { databaseId, ...limits } = parsed.data;
+        await settings.setDatabaseLimits(databaseId, ownerId, userId, limits);
+        await audit(userId, "deploy.db.limits", databaseId, limits);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not change the limits");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Point-in-time recovery
 // ---------------------------------------------------------------------------

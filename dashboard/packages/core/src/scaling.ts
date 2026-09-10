@@ -47,6 +47,23 @@ export const serviceScalingSchema = z.object({
 });
 export type ServiceScaling = z.infer<typeof serviceScalingSchema>;
 
+/** The most CPU (cores) and memory (MB) one container may use; null is no limit.
+ *  The same ranges the host daemon enforces. */
+export const resourceLimitsSchema = z.object({
+    cpus: z
+        .number()
+        .min(0.05, "Give at least 0.05 of a core")
+        .max(256, "At most 256 cores")
+        .nullable(),
+    memoryMb: z
+        .number()
+        .int("Memory is a whole number of MB")
+        .min(16, "Give at least 16 MB")
+        .max(4_194_304, "At most 4 TB")
+        .nullable()
+});
+export type ResourceLimitsInput = z.infer<typeof resourceLimitsSchema>;
+
 /** The stored column, or null when it is unset or no longer valid. */
 export function parseAutoscale(raw: string | null | undefined): Autoscale | null {
     if (!raw) return null;
