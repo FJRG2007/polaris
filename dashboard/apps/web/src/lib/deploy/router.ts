@@ -17,6 +17,7 @@
  * keeps enforcing when Polaris is down, on both the local and remote edges.
  */
 
+import { STICKY_COOKIE } from "@polaris/deploy";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
 import type { AppEdgeConfig, WafCustomRule, WafPrincipalGrant } from "@polaris/core";
@@ -54,6 +55,14 @@ export interface AppRoute {
     /** Host the edge dials for this app's published port. */
     readonly dialHost: string;
     readonly dialPort: number;
+    /** Every copy's name, when the service runs more than one: each is dialled on
+     *  `dialPort` and the edge balances between them. Absent for a single copy. */
+    readonly dialHosts?: readonly string[];
+    /** Keep each visitor on the copy that answered them first. */
+    readonly sticky?: boolean;
+    /** Asked of every copy every few seconds; one that stops answering it is left
+     *  out until it answers again. Only with more than one copy to fall back on. */
+    readonly healthPath?: string;
     /** WAF IP allowlists (one per configured scope). A request must satisfy every
      *  list, so each becomes a chained `ipAllowList` middleware. Empty/omitted =
      *  no allowlist restriction. */
@@ -256,6 +265,9 @@ export interface RenderOptions {
 function proxied(route: AppRoute, options: RenderOptions): boolean {
     return (
         route.emailObfuscation === true &&
+        // The guard's proxy dials the one origin its header names, so a service with
+        // several copies is balanced here instead - and goes unobfuscated.
+        (route.dialHosts?.length ?? 0) <= 1 &&
         (process.env.POLARIS_AUTH_SECRET ?? "") !== "" &&
         options.proxyAvailable !== false
     );
@@ -682,16 +694,49 @@ export function renderDynamicConfig(
         // A proxied route dials the guard instead of the app; the app's own address
         // travels in the signed header above, so the guard is the only thing that
         // learns it.
-        const upstream = proxied(route, options) ? guardProxyUrl() : `http://${dial}`;
-        services.push(
-            `    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`
-        );
+        services.push(serviceBlock(name, route, proxied(route, options) ? guardProxyUrl() : `http://${dial}`));
     }
     // Last, so it loses the length-ranked tie to every app router above it.
     if (zones.length > 0) routers.push(...vacantRouters(zones, defs));
     if (routers.length === 0) return "http: {}\n";
     const middlewares = [...defs.values()].join("\n");
     return `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n${middlewares}\n`;
+}
+
+/**
+ * A route's service: the one upstream, or - for a service running several copies -
+ * each copy by name, with the visitor pinned to one of them when asked, and a copy
+ * that fails the health path left out until it passes again.
+ */
+function serviceBlock(name: string, route: AppRoute, upstream: string): string {
+    const copies = route.dialHosts ?? [];
+    if (copies.length <= 1) {
+        return `    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`;
+    }
+    const lines = [
+        `    ${name}:`,
+        "      loadBalancer:",
+        "        servers:",
+        ...copies.map((host) => `          - url: "http://${host}:${route.dialPort}"`)
+    ];
+    if (route.sticky) {
+        lines.push(
+            "        sticky:",
+            "          cookie:",
+            `            name: ${STICKY_COOKIE}`,
+            "            httpOnly: true",
+            "            sameSite: lax"
+        );
+    }
+    if (route.healthPath) {
+        lines.push(
+            "        healthCheck:",
+            `          path: ${yamlQuote(route.healthPath)}`,
+            "          interval: 10s",
+            "          timeout: 3s"
+        );
+    }
+    return lines.join("\n");
 }
 
 /** The file in the edge's watched directory that holds every deployed app's route. */

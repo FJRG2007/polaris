@@ -151,7 +151,8 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
         network,
         domains: plan.domains,
         waf: plan.waf,
-        edge: plan.edge
+        edge: plan.edge,
+        replicas: plan.replicas
     });
     const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
     // The proxy network plus any extra networks the plan requests (deduped, proxy
@@ -232,6 +233,46 @@ export function forSwarm(spec: ComposeSpec): ComposeSpec {
         services: spec.services.map(({ pullPolicy: _dropped, ...service }) =>
             service.volumes.length === 0 ? { ...service, rollingUpdate: true } : service
         )
+    };
+}
+
+/** Longest container name DNS (and docker) will take. */
+const MAX_NAME = 63;
+
+/**
+ * The names a service's copies run under: its own first, then `-r2`, `-r3`... each
+ * cut to fit a DNS label. The first keeps the service's own name, so the terminal,
+ * the logs and the status - which all ask for that name - keep answering.
+ */
+export function replicaNames(name: string, count: number): string[] {
+    return Array.from({ length: Math.max(1, count) }, (_, index) => {
+        if (index === 0) return name;
+        const suffix = `-r${index + 1}`;
+        return `${name.slice(0, MAX_NAME - suffix.length)}${suffix}`;
+    });
+}
+
+/**
+ * The spec plain compose runs for a replicated service: one service per copy.
+ *
+ * Compose cannot scale a service that has a container name, and every service
+ * Polaris runs has one - it is what everything reaching into the container asks
+ * for. So each copy is a service of its own: the first unchanged, the others under
+ * `replicaNames`, publishing nothing on the host (the port is the first one's) and
+ * answering to the service's own name as well, so anything that reaches the service
+ * by name is spread over all of them. They carry the same labels, which the edge
+ * merges into one service it balances over. Swarm scales natively and never comes
+ * through here.
+ */
+export function expandReplicas(spec: ComposeSpec): ComposeSpec {
+    return {
+        ...spec,
+        services: spec.services.flatMap(({ replicas, ...service }) => {
+            if (!replicas || replicas <= 1) return [service];
+            const [, ...copies] = replicaNames(service.name, replicas);
+            const aliases = [...(service.aliases ?? []), service.name];
+            return [service, ...copies.map((name) => ({ ...service, name, ports: [], aliases }))];
+        })
     };
 }
 

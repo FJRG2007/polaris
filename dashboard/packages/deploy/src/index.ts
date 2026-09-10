@@ -35,7 +35,7 @@ export {
     type ZoneScope
 } from "./zones.js";
 export { quoteArg, quoteArgv } from "./shell.js";
-export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type TraefikServiceInput, type TraefikWaf } from "./traefik.js";
+export { traefikLabels, configHash, STICKY_COOKIE, type TraefikDomain, type CertResolver, type TraefikServiceInput, type TraefikWaf } from "./traefik.js";
 export {
     buildSpec,
     buildCommand,
@@ -74,7 +74,9 @@ export {
     appComposeSpec,
     dbComposeSpec,
     defaultDbPort,
+    expandReplicas,
     forCompose,
+    replicaNames,
     composeValue,
     renderComposeYaml,
     type ComposeSpec,

@@ -26,6 +26,7 @@ import { appBaseUrl, getPublicIp } from "./domain-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { LocalRouter, type AppRoute } from "./deploy/router";
+import { balancedOver, copiesOf } from "./deploy/replicas";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
@@ -1164,7 +1165,8 @@ export async function syncAppRoutes(): Promise<void> {
                     edgeConfig: true,
                     sourceType: true,
                     sourceConfig: true,
-                    target: { select: { kind: true, hostId: true } },
+                    replicas: true,
+                    target: { select: { kind: true, hostId: true, runtime: true } },
                     environment: {
                         select: { project: { select: { slug: true, ownerId: true } } }
                     }
@@ -1322,17 +1324,21 @@ export async function syncAppRoutes(): Promise<void> {
             // the edge reaches the container by name on the proxy network both are on
             // - the way a remote server's edge always has. Never a kept release, which
             // is reached on its own published port whatever the setting says.
-            const privately =
+            const ownName = serviceName(
+                domain.application.environment.project.slug,
+                domain.application.slug,
+                domain.applicationId
+            );
+            const own =
                 !remoteHostId &&
-                !domain.application.publishPort &&
                 !domain.deploymentId &&
                 !isolated.has(domain.application.currentDeploymentId ?? "");
+            // Several copies are each reached by name, published or not: only the
+            // first holds the host port.
+            const copies = own ? copiesOf(domain.application, ownName) : undefined;
+            const privately = own && (!domain.application.publishPort || copies !== undefined);
             const dialHost = privately
-                ? serviceName(
-                      domain.application.environment.project.slug,
-                      domain.application.slug,
-                      domain.applicationId
-                  )
+                ? ownName
                 : remoteHostId
                   ? (serverAddress.get(remoteHostId) ?? "")
                   : localIp;
@@ -1347,6 +1353,7 @@ export async function syncAppRoutes(): Promise<void> {
                 dialPort: privately
                     ? containerPortOf({ ...domain.application, domains: [domain] })
                     : hostPortForApp(dialTarget(domain, isolated)),
+                ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 presets: rule.presets,
@@ -1421,7 +1428,8 @@ type RoutableDomain = {
         currentDeploymentId: string | null;
         sourceType: string;
         sourceConfig: string;
-        target: { kind: string; hostId: string | null };
+        replicas: number;
+        target: { kind: string; hostId: string | null; runtime: string };
         environment: { project: { slug: string; ownerId: string } };
     };
 };
@@ -1476,6 +1484,11 @@ async function pushRemoteRoutes(
                 const connection = await getHostConnection(hostId, owner);
                 const routes: AppRoute[] = held.map((domain) => {
                     const rule = waf.get(domain.applicationId);
+                    const name = serviceName(
+                        domain.application.environment.project.slug,
+                        domain.application.slug,
+                        domain.applicationId
+                    );
                     return {
                         id: domain.id,
                         hostname: domain.hostname,
@@ -1487,12 +1500,12 @@ async function pushRemoteRoutes(
                         // labels resolve to as well. Never a published host port:
                         // the edge is a container, and the host is not a name it
                         // can be relied on to have.
-                        dialHost: serviceName(
-                            domain.application.environment.project.slug,
-                            domain.application.slug,
-                            domain.applicationId
-                        ),
+                        dialHost: name,
                         dialPort: domain.targetPort,
+                        ...balancedOver(
+                            copiesOf(domain.application, name),
+                            edgeOf.get(domain.applicationId)?.edge
+                        ),
                         allowLists: rule?.allowLists ?? [],
                         deny: rule?.deny ?? [],
                         presets: rule?.presets ?? [],
@@ -2747,7 +2760,7 @@ export async function deployApplication(
 
 /** What started a deployment, as the history names it. `settings` is the live
  *  release started again because something about how it runs changed. */
-export type DeploymentTrigger = "manual" | "push" | "preview" | "rollback" | "variables" | "settings";
+export type DeploymentTrigger = "manual" | "push" | "preview" | "rollback" | "variables" | "settings" | "scale";
 
 /** What a run of a kept image carries over from the release it runs. */
 export interface RollbackSource {
@@ -2759,7 +2772,7 @@ export interface RollbackSource {
     readonly authorAvatarUrl: string | null;
     /** A rollback to an earlier release, or the live one again with changed
      *  variables or settings. Rollback when absent. */
-    readonly kind?: "rollback" | "variables" | "settings";
+    readonly kind?: "rollback" | "variables" | "settings" | "scale";
 }
 
 /**
@@ -2783,7 +2796,7 @@ export async function restartFromKeptImage(
     applicationId: string,
     ownerId: string,
     userId: string,
-    reason: "variables" | "settings" = "variables"
+    reason: "variables" | "settings" | "scale" = "variables"
 ): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },

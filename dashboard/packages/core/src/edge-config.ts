@@ -281,6 +281,24 @@ export type EdgeChallengeMode = (typeof EDGE_CHALLENGE_MODES)[number];
 export const EDGE_CONCURRENCY_SCOPES = ["client", "service"] as const;
 export type EdgeConcurrencyScope = (typeof EDGE_CONCURRENCY_SCOPES)[number];
 
+/**
+ * How the edge spreads a service's traffic over its replicas. Only means anything
+ * with more than one: `sticky` keeps each visitor on the replica that answered them
+ * first - what a WebSocket or an in-memory session needs - and `healthPath` is asked
+ * every few seconds so a replica that stops answering it is left out until it does.
+ */
+export const edgeBalancingSchema = z.object({
+    sticky: z.boolean().default(false),
+    healthPath: z
+        .string()
+        .trim()
+        .max(200)
+        .regex(/^\/[^\s"\\]*$/, "Start the path with / and leave out spaces and quotes")
+        .nullable()
+        .default(null)
+});
+export type EdgeBalancing = z.infer<typeof edgeBalancingSchema>;
+
 export const appEdgeConfigSchema = z.object({
     rateLimits: z.array(edgeRateLimitSchema).max(EDGE_RATE_LIMITS_MAX).default([]),
     /** Requests in flight at once; 0 is no cap. */
@@ -289,7 +307,8 @@ export const appEdgeConfigSchema = z.object({
     challenge: z.enum(EDGE_CHALLENGE_MODES).default("off"),
     headers: edgeHeadersSchema.default({ preset: "off", custom: [] }),
     redirects: z.array(edgeRedirectSchema).max(EDGE_REDIRECTS_MAX).default([]),
-    rewrites: z.array(edgeRewriteSchema).max(EDGE_REWRITES_MAX).default([])
+    rewrites: z.array(edgeRewriteSchema).max(EDGE_REWRITES_MAX).default([]),
+    balancing: edgeBalancingSchema.default({ sticky: false, healthPath: null })
 });
 export type AppEdgeConfig = z.infer<typeof appEdgeConfigSchema>;
 
@@ -323,6 +342,7 @@ export function parseAppEdgeConfig(raw: string | null | undefined): AppEdgeConfi
     const concurrency = z.number().int().min(0).max(100_000).safeParse(obj.concurrency);
     const scope = z.enum(EDGE_CONCURRENCY_SCOPES).safeParse(obj.concurrencyScope);
     const challenge = z.enum(EDGE_CHALLENGE_MODES).safeParse(obj.challenge);
+    const balancing = edgeBalancingSchema.safeParse(obj.balancing ?? {});
     return {
         rateLimits: each(obj.rateLimits, edgeRateLimitSchema, EDGE_RATE_LIMITS_MAX),
         concurrency: concurrency.success ? concurrency.data : 0,
@@ -330,7 +350,8 @@ export function parseAppEdgeConfig(raw: string | null | undefined): AppEdgeConfi
         challenge: challenge.success ? challenge.data : "off",
         headers: headers.success ? headers.data : EMPTY_EDGE_CONFIG.headers,
         redirects: each(obj.redirects, edgeRedirectSchema, EDGE_REDIRECTS_MAX),
-        rewrites: each(obj.rewrites, edgeRewriteSchema, EDGE_REWRITES_MAX)
+        rewrites: each(obj.rewrites, edgeRewriteSchema, EDGE_REWRITES_MAX),
+        balancing: balancing.success ? balancing.data : EMPTY_EDGE_CONFIG.balancing
     };
 }
 

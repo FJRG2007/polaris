@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { CronPanel } from "./cron-panel";
+import { ScalingSection } from "./scaling-section";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
@@ -338,7 +339,9 @@ function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: Display
           ? " - variables changed, not rebuilt"
           : deployment.trigger === "settings"
             ? " - restarted with new settings, not rebuilt"
-            : deployment.trigger === "preview"
+            : deployment.trigger === "scale"
+              ? " - scaled, not rebuilt"
+              : deployment.trigger === "preview"
               ? ` - pull request preview via ${sourceLabel(app)}`
               : deployment.trigger === "push"
                 ? ` - pushed to ${sourceLabel(app)}`
@@ -3513,6 +3516,8 @@ function SettingsTab({
                     </Button>
                 </div>
             )}
+
+            {can("service.configure") && <ScalingSection applicationId={app.id} onChanged={onChanged} />}
 
             {can("service.create") && can("service.configure") && <MoveOutSection app={app} />}
 

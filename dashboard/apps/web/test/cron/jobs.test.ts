@@ -90,6 +90,8 @@ describe("the work Polaris runs on a schedule", () => {
             "mail-categories",
             "mail-send",
             "mail-sync",
+            // Two passes would both see the same streak and both add a copy.
+            "service-autoscale",
             "task-reminders",
             "task-trackers"
         ]);

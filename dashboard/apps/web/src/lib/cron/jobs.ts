@@ -25,6 +25,7 @@ import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
+import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -380,6 +381,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: MINUTE,
         leaseMs: null,
         run: tickServiceCrons
+    },
+    {
+        key: "service-autoscale",
+        // Every minute: the decision counts consecutive readings, and a minute is
+        // the grain its thresholds are written in. Leased, so two processes never
+        // read the same streak and both add a replica.
+        everyMs: MINUTE,
+        leaseMs: 5 * MINUTE,
+        run: () => runAutoscale()
     },
     {
         key: "chat-scheduled",

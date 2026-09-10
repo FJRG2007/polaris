@@ -12,7 +12,7 @@ import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { tailIntoLog, waitUntilServing } from "./readiness.js";
-import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { appComposeSpec, dbComposeSpec, expandReplicas } from "../compose-spec.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import type {
@@ -271,7 +271,8 @@ export class ComposeRuntime implements RuntimeDriver {
         if (!kept) imageTag = await pinRelease(imageTag, plan, ctx);
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
-        const spec = appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork);
+        // One service per copy, since compose cannot scale a named container.
+        const spec = expandReplicas(appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork));
         // Establish any NAS mounts the volumes bind onto, before the container comes
         // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.
         // Which share was being mounted when it went wrong. A deploy can bind
@@ -320,12 +321,16 @@ export class ComposeRuntime implements RuntimeDriver {
         started();
         // Not a success until it is serving: a container that exists and then
         // exits, crash-loops or reports itself unhealthy must not be promoted.
+        // Every copy, one after another: a replica that cannot start is the same
+        // release failing, only less often.
         const waited = step("Waiting for it to come up");
-        const ready = await waitUntilServing(ctx, plan.ref.name, plan);
-        if (!ready.ok) {
-            waited("it did not");
-            await tailIntoLog(ctx, plan.ref.name);
-            return fail(ctx, ready.reason);
+        for (const service of spec.services) {
+            const ready = await waitUntilServing(ctx, service.name, plan);
+            if (!ready.ok) {
+                waited("it did not");
+                await tailIntoLog(ctx, service.name);
+                return fail(ctx, ready.reason);
+            }
         }
         waited();
         // The release landed, so whatever it replaced is unreferenced from this

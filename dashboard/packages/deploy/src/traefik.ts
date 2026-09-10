@@ -82,7 +82,14 @@ export interface TraefikServiceInput {
      *  settings the local edge renders into its file, so a service answers the same
      *  way whichever edge serves it. */
     readonly edge?: AppEdgeConfig;
+    /** How many copies run. Every copy carries these same labels, so the edge merges
+     *  them into one service it balances over; a health check only has somewhere
+     *  else to send traffic when there is more than one. */
+    readonly replicas?: number;
 }
+
+/** The cookie a sticky service pins each visitor to one replica with. */
+export const STICKY_COOKIE = "polaris_lb";
 
 /** Traefik's ACME resolver name, configured in the static Traefik config. */
 const LE_RESOLVER = "letsencrypt";
@@ -280,6 +287,20 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
         "traefik.docker.network": input.network,
         [`traefik.http.services.${input.serviceName}.loadbalancer.server.port`]: String(domains[0]!.targetPort)
     };
+    const balancer = `traefik.http.services.${input.serviceName}.loadbalancer`;
+    if (input.edge?.balancing?.sticky) {
+        labels[`${balancer}.sticky.cookie.name`] = STICKY_COOKIE;
+        labels[`${balancer}.sticky.cookie.httponly`] = "true";
+        labels[`${balancer}.sticky.cookie.samesite`] = "lax";
+    }
+    // One copy failing its check would leave the edge nothing to send to, which is a
+    // worse answer than the copy's own.
+    const healthPath = input.edge?.balancing?.healthPath;
+    if (healthPath && (input.replicas ?? 1) > 1) {
+        labels[`${balancer}.healthcheck.path`] = healthPath;
+        labels[`${balancer}.healthcheck.interval`] = "10s";
+        labels[`${balancer}.healthcheck.timeout`] = "3s";
+    }
     // WAF middlewares are per-service (one app -> one rule), shared by every domain.
     const waf = input.waf ? wafMiddlewares(input.serviceName, input.waf, labels) : { app: [], http: [] };
     const siblings = new Set(domains.map((domain) => domain.hostname));

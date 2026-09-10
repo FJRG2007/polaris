@@ -3960,6 +3960,9 @@ model Application {
     // running | stopped
     desiredState        String    @default("running")
     replicas            Int       @default(1)
+    // JSON {min, max, cpuPercent}: the range the replica count moves in by itself
+    // to hold that CPU figure. Null leaves the count where the operator set it.
+    autoscale           String?
     // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
     currentDeploymentId String?   @db.Uuid
     // Auto-deploy on git push (Vercel-style): redeploy when a matching commit lands.
