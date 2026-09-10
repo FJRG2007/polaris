@@ -86,26 +86,45 @@ export function keepsReleases(app: {
  * The new release runs in a project of its own under a name of its own, and also
  * answers to the service's own name on the proxy network - which is how the edge,
  * a tunnel and every other service find it - so the change-over moves no address
- * at all. The one it replaced is taken down once the new one is serving.
+ * at all. The one it replaced is taken down once the new one is serving. With
+ * several copies, every copy of the new release answers to the service's name for
+ * that copy as well (see `expandReplicas`), so the edge's route - which names each
+ * copy - reaches the new copies the same way, keeping its sticky cookie and health
+ * path, and is never rewritten for it. Never rewritten on purpose: a route that
+ * named the new release's own containers would need the edge to take a new file
+ * before the old copies went, and an edge frozen on its last good configuration by
+ * one bad file elsewhere would go on dialling copies that no longer exist.
  *
  * Only where two copies can run at once without stepping on each other: no
  * volume (both would hold the same files), nothing published on the host (both
- * would want the same port), one replica, and not a compose file of the owner's
- * own, whose names are its own business. On this host, where the edge follows the
- * domain records; a remote server's labels would have both copies claiming the
- * address. A service that keeps its releases already runs them side by side.
+ * would want the same port), and not a compose file of the owner's own, whose
+ * names are its own business. A service that keeps its releases already runs them
+ * side by side.
+ *
+ * And only where the edge in front of it dials the service by name from routes
+ * Polaris writes (`edge`). This host's always does. Another server's does once it
+ * was prepared by a Polaris that pushes routes to it, and those routes rank above
+ * the ones each container declares in its labels. An older server's edge reads the
+ * labels alone, where both releases claim the address at the same rank and the old
+ * one is dialled by its own address rather than a name - so as its copies stop, the
+ * requests that edge still sends them fail. Such a server is recreated in place
+ * until it is prepared again. A domain another server's service has served through
+ * Polaris is dialled on the host port that server publishes, which is the
+ * published-port case already refused here.
  */
-export function runsCutover(app: {
-    keepReleases: boolean;
-    publishPort: boolean;
-    replicas: number;
-    sourceType: string;
-    sourceConfig: string;
-    volumes: readonly unknown[];
-    target: { kind: string; runtime: string };
-}): boolean {
-    if (app.keepReleases || app.publishPort || app.replicas > 1 || app.sourceType === "compose") return false;
-    if (app.volumes.length > 0 || app.target.kind !== "local" || app.target.runtime !== "compose") return false;
+export function runsCutover(
+    app: {
+        keepReleases: boolean;
+        publishPort: boolean;
+        sourceType: string;
+        sourceConfig: string;
+        volumes: readonly unknown[];
+        target: { runtime: string };
+    },
+    edge: { readonly followsPushedRoutes: boolean }
+): boolean {
+    if (app.keepReleases || app.publishPort || app.sourceType === "compose" || !edge.followsPushedRoutes) return false;
+    if (app.volumes.length > 0 || app.target.runtime !== "compose") return false;
     try {
         const source = JSON.parse(app.sourceConfig) as { extraPorts?: unknown };
         return !Array.isArray(source.extraPorts) || source.extraPorts.length === 0;

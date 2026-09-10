@@ -1,7 +1,9 @@
 /**
  * A service with more than one copy: the edge is given each copy by name and
  * balances between them, pins a visitor when asked, and leaves out a copy that
- * fails its health path. And the cases that must stay at one copy say why, and a
+ * fails its health path. A deploy that changes over starts a whole new set of
+ * copies that answer on those same names, and the edge dials only as many as the
+ * serving release runs. And the cases that must stay at one copy say why, and a
  * share of the traffic split off to a kept release by weight.
  */
 
@@ -11,6 +13,7 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/deploy-service", () => ({ restartFromKeptImage: vi.fn(), syncAppRoutes: vi.fn() }));
 
 const { parseAppEdgeConfig } = await import("@polaris/core");
+const { expandReplicas, replicaNames } = await import("@polaris/deploy");
 const { balancedOver, copiesOf } = await import("@/lib/deploy/replicas");
 const { singleCopyReason } = await import("@/lib/deploy/scaling-service");
 const { renderDynamicConfig } = await import("@/lib/deploy/router");
@@ -77,6 +80,72 @@ describe("copiesOf", () => {
     it("leaves swarm and a single copy to the ordinary route", () => {
         expect(copiesOf({ replicas: 3, target: { runtime: "swarm" } }, "web")).toBeUndefined();
         expect(copiesOf({ replicas: 1, target: { runtime: "compose" } }, "web")).toBeUndefined();
+    });
+
+    it("dials as many copies as the serving release was started with, not the new count", () => {
+        const app = { replicas: 5, target: { runtime: "compose" } };
+        // Scaled up from three: the fourth and fifth do not exist until the release
+        // carrying them is promoted, and a name nothing answers is traffic lost.
+        expect(copiesOf(app, "web", { replicas: 3 })).toEqual(["web", "web-r2", "web-r3"]);
+        expect(copiesOf(app, "web", { replicas: 1 })).toBeUndefined();
+        // A release from before the count was recorded reads as the setting.
+        expect(copiesOf(app, "web", { replicas: null })).toHaveLength(5);
+        expect(copiesOf({ ...app, replicas: 1 }, "web", { replicas: 3 })).toEqual(["web", "web-r2", "web-r3"]);
+    });
+});
+
+describe("changing over a service with several copies", () => {
+    /** A release started beside the running one, the way the pipeline plans it:
+     *  under names of its own, answering to the service's by alias. */
+    const release = (service: string, marker: string, replicas: number) =>
+        expandReplicas({
+            project: `p-${marker}`,
+            services: [
+                {
+                    // Cut the way `releaseRef` cuts it: the marker whole.
+                    name: `${service.slice(0, 63 - marker.length - 1)}-${marker}`,
+                    image: "shop:release",
+                    env: {},
+                    ports: [],
+                    volumes: [],
+                    labels: { "traefik.enable": "true" },
+                    networks: ["polaris-proxy"],
+                    aliases: [service],
+                    replicas
+                }
+            ],
+            volumes: [],
+            networks: ["polaris-proxy"]
+        }).services;
+
+    /** Everything one container answers to on the proxy network. */
+    const answersTo = (copy: { name: string; aliases?: string[] }) => [copy.name, ...(copy.aliases ?? [])];
+
+    it("reaches every copy of the new release on the names the edge already dials", () => {
+        const route = copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")!;
+        const copies = release("web", "abc1234", 3);
+        // One new copy behind each name the route holds, so switching the edge is the
+        // old copies going rather than a route being rewritten.
+        for (const [index, name] of route.entries()) expect(answersTo(copies[index]!)).toContain(name);
+        expect(copies.map((copy) => copy.name)).toEqual(["web-abc1234", "web-abc1234-r2", "web-abc1234-r3"]);
+        expect(copies[1]?.aliases).toEqual(["web", "web-abc1234", "web-r2"]);
+    });
+
+    it("keeps each numbered name to one copy of a release, so a pinned visitor stays on one", () => {
+        const copies = release("web", "abc1234", 4);
+        for (const name of replicaNames("web", 4).slice(1)) {
+            expect(copies.filter((copy) => answersTo(copy).includes(name))).toHaveLength(1);
+        }
+    });
+
+    it("fits every numbered name in a DNS label, the same way the edge cuts it", () => {
+        const long = "a".repeat(63);
+        const copies = release(long, "abc1234", 10);
+        const route = copiesOf({ replicas: 10, target: { runtime: "compose" } }, long)!;
+        for (const [index, copy] of copies.entries()) {
+            expect(answersTo(copy)).toContain(route[index]);
+            for (const name of answersTo(copy)) expect(name.length).toBeLessThanOrEqual(63);
+        }
     });
 });
 

@@ -1233,25 +1233,27 @@ export async function syncAppRoutes(): Promise<void> {
                 .map((other) => normalizeDeployHostname(other.hostname) ?? other.hostname)
         });
     }
-    // Which of the serving releases run in a project of their own, and so publish on
-    // a port of their own. One query for the whole edge rather than one per domain.
-    const isolated = new Set(
+    // The serving releases, one query for the whole edge rather than one per domain:
+    // which run in a project of their own, and so publish on a port of their own, and
+    // how many copies each was started with.
+    const serving = new Map(
         (
             await prisma.deployment.findMany({
                 where: {
-                    isolated: true,
-                    // A change-over release answers to the service's own name, so it is
-                    // reached the way the service always was.
-                    cutover: false,
                     id: {
                         in: domains
                             .map((domain) => domain.application.currentDeploymentId)
                             .filter((id) => id !== null)
                     }
                 },
-                select: { id: true }
+                select: { id: true, isolated: true, cutover: true, replicas: true }
             })
-        ).map((deployment) => deployment.id)
+        ).map((deployment) => [deployment.id, deployment])
+    );
+    // A change-over release answers to the service's own names, so it is reached the
+    // way the service always was.
+    const isolated = new Set(
+        [...serving.values()].filter((row) => row.isolated && !row.cutover).map((row) => row.id)
     );
     // The kept releases a share of traffic is sent to, and only while each is a
     // kept release still running: a canary that was retired, promoted or taken down
@@ -1394,7 +1396,9 @@ export async function syncAppRoutes(): Promise<void> {
                 !isolated.has(domain.application.currentDeploymentId ?? "");
             // Several copies are each reached by name, published or not: only the
             // first holds the host port.
-            const copies = own ? copiesOf(domain.application, ownName) : undefined;
+            const copies = own
+                ? copiesOf(domain.application, ownName, serving.get(domain.application.currentDeploymentId ?? ""))
+                : undefined;
             const privately = own && (!domain.application.publishPort || copies !== undefined);
             const dialHost = privately
                 ? ownName
@@ -1473,7 +1477,7 @@ export async function syncAppRoutes(): Promise<void> {
     // is asleep, moved or refusing a connection is a server whose own edge goes on
     // serving whatever it was already serving, and no reason for the routes on this
     // machine to be left unwritten.
-    await pushRemoteRoutes(remoteDomains, edgeOf);
+    await pushRemoteRoutes(remoteDomains, edgeOf, serving);
 }
 
 /**
@@ -1538,7 +1542,8 @@ type RoutableDomain = {
  */
 async function pushRemoteRoutes(
     domains: readonly RoutableDomain[],
-    edgeOf: ReadonlyMap<string, EdgeRouteFields>
+    edgeOf: ReadonlyMap<string, EdgeRouteFields>,
+    serving: ReadonlyMap<string, { readonly replicas: number | null }>
 ): Promise<void> {
     const pushable = domains.filter(
         (domain) => !domain.deploymentId && !domain.application.keepReleases
@@ -1584,11 +1589,18 @@ async function pushRemoteRoutes(
                         // it and that server's edge are on - which is what the
                         // labels resolve to as well. Never a published host port:
                         // the edge is a container, and the host is not a name it
-                        // can be relied on to have.
+                        // can be relied on to have. The service's own names, which
+                        // a change-over release answers to as well: ranked above
+                        // both releases' labels, this is what carries that server's
+                        // edge from the old copies to the new ones by name.
                         dialHost: name,
                         dialPort: domain.targetPort,
                         ...balancedOver(
-                            copiesOf(domain.application, name),
+                            copiesOf(
+                                domain.application,
+                                name,
+                                serving.get(domain.application.currentDeploymentId ?? "")
+                            ),
                             edgeOf.get(domain.applicationId)?.edge
                         ),
                         allowLists: rule?.allowLists ?? [],
@@ -2248,11 +2260,15 @@ export function hostPortForApp(id: string): number {
  * before it keeps running. The service's own domains are deliberately left off it:
  * they follow whichever release is current, and the edge re-points them the moment
  * this one is promoted.
+ *
+ * Whether the release changes over beside the running one is decided by the plan
+ * built without a release, and carried into the one built with it (`cutover`), so
+ * the two plans cannot disagree and another server's edge is asked about once.
  */
 async function buildAppPlan(
     applicationId: string,
     ownerId: string,
-    release?: { id: string; commitSha: string | null }
+    release?: { id: string; commitSha: string | null; cutover: boolean }
 ): Promise<{
     plan: AppDeployPlan;
     target: TargetRow & { name: string };
@@ -2284,7 +2300,7 @@ async function buildAppPlan(
     const kept = release !== undefined && keepsReleases(app);
     // Beside the running release only for the change-over, answering to the
     // service's own name as well (see `runsCutover`).
-    const cutover = release !== undefined && !kept && runsCutover(app);
+    const cutover = release !== undefined && !kept && release.cutover;
     const ref =
         release && kept
             ? releaseRef(base, markerOf(release))
@@ -2579,9 +2595,26 @@ async function buildAppPlan(
         buildConfig: app.buildConfig,
         buildCommands,
         keepsHistory: keepsReleases(app),
-        cutover: runsCutover(app),
+        cutover: release ? cutover : await changesOver(app, ownerId),
         unresolved: references.unresolved
     };
+}
+
+/**
+ * `runsCutover`, with the one fact about the edge it cannot know by itself. This
+ * host's edge is routed from the files Polaris writes. Another server's is asked -
+ * one connection - and only once nothing else has ruled the change-over out; a
+ * server that cannot be asked is taken as the older kind, and recreated in place.
+ */
+async function changesOver(
+    app: Parameters<typeof runsCutover>[0] & { target: { kind: string; hostId: string | null } },
+    ownerId: string
+): Promise<boolean> {
+    const hostId = app.target.kind === "local" ? null : app.target.hostId;
+    if (!runsCutover(app, { followsPushedRoutes: true })) return false;
+    if (!hostId) return true;
+    const { readServerEdge } = await import("./deploy/server-edge");
+    return runsCutover(app, { followsPushedRoutes: (await readServerEdge(hostId, ownerId)).pushable });
 }
 
 /** A service's or database's stored ceilings as a plan carries them. */
@@ -2870,6 +2903,8 @@ export async function deployApplication(
             authorAvatarUrl,
             isolated: keepsHistory || cutover,
             cutover,
+            // What the edge dials once this is serving (see `copiesOf`).
+            replicas: plan.replicas,
             // Only a rollback points back at the release it restored; a variable
             // change re-runs the live one and is not a step back.
             rollbackOfId:
@@ -2888,7 +2923,7 @@ export async function deployApplication(
     // also the hostname it will answer on. Only those cases pay for the second plan.
     let planned = plan;
     if (keepsHistory || cutover) {
-        const release = { id: deployment.id, commitSha };
+        const release = { id: deployment.id, commitSha, cutover };
         if (keepsHistory) {
             await ensureReleaseDomain(applicationId, release).catch((error) => {
                 console.error("polaris: could not name this release:", error);

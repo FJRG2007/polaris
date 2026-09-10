@@ -92,29 +92,50 @@ describe("runsCutover", () => {
         volumes: [],
         target: { kind: "local", runtime: "compose" }
     };
+    /** This host's edge, or another server's prepared to take pushed routes. */
+    const routed = { followsPushedRoutes: true };
 
     it("changes over beside the running release for a private service on this host", () => {
-        expect(releases.runsCutover(plain)).toBe(true);
+        expect(releases.runsCutover(plain, routed)).toBe(true);
+    });
+
+    it("changes over with several copies too: each new copy answers to its copy name", () => {
+        expect(releases.runsCutover({ ...plain, replicas: 2 }, routed)).toBe(true);
+        expect(releases.runsCutover({ ...plain, replicas: 10 }, routed)).toBe(true);
+    });
+
+    it("changes over on another server whose edge dials the service from pushed routes", () => {
+        const remote = { ...plain, target: { kind: "host", runtime: "compose" } };
+        expect(releases.runsCutover(remote, routed)).toBe(true);
+        expect(releases.runsCutover({ ...remote, replicas: 3 }, routed)).toBe(true);
+    });
+
+    it("does not on a server whose edge reads only the labels, where both releases claim the address", () => {
+        const remote = { ...plain, target: { kind: "host", runtime: "compose" } };
+        expect(releases.runsCutover(remote, { followsPushedRoutes: false })).toBe(false);
+        expect(releases.runsCutover({ ...remote, replicas: 3 }, { followsPushedRoutes: false })).toBe(false);
     });
 
     it("does not where two copies would collide or the names are not ours", () => {
-        // A published port, a volume, a second replica or a second port on the host
-        // would be fought over; a compose file of the owner's own names itself.
-        expect(releases.runsCutover({ ...plain, publishPort: true })).toBe(false);
-        expect(releases.runsCutover({ ...plain, volumes: [{}] })).toBe(false);
-        expect(releases.runsCutover({ ...plain, replicas: 2 })).toBe(false);
-        expect(releases.runsCutover({ ...plain, sourceConfig: '{"extraPorts":[{"host":1,"container":1}]}' })).toBe(false);
-        expect(releases.runsCutover({ ...plain, sourceType: "compose" })).toBe(false);
-        expect(releases.runsCutover({ ...plain, sourceConfig: "not json" })).toBe(false);
+        // A published port, a volume or a second port on the host would be fought
+        // over; a compose file of the owner's own names itself.
+        expect(releases.runsCutover({ ...plain, publishPort: true }, routed)).toBe(false);
+        expect(releases.runsCutover({ ...plain, publishPort: true, replicas: 3 }, routed)).toBe(false);
+        expect(releases.runsCutover({ ...plain, volumes: [{}] }, routed)).toBe(false);
+        expect(releases.runsCutover({ ...plain, sourceConfig: '{"extraPorts":[{"host":1,"container":1}]}' }, routed)).toBe(
+            false
+        );
+        expect(releases.runsCutover({ ...plain, sourceType: "compose" }, routed)).toBe(false);
+        expect(releases.runsCutover({ ...plain, sourceConfig: "not json" }, routed)).toBe(false);
     });
 
-    it("does not on swarm, which replaces start-first on its own, or on another server", () => {
-        expect(releases.runsCutover({ ...plain, target: { kind: "local", runtime: "swarm" } })).toBe(false);
-        expect(releases.runsCutover({ ...plain, target: { kind: "host", runtime: "compose" } })).toBe(false);
+    it("does not on swarm, which replaces start-first on its own", () => {
+        expect(releases.runsCutover({ ...plain, target: { kind: "local", runtime: "swarm" } }, routed)).toBe(false);
+        expect(releases.runsCutover({ ...plain, target: { kind: "host", runtime: "swarm" } }, routed)).toBe(false);
     });
 
     it("leaves a service that keeps its releases to that", () => {
-        expect(releases.runsCutover({ ...plain, keepReleases: true })).toBe(false);
+        expect(releases.runsCutover({ ...plain, keepReleases: true }, routed)).toBe(false);
     });
 });
 

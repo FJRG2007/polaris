@@ -180,7 +180,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             {
                 title: "Deploys with no gap",
                 description:
-                    "A new version counts only once it is serving, and a private service starts it beside the running one and changes over.",
+                    "A new version counts only once it is serving. A private service starts every copy of it beside the running ones - here, or on a server set up to serve its own domains - and changes over.",
                 where: "Service > Deployments",
                 href: PROJECTS
             },

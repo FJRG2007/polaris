@@ -3,10 +3,14 @@
  * the edge spreads traffic over them.
  *
  * A new count reaches the running service the way a changed variable does: the
- * live release is started again from its kept image, which recreates nothing that
- * did not change - the first copy is left as it is and the others come or go. So a
- * count moved by hand and one moved by the autoscaler take the same path, and both
- * leave a row in the history saying the service was scaled.
+ * live release is started again from its kept image. A service whose deploys change
+ * over beside the running release gets the new count as a whole set of copies
+ * beside the old ones, which go once every new copy is serving; anywhere else
+ * nothing that did not change is recreated - the first copy is left as it is and
+ * the others come or go. Either way the edge goes on dialling the copies the
+ * serving release has until the new one is promoted. So a count moved by hand and
+ * one moved by the autoscaler take the same path, and both leave a row in the
+ * history saying the service was scaled.
  */
 
 import { prisma } from "@polaris/db";

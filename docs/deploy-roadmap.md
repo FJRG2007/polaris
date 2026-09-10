@@ -111,7 +111,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Restart policies UI | todo | P2 | |
 | Scheduled jobs | done | P1 | Service > Cron |
 | One-off command | done | P2 | Service > Console |
-| Zero-downtime deploys | partial | P1 | swarm starts first and rolls back; compose changes over for a service with no published port or volume, the rest are recreated |
+| Zero-downtime deploys | partial | P1 | swarm starts first and rolls back; compose changes over for a service with no published port or volume, every copy, on this host or on a server whose edge takes pushed routes; a published port, a volume, a compose file, a second host port or a label-only server edge are recreated |
 
 ## 7. Databases
 

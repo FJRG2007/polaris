@@ -4373,6 +4373,11 @@ model Deployment {
     // replaced is taken down once this one is serving. Named after the deployment
     // rather than its commit, so redeploying one commit still gets a fresh container.
     cutover        Boolean   @default(false)
+    // How many copies it was started with. The edge dials the copies of the release
+    // that is serving rather than the count the service is set to, which moves
+    // before the release that carries it is up. Null on every deployment made
+    // before this was recorded, which reads as the service's own count.
+    replicas       Int?
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
     // The GitHub Deployment this release was announced as, so its state can be
