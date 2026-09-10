@@ -5,7 +5,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import type { AlarmInput } from "@/lib/watch/watch-schema";
+import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
+import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 
 export interface AlarmView {
     id: string;
@@ -33,24 +36,48 @@ export interface AlarmEventView {
 
 export interface AlarmTargets {
     apps: { id: string; name: string }[];
+    /** `measuresDisk` is false for a server reached over SSH: nothing here can
+     *  read its filesystem, so a disk alarm on it would never have a reading. */
+    hosts: { id: string; name: string; measuresDisk: boolean }[];
     domains: { id: string; hostname: string }[];
 }
 
-/** Apps and domains the owner can watch, for the create form. */
+/** Apps, servers and domains the owner can watch, for the create form. */
 export async function listAlarmTargets(ownerId: string): Promise<AlarmTargets> {
-    const [apps, domains] = await Promise.all([
+    const [apps, hosts, domains, identity, localName] = await Promise.all([
         prisma.application.findMany({
             where: { environment: { project: { ownerId } } },
             select: { id: true, name: true },
+            orderBy: { name: "asc" }
+        }),
+        prisma.host.findMany({
+            where: { ownerId },
+            select: { id: true, name: true, dockerId: true, address: true },
             orderBy: { name: "asc" }
         }),
         prisma.domain.findMany({
             where: { application: { environment: { project: { ownerId } } } },
             select: { id: true, hostname: true },
             orderBy: { hostname: "asc" }
-        })
+        }),
+        localMachineIdentity().catch(() => null),
+        getLocalServerName().catch(() => null)
     ]);
-    return { apps, domains };
+    // The machine Polaris runs on is one target however it is known: its enrolled
+    // server row when it has one, its reserved subject when it does not.
+    const servers = hosts.map((host) => ({
+        id: host.id,
+        name: host.name,
+        measuresDisk: identity ? isLocalMachine(host, identity) : false
+    }));
+    if (!servers.some((server) => server.measuresDisk)) {
+        servers.unshift({
+            id: LOCAL_HOST_SUBJECT,
+            name: localName ?? LOCAL_SERVER_FALLBACK_NAME,
+            measuresDisk: true
+        });
+    }
+    return { apps, hosts: servers, domains };
 }
 
 function toView(row: {
@@ -82,12 +109,30 @@ function toView(row: {
 }
 
 export async function listAlarms(ownerId: string): Promise<AlarmView[]> {
-    const rows = await prisma.alarm.findMany({ where: { ownerId }, orderBy: { createdAt: "desc" } });
+    const rows = await prisma.alarm.findMany({
+        where: { ownerId },
+        orderBy: { createdAt: "desc" }
+    });
     return rows.map(toView);
 }
 
-/** Confirm the target app/domain belongs to the owner before creating an alarm. */
-async function assertOwnsTarget(ownerId: string, targetType: string, targetId: string): Promise<void> {
+/** Confirm the target belongs to the owner before creating an alarm. */
+async function assertOwnsTarget(
+    ownerId: string,
+    targetType: string,
+    targetId: string
+): Promise<void> {
+    if (targetType === "host") {
+        // The machine Polaris runs on has no row to own until it is enrolled, and
+        // belongs to whoever is watching it - as its metrics already do.
+        if (targetId === LOCAL_HOST_SUBJECT) return;
+        const host = await prisma.host.findFirst({
+            where: { id: targetId, ownerId },
+            select: { id: true }
+        });
+        if (!host) throw new Error("The selected server was not found");
+        return;
+    }
     if (targetType === "application") {
         const app = await prisma.application.findFirst({
             where: { id: targetId, environment: { project: { ownerId } } },
@@ -122,13 +167,19 @@ export async function createAlarm(ownerId: string, input: AlarmInput): Promise<s
     return alarm.id;
 }
 
-export async function setAlarmEnabled(ownerId: string, id: string, enabled: boolean): Promise<void> {
+export async function setAlarmEnabled(
+    ownerId: string,
+    id: string,
+    enabled: boolean
+): Promise<void> {
     const alarm = await prisma.alarm.findFirst({ where: { id, ownerId }, select: { id: true } });
     if (!alarm) throw new Error("Alarm not found");
     // Re-enabling resets the streak/state so a stale breach does not fire instantly.
     await prisma.alarm.update({
         where: { id: alarm.id },
-        data: enabled ? { enabled: true, state: "insufficient", breachStreak: 0 } : { enabled: false }
+        data: enabled
+            ? { enabled: true, state: "insufficient", breachStreak: 0 }
+            : { enabled: false }
     });
 }
 
@@ -139,7 +190,10 @@ export async function deleteAlarm(ownerId: string, id: string): Promise<void> {
 }
 
 /** Recent alarm events across the owner's alarms, newest first. */
-export async function listRecentAlarmEvents(ownerId: string, limit = 50): Promise<AlarmEventView[]> {
+export async function listRecentAlarmEvents(
+    ownerId: string,
+    limit = 50
+): Promise<AlarmEventView[]> {
     const rows = await prisma.alarmEvent.findMany({
         where: { alarm: { ownerId } },
         orderBy: { createdAt: "desc" },

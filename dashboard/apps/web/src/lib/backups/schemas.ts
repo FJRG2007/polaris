@@ -35,8 +35,12 @@ export const subPathSchema = z
             .replace(/\/{2,}/g, "/")
             .replace(/^\/+|\/+$/g, "")
     )
-    .refine((value) => !value.split("/").includes(".."), { message: "That path cannot contain '..'" })
-    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), { message: "That path contains control characters" });
+    .refine((value) => !value.split("/").includes(".."), {
+        message: "That path cannot contain '..'"
+    })
+    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), {
+        message: "That path contains control characters"
+    });
 
 /**
  * The normalized identity of a protected thing.
@@ -53,7 +57,9 @@ export function buildSelector(kind: ResourceKind, parts: readonly string[] = [])
 /** The kind a selector names, for reading one back. */
 export function selectorKind(selector: string): ResourceKind | undefined {
     const head = selector.split(":", 1)[0];
-    return (RESOURCE_KINDS as readonly string[]).includes(head ?? "") ? (head as ResourceKind) : undefined;
+    return (RESOURCE_KINDS as readonly string[]).includes(head ?? "")
+        ? (head as ResourceKind)
+        : undefined;
 }
 
 /**
@@ -68,11 +74,12 @@ export const protectTargetSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("managed-database"), databaseId: z.string().uuid() }),
     z.object({ kind: z.literal("minecraft-world"), installedAppId: z.string().uuid() }),
     z.object({ kind: z.literal("deploy-volume"), volumeId: z.string().uuid() }),
+    z.object({ kind: z.literal("mail-server"), serverId: z.string().uuid() }),
     z.object({
         kind: z.literal("nas-path"),
         connectionId: z.string().uuid(),
         path: subPathSchema
-    }),
+    })
 ]);
 
 export type ProtectTarget = z.infer<typeof protectTargetSchema>;
@@ -88,6 +95,8 @@ export function targetSelector(target: ProtectTarget): string {
             return buildSelector("minecraft-world", [target.installedAppId]);
         case "deploy-volume":
             return buildSelector("deploy-volume", [target.volumeId]);
+        case "mail-server":
+            return buildSelector("mail-server", [target.serverId]);
         case "nas-path":
             return buildSelector("nas-path", [target.connectionId, target.path]);
     }
@@ -136,9 +145,14 @@ export const destinationSchema = z.discriminatedUnion("kind", [
         hostId: z.string().uuid(),
         // An absolute path on the machine, which is what somebody means when they
         // say where on a server the copies should go.
-        basePath: z.string().trim().min(1).max(1024).refine((value) => !value.includes(".."), {
-            message: "That path cannot contain '..'"
-        })
+        basePath: z
+            .string()
+            .trim()
+            .min(1)
+            .max(1024)
+            .refine((value) => !value.includes(".."), {
+                message: "That path cannot contain '..'"
+            })
     })
 ]);
 

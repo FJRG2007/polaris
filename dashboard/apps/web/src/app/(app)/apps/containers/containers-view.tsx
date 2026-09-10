@@ -31,7 +31,15 @@ import {
 import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ReactNode
+} from "react";
 import type {
     ContainerRow,
     DockerConnectionSummary,
@@ -77,7 +85,9 @@ export function ContainersView({
     const router = useRouter();
     // Whether the host on screen is the machine Polaris runs on, which is the only
     // one that has a Polaris to measure.
-    const isLocalHost = connections.some((connection) => connection.id === connectionId && connection.local);
+    const isLocalHost = connections.some(
+        (connection) => connection.id === connectionId && connection.local
+    );
     const [pending, startTransition] = useTransition();
     const [live, setLive] = useState(true);
     const [confirm, confirmDialog] = useConfirm();
@@ -123,7 +133,8 @@ export function ContainersView({
     const shown = useRef<{ connectionId: string | null; snapshot: HostSnapshot } | null>(null);
     const snapshot = useMemo(() => {
         if (!answer) return null;
-        const previous = shown.current?.connectionId === connectionId ? shown.current.snapshot : null;
+        const previous =
+            shown.current?.connectionId === connectionId ? shown.current.snapshot : null;
         const merged = carryForwardUsage(previous, answer);
         shown.current = { connectionId, snapshot: merged };
         return merged;
@@ -282,7 +293,7 @@ export function ContainersView({
 
             <section className="min-w-0">
                 {localDiagnostic ? (
-                    <div className="mb-4 rounded-md border border-warning/40 bg-warning/10 p-4 text-sm">
+                    <div className="mb-4 rounded-md border border-warning-edge bg-warning-soft p-4 text-sm">
                         <p className="font-medium">The local Docker host is not available yet</p>
                         <p className="mt-1 text-muted-foreground">{localDiagnostic.reason}</p>
                         <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -312,12 +323,12 @@ export function ContainersView({
                 ) : (
                     <>
                         {(actionError ?? error) ? (
-                            <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                            <div className="mb-4 rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
                                 {actionError ?? error}
                             </div>
                         ) : null}
                         {!actionError && !error && stale ? (
-                            <div className="mb-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+                            <div className="mb-4 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
                                 Showing the last reading. {stale}
                             </div>
                         ) : null}
@@ -367,10 +378,30 @@ export function ContainersView({
                             <table className="w-full min-w-[44rem] text-sm">
                                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                     <tr>
-                                        <SortHeader label="Container" order="name" sort={sort} onSort={sortBy} />
-                                        <SortHeader label="State" order="state" sort={sort} onSort={sortBy} />
-                                        <SortHeader label="CPU" order="cpu" sort={sort} onSort={sortBy} />
-                                        <SortHeader label="Memory" order="memory" sort={sort} onSort={sortBy} />
+                                        <SortHeader
+                                            label="Container"
+                                            order="name"
+                                            sort={sort}
+                                            onSort={sortBy}
+                                        />
+                                        <SortHeader
+                                            label="State"
+                                            order="state"
+                                            sort={sort}
+                                            onSort={sortBy}
+                                        />
+                                        <SortHeader
+                                            label="CPU"
+                                            order="cpu"
+                                            sort={sort}
+                                            onSort={sortBy}
+                                        />
+                                        <SortHeader
+                                            label="Memory"
+                                            order="memory"
+                                            sort={sort}
+                                            onSort={sortBy}
+                                        />
                                         <th className="px-3 py-2" />
                                     </tr>
                                 </thead>

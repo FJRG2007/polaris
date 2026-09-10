@@ -25,8 +25,8 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
-import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
+import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 
 /** The caller, as the action layer resolved them. */
 export interface NoteActor {
@@ -102,7 +102,10 @@ export async function resolveSpaceRole(
             org: {
                 select: {
                     ownerId: true,
-                    members: { where: { userId: actor.id }, select: { role: true } },
+                    members: {
+                        where: { userId: actor.id },
+                        select: { role: true, restricted: true }
+                    },
                     roles: { select: { slug: true, permissions: true } }
                 }
             }
@@ -129,7 +132,9 @@ export async function resolveSpaceRole(
 
     if (space.visibility !== "internal") return null;
     if (!space.orgId) return "guest";
-    return space.org && space.org.members.length > 0 ? "guest" : null;
+    // The roster, less its restricted members - see the same rule in Tasks.
+    const membership = space.org?.members[0];
+    return membership && !membership.restricted ? "guest" : null;
 }
 
 export async function requireSpace(

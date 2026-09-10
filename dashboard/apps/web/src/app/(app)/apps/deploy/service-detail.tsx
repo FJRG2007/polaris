@@ -8,30 +8,47 @@
  */
 
 import Link from "next/link";
+import { CronPanel } from "./cron-panel";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
+import { DomainCdnButton } from "./domain-cdn";
+import { EdgeSettings } from "./edge-settings";
 import { TerminalPanel } from "./terminal-panel";
+import { useProjectCan } from "./access-context";
+import { ScalingSection } from "./scaling-section";
 import { relativeTime } from "@/lib/relative-time";
+import { DeployCallouts } from "./deploy-callouts";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
+import { VariablesEditor } from "./variables-editor";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
-import { describeServiceEvent } from "./service-history";
+import { useParams, useRouter } from "next/navigation";
+import { UploadedSourceSection } from "./upload-source";
+import { RuntimeLogs } from "@/components/runtime-logs";
+import { deploySteps } from "@/lib/deploy/deploy-steps";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
-import { useProjectCan } from "./access-context";
-import { useParams, useRouter } from "next/navigation";
-import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { stageServiceDeleteAction } from "./project-actions";
+import { BuildMachineSection } from "./build-machine-section";
 import { useDisplayFormat } from "@/components/display-format";
-import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
+import { TabAttentionDot, tabAttention } from "./attention-dot";
+import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
+import { describeServiceEvent, unresolvedSetupFailure } from "./service-history";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import {
+    isTunnelHostname,
+    runtimeVersionSchema,
+    type DisplayFormat,
+    type ProjectCapability
+} from "@polaris/core";
 import {
     CONSUMPTION_METRICS,
     MetricsHistory,
@@ -39,6 +56,7 @@ import {
     type MetricSpec
 } from "@/components/metrics-history";
 import {
+    Badge,
     Button,
     Checkbox,
     cn,
@@ -46,6 +64,7 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    DnsRecordCard,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -71,22 +90,24 @@ import {
     CircleStop,
     Download,
     ExternalLink,
-    Eye,
-    EyeOff,
     Globe,
     Loader2,
     MapPin,
     Maximize2,
     Minimize2,
     MoreVertical,
+    Pin,
+    PinOff,
     Play,
     Plus,
     RotateCw,
     ScrollText,
     Search,
     ShieldCheck,
+    Split,
     Square,
     Trash2,
+    Undo2,
     X
 } from "lucide-react";
 
@@ -106,6 +127,7 @@ const TABS = [
     "Console",
     "Files",
     "Volumes",
+    "Cron",
     "Notes",
     "Settings"
 ] as const;
@@ -124,6 +146,9 @@ const TAB_CAPABILITY: Record<Tab, readonly ProjectCapability[]> = {
     Console: ["console.use"],
     Files: ["files.read"],
     Volumes: ["project.read"],
+    // Seeing jobs and their output is reading logs; changing or running one is
+    // gated again inside, on the console.
+    Cron: ["logs.read"],
     Notes: ["project.read"],
     // Settings holds three separate jobs - how the service is built, where it
     // answers, and removing it - so any one of them is enough to open it, and the
@@ -162,6 +187,7 @@ export function ServiceDetail({
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const can = useProjectCan();
     const tabs = TABS.filter((name) => TAB_CAPABILITY[name].some(can));
+    const dots = tabAttention(app.attention);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -219,6 +245,12 @@ export function ServiceDetail({
                             }`}
                         >
                             {name}
+                            {dots[name] && (
+                                <TabAttentionDot
+                                    label={dots[name]}
+                                    className="mb-0.5 ml-1.5 align-middle"
+                                />
+                            )}
                         </button>
                     ))}
                     <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
@@ -254,6 +286,7 @@ export function ServiceDetail({
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
                     {tab === "Volumes" && <VolumesTab app={app} />}
+                    {tab === "Cron" && <CronPanel applicationId={app.id} />}
                     {tab === "Notes" && <NotesTab applicationId={app.id} />}
                     {tab === "Settings" && (
                         <SettingsTab
@@ -271,13 +304,33 @@ export function ServiceDetail({
 
 type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
 
-function depBadge(deployment: DepSummary): { label: string; cls: string } {
-    if (deployment.isCurrent) return { label: "ACTIVE", cls: "bg-success/15 text-success" };
+/** A deployment's state as one chip. Every chip on a row is a Badge, so the
+ *  state, the rollback marks and the kept-image mark share one shape. */
+function depBadge(deployment: DepSummary): {
+    label: string;
+    variant: "success" | "danger" | "warning" | "neutral";
+} {
+    if (deployment.isCurrent) return { label: "Active", variant: "success" };
     if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
-        return { label: "FAILED", cls: "bg-danger/15 text-danger" };
+        return {
+            label: deployment.status === "cancelled" ? "Cancelled" : "Failed",
+            variant: "danger"
+        };
     if (["queued", "deploying"].includes(deployment.status))
-        return { label: deployment.status.toUpperCase(), cls: "bg-warning/15 text-warning" };
-    return { label: "REMOVED", cls: "bg-muted text-muted-foreground" };
+        return {
+            label: deployment.status === "queued" ? "Queued" : "Deploying",
+            variant: "warning"
+        };
+    return { label: "Removed", variant: "neutral" };
+}
+
+function StateBadge({ deployment }: { deployment: DepSummary }) {
+    const badge = depBadge(deployment);
+    return (
+        <Badge variant={badge.variant} className="shrink-0 uppercase tracking-wide">
+            {badge.label}
+        </Badge>
+    );
 }
 
 /** Whether a deployment has stopped moving. Everything else is still queued or
@@ -317,10 +370,64 @@ function DeployAvatar({ app, deployment }: { app: ProjectApp; deployment?: DepSu
     );
 }
 
-/** Deployment subtitle: relative time, optional author, and the source. */
+/** Deployment subtitle: relative time, optional author, what started it, and how
+ *  long it took once it has finished. A rollback or a restart with changed
+ *  variables says so instead of naming a source, since nothing was built. */
 function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: DisplayFormat): string {
     const by = deployment.authorName ? ` by ${deployment.authorName}` : "";
-    return `${relativeTime(deployment.createdAt, format)}${by} via ${sourceLabel(app)}`;
+    const via = deployment.rollbackOfId
+        ? " - rolled back"
+        : deployment.trigger === "variables"
+          ? " - variables changed, not rebuilt"
+          : deployment.trigger === "settings"
+            ? " - restarted with new settings, not rebuilt"
+            : deployment.trigger === "scale"
+              ? " - scaled, not rebuilt"
+              : deployment.trigger === "upload"
+                ? " - uploaded"
+                : deployment.trigger === "preview"
+                  ? ` - pull request preview via ${sourceLabel(app)}`
+                  : deployment.trigger === "push"
+                    ? ` - pushed to ${sourceLabel(app)}`
+                    : ` via ${sourceLabel(app)}`;
+    const took = deployment.durationMs !== null ? ` - took ${duration(deployment.durationMs)}` : "";
+    return `${relativeTime(deployment.createdAt, format)}${by}${via}${took}`;
+}
+
+/** A deploy's length the way a person says it: "48s", "3m 12s". */
+function duration(ms: number): string {
+    const seconds = Math.max(0, Math.round(ms / 1000));
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    return seconds % 60 === 0 ? `${minutes}m` : `${minutes}m ${seconds % 60}s`;
+}
+
+/** Whether a version can be put back instantly, and whether it is being kept
+ *  past the window. Only for versions that are not live: the live one is the
+ *  one everything else would be rolled back from. */
+function KeptChip({ deployment }: { deployment: DepSummary }) {
+    return (
+        <>
+            {deployment.rollbackOfId && (
+                <Badge variant="neutral" className="shrink-0" title="Put back from a kept image">
+                    Rollback
+                </Badge>
+            )}
+            {!deployment.isCurrent && deployment.imageKept && (
+                <Badge
+                    variant="primary"
+                    className="shrink-0"
+                    title={
+                        deployment.pinned
+                            ? "Kept until you stop keeping it - roll back to it at any time"
+                            : "Its image is still on the server - roll back to it instantly"
+                    }
+                >
+                    {deployment.pinned ? "Pinned" : "Instant rollback"}
+                </Badge>
+            )}
+        </>
+    );
 }
 
 /** The address one kept version answers on, beside the service's own. Only a
@@ -415,6 +522,23 @@ function DeploymentMenu({
         });
     }
 
+    /** Put this release back live from its kept image, and follow the new
+     *  deployment the way a redeploy does. */
+    function rollBack() {
+        startTransition(async () => {
+            const result = await deployActions
+                .rollbackDeploymentAction(deployment.id)
+                .catch(() => ({
+                    error: "Could not roll back to that release",
+                    deploymentId: undefined
+                }));
+            setError(result.error ?? null);
+            onAct();
+            onChanged();
+            if (result.deploymentId) onDeployStarted(result.deploymentId);
+        });
+    }
+
     // Every item in this menu ships or tears down a release, so with no standing
     // to do that there is no menu - not one that opens onto nothing.
     if (!can("deploy.run")) return null;
@@ -441,9 +565,59 @@ function DeploymentMenu({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                {deployment.rollbackable && (
+                    <DropdownMenuItem onSelect={rollBack}>
+                        <Undo2 className="size-4" /> Roll back to this version
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={redeploy}>
-                    <RotateCw className="size-4" /> Redeploy
+                    <RotateCw className="size-4" /> {isActive ? "Redeploy" : "Deploy latest source"}
                 </DropdownMenuItem>
+                {deployment.imageKept && (
+                    <DropdownMenuItem
+                        onSelect={() =>
+                            run(() =>
+                                deployActions.pinDeploymentAction(deployment.id, !deployment.pinned)
+                            )
+                        }
+                    >
+                        {deployment.pinned ? (
+                            <PinOff className="size-4" />
+                        ) : (
+                            <Pin className="size-4" />
+                        )}
+                        {deployment.pinned ? "Stop keeping this version" : "Keep this version"}
+                    </DropdownMenuItem>
+                )}
+                {deployment.canTakeTraffic &&
+                    (deployment.trafficPercent !== null ? (
+                        <DropdownMenuItem
+                            onSelect={() =>
+                                run(() =>
+                                    deployActions.setDeploymentTrafficAction(deployment.id, null)
+                                )
+                            }
+                        >
+                            <Split className="size-4" /> Stop sending {deployment.trafficPercent}%
+                            of traffic here
+                        </DropdownMenuItem>
+                    ) : (
+                        [10, 50].map((percent) => (
+                            <DropdownMenuItem
+                                key={percent}
+                                onSelect={() =>
+                                    run(() =>
+                                        deployActions.setDeploymentTrafficAction(
+                                            deployment.id,
+                                            percent
+                                        )
+                                    )
+                                }
+                            >
+                                <Split className="size-4" /> Send {percent}% of traffic here
+                            </DropdownMenuItem>
+                        ))
+                    ))}
                 {isActive && (
                     <>
                         <DropdownMenuItem
@@ -555,7 +729,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             <Globe className="size-4 shrink-0 text-muted-foreground" />{" "}
                             {primary.hostname}
                             {isLocalDomain(primary) && (
-                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[0.625rem] font-medium text-warning">
+                                <span className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink">
                                     LAN
                                 </span>
                             )}
@@ -581,7 +755,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" /> {region}
                     </span>
-                    <span>1 Replica</span>
+                    <span>
+                        {app.replicas} {app.replicas === 1 ? "Replica" : "Replicas"}
+                    </span>
                 </div>
                 {can("deploy.run") && (
                     <Button size="sm" disabled={busy} onClick={deploy}>
@@ -596,12 +772,24 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                 <Empty text="No deployments yet. Click Deploy to ship the current source." />
             ) : (
                 <>
+                    <DeployCallouts
+                        applicationId={app.id}
+                        items={items}
+                        canDeploy={can("deploy.run")}
+                        busy={busy}
+                        onDeploy={deploy}
+                        onViewLog={setLogsFor}
+                        canConfigure={can("service.configure")}
+                        canSetVariables={can("variables.write")}
+                        onFixed={() => {
+                            reload();
+                            onChanged();
+                        }}
+                    />
                     {active && (
-                        <div className="overflow-hidden rounded-xl border border-success/30 bg-success/[0.06]">
+                        <div className="overflow-hidden rounded-xl border border-success-edge bg-success/[0.06]">
                             <div className="flex items-center gap-3 p-3">
-                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-success">
-                                    ACTIVE
-                                </span>
+                                <StateBadge deployment={active} />
                                 <DeployAvatar app={app} deployment={active} />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium text-foreground">
@@ -611,10 +799,16 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                         {deploySubtitle(active, app, format)}
                                     </p>
                                 </div>
+                                {active.commitSha && (
+                                    <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                                        <CommitRef deployment={active} />
+                                    </span>
+                                )}
+                                <KeptChip deployment={active} />
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="shrink-0 border-success/40 text-success hover:bg-success/10 hover:text-success"
+                                    className="shrink-0 border-success-edge text-success-ink hover:bg-success-soft hover:text-success-ink"
                                     onClick={() => setLogsFor(active.id)}
                                 >
                                     View logs
@@ -631,7 +825,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             <button
                                 type="button"
                                 onClick={() => setSuccessOpen((value) => !value)}
-                                className="flex w-full items-center gap-1.5 border-t border-success/20 px-3 py-2 text-xs text-success"
+                                className="flex w-full items-center gap-1.5 border-t border-success-edge px-3 py-2 text-xs text-success-ink"
                             >
                                 <CheckCircle2 className="size-3.5" />
                                 {active.status === "running"
@@ -647,7 +841,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 />
                             </button>
                             {successOpen && (
-                                <div className="border-t border-success/20 px-3 py-2 text-xs text-muted-foreground">
+                                <div className="border-t border-success-edge px-3 py-2 text-xs text-muted-foreground">
                                     {active.commitSha ? (
                                         <CommitRef deployment={active} />
                                     ) : (
@@ -680,7 +874,6 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             {historyOpen && (
                                 <ul className="flex flex-col gap-2">
                                     {history.map((deployment) => {
-                                        const badge = depBadge(deployment);
                                         const failed = [
                                             "failed",
                                             "cancelled",
@@ -693,18 +886,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                 className={cn(
                                                     "flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-muted-foreground/40",
                                                     failed
-                                                        ? "border-danger/30 bg-danger/5"
+                                                        ? "border-danger-edge bg-danger-soft"
                                                         : "border-border/60"
                                                 )}
                                             >
-                                                <span
-                                                    className={cn(
-                                                        "shrink-0 rounded px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide",
-                                                        badge.cls
-                                                    )}
-                                                >
-                                                    {badge.label}
-                                                </span>
+                                                <StateBadge deployment={deployment} />
                                                 <DeployAvatar app={app} deployment={deployment} />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate font-medium text-foreground">
@@ -713,7 +899,18 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate text-xs text-muted-foreground">
                                                         {deploySubtitle(deployment, app, format)}
                                                     </p>
+                                                    {!isSettled(deployment) && (
+                                                        <InFlightSteps
+                                                            deploymentId={deployment.id}
+                                                        />
+                                                    )}
                                                 </div>
+                                                {deployment.commitSha && (
+                                                    <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                                                        <CommitRef deployment={deployment} />
+                                                    </span>
+                                                )}
+                                                <KeptChip deployment={deployment} />
                                                 <ReleaseLink deployment={deployment} />
                                                 {/* A deploy still in flight is listed
                                                     here, so this is where it is stopped
@@ -863,9 +1060,11 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
     // Nothing yet means nothing to open, and a heading over an empty box is a
     // control that does nothing.
     if (lines !== null && lines.length === 0) return null;
+    const failure = lines ? unresolvedSetupFailure(lines) : null;
 
     return (
         <div className="flex flex-col gap-2">
+            {failure ? <SetupFailure applicationId={applicationId} failure={failure} /> : null}
             <button
                 type="button"
                 onClick={() => setOpen((value) => !value)}
@@ -883,6 +1082,65 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
                     <ActivityFeed lines={lines} describe={describeServiceEvent} />
                 )
             ) : null}
+        </div>
+    );
+}
+
+/**
+ * A one-click service whose setup did not finish, said where its deploys are
+ * rather than only inside the folded activity. A failed setup command can be run
+ * again from here; a deploy that never started is fixed by deploying.
+ */
+function SetupFailure({
+    applicationId,
+    failure
+}: {
+    applicationId: string;
+    failure: ActivityLine;
+}) {
+    const can = useProjectCan();
+    const [started, setStarted] = useState(false);
+    const [error, setError] = useState("");
+    const [pending, startTransition] = useTransition();
+    const rerunnable = failure.action === "setup-failed" && can("service.configure");
+    const hint = started
+        ? "Setup is running again. How it went appears under Activity."
+        : failure.action === "setup-failed"
+          ? null
+          : "Once that is fixed, deploy this service.";
+
+    function rerun() {
+        setError("");
+        startTransition(async () => {
+            const result = await deployActions.rerunServiceSetupAction(applicationId);
+            if (result.error) setError(result.error);
+            else setStarted(true);
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-danger-edge bg-danger-soft p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                        {failure.action === "setup-failed"
+                            ? "Setup did not finish"
+                            : "Not deployed"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                        {describeServiceEvent(failure)}
+                    </span>
+                    {hint ? (
+                        <span className="block text-xs text-muted-foreground">{hint}</span>
+                    ) : null}
+                </span>
+                {rerunnable && !started ? (
+                    <Button variant="secondary" size="sm" onClick={rerun} disabled={pending}>
+                        {pending && <Loader2 className="size-4 animate-spin" />} Run setup again
+                    </Button>
+                ) : null}
+            </div>
+            {error && <p className="text-xs text-danger">{error}</p>}
         </div>
     );
 }
@@ -921,7 +1179,6 @@ function DeploymentLogsView({
     const [chosen, setChosen] = useState<(typeof CATS)[number] | null>(null);
     const building = !deployment || !isSettled(deployment);
     const cat = chosen ?? (building ? "Build Logs" : "Deploy Logs");
-    const badge = deployment ? depBadge(deployment) : null;
 
     return (
         <div className="flex flex-col gap-2 py-2">
@@ -947,13 +1204,7 @@ function DeploymentLogsView({
                         </span>
                     </>
                 )}
-                {badge && (
-                    <span
-                        className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}
-                    >
-                        {badge.label}
-                    </span>
-                )}
+                {deployment && <StateBadge deployment={deployment} />}
                 {deployment && (
                     <span className="ml-auto text-xs text-muted-foreground">
                         {format.dateTime(deployment.createdAt)}
@@ -1089,17 +1340,28 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
     );
 }
 
+/** A deploy that is still moving, drawn as its steps under its row. */
+function InFlightSteps({ deploymentId }: { deploymentId: string }) {
+    const steps = useDeploySteps(deploymentId, true);
+    return steps ? (
+        <div className="mt-1">
+            <DeployStepSegments steps={steps} />
+        </div>
+    ) : null;
+}
+
 /** Small pulsing "Live" badge shown above a log stream that is actively polling. */
 function LivePill() {
     return (
         <span className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live
+            <span className="size-1.5 animate-pulse rounded-full bg-success-solid" /> Live
         </span>
     );
 }
 
 function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
     const [log, setLog] = useState("");
+    const [status, setStatus] = useState("queued");
     const [live, setLive] = useState(true);
     const onDoneRef = useRef(onDone);
     onDoneRef.current = onDone;
@@ -1117,6 +1379,7 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
                 setLog(data.log);
+                setStatus(data.status);
                 // The build stream is terminal once the deployment leaves the build phase
                 // (running) or ends in failure; stop polling and drop the live indicator.
                 if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
@@ -1139,6 +1402,9 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
 
     return (
         <div className="flex flex-col gap-2">
+            <div className="rounded-lg border border-border bg-card px-3 pt-3">
+                <DeployStepper steps={deploySteps(status, log)} />
+            </div>
             {live && <LivePill />}
             <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />
         </div>
@@ -1146,8 +1412,9 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
 }
 
 /**
- * Live runtime stdout/stderr of the app's container - what the app prints while
- * running, distinct from the build log. Polled while the tab is open.
+ * Live runtime stdout/stderr of every container of the app - what it prints while
+ * running, distinct from the build log - followed as it prints, with what was
+ * kept over the last week one switch away.
  *
  * A deployment that has not finished has no container to read, and one that
  * failed never got one. Both used to surface whatever the engine said about the
@@ -1164,46 +1431,9 @@ function RuntimeLogView({
     deployment: DepSummary | null;
     onSeeBuild: () => void;
 }) {
-    const [log, setLog] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const pending = deployment !== null && !isSettled(deployment);
     const failed =
         deployment !== null && ["failed", "cancelled", "rolled_back"].includes(deployment.status);
-
-    useEffect(() => {
-        // Nothing to poll for: there is no container behind either state.
-        if (pending || failed) return;
-        let active = true;
-        let timer: ReturnType<typeof setTimeout>;
-        async function poll(): Promise<void> {
-            if (typeof document !== "undefined" && document.hidden) {
-                timer = setTimeout(poll, 3000);
-                return;
-            }
-            try {
-                const res = await fetch(`/api/deploy/apps/${appId}/logs?tail=500`, {
-                    cache: "no-store"
-                });
-                if (!active) return;
-                if (res.ok) {
-                    const data = (await res.json()) as { log: string };
-                    setLog(data.log ?? "");
-                    setError(null);
-                } else {
-                    const data = (await res.json().catch(() => null)) as { error?: string } | null;
-                    setError(data?.error ?? "Could not read runtime logs");
-                }
-            } catch {
-                if (active) setError("Could not read runtime logs");
-            }
-            if (active) timer = setTimeout(poll, 2500);
-        }
-        void poll();
-        return () => {
-            active = false;
-            clearTimeout(timer);
-        };
-    }, [appId, pending, failed]);
 
     if (pending || failed) {
         return (
@@ -1220,27 +1450,15 @@ function RuntimeLogView({
             </div>
         );
     }
-    if (error) return <Empty text={error} />;
-    if (log === null) return <Loading />;
-    if (!log.trim()) {
-        return (
-            <Empty text="No runtime logs yet. The container may have just started, or writes nothing to stdout." />
-        );
-    }
-    return (
-        <div className="flex flex-col gap-2">
-            <LivePill />
-            <LogViewer log={log} name={`${appId}-runtime`} searchable className="h-[26rem]" />
-        </div>
-    );
+    return <RuntimeLogs serviceIds={[appId]} name={`${appId}-runtime`} className="h-[26rem]" />;
 }
 
 /** Color an HTTP status by its class: 2xx ok, 3xx redirect, 4xx client, 5xx server. */
 function statusTone(status: number): string {
-    if (status >= 500) return "bg-red-500/10 text-red-600 dark:text-red-400";
-    if (status >= 400) return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    if (status >= 500) return "bg-danger-soft text-danger-ink";
+    if (status >= 400) return "bg-warning-soft text-warning-ink";
     if (status >= 300) return "bg-sky-500/10 text-sky-600 dark:text-sky-400";
-    if (status >= 200) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    if (status >= 200) return "bg-success-soft text-success-ink";
     return "bg-muted text-muted-foreground";
 }
 
@@ -1648,89 +1866,6 @@ function HttpLogsView({
 function VariablesTab({ app }: { app: ProjectApp }) {
     const can = useProjectCan();
     const [scope, setScope] = useState<"application" | "environment">("application");
-    const scopeId = scope === "application" ? app.id : app.environmentId;
-    const [items, setItems] = useState<Awaited<
-        ReturnType<typeof deployActions.listEnvVarsAction>
-    > | null>(null);
-    const [key, setKey] = useState("");
-    const [value, setValue] = useState("");
-    const [isSecret, setIsSecret] = useState(true);
-    // Revealed values, keyed by id: non-secrets use the listed value, secrets are
-    // decrypted on demand so a secret only reaches the client when the eye is clicked.
-    const [revealed, setRevealed] = useState<Record<string, string>>({});
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-    const [raw, setRaw] = useState("");
-    const [rawOpen, setRawOpen] = useState(false);
-    const [showAdd, setShowAdd] = useState(false);
-    const [note, setNote] = useState<string | null>(null);
-
-    function reload() {
-        setItems(null);
-        setRevealed({});
-        void deployActions.listEnvVarsAction(scope, scopeId).then(setItems);
-    }
-    useEffect(reload, [scope, scopeId]);
-
-    function toggleReveal(item: { id: string; isSecret: boolean; value: string | null }) {
-        if (item.id in revealed) {
-            setRevealed((prev) => {
-                const next = { ...prev };
-                delete next[item.id];
-                return next;
-            });
-            return;
-        }
-        if (!item.isSecret) {
-            setRevealed((prev) => ({ ...prev, [item.id]: item.value ?? "" }));
-            return;
-        }
-        void deployActions.revealEnvVarAction(item.id).then((result) => {
-            if (typeof result.value === "string")
-                setRevealed((prev) => ({ ...prev, [item.id]: result.value as string }));
-        });
-    }
-
-    function importRaw() {
-        setError(null);
-        setNote(null);
-        startTransition(async () => {
-            const result = await deployActions.importEnvVarsAction({
-                scope,
-                scopeId,
-                text: raw,
-                isSecret: true
-            });
-            if (result.error) setError(result.error);
-            else {
-                setRaw("");
-                setRawOpen(false);
-                setNote(`Imported ${result.count} variable${result.count === 1 ? "" : "s"}.`);
-                reload();
-            }
-        });
-    }
-
-    function add() {
-        setError(null);
-        startTransition(async () => {
-            const result = await deployActions.saveEnvVarAction({
-                scope,
-                scopeId,
-                key,
-                value,
-                isSecret
-            });
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setKey("");
-            setValue("");
-            reload();
-        });
-    }
-
     return (
         <div className="flex flex-col gap-4 py-2">
             <SegmentedControl
@@ -1743,152 +1878,17 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     { value: "environment", label: "Environment (shared)" }
                 ]}
             />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                    {items ? items.length : 0} {scope === "environment" ? "environment" : "service"}{" "}
-                    variable
-                    {items && items.length === 1 ? "" : "s"}
-                </span>
-                {can("variables.write") && (
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setRawOpen((open) => !open)}
-                        >
-                            {"{ } Raw Editor"}
-                        </Button>
-                        <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
-                            <Plus className="size-4" /> New Variable
-                        </Button>
-                    </div>
-                )}
-            </div>
-            {note && <p className="text-xs text-success">{note}</p>}
-            {rawOpen && (
-                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
-                    <span className="text-xs font-medium text-muted-foreground">
-                        Paste a .env - KEY=value per line. Quotes, spaces, `export` and # comments
-                        are handled.
-                    </span>
-                    <Textarea
-                        value={raw}
-                        onChange={(event) => setRaw(event.target.value)}
-                        rows={6}
-                        placeholder={
-                            'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'
-                        }
-                        className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs "
-                    />
-                    <div className="flex items-center justify-between gap-2">
-                        <label className="cursor-pointer text-xs text-primary hover:underline">
-                            Upload a .env file
-                            <input
-                                type="file"
-                                accept=".env,text/plain"
-                                className="hidden"
-                                onChange={(event) => {
-                                    const file = event.target.files?.[0];
-                                    if (file)
-                                        void file
-                                            .text()
-                                            .then((text) =>
-                                                setRaw((prev) => (prev ? `${prev}\n${text}` : text))
-                                            );
-                                }}
-                            />
-                        </label>
-                        <Button onClick={importRaw} disabled={pending || !raw.trim()}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Import
-                        </Button>
-                    </div>
-                </div>
-            )}
-            {showAdd && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
-                    <Input
-                        value={key}
-                        onChange={(event) => setKey(event.target.value)}
-                        placeholder="KEY"
-                        className="w-44 font-mono"
-                    />
-                    <Input
-                        value={value}
-                        onChange={(event) => setValue(event.target.value)}
-                        placeholder="value"
-                        className="min-w-0 flex-1"
-                    />
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Switch checked={isSecret} onChange={setIsSecret} aria-label="Secret" />{" "}
-                        secret
-                    </label>
-                    <Button onClick={add} disabled={pending || !key.trim()}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : "Add"}
-                    </Button>
-                </div>
-            )}
-            {items === null ? (
-                <Loading />
-            ) : items.length === 0 ? (
-                <Empty text="No variables yet. Add one or paste a .env." />
-            ) : (
-                <ul className="flex flex-col">
-                    {items.map((item) => {
-                        const shown = item.id in revealed;
-                        return (
-                            <li
-                                key={item.id}
-                                className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm"
-                            >
-                                <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
-                                <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">
-                                    {item.key}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                                    {shown ? (
-                                        revealed[item.id] || (
-                                            <span className="text-muted-foreground/50">
-                                                (empty)
-                                            </span>
-                                        )
-                                    ) : (
-                                        <SecretMask />
-                                    )}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => toggleReveal(item)}
-                                    className="text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
-                                    aria-label={shown ? "Hide value" : "Reveal value"}
-                                >
-                                    {shown ? (
-                                        <EyeOff className="size-3.5" />
-                                    ) : (
-                                        <Eye className="size-3.5" />
-                                    )}
-                                </button>
-                                {can("variables.write") && (
-                                    <button
-                                        type="button"
-                                        title="Remove"
-                                        aria-label={`Remove ${item.key}`}
-                                        onClick={() =>
-                                            startTransition(async () => {
-                                                await deployActions.deleteEnvVarAction(item.id);
-                                                reload();
-                                            })
-                                        }
-                                        className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </button>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-            {error && <p className="text-sm text-danger">{error}</p>}
+            <VariablesEditor
+                scope={scope}
+                scopeId={scope === "application" ? app.id : app.environmentId}
+                canWrite={can("variables.write")}
+                canDeploy={can("deploy.run")}
+                redeployTarget={
+                    scope === "application"
+                        ? "this service"
+                        : "every deployed service in this environment"
+                }
+            />
         </div>
     );
 }
@@ -1941,6 +1941,7 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
                 <h3 className="mb-1 text-sm font-medium">History</h3>
                 <MetricsHistory
                     endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                    live={`/api/deploy/apps/${applicationId}/metrics/stream`}
                     metrics={CONSUMPTION_METRICS}
                 />
             </div>
@@ -2377,17 +2378,32 @@ function defaultLabel(name: string): string {
 /** What the server did about a custom hostname's DNS, when it did anything. */
 type AddDomainDns = Awaited<ReturnType<typeof deployActions.addDomainAction>>["dns"];
 
-/** What is left to do about a custom hostname's DNS, in one line. Null when the name
- *  already answers here, which is the case that needs saying nothing. */
-function dnsAdvice(dns: AddDomainDns, hostname: string): string | null {
+/** What is left to do about a custom hostname's DNS, in one line, and the record to
+ *  create when there is one to create by hand. Null when the name already answers
+ *  here, which is the case that needs saying nothing. */
+function dnsAdvice(
+    dns: AddDomainDns,
+    hostname: string
+): { text: string; record?: { name: string; ip: string; conflict: boolean } } | null {
     if (!dns || dns.status === "unchanged") return null;
     if (dns.status === "created")
-        return `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`;
+        return {
+            text: `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`
+        };
+    const record = dns.ip
+        ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" }
+        : undefined;
     if (dns.status === "conflict") {
-        return `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`;
+        return {
+            text: `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`,
+            record
+        };
     }
     const target = dns.ip ? ` at ${dns.ip}` : "";
-    return `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`;
+    return {
+        text: `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`,
+        record
+    };
 }
 
 /**
@@ -2581,6 +2597,12 @@ function SettingsTab({
     const [installCommand, setInstallCommand] = useState(app.installCommand ?? "");
     const [buildCommand, setBuildCommand] = useState(app.buildCommand ?? "");
     const [startCommand, setStartCommand] = useState(app.startCommand ?? "");
+    const [runtimeVersion, setRuntimeVersion] = useState(app.runtimeVersion ?? "");
+    const [outputDirectory, setOutputDirectory] = useState(app.outputDirectory ?? "");
+    // Checked as it is typed, against the schema the server applies.
+    const runtimeVersionProblem = runtimeVersion.trim()
+        ? (runtimeVersionSchema.safeParse(runtimeVersion).error?.issues[0]?.message ?? null)
+        : null;
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
     // Empty means "not pinned": the deploy detects the container port from the image
     // (see buildAppPlan). Only a value the user types here pins it.
@@ -2619,7 +2641,7 @@ function SettingsTab({
     const [error, setError] = useState<string | null>(null);
     // Kept after a successful add: a custom domain works only once its DNS points here,
     // and whether Polaris managed that itself is the one thing the operator has to know.
-    const [dnsNote, setDnsNote] = useState<string | null>(null);
+    const [dnsNote, setDnsNote] = useState<ReturnType<typeof dnsAdvice>>(null);
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
@@ -2715,13 +2737,19 @@ function SettingsTab({
                 }
             }
             if (isGit) {
+                if (runtimeVersionProblem) {
+                    setError(runtimeVersionProblem);
+                    return;
+                }
                 const paths = await deployActions.setAppSourcePathsAction({
                     applicationId: app.id,
                     rootDirectory: rootDirectory.trim(),
                     dockerfilePath: dockerfilePath.trim(),
                     installCommand: installCommand.trim(),
                     buildCommand: buildCommand.trim(),
-                    startCommand: startCommand.trim()
+                    startCommand: startCommand.trim(),
+                    runtimeVersion: runtimeVersion.trim(),
+                    outputDirectory: outputDirectory.trim()
                 });
                 if (paths.error) {
                     setError(paths.error);
@@ -2962,8 +2990,8 @@ function SettingsTab({
                                             }
                                             className={cn(
                                                 "size-2 shrink-0 rounded-full",
-                                                domain.healthStatus === "up" && "bg-success",
-                                                domain.healthStatus === "down" && "bg-danger",
+                                                domain.healthStatus === "up" && "bg-success-solid",
+                                                domain.healthStatus === "down" && "bg-danger-solid",
                                                 domain.healthStatus !== "up" &&
                                                     domain.healthStatus !== "down" &&
                                                     "animate-pulse bg-muted-foreground/40"
@@ -2999,6 +3027,16 @@ function SettingsTab({
                                         supplied={domain.hasCertificate === true}
                                         onChanged={onChanged}
                                     />
+                                    {domain.cdn !== undefined &&
+                                        domain.kind !== "lan" &&
+                                        !domain.hostname.endsWith(".plr.local") && (
+                                            <DomainCdnButton
+                                                domainId={domain.id}
+                                                hostname={domain.hostname}
+                                                enabled={domain.cdn}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
                                     <Switch
                                         checked={domain.enabled}
                                         onChange={(next) =>
@@ -3230,7 +3268,17 @@ function SettingsTab({
                                     )}
                                 </div>
                             )}
-                            {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote}</p>}
+                            {dnsNote && (
+                                <p className="text-xs text-muted-foreground">{dnsNote.text}</p>
+                            )}
+                            {dnsNote?.record && (
+                                <DnsRecordCard
+                                    type="A"
+                                    name={dnsNote.record.name}
+                                    value={dnsNote.record.ip}
+                                    status={dnsNote.record.conflict ? "conflict" : "waiting"}
+                                />
+                            )}
                             <div className="flex justify-end">
                                 <Button
                                     variant="outline"
@@ -3244,6 +3292,15 @@ function SettingsTab({
                         </div>
                     </MethodBlock>
                 </section>
+            )}
+
+            {(can("domains.manage") || can("service.configure")) && (
+                <EdgeSettings
+                    applicationId={app.id}
+                    canEdit={can("domains.manage")}
+                    canConfigure={can("service.configure")}
+                    onChanged={onChanged}
+                />
             )}
 
             {isGit && can("service.configure") && (
@@ -3329,6 +3386,36 @@ function SettingsTab({
                             />
                         </label>
                     </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Runtime version
+                            <Input
+                                value={runtimeVersion}
+                                onChange={(event) => setRuntimeVersion(event.target.value)}
+                                placeholder="22, 3.12, 1.23"
+                                aria-invalid={runtimeVersionProblem !== null}
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                            <span className={runtimeVersionProblem ? "text-danger" : undefined}>
+                                {runtimeVersionProblem ??
+                                    "Node, Python, Go, Ruby, PHP or Java version to build on."}
+                            </span>
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Output directory
+                            <Input
+                                value={outputDirectory}
+                                onChange={(event) => setOutputDirectory(event.target.value)}
+                                placeholder="dist"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                            <span>For a built site, where its files end up.</span>
+                        </label>
+                    </div>
                 </section>
             )}
 
@@ -3410,6 +3497,16 @@ function SettingsTab({
                         {pending && <Loader2 className="size-4 animate-spin" />} Save settings
                     </Button>
                 </div>
+            )}
+
+            {can("service.configure") && (
+                <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
+            )}
+
+            {can("service.configure") && <BuildMachineSection applicationId={app.id} />}
+
+            {can("service.configure") && (
+                <ScalingSection applicationId={app.id} onChanged={onChanged} />
             )}
 
             {can("service.create") && can("service.configure") && <MoveOutSection app={app} />}
@@ -3560,7 +3657,7 @@ function DangerSection({
     return (
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-danger">Danger</h3>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft p-3">
                 <span className="min-w-0">
                     <span className="text-sm font-medium">Delete service</span>
                     <span className="block text-xs text-muted-foreground">
@@ -3663,15 +3760,4 @@ function Loading() {
 
 function Empty({ text }: { text: string }) {
     return <EmptyState bare title={text} />;
-}
-
-/** A masked value placeholder: fixed-width dots, so secrets never render as text. */
-function SecretMask() {
-    return (
-        <span className="inline-flex items-center gap-0.5 align-middle">
-            {Array.from({ length: 8 }).map((_, index) => (
-                <span key={index} className="size-1 rounded-full bg-muted-foreground/50" />
-            ))}
-        </span>
-    );
 }

@@ -776,7 +776,7 @@ function NewChatDialog({
                         </p>
                     )}
                     {platform === "telegram" && (
-                        <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-foreground">
+                        <p className="rounded-md border border-warning-edge bg-warning-soft p-2 text-xs text-foreground">
                             Telegram bots can't start a chat. Ask the person to open your bot and
                             send <code>/start</code> - the conversation appears in your inbox and
                             you reply there.

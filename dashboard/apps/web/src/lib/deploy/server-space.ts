@@ -25,8 +25,8 @@
 import { prisma } from "@polaris/db";
 import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
-import { parseReclaimedBytes } from "@polaris/deploy";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
+import { RELEASE_LABEL, parseReclaimedBytes } from "@polaris/deploy";
 
 /** How much of a command's output is kept. A prune prints a line per layer it
  *  removes, and only the total at the end is read. */
@@ -177,8 +177,15 @@ async function serverFreeBytes(hostId: string): Promise<number | null> {
  *  columns move. */
 export const DF_ROOT = "df -P /";
 
+/**
+ * The Docker line leaves pinned release images alone. `-a` takes every image no
+ * container is on, and an image kept so a service can be rolled back to it is
+ * exactly that - so without the filter, every deploy's tidy-up would delete the
+ * versions the deploy before it had just kept. Polaris removes those itself, one
+ * by one, as they fall out of the kept window (see `release-image`).
+ */
 export const PRUNE_EVERY_ENGINE = [
-    "if command -v docker >/dev/null 2>&1; then docker system prune -af || true; docker builder prune -af || true; fi",
+    `if command -v docker >/dev/null 2>&1; then docker system prune -af --filter 'label!=${RELEASE_LABEL}' || true; docker builder prune -af || true; fi`,
     "if command -v nerdctl >/dev/null 2>&1; then nerdctl system prune -af || true; fi",
     // cri-tools, which is what a Kubernetes-shaped host prunes images with. k3s
     // ships it as a subcommand rather than on the path, so both spellings are

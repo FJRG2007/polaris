@@ -19,14 +19,14 @@
  */
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
-import { leavesTheView } from "./mail-actions";
-import { missingFolderRole, refusalOf } from "./refusal";
-import { forwardSeed, replySeed } from "./answering";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
+import { leavesTheView } from "./mail-actions";
+import { forwardSeed, replySeed } from "./answering";
+import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
-import dynamic from "next/dynamic";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
 
@@ -46,6 +46,18 @@ const FileViewer = dynamic(
     () => import("@/app/(app)/drive/file-viewer").then((module) => module.FileViewer),
     { ssr: false }
 );
+import type { MailViewContext } from "./mail-view";
+import type { MailAction } from "@/lib/mailbox/messages";
+import type { ReadableMessage } from "@/lib/mailbox/reading";
+import { useDisplayFormat } from "@/components/display-format";
+import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+    actOnAction,
+    applyLabelAction,
+    openMessageAction,
+    setConversationStateAction
+} from "./actions";
 import {
     Button,
     DropdownMenu,
@@ -55,18 +67,16 @@ import {
     cn,
     useToast
 } from "@polaris/ui";
-import type { MailViewContext } from "./mail-view";
-import type { MailAction } from "@/lib/mailbox/messages";
-import type { ReadableMessage } from "@/lib/mailbox/reading";
-import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
-import { actOnAction, applyLabelAction, openMessageAction } from "./actions";
 import {
     ArrowLeft,
     Archive,
+    Bell,
     BellOff,
+    Bookmark,
     ChevronDown,
+    Pin,
+    PinOff,
+    Printer,
     CornerUpLeft,
     CornerUpRight,
     Download,
@@ -342,6 +352,22 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={thread.important ? "Mark not important" : "Mark important"}
+                        title={thread.important ? "Mark not important" : "Mark important"}
+                        disabled={busy}
+                        onClick={() => act(thread.important ? "unimportant" : "important")}
+                    >
+                        <Bookmark
+                            className={cn(
+                                "size-4 shrink-0",
+                                thread.important && "fill-current text-warning"
+                            )}
+                            aria-hidden
+                        />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         aria-label="Mark as unread"
                         title="Mark as unread"
                         disabled={busy}
@@ -372,6 +398,10 @@ export function ThreadView({
                     >
                         <Trash2 className="size-4 shrink-0" aria-hidden />
                     </Button>
+                    <ConversationMenu
+                        thread={thread}
+                        messageIds={messages.map((message) => message.id)}
+                    />
                 </div>
             </header>
 
@@ -435,6 +465,95 @@ export function ThreadView({
                 </div>
             </div>
         </div>
+    );
+}
+
+/**
+ * What else can be done to the conversation as a whole: pin it to the top, mute
+ * it, print it.
+ *
+ * A menu rather than three more icons, because the header already carries every
+ * action somebody takes several times a day and these are the ones taken now and
+ * then. Pinning and muting are Polaris' own and never reach the mail server;
+ * printing opens a page of its own, drawn on white, which the browser's print
+ * dialog opens over.
+ */
+function ConversationMenu({
+    thread,
+    messageIds
+}: {
+    thread: MailThreadView;
+    messageIds: string[];
+}) {
+    const { refresh } = useMail();
+    const toast = useToast();
+
+    const change = (state: { pinned?: boolean; muted?: boolean }, announce: string) => {
+        void (async () => {
+            const outcome = await setConversationStateAction({ messageIds, ...state });
+            const said = refusalOf(outcome);
+            if (said) {
+                toast.show({ title: said });
+                return;
+            }
+            toast.show({ title: announce });
+            refresh();
+        })();
+    };
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="More for this conversation"
+                    title="More for this conversation"
+                >
+                    <MoreHorizontal className="size-4 shrink-0" aria-hidden />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                    onSelect={() =>
+                        change(
+                            { pinned: !thread.pinned },
+                            thread.pinned ? "Unpinned." : "Pinned to the top."
+                        )
+                    }
+                >
+                    {thread.pinned ? (
+                        <PinOff className="size-3.5 shrink-0" aria-hidden />
+                    ) : (
+                        <Pin className="size-3.5 shrink-0" aria-hidden />
+                    )}
+                    {thread.pinned ? "Unpin" : "Pin to the top"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onSelect={() =>
+                        change(
+                            { muted: !thread.muted },
+                            thread.muted
+                                ? "Unmuted."
+                                : "Muted. New messages in it will not be announced."
+                        )
+                    }
+                >
+                    {thread.muted ? (
+                        <Bell className="size-3.5 shrink-0" aria-hidden />
+                    ) : (
+                        <BellOff className="size-3.5 shrink-0" aria-hidden />
+                    )}
+                    {thread.muted ? "Unmute" : "Mute"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onSelect={() => window.open(`/mail/print/${thread.id}`, "_blank", "noopener")}
+                >
+                    <Printer className="size-3.5 shrink-0" aria-hidden />
+                    Print
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -679,7 +798,7 @@ function MessageCard({
                                 act on; "a link says bank.example.com and goes
                                 to evil.example.ru" is. */}
                             {message.spamReason ? (
-                                <p className="mb-3 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-[12px] text-foreground">
+                                <p className="mb-3 flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-1.5 text-[12px] text-foreground">
                                     <ShieldAlert
                                         className="mt-px size-3.5 shrink-0 text-warning"
                                         aria-hidden
@@ -809,6 +928,26 @@ function MessageCard({
                                                 </a>
                                             </li>
                                         ))}
+                                    {/* All of them at once, for the message with
+                                        eleven scans on it. Only offered when there
+                                        is more than one: an archive of one file is
+                                        a file with an extra step. */}
+                                    {message.attachments.filter((file) => !file.inline).length >
+                                    1 ? (
+                                        <li className="flex items-center">
+                                            <a
+                                                href={`/api/mail/zip/${message.id}`}
+                                                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
+                                                download
+                                            >
+                                                <Download
+                                                    className="size-3.5 shrink-0"
+                                                    aria-hidden
+                                                />
+                                                Save all as a .zip
+                                            </a>
+                                        </li>
+                                    ) : null}
                                 </ul>
                             ) : null}
                             {/* The message itself, as its server holds it.

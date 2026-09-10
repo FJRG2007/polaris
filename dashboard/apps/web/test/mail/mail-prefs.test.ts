@@ -52,10 +52,20 @@ describe("reading somebody's mail preferences", () => {
         expect(parseMailPreferences(stringifyMailPreferences(chosen))).toEqual(chosen);
         expect(Object.keys(JSON.parse(stringifyMailPreferences(chosen))).sort()).toEqual([
             "afterFiling",
+            "keys",
             "markRead",
             "sort",
             "undoSeconds"
         ]);
+    });
+
+    it("keeps the shortcuts somebody moved, and drops a stored map that collides", () => {
+        const moved = parseMailPreferences('{"keys":{"archive":"y"}}');
+        expect(moved.keys).toEqual({ archive: "y" });
+        // Two commands on one key is a guess about which one was meant, so the
+        // whole map goes back to the defaults rather than half of it.
+        const clashing = parseMailPreferences('{"keys":{"archive":"s"}}');
+        expect(clashing.keys).toEqual({});
     });
 });
 

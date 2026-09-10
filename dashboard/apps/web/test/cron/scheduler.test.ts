@@ -25,7 +25,7 @@ vi.mock("../../src/lib/cron/jobs", () => ({
     ]
 }));
 
-const { runScheduledJob, startScheduledWork } = await import("../../src/lib/cron/scheduler");
+const { due, runScheduledJob, startScheduledWork } = await import("../../src/lib/cron/scheduler");
 
 /** How many times each job has been started so far. */
 function starts(key: string): number {
@@ -40,6 +40,32 @@ function held(): () => void {
     );
     return () => release();
 }
+
+describe("when a job is due", () => {
+    it("is due the first time it is looked at", () => {
+        expect(due(60_000, undefined, 0, 60_000)).toBe(true);
+    });
+
+    it("is due on the next tick after a pass that took a few seconds", () => {
+        // Started on the tick at 0, finished at 5s: the next tick is 55s after it.
+        expect(due(60_000, 5_000, 60_000, 60_000)).toBe(true);
+    });
+
+    it("is not due on the tick right after a pass that took most of the tick", () => {
+        expect(due(60_000, 45_000, 60_000, 60_000)).toBe(false);
+        expect(due(60_000, 45_000, 120_000, 60_000)).toBe(true);
+    });
+
+    it("never runs a longer cadence more than half a tick early", () => {
+        expect(due(600_000, 0, 540_000, 60_000)).toBe(false);
+        expect(due(600_000, 0, 570_000, 60_000)).toBe(true);
+    });
+
+    it("takes its slack from the tick it is looked at on", () => {
+        expect(due(15_000, 1_000, 15_000, 15_000)).toBe(true);
+        expect(due(15_000, 10_000, 15_000, 15_000)).toBe(false);
+    });
+});
 
 describe("turning the schedule off", () => {
     it("starts nothing at all when POLARIS_CRON is off", async () => {

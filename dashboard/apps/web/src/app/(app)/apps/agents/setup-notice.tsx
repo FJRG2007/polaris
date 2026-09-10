@@ -2,7 +2,11 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/session";
 import { providersFor } from "@/lib/agents/model-keys";
 import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
-import { ACCEPT_STEP, CLEARS_ITSELF, permissionList } from "@/lib/integrations/github-permission-copy";
+import {
+    ACCEPT_STEP,
+    CLEARS_ITSELF,
+    permissionList
+} from "@/lib/integrations/github-permission-copy";
 
 /**
  * The one thing standing between here and a working agent, when there is one.
@@ -31,7 +35,8 @@ export async function SetupNotice() {
                 <Link href="/admin/integrations" className="underline">
                     Integrations
                 </Link>
-                . A personal access token is not enough: the agent has to comment and open pull requests as itself.
+                . A personal access token is not enough: the agent has to comment and open pull
+                requests as itself.
             </Notice>
         );
     }
@@ -65,17 +70,18 @@ export async function SetupNotice() {
         if (!user.isAdmin) {
             return (
                 <Notice>
-                    Runs are paused: the GitHub App is missing a permission that only an administrator can add.
-                    Nothing to do here - it starts working again on its own once they have.
+                    Runs are paused: the GitHub App is missing a permission that only an
+                    administrator can add. Nothing to do here - it starts working again on its own
+                    once they have.
                 </Notice>
             );
         }
         return (
             <Notice>
                 <p>
-                    The GitHub App does not ask for {permissionList(gap.appMissing)} yet, so nobody can grant it -
-                    there is no request for anyone to accept. GitHub only lets the App&apos;s owner change what it
-                    asks for, and only by hand.
+                    The GitHub App does not ask for {permissionList(gap.appMissing)} yet, so nobody
+                    can grant it - there is no request for anyone to accept. GitHub only lets the
+                    App&apos;s owner change what it asks for, and only by hand.
                 </p>
                 {gap.appPermissionsUrl ? (
                     <p className="mt-2">
@@ -88,8 +94,8 @@ export async function SetupNotice() {
                         >
                             {gap.appPermissionsUrl}
                         </a>{" "}
-                        and save. Each account it is installed on then gets a request to accept, which this screen
-                        will ask you for next.
+                        and save. Each account it is installed on then gets a request to accept,
+                        which this screen will ask you for next.
                     </p>
                 ) : null}
                 <p className="mt-2 opacity-80">{CLEARS_ITSELF}</p>
@@ -101,17 +107,17 @@ export async function SetupNotice() {
         if (!user.isAdmin) {
             return (
                 <Notice>
-                    Runs are paused: GitHub is waiting for an administrator to accept a permission request. Nothing to
-                    do here - it starts working again on its own once they have.
+                    Runs are paused: GitHub is waiting for an administrator to accept a permission
+                    request. Nothing to do here - it starts working again on its own once they have.
                 </Notice>
             );
         }
         return (
             <Notice>
                 <p>
-                    GitHub is holding a permission request, and until its owner accepts it, runs on these accounts are
-                    refused. Only they can accept it - GitHub offers nobody else a way, so this is one of the few
-                    things Polaris cannot do for you.
+                    GitHub is holding a permission request, and until its owner accepts it, runs on
+                    these accounts are refused. Only they can accept it - GitHub offers nobody else
+                    a way, so this is one of the few things Polaris cannot do for you.
                 </p>
                 <ul className="mt-2 flex flex-col gap-1.5">
                     {gap.installations.map((row) => (
@@ -140,7 +146,10 @@ export async function SetupNotice() {
                                 // Only for a deployment holding neither the App's
                                 // page nor its name, which is a deployment with no
                                 // App. Naming the page beats a link that 404s.
-                                <span>Open it under Settings, Applications, on GitHub, then {lowerFirst(ACCEPT_STEP)}</span>
+                                <span>
+                                    Open it under Settings, Applications, on GitHub, then{" "}
+                                    {lowerFirst(ACCEPT_STEP)}
+                                </span>
                             )}
                         </li>
                     ))}
@@ -167,7 +176,7 @@ export async function SetupNotice() {
 
 function Notice({ children }: { children: React.ReactNode }) {
     return (
-        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200/90">
+        <div className="mb-4 rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-warning-ink">
             {children}
         </div>
     );

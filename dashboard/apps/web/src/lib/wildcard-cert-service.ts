@@ -22,19 +22,14 @@
  */
 
 import { join } from "node:path";
-import { loadEnv } from "@polaris/config";
 import { X509Certificate } from "node:crypto";
 import { deployBase } from "@/lib/domain-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { mkdir, readFile } from "node:fs/promises";
 import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
+import { cloudflareDns01 } from "@/lib/tls/dns01";
+import { orderDns01Certificate } from "@/lib/tls/acme-dns01";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
-import {
-    deleteDnsRecord,
-    findTxtRecords,
-    resolveZoneForHostname,
-    upsertTxtRecord
-} from "@/lib/integrations/cloudflare-api";
 
 /** Where the certificate and its key are written for the edge to read. */
 const DYNAMIC_CRT = "polaris-wildcard.crt";
@@ -44,8 +39,6 @@ const DYNAMIC_KEY = "polaris-wildcard.key";
  *  one only ever adds to `tls.certificates`, which merges cleanly. */
 const DYNAMIC_TLS = "polaris-wildcard.yml";
 
-/** The ACME account key, kept so renewals use the same registration. */
-const ACCOUNT_KEY_SETTING = "tls.wildcard.accountKey";
 /** The base the stored certificate was issued for, so a changed deploy base re-orders
  *  rather than serving a certificate for a name nobody uses any more. */
 const ISSUED_FOR_SETTING = "tls.wildcard.issuedFor";
@@ -56,11 +49,6 @@ const ISSUED_FOR_SETTING = "tls.wildcard.issuedFor";
  * many more chances before anything is actually at risk.
  */
 const RENEW_BEFORE_MS = 30 * 24 * 60 * 60 * 1000;
-
-/** How long to wait for the challenge record to be visible before asking Let's Encrypt
- *  to look. Cloudflare publishes in seconds, but the authoritative answer has to have
- *  propagated to the resolver the validation comes from. */
-const DNS_SETTLE_MS = 20_000;
 
 export interface WildcardCertState {
     /** The base it covers (`plr.example.com`), or null when there is none. */
@@ -147,61 +135,10 @@ async function orderWildcard(
     base: string,
     token: string
 ): Promise<{ certificate: string; key: string }> {
-    // Imported here rather than at module load: this is a heavy dependency used by one
-    // scheduled job, and every other request through this file should not pay for it.
-    const acme = await import("acme-client");
-    const zone = await resolveZoneForHostname(token, base);
-    const accountKey = await accountKeyPem(acme);
-
-    const client = new acme.Client({
-        directoryUrl: acme.directory.letsencrypt.production,
-        accountKey
+    return orderDns01Certificate({
+        names: [`*.${base}`, base],
+        provider: await cloudflareDns01(token, base)
     });
-
-    const [key, csr] = await acme.crypto.createCsr({ altNames: [`*.${base}`, base] });
-
-    const certificate = await client.auto({
-        csr,
-        email: loadEnv().POLARIS_ACME_EMAIL || undefined,
-        termsOfServiceAgreed: true,
-        challengePriority: ["dns-01"],
-        challengeCreateFn: async (_authz, challenge, keyAuthorization) => {
-            if (challenge.type !== "dns-01")
-                throw new Error("only the DNS challenge can issue a wildcard");
-            await upsertTxtRecord(token, zone.id, `_acme-challenge.${base}`, keyAuthorization);
-            // Both names on the order answer at the same record, so this is written
-            // twice with different values. Cloudflare keeps them as separate TXT
-            // records at that name, which is what the protocol expects.
-            await new Promise((resolve) => setTimeout(resolve, DNS_SETTLE_MS));
-        },
-        challengeRemoveFn: async () => {
-            // Best effort: a leftover challenge record is harmless, and failing the
-            // whole order because the cleanup did not answer would be worse.
-            try {
-                for (const record of await findTxtRecords(
-                    token,
-                    zone.id,
-                    `_acme-challenge.${base}`
-                )) {
-                    await deleteDnsRecord(token, zone.id, record.id);
-                }
-            } catch {
-                // Nothing to do about it here; the next order overwrites them.
-            }
-        }
-    });
-
-    return { certificate: certificate.toString(), key: key.toString() };
-}
-
-/** The ACME account key, generated once and kept, so renewals reuse the registration
- *  rather than making a new account against the rate limit every time. */
-async function accountKeyPem(acme: typeof import("acme-client")): Promise<string> {
-    const stored = await getSetting(ACCOUNT_KEY_SETTING);
-    if (stored) return stored;
-    const created = (await acme.crypto.createPrivateKey()).toString();
-    await setSetting(ACCOUNT_KEY_SETTING, created);
-    return created;
 }
 
 /**

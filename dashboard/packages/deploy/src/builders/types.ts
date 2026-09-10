@@ -37,6 +37,28 @@ export interface BuildInput {
     readonly staticDir?: string;
     /** method "compose": the compose file contents. */
     readonly composeYaml?: string;
+    /**
+     * The immutable image this deployment is kept as, and the deployment it
+     * belongs to. Whatever the deploy pulls or builds is pinned under this name
+     * once it has it, so the release can be run again later exactly as it was.
+     */
+    readonly release?: { readonly image: string; readonly deploymentId: string };
+    /**
+     * Run this kept release image and nothing else: no clone, no build, no pull.
+     * Set for a rollback, whose whole point is that the image already exists.
+     */
+    readonly rollbackImage?: string;
+    /**
+     * A release built somewhere else - on somebody's own machine - and uploaded as
+     * a gzipped `docker save` archive of its kept image. Loaded onto the machine
+     * and run as it is: nothing is fetched, built or pinned. `archive` is a path
+     * on the machine Polaris runs on.
+     */
+    readonly prebuilt?: {
+        readonly image: string;
+        readonly archive: string;
+        readonly bytes: number;
+    };
 }
 
 /** Normalized build description with the resolved image tag. */

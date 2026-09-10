@@ -13,6 +13,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { resolveMailKeymap } from "@polaris/core";
 import { runBetween } from "@/app/(app)/mail/mail-actions";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
@@ -60,10 +61,15 @@ describe("the gestures a list owns", () => {
     });
 
     it("deletes on the key somebody who has never used a mail client presses", async () => {
-        const keys = await readFile(`${SCREENS}use-mail-keys.ts`, "utf8");
-        expect(keys).toContain('case "Delete":');
-        expect(keys).toContain('case "Backspace":');
-        expect(keys).toContain('case "#":');
+        // The keyboard is data now (`mail-keys`); the hook only reads it. Delete
+        // and Backspace are fixed, so they trash whatever else has been moved.
+        const keys = resolveMailKeymap({});
+        expect(keys.get("Delete")).toBe("trash");
+        expect(keys.get("Backspace")).toBe("trash");
+        expect(keys.get("#")).toBe("trash");
+        expect(resolveMailKeymap({ trash: "x" }).get("Delete")).toBe("trash");
+        const hook = await readFile(`${SCREENS}use-mail-keys.ts`, "utf8");
+        expect(hook).toContain("core.resolveMailKeymap(keymap)");
     });
 
     it("reads the modifier off the click rather than tracking it", async () => {
@@ -75,9 +81,17 @@ describe("the gestures a list owns", () => {
 });
 
 describe("what the right-click menu offers", () => {
-    it("says which key does the same thing", async () => {
+    it("says which key does the same thing, as this person has set it up", async () => {
         const menu = await readFile(`${SCREENS}thread-menu.tsx`, "utf8");
-        for (const keys of ['keys="r"', 'keys="f"', 'keys="e"', 'keys="Delete"', 'keys="!"']) {
+        // The hint is read off the keymap, so a moved shortcut is shown where it
+        // now is; Delete is fixed and is written as itself.
+        for (const keys of [
+            'keys={keyFor("reply")}',
+            'keys={keyFor("forward")}',
+            'keys={keyFor("archive")}',
+            'keys={keyFor("junk")}',
+            'keys="Delete"'
+        ]) {
             expect(menu, keys).toContain(keys);
         }
     });

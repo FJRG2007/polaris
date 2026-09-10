@@ -295,6 +295,7 @@ model User {
     backupPlans         BackupPlan[]
     protectedResources  ProtectedResource[]
     backupJobs          BackupJob[]
+    backupKeys          BackupKey[]
     ownedVaults         VaultOrganization[]  @relation("VaultOwner")
     privacy             UserPrivacy?
     privacyLists        PrivacyList[]
@@ -310,6 +311,7 @@ model User {
     mailAccounts        MailAccount[]
     mailLabels          MailLabel[]
     mailUploads         MailUpload[]
+    mailTemplates       MailTemplate[]
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -623,7 +625,6 @@ model NoteFolder {
     @@index([spaceId])
     @@index([parentId])
 }
-
 
 // The account somebody named to take over their own if they die.
 //
@@ -1017,10 +1018,19 @@ model Invite {
     pendingGrant      String?
     // Created by somebody who is not an administrator, under the sharing policy.
     delegated         Boolean @default(false)
+    // The organization this invite also joins, and the role it joins at, when it
+    // was sent from an organization's People screen to somebody with no account.
+    // The role is checked again when the invite is claimed, since the organization
+    // may have deleted it in the meantime. Not a foreign key: an organization
+    // deleted while the invite is out leaves an invite that makes an account and
+    // joins nothing, which is the honest outcome.
+    orgId             String? @db.Uuid
+    orgRole           String?
 
     invitedBy User @relation("InviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
     @@index([email])
+    @@index([orgId])
 }
 
 // ---------------------------------------------------------------------------
@@ -3110,6 +3120,15 @@ model AuditLog {
     // organization being deleted must not quietly erase the record of it.
     orgId      String?  @db.Uuid
     at         DateTime @default(now())
+    // The tamper-evident chain. Written by the sealing pass, never by the request
+    // that recorded the entry, so there is exactly one writer and the chain cannot
+    // fork: `seq` is the entry's place in the chain, `prevHash` is the hash of the
+    // entry before it, and `hash` is a keyed hash over this entry's own columns and
+    // `prevHash`. Editing, deleting or inserting a sealed entry breaks a link that
+    // only a holder of the instance key could forge. Null until sealed.
+    seq        BigInt?  @unique
+    prevHash   String?
+    hash       String?
 
     @@index([actorId])
     @@index([action])
@@ -3121,6 +3140,29 @@ model AuditLog {
     // And the retention sweep asks by age, which is the other whole-table
     // question this answers on a schedule.
     @@index([at])
+}
+
+// Where the audit chain was cut by retention.
+//
+// Retention deletes the oldest entries, and a chain whose first link points at a
+// row that no longer exists would read as broken for ever after. So before a
+// prefix is removed, the last removed entry's place and hash are written here;
+// verification starts from the newest checkpoint instead of from nothing, and a
+// gap anywhere else is still a gap.
+model AuditCheckpoint {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    // The last entry removed, and its hash - what the first surviving entry's
+    // `prevHash` has to equal.
+    seq       BigInt   @unique
+    hash      String
+    // How many entries this cut removed, for the integrity screen.
+    pruned    Int      @default(0)
+    at        DateTime @default(now())
+    // A keyed hash over the fields above, under the instance key. Verification
+    // only starts from a checkpoint whose signature holds, so a row written by
+    // hand cannot move where the chain begins. Null only on checkpoints written
+    // before signing existed, until the sealing pass adopts them once.
+    signature String?
 }
 
 model Setting {
@@ -3883,6 +3925,22 @@ model Environment {
     isDefault Boolean  @default(false)
     // Canvas layout as stringified JSON: { pos: {serviceId:{x,y}}, links: [{source,target}] }.
     layout    String   @default("{}")
+    // The git branch every repository-built service in this environment builds
+    // from and follows, overriding each service's own. Null means each service's
+    // own branch, which is what an environment made by hand has always meant.
+    branch        String?
+    // Set on an environment made for one pull request: its number, the
+    // repository it was opened on ("owner/repo"), the environment it was cloned
+    // from, and the head commit last deployed. Such an environment is removed
+    // when the pull request closes.
+    pullRequest   Int?
+    previewRepo   String?
+    previewOfId   String?  @db.Uuid
+    previewSha    String?
+    // How its services see each other: "shared" (every service on the one proxy
+    // network, as every environment made before this was), "environment" (a
+    // private network of its own), or "links" (only services linked on the canvas).
+    networkMode   String   @default("shared")
     createdAt DateTime @default(now())
 
     project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -3912,6 +3970,22 @@ model Application {
     // running | stopped
     desiredState        String    @default("running")
     replicas            Int       @default(1)
+    // JSON {min, max, cpuPercent}: the range the replica count moves in by itself
+    // to hold that CPU figure. Null leaves the count where the operator set it.
+    autoscale           String?
+    // JSON {deploymentId, baseline, latest, behindBy, checkedAt, error}: what the
+    // updates scan last found for the live release - a newer image digest behind
+    // its tag, or commits on its branch it does not have. Null until scanned.
+    updateCheck         String?
+    // The most CPU (in cores) and memory (in MB) each copy may use; null is no
+    // limit. Applied the next time it is started.
+    cpuLimit            Float?
+    memoryLimitMb       Int?
+    // Stop the service after this many minutes with no request at the edge, and
+    // start it again on the next one. Null keeps it running.
+    sleepAfterMinutes   Int?
+    // When it was put to sleep; null while it is awake.
+    asleepSince         DateTime?
     // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
     currentDeploymentId String?   @db.Uuid
     // Auto-deploy on git push (Vercel-style): redeploy when a matching commit lands.
@@ -3931,6 +4005,17 @@ model Application {
     // Keep previous deployments running (Railway-style multi-version). Off by
     // default: a new deploy replaces the old container.
     keepReleases        Boolean   @default(false)
+    // Whether the container port is published on the host's interfaces, so the
+    // service answers on the machine's IP and a port with no proxy in the way.
+    // True for every service that existed before this could be switched off, so
+    // nothing an install already reaches that way stops answering; a service made
+    // from the Deploy screen starts with it off, reached only through the edge.
+    publishPort         Boolean   @default(true)
+    // JSON: what the edge does in front of this service beyond routing to it - rate
+    // limits, a concurrency cap, the browser challenge, security headers,
+    // redirects and rewrites. Read whole through `parseAppEdgeConfig`, which
+    // rebuilds the shape, because a row is always older than the code reading it.
+    edgeConfig          String    @default("{}")
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
 
@@ -3938,9 +4023,100 @@ model Application {
     target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
     domains     Domain[]
     volumes     Volume[]
+    crons       ServiceCron[]
+    runtimeLogs RuntimeLogLine[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
+}
+
+// A command a service runs on a schedule, inside its own running container, the
+// way a crontab line runs on a server: the service's code, its variables and its
+// network, with nothing new to deploy. Runs are kept with their output so a job
+// that failed at three in the morning can say why at nine.
+model ServiceCron {
+    id                String    @id @default(uuid(7)) @db.Uuid
+    applicationId     String    @db.Uuid
+    name              String
+    // Five-field cron expression or a shorthand (@daily), in `timezone`.
+    schedule          String
+    timezone          String    @default("UTC")
+    // Run with `sh -c` inside the service's container.
+    command           String
+    // Stopped after this long; the run is recorded as timed out.
+    timeoutSeconds    Int       @default(900)
+    // Tries in all, counting the first. A failed try waits `retryDelaySeconds`
+    // times the attempt number before the next.
+    maxAttempts       Int       @default(1)
+    retryDelaySeconds Int       @default(60)
+    enabled           Boolean   @default(true)
+    // When the schedule next fires, and when a retry of the last run is due -
+    // the one the scheduler reads, so it is one indexed column rather than a
+    // computation per job per minute.
+    nextRunAt         DateTime?
+    retryAt           DateTime?
+    retryAttempt      Int       @default(0)
+    lastRunAt         DateTime?
+    // succeeded | failed | timed_out, of the last finished run.
+    lastStatus        String?
+    createdById       String?   @db.Uuid
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+
+    application Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    runs        ServiceCronRun[]
+
+    @@index([applicationId])
+    @@index([enabled, nextRunAt])
+    @@index([retryAt])
+}
+
+// One run of a scheduled command, and what it printed.
+model ServiceCronRun {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    cronId     String    @db.Uuid
+    // schedule | manual | retry
+    trigger    String
+    attempt    Int       @default(1)
+    // running | succeeded | failed | timed_out | skipped (the previous run was
+    // still going when this one was due)
+    status     String    @default("running")
+    exitCode   Int?
+    // The last 64 KB of stdout and stderr together - the end of a log is where
+    // the reason is.
+    output     String    @default("")
+    error      String?
+    startedAt  DateTime  @default(now())
+    finishedAt DateTime?
+
+    cron ServiceCron @relation(fields: [cronId], references: [id], onDelete: Cascade)
+
+    @@index([cronId, startedAt])
+}
+
+// A line a running service printed, kept so its output outlives the container.
+// A container's own log goes with it on every deploy, and a crash at night was
+// otherwise only readable if nobody had redeployed since. Filled by a capture
+// that reads each running container's tail once a minute, and bounded twice -
+// by age and by a per-service count - by a scheduled prune.
+model RuntimeLogLine {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    applicationId String   @db.Uuid
+    // Which container printed it: a service has one, or one per replica.
+    container     String
+    // docker's own stamp, fraction padded to nanoseconds, so it sorts as text in
+    // the order it happened and is what the capture compares to know what it
+    // already has.
+    stamp         String
+    // The same moment as a timestamp, for the time filter and the retention.
+    at            DateTime
+    text          String
+
+    application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@index([applicationId, stamp])
+    @@index([applicationId, container, stamp])
+    @@index([at])
 }
 
 // A service this project runs somewhere that is not Polaris.
@@ -4018,6 +4194,10 @@ model ManagedDatabase {
     containerName       String
     // Optional published TCP port for external access via a per-db forwarder.
     exposePort          Int?
+    // The most CPU (in cores) and memory (in MB) the container may use; null is
+    // no limit. Applied the next time it is started.
+    cpuLimit            Float?
+    memoryLimitMb       Int?
     // Set when this is a logical database living inside another instance's
     // container rather than one of its own. It then has no image, volume or
     // container: it is reached through its parent's, with its own credentials.
@@ -4029,6 +4209,33 @@ model ManagedDatabase {
     credentialNonce     Bytes?
     credentialKeyId     String?
     status              String   @default("provisioning")
+    // Redis: how it keeps what it holds - default | cache | persistent - and the
+    // memory ceiling in megabytes a cache evicts to stay under.
+    mode                String   @default("default")
+    maxMemoryMb         Int?
+    // MongoDB: run as a single-member replica set (change streams, transactions).
+    replicaSet          Boolean  @default(false)
+    // PostgreSQL: archive every WAL segment and take daily base backups, so the
+    // instance can be recovered to any moment inside the kept window.
+    pitr                Boolean  @default(false)
+    pitrKeepDays        Int      @default(7)
+    // A version change asked for: the version, when to run it (null is now), and
+    // how it went - scheduled | running | done | failed. The version, image and
+    // data volume it ran before stay recorded so a failed upgrade is undone by
+    // pointing back at them, and the old volume can be removed deliberately later.
+    upgradeTo           String?
+    upgradeAt           DateTime?
+    upgradeState        String   @default("")
+    upgradeError        String?
+    previousVersion     String?
+    previousImage       String?
+    previousVolumeName  String?
+    // Set on an instance created by a point-in-time recovery: the instance it was
+    // recovered from, the base backup it started from and the moment it stopped at.
+    // Its first start unpacks that base backup and replays the archive to there.
+    recoveredFromId     String?  @db.Uuid
+    recoveryBase        String?
+    recoveryTarget      DateTime?
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
@@ -4039,10 +4246,104 @@ model ManagedDatabase {
     parent      ManagedDatabase?  @relation("DatabaseInstance", fields: [parentId], references: [id], onDelete: Cascade)
     children    ManagedDatabase[] @relation("DatabaseInstance")
     dataConnections DataConnection[]
+    baseBackups DatabaseBaseBackup[]
+    operations  DatabaseOperation[]
+    buckets     ObjectBucket[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
     @@index([parentId])
+    @@index([upgradeState, upgradeAt])
+}
+
+// One PostgreSQL base backup in an instance's point-in-time archive. The files
+// live in the archive folder on the server; this row is what a recovery picks
+// from, and when it had finished is what decides whether it can reach a moment -
+// PostgreSQL cannot recover to a time inside a base backup.
+model DatabaseBaseBackup {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    databaseId  String   @db.Uuid
+    // The folder name under the archive's base/, a UTC timestamp.
+    label       String
+    startedAt   DateTime
+    finishedAt  DateTime
+    // The backup history file the server wrote into the archive when it ended,
+    // which is what the segment cleanup is given to keep what this backup needs.
+    historyFile String   @default("")
+
+    database ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+    @@unique([databaseId, label])
+    @@index([databaseId, finishedAt])
+}
+
+// Something done to a database that takes a while and that somebody watches:
+// a restore, an upgrade, a copy from elsewhere, a point-in-time recovery. The
+// row is written first and closed last, so one that died mid-way shows as never
+// having finished rather than as never having happened.
+model DatabaseOperation {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    databaseId  String    @db.Uuid
+    // restore | upgrade | copy | recover
+    kind        String
+    // running | succeeded | failed
+    status      String    @default("running")
+    // The step it is on, in the words the screen shows.
+    step        String    @default("")
+    // Bytes moved so far and the total when it is known, for a copy.
+    doneBytes   BigInt    @default(0)
+    totalBytes  BigInt?
+    error       String?
+    actorId     String?   @db.Uuid
+    startedAt   DateTime  @default(now())
+    finishedAt  DateTime?
+
+    database ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+    @@index([databaseId, startedAt])
+}
+
+// A bucket in an object store Polaris runs (a ManagedDatabase whose engine is
+// an object store). The bucket itself lives in the engine; this row is what the
+// screens list and what keys, expiry rules and replication hang off.
+model ObjectBucket {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    storeId    String   @db.Uuid
+    name       String
+    // Expiry rules as JSON: [{ prefix, days }]. Applied to the engine as path
+    // TTLs, which govern objects written after the rule is set.
+    lifecycle  String   @default("[]")
+    // Where every object written here is copied to: another bucket, in another
+    // store on the same server. Null when it is not replicated.
+    replicateToId String? @db.Uuid
+    // ok | failed | "" - how the replication process was last found.
+    replicationState String @default("")
+    replicationError String?
+    createdAt  DateTime @default(now())
+
+    store ManagedDatabase @relation(fields: [storeId], references: [id], onDelete: Cascade)
+    keys  ObjectBucketKey[]
+
+    @@unique([storeId, name])
+}
+
+// An access key limited to one bucket. The secret is envelope-encrypted and
+// shown once, when it is made; afterwards only its access key id is listed.
+model ObjectBucketKey {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    bucketId        String   @db.Uuid
+    name            String
+    // readwrite | readonly
+    access          String   @default("readwrite")
+    accessKey       String   @unique
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    createdAt       DateTime @default(now())
+
+    bucket ObjectBucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+
+    @@unique([bucketId, name])
 }
 
 // One deploy run: a status row plus a pointer to its streamed log file. The log
@@ -4067,6 +4368,11 @@ model Deployment {
     // derived, because it decides which container and port serve this release -
     // and that must not change under it when the setting is turned off later.
     isolated       Boolean   @default(false)
+    // True when it stood beside the release before it only for the change-over: it
+    // answers to the service's own name as well as its own, and the release it
+    // replaced is taken down once this one is serving. Named after the deployment
+    // rather than its commit, so redeploying one commit still gets a fresh container.
+    cutover        Boolean   @default(false)
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
     // The GitHub Deployment this release was announced as, so its state can be
@@ -4076,6 +4382,19 @@ model Deployment {
     // write to it.
     githubRepo         String?
     githubDeploymentId String?
+    // True while the image in `imageTag` is a pinned release image still on the
+    // target, which is what makes rolling back to this release instant. Cleared
+    // when the image falls out of the kept window and is removed, so the screen
+    // offers a rollback only where one can actually happen.
+    imageKept      Boolean   @default(false)
+    // Kept regardless of the window, until somebody unpins it.
+    pinned         Boolean   @default(false)
+    // The deployment this one rolled back to, when it was a rollback rather
+    // than a build. Its image is that deployment's image.
+    rollbackOfId   String?   @db.Uuid
+    // What started it: manual | push | preview | rollback | variables. Null on
+    // every deployment made before this was recorded.
+    trigger        String?
     triggeredById  String?   @db.Uuid
     startedAt      DateTime?
     finishedAt     DateTime?
@@ -4128,6 +4447,10 @@ model Domain {
     // behind a router with nothing forwarded - and it makes this instance part of
     // the request path, so an outage here is an outage there.
     servedBy      String   @default("server")
+    // Served through Cloudflare's proxy, which caches static assets at its edge.
+    // Only possible for a hostname whose zone is on the connected Cloudflare
+    // account; the cache is purged for it after every successful deploy.
+    cdn           Boolean  @default(false)
     createdAt     DateTime @default(now())
     // Reachability, set by the health probe: up | down | unknown. So a free
     // subdomain that resolves but does not actually serve is flagged, not shown
@@ -4491,11 +4814,13 @@ model Alarm {
     // application | domain | host
     targetType      String
     targetId        String    @db.Uuid
-    // cpu | memory | http | service - http/service are reachability (no threshold).
+    // cpu | memory | disk | network_in | network_out | http | service -
+    // http/service are reachability (no threshold). See lib/watch/alarm-metrics.
     metric          String
     // gt | lt, for threshold metrics.
     operator        String    @default("gt")
-    // Threshold as a percent for cpu/memory; null for reachability alarms.
+    // Threshold in the metric's unit: a percent for cpu/memory and a server's
+    // disk, GB for a service's disk, MB/s for network; null for reachability.
     threshold       Float?
     // Consecutive breaching evaluations before firing, to ride out blips.
     forPeriods      Int       @default(2)
@@ -4570,6 +4895,11 @@ model Organization {
     // choice entirely (`chat.orgIsolation`), and when it does, what was already
     // said here is folded back into the shared chat rather than hidden.
     chatIsolated Boolean @default(false)
+    // The role an invitation offers unless whoever sends it picks another. Starts
+    // as `member`, which is what every organization offered before this existed;
+    // an organization that wants newcomers to arrive with nothing until they are
+    // granted something sets it to `restricted`.
+    defaultInviteRole String @default("member")
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -4681,6 +5011,11 @@ model OrgRole {
     permissions String   @default("[]")
     // Seeded by Polaris. Cannot be deleted, and `admin` cannot be edited either.
     system      Boolean  @default(false)
+    // Holding it reaches nothing that was not granted to the person directly: not
+    // the roster, not the organization's shelf, not its internal work. Every other
+    // role carries `org.read` implicitly; this one does not. Only the seeded
+    // `restricted` role sets it.
+    restricted  Boolean  @default(false)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -4720,14 +5055,51 @@ model OwnerDomain {
     checkedAt    DateTime?
     // Why the last check said what it did, in a sentence the owner can act on.
     checkDetail  String?
+    // Where its zone is hosted, for the DNS-01 challenge its wildcard certificate is
+    // proven with ("cloudflare"), and the API token that writes it - encrypted at
+    // rest. Null means the instance's own connected token, when that reaches it.
+    dnsProvider  String?
+    dnsToken     String?
     createdAt    DateTime  @default(now())
     updatedAt    DateTime  @updatedAt
 
-    user User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user         User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    org          Organization?        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    certificates ManagedCertificate[]
 
     @@index([userId])
     @@index([orgId])
+}
+
+// A wildcard certificate Polaris orders itself over DNS-01 and keeps renewed: one
+// per domain it covers (`<domain>` and `*.<domain>`), for an owner domain or for a
+// wildcard hostname a service answers on. The deploy base's own wildcard is not
+// here - it predates this and keeps its own files.
+model ManagedCertificate {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    domain        String    @unique
+    // "owner" (an owner domain) | "hostname" (a wildcard hostname on a service).
+    source        String
+    ownerDomainId String?   @db.Uuid
+    // pending | issued | failed
+    status        String    @default("pending")
+    certPem       String?
+    // Encrypted at rest like every other secret.
+    certKey       String?
+    expiresAt     DateTime?
+    lastAttemptAt DateTime?
+    // Not tried again before this, so a zone that keeps refusing backs off instead
+    // of spending the Let's Encrypt rate limit.
+    nextAttemptAt DateTime?
+    failures      Int       @default(0)
+    // Why the last attempt said what it did, in a sentence the owner can act on.
+    detail        String?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    ownerDomain OwnerDomain? @relation(fields: [ownerDomainId], references: [id], onDelete: Cascade)
+
+    @@index([ownerDomainId])
 }
 
 // Somebody other than the owner on an organization's roster.
@@ -4744,6 +5116,12 @@ model OrganizationMember {
     // the teams and the organization's spaces; only the owner can rename it,
     // transfer it, or delete it.
     role      String   @default("member")
+    // Mirrors the role's own `restricted`, written whenever the role is. Kept on
+    // the row because "every organization whose roster this person is on" is asked
+    // in a query by a dozen screens, and a role is a slug rather than a relation
+    // the query could follow. A restricted member is on the roster for the people
+    // running it and on nobody else's.
+    restricted Boolean @default(false)
     createdAt DateTime @default(now())
 
     org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -6845,6 +7223,10 @@ model RecoveryPointCopy {
     // pending | available | failed | deleting
     status        String   @default("pending")
     error         String?
+    // The backup key this copy was sealed under (a BackupKey id); null for a copy
+    // written in the clear - one taken before sealing existed, or one kept on the
+    // disk of the thing it protects.
+    sealedWith    String?
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
@@ -9409,6 +9791,7 @@ model MailAccount {
     spamReputation MailSpamReputation[]
     spamFeedback   MailSpamFeedback[]
     subscriptions  MailSubscription[]
+    templates      MailTemplate[]
 
     @@unique([userId, address])
     @@index([userId, position])
@@ -9544,6 +9927,12 @@ model MailFolder {
     // name match. Their answer outlives a resync: without this the next pass
     // would read the role off the server again and forget what they told us.
     roleLocked Boolean @default(false)
+    // Whether this folder is known to store keywords such as `$Important`:
+    // learned the first time a writable open accepts one or a message arrives
+    // carrying one. Until then the server's silence about a keyword is not an
+    // answer, because a folder opened read-only reports no permanent flags at
+    // all, and treating that as "no" would wipe a mark somebody made here.
+    keywords   Boolean @default(false)
 
     // What the server said the last time it was asked. A changed uidValidity
     // means every uid held here is meaningless and the folder is resynced.
@@ -9591,6 +9980,9 @@ model MailThread {
     // is fifty aggregates for one page.
     size           Int      @default(0)
     starred        Boolean  @default(false)
+    // Whether any message in it is marked important, rolled up the way starred
+    // is so the list can say so without reading its messages.
+    important      Boolean  @default(false)
     // Kept at the top of the list by its reader.
     pinned         Boolean  @default(false)
     // Nothing about this conversation is announced, however much it moves.
@@ -9655,6 +10047,10 @@ model MailMessage {
     answered Boolean @default(false)
     draft    Boolean @default(false)
     deleted  Boolean @default(false)
+    // The `$Important` keyword. Mirrored like the flags above where the folder
+    // stores keywords; where it does not, it is Polaris' own and a sync leaves
+    // it alone rather than reading the server's silence as "not important".
+    important Boolean @default(false)
 
     hasAttachments Boolean @default(false)
     // Whether this message asked to be told when it was read. Recorded so the
@@ -9833,6 +10229,33 @@ model MailDraft {
     @@index([state, sendAt])
 }
 
+// A message somebody writes often enough to keep: a subject and a body put into
+// the composer from a menu. The same machinery as a signature, with a name and
+// as many of them as somebody wants.
+//
+// Per person, and optionally tied to one mailbox: a support reply belongs to the
+// support address and has no business being offered while writing from a
+// personal one. Null is every mailbox.
+model MailTemplate {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    accountId String?  @db.Uuid
+    name      String
+    subject   String   @default("")
+    // Markdown, the way everything written in Polaris is.
+    body      String   @default("")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    account MailAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    // Two templates called the same thing are two templates nobody can tell
+    // apart in a menu.
+    @@unique([userId, name])
+    @@index([accountId])
+}
+
 // A file somebody attached in the composer.
 //
 // Owned by the person rather than by the draft, because it is uploaded before
@@ -9997,4 +10420,145 @@ model MailAutoReply {
 
     @@unique([accountId, address])
     @@index([repliedAt])
+}
+
+// A mail server Polaris runs, as opposed to one of the mailboxes above, which
+// somebody else runs.
+//
+// The engine is a Deploy service (`applicationId`), so its container, volumes,
+// logs and restarts are Deploy's; this row is what only a mail server has: the
+// name it answers to, how far its setup got, the credential Polaris manages it
+// with, where it relays through, and the last checks of its ports and DNS.
+// Domains, mailboxes, aliases and forwards live in the engine and are read from
+// it, never mirrored here - a copy is what drifts.
+model MailServer {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    ownerId       String   @db.Uuid
+    // The organization it serves, or null for somebody's own. Set from the shelf
+    // that was open when it was set up, and never moved.
+    orgId         String?  @db.Uuid
+    // Where the engine runs: "local", or the id of an enrolled server. Kept
+    // because setup creates the service in a later step than the one that asked.
+    placement     String   @default("local")
+    // The Deploy service the engine runs as; null until setup creates it.
+    applicationId String?  @db.Uuid
+    // The server's own name: its certificate, its SMTP greeting, the MX target.
+    hostname      String
+    // The first domain it was set up to receive mail for.
+    primaryDomain String
+    // setting-up | ready | failed | down (was ready, and the last sweep found
+    // the engine not answering)
+    status        String   @default("setting-up")
+    // The last setup step that finished, so running setup again resumes from
+    // there instead of starting a second server.
+    step          String   @default("")
+    // What setup said, newest last, bounded - the screen reads it back while
+    // setup runs.
+    log           String   @default("")
+    error         String?
+    // The password of the account Polaris manages the engine with, sealed with
+    // the master key. Never shown.
+    adminSecret      Bytes?
+    adminSecretNonce Bytes?
+    adminSecretKeyId String?
+    // The key the engine signs its webhook with, sealed the same way.
+    hookSecret      Bytes?
+    hookSecretNonce Bytes?
+    hookSecretKeyId String?
+    // The outbound relay as JSON (provider, host, port, username), or "" for
+    // sending straight to each recipient's server. Its secret is sealed apart.
+    relay            String   @default("")
+    relaySecret      Bytes?
+    relaySecretNonce Bytes?
+    relaySecretKeyId String?
+    // The password of the mailbox DMARC aggregate reports arrive in, sealed.
+    // Polaris reads that mailbox and files what it finds; nobody signs in to it.
+    reportsSecret      Bytes?
+    reportsSecretNonce Bytes?
+    reportsSecretKeyId String?
+    // When that mailbox was last read, and what stopped the read if it failed.
+    reportsCheckedAt   DateTime?
+    reportsError       String?
+    // The email channel Polaris sends its own mail through it with.
+    channelId     String?  @db.Uuid
+    // The last port probe and DNS scan, as JSON, so the screen opens on the
+    // answer rather than a spinner.
+    lastPorts     String   @default("")
+    lastDns       String   @default("")
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    rules   MailInboundRule[]
+    reports MailDmarcReport[]
+
+    @@index([ownerId])
+    @@index([orgId])
+    @@index([applicationId])
+}
+
+// A rule that turns a message arriving at the mail server into a Polaris
+// notification for the server's owner. Matched on what the engine's event says;
+// see `inboundRuleMatches` for the guards that keep a rule from becoming a flood.
+model MailInboundRule {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    serverId    String    @db.Uuid
+    name        String
+    // Wildcard patterns, "" for any.
+    recipient   String    @default("")
+    sender      String    @default("")
+    includeSpam Boolean   @default(false)
+    enabled     Boolean   @default(true)
+    // When it last raised a notification.
+    lastFiredAt     DateTime?
+    // The current window of the per-rule ceiling and the matches counted in it:
+    // the last guard against a loop.
+    windowStartedAt DateTime?
+    windowCount     Int       @default(0)
+    createdAt   DateTime  @default(now())
+
+    server MailServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+    @@index([serverId])
+}
+
+// One DMARC aggregate report a receiver sent about one of the server's domains.
+// Kept as read, so the screen can total them per sending address over any range.
+model MailDmarcReport {
+    id       String   @id @default(uuid(7)) @db.Uuid
+    serverId String   @db.Uuid
+    // Who sent it and its own id for it: the same report delivered twice is one row.
+    orgName  String
+    reportId String
+    domain   String
+    beginAt  DateTime
+    endAt    DateTime
+    // The rows as JSON (see DmarcRow in @polaris/core).
+    rows     Json     @default("[]")
+    messages Int      @default(0)
+    failed   Int      @default(0)
+    createdAt DateTime @default(now())
+
+    server MailServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+    @@unique([serverId, orgName, reportId])
+    @@index([serverId, endAt])
+}
+
+// A key backups are sealed under, one ring per owner. The key itself is wrapped
+// under the master key like every other credential here; a copy names the key it
+// was sealed with, so retiring a key for new backups leaves the old ones readable.
+// A key brought in from elsewhere (a recovery key) arrives already retired.
+model BackupKey {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    ownerId      String    @db.Uuid
+    encryptedKey Bytes
+    keyNonce     Bytes
+    keyKeyId     String
+    // Set once a newer key takes over sealing; still used to open what it sealed.
+    retiredAt    DateTime?
+    createdAt    DateTime  @default(now())
+
+    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId, retiredAt])
 }

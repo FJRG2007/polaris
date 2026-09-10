@@ -9,6 +9,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { ENV_VALUE_MAX, envValueMessage, hasControlCharacter } from "@polaris/core";
 
 export interface EnvVarView {
     id: string;
@@ -41,16 +42,20 @@ async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string
  * Which scope one variable belongs to, so a caller holding only its id can
  * resolve who is allowed to touch it before it does. Null when the row is gone
  * or names a scope this module does not own.
+ *
+ * The key comes back too, for the audit entry the caller writes: a reveal or a
+ * removal recorded without the name of what was revealed or removed says only
+ * that something happened.
  */
 export async function envVarScope(
     id: string
-): Promise<{ scope: EnvScope; scopeId: string } | null> {
+): Promise<{ scope: EnvScope; scopeId: string; key: string } | null> {
     const row = await prisma.envVar.findUnique({
         where: { id },
-        select: { scopeId: true, scopeType: true }
+        select: { scopeId: true, scopeType: true, key: true }
     });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
-    return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
+    return { scope: row.scopeType as EnvScope, scopeId: row.scopeId, key: row.key };
 }
 
 /** List a scope's variables (secret values masked). Application scope is a service;
@@ -104,6 +109,9 @@ export async function setEnvVar(
     const key = input.key.trim();
     if (!VALID_KEY.test(key))
         throw new Error("Key must be letters, digits and underscores, not starting with a digit");
+    if (hasControlCharacter(input.value)) throw new Error(envValueMessage(key));
+    if (input.value.length > ENV_VALUE_MAX)
+        throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB.`);
 
     const existing = await prisma.envVar.findFirst({
         where: { scopeType: scope, scopeId, key }
@@ -142,33 +150,31 @@ export async function setEnvVar(
     }
 }
 
+/** Moved to a pure module so the browser can stage a paste; kept here for callers. */
+export { parseDotEnv } from "./deploy/dotenv";
+
 /**
- * Parse a pasted .env blob into key/value pairs. Tolerates `export`, comments,
- * blank lines, surrounding single/double quotes, and inline `#` comments on
- * unquoted values. Values keep internal spaces.
+ * Mark a variable secret or plain without its value leaving the server: a
+ * plain value is sealed where it stands, a secret is opened and stored as text.
+ * Nothing to do when it already is what was asked.
  */
-export function parseDotEnv(text: string): Array<{ key: string; value: string }> {
-    const out: Array<{ key: string; value: string }> = [];
-    for (const raw of text.split(/\r?\n/)) {
-        const line = raw.trim();
-        if (!line || line.startsWith("#")) continue;
-        const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-        if (!match || !match[1]) continue;
-        const key = match[1];
-        let value = (match[2] ?? "").trim();
-        if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-        ) {
-            value = value.slice(1, -1);
-        } else {
-            // Strip a trailing inline comment on an unquoted value.
-            const hash = value.indexOf(" #");
-            if (hash >= 0) value = value.slice(0, hash).trim();
-        }
-        out.push({ key, value });
+export async function setEnvVarSecrecy(
+    id: string,
+    ownerId: string,
+    isSecret: boolean
+): Promise<void> {
+    const row = await prisma.envVar.findUnique({ where: { id } });
+    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) {
+        throw new Error("That variable no longer exists");
     }
-    return out;
+    await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    if (row.isSecret === isSecret) return;
+    const value = row.isSecret ? await revealEnvVar(id, ownerId) : row.value;
+    await setEnvVar(row.scopeType as EnvScope, row.scopeId, ownerId, {
+        key: row.key,
+        value: value ?? "",
+        isSecret
+    });
 }
 
 /** Set many variables at once (used by the .env paste import). */

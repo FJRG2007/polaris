@@ -10,24 +10,21 @@
 
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
+import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
+import { useProjectCan } from "./access-context";
 import { LogViewer } from "@/components/log-viewer";
+import type { ImportedConfig } from "@polaris/deploy";
+import { DatabaseManageDialog } from "./database-panel";
+import { RepoConfigPreview } from "./repo-config-preview";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
-import { useProjectCan } from "./access-context";
 import { stageDatabaseDeleteAction } from "./project-actions";
+import type { ServiceAttention } from "@/lib/deploy/attention";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import {
-    databaseCreateSchema,
-    dbEngineLabel,
-    DB_ENGINES,
-    DB_ENGINE_INFO,
-    type DatabaseCreateInput,
-    type DbEngine
-} from "@polaris/core";
 import {
     Badge,
     Button,
@@ -43,14 +40,26 @@ import {
     type SelectOption
 } from "@polaris/ui";
 import {
+    databaseCreateSchema,
+    dbEngineLabel,
+    MANAGED_ENGINES,
+    MANAGED_ENGINE_INFO,
+    SERVICE_TEMPLATES,
+    type ServiceTemplate,
+    type DatabaseCreateInput,
+    type ManagedEngine
+} from "@polaris/core";
+import {
     ArrowLeft,
     CheckCircle2,
+    LayoutTemplate,
     ChevronRight,
     Copy,
     Database,
     Eye,
     EyeOff,
     FolderOpen,
+    FolderUp,
     GitBranch,
     Globe,
     Loader2,
@@ -58,13 +67,14 @@ import {
     Plug,
     Plus,
     Rocket,
+    Settings2,
     TerminalSquare,
     Trash2
 } from "lucide-react";
 
-const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
+const ENGINE_OPTIONS: SelectOption[] = MANAGED_ENGINES.map((engine) => ({
     value: engine,
-    label: DB_ENGINE_INFO[engine].label,
+    label: MANAGED_ENGINE_INFO[engine].label,
     icon: <DbEngineIcon engine={engine} className="size-5" />
 }));
 
@@ -119,6 +129,12 @@ export interface ProjectSummary {
             installCommand: string | null;
             buildCommand: string | null;
             startCommand: string | null;
+            /** The runtime version it builds on, when the service names one. */
+            runtimeVersion: string | null;
+            /** Where a built site's files end up, when not the framework's default. */
+            outputDirectory: string | null;
+            /** How many copies of it run now. */
+            replicas: number;
             /** The container port the app listens on (for the IP:port link and routes). */
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
@@ -137,6 +153,9 @@ export interface ProjectSummary {
                 /** Who answers it: "server" - the machine the service runs on - or
                  *  "polaris" - this instance, dialling that machine. */
                 servedBy?: string;
+                /** Served through Cloudflare's proxy. Absent on a tunnel's name,
+                 *  which has no domain row of its own to change. */
+                cdn?: boolean;
             }[];
             volumes: {
                 id: string;
@@ -148,6 +167,8 @@ export interface ProjectSummary {
                 connectionName: string | null;
                 sizeLimit: string | null;
             }[];
+            /** What on it needs a look, for the dots on its tabs. */
+            attention?: ServiceAttention;
         }[];
         databases: {
             id: string;
@@ -348,7 +369,7 @@ function AppCard({
                     {isLocalDomain(primary) && (
                         <span
                             title="Resolves only on your local network"
-                            className="shrink-0 rounded bg-warning/10 px-1 text-[0.625rem] font-medium text-warning"
+                            className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink"
                         >
                             LAN
                         </span>
@@ -494,6 +515,7 @@ function DatabaseCard({
     const [pending, startTransition] = useTransition();
     const [confirming, setConfirming] = useState(false);
     const [connecting, setConnecting] = useState(false);
+    const [managing, setManaging] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function remove() {
@@ -576,6 +598,15 @@ function DatabaseCard({
                     <Button
                         variant="ghost"
                         size="icon"
+                        title="Manage"
+                        aria-label="Manage"
+                        onClick={() => setManaging(true)}
+                    >
+                        <Settings2 className="size-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         title={staged ? "Removal pending" : "Delete database"}
                         aria-label="Delete database"
                         disabled={staged}
@@ -591,6 +622,9 @@ function DatabaseCard({
                 open={connecting}
                 onOpenChange={setConnecting}
             />
+            {managing ? (
+                <DatabaseManageDialog database={database} open onOpenChange={setManaging} />
+            ) : null}
 
             <ConfirmDeleteDialog
                 open={confirming}
@@ -670,6 +704,12 @@ function DatabaseConnectionDialog({
                 {connection && (
                     <div className="flex flex-col gap-3">
                         <Field
+                            label="Reference"
+                            hint="Paste into a service's variable. It resolves to this database's address on every deploy, and to the copy's database in a copied environment."
+                        >
+                            <CopyRow value={connection.reference} />
+                        </Field>
+                        <Field
                             label="Connection URI"
                             hint="Reachable by name from any service in this environment."
                         >
@@ -722,7 +762,7 @@ function DatabaseConnectionDialog({
 }
 
 /** A read-only value with a copy button, for anything meant to be pasted. */
-function CopyRow({
+export function CopyRow({
     value,
     secret,
     copyValue
@@ -766,14 +806,18 @@ function CopyRow({
 export const SERVICE_TYPES = [
     { id: "github", label: "GitHub Repository", icon: <GitHubMark className="size-5" /> },
     { id: "docker", label: "Docker Image", icon: <DockerMark className="size-5" /> },
+    { id: "folder", label: "Upload a folder", icon: <FolderUp className="size-5" /> },
+    { id: "template", label: "Template", icon: <LayoutTemplate className="size-5" /> },
     { id: "database", label: "Database", icon: <Database className="size-5" /> }
 ] as const;
 
-export type ServiceView = "list" | "github" | "docker" | "database";
+export type ServiceView = "list" | "github" | "docker" | "folder" | "template" | "database";
 
 const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
     github: "GitHub Repository",
     docker: "Docker Image",
+    folder: "Upload a folder",
+    template: "From a template",
     database: "Database"
 };
 
@@ -823,6 +867,10 @@ export function NewServiceDialog({
                     <NewDatabaseForm environmentId={environmentId} onDone={done} />
                 ) : view === "github" ? (
                     <NewGithubForm environmentId={environmentId} onDone={done} />
+                ) : view === "folder" ? (
+                    <NewUploadForm environmentId={environmentId} onDone={done} />
+                ) : view === "template" ? (
+                    <NewTemplateForm environmentId={environmentId} onDone={done} />
                 ) : (
                     <NewImageForm environmentId={environmentId} onDone={done} />
                 )}
@@ -944,6 +992,132 @@ function ServerField({
     );
 }
 
+/** A new service from an uploaded folder, on the server picked here. */
+function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
+    return (
+        <NewFolderForm
+            environmentId={environmentId}
+            serverId={serverId}
+            serverField={<ServerField servers={servers} value={serverId} onChange={setServerId} />}
+            onDone={onDone}
+        />
+    );
+}
+
+/** What a template creates besides its own service, in the picker's words. */
+function templateExtra(template: ServiceTemplate): string | null {
+    if (template.database) return dbEngineLabel(template.database.engine);
+    if (template.companion) return `a ${template.companion.label}`;
+    return null;
+}
+
+/** A one-click service: pick a template, name it, and it deploys with its
+ *  volumes and variables already set. */
+function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const [picked, setPicked] = useState<ServiceTemplate | null>(null);
+    const [name, setName] = useState("");
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        if (!picked) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await deployActions.createApplicationAction({
+                environmentId,
+                name: name.trim() || picked.name,
+                templateId: picked.id,
+                serverId
+            });
+            if (result.error) setError(result.error);
+            else onDone();
+        });
+    }
+
+    if (!picked) {
+        return (
+            <div className="flex max-h-96 flex-col gap-1 overflow-y-auto overscroll-contain">
+                {SERVICE_TEMPLATES.map((template) => (
+                    <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => {
+                            setPicked(template);
+                            setName(template.name);
+                        }}
+                        className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                    >
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-foreground">
+                                {template.name}
+                                {templateExtra(template) && (
+                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                        with {templateExtra(template)}
+                                    </span>
+                                )}
+                            </span>
+                            <span
+                                className="block truncate text-xs text-muted-foreground"
+                                title={template.description}
+                            >
+                                {template.description}
+                            </span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </button>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+                {picked.description} <span className="font-mono text-xs">{picked.image}</span>
+            </p>
+            <Field label="Name">
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={picked.name}
+                />
+            </Field>
+            <ServerField servers={servers} value={serverId} onChange={setServerId} />
+            {picked.database && (
+                <p className="text-xs text-muted-foreground">
+                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named
+                    after the service. Its variables point at the database, so no password is
+                    copied.
+                </p>
+            )}
+            {picked.companion && (
+                <p className="text-xs text-muted-foreground">
+                    Creates a second service beside it for the {picked.companion.label}, reachable
+                    only from this environment.
+                </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+                {picked.firstRun}
+                {picked.secrets.length > 0 && " Generated secrets are in the service's Variables."}
+                {picked.prepare?.length
+                    ? " Setup runs inside it once it is up, and the service says how it went."
+                    : ""}
+            </p>
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-between gap-2">
+                <Button variant="ghost" onClick={() => setPicked(null)} disabled={pending}>
+                    Other templates
+                </Button>
+                <Button onClick={submit} disabled={pending}>
+                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
@@ -1050,6 +1224,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [dockerfilePath, setDockerfilePath] = useState("Dockerfile");
     const [rootDirectory, setRootDirectory] = useState("");
     const [framework, setFramework] = useState<string | null>(null);
+    const [imported, setImported] = useState<ImportedConfig | null>(null);
+    const [useRepoConfig, setUseRepoConfig] = useState(true);
     const [inspecting, setInspecting] = useState(false);
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
@@ -1073,6 +1249,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         setName(repo.fullName.split("/")[1] ?? "");
         setBranch(repo.defaultBranch);
         setFramework(null);
+        setImported(null);
+        setUseRepoConfig(true);
         setInspecting(true);
         const [owner, repoName] = repo.fullName.split("/");
         void deployActions
@@ -1085,6 +1263,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 setBuilder(inspection.builder);
                 setDockerfilePath(inspection.dockerfile ?? "Dockerfile");
                 setFramework(inspection.framework);
+                setImported(inspection.imported);
             })
             .catch(() => undefined)
             .finally(() => setInspecting(false));
@@ -1123,7 +1302,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 rootDirectory: rootDirectory.trim() || undefined,
                 // Only a GitHub repository can be cloned with the stored credentials.
                 provider: connected && choice.fullName ? "github" : undefined,
-                serverId
+                serverId,
+                useRepoConfig: imported !== null && useRepoConfig
             });
             if (result.error) setError(result.error);
             else onDone();
@@ -1238,6 +1418,13 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         </Field>
                     )}
                     <ServerField servers={servers} value={serverId} onChange={setServerId} />
+                    {imported && (
+                        <RepoConfigPreview
+                            imported={imported}
+                            use={useRepoConfig}
+                            onUse={setUseRepoConfig}
+                        />
+                    )}
                 </>
             )}
 
@@ -1264,7 +1451,7 @@ const PRIVILEGE_OPTIONS: SelectOption[] = [
 
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
-    const [engine, setEngine] = useState<DbEngine>("postgres");
+    const [engine, setEngine] = useState<ManagedEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -1281,7 +1468,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [password, setPassword] = useState("");
     const [privileges, setPrivileges] = useState("owner");
 
-    const info = DB_ENGINE_INFO[engine];
+    const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
 
     // Which instances this engine could be placed on. Reloaded when the engine
@@ -1314,7 +1501,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             exposePort: !hosted && exposePort.trim() ? Number(exposePort) : undefined,
             databaseName: databaseName.trim() || undefined,
             username: username.trim() || undefined,
-            password: password || undefined,
+            password: info.storage ? undefined : password || undefined,
             privileges: privileges as "owner" | "readwrite" | "readonly"
         };
     }
@@ -1346,7 +1533,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             <Field label="Engine">
                 <Select
                     value={engine}
-                    onValueChange={(value) => setEngine(value as DbEngine)}
+                    onValueChange={(value) => setEngine(value as ManagedEngine)}
                     options={ENGINE_OPTIONS}
                 />
             </Field>
@@ -1450,17 +1637,20 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                         </>
                     )}
 
-                    <Field
-                        label="Password"
-                        hint="Blank generates a strong one and stores it encrypted."
-                    >
-                        <Input
-                            type="password"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="Generated"
-                        />
-                    </Field>
+                    {/* An object store's account is an S3 key pair, always generated. */}
+                    {!info.storage && (
+                        <Field
+                            label="Password"
+                            hint="Blank generates a strong one and stores it encrypted."
+                        >
+                            <Input
+                                type="password"
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
+                                placeholder="Generated"
+                            />
+                        </Field>
+                    )}
                 </div>
             )}
 
@@ -1703,16 +1893,16 @@ export function StatusPill({
     label: string;
 }) {
     const dot = {
-        success: "bg-success",
-        warning: "bg-warning",
-        danger: "bg-danger",
+        success: "bg-success-solid",
+        warning: "bg-warning-solid",
+        danger: "bg-danger-solid",
         idle: "bg-muted-foreground"
     }[tone];
     // Tint the whole chip by tone so state reads in color at a glance, Railway-style.
     const chip = {
-        success: "border-success/25 bg-success/10 text-success",
-        warning: "border-warning/25 bg-warning/10 text-warning",
-        danger: "border-danger/25 bg-danger/10 text-danger",
+        success: "border-success-edge bg-success-soft text-success-ink",
+        warning: "border-warning-edge bg-warning-soft text-warning-ink",
+        danger: "border-danger-edge bg-danger-soft text-danger-ink",
         idle: "border-border/60 bg-surface text-muted-foreground"
     }[tone];
     return (

@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::deploy::{self, DeploySpec};
 use crate::docker;
 use crate::http::{self, Request, Response};
+use crate::networks;
 use crate::security::{self, PathError};
 
 /// Body cap for control endpoints (JSON). `fs` PUT is streamed and not bound by
@@ -58,6 +59,10 @@ fn capabilities(config: &Config) -> serde_json::Value {
         "nativeMounts": true,
         "docker": config.docker_socket.exists(),
         "deploy": config.docker_socket.exists(),
+        // Creates the private networks a deploy spec names. Reported so a dashboard
+        // newer than this daemon keeps its services on the shared network rather
+        // than naming one this daemon would not create.
+        "privateNetworks": config.docker_socket.exists(),
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
@@ -90,6 +95,12 @@ struct DownRequest {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PullRequest {
+    image: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExportImageRequest {
     image: String,
 }
 
@@ -192,6 +203,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/stack/up") => deploy_stack_up(state, req, body),
         ("POST", "/v1/deploy/stack/down") => deploy_stack_down(state, req, body),
         ("POST", "/v1/deploy/pull") => deploy_pull(state, req, body),
+        ("POST", "/v1/deploy/image/export") => deploy_image_export(req, body),
+        ("POST", "/v1/deploy/image/import") => deploy_image_import(state, req, body),
         ("POST", "/v1/deploy/inspect") => deploy_inspect(req, body),
         ("POST", "/v1/deploy/login") => deploy_login(state, req, body),
         ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
@@ -202,6 +215,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
         ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
+        ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -329,6 +343,11 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
     if let Err(msg) = deploy::validate_spec(&spec, &state.config) {
         return Response::bad_request(&msg);
     }
+    // Private networks the spec names are created here, because compose refuses to
+    // join one another project created (see `networks`).
+    if let Err(msg) = networks::ensure(&spec.networks, false) {
+        return Response::text(502, "Bad Gateway", &msg);
+    }
     let yaml = deploy::render_compose(&spec, &state.config);
     match deploy::compose_up(&state.config, &spec.project, &yaml) {
         Ok(reader) => stream_response(reader),
@@ -337,6 +356,51 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
             Response::text(502, "Bad Gateway", "could not start docker compose")
         }
     }
+}
+
+/// The private networks the dashboard still has a use for.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NetworksReconcileRequest {
+    keep: Vec<String>,
+}
+
+/// The most names one reconcile may carry: one per environment and one per
+/// service, with room to spare, and a bound on what a request can make this walk.
+const MAX_KEPT_NETWORKS: usize = 20_000;
+
+/// Keep this machine's private networks in line with what the dashboard still
+/// uses: attach Polaris's own containers to each wanted one and remove the rest
+/// (see `networks::reconcile`). Every name is checked against the private shape,
+/// so nothing sent here can name any other network.
+fn deploy_networks_reconcile<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    if !state.config.docker_socket.exists() {
+        return Response::not_implemented("docker is not available on this host");
+    }
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: NetworksReconcileRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid reconcile request"),
+    };
+    if request.keep.len() > MAX_KEPT_NETWORKS {
+        return Response::bad_request("too many networks");
+    }
+    if request
+        .keep
+        .iter()
+        .any(|name| !networks::is_private_network(name))
+    {
+        return Response::bad_request("invalid network name");
+    }
+    let report = networks::reconcile(&request.keep);
+    Response::json(
+        200,
+        "OK",
+        &serde_json::json!({ "kept": report.kept, "removed": report.removed }),
+    )
 }
 
 /// Deploy a validated spec onto a swarm via `docker stack deploy`, streaming
@@ -352,6 +416,9 @@ fn deploy_stack_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Re
     };
     if let Err(msg) = deploy::validate_spec(&spec, &state.config) {
         return Response::bad_request(&msg);
+    }
+    if let Err(msg) = networks::ensure(&spec.networks, true) {
+        return Response::text(502, "Bad Gateway", &msg);
     }
     let yaml = deploy::render_compose(&spec, &state.config);
     match deploy::stack_up(&state.config, &spec.project, &yaml) {
@@ -411,6 +478,92 @@ fn deploy_pull<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Respo
     match deploy::pull(&request.image) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not pull the image"),
+    }
+}
+
+/// Hand out a kept release image as a gzipped archive, for a service that was
+/// built on this machine and runs on another. Only images under the release
+/// repository: nothing an operator pulled or built by hand leaves this way.
+fn deploy_image_export<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: ExportImageRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid export request"),
+    };
+    if !deploy::valid_release_image(&request.image) {
+        return Response::bad_request("only a kept release image can be exported");
+    }
+    match deploy::export_image(&request.image) {
+        Ok(reader) => {
+            Response::stream(200, "OK", reader).with_header("Content-Type", "application/gzip")
+        }
+        Err(_) => Response::text(502, "Bad Gateway", "could not export the image"),
+    }
+}
+
+/// A unique name for a staged upload, so two at once never share a file.
+fn staged_name(prefix: &str) -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "{prefix}-{}-{nanos}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+/// Take in a gzipped `docker save` archive of kept release images built on another
+/// machine, and load it. Staged to disk under the deploy root, bounded, and read
+/// for what it would load before anything is loaded: an archive naming any image
+/// outside the release repository is refused whole.
+fn deploy_image_import<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    const MAX_ARCHIVE: u64 = 16 * 1024 * 1024 * 1024;
+    if req.content_length == 0 {
+        return Response::bad_request("an image archive is required");
+    }
+    if req.content_length > MAX_ARCHIVE {
+        return Response::text(
+            413,
+            "Payload Too Large",
+            "the image archive is larger than 16 GB",
+        );
+    }
+    let dir = state.config.deploy_root.join("_images");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Response::server_error();
+    }
+    let staged = dir.join(format!("{}.tar.gz", staged_name("import")));
+    let mut file = match std::fs::File::create(&staged) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    let mut limited = body.take(req.content_length);
+    let copied = std::io::copy(&mut limited, &mut file);
+    drop(file);
+    if !matches!(copied, Ok(n) if n == req.content_length) {
+        let _ = std::fs::remove_file(&staged);
+        return Response::bad_request("the image archive arrived incomplete");
+    }
+    if !deploy::archive_is_release(&staged) {
+        let _ = std::fs::remove_file(&staged);
+        return Response::bad_request("the archive holds something other than kept release images");
+    }
+    let reopened = match std::fs::File::open(&staged) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    // The child holds its own descriptor, so the name can go now.
+    let _ = std::fs::remove_file(&staged);
+    match deploy::load_image(reopened) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not load the image"),
     }
 }
 
@@ -683,6 +836,9 @@ fn deploy_fs_read<R: Read>(req: &Request, body: &mut R) -> Response {
 
 /// The most output a one-shot exec may report back. These commands answer with a
 /// status line or an error, so anything past this is a runaway, not a result.
+/// Only consumed by the unix `run_in_container`, so it is dead code on a
+/// non-unix build.
+#[cfg_attr(not(unix), allow(dead_code))]
 const EXEC_RUN_MAX_OUTPUT: usize = 16 * 1024;
 
 /// Run a command inside a container, wait for it, and report how it went.
@@ -749,6 +905,10 @@ fn run_in_container(container: &str, argv: &[String]) -> std::io::Result<(i32, S
 /// character, and the cap almost never does: a container writes whatever it
 /// likes, and decoding that leniently leaves a three-byte replacement wherever
 /// the stream was not valid UTF-8. Cutting blind aborts the daemon.
+///
+/// Only called from the unix `run_in_container`, so it is dead code on a
+/// non-unix build.
+#[cfg_attr(not(unix), allow(dead_code))]
 fn truncate_on_char_boundary(text: &mut String, max: usize) {
     if text.len() <= max {
         return;
@@ -1055,6 +1215,9 @@ enum MountError {
     /// operator nothing, while "Host is down" or "Permission denied" names the
     /// thing they have to go and fix. Only the helper's own diagnostic goes in
     /// here - a host-side io::Error or path stays on the daemon's stderr.
+    /// Only constructed by the unix `run_mount`/`run_umount`, so it is dead
+    /// code on a non-unix build.
+    #[cfg_attr(not(unix), allow(dead_code))]
     Failed(String),
 }
 
@@ -1444,5 +1607,6 @@ mod tests {
         // Presence-based flags are booleans regardless of host.
         assert!(caps["docker"].is_boolean());
         assert!(caps["systemd"].is_boolean());
+        assert!(caps["privateNetworks"].is_boolean());
     }
 }

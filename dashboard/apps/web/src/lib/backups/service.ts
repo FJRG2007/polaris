@@ -18,11 +18,22 @@ import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
 import type { Prisma } from "@polaris/db";
 import { createReadStream } from "node:fs";
+import { sealArtifact } from "./sealed-copies";
 import { sourceFor, allSources } from "./sources/registry";
 import { createNotification } from "@/lib/notification-service";
 import { SourceUnavailableError, type SourceResource, type StagedArtifact } from "./sources/types";
-import { DestinationUnavailableError, isSourceLocal, openDestination, type DestinationRow } from "./destination";
-import { DEFAULT_LOCAL_DESTINATION, DEFAULT_SOURCE_LOCAL_DESTINATION, isResourceKind, type ResourceKind } from "./kinds";
+import {
+    DestinationUnavailableError,
+    isSourceLocal,
+    openDestination,
+    type DestinationRow
+} from "./destination";
+import {
+    DEFAULT_LOCAL_DESTINATION,
+    DEFAULT_SOURCE_LOCAL_DESTINATION,
+    isResourceKind,
+    type ResourceKind
+} from "./kinds";
 import {
     backupDue,
     copiesToPrune,
@@ -94,17 +105,21 @@ function toSourceResource(row: {
  * Without a plan there is still somewhere to put it: the owner's default. A
  * protected thing somebody backs up by hand should not need a schedule first.
  */
-async function destinationsFor(
-    ownerId: string,
-    planId: string | null
-): Promise<DestinationRow[]> {
+async function destinationsFor(ownerId: string, planId: string | null): Promise<DestinationRow[]> {
     if (planId) {
         const rows = await prisma.backupPlanDestination.findMany({
             where: { planId },
             orderBy: { position: "asc" },
             select: {
                 destination: {
-                    select: { id: true, name: true, kind: true, connectionId: true, hostId: true, basePath: true }
+                    select: {
+                        id: true,
+                        name: true,
+                        kind: true,
+                        connectionId: true,
+                        hostId: true,
+                        basePath: true
+                    }
                 }
             }
         });
@@ -112,7 +127,14 @@ async function destinationsFor(
     }
     const fallback = await prisma.backupDestination.findFirst({
         where: { ownerId, isDefault: true },
-        select: { id: true, name: true, kind: true, connectionId: true, hostId: true, basePath: true }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            connectionId: true,
+            hostId: true,
+            basePath: true
+        }
     });
     return fallback ? [fallback] : [];
 }
@@ -122,7 +144,13 @@ async function policyFor(planId: string | null): Promise<RetentionPolicy> {
     if (!planId) return DEFAULT_POLICY;
     const plan = await prisma.backupPlan.findUnique({
         where: { id: planId },
-        select: { every: true, keepLast: true, keepDays: true, maxBytes: true, notifyOnFailure: true }
+        select: {
+            every: true,
+            keepLast: true,
+            keepDays: true,
+            maxBytes: true,
+            notifyOnFailure: true
+        }
     });
     return plan ? readPolicy(plan) : DEFAULT_POLICY;
 }
@@ -135,7 +163,13 @@ async function policyFor(planId: string | null): Promise<RetentionPolicy> {
  */
 export async function runBackup(
     resourceId: string,
-    options: { trigger?: "manual" | "scheduled"; actorUserId?: string } = {}
+    /** `pre-restore` and `pre-upgrade` are the safety copies taken before an
+     *  operation that replaces a database's contents, so the history says why a
+     *  copy exists that nobody asked for by hand. */
+    options: {
+        trigger?: "manual" | "scheduled" | "pre-restore" | "pre-upgrade";
+        actorUserId?: string;
+    } = {}
 ): Promise<BackupOutcome> {
     const row = await prisma.protectedResource.findUnique({
         where: { id: resourceId },
@@ -201,14 +235,24 @@ export async function runBackup(
 
 /** Produce the artifact once and write it everywhere the plan says. */
 async function produceAndReplicate(
-    row: { id: string; ownerId: string; kind: string; selector: string; name: string; config: string; planId: string | null },
+    row: {
+        id: string;
+        ownerId: string;
+        kind: string;
+        selector: string;
+        name: string;
+        config: string;
+        planId: string | null;
+    },
     pointId: string
 ): Promise<BackupOutcome> {
     const resource = toSourceResource(row);
     const source = sourceFor(resource.kind);
     const destinations = await destinationsFor(row.ownerId, row.planId);
     if (destinations.length === 0) {
-        throw new SourceUnavailableError("There is nowhere to put this backup. Add a destination first.");
+        throw new SourceUnavailableError(
+            "There is nowhere to put this backup. Add a destination first."
+        );
     }
     const policy = await policyFor(row.planId);
     const takenAt = new Date();
@@ -251,6 +295,9 @@ async function produceAndReplicate(
     }
 
     let staged: StagedArtifact | null = null;
+    // What is actually written: the artifact sealed under the owner's backup key,
+    // so no destination ever holds it in the clear.
+    let sealed: { artifact: StagedArtifact; keyId: string } | null = null;
     if (remote.length > 0) {
         staged = await source.produce(resource);
         metadata = { ...staged.metadata, fileName: staged.fileName };
@@ -258,23 +305,28 @@ async function produceAndReplicate(
     }
 
     try {
+        if (staged) sealed = await sealArtifact(staged, row.ownerId);
         for (const destination of remote) {
-            if (!staged) break;
+            if (!sealed) break;
+            const upload = sealed.artifact;
             const copy = await prisma.recoveryPointCopy.create({
                 data: {
                     pointId,
                     destinationId: destination.id,
-                    path: `${resource.id}/${staged.fileName}`,
-                    sizeBytes: BigInt(staged.sizeBytes),
-                    status: "pending"
+                    path: `${resource.id}/${upload.fileName}`,
+                    sizeBytes: BigInt(upload.sizeBytes),
+                    status: "pending",
+                    sealedWith: sealed.keyId
                 },
                 select: { id: true, path: true }
             });
             let handle;
             try {
                 handle = await openDestination(destination, row.ownerId);
-                const body = Readable.toWeb(createReadStream(staged.path)) as ReadableStream<Uint8Array>;
-                const written = await handle.put(copy.path, body, BigInt(staged.sizeBytes));
+                const body = Readable.toWeb(
+                    createReadStream(upload.path)
+                ) as ReadableStream<Uint8Array>;
+                const written = await handle.put(copy.path, body, BigInt(upload.sizeBytes));
                 await prisma.recoveryPointCopy.update({
                     where: { id: copy.id },
                     data: { status: "available", sizeBytes: BigInt(written.sizeBytes) }
@@ -290,15 +342,22 @@ async function produceAndReplicate(
                 // The destination is the thing that is wrong, not the backup:
                 // recording it here is what makes the console able to say which
                 // one has started refusing before the next run is due.
-                await prisma.backupDestination.update({
-                    where: { id: destination.id },
-                    data: { status: "unreachable", lastCheckedAt: new Date(), lastError: reason }
-                }).catch(() => undefined);
+                await prisma.backupDestination
+                    .update({
+                        where: { id: destination.id },
+                        data: {
+                            status: "unreachable",
+                            lastCheckedAt: new Date(),
+                            lastError: reason
+                        }
+                    })
+                    .catch(() => undefined);
             } finally {
                 await handle?.dispose().catch(() => undefined);
             }
         }
     } finally {
+        await sealed?.artifact.cleanup();
         await staged?.cleanup();
     }
 
@@ -333,7 +392,10 @@ function reasonOf(error: unknown): string {
 }
 
 function summarize(failures: readonly { destination: string; reason: string }[]): string {
-    return failures.map((failure) => `${failure.destination}: ${failure.reason}`).join("; ").slice(0, 1000);
+    return failures
+        .map((failure) => `${failure.destination}: ${failure.reason}`)
+        .join("; ")
+        .slice(0, 1000);
 }
 
 /** Tell somebody a scheduled backup did not land, when the plan asks for it. */
@@ -376,7 +438,14 @@ export async function pruneResource(resourceId: string, policy: RetentionPolicy)
             sizeBytes: true,
             point: { select: { takenAt: true } },
             destination: {
-                select: { id: true, name: true, kind: true, connectionId: true, hostId: true, basePath: true }
+                select: {
+                    id: true,
+                    name: true,
+                    kind: true,
+                    connectionId: true,
+                    hostId: true,
+                    basePath: true
+                }
             }
         }
     });
@@ -551,7 +620,13 @@ export async function sweepDueBackups(now: Date = new Date()): Promise<{
 
 /** Everything of every kind that exists and is not protected yet. */
 export async function discoverUnprotected(ownerId: string): Promise<
-    { kind: ResourceKind; selector: string; name: string; context?: string; target: Record<string, unknown> }[]
+    {
+        kind: ResourceKind;
+        selector: string;
+        name: string;
+        context?: string;
+        target: Record<string, unknown>;
+    }[]
 > {
     const [found, existing] = await Promise.all([
         Promise.all(allSources().map((source) => source.discover(ownerId).catch(() => []))),

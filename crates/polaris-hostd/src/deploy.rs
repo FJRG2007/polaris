@@ -27,7 +27,7 @@ use crate::security::{self, PathError};
 
 /// A deploy request: one compose project made of one or more services.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DeploySpec {
     pub project: String,
     pub services: Vec<ServiceSpec>,
@@ -37,6 +37,12 @@ pub struct DeploySpec {
     /// External networks the services join (the shared proxy network).
     #[serde(default)]
     pub networks: Vec<String>,
+    /// Volumes that already exist, named exactly, which this project mounts but
+    /// never owns: a maintenance container reaching another service's data while
+    /// that service is stopped. Declared `external`, so nothing here creates,
+    /// renames or removes them.
+    #[serde(default)]
+    pub external_volumes: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,8 +65,17 @@ pub struct ServiceSpec {
     pub labels: BTreeMap<String, String>,
     #[serde(default)]
     pub command: Vec<String>,
+    /// Replaces the image's own entrypoint. Only a maintenance container sets it,
+    /// to run a script beside the program the image is built around.
+    #[serde(default)]
+    pub entrypoint: Vec<String>,
     #[serde(default)]
     pub networks: Vec<String>,
+    /// Other names the container answers to on every network it joins: the service's
+    /// own, carried by a release running beside the one it replaces, so whatever
+    /// reaches the service by that name keeps reaching it across the change.
+    #[serde(default)]
+    pub aliases: Vec<String>,
     /// Names this container can reach that DNS cannot answer, as `name:address`.
     /// Always carries `host.docker.internal:host-gateway`: a container Polaris
     /// starts routinely talks to something the host publishes - the camera relay,
@@ -75,7 +90,23 @@ pub struct ServiceSpec {
     /// Replica count for swarm deploys (rendered as `deploy.replicas`). Ignored by
     /// plain compose.
     pub replicas: Option<u32>,
+    /// Swarm only: replace start-first and roll back by itself if the new task
+    /// fails within the monitor window. The dashboard never sets it for a service
+    /// with a volume, where two tasks at once would share its files.
+    #[serde(default)]
+    pub rolling_update: bool,
+    /// The most CPU, in cores, the container may use. Absent is no limit.
+    #[serde(default)]
+    pub cpus: Option<f64>,
+    /// The most memory, in MB, the container may use. Absent is no limit.
+    #[serde(default)]
+    pub memory_mb: Option<u32>,
 }
+
+/// The range a CPU limit may take, in cores.
+const CPU_LIMIT_RANGE: std::ops::RangeInclusive<f64> = 0.05..=256.0;
+/// The range a memory limit may take, in MB.
+const MEMORY_LIMIT_RANGE: std::ops::RangeInclusive<u32> = 16..=4_194_304;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -152,7 +183,7 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                 ));
             }
         }
-        for arg in &service.command {
+        for arg in service.command.iter().chain(service.entrypoint.iter()) {
             if has_control(arg) {
                 return Err("command arguments must not contain control characters".into());
             }
@@ -170,6 +201,17 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
         for net in &service.networks {
             if !valid_name(net) {
                 return Err(format!("invalid network name: {net}"));
+            }
+        }
+        if !service.aliases.is_empty() && service.networks.is_empty() {
+            return Err(format!(
+                "aliases for {} need a network to answer on",
+                service.name
+            ));
+        }
+        for alias in &service.aliases {
+            if !valid_name(alias) {
+                return Err(format!("invalid network alias: {alias}"));
             }
         }
         for dep in &service.depends_on {
@@ -190,16 +232,39 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                 }
             }
         }
+        if let Some(cpus) = service.cpus {
+            if !cpus.is_finite() || !CPU_LIMIT_RANGE.contains(&cpus) {
+                return Err(format!(
+                    "cpu limit for {} must be between 0.05 and 256",
+                    service.name
+                ));
+            }
+        }
+        if let Some(memory) = service.memory_mb {
+            if !MEMORY_LIMIT_RANGE.contains(&memory) {
+                return Err(format!(
+                    "memory limit for {} must be between 16 and 4194304 MB",
+                    service.name
+                ));
+            }
+        }
     }
     for net in &spec.networks {
         if !valid_name(net) {
             return Err(format!("invalid network name: {net}"));
         }
     }
-    for vol in &spec.volumes {
+    for vol in spec.volumes.iter().chain(spec.external_volumes.iter()) {
         if !valid_name(vol) {
             return Err(format!("invalid volume name: {vol}"));
         }
+    }
+    if spec
+        .external_volumes
+        .iter()
+        .any(|vol| spec.volumes.contains(vol))
+    {
+        return Err("a volume cannot be both owned and external".into());
     }
     Ok(())
 }
@@ -237,6 +302,47 @@ fn validate_volume(volume: &VolumeSpec, config: &Config) -> Result<(), String> {
         }
         other => Err(format!("invalid volume kind: {other}")),
     }
+}
+
+/// The `deploy:` block of a service: swarm's replica count and start-first update,
+/// and the resource limits - which plain compose reads from the same place, so one
+/// block serves both engines. Empty when none of them applies, which is what plain
+/// compose deploys have always rendered. The same shape as the dashboard's own
+/// renderer for remote servers.
+fn deploy_block(service: &ServiceSpec) -> String {
+    let replicas = service.replicas;
+    let rolling_update = service.rolling_update;
+    let replicated = replicas.is_some_and(|count| count > 1);
+    let limited = service.cpus.is_some() || service.memory_mb.is_some();
+    if !replicated && !rolling_update && !limited {
+        return String::new();
+    }
+    let mut out = String::from("    deploy:\n");
+    if replicated || rolling_update {
+        out.push_str(&format!(
+            "      mode: replicated\n      replicas: {}\n",
+            if replicated { replicas.unwrap_or(1) } else { 1 }
+        ));
+    }
+    if limited {
+        out.push_str("      resources:\n        limits:\n");
+        if let Some(cpus) = service.cpus {
+            // Validated finite and in range; written as a quoted decimal.
+            out.push_str(&format!(
+                "          cpus: \"{}\"\n",
+                (cpus * 100.0).round() / 100.0
+            ));
+        }
+        if let Some(memory) = service.memory_mb {
+            out.push_str(&format!("          memory: {memory}M\n"));
+        }
+    }
+    if rolling_update {
+        out.push_str(
+            "      update_config:\n        order: start-first\n        failure_action: rollback\n        monitor: 30s\n      rollback_config:\n        order: start-first\n",
+        );
+    }
+    out
 }
 
 /// Render a validated spec into a compose file. Every string is emitted as a
@@ -315,8 +421,20 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         }
         if !service.networks.is_empty() {
             out.push_str("    networks:\n");
-            for net in &service.networks {
-                out.push_str(&format!("      - {net}\n"));
+            if service.aliases.is_empty() {
+                for net in &service.networks {
+                    out.push_str(&format!("      - {net}\n"));
+                }
+            } else {
+                // The mapping form, which is the only one that can carry aliases;
+                // they go on every network, since whoever reaches the service by
+                // name may be on any of them.
+                for net in &service.networks {
+                    out.push_str(&format!("      {net}:\n        aliases:\n"));
+                    for alias in &service.aliases {
+                        out.push_str(&format!("          - {}\n", yaml_quote(alias)));
+                    }
+                }
             }
         }
         if !service.extra_hosts.is_empty() {
@@ -330,6 +448,10 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             for dep in &service.depends_on {
                 out.push_str(&format!("      - {dep}\n"));
             }
+        }
+        if !service.entrypoint.is_empty() {
+            let parts: Vec<String> = service.entrypoint.iter().map(|c| yaml_quote(c)).collect();
+            out.push_str(&format!("    entrypoint: [{}]\n", parts.join(", ")));
         }
         if !service.command.is_empty() {
             let parts: Vec<String> = service.command.iter().map(|c| yaml_quote(c)).collect();
@@ -349,12 +471,7 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
                 out.push_str(&format!("      start_period: {start}s\n"));
             }
         }
-        if let Some(replicas) = service.replicas {
-            // Swarm scaling: `docker stack deploy` reads this; plain compose ignores it.
-            out.push_str(&format!(
-                "    deploy:\n      mode: replicated\n      replicas: {replicas}\n"
-            ));
-        }
+        out.push_str(&deploy_block(service));
     }
     if !spec.networks.is_empty() {
         out.push_str("networks:\n");
@@ -362,10 +479,13 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             out.push_str(&format!("  {net}:\n    external: true\n"));
         }
     }
-    if !spec.volumes.is_empty() {
+    if !spec.volumes.is_empty() || !spec.external_volumes.is_empty() {
         out.push_str("volumes:\n");
         for vol in &spec.volumes {
             out.push_str(&format!("  {vol}:\n"));
+        }
+        for vol in &spec.external_volumes {
+            out.push_str(&format!("  {vol}:\n    external: true\n"));
         }
     }
     out
@@ -756,6 +876,101 @@ pub fn build(
     stream_command(cmd)
 }
 
+/// Whether a reference names a kept release image, `polaris-release/<name>:<12 hex>`:
+/// the only images this daemon hands out or takes in whole.
+pub fn valid_release_image(reference: &str) -> bool {
+    reference
+        .strip_prefix("polaris-release/")
+        .is_some_and(crate::docker::valid_release_reference)
+}
+
+/// A child's stdout read directly, so the reader's pace is the child's pace.
+///
+/// The channel-backed reader the other streams use queues whatever the child
+/// writes; for an image of several gigabytes read by a slower consumer that queue
+/// is the whole image in this daemon's memory. Reading the pipe itself blocks the
+/// child instead. Dropping it kills and reaps the child.
+struct PipeReader {
+    stdout: std::process::ChildStdout,
+    _child: ChildGuard,
+}
+
+impl Read for PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.stdout.read(buf)
+    }
+}
+
+/// A kept release image as a gzipped `docker save` archive, streamed raw: no
+/// exit trailer and no stderr, either of which would corrupt the archive. A
+/// save that fails yields an archive with no image in it, which the loading end
+/// refuses. The image is a positional argument, never part of the script.
+pub fn export_image(image: &str) -> io::Result<Box<dyn Read + Send>> {
+    let mut child = Command::new("sh")
+        .arg("-c")
+        .arg("docker save \"$1\" | gzip -1")
+        .arg("sh")
+        .arg(image)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let stdout = child.stdout.take().expect("stdout piped");
+    Ok(Box::new(PipeReader {
+        stdout,
+        _child: ChildGuard(child),
+    }))
+}
+
+/// The image names a `docker save` archive would load, from its `manifest.json`.
+/// None when it is not such an archive or names nothing.
+pub fn parse_manifest_tags(raw: &[u8]) -> Option<Vec<String>> {
+    #[derive(Deserialize)]
+    struct Entry {
+        #[serde(rename = "RepoTags", default)]
+        repo_tags: Option<Vec<String>>,
+    }
+    let entries: Vec<Entry> = serde_json::from_slice(raw).ok()?;
+    let tags: Vec<String> = entries
+        .into_iter()
+        .flat_map(|entry| entry.repo_tags.unwrap_or_default())
+        .collect();
+    if tags.is_empty() {
+        None
+    } else {
+        Some(tags)
+    }
+}
+
+/// Whether a staged gzipped archive holds kept release images and nothing else.
+///
+/// Asked before anything is loaded, because a load cannot be taken back: an
+/// archive naming `traefik:v3` would quietly replace the edge's own image on the
+/// next restart. The manifest is read with the system's gzip and tar, bounded.
+pub fn archive_is_release(path: &std::path::Path) -> bool {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg("gzip -dc \"$1\" | tar -xOf - manifest.json")
+        .arg("sh")
+        .arg(path)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output();
+    let Ok(output) = output else { return false };
+    if output.stdout.len() > 1024 * 1024 {
+        return false;
+    }
+    parse_manifest_tags(&output.stdout)
+        .is_some_and(|tags| tags.iter().all(|tag| valid_release_image(tag)))
+}
+
+/// `docker load` from a staged archive, streaming what it printed.
+pub fn load_image(archive: std::fs::File) -> io::Result<Box<dyn Read + Send>> {
+    let mut cmd = Command::new("docker");
+    cmd.arg("load").stdin(Stdio::from(archive));
+    stream_command(cmd)
+}
+
 /// `docker pull`, streaming progress.
 pub fn pull(image: &str) -> io::Result<Box<dyn Read + Send>> {
     let mut cmd = Command::new("docker");
@@ -1080,6 +1295,130 @@ mod tests {
         let rendered = render_compose(&s, &config);
         assert!(rendered.contains("\"19132:19132/udp\""));
         assert!(rendered.contains("\"25565:25565\""));
+    }
+
+    #[test]
+    fn a_rolling_update_starts_the_new_task_first_and_rolls_itself_back() {
+        // Accepted under the name the dashboard sends, and rendered so swarm keeps
+        // the old task serving until the new one is healthy. Absent, nothing is
+        // rendered - which is what every plain compose deploy has always had.
+        let config = test_config();
+        let rolling = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","rollingUpdate":true}]}"#,
+        );
+        let rendered = render_compose(&rolling, &config);
+        assert!(rendered.contains("order: start-first"));
+        assert!(rendered.contains("failure_action: rollback"));
+        assert!(rendered.contains("replicas: 1"));
+
+        let plain = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx"}]}"#);
+        assert!(!render_compose(&plain, &config).contains("deploy:"));
+    }
+
+    #[test]
+    fn only_kept_release_images_travel_between_machines() {
+        assert!(valid_release_image("polaris-release/web:0123456789ab"));
+        assert!(!valid_release_image("polaris-release/web:latest"));
+        assert!(!valid_release_image("traefik:v3.6"));
+        assert!(!valid_release_image("polaris-release/../web:0123456789ab"));
+        assert!(!valid_release_image(
+            "other/polaris-release/web:0123456789ab"
+        ));
+    }
+
+    #[test]
+    fn an_archive_is_read_for_what_it_would_load() {
+        // What `docker save` writes as manifest.json: every tag the archive would
+        // create is listed, and the import refuses the archive if any is not a
+        // kept release image.
+        let one =
+            br#"[{"Config":"c.json","RepoTags":["polaris-release/web:0123456789ab"],"Layers":[]}]"#;
+        assert_eq!(
+            parse_manifest_tags(one),
+            Some(vec!["polaris-release/web:0123456789ab".to_string()])
+        );
+        let mixed =
+            br#"[{"RepoTags":["polaris-release/web:0123456789ab"]},{"RepoTags":["traefik:v3"]}]"#;
+        let tags = parse_manifest_tags(mixed).unwrap();
+        assert!(!tags.iter().all(|tag| valid_release_image(tag)));
+        // An untagged image, or not a manifest at all, names nothing to accept.
+        assert_eq!(parse_manifest_tags(br#"[{"RepoTags":null}]"#), None);
+        assert_eq!(parse_manifest_tags(b"not json"), None);
+    }
+
+    #[test]
+    fn a_maintenance_container_mounts_what_it_does_not_own() {
+        // Another project's volumes by their exact names, declared external so
+        // this project never creates or removes them, and a script in place of
+        // the image's own entrypoint. Neither is rendered when absent.
+        let config = test_config();
+        let maintenance = spec(
+            r#"{"project":"polaris-mailexport-1","services":[{"name":"polaris-mailexport-1","image":"stalwartlabs/stalwart:v0.16","entrypoint":["/bin/sh","-c"],"command":["echo ok"],"volumes":[{"source":"polaris-abc_stalwart-data","target":"/var/lib/stalwart","kind":"volume"}],"restart":"no"}],"externalVolumes":["polaris-abc_stalwart-data"]}"#,
+        );
+        assert!(validate_spec(&maintenance, &config).is_ok());
+        let rendered = render_compose(&maintenance, &config);
+        assert!(rendered.contains("    entrypoint: [\"/bin/sh\", \"-c\"]\n"));
+        assert!(rendered.contains("  polaris-abc_stalwart-data:\n    external: true\n"));
+
+        let both = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx"}],"volumes":["data"],"externalVolumes":["data"]}"#,
+        );
+        assert!(validate_spec(&both, &config).is_err());
+        let control = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","entrypoint":["sh\n"]}]}"#,
+        );
+        assert!(validate_spec(&control, &config).is_err());
+
+        let plain = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx"}]}"#);
+        let rendered = render_compose(&plain, &config);
+        assert!(!rendered.contains("entrypoint"));
+        assert!(!rendered.contains("volumes:"));
+    }
+
+    #[test]
+    fn resource_limits_render_under_deploy_and_stay_in_range() {
+        // Plain compose and swarm both read the limits from `deploy.resources`, so
+        // they render there whatever the engine; a value outside the range is
+        // refused rather than handed to the engine.
+        let config = test_config();
+        let limited = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":0.5,"memoryMb":512}]}"#,
+        );
+        assert!(validate_spec(&limited, &config).is_ok());
+        let rendered = render_compose(&limited, &config);
+        assert!(rendered.contains("    deploy:\n      resources:\n        limits:\n          cpus: \"0.5\"\n          memory: 512M\n"));
+        assert!(!rendered.contains("mode: replicated"));
+
+        let too_small =
+            spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","memoryMb":4}]}"#);
+        assert!(validate_spec(&too_small, &config).is_err());
+        let too_many =
+            spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":1000.0}]}"#);
+        assert!(validate_spec(&too_many, &config).is_err());
+    }
+
+    #[test]
+    fn an_alias_rides_on_every_network() {
+        // A release standing beside the one it replaces answers to the service's
+        // own name too, on every network it joins - the edge reaches it on one, the
+        // services beside it on another. Without aliases the list form is unchanged.
+        let config = test_config();
+        let aliased = spec(
+            r#"{"project":"p","services":[{"name":"web-abc1234","image":"nginx","networks":["polaris-proxy","hub"],"aliases":["web"]}],"networks":["polaris-proxy","hub"]}"#,
+        );
+        assert!(validate_spec(&aliased, &config).is_ok());
+        let rendered = render_compose(&aliased, &config);
+        assert!(rendered.contains("      polaris-proxy:\n        aliases:\n          - \"web\"\n"));
+        assert!(rendered.contains("      hub:\n        aliases:\n          - \"web\"\n"));
+
+        let bad = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["polaris-proxy"],"aliases":["Not Valid"]}]}"#,
+        );
+        assert!(validate_spec(&bad, &config).is_err());
+        let orphan = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","aliases":["web2"]}]}"#,
+        );
+        assert!(validate_spec(&orphan, &config).is_err());
     }
 
     #[test]

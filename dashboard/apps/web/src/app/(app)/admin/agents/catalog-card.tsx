@@ -71,7 +71,7 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
                         aria-label="Share provider keys"
                     />
                 </div>
-                {error ? <p className="text-xs text-red-400">{error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );
@@ -138,13 +138,13 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
                     account-sharing enforcement exists for - and it ends in a
                     suspension, not a warning. */}
                 {on ? (
-                    <p className="text-xs text-amber-400">
+                    <p className="text-xs text-warning">
                         Sign it in with an API key or a team plan. A personal Claude or ChatGPT
                         subscription is licensed to one person, and several people working through
                         one is what gets it suspended.
                     </p>
                 ) : null}
-                {error ? <p className="text-xs text-red-400">{error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );
@@ -198,7 +198,7 @@ export function CatalogCard({
                         Last read <time dateTime={at}>{format.dateTime(at)}</time>.
                     </p>
                 ) : null}
-                {error ? <p className="text-xs text-red-400">{error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );

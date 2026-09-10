@@ -22,6 +22,7 @@ export const PERMISSIONS = [
     "notes.use",
     "office.use",
     "mail.use",
+    "mailserver.manage",
     "chat.use",
     "chat.spaces",
     "chat.groups",
@@ -193,6 +194,14 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "notes.use": { area: "Notes", label: "Keep private notes" },
     "office.use": { area: "Office", label: "Write documents, spreadsheets, slides and diagrams" },
     "mail.use": { area: "Mail", label: "Link mailboxes and read mail here" },
+    // Not granted to members by default, and not implied by deploying: a mail
+    // server opens port 25 to the internet and sends as whole domains, and one
+    // badly run can put the machine's address on every blocklist there is. That
+    // is a decision about the instance, the way registering a server is.
+    "mailserver.manage": {
+        area: "Mail",
+        label: "Run a mail server, and manage its domains and mailboxes"
+    },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split
     // out because "has the chat" and "may start a server in it" are different

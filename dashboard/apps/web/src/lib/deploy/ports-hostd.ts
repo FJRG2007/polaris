@@ -7,8 +7,19 @@
 
 import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
-import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
+import { forCompose, isReleaseImage } from "@polaris/deploy";
+import type {
+    BuildRequest,
+    ComposeSpec,
+    ExecResult,
+    ExecSpec,
+    ExecStream,
+    LogOptions,
+    MountTarget,
+    OutputSink,
+    RuntimePorts
+} from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client: HostdClient;
@@ -24,7 +35,9 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const res = await this.client.deployUp(spec);
+        // The daemon writes values into the compose file as they are, so a `$` in any
+        // of them is escaped here - see `forCompose`.
+        const res = await this.client.deployUp(forCompose(spec));
         await drain(res, onOutput);
     }
 
@@ -34,7 +47,7 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const res = await this.client.stackUp(spec);
+        const res = await this.client.stackUp(forCompose(spec));
         await drain(res, onOutput);
     }
 
@@ -75,12 +88,59 @@ export class HostdPorts implements RuntimePorts {
         return this.client.inspectImage(image);
     }
 
+    /** The daemon answers an inspect of an image it does not have with an error,
+     *  which is the whole of the question a rollback needs asked. */
+    public async hasImage(image: string): Promise<boolean> {
+        return this.client.inspectImage(image).then(
+            () => true,
+            () => false
+        );
+    }
+
+    /** Through the daemon's allowlist, which reaches only images under the release
+     *  repository - checked here as well, so a refusal is ours and says why. A 404
+     *  is success: the image the caller wanted gone is gone. */
+    public async removeImage(image: string): Promise<void> {
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be removed");
+        const response = await this.client.dockerRequest("DELETE", `/images/${image}`);
+        if (response.status === 404) return;
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`the image could not be removed (${response.status})`);
+        }
+    }
+
+    /** A refusal before any bytes arrive is the daemon's sentence, read here so
+     *  it is not mistaken for the start of an archive. */
+    public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
+        if (!isReleaseImage(image))
+            throw new Error("only a kept release image can be sent to another machine");
+        const response = await this.client.imageExport(image);
+        const status = response.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+            const said = (await collect(response)).trim();
+            throw new Error(said || `the image could not be read (HTTP ${status})`);
+        }
+        return response;
+    }
+
+    public async importImage(
+        archive: NodeJS.ReadableStream,
+        size: number,
+        onOutput?: OutputSink
+    ): Promise<void> {
+        const response = await this.client.imageImport(archive, size);
+        await drain(response, onOutput);
+    }
+
     public async login(registry: string, username: string, password: string): Promise<void> {
         await this.client.deployLogin(registry, username, password);
     }
 
     public async inspect(ref: string): Promise<unknown> {
-        const response = await this.client.dockerRequest("GET", `/containers/${encodeURIComponent(ref)}/json`);
+        const response = await this.client.dockerRequest(
+            "GET",
+            `/containers/${encodeURIComponent(ref)}/json`
+        );
         if (response.status < 200 || response.status >= 300) {
             throw new Error(`inspect ${ref} failed (${response.status})`);
         }
@@ -103,7 +163,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
-        const response = await this.client.dockerRequest("POST", `/containers/${encodeURIComponent(ref)}/${action}`);
+        const response = await this.client.dockerRequest(
+            "POST",
+            `/containers/${encodeURIComponent(ref)}/${action}`
+        );
         // 204 = done, 304 = already in that state (start/stop a no-op) - both fine.
         if (response.status !== 204 && response.status !== 304) {
             throw new Error(`${action} ${ref} failed (${response.status})`);
@@ -117,6 +180,31 @@ export class HostdPorts implements RuntimePorts {
             tail: options?.tail
         });
         await drain(res, onData);
+    }
+
+    /**
+     * Through the daemon's read-only container listing, filtered by the labels
+     * compose and swarm put on what they start. Two questions rather than one
+     * filter: label filters combine with AND, and a container carries one of the
+     * two labels, never both.
+     */
+    public async listContainers(project: string): Promise<string[]> {
+        const names = new Set<string>();
+        for (const label of [
+            `com.docker.compose.project=${project}`,
+            `com.docker.stack.namespace=${project}`
+        ]) {
+            const filters = encodeURIComponent(
+                JSON.stringify({ label: [label], status: ["running"] })
+            );
+            const response = await this.client.dockerRequest(
+                "GET",
+                `/containers/json?filters=${filters}`
+            );
+            if (response.status < 200 || response.status >= 300) continue;
+            for (const name of containerNames(response.body)) names.add(name);
+        }
+        return [...names].sort();
     }
 
     public async diskUsage(ref: string, path: string): Promise<number | null> {
@@ -159,6 +247,18 @@ export class HostdPorts implements RuntimePorts {
         // `--` so a path that begins with a dash is a path and not a flag.
         const response = await this.client.fsRead(container, ["cat", "--", path]);
         return Readable.toWeb(response) as ReadableStream<Uint8Array>;
+    }
+
+    /** Streamed through the daemon's write route. The daemon streams back what
+     *  the write printed; that is drained so a refusal surfaces as an error. */
+    public async writeFile(
+        container: string,
+        path: string,
+        body: NodeJS.ReadableStream,
+        size: number
+    ): Promise<void> {
+        const response = await this.client.fsWriteStream(container, path, body, size);
+        await drain(response);
     }
 
     public async dispose(): Promise<void> {
@@ -259,6 +359,28 @@ function collect(stream: Readable): Promise<string> {
         stream.on("data", (chunk: Buffer) => chunks.push(chunk));
         stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
         stream.on("error", reject);
+    });
+}
+
+/**
+ * The names out of a Docker `/containers/json` answer, without the leading slash
+ * the engine puts on each. Anything that does not parse, or is not shaped like a
+ * container list, is an empty answer rather than an error: the caller falls back
+ * to the one name it already knows.
+ */
+export function containerNames(body: string): string[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry) => {
+        const names = (entry as { Names?: unknown }).Names;
+        if (!Array.isArray(names)) return [];
+        const first = names.find((name): name is string => typeof name === "string");
+        return first ? [first.replace(/^\//, "")] : [];
     });
 }
 

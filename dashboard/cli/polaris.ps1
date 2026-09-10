@@ -246,16 +246,491 @@ function Show-SetupLink {
     Write-Host "  $(Get-OpenUrl)/oauth/setup?token=$token" -ForegroundColor Yellow
 }
 
+# ---------------------------------------------------------------------------
+# Deploy, from anywhere
+#
+# The same commands as the POSIX script, over the Deploy API with an API key.
+# `polaris login` keeps the address and the key in the user's own profile, with
+# the key encrypted for this Windows account (DPAPI), so another account on the
+# machine cannot read it. POLARIS_URL and POLARIS_TOKEN override the stored
+# sign-in for a CI job. An argument with a slash, or an id, is a Deploy service;
+# anything else keeps meaning a container of this stack.
+# ---------------------------------------------------------------------------
+
+$configDir = if ($env:POLARIS_CONFIG_DIR) { $env:POLARIS_CONFIG_DIR } else { Join-Path $env:APPDATA "polaris" }
+$configFile = Join-Path $configDir "cli.json"
+
+function Stop-WithError {
+    param([string]$Message)
+    Write-Host "polaris: $Message" -ForegroundColor Red
+    exit 1
+}
+
+function Test-DeployRef {
+    param([string]$Value)
+    return ($Value -match "/") -or ($Value -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+}
+
+function Get-ApiContext {
+    $stored = $null
+    if (Test-Path $configFile) { $stored = Get-Content $configFile -Raw | ConvertFrom-Json }
+    $url = $env:POLARIS_URL
+    if (-not $url -and $stored) { $url = $stored.url }
+    $token = $env:POLARIS_TOKEN
+    if (-not $token -and $stored -and $stored.token) {
+        $secure = ConvertTo-SecureString $stored.token
+        $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+    }
+    $insecure = ($env:POLARIS_INSECURE -eq "1") -or ($stored -and $stored.insecure)
+    if (-not $url -or -not $token) { Stop-WithError "not signed in to a Polaris - run 'polaris login'" }
+    return @{ Url = $url.TrimEnd("/"); Token = $token; Insecure = [bool]$insecure }
+}
+
+# One call to the API. A refusal is printed with the reason the API gave and
+# ends the command; anything that is not an answer from Polaris says so.
+function Invoke-Api {
+    param(
+        [hashtable]$Context,
+        [string]$Method,
+        [string]$Path,
+        [hashtable]$Body
+    )
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    if ($Context.Insecure) {
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+    }
+    $arguments = @{
+        Uri = "$($Context.Url)$Path"
+        Method = $Method
+        Headers = @{ Authorization = "Bearer $($Context.Token)" }
+        UseBasicParsing = $true
+    }
+    if ($Body) {
+        $arguments.Body = [System.Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Compress))
+        $arguments.ContentType = "application/json; charset=utf-8"
+    }
+    try {
+        return Invoke-RestMethod @arguments
+    }
+    catch {
+        $status = 0
+        if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+        if ($status -eq 401) { Stop-WithError "the key was refused - it may be revoked or expired; run 'polaris login'" }
+        # Windows PowerShell 5.1 fills ErrorDetails for some failures and not
+        # others, so the body is read off the response itself when it is empty.
+        $said = $null
+        if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $said = $_.ErrorDetails.Message }
+        elseif ($_.Exception.Response) {
+            try {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $said = $reader.ReadToEnd()
+                $reader.Close()
+            }
+            catch { }
+        }
+        $reason = $null
+        if ($said) {
+            try { $reason = ($said | ConvertFrom-Json).error } catch { }
+        }
+        if ($reason) { Stop-WithError $reason }
+        if ($status -gt 0) { Stop-WithError "the request failed with HTTP $status" }
+        Stop-WithError "could not reach $($Context.Url)"
+    }
+}
+
+function Resolve-Service {
+    param([hashtable]$Context, [string]$Ref)
+    if (-not $Ref) { $Ref = $env:POLARIS_SERVICE }
+    if (-not $Ref) { Stop-WithError "name a service (project/service, project/environment/service or its id), or set POLARIS_SERVICE" }
+    $answer = Invoke-Api $Context "GET" "/api/v1/deploy/services?ref=$([uri]::EscapeDataString($Ref))"
+    return $answer.service.id
+}
+
+# The value after a flag in the remaining arguments, or the default.
+function Get-Flag {
+    param([string[]]$Arguments, [string]$Name, [string]$Default = "")
+    for ($i = 0; $i -lt $Arguments.Count - 1; $i++) {
+        if ($Arguments[$i] -eq $Name) { return $Arguments[$i + 1] }
+    }
+    return $Default
+}
+
+# The arguments that are neither a flag nor a flag's value.
+function Get-Positional {
+    param([string[]]$Arguments)
+    $valued = @("--tail", "--port", "--cert", "--context", "--dockerfile", "--platform")
+    $out = @()
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        $arg = $Arguments[$i]
+        if ($valued -contains $arg) { $i++; continue }
+        if ($arg.StartsWith("-")) { continue }
+        $out += $arg
+    }
+    return , $out
+}
+
+function Test-Follow {
+    param([string[]]$Arguments)
+    return ($Arguments -contains "--follow") -or ($Arguments -contains "-f")
+}
+
+# A deployment's build log as it is written. Windows PowerShell 5.1 cannot
+# stream a response, so this reads from where the last read ended until the
+# deployment has finished.
+function Watch-Build {
+    param([hashtable]$Context, [string]$DeploymentId)
+    $offset = 0
+    while ($true) {
+        $answer = Invoke-Api $Context "GET" "/api/v1/deploy/deployments/$DeploymentId`?offset=$offset"
+        if ($answer.log) { [Console]::Out.Write($answer.log) }
+        $offset = $answer.nextOffset
+        if ($answer.done -and -not $answer.log) {
+            Write-Host ""
+            Write-Host "[polaris] deployment $($answer.status)" -ForegroundColor $(if ($answer.status -eq "failed") { "Red" } else { "Green" })
+            if ($answer.error) { Write-Host $answer.error -ForegroundColor Red }
+            return
+        }
+        if (-not $answer.log) { Start-Sleep -Seconds 2 }
+    }
+}
+
+function Invoke-Login {
+    param([string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    $url = if ($positional.Count -gt 0) { $positional[0] } else { Read-Host "Polaris address (https://...)" }
+    $url = $url.TrimEnd("/")
+    if ($url -notmatch "^https?://") { Stop-WithError "the address must start with https:// (or http:// on a trusted network)" }
+    $insecure = $Arguments -contains "--insecure"
+    if ($env:POLARIS_TOKEN) {
+        $token = $env:POLARIS_TOKEN
+    }
+    else {
+        $secure = Read-Host "API key (Account > API keys)" -AsSecureString
+        $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+    }
+    if (-not $token) { Stop-WithError "no key was given" }
+    if ($insecure) { Write-Host "polaris: certificate checks are OFF for $url - only do this for an address you control" -ForegroundColor Yellow }
+
+    $me = Invoke-Api @{ Url = $url; Token = $token; Insecure = $insecure } "GET" "/api/v1/me"
+    if (-not (Test-Path $configDir)) { New-Item -ItemType Directory -Path $configDir | Out-Null }
+    $protected = ConvertTo-SecureString $token -AsPlainText -Force | ConvertFrom-SecureString
+    @{ url = $url; token = $protected; insecure = [bool]$insecure } | ConvertTo-Json | Set-Content -Path $configFile -Encoding UTF8
+    Write-Host "Signed in to $url as $($me.user.name)." -ForegroundColor Green
+}
+
+function Show-Projects {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $answer = Invoke-Api $Context "GET" "/api/v1/deploy/projects"
+    $rows = foreach ($project in $answer.projects) {
+        foreach ($environment in $project.environments) {
+            foreach ($service in $environment.services) {
+                [pscustomobject]@{
+                    Service = "$($project.slug)/$($environment.slug)/$($service.slug)"
+                    Status = $service.status
+                    Id = $service.id
+                }
+            }
+        }
+    }
+    if ($Arguments -contains "--quiet") { $rows | ForEach-Object { $_.Service }; return }
+    $rows | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+}
+
+function Invoke-DeployNow {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    $id = Resolve-Service $Context $(if ($positional.Count -gt 0) { $positional[0] } else { "" })
+    if ($Arguments -contains "--local") {
+        $deploymentId = Invoke-LocalBuild $Context $id $Arguments
+    }
+    else {
+        $deploymentId = (Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/deploy").deploymentId
+    }
+    Write-Host "Deployment $deploymentId started."
+    if (Test-Follow $Arguments) { Watch-Build $Context $deploymentId }
+}
+
+# Build here with this machine's own docker and send the image, rather than have
+# Polaris build the service's source. The image is tagged under the service's
+# release repository with a fresh tag, saved, gzipped to a temporary file and
+# streamed up without being held in memory. Answers the deployment id.
+function Invoke-LocalBuild {
+    param([hashtable]$Context, [string]$Id, [string[]]$Arguments)
+    Assert-Docker
+    $contextDir = Get-Flag $Arguments "--context" "."
+    $dockerfile = Get-Flag $Arguments "--dockerfile"
+    $platform = Get-Flag $Arguments "--platform"
+    if (-not (Test-Path $contextDir -PathType Container)) { Stop-WithError "$contextDir is not a folder" }
+    $repository = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$Id/image").repository
+    $bytes = New-Object byte[] 6
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $image = "${repository}:" + (($bytes | ForEach-Object { $_.ToString("x2") }) -join "")
+    $buildArgs = @("build", "-t", $image)
+    if ($dockerfile) { $buildArgs += @("-f", $dockerfile) }
+    if ($platform) { $buildArgs += @("--platform", $platform) }
+    Write-Host "Building $image here..."
+    & docker @buildArgs $contextDir
+    if ($LASTEXITCODE -ne 0) { Stop-WithError "the build failed" }
+    $tar = [System.IO.Path]::GetTempFileName()
+    $archive = "$tar.gz"
+    try {
+        Write-Host "Saving it..."
+        & docker save -o $tar $image
+        if ($LASTEXITCODE -ne 0) { Stop-WithError "could not save the image" }
+        # Only the upload needs the tag; the layers stay in this machine's cache.
+        & docker image rm $image | Out-Null
+        $in = [System.IO.File]::OpenRead($tar)
+        $out = [System.IO.File]::Create($archive)
+        $gzip = New-Object System.IO.Compression.GZipStream($out, [System.IO.Compression.CompressionLevel]::Fastest)
+        try { $in.CopyTo($gzip) } finally { $gzip.Dispose(); $out.Dispose(); $in.Dispose() }
+        Remove-Item $tar -Force
+        $headers = @{ Authorization = "Bearer $($Context.Token)" }
+        # What it was built from, when the folder is a git checkout.
+        if (Get-Command git -ErrorAction SilentlyContinue) {
+            $commit = "$(Get-Quiet { git -C $contextDir rev-parse HEAD } | Select-Object -First 1)".Trim()
+            if ($commit -match '^[0-9a-f]{40}$') {
+                $headers["x-polaris-commit"] = $commit
+                $subject = "$(Get-Quiet { git -C $contextDir log -1 --pretty=%s } | Select-Object -First 1)"
+                if ($subject.Length -gt 400) { $subject = $subject.Substring(0, 400) }
+                if ($subject) { $headers["x-polaris-message"] = [uri]::EscapeDataString($subject) }
+            }
+        }
+        $size = (Get-Item $archive).Length
+        Write-Host "Sending $([Math]::Round($size / 1MB)) MB..."
+        return Send-Archive $Context "/api/v1/deploy/services/$Id/image" $archive $headers
+    }
+    finally {
+        Remove-Item $tar, $archive -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# POST a file as the body with its length declared and write buffering off, so
+# Windows PowerShell streams it instead of reading gigabytes into memory first.
+function Send-Archive {
+    param([hashtable]$Context, [string]$Path, [string]$File, [hashtable]$Headers)
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    if ($Context.Insecure) {
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+    }
+    $request = [System.Net.HttpWebRequest]::Create("$($Context.Url)$Path")
+    $request.Method = "POST"
+    $request.ContentType = "application/gzip"
+    $request.AllowWriteStreamBuffering = $false
+    $request.Timeout = [System.Threading.Timeout]::Infinite
+    $request.ReadWriteTimeout = 30 * 60 * 1000
+    $request.ContentLength = (Get-Item $File).Length
+    foreach ($name in $Headers.Keys) { $request.Headers[$name] = $Headers[$name] }
+    $source = [System.IO.File]::OpenRead($File)
+    try {
+        $body = $request.GetRequestStream()
+        try { $source.CopyTo($body) } finally { $body.Dispose() }
+    }
+    finally { $source.Dispose() }
+    try {
+        $response = $request.GetResponse()
+    }
+    catch [System.Net.WebException] {
+        $response = $_.Exception.Response
+        if (-not $response) { Stop-WithError "could not reach $($Context.Url)" }
+    }
+    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+    $said = $reader.ReadToEnd()
+    $reader.Close()
+    $status = [int]$response.StatusCode
+    if ($status -eq 401) { Stop-WithError "the key was refused - it may be revoked or expired; run 'polaris login'" }
+    $answer = $null
+    try { $answer = $said | ConvertFrom-Json } catch { }
+    if ($status -lt 200 -or $status -ge 300) {
+        if ($answer -and $answer.error) { Stop-WithError $answer.error }
+        Stop-WithError "the request failed with HTTP $status"
+    }
+    return $answer.deploymentId
+}
+
+function Show-Deployments {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    $id = Resolve-Service $Context $(if ($positional.Count -gt 0) { $positional[0] } else { "" })
+    $answer = Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/deployments"
+    $answer.deployments | ForEach-Object {
+        [pscustomobject]@{
+            Deployment = $_.id
+            Status = if ($_.isCurrent) { "$($_.status)*" } else { $_.status }
+            Created = $_.createdAt
+            Commit = if ($_.commitSha) { $_.commitSha.Substring(0, [Math]::Min(7, $_.commitSha.Length)) } else { "" }
+            Rollback = if ($_.rollbackable) { "yes" } else { "no" }
+        }
+    } | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+}
+
+function Show-BuildLog {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    if ($positional.Count -eq 0) { Stop-WithError "name a deployment id (see 'polaris deployments <service>')" }
+    if (Test-Follow $Arguments) { Watch-Build $Context $positional[0]; return }
+    $answer = Invoke-Api $Context "GET" "/api/v1/deploy/deployments/$($positional[0])?tail=200"
+    [Console]::Out.Write($answer.log)
+    Write-Host ""
+}
+
+function Invoke-Rollback {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    if ($positional.Count -eq 0) { Stop-WithError "name the deployment to roll back to (see 'polaris deployments <service>')" }
+    $answer = Invoke-Api $Context "POST" "/api/v1/deploy/deployments/$($positional[0])/rollback"
+    Write-Host "Rolling back as deployment $($answer.deploymentId)."
+    if (Test-Follow $Arguments) { Watch-Build $Context $answer.deploymentId }
+}
+
+# A service's runtime logs; with --follow, the lines after the last one printed.
+function Show-ServiceLogs {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    $id = Resolve-Service $Context $positional[0]
+    $tail = Get-Flag $Arguments "--tail" "200"
+    $answer = Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/logs?tail=$tail"
+    if ($answer.log) { Write-Host $answer.log.TrimEnd() }
+    if (-not (Test-Follow $Arguments)) { return }
+    $stamp = '^(\d{4}-\d{2}-\d{2}T\S+)'
+    $last = ($answer.log -split "`n" | Where-Object { $_ -match $stamp } | Select-Object -Last 1)
+    if ($last -match $stamp) { $last = $Matches[1] } else { $last = "" }
+    while ($true) {
+        Start-Sleep -Seconds 2
+        $query = if ($last) { "tail=1000&since=$([uri]::EscapeDataString($last))" } else { "tail=$tail" }
+        $answer = Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/logs?$query"
+        if (-not $answer.log) { continue }
+        Write-Host $answer.log.TrimEnd()
+        $newest = ($answer.log -split "`n" | Where-Object { $_ -match $stamp } | Select-Object -Last 1)
+        if ($newest -match $stamp) { $last = $Matches[1] }
+    }
+}
+
+function Show-ServiceStatus {
+    param([hashtable]$Context, [string]$Ref)
+    $service = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$(Resolve-Service $Context $Ref)").service
+    Write-Host "$($service.project.slug)/$($service.environment.slug)/$($service.slug)  $($service.status)" -ForegroundColor White
+    $source = if ($service.source.image) { $service.source.image } elseif ($service.source.repository) { $service.source.repository } else { $service.source.kind }
+    Write-Host "  source   $source$(if ($service.source.branch) { " ($($service.source.branch))" })"
+    Write-Host "  domains  $(($service.domains | ForEach-Object { $_.hostname }) -join ', ')"
+    Write-Host "  id       $($service.id)"
+}
+
+function Invoke-Power {
+    param([hashtable]$Context, [string]$Action, [string]$Ref)
+    Invoke-Api $Context "POST" "/api/v1/deploy/services/$(Resolve-Service $Context $Ref)/$Action" | Out-Null
+    Write-Host "$Action done."
+}
+
+function Invoke-Env {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    $sub = if ($positional.Count -gt 0) { $positional[0] } else { "list" }
+    $id = Resolve-Service $Context $(if ($positional.Count -gt 1) { $positional[1] } else { "" })
+    $secret = -not ($Arguments -contains "--plain")
+    switch ($sub) {
+        "list" {
+            (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/variables").variables | ForEach-Object {
+                [pscustomobject]@{ Key = $_.key; Value = if ($_.isSecret) { "(secret)" } else { $_.value }; Id = $_.id }
+            } | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+        }
+        "set" {
+            if ($positional.Count -lt 3 -or $positional[2] -notmatch "=") { Stop-WithError "usage: polaris env set <service> KEY=VALUE [--plain]" }
+            $split = $positional[2].IndexOf("=")
+            $key = $positional[2].Substring(0, $split)
+            $value = $positional[2].Substring($split + 1)
+            Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/variables" @{ key = $key; value = $value; secret = $secret } | Out-Null
+            Write-Host "saved $key"
+        }
+        "unset" {
+            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris env unset <service> KEY" }
+            $match = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/variables").variables | Where-Object { $_.key -eq $positional[2] }
+            if (-not $match) { Stop-WithError "$($positional[2]) is not set on that service" }
+            Invoke-Api $Context "DELETE" "/api/v1/deploy/variables/$($match.id)" | Out-Null
+            Write-Host "removed $($positional[2])"
+        }
+        "import" {
+            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris env import <service> <file> [--plain]" }
+            if (-not (Test-Path $positional[2])) { Stop-WithError "cannot read $($positional[2])" }
+            $text = Get-Content $positional[2] -Raw
+            $answer = Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/variables/import" @{ text = $text; secret = $secret }
+            Write-Host "imported $($answer.count)"
+        }
+        default { Stop-WithError "unknown 'env' command '$sub' - list, set, unset or import" }
+    }
+}
+
+function Invoke-Domains {
+    param([hashtable]$Context, [string[]]$Arguments)
+    $positional = Get-Positional $Arguments
+    $sub = if ($positional.Count -gt 0) { $positional[0] } else { "list" }
+    $id = Resolve-Service $Context $(if ($positional.Count -gt 1) { $positional[1] } else { "" })
+    switch ($sub) {
+        "list" {
+            (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/domains").domains | ForEach-Object {
+                [pscustomobject]@{ Hostname = $_.hostname; Enabled = $_.enabled; Cert = $_.certificate; Port = $_.targetPort; Health = $_.health; Id = $_.id }
+            } | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+        }
+        "add" {
+            $body = @{}
+            if ($positional.Count -gt 2) { $body.hostname = $positional[2] }
+            $port = Get-Flag $Arguments "--port"
+            if ($port) {
+                if ($port -notmatch '^\d+$') { Stop-WithError "--port takes a number" }
+                $body.targetPort = [int]$port
+            }
+            $cert = Get-Flag $Arguments "--cert"
+            if ($cert) { $body.certificate = $cert }
+            $answer = Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/domains" $body
+            Write-Host $answer.hostname
+        }
+        "remove" {
+            if ($positional.Count -lt 3) { Stop-WithError "usage: polaris domains remove <service> <hostname|id>" }
+            $want = $positional[2]
+            $match = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$id/domains").domains | Where-Object { $_.hostname -eq $want -or $_.id -eq $want }
+            if (-not $match) { Stop-WithError "$want is not attached to that service" }
+            Invoke-Api $Context "DELETE" "/api/v1/deploy/domains/$($match.id)" | Out-Null
+            Write-Host "removed $want"
+        }
+        default { Stop-WithError "unknown 'domains' command '$sub' - list, add or remove" }
+    }
+}
+
+$firstRest = if ($Rest -and $Rest.Count -gt 0) { $Rest[0] } else { "" }
+$deployRef = $firstRest -and (Test-DeployRef $firstRest)
+
 switch ($Command) {
     "setup" { Show-SetupLink }
     "token" { Get-Setting "POLARIS_SETUP_TOKEN" }
-    "status" { Show-Status }
+    "status" {
+        if ($deployRef) { Show-ServiceStatus (Get-ApiContext) $firstRest } else { Show-Status }
+    }
     "ps" { Invoke-Compose @("ps") }
     "doctor" { Invoke-Doctor }
-    "logs" { Invoke-Compose (@("logs") + $Rest) }
-    { $_ -in @("start", "up") } { Invoke-Compose @("up", "-d") }
-    "stop" { Invoke-Compose @("stop") }
-    "restart" { Invoke-Compose (@("restart") + $Rest) }
+    "logs" {
+        if ($deployRef) { Show-ServiceLogs (Get-ApiContext) $Rest } else { Invoke-Compose (@("logs") + $Rest) }
+    }
+    { $_ -in @("start", "up") } {
+        if ($deployRef) { Invoke-Power (Get-ApiContext) "start" $firstRest } else { Invoke-Compose @("up", "-d") }
+    }
+    "stop" {
+        if ($deployRef) { Invoke-Power (Get-ApiContext) "stop" $firstRest } else { Invoke-Compose @("stop") }
+    }
+    "restart" {
+        if ($deployRef) { Invoke-Power (Get-ApiContext) "restart" $firstRest } else { Invoke-Compose (@("restart") + $Rest) }
+    }
+    "login" { Invoke-Login $Rest }
+    "logout" {
+        if (Test-Path $configFile) { Remove-Item $configFile -Force }
+        Write-Host "Signed out. The key itself still works until it is revoked in Polaris."
+    }
+    "whoami" { Invoke-Api (Get-ApiContext) "GET" "/api/v1/me" | ConvertTo-Json -Depth 5 }
+    "projects" { Show-Projects (Get-ApiContext) $Rest }
+    "deploy" { Invoke-DeployNow (Get-ApiContext) $Rest }
+    "deployments" { Show-Deployments (Get-ApiContext) $Rest }
+    "build-log" { Show-BuildLog (Get-ApiContext) $Rest }
+    "rollback" { Invoke-Rollback (Get-ApiContext) $Rest }
+    "env" { Invoke-Env (Get-ApiContext) $Rest }
+    "domains" { Invoke-Domains (Get-ApiContext) $Rest }
     "update" {
         $installer = Join-Path $installDir "dashboard\scripts\install.ps1"
         if (-not (Test-Path $installer)) {
@@ -271,8 +746,9 @@ switch ($Command) {
     }
     { $_ -in @("help", "--help", "-h") } {
         @"
-polaris - manage a Polaris deployment
+polaris - manage a Polaris deployment, and deploy to one
 
+This stack (on the host):
   polaris setup        Print the link to create the administrator
   polaris token        Print the current setup token
   polaris status       Show a clean, colored view of every service
@@ -283,6 +759,29 @@ polaris - manage a Polaris deployment
   polaris stop         Stop the stack
   polaris restart [s]  Restart the stack (or one service)
   polaris update       Pull the latest and redeploy
+
+Deploy (from anywhere, with an API key):
+  polaris login [url] [--insecure]     Sign in with an API key
+  polaris logout                       Forget the stored key
+  polaris whoami                       Who the key acts as
+  polaris projects                     Every service you can reach
+  polaris deploy <service> [--follow]  Deploy, and watch the build
+  polaris deploy <service> --local [--context dir] [--dockerfile f] [--platform p]
+                                       Build here with docker and send the image
+  polaris deployments <service>        Recent deployments
+  polaris build-log <id> [--follow]    A deployment's build log
+  polaris rollback <id> [--follow]     Put an earlier deployment back
+  polaris logs <service> [--follow] [--tail N]
+  polaris status <service>             Status, source and domains
+  polaris restart|stop|start <service>
+  polaris env list|set|unset|import <service> ...
+                  set KEY=VALUE [--plain]   unset KEY   import <file> [--plain]
+  polaris domains list|add|remove <service> ...
+                  add [hostname] [--port N] [--cert le|internal|none]   remove <hostname|id>
+
+A service is project/service (default environment), project/environment/service
+or its id. POLARIS_URL and POLARIS_TOKEN override the stored sign-in, and
+POLARIS_SERVICE names the service for commands where it is left out.
 "@ | Write-Host
     }
     default {

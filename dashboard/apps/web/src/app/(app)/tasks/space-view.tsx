@@ -135,7 +135,10 @@ export function SpaceScreen(props: SpaceScreenProps) {
             </nav>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -691,21 +694,29 @@ function TagsTab({
                                 type="color"
                                 value={draft.color}
                                 aria-label="Tag color"
-                                onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+                                onChange={(event) =>
+                                    setDraft({ ...draft, color: event.target.value })
+                                }
                                 className="h-8 w-12 shrink-0 rounded border border-border bg-field"
                             />
                             <Input
                                 autoFocus
                                 value={draft.name}
                                 aria-label="Tag name"
-                                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                                onChange={(event) =>
+                                    setDraft({ ...draft, name: event.target.value })
+                                }
                                 onKeyDown={(event) => {
                                     if (event.key === "Escape") setEditing(null);
                                     if (event.key === "Enter") void save();
                                 }}
                                 className="h-8 min-w-32 flex-1 text-sm"
                             />
-                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                            <Button
+                                size="sm"
+                                disabled={!draft.name.trim() || saving}
+                                onClick={() => void save()}
+                            >
                                 {saving ? "Saving..." : "Save"}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>

@@ -20,27 +20,28 @@
  */
 
 import * as core from "@polaris/core";
+import * as spam from "@/lib/mailbox/spam";
 import { revalidatePath } from "next/cache";
 import * as rules from "@/lib/mailbox/rules";
+import * as prefs from "@/lib/mailbox/prefs";
 import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
-import * as prefs from "@/lib/mailbox/prefs";
 import * as reading from "@/lib/mailbox/reading";
-import * as blocking from "@/lib/mailbox/blocking";
-import * as subscriptions from "@/lib/mailbox/subscriptions";
-import * as attachFrom from "@/lib/mailbox/attach-from";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
+import * as blocking from "@/lib/mailbox/blocking";
 import * as accounts from "@/lib/mailbox/accounts";
-import * as spam from "@/lib/mailbox/spam";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
-import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
+import * as templates from "@/lib/mailbox/templates";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
+import * as subscriptions from "@/lib/mailbox/subscriptions";
+import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import { MailAccessError, ownedAccount, ownedAccountIds } from "@/lib/mailbox/access";
 
 const MAIL_PATH = "/mail";
@@ -70,6 +71,8 @@ function failure(
         return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
+    if (caught instanceof templates.MailTemplateNameTaken)
+        return { error: caught.message, field: "name" };
     if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
     return { error: fallback };
@@ -218,7 +221,9 @@ export async function forgetSpamAction(accountId: string) {
 
 export async function editAccountAction(accountId: string, input: unknown) {
     const userId = await actorId();
-    const parsed = core.mailAccountEditSchema.safeParse(input);
+    // A patch: only what the screen sent is written, so one switch never puts
+    // every other setting back to its default.
+    const parsed = core.mailAccountPatchSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details." };
     try {
         const account = await accounts.editAccount(userId, accountId, parsed.data);
@@ -314,6 +319,24 @@ export async function actOnAction(input: unknown) {
         return { done };
     } catch (caught) {
         return failure(caught, "The mail server did not accept that.");
+    }
+}
+
+/** Pin a conversation to the top of every list, or mute it - or undo either.
+ *  Polaris' own: nothing is sent to the mail server. */
+export async function setConversationStateAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailConversationStateSchema.safeParse(input);
+    if (!parsed.success) return { error: "Nothing was selected." };
+    try {
+        const done = await messages.setConversationState(userId, parsed.data.messageIds, {
+            pinned: parsed.data.pinned,
+            muted: parsed.data.muted
+        });
+        refresh();
+        return { done };
+    } catch (caught) {
+        return failure(caught, "That could not be changed.");
     }
 }
 
@@ -518,6 +541,19 @@ export async function sendAction(input: unknown) {
     }
 }
 
+/**
+ * Leave a copy of an unsent draft in the mail server's Drafts folder, so it can
+ * be finished in another client. Called when the composer closes. Never refuses
+ * anybody: the draft is safe here whether or not the copy could be written.
+ */
+export async function fileDraftOnServerAction(draftId: string) {
+    const userId = await actorId();
+    const parsed = core.mailDraftIdSchema.safeParse(draftId);
+    if (!parsed.success) return {};
+    await compose.fileDraftOnServer(userId, parsed.data);
+    return {};
+}
+
 /** Take a message back out of the queue. Only works while it is still in it. */
 export async function undoSendAction(draftId: string) {
     const userId = await actorId();
@@ -612,11 +648,82 @@ export async function setMailPreferencesAction(input: unknown) {
         };
     }
     try {
-        await prefs.saveMailPreferences(userId, parsed.data);
+        // The reading form does not carry the keyboard, and saving it must not
+        // quietly put every moved shortcut back where it started.
+        const current = await prefs.readMailPreferences(userId);
+        await prefs.saveMailPreferences(userId, {
+            ...parsed.data,
+            keys: parsed.data.keys ?? current.keys
+        });
         refresh();
         return { saved: true };
     } catch (caught) {
         return failure(caught, "That could not be saved.");
+    }
+}
+
+/**
+ * Move Mail's shortcuts.
+ *
+ * The whole keyboard at once, and refused whole when two commands would share a
+ * key - the message names both, so the screen can say which binding is in the
+ * way rather than storing one that would archive when somebody meant to mute.
+ */
+export async function setMailKeysAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailKeymapSchema.safeParse(input);
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return {
+            error: issue?.message ?? "Those shortcuts could not be saved.",
+            field: String(issue?.path[0] ?? "")
+        };
+    }
+    try {
+        const current = await prefs.readMailPreferences(userId);
+        await prefs.saveMailPreferences(userId, { ...current, keys: parsed.data });
+        refresh();
+        return { keys: parsed.data };
+    } catch (caught) {
+        return failure(caught, "Those shortcuts could not be saved.");
+    }
+}
+
+/** Every template this person has, for the composer's menu and the settings
+ *  screen. Read when the menu opens rather than with the page, because most
+ *  messages are written without one. */
+export async function listTemplatesAction() {
+    const userId = await actorId();
+    return { templates: await templates.listTemplates(userId) };
+}
+
+export async function saveTemplateAction(templateId: string | null, input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailTemplateSchema.safeParse(input);
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return {
+            error: issue?.message ?? "Check the template.",
+            field: String(issue?.path[0] ?? "")
+        };
+    }
+    try {
+        const id = await templates.saveTemplate(userId, templateId, parsed.data);
+        refresh();
+        return { id };
+    } catch (caught) {
+        return failure(caught, "That template could not be saved.");
+    }
+}
+
+export async function deleteTemplateAction(templateId: string) {
+    const userId = await actorId();
+    try {
+        await templates.deleteTemplate(userId, templateId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That template could not be removed.");
     }
 }
 
@@ -727,6 +834,19 @@ export async function attachFromAddressAction(input: unknown) {
     } catch (caught) {
         if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
         return failure(caught, "That file could not be attached.");
+    }
+}
+
+/** Carry the files of the message being forwarded onto the forward. Answers the
+ *  ones it carried and names the ones it could not. */
+export async function attachFromMessageAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailAttachFromMessageSchema.safeParse(input);
+    if (!parsed.success) return { error: "Those files could not be carried over." };
+    try {
+        return await attachFrom.attachFromMessage(userId, parsed.data.messageId);
+    } catch (caught) {
+        return failure(caught, "Those files could not be carried over.");
     }
 }
 

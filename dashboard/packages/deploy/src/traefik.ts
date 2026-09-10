@@ -8,7 +8,8 @@
 
 import { createHash } from "node:crypto";
 import { encodeGuardRule } from "@polaris/core/waf";
-import type { WafCustomRule, WafPrincipalGrant } from "@polaris/core";
+import type { AppEdgeConfig, WafCustomRule, WafPrincipalGrant } from "@polaris/core";
+import { isWildcardHostname, normalizeDeployHostname, securityHeaderMap } from "@polaris/core";
 
 export type CertResolver = "le" | "internal" | "none";
 
@@ -65,6 +66,8 @@ export interface TraefikWaf {
      * obfuscated; nothing else about its firewall differs.
      */
     readonly emailObfuscation?: boolean;
+    /** Ask visitors for proof of a browser. Needs the guard, like the denylist. */
+    readonly challenge?: boolean;
 }
 
 export interface TraefikServiceInput {
@@ -75,7 +78,18 @@ export interface TraefikServiceInput {
     readonly domains: readonly TraefikDomain[];
     /** WAF rules to enforce at this service's edge (allowlist + denylist + login). */
     readonly waf?: TraefikWaf;
+    /** Rate limits, concurrency, security headers, redirects and rewrites - the same
+     *  settings the local edge renders into its file, so a service answers the same
+     *  way whichever edge serves it. */
+    readonly edge?: AppEdgeConfig;
+    /** How many copies run. Every copy carries these same labels, so the edge merges
+     *  them into one service it balances over; a health check only has somewhere
+     *  else to send traffic when there is more than one. */
+    readonly replicas?: number;
 }
+
+/** The cookie a sticky service pins each visitor to one replica with. */
+export const STICKY_COOKIE = "polaris_lb";
 
 /** Traefik's ACME resolver name, configured in the static Traefik config. */
 const LE_RESOLVER = "letsencrypt";
@@ -98,7 +112,8 @@ function wafNeedsGuard(waf: TraefikWaf): boolean {
         waf.requireLogin === true ||
         waf.browserIntegrity === true ||
         waf.sqlInjectionProtection === true ||
-        waf.xssProtection === true
+        waf.xssProtection === true ||
+        waf.challenge === true
     );
 }
 
@@ -124,61 +139,243 @@ function wafMiddlewares(
     });
     if (wafNeedsGuard(waf)) {
         const ctx = `${serviceName}-waf-ctx`;
-        labels[`traefik.http.middlewares.${ctx}.headers.customrequestheaders.X-Polaris-Waf`] = encodeGuardRule({
-            deny: waf.deny ?? [],
-            presets: waf.presets ?? [],
-            rules: waf.rules ?? [],
-            requireLogin: waf.requireLogin === true,
-            loginUrl: waf.loginUrl,
-            loginAllowLists: waf.loginAllowLists ?? [],
-            loginDeny: waf.loginDeny ?? [],
-            browserIntegrity: waf.browserIntegrity === true,
-            sqlInjectionProtection: waf.sqlInjectionProtection === true,
-            xssProtection: waf.xssProtection === true,
-            emailObfuscation: waf.emailObfuscation === true
-        });
-        labels["traefik.http.middlewares.polaris-waf-guard.forwardauth.address"] = `${guardUrl()}/authz`;
+        labels[`traefik.http.middlewares.${ctx}.headers.customrequestheaders.X-Polaris-Waf`] =
+            encodeGuardRule({
+                deny: waf.deny ?? [],
+                presets: waf.presets ?? [],
+                rules: waf.rules ?? [],
+                requireLogin: waf.requireLogin === true,
+                loginUrl: waf.loginUrl,
+                loginAllowLists: waf.loginAllowLists ?? [],
+                loginDeny: waf.loginDeny ?? [],
+                browserIntegrity: waf.browserIntegrity === true,
+                sqlInjectionProtection: waf.sqlInjectionProtection === true,
+                xssProtection: waf.xssProtection === true,
+                emailObfuscation: waf.emailObfuscation === true,
+                challenge: waf.challenge === true
+            });
+        labels["traefik.http.middlewares.polaris-waf-guard.forwardauth.address"] =
+            `${guardUrl()}/authz`;
         app.push(`${ctx}@docker`, "polaris-waf-guard@docker");
     }
     return { app, http };
 }
 
+/**
+ * The rank of a label router, stated rather than left to rule length - the same
+ * ordering the local edge's file uses, so an exact hostname beats a wildcard over it
+ * and a path beats its hostname. Below the 100 a pushed route takes, which is what
+ * lets Polaris' pushed configuration win over these when both exist.
+ */
+function labelRank(domain: TraefikDomain, bump = 0): number {
+    return 40 + (domain.pathPrefix ? 5 : 0) - (isWildcardHostname(domain.hostname) ? 20 : 0) + bump;
+}
+
+/** A hostname as a matcher: `Host()` for a name, and a one-label regular expression
+ *  for a wildcard, which is what a wildcard certificate covers. */
+function hostMatcher(hostname: string): string {
+    if (!isWildcardHostname(hostname)) return `Host(\`${hostname}\`)`;
+    return `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostname.slice(2).replace(/\./g, "[.]")}$\`)`;
+}
+
+/** A path prefix safe to write into a rule. */
+const PATH_PREFIX = /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/;
+
+/** Where a limit counts a visitor; see the local edge's `sourceByIp`. */
+function ipSource(labels: Record<string, string>, prefix: string, domain: TraefikDomain): void {
+    labels[`${prefix}.sourcecriterion.ipstrategy.depth`] =
+        domain.certResolver === "none" ? "1" : "0";
+}
+
+/**
+ * The edge middlewares a service asked for, as labels, split by where they sit in
+ * the chain. Mirrors `edgeChain` in the local router; the two are kept apart only
+ * because one writes a file and the other writes labels.
+ */
+function edgeMiddlewares(
+    serviceName: string,
+    edge: AppEdgeConfig,
+    domain: TraefikDomain,
+    siblings: ReadonlySet<string>,
+    labels: Record<string, string>
+): { early: string[]; late: string[]; byPath: { path: string; middleware: string }[] } {
+    const early: string[] = [];
+    const late: string[] = [];
+    const byPath: { path: string; middleware: string }[] = [];
+    const mwKey = (name: string) => `traefik.http.middlewares.${name}`;
+
+    edge.rateLimits.forEach((limit, index) => {
+        const name = `${serviceName}-rate-${index}`;
+        labels[`${mwKey(name)}.ratelimit.average`] = String(limit.average);
+        labels[`${mwKey(name)}.ratelimit.period`] = limit.period;
+        labels[`${mwKey(name)}.ratelimit.burst`] = String(limit.burst);
+        if (limit.key === "header" && limit.header) {
+            labels[`${mwKey(name)}.ratelimit.sourcecriterion.requestheadername`] = limit.header;
+        } else {
+            ipSource(labels, `${mwKey(name)}.ratelimit`, domain);
+        }
+        if (limit.path) byPath.push({ path: limit.path, middleware: `${name}@docker` });
+        else early.push(`${name}@docker`);
+    });
+    if (edge.concurrency > 0) {
+        const name = `${serviceName}-inflight`;
+        labels[`${mwKey(name)}.inflightreq.amount`] = String(edge.concurrency);
+        if (edge.concurrencyScope === "service") {
+            labels[`${mwKey(name)}.inflightreq.sourcecriterion.requesthost`] = "true";
+        } else {
+            ipSource(labels, `${mwKey(name)}.inflightreq`, domain);
+        }
+        early.push(`${name}@docker`);
+    }
+    const headers = Object.entries(securityHeaderMap(edge.headers));
+    if (headers.length > 0) {
+        const name = `${serviceName}-headers`;
+        for (const [key, value] of headers)
+            labels[`${mwKey(name)}.headers.customresponseheaders.${key}`] = value;
+        late.push(`${name}@docker`);
+    }
+    const hostname = domain.hostname;
+    edge.redirects.forEach((redirect, index) => {
+        let regex: string | null = null;
+        let replacement: string | null = null;
+        if (redirect.kind === "www-to-apex") {
+            if (hostname.startsWith("www.") && siblings.has(hostname.slice(4))) {
+                regex = "^(https?)://www\\.([^/:]+)(.*)$";
+                replacement = "${1}://${2}${3}";
+            }
+        } else if (redirect.kind === "apex-to-www") {
+            if (
+                !hostname.startsWith("www.") &&
+                !isWildcardHostname(hostname) &&
+                siblings.has(`www.${hostname}`)
+            ) {
+                regex = "^(https?)://([^/:]+)(.*)$";
+                replacement = "${1}://www.${2}${3}";
+            }
+        } else if (redirect.regex && redirect.replacement) {
+            regex = redirect.regex;
+            replacement = redirect.replacement;
+        }
+        if (regex === null || replacement === null) return;
+        const name = `${serviceName}-redirect-${index}`;
+        labels[`${mwKey(name)}.redirectregex.regex`] = regex;
+        labels[`${mwKey(name)}.redirectregex.replacement`] = replacement;
+        labels[`${mwKey(name)}.redirectregex.permanent`] = redirect.permanent ? "true" : "false";
+        late.push(`${name}@docker`);
+    });
+    edge.rewrites.forEach((rewrite, index) => {
+        const name = `${serviceName}-rewrite-${index}`;
+        if (rewrite.kind === "strip-prefix" && rewrite.prefix) {
+            labels[`${mwKey(name)}.stripprefix.prefixes`] = rewrite.prefix;
+        } else if (rewrite.kind === "add-prefix" && rewrite.prefix) {
+            labels[`${mwKey(name)}.addprefix.prefix`] = rewrite.prefix;
+        } else if (rewrite.kind === "replace-path" && rewrite.regex && rewrite.replacement) {
+            labels[`${mwKey(name)}.replacepathregex.regex`] = rewrite.regex;
+            labels[`${mwKey(name)}.replacepathregex.replacement`] = rewrite.replacement;
+        } else {
+            return;
+        }
+        late.push(`${name}@docker`);
+    });
+    return { early, late, byPath };
+}
+
 /** Build the Traefik label set for a service with zero or more domains. */
 export function traefikLabels(input: TraefikServiceInput): Record<string, string> {
-    if (input.domains.length === 0) return {};
+    // A stored hostname or path that could break a rule is left out rather than
+    // written into the container's labels, where the edge would refuse it.
+    const domains = input.domains.flatMap((domain) => {
+        const hostname = normalizeDeployHostname(domain.hostname);
+        if (!hostname || (domain.pathPrefix !== undefined && !PATH_PREFIX.test(domain.pathPrefix)))
+            return [];
+        return [{ ...domain, hostname }];
+    });
+    if (domains.length === 0) return {};
     const labels: Record<string, string> = {
         "traefik.enable": "true",
         "traefik.docker.network": input.network,
         [`traefik.http.services.${input.serviceName}.loadbalancer.server.port`]: String(
-            input.domains[0]!.targetPort
+            domains[0]!.targetPort
         )
     };
+    const balancer = `traefik.http.services.${input.serviceName}.loadbalancer`;
+    if (input.edge?.balancing?.sticky) {
+        labels[`${balancer}.sticky.cookie.name`] = STICKY_COOKIE;
+        labels[`${balancer}.sticky.cookie.httponly`] = "true";
+        labels[`${balancer}.sticky.cookie.samesite`] = "lax";
+    }
+    // One copy failing its check would leave the edge nothing to send to, which is a
+    // worse answer than the copy's own.
+    const healthPath = input.edge?.balancing?.healthPath;
+    if (healthPath && (input.replicas ?? 1) > 1) {
+        labels[`${balancer}.healthcheck.path`] = healthPath;
+        labels[`${balancer}.healthcheck.interval`] = "10s";
+        labels[`${balancer}.healthcheck.timeout`] = "3s";
+    }
     // WAF middlewares are per-service (one app -> one rule), shared by every domain.
-    const waf = input.waf ? wafMiddlewares(input.serviceName, input.waf, labels) : { app: [], http: [] };
-    input.domains.forEach((domain, index) => {
-        const router = input.domains.length === 1 ? input.serviceName : `${input.serviceName}-${index}`;
-        const rule = domain.pathPrefix
-            ? `Host(\`${domain.hostname}\`) && PathPrefix(\`${domain.pathPrefix}\`)`
-            : `Host(\`${domain.hostname}\`)`;
-        if (domain.certResolver === "none") {
-            labels[`traefik.http.routers.${router}.rule`] = rule;
-            labels[`traefik.http.routers.${router}.entrypoints`] = WEB;
-            labels[`traefik.http.routers.${router}.service`] = input.serviceName;
-            if (waf.app.length > 0) labels[`traefik.http.routers.${router}.middlewares`] = waf.app.join(",");
-            return;
-        }
-        // TLS router on websecure, plus an http router that redirects to https.
-        labels[`traefik.http.routers.${router}.rule`] = rule;
-        labels[`traefik.http.routers.${router}.entrypoints`] = WEBSECURE;
-        labels[`traefik.http.routers.${router}.tls`] = "true";
-        labels[`traefik.http.routers.${router}.service`] = input.serviceName;
-        if (waf.app.length > 0) labels[`traefik.http.routers.${router}.middlewares`] = waf.app.join(",");
-        if (domain.certResolver === "le") {
-            labels[`traefik.http.routers.${router}.tls.certresolver`] = LE_RESOLVER;
-        }
+    const waf = input.waf
+        ? wafMiddlewares(input.serviceName, input.waf, labels)
+        : { app: [], http: [] };
+    const siblings = new Set(domains.map((domain) => domain.hostname));
+    domains.forEach((domain, index) => {
+        const router = domains.length === 1 ? input.serviceName : `${input.serviceName}-${index}`;
+        const rule = [
+            hostMatcher(domain.hostname),
+            ...(domain.pathPrefix ? [`PathPrefix(\`${domain.pathPrefix}\`)`] : [])
+        ].join(" && ");
+        const edge = input.edge
+            ? edgeMiddlewares(
+                  domains.length === 1 ? input.serviceName : router,
+                  input.edge,
+                  domain,
+                  siblings,
+                  labels
+              )
+            : { early: [], late: [], byPath: [] };
+        // The allowlist first, then the flood limits, then the guard, then what the
+        // service asked to change about its answers - the local edge's order.
+        const allow = waf.http;
+        const guard = waf.app.filter((name) => !allow.includes(name));
+        const chain = [...allow, ...edge.early, ...guard, ...edge.late];
+        const secure = domain.certResolver !== "none";
+        const setRouter = (
+            name: string,
+            routerRule: string,
+            rank: number,
+            middlewares: string[]
+        ) => {
+            labels[`traefik.http.routers.${name}.rule`] = routerRule;
+            labels[`traefik.http.routers.${name}.entrypoints`] = secure ? WEBSECURE : WEB;
+            labels[`traefik.http.routers.${name}.priority`] = String(rank);
+            labels[`traefik.http.routers.${name}.service`] = input.serviceName;
+            if (middlewares.length > 0)
+                labels[`traefik.http.routers.${name}.middlewares`] = middlewares.join(",");
+            if (!secure) return;
+            labels[`traefik.http.routers.${name}.tls`] = "true";
+            // A wildcard has no single name to order a certificate for over HTTP.
+            if (domain.certResolver === "le" && !isWildcardHostname(domain.hostname)) {
+                labels[`traefik.http.routers.${name}.tls.certresolver`] = LE_RESOLVER;
+            }
+        };
+        setRouter(router, rule, labelRank(domain), chain);
+        edge.byPath.forEach((scoped, pathIndex) => {
+            setRouter(
+                `${router}-path-${pathIndex}`,
+                `${rule} && PathPrefix(\`${scoped.path}\`)`,
+                labelRank(domain, 1),
+                [...chain, scoped.middleware]
+            );
+        });
+        if (!secure) return;
+        // An http router that redirects to https, behind the allowlist and the limits.
         labels[`traefik.http.routers.${router}-web.rule`] = rule;
         labels[`traefik.http.routers.${router}-web.entrypoints`] = WEB;
-        labels[`traefik.http.routers.${router}-web.middlewares`] = [...waf.http, "polaris-redirect-https@docker"].join(",");
+        labels[`traefik.http.routers.${router}-web.priority`] = String(labelRank(domain));
+        labels[`traefik.http.routers.${router}-web.middlewares`] = [
+            ...allow,
+            ...edge.early,
+            "polaris-redirect-https@docker"
+        ].join(",");
         labels[`traefik.http.routers.${router}-web.service`] = input.serviceName;
     });
     // The redirect middleware itself (idempotent; Traefik dedupes by name).

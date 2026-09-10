@@ -6,6 +6,7 @@
  * the implementations and the deploy pipeline that calls them come in P3/P5.
  */
 
+import type { AppEdgeConfig } from "@polaris/core";
 import type { BuildInput } from "../builders/types.js";
 import type { BuildContext } from "../build-context.js";
 import type { RuntimePorts, OutputSink } from "../ports.js";
@@ -35,6 +36,20 @@ export interface RuntimeContext {
      *  once the source is on disk: a workspace has to be built from the repository
      *  root, whatever the service's own root directory says. */
     readonly buildContext?: () => Promise<BuildContext>;
+    /**
+     * The machine a source build runs on, when it is not the one that runs the
+     * service. The image is built and kept there, then carried here (see `ship`).
+     * Absent builds where it runs, as every deploy did before.
+     */
+    readonly builder?: {
+        readonly ports: RuntimePorts;
+        /** The build machine, as the log names it. */
+        readonly name: string;
+        /** The machine that runs the service, as the log names it. */
+        readonly runsOn: string;
+        /** Where the archive waits on its way between the two. */
+        readonly stageDir: string;
+    };
 }
 
 export interface ServiceRef {
@@ -66,6 +81,10 @@ export interface AppDeployPlan {
     /** Runtime environment (already merged from EnvVars, secrets decrypted). */
     readonly env: Readonly<Record<string, string>>;
     readonly replicas: number;
+    /** The networks this service joins in place of the proxy network alone, from
+     *  `serviceNetworks`. Absent or empty means the proxy network, which is what
+     *  every service joined before an environment could keep its own. */
+    readonly networks?: readonly string[];
     /** External networks this service joins beyond the proxy network. The messaging
      *  hub uses it to join the control-plane's default network so it can reach the
      *  web's inbound ingest directly; empty for a normal app. Each must already
@@ -78,11 +97,36 @@ export interface AppDeployPlan {
     /** Host port to publish so the app is reachable directly over the host's IP
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
-    readonly expose?: { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" };
+    readonly expose?: {
+        readonly host: number;
+        readonly container: number;
+        readonly protocol?: "tcp" | "udp";
+    };
+    /**
+     * Keep the service off every interface of the host: its port is not published at
+     * all, and the edge reaches it by name on the proxy network instead. `expose` still
+     * says which port the app listens on inside the container - that is what the edge
+     * dials - but nothing outside Docker can open it.
+     */
+    readonly private?: boolean;
+    /**
+     * A second name the container answers to on the proxy network: the service's
+     * own, carried by a release that runs beside the one it replaces. Everything that
+     * reaches the service by that name - the edge, a tunnel, another service - goes
+     * on reaching it while the container behind it changes.
+     */
+    readonly alias?: string;
+    /** Rate limits, concurrency, security headers, redirects and rewrites, written into
+     *  the edge labels beside the WAF so a remote server's own edge applies them. */
+    readonly edge?: AppEdgeConfig;
     /** Further ports to publish beside the main one. A Java Minecraft server that
      *  Bedrock clients can also join answers on a second, UDP port - one service,
      *  two doors, so it cannot be modelled as the single exposed port. */
-    readonly extraPorts?: readonly { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" }[];
+    readonly extraPorts?: readonly {
+        readonly host: number;
+        readonly container: number;
+        readonly protocol?: "tcp" | "udp";
+    }[];
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */
     readonly autoContainerPort?: boolean;
@@ -95,6 +139,18 @@ export interface AppDeployPlan {
     }[];
     /** JSON healthcheck spec (or null for none). */
     readonly healthcheck?: HealthcheckSpec;
+    /** The most CPU (cores) and memory (MB) the container may use. Absent is no
+     *  limit. */
+    readonly limits?: ResourceLimits;
+    /** Arguments that replace the image's own command, handed over as they are
+     *  rather than through a shell. Absent runs what the image says. */
+    readonly command?: readonly string[];
+}
+
+/** Resource ceilings for one container. */
+export interface ResourceLimits {
+    readonly cpus?: number;
+    readonly memoryMb?: number;
 }
 
 export interface HealthcheckSpec {
@@ -114,12 +170,33 @@ export interface DbDeployPlan {
     readonly volumeName: string;
     readonly dataPath: string;
     readonly exposePort?: number;
+    /** The networks the database joins in place of the proxy network, as for an
+     *  application. Absent or empty means the proxy network. */
+    readonly networks?: readonly string[];
+    /** Further mounts beside the data volume. A PostgreSQL instance with
+     *  point-in-time recovery mounts its archive folder here - a host folder
+     *  confined under the volume root, which a recovered instance can mount too. */
+    readonly extraVolumes?: readonly {
+        readonly source: string;
+        readonly target: string;
+        readonly kind: "bind" | "volume";
+    }[];
+    /** The most CPU (cores) and memory (MB) the container may use. Absent is no
+     *  limit. */
+    readonly limits?: ResourceLimits;
 }
 
 export interface DeployResult {
     readonly ok: boolean;
     readonly imageTag?: string;
     readonly error?: string;
+    /**
+     * The container port read from the image, when it differed from the one the plan
+     * guessed. Handed back so the caller can store it: a service kept off the host's
+     * interfaces is dialled by the edge on exactly this port, and a guess left in the
+     * route is a 502 with a healthy container behind it.
+     */
+    readonly detectedPort?: { readonly from: number; readonly to: number };
 }
 
 export interface RuntimeStatus {

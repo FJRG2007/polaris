@@ -52,7 +52,7 @@
  * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
  * new rule apply to tomorrow's mail and no further.
  */
-export const MAIL_CATEGORY_VERSION = 4;
+export const MAIL_CATEGORY_VERSION = 5;
 
 export const MAIL_CATEGORIES = [
     "primary",
@@ -578,6 +578,56 @@ const PAYMENT_SETTLED: readonly RegExp[] = [
 ];
 
 /**
+ * Credit being arranged: a loan, a mortgage, a purchase paid in instalments.
+ *
+ * This is money about to move in the plainest sense - an approved application
+ * is a schedule of payments that starts next month - and none of it says so in
+ * the words the lists above know. "Enhorabuena JAVIER, tu solicitud de
+ * financiacion ha sido aprobada" has no renewal, no invoice and no receipt in
+ * it, arrives with no List-Unsubscribe and an HTML body whose preview is empty,
+ * so it fell through every question and landed in Primary.
+ *
+ * Patterns rather than words, because the nouns on their own are what lenders
+ * advertise with: "financiacion al 0%" is an offer, "tu financiacion" and "tu
+ * solicitud de financiacion" are the reader's own. So the noun is matched only
+ * where it belongs to the reader, was applied for, or was decided on - and a
+ * refusal counts, for the same reason a refused payment does.
+ *
+ * Pre-contractual information is here too: it is the document a lender is
+ * obliged to send before credit is signed, and the word appears in nothing
+ * else anybody receives.
+ */
+const FINANCING: readonly RegExp[] = [
+    // Spanish
+    /\b(?:tu|su)\s+(?:financiacion|financiamiento|prestamo|credito|hipoteca)\b/,
+    /\b(?:solicitud|contrato)\s+de\s+(?:tu\s+)?(?:financiacion|financiamiento|prestamo|credito|hipoteca)\b/,
+    /\b(?:financiacion|financiamiento|prestamo|credito|hipoteca)\b.{0,60}?\b(?:aprobad[oa]|concedid[oa]|denegad[oa]|rechazad[oa]|formalizad[oa])\b/,
+    // English
+    /\byour\s+(?:loan|mortgage|financing|finance agreement|credit agreement)\b/,
+    /\b(?:loan|mortgage|financing|credit)\s+(?:application|agreement|approval|decision)\b/,
+    /\b(?:loan|mortgage|financing)\b.{0,60}?\b(?:approved|declined|denied|disbursed|funded)\b/,
+    // Portuguese
+    /\b(?:seu|sua)\s+(?:emprestimo|financiamento|credito)\b/,
+    /\bpedido\s+de\s+(?:emprestimo|financiamento|credito)\b/,
+    /\b(?:emprestimo|financiamento)\b.{0,60}?\b(?:aprovad[oa]|concedid[oa]|recusad[oa])\b/,
+    // French
+    /\bvotre\s+(?:pret|financement)\b/,
+    /\bdemande\s+de\s+(?:pret|financement|credit)\b/,
+    /\b(?:pret|financement|credit)\b.{0,60}?\b(?:accorde|approuve|refuse)e?\b/,
+    // German
+    /\b(?:kredit|darlehens?|finanzierungs?)(?:antrag|vertrag|zusage)\b/,
+    /\bihre?\s+(?:kredit|darlehen|finanzierung)\b/,
+    /\b(?:kredit|darlehen|finanzierung)\b.{0,60}?\b(?:genehmigt|bewilligt|abgelehnt)\b/,
+    // Italian
+    /\b(?:il tuo|la tua)\s+(?:prestito|finanziamento|mutuo)\b/,
+    /\brichiesta\s+di\s+(?:prestito|finanziamento|mutuo)\b/,
+    /\b(?:prestito|finanziamento|mutuo)\b.{0,60}?\b(?:approvat[oa]|concess[oa]|rifiutat[oa])\b/,
+    // The disclosure a lender sends before anything is signed, in every language
+    // above: pre-contractual, precontractuel, precontrattuale, pre-contratual.
+    /\bpre-?(?:contractual|contractuel(?:le)?|contrattuale|contratual)\b/
+];
+
+/**
  * Words that mean something is on its way, or that a record was issued.
  *
  * What is left of the transactional pile once money has been taken out of it: a
@@ -647,7 +697,9 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
 
     const promotional = PROMOTION_WORDS.some((word) => words.includes(word));
     const transactional = UPDATE_WORDS.some((word) => words.includes(word));
-    const billed = BILLING_WORDS.some((word) => words.includes(word));
+    const billed =
+        BILLING_WORDS.some((word) => words.includes(word)) ||
+        FINANCING.some((pattern) => pattern.test(words));
     // Money that already moved. Asked AFTER the parcel, because the two lists
     // overlap on exactly one word and it is the commonest one: "your order" and
     // "tu pedido" open a receipt and a shipping notice alike, and "your order
@@ -679,11 +731,19 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     return "primary";
 }
 
-/** Whether a subject carries a code somebody is meant to type. Four to eight
- *  digits or an upper-case run, standing on its own rather than inside a word -
- *  an order number in a sentence is not one of these. */
+/**
+ * Whether a subject carries a code somebody is meant to type. Four to eight
+ * digits, or an upper-case run with a digit in it, standing on its own rather
+ * than inside a word - an order number in a sentence is not one of these.
+ *
+ * The digit is required because an upper-case word on its own is a name far
+ * more often than a code: lenders and shops write "Enhorabuena JAVIER," and
+ * "compra en AMAZON", and without it either subject counted as carrying a code -
+ * which, with a sign-in phrase anywhere in the preview, filed the message under
+ * the one tab that can be cleared up automatically.
+ */
 function bareCode(subject: string): boolean {
-    return /(?:^|[\s:>-])(?:\d{4,8}|[A-Z0-9]{6,8})(?:$|[\s.,)<-])/.test(subject);
+    return /(?:^|[\s:>-])(?:\d{4,8}|(?=[A-Z]*\d)[A-Z0-9]{6,8})(?:$|[\s.,)<-])/.test(subject);
 }
 
 /** The domain an address is at, lower case and with no trailing dot. */

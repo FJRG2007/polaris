@@ -11,16 +11,18 @@
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
-import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
-import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { nicknamesFor } from "@/lib/contact-names";
-import { discardAvatars } from "@/lib/avatar-service";
 import { dropGrantsFor } from "@/lib/access/grants";
 import { discardChannelFiles } from "./attachments";
+import { discardAvatars } from "@/lib/avatar-service";
+import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
+import { blockedBetween, blockedBy } from "@/lib/blocks";
+import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
 import {
+    // enigma: predates the namespace-import rule; converting its call sites is its own change.
     ChatAccessError,
     ChatRuleError,
     channelAccess,
@@ -224,15 +226,14 @@ export async function createSpace(
     input: core.ChatSpaceCreateInput
 ): Promise<string> {
     if (input.orgId) {
-        const membership = await prisma.organizationMember.findFirst({
-            where: { orgId: input.orgId, userId: actor.id },
+        // Reading the organization, not merely being on its roster: a restricted
+        // member holds nothing there that was not granted to them, and a space on
+        // the organization's shelf is the organization's.
+        const reads = await prisma.organization.findFirst({
+            where: { id: input.orgId, ...readsOrgWhere(actor.id) },
             select: { id: true }
         });
-        const owned = await prisma.organization.findFirst({
-            where: { id: input.orgId, ownerId: actor.id },
-            select: { id: true }
-        });
-        if (!membership && !owned) throw new ChatAccessError("You are not in that organization");
+        if (!reads) throw new ChatAccessError("You are not in that organization");
     }
 
     return prisma.$transaction(async (tx) => {
@@ -1601,7 +1602,10 @@ export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElse
         new Map(heard.map((row) => [row.channelId, row]))
     );
 
-    const grouped = new Map<string | null, { name: string; conversations: number; unread: number }>();
+    const grouped = new Map<
+        string | null,
+        { name: string; conversations: number; unread: number }
+    >();
     for (const channel of away) {
         const entry = grouped.get(channel.orgId) ?? {
             // A conversation filed under an organization that is gone cannot

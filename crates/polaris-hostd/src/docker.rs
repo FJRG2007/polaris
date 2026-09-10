@@ -98,6 +98,14 @@ pub fn validate<'a>(method: &'a str, path: &'a str) -> Result<AllowedRequest<'a>
         // No query string: `?force=` is the only thing that could be passed
         // here, and forcing is exactly the judgement this route refuses to make.
         ("DELETE", ["volumes", name]) => valid_volume_name(name) && !path.contains('?'),
+        // One kept release image, once it has fallen out of the window a service
+        // can be rolled back through. Only under the release repository Polaris
+        // pins its own releases into, so nothing an operator pulled or built by
+        // hand can be reached by this route. No query string: `force` would take
+        // an image out from under a container that still runs it.
+        ("DELETE", ["images", "polaris-release", reference]) => {
+            valid_release_reference(reference) && !path.contains('?')
+        }
         _ => false,
     };
     if !allowed {
@@ -133,6 +141,26 @@ fn valid_volume_name(name: &str) -> bool {
     }
     name.len() <= 255
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
+}
+
+/// A kept release image's `<name>:<tag>` under the release repository: a lower-case
+/// service name and the twelve hex characters derived from the deployment. The same
+/// shape the dashboard produces (`isReleaseImage`), and nothing looser.
+pub(crate) fn valid_release_reference(reference: &str) -> bool {
+    let Some((name, tag)) = reference.split_once(':') else {
+        return false;
+    };
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit() => {}
+        _ => return false,
+    }
+    name.len() <= 100
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && tag.len() == 12
+        && tag
+            .chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
 }
 
 /// Forward one already-validated request to the Docker socket and return the
@@ -301,6 +329,25 @@ mod tests {
         assert!(validate("DELETE", "/volumes/data?force=1").is_err());
         assert!(validate("DELETE", "/volumes/-leading-dash").is_err());
         assert!(validate("DELETE", "/volumes/..").is_err());
+    }
+
+    #[test]
+    fn only_a_kept_release_image_can_be_removed() {
+        assert!(validate(
+            "DELETE",
+            "/images/polaris-release/shop-web-1a2b:0123456789ab"
+        )
+        .is_ok());
+
+        // Anything else by that verb: an operator's own images, a look-alike, a
+        // tag that is not a release's, a forced removal, a way out of the route.
+        assert!(validate("DELETE", "/images/nginx:latest").is_err());
+        assert!(validate("DELETE", "/images/polaris-release/web:latest").is_err());
+        assert!(validate("DELETE", "/images/polaris-release/Web:0123456789ab").is_err());
+        assert!(validate("DELETE", "/images/polaris-release/web:0123456789ab?force=1").is_err());
+        assert!(validate("DELETE", "/images/polaris-release/../web:0123456789ab").is_err());
+        assert!(validate("DELETE", "/images/evil/polaris-release/web:0123456789ab").is_err());
+        assert!(validate("DELETE", "/images/polaris-release/-web:0123456789ab").is_err());
     }
 
     #[test]

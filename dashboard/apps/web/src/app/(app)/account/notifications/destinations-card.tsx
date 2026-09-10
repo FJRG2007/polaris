@@ -12,8 +12,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
-import { destinationInputSchema, WEBHOOK_FORMATS } from "@polaris/core";
 import type { DestinationView } from "@/lib/notifications/destinations";
+import { destinationInputSchema, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS } from "@polaris/core";
 import {
     createDestinationAction,
     deleteDestinationAction,
@@ -89,10 +89,14 @@ export function DestinationsCard({
                                             <Webhook className="size-4 shrink-0 text-muted-foreground" />
                                         )}
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-medium">{destination.name}</p>
+                                            <p className="truncate text-sm font-medium">
+                                                {destination.name}
+                                            </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {destination.targetHint}
-                                                {destination.format ? ` - ${destination.format}` : ""}
+                                                {destination.format
+                                                    ? ` - ${destination.format}`
+                                                    : ""}
                                             </p>
                                         </div>
                                     </div>
@@ -106,11 +110,16 @@ export function DestinationsCard({
                                             checked={destination.enabled}
                                             onChange={(next) =>
                                                 startTransition(async () => {
-                                                    await setDestinationEnabledAction(destination.id, next);
+                                                    await setDestinationEnabledAction(
+                                                        destination.id,
+                                                        next
+                                                    );
                                                     router.refresh();
                                                 })
                                             }
-                                            aria-label={destination.enabled ? "Switch off" : "Switch on"}
+                                            aria-label={
+                                                destination.enabled ? "Switch off" : "Switch on"
+                                            }
                                         />
                                         <button
                                             type="button"
@@ -148,7 +157,13 @@ export function DestinationsCard({
                                     </p>
                                 ) : null}
                                 {testResult?.id === destination.id ? (
-                                    <p className={testResult.error ? "text-xs text-danger" : "text-xs text-success"}>
+                                    <p
+                                        className={
+                                            testResult.error
+                                                ? "text-xs text-danger"
+                                                : "text-xs text-success"
+                                        }
+                                    >
                                         {testResult.error ?? "Test alert sent."}
                                     </p>
                                 ) : destination.lastError ? (
@@ -257,8 +272,10 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                     placeholder="https://discord.com/api/webhooks/..."
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Anyone with this URL can post to the channel, so it is stored encrypted and
-                                    never shown again.
+                                    Discord, Slack, Teams, or a Telegram bot as
+                                    https://api.telegram.org/bot&lt;token&gt;/sendMessage?chat_id=&lt;chat
+                                    id&gt;. Anyone with this URL can post to the channel, so it is
+                                    stored encrypted and never shown again.
                                 </span>
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
@@ -270,7 +287,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                         { value: "auto", label: "Detect from the URL" },
                                         ...WEBHOOK_FORMATS.map((entry) => ({
                                             value: entry,
-                                            label: entry === "generic" ? "Raw JSON" : entry
+                                            label: WEBHOOK_FORMAT_LABEL[entry]
                                         }))
                                     ]}
                                 />

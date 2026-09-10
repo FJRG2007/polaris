@@ -68,9 +68,17 @@ describe("the work Polaris runs on a schedule", () => {
             // the same daemon call, and the one that loses fails on a container
             // the other already removed.
             "agent-sessions",
+            // The audit chain has exactly one writer, and two sealing passes
+            // would hand out the same places twice. Verification walks the whole
+            // chain and has no reason to do that twice at once.
+            "audit-seal",
+            "audit-verify",
             "backups",
             "chat-scheduled",
             "connection-health",
+            // Two passes would take two base backups of the same instance, and
+            // two replication checks could each find a copy stopped and start one.
+            "database-archives",
             "game-health",
             "game-schedules",
             "home-availability",
@@ -84,7 +92,17 @@ describe("the work Polaris runs on a schedule", () => {
             // same batch of messages twice.
             "mail-categories",
             "mail-send",
+            // Two passes would read the same DMARC report mailbox at once.
+            "mail-server",
             "mail-sync",
+            "object-replication",
+            // A capture stores the lines after the newest one it has; two at once
+            // would both read the same newest line and store what follows twice.
+            "runtime-logs",
+            // Two passes would both see the same streak and both add a copy.
+            "service-autoscale",
+            // Two passes would both stop, or both start, the same container.
+            "service-sleep",
             "task-reminders",
             "task-trackers"
         ]);

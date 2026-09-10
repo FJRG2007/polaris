@@ -180,10 +180,21 @@ async function performActions(
                     .catch(() => undefined);
                 break;
             case "pin":
-                await prisma.mailMessage.update({
-                    where: { id: messageId },
-                    data: { pinned: true }
-                });
+                // The conversation, not only the message: the list orders by the
+                // conversation's pin, so a pin written on the message alone was a
+                // rule that did nothing anybody could see.
+                await prisma.mailMessage
+                    .update({
+                        where: { id: messageId },
+                        data: { pinned: true },
+                        select: { threadId: true }
+                    })
+                    .then((message) =>
+                        prisma.mailThread.update({
+                            where: { id: message.threadId },
+                            data: { pinned: true }
+                        })
+                    );
                 break;
             case "forward":
                 await forwardMessage(accountId, messageId, action.to);

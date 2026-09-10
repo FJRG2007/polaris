@@ -2,7 +2,7 @@
  * Per-app ngrok tunnels: expose one deployed app on a public ngrok URL with no
  * port-forwarding, using the authtoken from the ngrok integration. An `ngrok`
  * sidecar connects out to ngrok's edge and forwards inbound traffic to the app's
- * already-published host port (see hostPortForApp), mirroring quick-tunnel-service
+ * already-published host port (see connectorOrigin), mirroring quick-tunnel-service
  * for the sidecar lifecycle. The URL is read back from the agent's logs (ngrok
  * prints `url=https://...` on startup) and cached in a Setting for the UI.
  *
@@ -15,9 +15,9 @@ import { prisma } from "@polaris/db";
 import { newestUrl } from "./tunnel-url";
 import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
-import { getPublicIp } from "../domain-service";
 import type { ComposeSpec } from "@polaris/deploy";
-import { hostPortForApp } from "../deploy-service";
+import { connectorOrigin } from "../deploy-service";
+import { connectorNetworks } from "./service-networks";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
 
 const PROXY_NETWORK = "polaris-proxy";
@@ -55,7 +55,13 @@ async function requireLocalApp(appId: string, ownerId: string): Promise<void> {
 }
 
 /** The ngrok sidecar spec forwarding the edge to the app's published host port. */
-function tunnelSpec(project: string, service: string, origin: string, token: string): ComposeSpec {
+function tunnelSpec(
+    project: string,
+    service: string,
+    origin: string,
+    token: string,
+    networks: string[]
+): ComposeSpec {
     return {
         project,
         services: [
@@ -70,21 +76,25 @@ function tunnelSpec(project: string, service: string, origin: string, token: str
                 volumes: [],
                 labels: {},
                 command: ["http", origin, "--log", "stdout"],
-                networks: [PROXY_NETWORK],
+                networks,
                 restart: "unless-stopped"
             }
         ],
         volumes: [],
-        networks: [PROXY_NETWORK]
+        networks
     };
 }
 
 async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<string | null> {
     let buffer = "";
     try {
-        await ports.logs(service, (chunk) => {
-            buffer += chunk.toString("utf8");
-        }, { tail: 200, follow: false });
+        await ports.logs(
+            service,
+            (chunk) => {
+                buffer += chunk.toString("utf8");
+            },
+            { tail: 200, follow: false }
+        );
     } catch {
         return null;
     }
@@ -111,15 +121,23 @@ export async function startNgrokTunnel(appId: string, ownerId: string): Promise<
     await requireLocalApp(appId, ownerId);
     const token = await ngrokToken();
     if (!token) throw new Error("Add your ngrok authtoken under Integrations first");
-    const ip = await getPublicIp();
-    if (!ip) throw new Error("Set this server's IP under Deploy settings first");
+    // The published port, or the container by name for a service kept off the host.
+    const origin = await connectorOrigin(appId);
+    if (!origin) throw new Error("Set this server's IP under Deploy settings first");
 
     const { project, service } = names(appId);
-    const origin = `${ip}:${hostPortForApp(appId)}`;
     const ports = new HostdPorts();
     try {
         await ports.composeDown(project).catch(() => undefined);
-        await ports.composeUp(tunnelSpec(project, service, origin, token));
+        await ports.composeUp(
+            tunnelSpec(
+                project,
+                service,
+                origin,
+                token,
+                await connectorNetworks(appId, PROXY_NETWORK)
+            )
+        );
 
         let url: string | null = null;
         for (let attempt = 0; attempt < 20 && !url; attempt += 1) {
@@ -147,7 +165,10 @@ export async function stopNgrokTunnel(appId: string, ownerId: string): Promise<v
 }
 
 /** Whether the tunnel is up and its current public URL. Best-effort. */
-export async function getNgrokTunnelStatus(appId: string, ownerId: string): Promise<NgrokTunnelStatus> {
+export async function getNgrokTunnelStatus(
+    appId: string,
+    ownerId: string
+): Promise<NgrokTunnelStatus> {
     const app = await prisma.application.findFirst({
         where: { id: appId, environment: { project: { ownerId } } },
         select: { id: true }
@@ -173,7 +194,10 @@ export async function getNgrokTunnelStatus(appId: string, ownerId: string): Prom
 }
 
 async function getStoredUrl(appId: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: urlKey(appId) },
+        select: { value: true }
+    });
     return row?.value ?? null;
 }
 
@@ -183,5 +207,9 @@ async function setStoredUrl(appId: string, url: string | null): Promise<void> {
         await prisma.setting.deleteMany({ where: { key } });
         return;
     }
-    await prisma.setting.upsert({ where: { key }, create: { key, value: url, scope: "global" }, update: { value: url } });
+    await prisma.setting.upsert({
+        where: { key },
+        create: { key, value: url, scope: "global" },
+        update: { value: url }
+    });
 }

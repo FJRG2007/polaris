@@ -90,7 +90,7 @@ export function RuleListInput({
                             className={cn(
                                 "flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-xs",
                                 tone === "deny"
-                                    ? "border-danger/40 bg-danger/5 text-danger"
+                                    ? "border-danger-edge bg-danger-soft text-danger-ink"
                                     : "border-primary/40 bg-primary/5 text-primary"
                             )}
                         >

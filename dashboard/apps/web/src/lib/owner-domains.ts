@@ -29,18 +29,26 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { isIpv4 } from "@polaris/core";
-import { grantedResourceIds } from "@polaris/auth";
 import { randomBytes } from "node:crypto";
+import { grantedResourceIds } from "@polaris/auth";
 import { detectPublicIp } from "./network-service";
 import { resolve4, resolveTxt } from "node:dns/promises";
 import { getSetting, setSetting } from "./setting-store";
 import { isBaseDomain, normalizeBaseDomain, randomLabel } from "@polaris/deploy";
+import { resolveZoneForHostname, verifyToken } from "./integrations/cloudflare-api";
 import {
     ownerDomainPolicySchema,
     instanceDomainConflict,
     OWNER_DOMAIN_POLICY_DEFAULTS,
     type OwnerDomainPolicy
 } from "./owner-domains-policy";
+import {
+    ownerDomainCertificates,
+    requestManagedCertificates,
+    retryOwnerDomainCertificate,
+    sealText,
+    type ManagedCertificateView
+} from "./tls/managed-certificates";
 
 // The vocabulary the settings form and this module both read. Re-exported so a
 // server caller has one import for the subject, while the form keeps importing
@@ -79,7 +87,8 @@ export async function ownerDomainPolicy(): Promise<OwnerDomainPolicy> {
 
 export async function setOwnerDomainPolicy(input: unknown): Promise<OwnerDomainPolicy> {
     const parsed = ownerDomainPolicySchema.safeParse(input);
-    if (!parsed.success) throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the settings");
+    if (!parsed.success)
+        throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the settings");
     await setSetting(POLICY_KEY, JSON.stringify(parsed.data));
     return parsed.data;
 }
@@ -142,7 +151,9 @@ function parseStringList(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -155,7 +166,9 @@ function parseStringList(raw: string | null): string[] {
 /** Whose domain it is. Exactly one, always - a domain belongs to one account or
  *  to one organization, and the service is the only writer of these rows, which
  *  is what makes that hold. */
-export type DomainOwner = { readonly kind: "user"; readonly id: string } | { readonly kind: "org"; readonly id: string };
+export type DomainOwner =
+    | { readonly kind: "user"; readonly id: string }
+    | { readonly kind: "org"; readonly id: string };
 
 function ownerWhere(owner: DomainOwner) {
     return owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id };
@@ -194,18 +207,27 @@ export interface OwnerDomainView {
     readonly checkedAt: string | null;
     readonly detail: string;
     readonly createdAt: string;
+    /** Whether it carries a DNS API token of its own for its wildcard certificate,
+     *  rather than relying on the one this Polaris has connected. */
+    readonly hasDnsToken: boolean;
+    /** Its wildcard certificate, once one has been asked for. */
+    readonly certificate: ManagedCertificateView | null;
 }
 
-function toView(row: {
-    id: string;
-    domain: string;
-    verifyToken: string;
-    verifiedAt: Date | null;
-    wildcardOk: boolean;
-    checkedAt: Date | null;
-    checkDetail: string | null;
-    createdAt: Date;
-}): OwnerDomainView {
+function toView(
+    row: {
+        id: string;
+        domain: string;
+        verifyToken: string;
+        verifiedAt: Date | null;
+        wildcardOk: boolean;
+        checkedAt: Date | null;
+        checkDetail: string | null;
+        dnsToken: string | null;
+        createdAt: Date;
+    },
+    certificate: ManagedCertificateView | null = null
+): OwnerDomainView {
     return {
         id: row.id,
         domain: row.domain,
@@ -216,7 +238,9 @@ function toView(row: {
         wildcardOk: row.wildcardOk,
         checkedAt: row.checkedAt?.toISOString() ?? null,
         detail: row.checkDetail ?? "",
-        createdAt: row.createdAt.toISOString()
+        createdAt: row.createdAt.toISOString(),
+        hasDnsToken: row.dnsToken !== null,
+        certificate
     };
 }
 
@@ -231,12 +255,15 @@ function toView(row: {
 export async function listOwnerDomains(owner: DomainOwner): Promise<OwnerDomainView[]> {
     const mine = ownerWhere(owner);
     const granted =
-        owner.kind === "user" ? (await grantedResourceIds(owner.id, "domain", "deploy.manage")).ids : [];
+        owner.kind === "user"
+            ? (await grantedResourceIds(owner.id, "domain", "deploy.manage")).ids
+            : [];
     const rows = await prisma.ownerDomain.findMany({
         where: granted.length > 0 ? { OR: [mine, { id: { in: granted } }] } : mine,
         orderBy: { createdAt: "asc" }
     });
-    return rows.map(toView);
+    const certificates = await ownerDomainCertificates(rows.map((row) => row.id));
+    return rows.map((row) => toView(row, certificates.get(row.id) ?? null));
 }
 
 /**
@@ -266,14 +293,18 @@ export async function canAddOwnerDomain(
     isAdmin: boolean
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
     const policy = await ownerDomainPolicy();
-    if (policy.mode === "off") return { ok: false, reason: "This Polaris does not take domains of your own" };
+    if (policy.mode === "off")
+        return { ok: false, reason: "This Polaris does not take domains of your own" };
     if (policy.mode === "admins" && !isAdmin) {
         return { ok: false, reason: "Only an administrator can add a domain on this Polaris" };
     }
     if (policy.maxPerOwner > 0) {
         const held = await prisma.ownerDomain.count({ where: ownerWhere(owner) });
         if (held >= policy.maxPerOwner) {
-            return { ok: false, reason: `This Polaris allows ${policy.maxPerOwner} domains per owner` };
+            return {
+                ok: false,
+                reason: `This Polaris allows ${policy.maxPerOwner} domains per owner`
+            };
         }
     }
     return { ok: true };
@@ -288,9 +319,16 @@ export async function canAddOwnerDomain(
  * gets a new one, so a TXT record left behind at the registrar cannot re-verify a
  * claim somebody else has since made.
  */
-export async function addOwnerDomain(owner: DomainOwner, input: unknown, isAdmin: boolean): Promise<OwnerDomainView> {
+export async function addOwnerDomain(
+    owner: DomainOwner,
+    input: unknown,
+    isAdmin: boolean
+): Promise<OwnerDomainView> {
     const parsed = ownerDomainInputSchema.safeParse(input);
-    if (!parsed.success) throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Enter a domain like example.com");
+    if (!parsed.success)
+        throw new OwnerDomainError(
+            parsed.error.issues[0]?.message ?? "Enter a domain like example.com"
+        );
 
     const allowed = await canAddOwnerDomain(owner, isAdmin);
     if (!allowed.ok) throw new OwnerDomainError(allowed.reason);
@@ -375,7 +413,8 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
     // Without a known public IP the record can only be confirmed to exist, not
     // compared - which is still the useful half of the answer, and better than
     // refusing a domain because this box cannot work out its own address.
-    const pointsHere = wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
+    const pointsHere =
+        wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
 
     const detail = !owns
         ? `No ${OWNER_DOMAIN_TXT_LABEL}.${row.domain} TXT record with that value yet. Records can take a few minutes to appear.`
@@ -394,5 +433,82 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
             checkDetail: detail
         }
     });
-    return toView(updated);
+    // Proven just now: its wildcard certificate can be ordered straight away
+    // rather than on the next scheduled pass.
+    if (owns && row.verifiedAt === null) requestManagedCertificates();
+    return toView(updated, (await ownerDomainCertificates([updated.id])).get(updated.id) ?? null);
+}
+
+// ---------------------------------------------------------------------------
+// Certificates
+// ---------------------------------------------------------------------------
+
+/** What a caller may submit as a domain's DNS token: a Cloudflare API token, or
+ *  nothing to go back to this Polaris's own. */
+export const ownerDomainDnsTokenSchema = z.object({
+    token: z
+        .string()
+        .transform((value) => value.trim())
+        .refine(
+            (value) => value === "" || /^[A-Za-z0-9_-]{20,200}$/.test(value),
+            "That does not look like an API token"
+        )
+});
+
+/**
+ * Give a domain a DNS token of its own, for its wildcard certificate, or take it
+ * away. Checked before it is kept: the token has to be live and has to reach the
+ * zone the domain is in, or it would sit here failing every renewal quietly.
+ */
+export async function setOwnerDomainDnsToken(
+    owner: DomainOwner,
+    id: string,
+    input: unknown
+): Promise<OwnerDomainView> {
+    const parsed = ownerDomainDnsTokenSchema.safeParse(input);
+    if (!parsed.success)
+        throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the token");
+    const row = await prisma.ownerDomain.findFirst({ where: { id, ...ownerWhere(owner) } });
+    if (!row) throw new OwnerDomainError("That domain is not one of yours");
+
+    const token = parsed.data.token;
+    if (token) {
+        try {
+            await verifyToken(token);
+            await resolveZoneForHostname(token, row.domain);
+        } catch (caught) {
+            throw new OwnerDomainError(
+                caught instanceof Error ? caught.message : "Cloudflare did not accept that token"
+            );
+        }
+    }
+    const updated = await prisma.ownerDomain.update({
+        where: { id: row.id },
+        data: token
+            ? { dnsProvider: "cloudflare", dnsToken: sealText(token) }
+            : { dnsProvider: null, dnsToken: null }
+    });
+    await retryOwnerDomainCertificate(row.id);
+    return toView(updated, (await ownerDomainCertificates([updated.id])).get(updated.id) ?? null);
+}
+
+/** One domain as it stands, with no DNS lookup - what a screen polls while a
+ *  certificate is being ordered. */
+export async function getOwnerDomain(owner: DomainOwner, id: string): Promise<OwnerDomainView> {
+    const row = await prisma.ownerDomain.findFirst({ where: { id, ...ownerWhere(owner) } });
+    if (!row) throw new OwnerDomainError("That domain is not one of yours");
+    return toView(row, (await ownerDomainCertificates([row.id])).get(row.id) ?? null);
+}
+
+/** Order a domain's certificate now instead of waiting out a failed attempt. */
+export async function retryOwnerDomainCertificateFor(
+    owner: DomainOwner,
+    id: string
+): Promise<void> {
+    const row = await prisma.ownerDomain.findFirst({
+        where: { id, ...ownerWhere(owner) },
+        select: { id: true }
+    });
+    if (!row) throw new OwnerDomainError("That domain is not one of yours");
+    await retryOwnerDomainCertificate(row.id);
 }

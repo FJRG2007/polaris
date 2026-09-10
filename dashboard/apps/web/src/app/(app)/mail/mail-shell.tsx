@@ -18,16 +18,16 @@
 
 import Link from "next/link";
 import { cn } from "@polaris/ui";
-import { MailRail } from "./mail-rail";
 import { Composer } from "./composer";
-import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
-import { Menu, PenLine } from "lucide-react";
+import { MailRail } from "./mail-rail";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
-import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
+import { Menu, PenLine, Plus } from "lucide-react";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
+import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
 import {
     useRef,
     useMemo,
@@ -47,6 +47,10 @@ export interface MailContextValue {
     readonly identities: Readonly<Record<string, readonly MailIdentityView[]>>;
     readonly unread: { total: number; byAccount: Record<string, number> };
     readonly viewerName: string;
+    /** Which shelf is on screen: "personal", or the organization's id. Part of
+     *  every client-side cache key, so one shelf's list is never drawn on the
+     *  other's. */
+    readonly shelf: string;
     /** Pull everything the server drew again. The answer to every live frame:
      *  one small query, against teaching the client to apply every kind of
      *  change to a shape the server already knows how to build. */
@@ -114,6 +118,8 @@ export interface ComposerSeed {
     readonly accountId?: string;
     readonly to?: readonly { name: string; address: string }[];
     readonly cc?: readonly { name: string; address: string }[];
+    /** Only ever from a `mailto:` link: nothing Polaris starts itself is blind. */
+    readonly bcc?: readonly { name: string; address: string }[];
     readonly subject?: string;
     readonly body?: string;
     readonly inReplyToId?: string | null;
@@ -160,6 +166,10 @@ function colorFor(seed: string): string {
  *  fetch of the whole page. */
 const STREAM_SETTLE_MS = 400;
 
+/** Where somebody with no mailbox is sent when they ask to write: the connect
+ *  dialog, already open. */
+export const CONNECT_MAILBOX_HREF = "/mail/settings/accounts?connect=1";
+
 export function MailShell({
     accounts,
     folders,
@@ -167,6 +177,7 @@ export function MailShell({
     identities,
     unread,
     viewerName,
+    shelf,
     children
 }: {
     accounts: MailAccountView[];
@@ -175,6 +186,7 @@ export function MailShell({
     identities: Record<string, MailIdentityView[]>;
     unread: { total: number; byAccount: Record<string, number> };
     viewerName: string;
+    shelf: string;
     children: ReactNode;
 }) {
     const router = useRouter();
@@ -298,6 +310,25 @@ export function MailShell({
     );
     useMailStream(onFrame);
 
+    /**
+     * Another shelf: personal mail for an organization's, or back.
+     *
+     * The rail is the server's and follows on its own. The list and the open
+     * conversation are the browser's, and neither had any reason to ask again -
+     * so the list kept the other shelf's mail and the conversation stayed open on
+     * a mailbox that is not on this shelf. The list is asked for again, and a
+     * conversation that was open is closed: it belongs to the shelf that was left.
+     */
+    const shownShelf = useRef(shelf);
+    useEffect(() => {
+        if (shownShelf.current === shelf) return;
+        shownShelf.current = shelf;
+        reloadLists();
+        if (search.get("open") || pathname.startsWith("/mail/t/")) {
+            router.replace("/mail", { scroll: false });
+        }
+    }, [shelf, reloadLists, router, search, pathname]);
+
     const accountColor = useCallback(
         (accountId: string) => {
             const account = accounts.find((one) => one.id === accountId);
@@ -311,6 +342,26 @@ export function MailShell({
         []
     );
 
+    /**
+     * Open the composer, or say what is missing first.
+     *
+     * A message needs a mailbox to leave from. With none connected the composer
+     * would open with an empty From and fail only on Send, so every way in -
+     * Write, the keyboard shortcut, a `mailto:` link - goes to connecting one
+     * instead. Closing is always allowed.
+     */
+    const hasMailbox = accounts.length > 0;
+    const openComposer = useCallback(
+        (draft: ComposerSeed | null) => {
+            if (draft && !hasMailbox) {
+                router.push(CONNECT_MAILBOX_HREF);
+                return;
+            }
+            setComposing(draft);
+        },
+        [hasMailbox, router]
+    );
+
     const value = useMemo<MailContextValue>(
         () => ({
             accounts,
@@ -319,13 +370,14 @@ export function MailShell({
             identities,
             unread: shownUnread,
             viewerName,
+            shelf,
             refresh,
             reloadLists,
             revision,
             nudgeUnread,
             accountColor,
             composing,
-            openComposer: setComposing,
+            openComposer,
             askFolderRole
         }),
         [
@@ -335,12 +387,14 @@ export function MailShell({
             identities,
             shownUnread,
             viewerName,
+            shelf,
             refresh,
             reloadLists,
             revision,
             nudgeUnread,
             accountColor,
             composing,
+            openComposer,
             askFolderRole
         ]
     );
@@ -377,12 +431,16 @@ export function MailShell({
                         <Button
                             className="w-full justify-start gap-2"
                             onClick={() => {
-                                setComposing({});
+                                openComposer({});
                                 setRailOpen(false);
                             }}
                         >
-                            <PenLine className="size-4 shrink-0" aria-hidden />
-                            Write
+                            {hasMailbox ? (
+                                <PenLine className="size-4 shrink-0" aria-hidden />
+                            ) : (
+                                <Plus className="size-4 shrink-0" aria-hidden />
+                            )}
+                            {hasMailbox ? "Write" : "Connect a mailbox"}
                         </Button>
                     </div>
                     <MailRail onNavigate={() => setRailOpen(false)} />

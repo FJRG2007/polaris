@@ -9,8 +9,12 @@
  */
 
 import { expandWafPresets } from "./waf-presets.js";
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { wafCustomRuleSchema, type WafCustomRule, type WafPrincipalGrant } from "./schemas/deploy.js";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import {
+    wafCustomRuleSchema,
+    type WafCustomRule,
+    type WafPrincipalGrant
+} from "./schemas/deploy.js";
 
 /** The per-route rule the guard enforces. Empty denylist, no packs, no custom rules,
  *  no principal lists and no login = a no-op. */
@@ -57,6 +61,14 @@ export interface GuardRule {
      *  it is the only entry the forwardAuth path ignores, because it changes the
      *  response and forwardAuth never sees one. */
     readonly emailObfuscation?: boolean;
+    /**
+     * Ask every visitor to prove they are running a browser before letting them through
+     * - the proof-of-work page, then a signed pass cookie. Set when a service is marked
+     * as under attack, by its owner or by the flood check. Optional on the way in (an
+     * older edge config predates it) and left out of the header when off, which is the
+     * case on essentially every route.
+     */
+    readonly challenge?: boolean;
     /** Managed rule-pack ids, expanded to rules on decode. Sending ids rather than
      *  their contents is what keeps this header small: a pack of forty user agents
      *  is four bytes here and is stamped onto every single request to the route.
@@ -81,8 +93,8 @@ export interface GuardRule {
  * Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON: `d` =
  * denylist, `l` = require-login, `a` = where to sign in, `n` = the principal lists that
  * login admits, `y` = the principals it refuses, `b` = browser integrity, `s` = SQL
- * injection protection, `x` = XSS protection, `e` = email obfuscation, `p` = pack ids,
- * `r` = custom rules).
+ * injection protection, `x` = XSS protection, `e` = email obfuscation, `c` = the
+ * browser challenge, `p` = pack ids, `r` = custom rules).
  *
  * The login keys are left out entirely when they say nothing, which is the case on
  * essentially every route. They decode to the same empty result either way, and this
@@ -104,6 +116,7 @@ export function encodeGuardRule(rule: GuardRule): string {
             s: rule.sqlInjectionProtection === true,
             x: rule.xssProtection === true,
             e: rule.emailObfuscation === true,
+            ...(rule.challenge === true ? { c: true } : {}),
             p: rule.presets ?? [],
             r: rule.rules
         })
@@ -147,6 +160,7 @@ const EMPTY_RULE: GuardRule = {
     sqlInjectionProtection: false,
     xssProtection: false,
     emailObfuscation: false,
+    challenge: false,
     presets: [],
     rules: [],
     managedRules: []
@@ -167,6 +181,7 @@ const FAIL_CLOSED: GuardRule = {
     sqlInjectionProtection: true,
     xssProtection: true,
     emailObfuscation: false,
+    challenge: false,
     presets: [],
     rules: [],
     managedRules: []
@@ -233,11 +248,16 @@ function decodeUncached(header: string): GuardRule {
                 s?: unknown;
                 x?: unknown;
                 e?: unknown;
+                c?: unknown;
                 p?: unknown;
                 r?: unknown;
             };
-            const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
-            const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
+            const deny = Array.isArray(obj.d)
+                ? obj.d.filter((v): v is string => typeof v === "string")
+                : [];
+            const presets = Array.isArray(obj.p)
+                ? obj.p.filter((v): v is string => typeof v === "string")
+                : [];
             // `i` is the single injection flag the two below were split out of. A route
             // materialized before the split still carries it, and keeps both checks
             // until its edge is rewritten - dropping one silently on upgrade would be a
@@ -246,13 +266,15 @@ function decodeUncached(header: string): GuardRule {
             return {
                 deny,
                 requireLogin: obj.l === true,
-                loginUrl: normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
+                loginUrl:
+                    normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
                 loginAllowLists: parsePrincipalLists(obj.n),
                 loginDeny: parseGrants(obj.y),
                 browserIntegrity: obj.b === true,
                 sqlInjectionProtection: obj.s === true || legacy,
                 xssProtection: obj.x === true || legacy,
                 emailObfuscation: obj.e === true,
+                challenge: obj.c === true,
                 presets,
                 rules: parseRules(obj.r),
                 managedRules: expandWafPresets(presets)
@@ -297,7 +319,11 @@ function parseGrants(value: unknown): WafPrincipalGrant[] {
         if (!entry || typeof entry !== "object") continue;
         const { r, f, u } = entry as { r?: unknown; f?: unknown; u?: unknown };
         if (typeof r !== "string" || r.length === 0) continue;
-        if ((f !== undefined && typeof f !== "number") || (u !== undefined && typeof u !== "number")) continue;
+        if (
+            (f !== undefined && typeof f !== "number") ||
+            (u !== undefined && typeof u !== "number")
+        )
+            continue;
         grants.push({ ref: r, from: f as number | undefined, until: u as number | undefined });
     }
     return grants;
@@ -374,7 +400,9 @@ export function verifyEdgeOrigin(value: string | undefined | null, secret: strin
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);
     const provided = Buffer.from(value.slice(dot + 1));
-    const expected = Buffer.from(createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url"));
+    const expected = Buffer.from(
+        createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url")
+    );
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
     try {
         const origin = Buffer.from(payload, "base64url").toString("utf8");
@@ -486,7 +514,10 @@ export function signEdgeToken(token: EdgeToken, secret: string): string {
  *
  * A token with no `iat` cannot be compared, so a known change supersedes it.
  */
-export function principalsSuperseded(token: { readonly iat?: number }, movedAt: number | null): boolean {
+export function principalsSuperseded(
+    token: { readonly iat?: number },
+    movedAt: number | null
+): boolean {
     if (movedAt === null) return false;
     return token.iat === undefined || movedAt > token.iat * 1000;
 }
@@ -524,12 +555,20 @@ export function verifyEdgeToken(
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);
     const provided = Buffer.from(value.slice(dot + 1));
-    const expected = Buffer.from(createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url"));
+    const expected = Buffer.from(
+        createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url")
+    );
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
     try {
         const raw: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown; iat?: unknown; prn?: unknown };
+            const obj = raw as {
+                sub?: unknown;
+                aud?: unknown;
+                exp?: unknown;
+                iat?: unknown;
+                prn?: unknown;
+            };
             if (
                 typeof obj.sub === "string" &&
                 typeof obj.aud === "string" &&
@@ -550,4 +589,131 @@ export function verifyEdgeToken(
         // Fall through to null (invalid payload).
     }
     return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The browser challenge                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** The cookie a solved challenge is kept in, on the app's own domain. */
+export const EDGE_PASS_COOKIE = "polaris.pass";
+
+/**
+ * How much work a visitor's browser does before it is let through: the number of
+ * leading zero bits the hash of the puzzle and its answer must have.
+ *
+ * Sixteen is about 65 thousand hashes, which a phone does in well under a second and
+ * which makes every request from a script that does not run the page cost the same.
+ * The point is not that the work is expensive for one visitor, it is that it cannot be
+ * skipped - a flood of plain HTTP requests carries no pass and gets nothing but the
+ * page back.
+ */
+export const EDGE_CHALLENGE_BITS = 16;
+
+/** How long a pass lasts before the visitor is asked again. */
+export const EDGE_PASS_TTL_SECONDS = 30 * 60;
+
+/** What a puzzle carries, signed: the host and address it is for, when it was issued,
+ *  how hard it is, and a random nonce so no two are alike. */
+interface ChallengePayload {
+    readonly h: string;
+    readonly a: string;
+    readonly i: number;
+    readonly b: number;
+    readonly n: string;
+}
+
+/**
+ * Issue a puzzle for one visitor to one host.
+ *
+ * Bound to the address the firewall judged as well as to the host, so a pass solved
+ * once cannot be handed round a botnet: every address has to do its own work. A
+ * visitor whose address changes is simply asked again. Signed, so the difficulty and
+ * the binding are the guard's and not the visitor's to choose.
+ */
+export function issueEdgeChallenge(
+    input: { host: string; ip: string | null; now: number; nonce: string; bits?: number },
+    secret: string
+): string {
+    const payload: ChallengePayload = {
+        h: input.host.toLowerCase(),
+        a: input.ip ?? "",
+        i: input.now,
+        b: input.bits ?? EDGE_CHALLENGE_BITS,
+        n: input.nonce
+    };
+    const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+    return `${body}.${createHmac("sha256", secret).update(`challenge:${body}`).digest("base64url")}`;
+}
+
+/** Leading zero bits of a hash, stopping at the first set bit. */
+function leadingZeroBits(digest: Buffer): number {
+    let bits = 0;
+    for (const byte of digest) {
+        if (byte === 0) {
+            bits += 8;
+            continue;
+        }
+        return bits + Math.clz32(byte) - 24;
+    }
+    return bits;
+}
+
+/**
+ * Whether `counter` answers `challenge` at `bits` of difficulty: SHA-256 of
+ * `<challenge>:<counter>` starts with that many zero bits. The page computes exactly
+ * this, so the two must never drift - which is why the tests run the page's own
+ * solver against this check.
+ */
+export function edgeChallengeAnswered(challenge: string, counter: string, bits: number): boolean {
+    if (!/^\d{1,12}$/.test(counter)) return false;
+    return leadingZeroBits(createHash("sha256").update(`${challenge}:${counter}`).digest()) >= bits;
+}
+
+/**
+ * Whether a pass cookie lets this request through.
+ *
+ * The cookie is the puzzle the guard issued followed by the visitor's answer. Checked
+ * in the cheapest order - shape, signature, binding, age - and the hash last, because
+ * a forged or stale cookie should cost the guard nothing. An empty secret is refused
+ * outright, like every other signed value here.
+ */
+export function verifyEdgePass(
+    value: string | undefined | null,
+    secret: string,
+    now: number,
+    host: string | undefined,
+    ip: string | null
+): boolean {
+    if (!value || !secret || !host) return false;
+    const cut = value.lastIndexOf(".");
+    if (cut <= 0) return false;
+    const challenge = value.slice(0, cut);
+    const counter = value.slice(cut + 1);
+    const dot = challenge.indexOf(".");
+    if (dot <= 0 || dot === challenge.length - 1) return false;
+    const body = challenge.slice(0, dot);
+    const provided = Buffer.from(challenge.slice(dot + 1));
+    const expected = Buffer.from(
+        createHmac("sha256", secret).update(`challenge:${body}`).digest("base64url")
+    );
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return false;
+    let payload: Partial<ChallengePayload>;
+    try {
+        payload = JSON.parse(
+            Buffer.from(body, "base64url").toString("utf8")
+        ) as Partial<ChallengePayload>;
+    } catch {
+        return false;
+    }
+    if (typeof payload.h !== "string" || payload.h !== host.toLowerCase()) return false;
+    if (typeof payload.a !== "string" || payload.a !== (ip ?? "")) return false;
+    if (
+        typeof payload.i !== "number" ||
+        payload.i > now ||
+        now - payload.i >= EDGE_PASS_TTL_SECONDS
+    )
+        return false;
+    if (typeof payload.b !== "number" || payload.b < 1 || payload.b > 32) return false;
+    return edgeChallengeAnswered(challenge, counter, payload.b);
 }

@@ -63,12 +63,21 @@ export interface EdgePageInput {
     readonly facts: readonly EdgePageFact[];
     /** The last footer item, which carries no value of its own. */
     readonly note: string;
+    /** A script the page runs, allowed by the nonce in the response's own CSP. Only
+     *  the challenge page has one; every other edge page is inert markup. */
+    readonly script?: { readonly nonce: string; readonly source: string };
+    /** Reload the page by itself after this many seconds - for a page that is only
+     *  there while something the visitor is waiting for gets ready. */
+    readonly refreshSeconds?: number;
 }
 
 /** Render one edge page. */
 export function edgePage(input: EdgePageInput): string {
     const sections = input.sections
-        .map((section) => `<section>\n<h2>${section.heading}</h2>\n<p>${section.body}</p>\n</section>`)
+        .map(
+            (section) =>
+                `<section>\n<h2>${section.heading}</h2>\n<p>${section.body}</p>\n</section>`
+        )
         .join("\n");
     const facts = input.facts
         .filter((fact) => fact.value !== "")
@@ -79,7 +88,12 @@ export function edgePage(input: EdgePageInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
+<meta name="robots" content="noindex, nofollow">${
+        input.refreshSeconds
+            ? `
+<meta http-equiv="refresh" content="${Math.round(input.refreshSeconds)}">`
+            : ""
+    }
 <title>${input.title}</title>
 <style>
 :root {
@@ -164,7 +178,7 @@ ${facts}
 <span>${input.note}</span>
 </footer>
 </main>
-</body>
+${input.script ? `<script nonce="${input.script.nonce}">${input.script.source}</script>\n` : ""}</body>
 </html>
 `;
 }

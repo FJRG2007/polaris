@@ -13,7 +13,12 @@ import {
 const NOW = 1_800_000_000;
 const SECRET = "test-secret-at-least-16-chars";
 const HOST = "app.example.com";
-const cfg: GuardConfig = { secret: SECRET, authorizeUrl: "https://polaris", cookieName: "polaris.edge", now: NOW };
+const cfg: GuardConfig = {
+    secret: SECRET,
+    authorizeUrl: "https://polaris",
+    cookieName: "polaris.edge",
+    now: NOW
+};
 
 /** A Cookie header carrying a signed edge token bound to `aud`, expiring at `exp`. */
 function tokenCookie(sub: string, aud: string, exp: number): string {
@@ -36,7 +41,11 @@ describe("evaluate - denylist", () => {
     });
 
     it("blocks an exact deny IP", () => {
-        const wafHeader = encodeGuardRule({ deny: ["203.0.113.5"], requireLogin: false, rules: [] });
+        const wafHeader = encodeGuardRule({
+            deny: ["203.0.113.5"],
+            requireLogin: false,
+            rules: []
+        });
         expect(evaluate({ wafHeader, forwardedFor: "203.0.113.5" }, cfg).status).toBe(403);
     });
 
@@ -54,7 +63,10 @@ describe("evaluate - denylist", () => {
 describe("evaluate - require login", () => {
     it("redirects to login when no token is present", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
-        const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: "/dash" }, cfg);
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: "/dash" },
+            cfg
+        );
         expect(decision.status).toBe(302);
         expect(decision).toMatchObject({
             location: "https://polaris/edge/authorize?redirect=https%3A%2F%2Fapp.example.com%2Fdash"
@@ -82,7 +94,10 @@ describe("evaluate - require login", () => {
     it("redirects when the token signature is forged", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
         const forged = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW + 3600 }, "wrong-secret");
-        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: `polaris.edge=${forged}` }, cfg).status).toBe(302);
+        expect(
+            evaluate({ wafHeader, forwardedHost: HOST, cookie: `polaris.edge=${forged}` }, cfg)
+                .status
+        ).toBe(302);
     });
 
     it("fails closed when the host is unknown", () => {
@@ -98,7 +113,10 @@ describe("evaluate - require login", () => {
     it("blocks a denied IP even when it carries a valid login token", () => {
         const wafHeader = encodeGuardRule({ deny: ["10.0.0.0/8"], requireLogin: true, rules: [] });
         const cookie = tokenCookie("user-1", HOST, NOW + 3600);
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedFor: "10.9.9.9", cookie }, cfg).status).toBe(403);
+        expect(
+            evaluate({ wafHeader, forwardedHost: HOST, forwardedFor: "10.9.9.9", cookie }, cfg)
+                .status
+        ).toBe(403);
     });
 
     it("sends the visitor to the address the rule carries, not the one in its environment", () => {
@@ -116,14 +134,17 @@ describe("evaluate - require login", () => {
             { ...cfg, authorizeUrl: "http://polaris.local" }
         );
         expect(decision).toMatchObject({
-            location: "https://polaris.example.com/edge/authorize?redirect=https%3A%2F%2Fapp.example.com%2Fdash"
+            location:
+                "https://polaris.example.com/edge/authorize?redirect=https%3A%2F%2Fapp.example.com%2Fdash"
         });
     });
 
     it("falls back to the environment for a rule written before it carried an address", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
         const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST }, cfg);
-        expect(decision).toMatchObject({ location: expect.stringContaining("https://polaris/edge/authorize") });
+        expect(decision).toMatchObject({
+            location: expect.stringContaining("https://polaris/edge/authorize")
+        });
     });
 });
 
@@ -152,19 +173,25 @@ describe("evaluate - who the login admits", () => {
      *  because signEdgeToken always writes the key now - which is what makes its
      *  absence a reliable signal rather than a guess. */
     function legacyCookie(sub: string): string {
-        const payload = Buffer.from(JSON.stringify({ sub, aud: HOST, exp: NOW + 3600 })).toString("base64url");
+        const payload = Buffer.from(JSON.stringify({ sub, aud: HOST, exp: NOW + 3600 })).toString(
+            "base64url"
+        );
         const sig = createHmac("sha256", SECRET).update(`edge:${payload}`).digest("base64url");
         return `polaris.edge=${payload}.${sig}`;
     }
 
     it("admits any signed-in account when no scope named anyone", () => {
         const cookie = memberCookie("user-1", ["user:user-1"]);
-        expect(evaluate({ wafHeader: narrowed(), forwardedHost: HOST, cookie }, cfg)).toEqual({ status: 200 });
+        expect(evaluate({ wafHeader: narrowed(), forwardedHost: HOST, cookie }, cfg)).toEqual({
+            status: 200
+        });
     });
 
     it("admits a visitor whose group is named", () => {
         const cookie = memberCookie("user-1", ["user:user-1", "group:ops"]);
-        expect(evaluate({ wafHeader: narrowed(["group:ops"]), forwardedHost: HOST, cookie }, cfg)).toEqual({
+        expect(
+            evaluate({ wafHeader: narrowed(["group:ops"]), forwardedHost: HOST, cookie }, cfg)
+        ).toEqual({
             status: 200
         });
     });
@@ -172,7 +199,9 @@ describe("evaluate - who the login admits", () => {
     it("admits a visitor named by id even when their token proves no membership", () => {
         // `user:<sub>` is carried by the signature over `sub`, not by the list.
         const cookie = memberCookie("user-1", []);
-        expect(evaluate({ wafHeader: narrowed(["user:user-1"]), forwardedHost: HOST, cookie }, cfg)).toEqual({
+        expect(
+            evaluate({ wafHeader: narrowed(["user:user-1"]), forwardedHost: HOST, cookie }, cfg)
+        ).toEqual({
             status: 200
         });
     });
@@ -181,7 +210,10 @@ describe("evaluate - who the login admits", () => {
         // A redirect here is what a loop is made of: Polaris has already decided this
         // account may come, from a rule its edge has not caught up with yet.
         const cookie = memberCookie("user-1", ["user:user-1", "group:sales"]);
-        const decision = evaluate({ wafHeader: narrowed(["group:ops"]), forwardedHost: HOST, cookie }, cfg);
+        const decision = evaluate(
+            { wafHeader: narrowed(["group:ops"]), forwardedHost: HOST, cookie },
+            cfg
+        );
         expect(decision).toEqual({ status: 403, reason: "not admitted by this scope" });
     });
 
@@ -211,7 +243,9 @@ describe("evaluate - who the login admits", () => {
     });
 
     it("still sends a visitor with no token at all to the login", () => {
-        expect(evaluate({ wafHeader: narrowed(["group:ops"]), forwardedHost: HOST }, cfg).status).toBe(302);
+        expect(
+            evaluate({ wafHeader: narrowed(["group:ops"]), forwardedHost: HOST }, cfg).status
+        ).toBe(302);
     });
 
     it("refuses a denied principal on a route that admits everyone else", () => {
@@ -224,7 +258,14 @@ describe("evaluate - who the login admits", () => {
         // Everybody else on the same route is unaffected.
         const other = memberCookie("user-2", ["user:user-2"]);
         expect(
-            evaluate({ wafHeader: refusing({ ref: "group:contractors" }), forwardedHost: HOST, cookie: other }, cfg)
+            evaluate(
+                {
+                    wafHeader: refusing({ ref: "group:contractors" }),
+                    forwardedHost: HOST,
+                    cookie: other
+                },
+                cfg
+            )
         ).toEqual({ status: 200 });
     });
 
@@ -251,20 +292,26 @@ describe("evaluate - who the login admits", () => {
         });
         const cookie = memberCookie("user-1", ["user:user-1", "group:ops"]);
         expect(evaluate({ wafHeader, forwardedHost: HOST, cookie }, cfg)).toEqual({ status: 200 });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie }, { ...cfg, now: NOW + 60 }).status).toBe(403);
+        expect(
+            evaluate({ wafHeader, forwardedHost: HOST, cookie }, { ...cfg, now: NOW + 60 }).status
+        ).toBe(403);
     });
 
     it("holds a scheduled refusal until it starts", () => {
         const wafHeader = refusing({ ref: "group:ops", from: NOW + 60 });
         const cookie = memberCookie("user-1", ["user:user-1", "group:ops"]);
         expect(evaluate({ wafHeader, forwardedHost: HOST, cookie }, cfg)).toEqual({ status: 200 });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie }, { ...cfg, now: NOW + 60 }).status).toBe(403);
+        expect(
+            evaluate({ wafHeader, forwardedHost: HOST, cookie }, { ...cfg, now: NOW + 60 }).status
+        ).toBe(403);
     });
 });
 
 describe("evaluate - custom rules", () => {
     /** A rule set on the wire, as the router encodes one. */
-    function rules(...entries: { name: string; action: "block" | "allow"; conditions: unknown[] }[]): string {
+    function rules(
+        ...entries: { name: string; action: "block" | "allow"; conditions: unknown[] }[]
+    ): string {
         return encodeGuardRule({ deny: [], requireLogin: false, rules: entries as never });
     }
 
@@ -274,7 +321,10 @@ describe("evaluate - custom rules", () => {
             action: "block",
             conditions: [{ field: "path", operator: "starts_with", values: ["/wp-admin"] }]
         });
-        const decision = evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/wp-admin/x.php" }, cfg);
+        const decision = evaluate(
+            { wafHeader, forwardedHost: HOST, forwardedUri: "/wp-admin/x.php" },
+            cfg
+        );
         expect(decision).toEqual({ status: 403, reason: "rule: no wp-admin" });
     });
 
@@ -284,7 +334,9 @@ describe("evaluate - custom rules", () => {
             action: "block",
             conditions: [{ field: "path", operator: "starts_with", values: ["/wp-admin"] }]
         });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/" }, cfg)).toEqual({ status: 200 });
+        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/" }, cfg)).toEqual({
+            status: 200
+        });
     });
 
     it("reads the method Traefik forwarded, not the guard's own", () => {
@@ -293,8 +345,12 @@ describe("evaluate - custom rules", () => {
             action: "block",
             conditions: [{ field: "method", operator: "equals", values: ["POST"] }]
         });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedMethod: "POST" }, cfg).status).toBe(403);
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedMethod: "GET" }, cfg).status).toBe(200);
+        expect(
+            evaluate({ wafHeader, forwardedHost: HOST, forwardedMethod: "POST" }, cfg).status
+        ).toBe(403);
+        expect(
+            evaluate({ wafHeader, forwardedHost: HOST, forwardedMethod: "GET" }, cfg).status
+        ).toBe(200);
     });
 
     it("admits a request an allow rule matches without sending it round the login", () => {
@@ -312,8 +368,12 @@ describe("evaluate - custom rules", () => {
                 }
             ]
         });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/healthz" }, cfg)).toEqual({ status: 200 });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/" }, cfg).status).toBe(302);
+        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/healthz" }, cfg)).toEqual(
+            { status: 200 }
+        );
+        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedUri: "/" }, cfg).status).toBe(
+            302
+        );
     });
 
     it("blocks a denied address before any rule can allow it", () => {
@@ -329,7 +389,12 @@ describe("evaluate - custom rules", () => {
                 }
             ]
         });
-        expect(evaluate({ wafHeader, forwardedHost: HOST, forwardedFor: "10.1.2.3", forwardedUri: "/" }, cfg).status).toBe(403);
+        expect(
+            evaluate(
+                { wafHeader, forwardedHost: HOST, forwardedFor: "10.1.2.3", forwardedUri: "/" },
+                cfg
+            ).status
+        ).toBe(403);
     });
 });
 
@@ -338,7 +403,10 @@ describe("evaluate - login callback", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
         const token = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW + 3600 }, SECRET);
         const uri = `/edge/callback?token=${token}&redirect=${encodeURIComponent(`https://${HOST}/dash`)}`;
-        const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri }, cfg);
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri },
+            cfg
+        );
         expect(decision.status).toBe(302);
         expect(decision).toMatchObject({ location: `https://${HOST}/dash` });
         expect((decision as { setCookie?: string }).setCookie).toContain(`polaris.edge=${token}`);
@@ -349,7 +417,10 @@ describe("evaluate - login callback", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
         const token = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW + 3600 }, SECRET);
         const uri = `/edge/callback?token=${token}&redirect=${encodeURIComponent("https://evil.example.com/")}`;
-        const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri }, cfg);
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri },
+            cfg
+        );
         expect(decision).toMatchObject({ status: 302, location: `https://${HOST}/` });
     });
 
@@ -357,16 +428,50 @@ describe("evaluate - login callback", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
         const token = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW + 3600 }, SECRET);
         const uri = `/edge/callback?token=${token}&redirect=${encodeURIComponent(`http://${HOST}/`)}`;
-        const decision = evaluate({ wafHeader, forwardedProto: "http", forwardedHost: HOST, forwardedUri: uri }, cfg);
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "http", forwardedHost: HOST, forwardedUri: uri },
+            cfg
+        );
         expect((decision as { setCookie?: string }).setCookie).not.toContain("Secure");
     });
 
     it("redirects to login when the callback token is invalid", () => {
         const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
         const uri = `/edge/callback?token=bogus&redirect=${encodeURIComponent(`https://${HOST}/`)}`;
-        const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri }, cfg);
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri },
+            cfg
+        );
         expect(decision.status).toBe(302);
         expect(decision).toMatchObject({ location: expect.stringContaining("/edge/authorize") });
+    });
+
+    it("sends a stale callback round the login to where it was headed, not back to itself", () => {
+        // A callback replayed the next day carries a token that expired overnight. If
+        // its own URL became the return trip, Polaris would mint a fresh token only to
+        // land on the stale one again, forever.
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
+        const stale = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW - 60 }, SECRET);
+        const uri = `/edge/callback?token=${stale}&redirect=${encodeURIComponent(`https://${HOST}/dash`)}`;
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri },
+            cfg
+        );
+        const location = new URL((decision as { location: string }).location);
+        expect(location.pathname).toBe("/edge/authorize");
+        expect(location.searchParams.get("redirect")).toBe(`https://${HOST}/dash`);
+    });
+
+    it("never returns a visitor to the callback, whichever token carries them there", () => {
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
+        const fresh = signEdgeToken({ sub: "user-1", aud: HOST, exp: NOW + 3600 }, SECRET);
+        const nested = `https://${HOST}/edge/callback?token=old&redirect=${encodeURIComponent(`https://${HOST}/dash`)}`;
+        const uri = `/edge/callback?token=${fresh}&redirect=${encodeURIComponent(nested)}`;
+        const decision = evaluate(
+            { wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri },
+            cfg
+        );
+        expect(decision).toMatchObject({ status: 302, location: `https://${HOST}/` });
     });
 });
 
@@ -378,20 +483,28 @@ describe("evaluate - address intelligence", () => {
     });
 
     it("blocks a banned address with no rule of any kind attached", () => {
-        const decision = evaluate({ forwardedFor: "203.0.113.7" }, withIntel([["203.0.113.7", ban]]));
+        const decision = evaluate(
+            { forwardedFor: "203.0.113.7" },
+            withIntel([["203.0.113.7", ban]])
+        );
         expect(decision.status).toBe(403);
         expect(decision).toMatchObject({ reason: expect.stringContaining("404 flood") });
     });
 
     it("lets everyone else through", () => {
-        expect(evaluate({ forwardedFor: "203.0.113.8" }, withIntel([["203.0.113.7", ban]]))).toEqual({
+        expect(
+            evaluate({ forwardedFor: "203.0.113.8" }, withIntel([["203.0.113.7", ban]]))
+        ).toEqual({
             status: 200
         });
     });
 
     it("blocks a Tor exit and says so", () => {
         const tor: WafIntelEntry = { reason: "tor", until: null };
-        const decision = evaluate({ forwardedFor: "198.51.100.4" }, withIntel([["198.51.100.4", tor]]));
+        const decision = evaluate(
+            { forwardedFor: "198.51.100.4" },
+            withIntel([["198.51.100.4", tor]])
+        );
         expect(decision).toMatchObject({ status: 403, reason: "intel: tor" });
     });
 
@@ -531,7 +644,8 @@ describe("injection protection", () => {
 
     it("blocks a payload in the path and an encoded one", () => {
         expect(
-            evaluate({ wafHeader: armed(), forwardedHost: HOST, forwardedUri: "/p/<script>" }, cfg).status
+            evaluate({ wafHeader: armed(), forwardedHost: HOST, forwardedUri: "/p/<script>" }, cfg)
+                .status
         ).toBe(403);
         expect(
             evaluate(
@@ -587,7 +701,12 @@ describe("injection protection", () => {
         // The same client, still refused by the rule below the skip.
         expect(
             evaluate(
-                { wafHeader: header, forwardedHost: HOST, forwardedUri: "/admin", userAgent: "PolarisSDK/1.0" },
+                {
+                    wafHeader: header,
+                    forwardedHost: HOST,
+                    forwardedUri: "/admin",
+                    userAgent: "PolarisSDK/1.0"
+                },
                 cfg
             )
         ).toEqual({ status: 403, reason: "rule: not the admin path" });
@@ -621,7 +740,12 @@ describe("injection protection", () => {
             presets: ["scanners"],
             rules: [skip]
         });
-        const ours = { wafHeader: header, forwardedHost: HOST, userAgent: "nikto/2.5", forwardedFor: "203.0.113.7" };
+        const ours = {
+            wafHeader: header,
+            forwardedHost: HOST,
+            userAgent: "nikto/2.5",
+            forwardedFor: "203.0.113.7"
+        };
 
         // The pack would refuse this user agent; the skip steps over the pack.
         expect(evaluate({ ...ours, forwardedUri: "/" }, cfg).status).toBe(200);
@@ -669,16 +793,28 @@ describe("injection protection", () => {
         });
 
         expect(
-            evaluate({ wafHeader: sqlOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" }, cfg).status
+            evaluate(
+                { wafHeader: sqlOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" },
+                cfg
+            ).status
         ).toBe(403);
         expect(
-            evaluate({ wafHeader: sqlOnly, forwardedHost: HOST, forwardedUri: "/p?q=<script>" }, cfg).status
+            evaluate(
+                { wafHeader: sqlOnly, forwardedHost: HOST, forwardedUri: "/p?q=<script>" },
+                cfg
+            ).status
         ).toBe(200);
         expect(
-            evaluate({ wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?q=<script>" }, cfg).status
+            evaluate(
+                { wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?q=<script>" },
+                cfg
+            ).status
         ).toBe(403);
         expect(
-            evaluate({ wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" }, cfg).status
+            evaluate(
+                { wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" },
+                cfg
+            ).status
         ).toBe(200);
     });
 });
@@ -687,7 +823,10 @@ describe("evaluate - an account Polaris re-decided", () => {
     /** A guard holding a snapshot that says these accounts moved at these times (ms). */
     function withMoved(moved: Record<string, number>): GuardConfig {
         const entries: [string, WafIntelEntry][] = [];
-        return { ...cfg, intel: indexWafIntel(buildWafIntel(entries, NOW * 1000, Object.entries(moved))) };
+        return {
+            ...cfg,
+            intel: indexWafIntel(buildWafIntel(entries, NOW * 1000, Object.entries(moved)))
+        };
     }
 
     /** A token minted at `iat`, carrying membership. */
@@ -739,7 +878,9 @@ describe("evaluate - an account Polaris re-decided", () => {
         // The age backstop must not reach here: a token good for eight hours would
         // otherwise bounce every half hour, mid-request, on every protected route.
         const old = cookieAt("user-1", NOW - 40 * 60, ["user:user-1"]);
-        expect(evaluate({ wafHeader: plain, forwardedHost: HOST, cookie: old }, cfg)).toEqual({ status: 200 });
+        expect(evaluate({ wafHeader: plain, forwardedHost: HOST, cookie: old }, cfg)).toEqual({
+            status: 200
+        });
     });
 
     it("re-mints an aged membership claim where the rule decides by it", () => {
@@ -753,7 +894,9 @@ describe("evaluate - an account Polaris re-decided", () => {
         });
         const fresh = cookieAt("user-1", NOW - 60, ["user:user-1", "group:ops"]);
         const aged = cookieAt("user-1", NOW - 40 * 60, ["user:user-1", "group:ops"]);
-        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: fresh }, cfg)).toEqual({ status: 200 });
+        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: fresh }, cfg)).toEqual({
+            status: 200
+        });
         expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: aged }, cfg).status).toBe(302);
     });
 });

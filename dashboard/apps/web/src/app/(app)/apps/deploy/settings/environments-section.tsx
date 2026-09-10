@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Environments: rename them, choose which one a bare link lands on, and remove
- * the ones that are finished with.
+ * Environments: rename them, choose which one a bare link lands on, choose which
+ * of their services can reach each other, and remove the ones that are finished
+ * with.
  *
  * The default environment cannot be deleted, because something has to answer
  * when a link names no environment - so the way to remove it is to promote
@@ -13,6 +14,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SettingsCard } from "../project-settings";
+import { NetworkingCard } from "./networking-card";
 import { deleteEnvironmentAction } from "../actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Input } from "@polaris/ui";
@@ -107,7 +109,8 @@ export function EnvironmentsSection({
                                             value={draft}
                                             onChange={(event) => setDraft(event.target.value)}
                                             onKeyDown={(event) => {
-                                                if (event.key === "Enter") commitRename(environment);
+                                                if (event.key === "Enter")
+                                                    commitRename(environment);
                                                 if (event.key === "Escape") setRenaming(null);
                                             }}
                                             className="h-8 max-w-56"
@@ -141,10 +144,33 @@ export function EnvironmentsSection({
                                                     Default
                                                 </span>
                                             )}
+                                            {environment.pullRequest !== null &&
+                                                environment.previewRepo && (
+                                                    <a
+                                                        href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        title="Open the pull request this previews"
+                                                        className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        Preview of #{environment.pullRequest}
+                                                    </a>
+                                                )}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {environment.serviceCount}{" "}
-                                            {environment.serviceCount === 1 ? "service" : "services"} - created{" "}
+                                            {environment.serviceCount === 1
+                                                ? "service"
+                                                : "services"}
+                                            {environment.branch ? (
+                                                <>
+                                                    {" - follows "}
+                                                    <span className="font-mono">
+                                                        {environment.branch}
+                                                    </span>
+                                                </>
+                                            ) : null}
+                                            {" - created "}
                                             {display.date(environment.createdAt)}
                                         </p>
                                     </div>
@@ -168,9 +194,15 @@ export function EnvironmentsSection({
                                         disabled={environment.isDefault || pending}
                                         onClick={() => makeDefault(environment)}
                                         aria-label={`Make ${environment.name} the default`}
-                                        title={environment.isDefault ? "Already the default" : "Make default"}
+                                        title={
+                                            environment.isDefault
+                                                ? "Already the default"
+                                                : "Make default"
+                                        }
                                     >
-                                        <Star className={`size-4 ${environment.isDefault ? "fill-current" : ""}`} />
+                                        <Star
+                                            className={`size-4 ${environment.isDefault ? "fill-current" : ""}`}
+                                        />
                                     </Button>
                                     <Button
                                         variant="ghost"
@@ -201,7 +233,14 @@ export function EnvironmentsSection({
                 )}
             </SettingsCard>
 
-            <NewEnvironmentDialog projectId={settings.id} open={creating} onOpenChange={setCreating} />
+            <NetworkingCard settings={settings} canManage={canManage} />
+
+            <NewEnvironmentDialog
+                projectId={settings.id}
+                open={creating}
+                onOpenChange={setCreating}
+                environments={settings.environments}
+            />
 
             <ConfirmDeleteDialog
                 open={deleting !== null}

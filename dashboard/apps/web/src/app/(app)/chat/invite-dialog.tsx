@@ -199,7 +199,7 @@ export function InviteDialog({
                                                 current.filter((entry) => entry.id !== invite.id)
                                             );
                                         }}
-                                        className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                        className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                                     >
                                         <X className="size-3.5" />
                                     </button>

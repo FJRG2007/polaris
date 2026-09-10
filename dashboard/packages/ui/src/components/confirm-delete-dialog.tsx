@@ -112,21 +112,23 @@ export function ConfirmDeleteDialog({
                     {children}
 
                     {blocked ? (
-                        <p className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-muted-foreground">
+                        <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-sm text-muted-foreground">
                             {blockedReason}
                         </p>
                     ) : !requireTyping ? (
                         <p className="text-sm text-muted-foreground">
                             {question ?? (
                                 <>
-                                    Delete <span className="font-medium text-foreground">{name}</span>?
+                                    Delete{" "}
+                                    <span className="font-medium text-foreground">{name}</span>?
                                 </>
                             )}
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1.5" htmlFor={fieldId}>
                             <span className="text-xs text-muted-foreground">
-                                Type <span className="font-medium text-foreground">{name}</span> to confirm.
+                                Type <span className="font-medium text-foreground">{name}</span> to
+                                confirm.
                             </span>
                             <Input
                                 id={fieldId}
@@ -137,7 +139,7 @@ export function ConfirmDeleteDialog({
                                 onChange={(event) => setTyped(event.target.value)}
                                 onKeyDown={(event) => event.key === "Enter" && ready && onConfirm()}
                                 placeholder={name}
-                                className={cn(typed.length > 0 && !matches && "border-danger/50")}
+                                className={cn(typed.length > 0 && !matches && "border-danger")}
                             />
                         </label>
                     )}
@@ -145,7 +147,11 @@ export function ConfirmDeleteDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             Cancel
                         </Button>
                         <Button variant="danger" onClick={onConfirm} disabled={!ready}>

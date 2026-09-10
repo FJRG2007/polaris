@@ -16,6 +16,7 @@ export const RESOURCE_KINDS = [
     "managed-database",
     "minecraft-world",
     "deploy-volume",
+    "mail-server",
     "nas-path"
 ] as const;
 
@@ -81,6 +82,15 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
         kind: "deploy-volume",
         label: "Service data",
         summary: "A volume one of your services keeps its data in.",
+        canRestore: true,
+        supportsSourceLocal: false,
+        discoverable: true
+    },
+    "mail-server": {
+        kind: "mail-server",
+        label: "Mail server",
+        summary:
+            "A mail server's mailboxes, queue and keys, exported with the engine stopped so the copy is whole.",
         canRestore: true,
         supportsSourceLocal: false,
         discoverable: true

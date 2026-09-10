@@ -37,7 +37,8 @@ export function ProjectSettings({
     isOwner: boolean;
 }) {
     const base = `/apps/deploy/${settings.id}/settings`;
-    const current = SETTINGS_SECTIONS.find((entry) => entry.slug === section) ?? SETTINGS_SECTIONS[0]!;
+    const current =
+        SETTINGS_SECTIONS.find((entry) => entry.slug === section) ?? SETTINGS_SECTIONS[0]!;
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -45,7 +46,10 @@ export function ProjectSettings({
 
             <div className="flex flex-col gap-5 md:flex-row md:gap-6">
                 <nav className="md:w-48 md:shrink-0">
-                    <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+                    <ScrollRow
+                        as="ul"
+                        className="-mx-1 flex gap-1 px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0"
+                    >
                         {SETTINGS_SECTIONS.map((entry) => {
                             const href = entry.slug === "general" ? base : `${base}/${entry.slug}`;
                             const active = entry.slug === current.slug;
@@ -74,19 +78,33 @@ export function ProjectSettings({
                 </nav>
 
                 <div className="min-w-0 flex-1">
-                    {current.slug === "general" && <GeneralSection settings={settings} canManage={canManage} />}
+                    {current.slug === "general" && (
+                        <GeneralSection settings={settings} canManage={canManage} />
+                    )}
                     {current.slug === "usage" && <UsageSection projectId={settings.id} />}
                     {current.slug === "environments" && (
                         <EnvironmentsSection settings={settings} canManage={canManage} />
                     )}
-                    {current.slug === "variables" && <SharedVariablesSection settings={settings} canManage={canManage} />}
+                    {current.slug === "variables" && (
+                        <SharedVariablesSection settings={settings} canManage={canManage} />
+                    )}
                     {current.slug === "webhooks" && <WebhooksSection projectId={settings.id} />}
-                    {current.slug === "flags" && <FeatureFlagsSection settings={settings} canManage={canManage} />}
+                    {current.slug === "flags" && (
+                        <FeatureFlagsSection settings={settings} canManage={canManage} />
+                    )}
                     {current.slug === "members" && <MembersSection projectId={settings.id} />}
-                    {current.slug === "tokens" && <TokensSection projectId={settings.id} canManage={canManage} />}
-                    {current.slug === "integrations" && <IntegrationsSection projectId={settings.id} />}
+                    {current.slug === "tokens" && (
+                        <TokensSection projectId={settings.id} canManage={canManage} />
+                    )}
+                    {current.slug === "integrations" && (
+                        <IntegrationsSection projectId={settings.id} />
+                    )}
                     {current.slug === "danger" && (
-                        <DangerSection settings={settings} canManage={canManage} isOwner={isOwner} />
+                        <DangerSection
+                            settings={settings}
+                            canManage={canManage}
+                            isOwner={isOwner}
+                        />
                     )}
                 </div>
             </div>
@@ -110,12 +128,16 @@ export function SettingsCard({
         <section
             className={cn(
                 "flex flex-col gap-3 rounded-lg border p-4",
-                tone === "danger" ? "border-danger/30 bg-danger/5" : "border-border/60"
+                tone === "danger" ? "border-danger-edge bg-danger-soft" : "border-border/60"
             )}
         >
             <div>
-                <h2 className={cn("text-sm font-medium", tone === "danger" && "text-danger")}>{title}</h2>
-                {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+                <h2 className={cn("text-sm font-medium", tone === "danger" && "text-danger")}>
+                    {title}
+                </h2>
+                {description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+                )}
             </div>
             {children}
         </section>

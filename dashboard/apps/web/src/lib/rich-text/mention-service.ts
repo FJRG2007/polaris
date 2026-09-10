@@ -13,9 +13,9 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { blockedBy } from "@/lib/blocks";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
-import { blockedBy } from "@/lib/blocks";
 import { allowedBy } from "@/lib/privacy-service";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { conversationAudience } from "@/lib/chat/access";
@@ -238,8 +238,10 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
             where: { folder: { spaceId: { in: spaceIds } } },
             select: { userId: true }
         }),
+        // A restricted member is on the roster for whoever runs it, and on
+        // nobody else's - so not somebody the rest of it can name either.
         prisma.organizationMember.findMany({
-            where: { orgId: { in: orgIds } },
+            where: { orgId: { in: orgIds }, restricted: false },
             select: { userId: true }
         })
     ]);

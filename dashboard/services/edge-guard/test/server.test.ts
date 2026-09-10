@@ -34,7 +34,7 @@ afterAll(async () => {
 
 /** Ask the guard about one request, as Traefik's forwardAuth would. */
 async function check(headers: Record<string, string>) {
-    return await fetch(`${guardUrl}/authz`, { headers });
+    return await fetch(`${guardUrl}/authz`, { headers, redirect: "manual" });
 }
 
 const DENIED = {
@@ -69,6 +69,21 @@ describe("a blocked request", () => {
         const body = await (await check({ ...DENIED, accept: "text/html" })).text();
 
         expect(body).not.toContain("denied ip");
+    });
+});
+
+describe("the login handoff", () => {
+    it("is never stored, so a tab reopened the next day cannot replay it", async () => {
+        const response = await check({
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "app.example.com",
+            "x-forwarded-uri": "/dash",
+            "x-polaris-waf": encodeGuardRule({ deny: [], requireLogin: true, rules: [] })
+        });
+
+        expect(response.status).toBe(302);
+        expect(response.headers.get("location")).toContain("/edge/authorize");
+        expect(response.headers.get("cache-control")).toBe("no-store");
     });
 });
 

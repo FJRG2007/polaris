@@ -14,9 +14,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
-import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
 import * as staged from "@/lib/deploy-staged-changes";
+import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as projectService from "@/lib/deploy-project-service";
 import {
     deleteVolume,
@@ -34,12 +34,14 @@ import {
 } from "@/lib/deploy-project-access";
 import {
     environmentNameSchema,
+    environmentNetworkModeSchema,
     projectAccessInputSchema,
     projectFlagsSchema,
     projectGeneralSchema,
     projectTokenInputSchema,
     projectVisibilitySchema,
     projectWebhookInputSchema,
+    type EnvironmentNetworkMode,
     type ProjectAccessInput,
     type ProjectCapability,
     type ProjectFlags,
@@ -49,6 +51,13 @@ import {
 } from "@polaris/core";
 
 const DEPLOY_PATH = "/apps/deploy";
+
+/** What a token that may change things can do through the Deploy API. */
+const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = [
+    "deploy.run",
+    "variables.write",
+    "domains.manage"
+];
 
 /** The one shape every action here answers with, so a caller never has to guess
  *  whether a missing `error` means success or a field it forgot to read. */
@@ -116,7 +125,7 @@ export async function updateProjectGeneralAction(input: {
             name: parsed.data.name,
             description: parsed.data.description
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.update",
             targetType: "project",
@@ -137,7 +146,7 @@ export async function setProjectVisibilityAction(input: {
         if (!parsed.success) return { error: "Pick one of the offered visibilities" };
         await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.setProjectVisibility(parsed.data.projectId, parsed.data.visibility);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.visibility",
             targetType: "project",
@@ -201,6 +210,50 @@ export async function setDefaultEnvironmentAction(environmentId: string): Promis
     });
 }
 
+/**
+ * Choose how an environment's services see each other, and optionally deploy it
+ * at once so the choice takes effect now. Changing it needs the settings
+ * capability; deploying everything in it on top needs the deploy one too.
+ */
+export async function setEnvironmentNetworkModeAction(input: {
+    environmentId: string;
+    networkMode: EnvironmentNetworkMode;
+    apply?: boolean;
+}): Promise<Result<{ started: number; failed: string[] }>> {
+    return attempt("Could not change how the services connect", async () => {
+        const user = await requirePermission("deploy.manage");
+        const parsed = environmentNetworkModeSchema.safeParse(input);
+        if (!parsed.success) return { error: "Pick one of the offered options" };
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "project.settings"
+        );
+        if (parsed.data.apply && !accessCan(access, "deploy.run")) {
+            return {
+                error: "You can change this setting, but not deploy the services in this environment."
+            };
+        }
+        const { previous } = await deployService.setEnvironmentNetworkMode(
+            parsed.data.environmentId,
+            access.ownerId,
+            parsed.data.networkMode
+        );
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.env.network",
+            targetType: "environment",
+            targetId: parsed.data.environmentId,
+            metadata: { from: previous, to: parsed.data.networkMode, applied: parsed.data.apply }
+        });
+        refresh(access.projectId);
+        if (!parsed.data.apply) return {};
+        const { deployEnvironment } = await import("@/lib/deploy/environments");
+        const result = await deployEnvironment(parsed.data.environmentId, access.ownerId, user.id);
+        return { started: result.started, failed: result.failed };
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Members
 // ---------------------------------------------------------------------------
@@ -252,7 +305,7 @@ export async function setProjectAccessAction(input: ProjectAccessInput): Promise
                 environmentIds: access.environmentIds
             }
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.member.add",
             targetType: "project",
@@ -284,7 +337,7 @@ export async function removeProjectMemberAction(input: {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "members.manage");
         await projectService.removeProjectMember(input.projectId, input.memberId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.member.remove",
             targetType: "project",
@@ -321,11 +374,21 @@ export async function createProjectTokenAction(
             user.id,
             "project.settings"
         );
+        // A token acts with its minter's access and never more, so one that may
+        // change things is only minted by somebody who can change something here.
+        if (
+            parsed.data.canManage &&
+            !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))
+        ) {
+            return {
+                error: "You cannot deploy, change variables or manage domains in this project, so a token you make could not either. Make a read-only token, or ask the project's owner for one."
+            };
+        }
         const created = await projectService.createProjectToken({
             ...parsed.data,
-            ownerId: access.ownerId
+            minterId: user.id
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.token.create",
             targetType: "project",
@@ -344,7 +407,7 @@ export async function revokeProjectTokenAction(input: {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.revokeProjectToken(input.projectId, input.tokenId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.token.revoke",
             targetType: "project",
@@ -390,7 +453,7 @@ export async function createProjectWebhookAction(input: ProjectWebhookInput): Pr
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
         await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.createProjectWebhook(parsed.data);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.webhook.add",
             targetType: "project",
@@ -498,8 +561,9 @@ export async function stageServiceDeleteAction(input: {
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             await deployService.deleteApplication(input.applicationId, access.ownerId);
-            await recordAudit({
+            await recordDeployAudit({
                 actorId: user.id,
+                orgId: access.orgId ?? undefined,
                 action: "deploy.app.delete",
                 targetType: "application",
                 targetId: input.applicationId
@@ -537,8 +601,9 @@ export async function stageDatabaseDeleteAction(input: {
         if (!(await staged.projectStagesChanges(access.projectId))) {
             const { deleteDatabase } = await import("@/lib/database-service");
             await deleteDatabase(input.databaseId, access.ownerId);
-            await recordAudit({
+            await recordDeployAudit({
                 actorId: user.id,
+                orgId: access.orgId ?? undefined,
                 action: "deploy.db.delete",
                 targetType: "database",
                 targetId: input.databaseId
@@ -650,7 +715,7 @@ export async function applyStagedChangesAction(input: {
         if (access.projectId !== input.projectId)
             return { error: "That environment is not in this project" };
         const result = await staged.applyStagedChanges(input.environmentId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.changeset.apply",
             targetType: "environment",
@@ -723,7 +788,7 @@ export async function wipeVolumeAction(volumeId: string): Promise<Result> {
             "volumes.manage"
         );
         await wipeVolume(volumeId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.volume.wipe",
             targetType: "volume",

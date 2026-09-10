@@ -15,6 +15,7 @@ import { saveDisplayPreferencesAction, saveTextSizeAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { AccessibilityForm } from "@/components/accessibility-form";
 import { DeviceCacheCard } from "@/components/device-cache-card";
+import { InstallAppCard } from "@/components/installed-app";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import {
@@ -60,6 +61,7 @@ export default async function PreferencesPage() {
                 save={saveTextSizeAction}
             />
             <SpoilersCard />
+            <InstallAppCard />
             <DeviceCacheCard />
         </div>
     );

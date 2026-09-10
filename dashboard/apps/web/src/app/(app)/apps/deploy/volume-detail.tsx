@@ -366,6 +366,7 @@ function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
                 <h3 className="mb-1 text-sm font-medium">History</h3>
                 <MetricsHistory
                     endpoint={`/api/deploy/volumes/${volume.id}/metrics/history`}
+                    live={`/api/deploy/volumes/${volume.id}/metrics/stream`}
                     metrics={VOLUME_METRICS}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -528,7 +529,7 @@ function SettingsTab({
 
             {canManage && (
                 <>
-                    <div className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-danger/5 p-3">
+                    <div className="flex flex-col gap-3 rounded-lg border border-danger-edge bg-danger-soft p-3">
                         <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
                             <TriangleAlert className="size-4" /> Danger
                         </p>
@@ -555,7 +556,7 @@ function SettingsTab({
                             </Button>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger/20 pt-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger-edge pt-3">
                             <div className="min-w-0">
                                 <p className="text-sm">Delete volume</p>
                                 <p className="text-xs text-muted-foreground">

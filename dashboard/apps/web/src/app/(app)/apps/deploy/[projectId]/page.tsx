@@ -5,9 +5,10 @@ import { getPublicIp } from "@/lib/domain-service";
 import type { ProjectSummary } from "../deploy-view";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import { refreshCapabilities } from "@polaris/hostd-client";
+import { projectAccess } from "@/lib/deploy-project-access";
+import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
-import { projectAccess } from "@/lib/deploy-project-access";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
 import { getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
 
@@ -89,7 +90,10 @@ export default async function DeployProjectPage({
     const appIds = project.environments.flatMap((environment) =>
         environment.applications.map((app) => app.id)
     );
-    const tunnelDomains = await listActiveTunnelDomains(appIds);
+    const [tunnelDomains, attention] = await Promise.all([
+        listActiveTunnelDomains(appIds),
+        serviceAttention(appIds)
+    ]);
     // A service that keeps its history is served by the release it currently points
     // at, which has a container name and a published port of its own - so the
     // terminal, the file browser and the direct IP:port link all have to follow it.
@@ -135,10 +139,18 @@ export default async function DeployProjectPage({
                 installCommand: storedText(app.buildConfig, "installCommand"),
                 buildCommand: storedText(app.buildConfig, "buildCommand"),
                 startCommand: storedText(app.buildConfig, "startCommand"),
+                runtimeVersion: storedText(app.buildConfig, "runtimeVersion"),
+                outputDirectory: storedText(app.buildConfig, "outputDirectory"),
+                replicas: app.replicas,
                 port: portOf(app.sourceConfig),
-                ipUrl: serverIp
-                    ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}`
-                    : null,
+                // None for a service whose port is kept closed: it has no address of
+                // its own on the machine, only its domains. A kept release is still
+                // reached on its own port, whatever the setting.
+                ipUrl:
+                    serverIp &&
+                    (app.publishPort || (serving.get(app.id)?.portSubject ?? app.id) !== app.id)
+                        ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}`
+                        : null,
                 domains: mergeTunnelDomains(
                     // A per-release hostname belongs to one build, not to the service, so
                     // it is listed on that deployment rather than among the service's own
@@ -156,7 +168,8 @@ export default async function DeployProjectPage({
                             // Whether one was supplied, never the material itself: the
                             // panel only needs to say which certificate is in use.
                             hasCertificate: domain.certPem !== null,
-                            servedBy: domain.servedBy
+                            servedBy: domain.servedBy,
+                            cdn: domain.cdn
                         })),
                     tunnelDomains.get(app.id) ?? []
                 ),
@@ -169,7 +182,8 @@ export default async function DeployProjectPage({
                     connectionId: volume.connectionId,
                     connectionName: volume.connection?.name ?? null,
                     sizeLimit: volume.sizeLimit
-                }))
+                })),
+                attention: attention.get(app.id)
             })),
             databases: environment.databases.map((database) => ({
                 id: database.id,

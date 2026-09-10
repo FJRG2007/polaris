@@ -12,8 +12,8 @@
 
 import { cn } from "@polaris/ui";
 import type { SVGProps } from "react";
-import { Database } from "lucide-react";
-import { dbEngineLabel, type DbEngine } from "@polaris/core";
+import { Archive, Database } from "lucide-react";
+import { dbEngineLabel, isStorageEngine, type DbEngine } from "@polaris/core";
 import { MariaDbMark, MongoDbMark, MySqlMark, PostgresMark, RedisMark } from "./brand-icons";
 
 interface EngineBrand {
@@ -35,11 +35,13 @@ const BRANDS: Partial<Record<DbEngine, EngineBrand>> = {
     redis: { Mark: RedisMark, color: "#FF4438" }
 };
 
-/** The engine's mark on its tinted chip. Falls back to a generic database glyph
- *  for an engine this build does not know, so a row still renders. */
+/** The engine's mark on its tinted chip. An object store is shown as what it is
+ *  to the reader - storage, not a product - and an engine this build does not
+ *  know as a generic database, so a row still renders. */
 export function DbEngineIcon({ engine, className }: { engine: string; className?: string }) {
     const brand = BRANDS[engine as DbEngine];
     if (!brand) {
+        const Glyph = isStorageEngine(engine) ? Archive : Database;
         return (
             <span
                 className={cn(
@@ -47,7 +49,7 @@ export function DbEngineIcon({ engine, className }: { engine: string; className?
                     className ?? "size-7"
                 )}
             >
-                <Database className="size-[55%]" />
+                <Glyph className="size-[55%]" />
             </span>
         );
     }

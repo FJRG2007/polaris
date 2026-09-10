@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { sendWebhook, type WebhookPayload } from "@/lib/notifications/webhook-sender";
 
 /** What each request arrived as, so the body shape can be asserted for real
@@ -110,5 +110,53 @@ describe("when the endpoint does not take it", () => {
     it("explains an unreachable host rather than throwing", async () => {
         const result = await sendWebhook("http://127.0.0.1:1/nowhere", "generic", PAYLOAD);
         expect(result.error).toBe("The endpoint could not be reached.");
+    });
+});
+
+describe("Teams and Telegram", () => {
+    it("posts Teams an Adaptive Card with a way back into Polaris", async () => {
+        const result = await sendWebhook(`${base}/teams`, "teams", PAYLOAD);
+        expect(result).toEqual({});
+        const body = received.find((entry) => entry.path === "/teams")?.body as {
+            type: string;
+            attachments: {
+                contentType: string;
+                content: { type: string; actions: { url: string }[] };
+            }[];
+        };
+        expect(body.type).toBe("message");
+        expect(body.attachments[0]?.contentType).toBe("application/vnd.microsoft.card.adaptive");
+        expect(body.attachments[0]?.content.type).toBe("AdaptiveCard");
+        expect(body.attachments[0]?.content.actions[0]?.url).toBe(PAYLOAD.url);
+    });
+
+    it("posts Telegram's sendMessage with the chat from the URL in the body", async () => {
+        const fetchMock = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValue(new Response("{}", { status: 200 }));
+        try {
+            const result = await sendWebhook(
+                "https://api.telegram.org/bot123:abc/sendMessage?chat_id=-100",
+                "telegram",
+                PAYLOAD
+            );
+            expect(result).toEqual({});
+            const [target, init] = fetchMock.mock.calls[0] ?? [];
+            expect(target).toBe("https://api.telegram.org/bot123:abc/sendMessage");
+            const sent = JSON.parse(String(init?.body)) as { chat_id: string; text: string };
+            expect(sent.chat_id).toBe("-100");
+            expect(sent.text).toContain(PAYLOAD.title);
+        } finally {
+            fetchMock.mockRestore();
+        }
+    });
+
+    it("says so when a Telegram destination does not name a chat", async () => {
+        const result = await sendWebhook(
+            "https://api.telegram.org/bot123:abc/sendMessage",
+            "telegram",
+            PAYLOAD
+        );
+        expect(result.error).toMatch(/chat_id/);
     });
 });

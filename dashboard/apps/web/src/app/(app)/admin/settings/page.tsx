@@ -2,6 +2,7 @@ import { PageHeader } from "@polaris/ui";
 import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
 import { SettingsView } from "./settings-view";
+import { TransferCard } from "./transfer-card";
 import { getUpdateSource } from "@/lib/update-source";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
 import { getLegalContact, publicUrls } from "@/lib/legal/service";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
  * `/api/admin/settings/overview`.
  */
 export default async function SettingsPage() {
-    await requireAdmin();
+    const user = await requireAdmin();
     const env = loadEnv();
     const [policy, source, contact, publicPages] = await Promise.all([
         getAutoUpdatePolicy(),
@@ -35,7 +36,10 @@ export default async function SettingsPage() {
         // Narrow page: centre the column in the content area, header included, and
         // keep it at the top so it does not shift as the update card grows.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader title="Settings" description="General configuration for this Polaris deployment." />
+            <PageHeader
+                title="Settings"
+                description="General configuration for this Polaris deployment."
+            />
             <SettingsView
                 initialPolicy={policy}
                 initialSource={source}
@@ -48,6 +52,7 @@ export default async function SettingsPage() {
                     autoUpdate: env.POLARIS_AUTO_UPDATE
                 }}
             />
+            <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>
     );
 }

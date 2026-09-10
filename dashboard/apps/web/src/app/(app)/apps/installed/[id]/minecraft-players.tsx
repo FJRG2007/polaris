@@ -33,7 +33,11 @@ import { PlayerIconAction, PlayersTable } from "@/components/game-players-table"
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
-import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import type {
+    MinecraftFirewall,
+    MinecraftRoster,
+    MinecraftStatus
+} from "@/lib/apps/minecraft/service";
 import {
     playerAction,
     playerConfirm,
@@ -141,7 +145,10 @@ export function MinecraftPlayers({
     const [applied, setApplied] = useState<Map<string, Partial<PlayerEntry>>>(new Map());
     // The player a form is open about, and which form. A null player with the
     // access form open is somebody being registered for the first time.
-    const [acting, setActing] = useState<{ player: PlayerEntry | null; dialog: PlayerDialog } | null>(null);
+    const [acting, setActing] = useState<{
+        player: PlayerEntry | null;
+        dialog: PlayerDialog;
+    } | null>(null);
     /** What the server refused the open form with, shown inside it rather than
      *  behind it on a page the reader has stopped looking at. */
     const [formError, setFormError] = useState<string | null>(null);
@@ -157,7 +164,11 @@ export function MinecraftPlayers({
         [status, roster, access, sessions, now, seen]
     );
     const players = useMemo(
-        () => known.map((player) => ({ ...player, ...(applied.get(player.name.toLowerCase()) ?? {}) })),
+        () =>
+            known.map((player) => ({
+                ...player,
+                ...(applied.get(player.name.toLowerCase()) ?? {})
+            })),
         [known, applied]
     );
     const registered = access?.rules.length ?? 0;
@@ -312,16 +323,17 @@ export function MinecraftPlayers({
                 nothing anywhere saying why. It is also the state a server lands in
                 when its first player was removed, so it is worth naming loudly. */}
             {access !== null && registered === 0 && (
-                <Card className="border-warning/40 bg-warning/5">
+                <Card className="border-warning-edge bg-warning-soft">
                     <CardBody className="flex flex-col gap-1">
                         <p className="flex items-center gap-2 text-sm font-medium">
                             <Users className="size-4 text-warning" />
                             Nobody can join yet
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            The server is closed until somebody is registered. Add yourself first: your{" "}
-                            {edition === "bedrock" ? "gamertag" : "Minecraft username"}, and the address you play from -
-                            the locate button fills in the one you are on now.
+                            The server is closed until somebody is registered. Add yourself first:
+                            your {edition === "bedrock" ? "gamertag" : "Minecraft username"}, and
+                            the address you play from - the locate button fills in the one you are
+                            on now.
                         </p>
                     </CardBody>
                 </Card>
@@ -333,8 +345,8 @@ export function MinecraftPlayers({
                         <div>
                             <p className="text-sm font-medium">Who can join</p>
                             <p className="text-xs text-muted-foreground">
-                                A player is let in when the username is on this list and they arrive from the address
-                                registered to it. {ACCESS_REACH_NOTE}
+                                A player is let in when the username is on this list and they arrive
+                                from the address registered to it. {ACCESS_REACH_NOTE}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -343,7 +355,11 @@ export function MinecraftPlayers({
                             </span>
                             <Switch
                                 checked={access?.bindAddresses ?? true}
-                                onChange={(enabled) => run(() => actions.setAddressBindingAction(installedAppId, enabled))}
+                                onChange={(enabled) =>
+                                    run(() =>
+                                        actions.setAddressBindingAction(installedAppId, enabled)
+                                    )
+                                }
                                 disabled={pending || access === null || !access.addressesAvailable}
                                 aria-label="Check each player's address when they join"
                             />
@@ -351,7 +367,8 @@ export function MinecraftPlayers({
                     </div>
                     {access && !access.addressesAvailable && (
                         <p className="text-xs text-muted-foreground">
-                            Bedrock does not record where a player connected from, so only the names here are enforced.
+                            Bedrock does not record where a player connected from, so only the names
+                            here are enforced.
                         </p>
                     )}
                 </CardBody>
@@ -363,13 +380,16 @@ export function MinecraftPlayers({
                         <div>
                             <p className="text-sm font-medium">Waiting to happen</p>
                             <p className="text-xs text-muted-foreground">
-                                Decided while the server or the player was away. Each one runs by itself as soon as it
-                                can, and lapses if it never can.
+                                Decided while the server or the player was away. Each one runs by
+                                itself as soon as it can, and lapses if it never can.
                             </p>
                         </div>
                         <ul className="flex flex-col divide-y divide-border/60">
                             {waiting.map((entry) => (
-                                <li key={entry.id} className="flex items-center justify-between gap-3 py-2">
+                                <li
+                                    key={entry.id}
+                                    className="flex items-center justify-between gap-3 py-2"
+                                >
                                     <div className="min-w-0">
                                         <p className="truncate text-sm">
                                             {entry.username}: {describeQueued(entry)}
@@ -387,10 +407,11 @@ export function MinecraftPlayers({
                                         title={`Cancel ${describeQueued(entry)} for ${entry.username}`}
                                         onClick={() =>
                                             startTransition(async () => {
-                                                const result = await actions.cancelQueuedActionAction(
-                                                    installedAppId,
-                                                    entry.id
-                                                );
+                                                const result =
+                                                    await actions.cancelQueuedActionAction(
+                                                        installedAppId,
+                                                        entry.id
+                                                    );
                                                 if (result.error) {
                                                     setError(result.error);
                                                     return;
@@ -469,8 +490,10 @@ export function MinecraftPlayers({
                         level={levels[player.name] ?? null}
                         timeout={timeoutFor(timeouts, player.name)}
                         waiting={
-                            waiting.filter((entry) => entry.username.toLowerCase() === player.name.toLowerCase())
-                                .length
+                            waiting.filter(
+                                (entry) =>
+                                    entry.username.toLowerCase() === player.name.toLowerCase()
+                            ).length
                         }
                         onOpen={(dialog) => setActing({ player, dialog })}
                         onRevoke={() =>
@@ -479,7 +502,13 @@ export function MinecraftPlayers({
                                 confirmLabel: "Remove",
                                 danger: true
                             }).then((agreed) => {
-                                if (agreed) run(() => actions.revokePlayerAccessAction(installedAppId, player.name));
+                                if (agreed)
+                                    run(() =>
+                                        actions.revokePlayerAccessAction(
+                                            installedAppId,
+                                            player.name
+                                        )
+                                    );
                             })
                         }
                     />
@@ -490,13 +519,21 @@ export function MinecraftPlayers({
                 <PlayerAccessDialog
                     edition={edition}
                     player={
-                        target ? { username: target.name, addresses: target.addresses, note: target.note } : null
+                        target
+                            ? {
+                                  username: target.name,
+                                  addresses: target.addresses,
+                                  note: target.note
+                              }
+                            : null
                     }
                     pending={pending}
                     error={formError}
                     onClose={() => setActing(null)}
                     onSave={savePlayer}
-                    onLookUp={(query) => actions.findMinecraftPlayerByUserAction(installedAppId, query)}
+                    onLookUp={(query) =>
+                        actions.findMinecraftPlayerByUserAction(installedAppId, query)
+                    }
                     onRemoveAddress={(address) => {
                         if (!target) return;
                         const name = target.name;
@@ -546,9 +583,19 @@ export function MinecraftPlayers({
                     onTimeout={(minutes, reason) => {
                         const player = target.name;
                         setActing(null);
-                        const rollback = expect(player, { banned: true, online: false, presence: "offline" });
+                        const rollback = expect(player, {
+                            banned: true,
+                            online: false,
+                            presence: "offline"
+                        });
                         run(
-                            () => actions.timeoutPlayerAction({ installedAppId, player, minutes, reason }),
+                            () =>
+                                actions.timeoutPlayerAction({
+                                    installedAppId,
+                                    player,
+                                    minutes,
+                                    reason
+                                }),
                             rollback
                         );
                     }}
@@ -640,7 +687,12 @@ function PlayerRow({
     const live = answering && !pending;
 
     return (
-        <tr className={cn("border-t border-border hover:bg-card-hover", player.banned && "opacity-60")}>
+        <tr
+            className={cn(
+                "border-t border-border hover:bg-card-hover",
+                player.banned && "opacity-60"
+            )}
+        >
             <td className="px-3 py-2">
                 <p className="flex items-center gap-1.5 truncate font-medium" title={name}>
                     {player.operator && <Crown className="size-3.5 shrink-0 text-warning" />}
@@ -677,16 +729,25 @@ function PlayerRow({
                 </td>
             )}
             <td className="px-3 py-2">
-                {read ? <StatusCell player={player} onOpen={onOpen} /> : <Skeleton className="h-5 w-16" />}
+                {read ? (
+                    <StatusCell player={player} onOpen={onOpen} />
+                ) : (
+                    <Skeleton className="h-5 w-16" />
+                )}
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {player.addresses.length > 0 && <Badge variant="primary">{playerStanding.allowed}</Badge>}
+                    {player.addresses.length > 0 && (
+                        <Badge variant="primary">{playerStanding.allowed}</Badge>
+                    )}
                     {player.operator && <Badge>{playerStanding.operator}</Badge>}
                     {player.whitelisted && <Badge>whitelisted</Badge>}
                     {player.banned &&
                         (timeout ? (
-                            <Badge variant="danger" title={`Lifts ${new Date(timeout.until).toLocaleString()}`}>
+                            <Badge
+                                variant="danger"
+                                title={`Lifts ${new Date(timeout.until).toLocaleString()}`}
+                            >
                                 <Timer className="size-3" />
                                 timed out, {timeoutRemaining(timeout.until)}
                             </Badge>
@@ -731,7 +792,11 @@ function PlayerRow({
                 <div className="flex justify-end gap-1">
                     {!bedrock && (
                         <PlayerIconAction
-                            label={player.operator ? `Remove ${name} as operator` : `Make ${name} an operator`}
+                            label={
+                                player.operator
+                                    ? `Remove ${name} as operator`
+                                    : `Make ${name} an operator`
+                            }
                             icon={
                                 player.operator ? (
                                     <ShieldMinus className="size-4" />
@@ -740,7 +805,12 @@ function PlayerRow({
                                 )
                             }
                             disabled={!live}
-                            onClick={() => onModerate({ action: player.operator ? "deop" : "op", player: name })}
+                            onClick={() =>
+                                onModerate({
+                                    action: player.operator ? "deop" : "op",
+                                    player: name
+                                })
+                            }
                         />
                     )}
                     {!bedrock && (
@@ -760,7 +830,9 @@ function PlayerRow({
                             disabled={!live}
                             onClick={() =>
                                 onModerate({
-                                    action: player.whitelisted ? "whitelist-remove" : "whitelist-add",
+                                    action: player.whitelisted
+                                        ? "whitelist-remove"
+                                        : "whitelist-add",
                                     player: name
                                 })
                             }
@@ -773,7 +845,11 @@ function PlayerRow({
                             disabled={!live}
                             onClick={() => {
                                 const { title, description } = playerConfirm.kick(name);
-                                void onModerateWithConfirm({ action: "kick", player: name }, title, description);
+                                void onModerateWithConfirm(
+                                    { action: "kick", player: name },
+                                    title,
+                                    description
+                                );
                             }}
                         />
                     )}
@@ -793,7 +869,11 @@ function PlayerRow({
                                 disabled={!live}
                                 onClick={() => {
                                     const { title, description } = playerConfirm.ban(name);
-                                    void onModerateWithConfirm({ action: "ban", player: name }, title, description);
+                                    void onModerateWithConfirm(
+                                        { action: "ban", player: name },
+                                        title,
+                                        description
+                                    );
                                 }}
                             />
                         ))}
@@ -829,7 +909,13 @@ function PlayerRow({
  * player mining in silence would be labelled away to the operator about to kick
  * them.
  */
-function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: PlayerDialog) => void }) {
+function StatusCell({
+    player,
+    onOpen
+}: {
+    player: PlayerEntry;
+    onOpen: (dialog: PlayerDialog) => void;
+}) {
     const format = useDisplayFormat();
     const badge =
         player.presence === "playing" ? (
@@ -884,7 +970,12 @@ function MoreActions({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" aria-label={playerAction.more(player.name)} title="More">
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={playerAction.more(player.name)}
+                    title="More"
+                >
                     <MoreHorizontal className="size-4" />
                 </Button>
             </DropdownMenuTrigger>
@@ -909,10 +1000,16 @@ function MoreActions({
                 <DropdownMenuItem disabled={!live || bedrock} onSelect={() => onOpen("inventory")}>
                     <Backpack className="size-4" /> Inventory and items
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!live || bedrock || !player.online} onSelect={() => onOpen("location")}>
+                <DropdownMenuItem
+                    disabled={!live || bedrock || !player.online}
+                    onSelect={() => onOpen("location")}
+                >
                     <LocateFixed className="size-4" /> Where they are
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!live || bedrock || !player.online} onSelect={() => onOpen("teleport")}>
+                <DropdownMenuItem
+                    disabled={!live || bedrock || !player.online}
+                    onSelect={() => onOpen("teleport")}
+                >
                     <MapPin className="size-4" /> Teleport
                 </DropdownMenuItem>
                 {/* Only while they are on: the game changes a bar on a player who
@@ -934,7 +1031,9 @@ function MoreActions({
                 <DropdownMenuSeparator />
                 {/* Flat rather than a submenu. Four items is not enough to be worth
                     a second layer somebody has to hover exactly onto. */}
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Game mode</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    Game mode
+                </DropdownMenuLabel>
                 {GAME_MODES.map((mode) => (
                     <DropdownMenuItem
                         key={mode}
@@ -1030,7 +1129,9 @@ export function FirewallSection({
 }) {
     const [pending, startTransition] = useTransition();
     const [applied, setApplied] = useState<string | null>(null);
-    const outstanding = firewall ? firewall.blocked.filter((entry) => !firewall.applied.includes(entry)) : [];
+    const outstanding = firewall
+        ? firewall.blocked.filter((entry) => !firewall.applied.includes(entry))
+        : [];
 
     function apply(): void {
         onError(null);
@@ -1056,21 +1157,33 @@ export function FirewallSection({
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">
-                        Firewall <span className="text-muted-foreground">{firewall.blocked.length || ""}</span>
+                        Firewall{" "}
+                        <span className="text-muted-foreground">
+                            {firewall.blocked.length || ""}
+                        </span>
                     </p>
-                    <Button size="sm" variant="secondary" onClick={apply} disabled={pending || outstanding.length === 0}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={apply}
+                        disabled={pending || outstanding.length === 0}
+                    >
                         <ShieldBan className="size-4" />
-                        {outstanding.length === 0 ? "All applied" : `Ban ${outstanding.length} here`}
+                        {outstanding.length === 0
+                            ? "All applied"
+                            : `Ban ${outstanding.length} here`}
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    Addresses the Polaris firewall blocks. A game server refuses them only once they are on its own ban
-                    list.
+                    Addresses the Polaris firewall blocks. A game server refuses them only once they
+                    are on its own ban list.
                 </p>
                 {firewall.ranges.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                        {firewall.ranges.length} {firewall.ranges.length === 1 ? "range is" : "ranges are"} blocked in
-                        the firewall. Minecraft bans single addresses only, so those are not applied here.
+                        {firewall.ranges.length}{" "}
+                        {firewall.ranges.length === 1 ? "range is" : "ranges are"} blocked in the
+                        firewall. Minecraft bans single addresses only, so those are not applied
+                        here.
                     </p>
                 )}
                 {applied && <p className="text-xs text-muted-foreground">{applied}</p>}

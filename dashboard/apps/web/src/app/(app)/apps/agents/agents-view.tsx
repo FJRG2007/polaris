@@ -6,7 +6,11 @@ import { RunState } from "./run-state";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, EmptyState } from "@polaris/ui";
-import { AGENT_EXECUTION_LABELS, AGENT_RUN_STATE_LABELS, AGENT_TRIGGER_LABELS } from "@polaris/core";
+import {
+    AGENT_EXECUTION_LABELS,
+    AGENT_RUN_STATE_LABELS,
+    AGENT_TRIGGER_LABELS
+} from "@polaris/core";
 
 /**
  * The overview: which repositories are on, and what has happened lately.
@@ -36,10 +40,12 @@ export function AgentsOverview({ repos, runs }: { repos: AgentRepoView[]; runs: 
                                 {!repo.enabled ? (
                                     <Badge variant="neutral">Off</Badge>
                                 ) : (
-                                    <Badge variant="neutral">{AGENT_EXECUTION_LABELS[repo.execution]}</Badge>
+                                    <Badge variant="neutral">
+                                        {AGENT_EXECUTION_LABELS[repo.execution]}
+                                    </Badge>
                                 )}
                                 {repo.error ? (
-                                    <span title={repo.error} className="text-xs text-red-400">
+                                    <span title={repo.error} className="text-xs text-danger">
                                         Problem
                                     </span>
                                 ) : null}
@@ -56,8 +62,8 @@ export function AgentsOverview({ repos, runs }: { repos: AgentRepoView[]; runs: 
                 <CardBody className="p-0">
                     {runs.length === 0 ? (
                         <p className="px-4 py-6 text-sm text-muted-foreground">
-                            Nothing has run yet. Mention the app in an issue or a pull request, or start a run from a
-                            repository.
+                            Nothing has run yet. Mention the app in an issue or a pull request, or
+                            start a run from a repository.
                         </p>
                     ) : (
                         <ul className="divide-y divide-white/5">

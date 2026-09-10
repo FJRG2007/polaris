@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
+import { HEALTH_PROBE_USER_AGENT, VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
 import { notifyDomainHealthChanged } from "@/lib/notifications/domain-events";
 
 const PROBE_TIMEOUT_MS = 6000;
@@ -112,6 +112,8 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
         const response = await fetch(url, {
             method: "GET",
             redirect: "manual",
+            // Named, so sleep mode never counts this as somebody visiting.
+            headers: { "user-agent": HEALTH_PROBE_USER_AGENT },
             signal: controller.signal
         });
         if (await edgeSaysNotRouted(response)) {
@@ -270,7 +272,15 @@ let repair: RepairState = NO_REPAIR;
 /** Probe every enabled domain, with bounded concurrency. */
 export async function probeAllDomains(): Promise<void> {
     const domains = await prisma.domain.findMany({
-        where: { enabled: true },
+        // A wildcard names no one address to probe - `https://*.example.com` is not a
+        // URL - and a probe that cannot even be made would read as the site being down.
+        // An asleep service is stopped on purpose; probing it would report an outage
+        // that is not one.
+        where: {
+            enabled: true,
+            NOT: { hostname: { startsWith: "*." } },
+            application: { asleepSince: null }
+        },
         select: {
             id: true,
             hostname: true,

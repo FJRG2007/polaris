@@ -13,8 +13,12 @@
  * builder. Everything here is pure - the caller reads the files and passes what it
  * found - and it deliberately answers `null` for anything it does not recognize,
  * which leaves nixpacks' own providers in charge of Python, Go, Rust and the rest
- * instead of guessing over them.
+ * instead of guessing over them - unless the caller asks for the other languages
+ * (`detect-languages.ts`), which a service only does before its first successful
+ * deploy or once it names its own runtime version.
  */
+
+import { detectLanguageBuild } from "./detect-languages.js";
 
 /** The parts of a package.json this needs. */
 export interface PackageManifest {
@@ -33,6 +37,9 @@ export interface DirectorySnapshot {
     /** File and directory names directly inside it. */
     readonly files: readonly string[];
     readonly manifest?: PackageManifest;
+    /** The text of the small manifests beside it (see `LANGUAGE_FILES`), read
+     *  for the service's own directory. */
+    readonly texts?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -98,6 +105,20 @@ export interface DetectedBuild {
     /** One line for the deployment log, so a wrong guess is diagnosable from the
      *  output rather than from the source. */
     readonly note: string;
+}
+
+/**
+ * What the caller wants beyond the defaults.
+ *
+ * `languages` turns on the non-JavaScript stacks. Off by default, and the deploy
+ * only turns it on for a service that has never deployed successfully or has set
+ * its own runtime version: a service the auto-detecting builder already deploys is
+ * left on it, because a working deploy is not the place to change the builder.
+ */
+export interface DetectOptions {
+    readonly languages?: boolean;
+    /** The runtime version the service set, which beats what the repository says. */
+    readonly runtimeVersion?: string | null;
 }
 
 /** A JavaScript package manager, decided by the lockfile that is present. */
@@ -264,7 +285,10 @@ function withFallback(strict: string, loose: string): string {
 function installCommand(manager: PackageManager, files: readonly string[]): string {
     switch (manager) {
         case "pnpm":
-            return withFallback("pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile");
+            return withFallback(
+                "pnpm install --frozen-lockfile",
+                "pnpm install --no-frozen-lockfile"
+            );
         case "yarn":
             // Yarn 2 and up rejects `--frozen-lockfile` as an option rather than
             // failing the install, so the fallback is what carries those versions.
@@ -274,7 +298,9 @@ function installCommand(manager: PackageManager, files: readonly string[]): stri
             return "bun install";
         case "npm":
             // `npm ci` needs a lockfile and refuses without one.
-            return files.includes("package-lock.json") ? withFallback("npm ci", "npm install") : "npm install";
+            return files.includes("package-lock.json")
+                ? withFallback("npm ci", "npm install")
+                : "npm install";
     }
 }
 
@@ -314,9 +340,30 @@ function inDirectory(directory: string, command: string): string {
  * and for a plain Node app with a `start` script - both of which nixpacks already
  * handles, and neither of which is improved by being second-guessed.
  */
-export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
+export function detectBuild(
+    snapshot: RepoSnapshot,
+    options: DetectOptions = {}
+): DetectedBuild | null {
     const app = snapshot.levels[snapshot.levels.length - 1];
-    if (!app?.manifest) return null;
+    if (!app) return null;
+    // A Node app that says how to start itself stays Node's, whatever else is in
+    // the directory; past that, the other languages get their turn - but only
+    // where the caller asked for them (see `DetectOptions`).
+    const others = () =>
+        options.languages && !app.manifest?.scripts?.start
+            ? detectLanguageBuild(app, options.runtimeVersion)
+            : null;
+    if (!app.manifest) return others();
+    return detectNode(snapshot, app, options) ?? others();
+}
+
+/** How to build a JavaScript project, or null when nothing here knows better. */
+function detectNode(
+    snapshot: RepoSnapshot,
+    app: DirectorySnapshot,
+    options: DetectOptions
+): DetectedBuild | null {
+    if (!app.manifest) return null;
 
     const enclosing = workspaceRoot(snapshot.levels);
     // A workspace member is addressed by its package name; without one there is
@@ -377,7 +424,9 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     let start: string | null = null;
     let note: string;
 
-    const servesItself = framework?.start ?? (framework?.serverDep && framework.serverDep in deps ? framework.serverStart : undefined);
+    const servesItself =
+        framework?.start ??
+        (framework?.serverDep && framework.serverDep in deps ? framework.serverStart : undefined);
     const label = framework?.label ?? "Node.js";
     const foreignAdapter = framework?.foreignAdapters?.find((adapter) => adapter in deps);
 
@@ -415,10 +464,11 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     // unscoped: a Dockerfile puts the app's own directory under WORKDIR, so a
     // script runs where it lives and no `--filter` or `cd` is needed. A workspace
     // installs once at its root, which is where its lockfile is.
-    const nodeMajor = nodeImageMajor(declaredNodeRange(snapshot.levels));
+    const nodeMajor = nodeImageMajor(options.runtimeVersion || declaredNodeRange(snapshot.levels));
     const image = baseImage(manager, nodeMajor);
     const rootInstall = installCommand(manager, (enclosing ?? app).files);
-    const staticDirectory = !scripts.start && !servesItself && !foreignAdapter ? (framework?.dist ?? null) : null;
+    const staticDirectory =
+        !scripts.start && !servesItself && !foreignAdapter ? (framework?.dist ?? null) : null;
 
     if (nodeRequirement) note = `${note}; on Node ${nodeMajor}, which is what it asks for`;
     else if (!foreignAdapter) note = `${note}; on Node ${nodeMajor}`;
@@ -440,9 +490,7 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
                   workspaceInstall: workspaceBuild ? rootInstall : null,
                   install: workspaceBuild ? null : rootInstall,
                   build: scripts.build ? runScript(manager, "build", null) : null,
-                  start: scripts.start
-                      ? runScript(manager, "start", null)
-                      : (servesItself ?? null),
+                  start: scripts.start ? runScript(manager, "start", null) : (servesItself ?? null),
                   staticDirectory
               },
         note: workspaceBuild ? `${note}; built from the workspace root for ${workspace}` : note

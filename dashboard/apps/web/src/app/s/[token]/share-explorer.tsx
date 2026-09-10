@@ -1301,13 +1301,13 @@ export function ShareExplorer({
 
             {/* Error toast for a failed write */}
             {opError ? (
-                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-popover">
+                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink shadow-popover">
                     <Info className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0 flex-1 break-words">{opError}</span>
                     <button
                         type="button"
                         onClick={() => setOpError(null)}
-                        className="shrink-0 rounded p-0.5 hover:bg-danger/10"
+                        className="shrink-0 rounded p-0.5 hover:bg-danger-soft"
                         aria-label="Dismiss"
                     >
                         <X className="size-4" />

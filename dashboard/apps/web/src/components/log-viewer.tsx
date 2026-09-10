@@ -15,20 +15,23 @@
 
 import { Button, Input, cn } from "@polaris/ui";
 import { useDisplayFormat } from "./display-format";
-import { useMemo, useState, type ReactNode } from "react";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { Check, Copy, Download, Search } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatLogTime, parseLog, type LogEntry, type LogLevel } from "@/lib/log-lines";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
-    error: "text-red-400",
-    warn: "text-amber-300",
+    error: "text-danger",
+    warn: "text-warning",
     info: "text-sky-400",
     default: "text-zinc-300"
 };
 
 /** Cap on rendered log rows, so a very large stream stays responsive. */
 const MAX_LOG_ROWS = 3000;
+
+/** How near the top counts as having scrolled back to the start of what is loaded. */
+const NEAR_START = 64;
 
 export function LogViewer({
     log,
@@ -37,7 +40,10 @@ export function LogViewer({
     searchable = false,
     autoScroll = true,
     emptyText = "Waiting for output...",
-    className
+    className,
+    withDates = false,
+    onReachStart,
+    startSlot
 }: {
     log: string;
     name?: string;
@@ -46,12 +52,35 @@ export function LogViewer({
     autoScroll?: boolean;
     emptyText?: string;
     className?: string;
+    /** The gutter carries the date as well as the time - for a log that spans days. */
+    withDates?: boolean;
+    /** Called when the reader scrolls back to the top, for a log that loads older
+     *  lines on demand. Lines it prepends keep the reader where they were. */
+    onReachStart?: () => void;
+    /** Shown above the first line, inside the scrolling region. */
+    startSlot?: ReactNode;
 }) {
     const [search, setSearch] = useState("");
     const [copiedAll, setCopiedAll] = useState(false);
     // Follows the tail as new output streams in, matching a live console - and
     // leaves the view alone while it is being read further up.
     const follow = useFollowBottom<HTMLDivElement>(log, autoScroll);
+    const previous = useRef<{ height: number; first: string; last: string } | null>(null);
+
+    // Older lines arriving above the reader push everything down by their own
+    // height; moving the scroll position by that much is what keeps the line
+    // being read under the reader's eye instead of somewhere below it.
+    useLayoutEffect(() => {
+        const element = follow.ref.current;
+        if (!element) return;
+        const first = log.slice(0, 120);
+        const last = log.slice(-120);
+        const before = previous.current;
+        if (onReachStart && before && before.last === last && before.first !== first) {
+            element.scrollTop += element.scrollHeight - before.height;
+        }
+        previous.current = { height: element.scrollHeight, first, last };
+    }, [log, onReachStart, follow]);
 
     const entries = useMemo(() => (log ? parseLog(log) : []), [log]);
     const query = search.trim().toLowerCase();
@@ -117,7 +146,7 @@ export function LogViewer({
                     className="ml-auto shrink-0"
                 >
                     {copiedAll ? (
-                        <Check className="size-4 text-emerald-400" />
+                        <Check className="size-4 text-success" />
                     ) : (
                         <Copy className="size-4" />
                     )}
@@ -138,12 +167,17 @@ export function LogViewer({
 
             <div
                 ref={follow.ref}
-                onScroll={follow.onScroll}
+                onScroll={() => {
+                    follow.onScroll();
+                    const element = follow.ref.current;
+                    if (onReachStart && element && element.scrollTop < NEAR_START) onReachStart();
+                }}
                 className={cn(
                     "h-80 overflow-auto overscroll-contain rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed",
                     className
                 )}
             >
+                {startSlot}
                 {filtered.length === 0 ? (
                     <p className="px-3 py-2 text-muted-foreground">
                         {log ? "No matching lines." : emptyText}
@@ -157,7 +191,12 @@ export function LogViewer({
                             </p>
                         )}
                         {filtered.map((entry, index) => (
-                            <LogRow key={index} entry={entry} gutter={hasTimes} />
+                            <LogRow
+                                key={index}
+                                entry={entry}
+                                gutter={hasTimes}
+                                withDates={withDates}
+                            />
                         ))}
                     </>
                 )}
@@ -166,10 +205,18 @@ export function LogViewer({
     );
 }
 
-function LogRow({ entry, gutter }: { entry: LogEntry; gutter: boolean }) {
+function LogRow({
+    entry,
+    gutter,
+    withDates
+}: {
+    entry: LogEntry;
+    gutter: boolean;
+    withDates: boolean;
+}) {
     const [copied, setCopied] = useState(false);
     const format = useDisplayFormat();
-    const time = entry.time ? formatLogTime(entry.time, format) : null;
+    const time = entry.time ? formatLogTime(entry.time, format, withDates) : null;
 
     async function copy(): Promise<void> {
         try {
@@ -184,7 +231,12 @@ function LogRow({ entry, gutter }: { entry: LogEntry; gutter: boolean }) {
     return (
         <div className="group relative flex gap-2 px-3 pr-9 hover:bg-white/5">
             {gutter && (
-                <span className="w-[4.25rem] shrink-0 select-none border-r border-white/10 pr-2 text-zinc-500 tabular-nums">
+                <span
+                    className={cn(
+                        "shrink-0 select-none border-r border-white/10 pr-2 text-zinc-500 tabular-nums",
+                        withDates ? "w-[9.5rem]" : "w-[4.25rem]"
+                    )}
+                >
                     {time ?? ""}
                 </span>
             )}
@@ -203,7 +255,7 @@ function LogRow({ entry, gutter }: { entry: LogEntry; gutter: boolean }) {
                 className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
                 {copied ? (
-                    <Check className="size-3.5 text-emerald-400" />
+                    <Check className="size-3.5 text-success" />
                 ) : (
                     <Copy className="size-3.5" />
                 )}

@@ -35,7 +35,7 @@ import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
+import { mailShortcuts, useMailKeys } from "./use-mail-keys";
 import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
 import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
@@ -59,13 +59,17 @@ import {
     openMessageAction,
     warmMessageAction,
     snoozeAction,
-    syncAllAction
+    syncAllAction,
+    setConversationStateAction
 } from "./actions";
 import {
     Archive,
+    BellOff,
+    Bookmark,
     Bug,
     Check,
     Clock,
+    Pin,
     Columns2,
     Inbox,
     ListFilter,
@@ -211,7 +215,8 @@ export function MailView({
         openComposer,
         refresh,
         reloadLists,
-        revision
+        revision,
+        shelf
     } = useMail();
 
     /**
@@ -270,7 +275,7 @@ export function MailView({
      * mailbox never opened in this tab is the only case that waits, and it waits
      * behind rows shaped like rows rather than behind nothing.
      */
-    const list = useMailList(page, revision);
+    const list = useMailList(page, revision, shelf);
     const firstPage = list.threads;
     const firstCursor = list.cursor;
     const opened = useMailThread(openThreadId, revision);
@@ -759,6 +764,41 @@ export function MailView({
         ]
     );
 
+    /**
+     * Pin a conversation to the top, or mute it - or undo either.
+     *
+     * The row changes now and changes back if the server refuses, like every
+     * other action here. Neither goes near the mail server, so the wait is one
+     * database write; the overlay is still what makes the click feel answered.
+     */
+    const setConversation = useCallback(
+        (
+            messageIds: readonly string[],
+            state: { pinned?: boolean; muted?: boolean },
+            announce: string
+        ) => {
+            if (messageIds.length === 0) return;
+            patchUntilAnswered(threadsOf(messageIds), state);
+            startBusy(async () => {
+                const outcome = await setConversationStateAction({
+                    messageIds: [...messageIds],
+                    ...state
+                });
+                const said = refusalOf(outcome);
+                if (said) {
+                    clearPatches();
+                    toast.show({ title: said });
+                    return;
+                }
+                inFlight.current = {};
+                setSelected([]);
+                toast.show({ title: announce });
+                refresh();
+            });
+        },
+        [clearPatches, patchUntilAnswered, refresh, threadsOf, toast]
+    );
+
     const snooze = useCallback(
         (messageIds: readonly string[], until: Date) => {
             startBusy(async () => {
@@ -794,11 +834,44 @@ export function MailView({
      * from the recipient box opened whichever conversation the list's cursor
      * happened to be on, in the middle of somebody typing an address.
      */
+    /** The conversation a key that answers means: the one being read if there
+     *  is one, otherwise the one the keyboard is on. */
+    const answeredId = (openThread ?? onRow)?.leadMessageId ?? "";
     useMailKeys(
         composing
             ? {}
             : {
                   compose: () => openComposer({}),
+                  reply: () => answer("reply", answeredId),
+                  replyAll: () => answer("reply-all", answeredId),
+                  forward: () => answer("forward", answeredId),
+                  important: () => {
+                      if (!onRow) return;
+                      act(
+                          shown(onRow).important ? "unimportant" : "important",
+                          rowMessageIds,
+                          shown(onRow).important ? "No longer important." : "Marked important."
+                      );
+                  },
+                  pin: () => {
+                      if (!onRow) return;
+                      const pinned = shown(onRow).pinned;
+                      setConversation(
+                          rowMessageIds,
+                          { pinned: !pinned },
+                          pinned ? "Unpinned." : "Pinned to the top."
+                      );
+                  },
+                  mute: () => {
+                      if (!onRow) return;
+                      const muted = shown(onRow).muted;
+                      setConversation(
+                          rowMessageIds,
+                          { muted: !muted },
+                          muted ? "Unmuted." : "Muted. New messages in it will not be announced."
+                      );
+                  },
+                  help: () => setHelpOpen((held) => !held),
                   next: () =>
                       setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
                   previous: () => setOnIndex((held) => Math.max(0, held - 1)),
@@ -848,27 +921,11 @@ export function MailView({
                       setAnchor("");
                       return true;
                   }
-              }
+              },
+        // The keyboard this person set up, including the help sheet's own key,
+        // which is why that is a command in the map rather than a listener here.
+        preferences.keys
     );
-
-    // `?` is bound here rather than in the hook: it is about this screen's own
-    // help sheet, and a hook that owned it would have to know the sheet exists.
-    useEffect(() => {
-        function onKey(event: KeyboardEvent): void {
-            if (event.key !== "?" || event.metaKey || event.ctrlKey || event.altKey) return;
-            const target = event.target;
-            if (
-                target instanceof HTMLElement &&
-                (target.isContentEditable || EDITABLE.test(target.tagName))
-            ) {
-                return;
-            }
-            event.preventDefault();
-            setHelpOpen((held) => !held);
-        }
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, []);
 
     const label = useCallback(
         (labelId: string, messageIds: readonly string[]) => {
@@ -1268,6 +1325,8 @@ export function MailView({
                                         onLabel={label}
                                         onAnswer={answer}
                                         onBlock={block}
+                                        onConversation={setConversation}
+                                        keymap={preferences.keys}
                                     >
                                         <ThreadRow
                                             thread={shown(thread)}
@@ -1310,7 +1369,9 @@ export function MailView({
                 </div>
             </section>
 
-            {helpOpen ? <ShortcutSheet onClose={() => setHelpOpen(false)} /> : null}
+            {helpOpen ? (
+                <ShortcutSheet keymap={preferences.keys} onClose={() => setHelpOpen(false)} />
+            ) : null}
 
             {blocking ? (
                 <ConfirmDeleteDialog
@@ -1768,11 +1829,11 @@ function TabButton({
 /** How `/` finds the search box, and which elements own a key press rather than
  *  the screen. Named because two places read each. */
 const SEARCH_BOX = 'input[aria-label="Search mail"]';
-const EDITABLE = /^(?:INPUT|TEXTAREA|SELECT)$/;
 
-/** What the keys do. Reached with `?`, and from nowhere else - it is a reminder
- *  for people who already use them, not a feature anybody has to find. */
-function ShortcutSheet({ onClose }: { onClose: () => void }) {
+/** What the keys do, for the keyboard this person set up. Reached with its own
+ *  key and from nowhere else - it is a reminder for people who already use
+ *  them, not a feature anybody has to find. Moving one is in settings. */
+function ShortcutSheet({ keymap, onClose }: { keymap: core.MailKeymap; onClose: () => void }) {
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent>
@@ -1780,15 +1841,18 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
                     <DialogTitle>Keyboard</DialogTitle>
                 </DialogHeader>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-                    {MAIL_SHORTCUTS.map((entry) => (
-                        <div key={entry.keys} className="contents">
+                    {mailShortcuts(keymap).map((entry) => (
+                        <div key={entry.what} className="contents">
                             <dt className="font-mono text-[12px] text-foreground">{entry.keys}</dt>
                             <dd className="text-muted-foreground">{entry.what}</dd>
                         </div>
                     ))}
                 </dl>
                 <p className="mt-2 text-[12px] text-foreground-subtle">
-                    Every one of these has a button on screen as well.
+                    Every one of these has a button on screen as well.{" "}
+                    <Link href="/mail/settings/shortcuts" className="underline" onClick={onClose}>
+                        Change them
+                    </Link>
                 </p>
             </DialogContent>
         </Dialog>
@@ -1796,10 +1860,13 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** What an action changes about a row before the server has confirmed it. Only
- *  the two things a list actually draws differently. */
+ *  the things a list actually draws differently. */
 interface ThreadPatch {
     unreadCount?: number;
     starred?: boolean;
+    important?: boolean;
+    pinned?: boolean;
+    muted?: boolean;
     /** Taken out of this list. Drawn as gone at once and put back if the server
      *  refuses, rather than left sitting there while a mail server is asked. */
     gone?: boolean;
@@ -1825,9 +1892,46 @@ function optimistically(action: MailAction): ThreadPatch | null {
             return { starred: true };
         case "unstar":
             return { starred: false };
+        case "important":
+            return { important: true };
+        case "unimportant":
+            return { important: false };
         default:
             return leavesTheView(action) ? { gone: true } : null;
     }
+}
+
+/**
+ * What a row says about itself besides who and what: important, pinned, muted.
+ *
+ * Small and in the row's own grey, because they are facts about the row rather
+ * than calls to act - and each carries its name for a screen reader and on
+ * hover, since three unlabelled glyphs in a row are three things nobody learns.
+ */
+function RowMarks({ thread }: { thread: MailThreadView }) {
+    if (!thread.important && !thread.pinned && !thread.muted) return null;
+    return (
+        <span className="flex shrink-0 items-center gap-1 text-foreground-subtle">
+            {thread.important ? (
+                <span title="Important" className="text-warning">
+                    <Bookmark className="size-3 shrink-0 fill-current" aria-hidden />
+                    <span className="sr-only">Important</span>
+                </span>
+            ) : null}
+            {thread.pinned ? (
+                <span title="Pinned to the top">
+                    <Pin className="size-3 shrink-0" aria-hidden />
+                    <span className="sr-only">Pinned</span>
+                </span>
+            ) : null}
+            {thread.muted ? (
+                <span title="Muted: new messages are not announced">
+                    <BellOff className="size-3 shrink-0" aria-hidden />
+                    <span className="sr-only">Muted</span>
+                </span>
+            ) : null}
+        </span>
+    );
 }
 
 /** Eight tomorrow morning, in the reader's own clock. The one snooze everybody
@@ -2063,6 +2167,7 @@ function ThreadRow({
                                 {thread.messageCount}
                             </span>
                         ) : null}
+                        <RowMarks thread={thread} />
                         {wide ? null : <Stamp thread={thread} bySize={bySize} />}
                     </div>
                     <div className={cn("min-w-0", wide && "flex flex-1 items-baseline gap-2")}>

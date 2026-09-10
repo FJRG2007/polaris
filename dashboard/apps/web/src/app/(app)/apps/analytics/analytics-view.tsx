@@ -20,10 +20,45 @@ import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { ANALYTICS_SCOPES, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
-import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
-import { countryFlag, countryName, VISIT_RANGE_SPEC, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
+import {
+    ANALYTICS_SCOPES,
+    scopeNeedsTarget,
+    type AnalyticsScope,
+    type SiteOption
+} from "./site-catalog";
+import {
+    Activity,
+    Check,
+    Copy,
+    Globe,
+    MonitorSmartphone,
+    RefreshCw,
+    ShieldCheck,
+    TrendingUp
+} from "lucide-react";
+import {
+    countryFlag,
+    countryName,
+    VISIT_RANGE_SPEC,
+    type VisitDimension,
+    type VisitRange,
+    type VisitRow
+} from "@polaris/core";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    cn,
+    Input,
+    ScrollRow,
+    Select,
+    Skeleton,
+    Switch,
+    TimeSeriesChart
+} from "@polaris/ui";
 import {
     getAnalyticsOverviewAction,
     listAnalyticsSitesAction,
@@ -95,7 +130,9 @@ export function AnalyticsView({
     useEffect(() => {
         if (!scopeNeedsTarget(scope) || siteId || !services || services.length === 0) return;
         const first = services[0]!.id;
-        router.replace(`/apps/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`);
+        router.replace(
+            `/apps/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`
+        );
     }, [scope, siteId, services, range, router]);
 
     const load = useCallback(() => {
@@ -104,7 +141,11 @@ export function AnalyticsView({
         // something Polaris measures", which is a sentence about a URL nobody typed.
         if (scopeNeedsTarget(scope) && !siteId) return;
         startLoad(async () => {
-            const result = await getAnalyticsOverviewAction({ scopeType: scope, scopeId: siteId, range });
+            const result = await getAnalyticsOverviewAction({
+                scopeType: scope,
+                scopeId: siteId,
+                range
+            });
             if ("error" in result) {
                 setFailure(result.error);
                 setData(null);
@@ -120,7 +161,10 @@ export function AnalyticsView({
     /** Move the screen first and let the server confirm, so a switch follows the
      *  finger. Only a real failure puts it back. */
     const mutate = useCallback(
-        (patch: (current: AnalyticsOverview) => AnalyticsOverview, run: () => Promise<{ error?: string }>) => {
+        (
+            patch: (current: AnalyticsOverview) => AnalyticsOverview,
+            run: () => Promise<{ error?: string }>
+        ) => {
             setData((current) => {
                 if (!current) return current;
                 const previous = current;
@@ -152,30 +196,40 @@ export function AnalyticsView({
                         </span>
                     ) : null}
                     {data && data.view.online > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success-ink">
                             <span className="size-1.5 animate-pulse rounded-full bg-success" />
                             {grouped(data.view.online)} online
                         </span>
                     ) : null}
                 </div>
-                <SitePicker scope={scope} siteId={siteId} services={services} canOperate={canOperate} />
+                <SitePicker
+                    scope={scope}
+                    siteId={siteId}
+                    services={services}
+                    canOperate={canOperate}
+                />
                 <RangeTabs range={range} />
             </div>
 
             {failure ? (
-                <p className="rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger">{failure}</p>
+                <p className="rounded-md border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">
+                    {failure}
+                </p>
             ) : null}
 
             {nothingToMeasure ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    No services yet. Deploy one and its visitors appear here on their own - no script to add.
+                    No services yet. Deploy one and its visitors appear here on their own - no
+                    script to add.
                 </p>
             ) : (
                 <>
                     <Overview data={data} range={range} />
                     <Breakdowns data={data} />
                     <Recent data={data} />
-                    {data ? <TrackerPanel data={data} scope={scope} siteId={siteId} mutate={mutate} /> : null}
+                    {data ? (
+                        <TrackerPanel data={data} scope={scope} siteId={siteId} mutate={mutate} />
+                    ) : null}
                     {data && canOperate ? <SettingsPanel data={data} mutate={mutate} /> : null}
                 </>
             )}
@@ -327,7 +381,9 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                       {card.label}
                                   </span>
-                                  <span className="text-2xl font-semibold tabular-nums">{card.value}</span>
+                                  <span className="text-2xl font-semibold tabular-nums">
+                                      {card.value}
+                                  </span>
                                   <span className="text-xs text-muted-foreground">{card.hint}</span>
                               </CardBody>
                           </Card>
@@ -349,13 +405,18 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                         <TrendingUp className="size-4 text-muted-foreground" /> Traffic
                     </CardTitle>
                     {data?.view.source === "daily" ? (
-                        <span className="text-xs text-muted-foreground">From daily totals - one bar is a day</span>
+                        <span className="text-xs text-muted-foreground">
+                            From daily totals - one bar is a day
+                        </span>
                     ) : null}
                 </CardHeader>
                 <CardBody>
                     {data ? (
                         <TimeSeriesChart
-                            points={data.view.series.map((point) => ({ t: point.t, v: point.views }))}
+                            points={data.view.series.map((point) => ({
+                                t: point.t,
+                                v: point.views
+                            }))}
                             from={data.view.from}
                             to={data.view.to}
                             summary="sum"
@@ -390,7 +451,7 @@ interface Panel {
 /** One card: a row of tabs and the list under whichever is chosen. The bar behind a
  *  row is its share of the top row, the only comparison that survives a list where
  *  the first entry is ten times the second. */
-function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Panel[]; }) {
+function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Panel[] }) {
     const [active, setActive] = useState(0);
     const panel = panels[Math.min(active, panels.length - 1)];
     if (!panel) return null;
@@ -428,20 +489,32 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                         ))}
                     </div>
                 ) : rows.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-sm text-muted-foreground">{panel.empty}</p>
+                    <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                        {panel.empty}
+                    </p>
                 ) : (
                     <ul className="flex flex-col">
                         {rows.map((row) => (
-                            <li key={row.key} className="relative flex items-center gap-3 py-1.5 text-sm">
+                            <li
+                                key={row.key}
+                                className="relative flex items-center gap-3 py-1.5 text-sm"
+                            >
                                 <span
                                     aria-hidden
                                     className="absolute inset-y-0.5 left-0 rounded bg-primary/10"
-                                    style={{ width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%` }}
+                                    style={{
+                                        width: `${top > 0 ? Math.max(2, (row.visitors / top) * 100) : 0}%`
+                                    }}
                                 />
-                                <span className="relative min-w-0 flex-1 truncate pl-2" title={row.key}>
+                                <span
+                                    className="relative min-w-0 flex-1 truncate pl-2"
+                                    title={row.key}
+                                >
                                     {panel.render ? panel.render(row.key) : row.key}
                                 </span>
-                                <span className="relative shrink-0 pr-2 tabular-nums">{grouped(row.visitors)}</span>
+                                <span className="relative shrink-0 pr-2 tabular-nums">
+                                    {grouped(row.visitors)}
+                                </span>
                             </li>
                         ))}
                     </ul>
@@ -451,7 +524,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
     );
 }
 
-function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
+function Breakdowns({ data }: { data: AnalyticsOverview | null }) {
     const rows = data?.view.breakdowns ?? null;
     // Over a long range these come from the daily totals, which do not carry the
     // per-visit dimensions. Saying so beats an empty panel that reads as "nobody used
@@ -467,15 +540,27 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
             <BreakdownCard
                 panels={[
                     { label: "Pages", rows: rows?.path ?? null, empty: "No pages read yet." },
-                    { label: "Entry", rows: rows?.entry ?? null, empty: why("entry", "No visits yet.") },
-                    { label: "Exit", rows: rows?.exit ?? null, empty: why("exit", "No visits yet.") }
+                    {
+                        label: "Entry",
+                        rows: rows?.entry ?? null,
+                        empty: why("entry", "No visits yet.")
+                    },
+                    {
+                        label: "Exit",
+                        rows: rows?.exit ?? null,
+                        empty: why("exit", "No visits yet.")
+                    }
                 ]}
             />
             <BreakdownCard
                 panels={[
                     { label: "Referrers", rows: rows?.referrer ?? null, empty: "Nowhere yet." },
                     { label: "Channels", rows: rows?.channel ?? null, empty: "Nothing yet." },
-                    { label: "Campaigns", rows: rows?.campaign ?? null, empty: why("campaign", "No tagged links yet.") }
+                    {
+                        label: "Campaigns",
+                        rows: rows?.campaign ?? null,
+                        empty: why("campaign", "No tagged links yet.")
+                    }
                 ]}
             />
             <BreakdownCard
@@ -487,7 +572,10 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
                     {
                         label: "Screens",
                         rows: rows?.screen ?? null,
-                        empty: why("screen", "A log cannot see a screen. Turn the tracker on for this one.")
+                        empty: why(
+                            "screen",
+                            "A log cannot see a screen. Turn the tracker on for this one."
+                        )
                     }
                 ]}
             />
@@ -500,7 +588,11 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
                         empty: "No location yet. It is read from the visitor's time zone, so it needs the tracker.",
                         render: (code) => `${countryFlag(code)} ${countryName(code)}`
                     },
-                    { label: "Languages", rows: rows?.language ?? null, empty: why("language", "Nothing yet.") }
+                    {
+                        label: "Languages",
+                        rows: rows?.language ?? null,
+                        empty: why("language", "Nothing yet.")
+                    }
                 ]}
             />
             <BreakdownCard
@@ -590,15 +682,22 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                                             {visit.country ? `${countryFlag(visit.country)} ` : ""}
                                             {visit.referrerSource ?? "Direct"}
                                         </td>
-                                        <td className="max-w-[16rem] truncate px-2 py-1.5 font-mono text-xs" title={visit.lastPath ?? undefined}>
+                                        <td
+                                            className="max-w-[16rem] truncate px-2 py-1.5 font-mono text-xs"
+                                            title={visit.lastPath ?? undefined}
+                                        >
                                             {visit.lastPath ?? "-"}
                                         </td>
                                         <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">
                                             {visit.browser} on {visit.os}
                                         </td>
-                                        <td className="px-2 py-1.5 text-right tabular-nums">{grouped(visit.views)}</td>
+                                        <td className="px-2 py-1.5 text-right tabular-nums">
+                                            {grouped(visit.views)}
+                                        </td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                                            {visit.durationSec > 0 ? duration(visit.durationSec) : "-"}
+                                            {visit.durationSec > 0
+                                                ? duration(visit.durationSec)
+                                                : "-"}
                                         </td>
                                     </tr>
                                 ))}
@@ -611,7 +710,10 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
     );
 }
 
-type Mutate = (patch: (current: AnalyticsOverview) => AnalyticsOverview, run: () => Promise<{ error?: string }>) => void;
+type Mutate = (
+    patch: (current: AnalyticsOverview) => AnalyticsOverview,
+    run: () => Promise<{ error?: string }>
+) => void;
 
 function TrackerPanel({
     data,
@@ -641,9 +743,10 @@ function TrackerPanel({
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <p className="text-sm text-muted-foreground">
-                    Pageviews, referrers and devices are already being counted from the edge - this service needed no
-                    setup for that. The script adds the four things a server-side log cannot see: how long a visit
-                    lasted, the screen it was read on, single-page route changes, and your own events.
+                    Pageviews, referrers and devices are already being counted from the edge - this
+                    service needed no setup for that. The script adds the four things a server-side
+                    log cannot see: how long a visit lasted, the screen it was read on, single-page
+                    route changes, and your own events.
                 </p>
 
                 <label className="flex items-start gap-3">
@@ -651,8 +754,16 @@ function TrackerPanel({
                         checked={data.site.trackerEnabled}
                         onChange={(checked) =>
                             mutate(
-                                (current) => ({ ...current, site: { ...current.site, trackerEnabled: checked } }),
-                                () => setTrackerEnabledAction({ scopeType: scope, scopeId: siteId, enabled: checked })
+                                (current) => ({
+                                    ...current,
+                                    site: { ...current.site, trackerEnabled: checked }
+                                }),
+                                () =>
+                                    setTrackerEnabledAction({
+                                        scopeType: scope,
+                                        scopeId: siteId,
+                                        enabled: checked
+                                    })
                             )
                         }
                         aria-label="Accept beats from the tracker"
@@ -660,8 +771,8 @@ function TrackerPanel({
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">Accept beats from the tracker</span>
                         <span className="text-xs text-muted-foreground">
-                            While this is off the endpoint ignores this key, so a script left on a page after you turn
-                            it off records nothing.
+                            While this is off the endpoint ignores this key, so a script left on a
+                            page after you turn it off records nothing.
                         </span>
                     </span>
                 </label>
@@ -672,7 +783,11 @@ function TrackerPanel({
                             Paste into the page&apos;s head
                         </span>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={snippet} className="min-w-0 flex-1 font-mono text-xs" />
+                            <Input
+                                readOnly
+                                value={snippet}
+                                className="min-w-0 flex-1 font-mono text-xs"
+                            />
                             <Button
                                 type="button"
                                 variant="outline"
@@ -685,14 +800,18 @@ function TrackerPanel({
                                     });
                                 }}
                             >
-                                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                                {copied ? (
+                                    <Check className="size-4" />
+                                ) : (
+                                    <Copy className="size-4" />
+                                )}
                                 {copied ? "Copied" : "Copy"}
                             </Button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span>
-                                No cookies and nothing stored on the visitor&apos;s machine, so there is nothing here to
-                                ask consent for.
+                                No cookies and nothing stored on the visitor&apos;s machine, so
+                                there is nothing here to ask consent for.
                             </span>
                             <Button
                                 type="button"
@@ -701,11 +820,15 @@ function TrackerPanel({
                                 disabled={rotating}
                                 onClick={() =>
                                     startRotate(async () => {
-                                        await rotateTrackerKeyAction({ scopeType: scope, scopeId: siteId });
+                                        await rotateTrackerKeyAction({
+                                            scopeType: scope,
+                                            scopeId: siteId
+                                        });
                                     })
                                 }
                             >
-                                <RefreshCw className={cn("size-3.5", rotating && "animate-spin")} /> New key
+                                <RefreshCw className={cn("size-3.5", rotating && "animate-spin")} />{" "}
+                                New key
                             </Button>
                         </div>
                     </div>
@@ -742,8 +865,8 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">Count visits from the edge log</span>
                         <span className="text-xs text-muted-foreground">
-                            How every deployed service gets analytics without a script. Turning this off leaves only
-                            what the tracker sends.
+                            How every deployed service gets analytics without a script. Turning this
+                            off leaves only what the tracker sends.
                         </span>
                     </span>
                 </label>
@@ -755,10 +878,12 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                         aria-label="Count recognized bots as visitors"
                     />
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">Count recognized bots as visitors</span>
+                        <span className="text-sm font-medium">
+                            Count recognized bots as visitors
+                        </span>
                         <span className="text-xs text-muted-foreground">
-                            Off, because a dashboard where a crawler outranks every real page is one nobody reads. The
-                            firewall is where bot traffic is worth looking at.
+                            Off, because a dashboard where a crawler outranks every real page is one
+                            nobody reads. The firewall is where bot traffic is worth looking at.
                         </span>
                     </span>
                 </label>
@@ -778,15 +903,17 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                                     setRetention(String(settings.retentionDays));
                                     return;
                                 }
-                                if (days !== settings.retentionDays) save({ ...settings, retentionDays: Math.round(days) });
+                                if (days !== settings.retentionDays)
+                                    save({ ...settings, retentionDays: Math.round(days) });
                             }}
                             className="w-28"
                         />
                         <span className="text-sm text-muted-foreground">days</span>
                     </span>
                     <span className="text-xs text-muted-foreground">
-                        Addresses, individual visits and their pages are dropped after this. The daily totals behind the
-                        charts are kept, so history stays comparable without keeping a row per request.
+                        Addresses, individual visits and their pages are dropped after this. The
+                        daily totals behind the charts are kept, so history stays comparable without
+                        keeping a row per request.
                     </span>
                 </label>
             </CardBody>

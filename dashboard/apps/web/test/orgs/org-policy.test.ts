@@ -40,7 +40,13 @@ describe("organization limits", () => {
             creation: "everyone",
             maxPerUser: 0,
             maxMembers: 0,
-            maxTeams: 0
+            maxTeams: 0,
+            // Inviting an address with no account makes an account here, which
+            // is an administrator's to do until an administrator says otherwise.
+            newPeople: "admins",
+            // And a person's invitations are bounded from the first boot, with no
+            // setting anybody has to find first.
+            invitesPerHour: 20
         });
     });
 
@@ -52,7 +58,9 @@ describe("organization limits", () => {
             creation: "admins",
             maxPerUser: 0,
             maxMembers: 0,
-            maxTeams: 0
+            maxTeams: 0,
+            newPeople: "admins",
+            invitesPerHour: 20
         });
     });
 
@@ -87,8 +95,13 @@ describe("organization roles", () => {
     it("refuses a written role that grants the wildcard", () => {
         // Only the seeded admin holds it. A role anybody writes must not quietly
         // inherit whatever a later version of Polaris adds.
-        expect(orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["*"] }).success).toBe(false);
-        expect(orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["teams.manage"] }).success).toBe(true);
+        expect(
+            orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["*"] }).success
+        ).toBe(false);
+        expect(
+            orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["teams.manage"] })
+                .success
+        ).toBe(true);
     });
 
     it("keeps role handles short and typeable", () => {

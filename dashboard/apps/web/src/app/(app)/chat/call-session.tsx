@@ -257,7 +257,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 {!call.audio.ok && call.audio.blame === "fault" && (
                     <span
                         title={call.audio.headline}
-                        className="flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-warning"
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-warning-soft px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-warning-ink"
                     >
                         <AlertTriangle className="size-2.5 shrink-0" />
                         No sound
@@ -275,7 +275,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 {recorded && (
                     <span
                         title="This call is being recorded"
-                        className="flex shrink-0 items-center gap-1 rounded-full bg-danger/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-danger"
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-danger-ink"
                     >
                         <span aria-hidden="true" className="size-1.5 rounded-full bg-danger" />
                         Rec

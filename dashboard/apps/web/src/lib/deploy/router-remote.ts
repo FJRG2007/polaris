@@ -80,6 +80,67 @@ export function remoteWriteScript(yaml: string, nonce = randomBytes(6).toString(
     ].join("\n");
 }
 
+/** Every certificate file Polaris puts on a server's edge starts with this, so a
+ *  push can take away the ones it no longer holds and nothing else. */
+export const REMOTE_CERT_PREFIX = "polaris-managed-";
+
+/** Where a server's edge sees its dynamic directory (see `onboardingScript`). */
+const REMOTE_EDGE_DYNAMIC = "/dynamic";
+
+/**
+ * The script that gives a server's edge exactly these certificates.
+ *
+ * Each file lands the way the routes do - written beside its target and renamed
+ * over it - and the list the edge reads is written last, so it never names a file
+ * that is not there yet. Then every earlier file of ours that is not in this set
+ * goes, which is how a certificate for a domain that left the server stops being
+ * served. With nothing to hold, that removes the list too: an empty `tls` block is
+ * a file the edge refuses, and refusing one file freezes all the others.
+ */
+export function remoteCertificatesScript(
+    certificates: readonly {
+        readonly id: string;
+        readonly certPem: string;
+        readonly keyPem: string;
+    }[],
+    nonce = randomBytes(6).toString("hex")
+): string {
+    const lines = ["set -e", `mkdir -p ${quoteArg(DYNAMIC_DIR)}`];
+    const kept: string[] = [];
+    const put = (name: string, content: string, secret: boolean) => {
+        const target = `${DYNAMIC_DIR}/${name}`;
+        const temporary = `${DYNAMIC_DIR}/.${name}.${nonce}`;
+        lines.push(
+            `printf %s ${quoteArg(Buffer.from(content, "utf8").toString("base64"))} | base64 -d > ${quoteArg(temporary)}`
+        );
+        if (secret) lines.push(`chmod 600 ${quoteArg(temporary)}`);
+        lines.push(`mv -f ${quoteArg(temporary)} ${quoteArg(target)}`);
+        kept.push(name);
+    };
+    const entries: string[] = [];
+    for (const certificate of certificates) {
+        const crt = `${REMOTE_CERT_PREFIX}${certificate.id}.crt`;
+        const key = `${REMOTE_CERT_PREFIX}${certificate.id}.key`;
+        put(crt, certificate.certPem, false);
+        put(key, certificate.keyPem, true);
+        entries.push(
+            `    - certFile: ${REMOTE_EDGE_DYNAMIC}/${crt}`,
+            `      keyFile: ${REMOTE_EDGE_DYNAMIC}/${key}`
+        );
+    }
+    if (entries.length > 0)
+        put(
+            `${REMOTE_CERT_PREFIX}certs.yml`,
+            ["tls:", "  certificates:", ...entries, ""].join("\n"),
+            false
+        );
+    const keep = kept.length > 0 ? kept.map((name) => quoteArg(name)).join("|") : "''";
+    lines.push(
+        `for f in ${quoteArg(DYNAMIC_DIR)}/${REMOTE_CERT_PREFIX}*; do case "$(basename "$f")" in ${keep}) ;; *) rm -f "$f" ;; esac; done`
+    );
+    return lines.join("\n");
+}
+
 /** The script that takes Polaris's file off a server - for a server that no longer
  *  runs anything of ours, so its edge stops holding routes to nothing. */
 export function remoteClearScript(): string {
@@ -111,6 +172,17 @@ export class RemoteRouter implements Router {
             routePriority: PUSHED_ROUTE_PRIORITY
         });
         await this.run(routes.length === 0 ? remoteClearScript() : remoteWriteScript(yaml));
+    }
+
+    /** Replace the certificates Polaris gave this server's edge with exactly these. */
+    public async pushCertificates(
+        certificates: readonly {
+            readonly id: string;
+            readonly certPem: string;
+            readonly keyPem: string;
+        }[]
+    ): Promise<void> {
+        await this.run(remoteCertificatesScript(certificates));
     }
 
     private async run(script: string): Promise<void> {

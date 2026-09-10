@@ -20,15 +20,19 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import type { Permission } from "@polaris/core";
 import { MCP_TOOLS } from "@/lib/mcp/tools";
+import { readCappedBody } from "@/lib/request-body";
+import type { Permission } from "@polaris/core";
+import { DEPLOY_TOOLS } from "@/lib/mcp/tools/deploy";
 import { authenticateApiKey } from "@/lib/api-key-auth";
+import { throttleDeployKey, tooManyCalls } from "@/lib/deploy/api/http";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import {
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_REQUEST,
     RPC_PARSE_ERROR,
     handleMcpMessage,
+    toolFailure,
     type JsonRpcResponse,
     type McpCaller,
     type McpServerInfo
@@ -54,7 +58,10 @@ const SERVER: McpServerInfo = {
         "tasks_update as you go, and say what you found in tasks_comment when you finish -",
         "including anything you could not do. Statuses, spaces and lists are named the way",
         "the people using them named them, so pass the name rather than looking up an id.",
-        "Work you find that is out of scope belongs in tasks_create, not in this change."
+        "Work you find that is out of scope belongs in tasks_create, not in this change.",
+        "The deploy_ tools name a service as project/service or project/environment/service;",
+        "deploy_projects lists them. After deploy_start, read deploy_deployment until it finishes",
+        "and report a failure with the lines that explain it."
     ].join(" ")
 };
 
@@ -67,6 +74,11 @@ function jsonRpcError(code: number, message: string, status: number): Response {
  *  calls - each of which reaches the database and, for some of them, somebody
  *  else's tracker. */
 const BATCH_MAX = 20;
+
+/** The most one request may carry: a full batch of the largest arguments any
+ *  tool takes, with room to spare. Read no further, so a body is refused for its
+ *  size before it is held. */
+const BODY_MAX = 4 * 1024 * 1024;
 
 /**
  * The envelope, before anything looks at what is inside it.
@@ -109,7 +121,13 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
             select: { isAdmin: true }
         });
         if (!user) return null;
-        return { userId: principal.userId, isAdmin: user.isAdmin, scopes: principal.scopes };
+        return {
+            userId: principal.userId,
+            isAdmin: user.isAdmin,
+            scopes: principal.scopes,
+            keyId: principal.keyId,
+            projectId: principal.projectId
+        };
     }
 
     const header = request.headers.get("authorization") ?? "";
@@ -125,6 +143,40 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
     return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES };
 }
 
+/**
+ * Spend a deploy tool call against the key's Deploy API budgets, the same ones a
+ * REST call spends. Counted per call rather than per request, so a batch of
+ * twenty deploy_start calls costs what twenty deploys through the API cost and
+ * is held back where they would be. Answers the reply for a call over budget,
+ * or null for one that may run - including every message that is not a deploy
+ * tool call, which the handler answers as it always has.
+ */
+async function overBudget(
+    message: Record<string, unknown>,
+    caller: McpCaller
+): Promise<JsonRpcResponse | null> {
+    if (!caller.keyId || message.method !== "tools/call") return null;
+    const id = message.id;
+    // A notification is answered with nothing and runs nothing, and a malformed
+    // id is the handler's to refuse.
+    if (typeof id !== "string" && typeof id !== "number" && id !== null) return null;
+    const name = (message.params as { name?: unknown } | undefined)?.name;
+    const tool = DEPLOY_TOOLS.find((candidate) => candidate.name === name);
+    if (!tool) return null;
+    const wait = await throttleDeployKey(caller.keyId, !tool.readOnly);
+    return wait === null ? null : toolFailure(id, tooManyCalls(wait));
+}
+
+/** One message, answered after its deploy budget is spent. */
+async function answer(
+    message: Record<string, unknown>,
+    caller: McpCaller
+): Promise<JsonRpcResponse | null> {
+    return (
+        (await overBudget(message, caller)) ?? handleMcpMessage(message, MCP_TOOLS, caller, SERVER)
+    );
+}
+
 export async function POST(request: Request): Promise<Response> {
     const caller = await callerFor(request);
     // A 401 here rather than a JSON-RPC error: the call never reached the
@@ -132,9 +184,16 @@ export async function POST(request: Request): Promise<Response> {
     // rather than reporting a tool failure to the model.
     if (!caller) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const tooLarge = () =>
+        jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
+    const declared = Number(request.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > BODY_MAX) return tooLarge();
+    const bytes = await readCappedBody(request, BODY_MAX);
+    if (!bytes) return tooLarge();
+
     let body: unknown;
     try {
-        body = await request.json();
+        body = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
     } catch {
         return jsonRpcError(RPC_PARSE_ERROR, "That was not JSON", 400);
     }
@@ -154,16 +213,16 @@ export async function POST(request: Request): Promise<Response> {
     if (Array.isArray(payload)) {
         const answers: JsonRpcResponse[] = [];
         for (const message of payload) {
-            const answer = await handleMcpMessage(message, MCP_TOOLS, caller, SERVER);
-            if (answer) answers.push(answer);
+            const reply = await answer(message, caller);
+            if (reply) answers.push(reply);
         }
         if (answers.length === 0) return new Response(null, { status: 202, headers });
         return Response.json(answers, { headers });
     }
 
-    const answer = await handleMcpMessage(payload, MCP_TOOLS, caller, SERVER);
-    if (!answer) return new Response(null, { status: 202, headers });
-    return Response.json(answer, { headers });
+    const reply = await answer(payload, caller);
+    if (!reply) return new Response(null, { status: 202, headers });
+    return Response.json(reply, { headers });
 }
 
 /**

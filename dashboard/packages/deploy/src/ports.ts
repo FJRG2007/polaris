@@ -100,6 +100,33 @@ export interface RuntimePorts {
      *  can default the container port to what the image actually listens on. Empty
      *  when the image declares none or inspection is unavailable. */
     inspectImage(image: string): Promise<number[]>;
+    /**
+     * Remove a pinned release image once it has fallen out of the kept window.
+     * Only ever handed a name `isReleaseImage` accepts; never forced, so an image
+     * a container still runs is refused by the engine. Optional, because an
+     * older host daemon has no route for it - the image then simply stays.
+     */
+    removeImage?(image: string): Promise<void>;
+    /** Whether an image is present on the machine, asked before a rollback runs a
+     *  kept image so a missing one is refused in words rather than by a failed
+     *  pull of a name no registry has. Optional for the same reason as above. */
+    hasImage?(image: string): Promise<boolean>;
+    /**
+     * A kept release image as a gzipped `docker save` archive, for a service built
+     * on this machine that runs on another. Streamed, never held whole. Only ever
+     * handed a name `isReleaseImage` accepts. Optional: a machine that cannot hand
+     * one out is not offered as a place to build.
+     */
+    exportImage?(image: string): Promise<NodeJS.ReadableStream>;
+    /**
+     * Load such an archive, `size` bytes long, streaming what the load printed.
+     * The local daemon refuses an archive naming anything but release images.
+     */
+    importImage?(
+        archive: NodeJS.ReadableStream,
+        size: number,
+        onOutput?: OutputSink
+    ): Promise<void>;
     /** Authenticate to a private registry (`docker login`) so a following pull can
      *  access it. An empty registry targets Docker Hub. The password is sent out of
      *  band (stdin / request body), never on the command line. */
@@ -116,6 +143,14 @@ export interface RuntimePorts {
      *  only the apps whose mount had to be re-established (e.g. after a host reboot). */
     ensureMount(spec: MountTarget): Promise<boolean>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
+    /**
+     * The running containers a compose project or swarm stack has, by name.
+     *
+     * A service is one container today and several once it has replicas, and
+     * everything that reads its output has to read all of them. Optional: where it
+     * is missing, or answers nothing, the service's own container name is used.
+     */
+    listContainers?(project: string): Promise<string[]>;
     /** Bytes in use under a path inside a running container, for volume usage
      *  history. Resolves null rather than throwing when it cannot be measured -
      *  a stopped container is the ordinary case, not an error worth a stack. */
@@ -139,5 +174,20 @@ export interface RuntimePorts {
      * themselves, so they get a stream and never a string.
      */
     readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>>;
+    /**
+     * Stream bytes into a file inside a container - the reverse of `readFile`.
+     *
+     * A restore puts a dump back, and a dump is exactly the artifact that must
+     * not be held in memory or pushed through a command line. `size` is known
+     * because the caller staged the file first, and the local daemon needs it up
+     * front. Optional so a runtime without the route fails in words rather than
+     * pretending.
+     */
+    writeFile?(
+        container: string,
+        path: string,
+        body: NodeJS.ReadableStream,
+        size: number
+    ): Promise<void>;
     dispose(): Promise<void>;
 }

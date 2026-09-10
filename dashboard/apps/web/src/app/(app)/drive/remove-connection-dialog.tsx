@@ -31,7 +31,8 @@ const CHOICES: readonly Choice[] = [
     {
         mode: "forget",
         label: "Forget it",
-        summary: "Polaris stops using the device. Nothing on it is deleted, and it can be added again later.",
+        summary:
+            "Polaris stops using the device. Nothing on it is deleted, and it can be added again later.",
         confirmLabel: "Forget connection"
     },
     {
@@ -71,7 +72,8 @@ export function RemoveConnectionDialog({
             setDestination(result?.destinations[0]?.id ?? "");
             // A device something is mounted on cannot simply be forgotten, so the
             // only answer that works is the one already selected when they arrive.
-            if (result && result.services.length > 0 && result.destinations.length > 0) setMode("move");
+            if (result && result.services.length > 0 && result.destinations.length > 0)
+                setMode("move");
         });
         return () => {
             current = false;
@@ -128,7 +130,9 @@ export function RemoveConnectionDialog({
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
                                 {choice.label}
-                                {mode === choice.mode ? <Check className="size-3.5 text-primary" /> : null}
+                                {mode === choice.mode ? (
+                                    <Check className="size-3.5 text-primary" />
+                                ) : null}
                             </span>
                             <span className="text-xs text-muted-foreground">{choice.summary}</span>
                         </button>
@@ -142,7 +146,10 @@ export function RemoveConnectionDialog({
                             value={destination}
                             onValueChange={setDestination}
                             disabled={pending}
-                            options={plan.destinations.map((entry) => ({ value: entry.id, label: entry.name }))}
+                            options={plan.destinations.map((entry) => ({
+                                value: entry.id,
+                                label: entry.name
+                            }))}
                         />
                     </label>
                 ) : null}
@@ -172,19 +179,22 @@ function Dependents({ plan }: { plan: ConnectionRemovalPlan }) {
         );
     }
     return (
-        <div className="flex flex-col gap-1.5 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             {plan.services.length > 0 ? (
                 <p className="flex items-start gap-2">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     <span>
-                        {plan.services.map((service) => `${service.name} (${service.volume})`).join(", ")}{" "}
+                        {plan.services
+                            .map((service) => `${service.name} (${service.volume})`)
+                            .join(", ")}{" "}
                         {plan.services.length === 1 ? "keeps its data" : "keep their data"} here.
                     </span>
                 </p>
             ) : null}
             {links > 0 ? (
                 <p className="pl-6">
-                    {links} shared {links === 1 ? "link or file request" : "links and file requests"} stop working.
+                    {links} shared{" "}
+                    {links === 1 ? "link or file request" : "links and file requests"} stop working.
                 </p>
             ) : null}
         </div>

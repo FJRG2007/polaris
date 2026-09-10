@@ -12,11 +12,13 @@ const SCREENS = [
     // of their mailboxes - and the only one worth opening before there is a
     // mailbox at all.
     { label: "General", href: "/mail/settings/general" },
+    { label: "Shortcuts", href: "/mail/settings/shortcuts" },
     { label: "Mailboxes", href: "/mail/settings/accounts" },
     { label: "Send-as", href: "/mail/settings/identities" },
     { label: "Labels", href: "/mail/settings/labels" },
     { label: "Filters", href: "/mail/settings/rules" },
     { label: "Signature", href: "/mail/settings/signature" },
+    { label: "Templates", href: "/mail/settings/templates" },
     { label: "Privacy", href: "/mail/settings/privacy" },
     { label: "Junk", href: "/mail/settings/junk" },
     { label: "Blocked", href: "/mail/settings/blocked" },

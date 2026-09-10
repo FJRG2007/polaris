@@ -35,6 +35,19 @@ export function normalizeMailName(value: string): string {
         .trim();
 }
 
+/**
+ * The shape of an address, for every validator in Polaris that reads one.
+ *
+ * One @, a local part of the characters an unquoted mailbox may use, and a
+ * domain made of host labels with a dot in it. Letters in any script are
+ * allowed on both sides, since internationalized mailboxes are real. What it
+ * refuses is what no mailbox can have unquoted - a comma, a semicolon,
+ * brackets, a space - which is exactly what a slip of the finger leaves
+ * behind: `ana@example.com,` is a typo, not an address.
+ */
+export const MAIL_ADDRESS_PATTERN =
+    /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~.-]+@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}-]{2,}$/u;
+
 export const mailAddress = z
     .string()
     .transform(normalizeMailAddress)
@@ -43,10 +56,7 @@ export const mailAddress = z
             .string()
             .min(3, "That is not an email address")
             .max(320)
-            // One @ with something either side, no spaces, and a dot in the
-            // domain. Everything a mailbox must have and nothing a real one
-            // would be refused for.
-            .regex(/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/, "That is not an email address")
+            .regex(MAIL_ADDRESS_PATTERN, "That is not an email address")
     );
 
 export const mailDisplayName = z.string().transform(normalizeMailName).pipe(z.string().max(120));
@@ -181,6 +191,35 @@ export const mailAccountEditSchema = z.object({
      *  inserted by hand every time is one nobody ever sends. */
     signatureAuto: mailSignatureAuto.default("new")
 });
+
+/**
+ * A change to a mailbox's settings, of only the fields a screen actually sent.
+ *
+ * The full schema above defaults every missing field, and the screens send one
+ * switch at a time - so saving "In the shared inbox" used to write "new" over
+ * whatever somebody had chosen for when their signature goes in, because that
+ * switch did not send it and the default filled it in. Every field here is
+ * optional with no default: absent means "leave it as it is".
+ */
+export const mailAccountPatchSchema = z.object({
+    displayName: mailDisplayName.optional(),
+    label: z.string().transform(normalizeMailName).pipe(z.string().max(60)).optional(),
+    color: z
+        .string()
+        .trim()
+        .regex(/^#[0-9a-fA-F]{6}$/, "That is not a color")
+        .nullable()
+        .optional(),
+    notify: z.boolean().optional(),
+    pollSeconds: z.number().int().min(60).max(3600).optional(),
+    unified: z.boolean().optional(),
+    appendToSent: z.boolean().optional(),
+    signature: z.string().max(20000).optional(),
+    signatureAboveQuote: z.boolean().optional(),
+    signatureAuto: mailSignatureAuto.optional()
+});
+
+export type MailAccountPatch = z.infer<typeof mailAccountPatchSchema>;
 
 /** The out-of-office reply. Off means the fields are kept and nothing is sent. */
 export const mailVacationSchema = z
@@ -333,6 +372,8 @@ export const mailMessageAction = z.enum([
     "unread",
     "star",
     "unstar",
+    "important",
+    "unimportant",
     "archive",
     "trash",
     "delete",
@@ -347,6 +388,25 @@ export const mailActionSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),
     action: mailMessageAction
 });
+
+/**
+ * Pinning a conversation to the top of every list, or muting it.
+ *
+ * Both are about the conversation rather than a message, and neither is
+ * something a mail server has a word for - so they are Polaris' own and nothing
+ * is sent anywhere. Named by the messages the screen is showing, the way every
+ * other action is, and resolved to their conversations on the server. At least
+ * one of the two has to be said, or the request asks for nothing.
+ */
+export const mailConversationStateSchema = z
+    .object({
+        messageIds: z.array(z.string().uuid()).min(1).max(500),
+        pinned: z.boolean().optional(),
+        muted: z.boolean().optional()
+    })
+    .refine((value) => value.pinned !== undefined || value.muted !== undefined, {
+        message: "Say whether to pin or mute."
+    });
 
 export const mailMoveSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),
@@ -512,6 +572,7 @@ export const mailPageSchema = z.object({
     unreadOnly: z.boolean().default(false),
     readOnly: z.boolean().default(false),
     starredOnly: z.boolean().default(false),
+    importantOnly: z.boolean().default(false),
     snoozedOnly: z.boolean().default(false),
     withAttachments: z.boolean().default(false),
     category: z.string().trim().max(32).default(""),
@@ -538,6 +599,40 @@ export const mailAttachFromDriveSchema = z.object({
  *  an address this server may reach at all is decided by the fetch guard. */
 export const mailAttachFromAddressSchema = z.object({
     url: z.string().trim().url().max(2048)
+});
+
+/**
+ * A message template: a name for the menu, and the subject and body it puts into
+ * the composer.
+ *
+ * A body is the only thing a template has to carry - a subject is optional,
+ * because most templates are a paragraph dropped into a reply that already has
+ * one. The ceiling is a letter's, not a newsletter's: a template is text
+ * somebody inserts while writing, and a megabyte of it is a mistake.
+ */
+export const mailTemplateSchema = z.object({
+    name: z
+        .string()
+        .transform(normalizeMailName)
+        .pipe(z.string().min(1, "Give it a name").max(80, "Keep the name under 80 characters")),
+    subject: z.string().transform(normalizeMailName).pipe(z.string().max(500)).default(""),
+    body: z
+        .string()
+        .max(50_000, "That is longer than a template can be")
+        .refine((value) => value.trim().length > 0, { message: "Write what the template says" }),
+    /** Offered only while writing from this mailbox. Null is every mailbox. */
+    accountId: z.string().uuid().nullable().default(null)
+});
+
+export type MailTemplateInput = z.infer<typeof mailTemplateSchema>;
+
+/** A draft named from the screen. Whose it is, is decided in the query. */
+export const mailDraftIdSchema = z.string().uuid();
+
+/** Carrying the files of a message being forwarded onto the forward. Whose the
+ *  message is, is decided on the server inside the query that finds it. */
+export const mailAttachFromMessageSchema = z.object({
+    messageId: z.string().uuid()
 });
 
 /** Refusing a sender. `junk` teaches the provider as well as filing the message,

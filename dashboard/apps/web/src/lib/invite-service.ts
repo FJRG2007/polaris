@@ -24,8 +24,8 @@ import { sendAuthEmail } from "@/lib/auth-mail";
 import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { suggestConnectionLink } from "@/lib/connections/suggest-link";
 import { evaluateNetworkRules } from "@/lib/network-rules";
+import { suggestConnectionLink } from "@/lib/connections/suggest-link";
 import { generateShortCode, generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import {
@@ -66,6 +66,8 @@ export interface InviteView {
     method: InviteMethod;
     /** Whether a one-time password must be presented alongside the link or code. */
     needsPassword: boolean;
+    /** The organization accepting this also joins, named so the page can say so. */
+    orgName: string | null;
 }
 
 interface InviteRow {
@@ -82,6 +84,8 @@ interface InviteRow {
     allowedContinents: string;
     accessGroupIds: string;
     pendingGrant: string | null;
+    orgId: string | null;
+    orgRole: string | null;
 }
 
 const INVITE_FIELDS = {
@@ -97,7 +101,9 @@ const INVITE_FIELDS = {
     allowedCountries: true,
     allowedContinents: true,
     accessGroupIds: true,
-    pendingGrant: true
+    pendingGrant: true,
+    orgId: true,
+    orgRole: true
 } as const;
 
 /** The URL a link or magic invite is claimed at. Built on the address Polaris is
@@ -121,6 +127,47 @@ function inviteMessage(url: string): { text: string; html: string } {
         "<p>The link expires in 7 days. If you were not expecting this, ignore this message.</p>"
     ].join("");
     return { text, html };
+}
+
+/** The organization an invite also joins, as the message and the row need it. */
+export interface InviteOrg {
+    readonly id: string;
+    readonly name: string;
+    /** The role they join at, re-checked when they accept. */
+    readonly role: string;
+    /** Who sent it, as the recipient will recognise them. */
+    readonly inviter: string;
+}
+
+/**
+ * The message for an invite sent from an organization.
+ *
+ * It names the organization and the person, because "you have been invited to
+ * Polaris" from an address somebody has never heard of is exactly what a
+ * phishing message looks like. Both names are typed by people, so the HTML half
+ * escapes them - an organization called `<a href=...>` must not become a link in
+ * somebody's inbox.
+ */
+function orgInviteMessage(
+    url: string,
+    org: InviteOrg
+): { subject: string; text: string; html: string } {
+    const subject = `${org.inviter} invited you to ${org.name} on Polaris`;
+    const text = [
+        `${org.inviter} invited you to join ${org.name} on Polaris.`,
+        "",
+        "Accepting creates your account and adds you to the organization:",
+        url,
+        "",
+        "The link works once and expires in 7 days. If you were not expecting this, ignore this message."
+    ].join("\n");
+    const html = [
+        `<p>${core.escapeHtml(org.inviter)} invited you to join <strong>${core.escapeHtml(org.name)}</strong> on Polaris.</p>`,
+        "<p>Accepting creates your account and adds you to the organization.</p>",
+        `<p><a href="${url}">Accept the invitation</a></p>`,
+        "<p>The link works once and expires in 7 days. If you were not expecting this, ignore this message.</p>"
+    ].join("");
+    return { subject, text, html };
 }
 
 /** What an invite hands back to the administrator who created it. */
@@ -155,13 +202,15 @@ async function inviteRefusal(email: string): Promise<string | null> {
         where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
         select: { id: true }
     });
-    if (open) return "There is already an open invite for that address. Revoke it before sending another.";
+    if (open)
+        return "There is already an open invite for that address. Revoke it before sending another.";
     return null;
 }
 
 export async function createInvite(
     invitedById: string,
-    input: CreateInviteInput
+    input: CreateInviteInput,
+    options: { org?: InviteOrg } = {}
 ): Promise<CreatedInvite> {
     await seedDefaultRoles();
     const email = input.email.trim().toLowerCase();
@@ -170,7 +219,10 @@ export async function createInvite(
 
     // Roles are rows an operator can add to, so an unknown name is a mistake to
     // report rather than an invite that quietly hands out nothing.
-    const role = await prisma.role.findUnique({ where: { name: input.role }, select: { id: true } });
+    const role = await prisma.role.findUnique({
+        where: { name: input.role },
+        select: { id: true }
+    });
     if (!role) return { id: "", error: "That role no longer exists." };
     const token = generateToken();
     // Only the groups the inviting administrator owns; a foreign id is dropped
@@ -186,7 +238,9 @@ export async function createInvite(
             email,
             tokenHash: hashToken(token),
             codeHash: code ? hashToken(code) : null,
-            passwordHash: input.oneTimePassword ? await hashLinkPassword(input.oneTimePassword) : null,
+            passwordHash: input.oneTimePassword
+                ? await hashLinkPassword(input.oneTimePassword)
+                : null,
             method: input.method,
             roleId: role.id,
             invitedById,
@@ -198,14 +252,19 @@ export async function createInvite(
             delegated: input.delegated === true,
             // What it promises on one thing. Only an intention until the claim,
             // which resolves it again against what the inviter still holds.
-            pendingGrant: input.pendingGrant ? JSON.stringify(input.pendingGrant) : null
+            pendingGrant: input.pendingGrant ? JSON.stringify(input.pendingGrant) : null,
+            orgId: options.org?.id ?? null,
+            orgRole: options.org?.role ?? null
         },
         select: { id: true }
     });
 
     const url = await inviteUrl(token);
     if (input.method === "magic") {
-        const sent = await sendAuthEmail({ to: email, subject: "You have been invited to Polaris", ...inviteMessage(url) });
+        const message = options.org
+            ? orgInviteMessage(url, options.org)
+            : { subject: "You have been invited to Polaris", ...inviteMessage(url) };
+        const sent = await sendAuthEmail({ to: email, ...message });
         if (sent.error) return { id: invite.id, url, sendError: sent.error };
         await prisma.invite.update({ where: { id: invite.id }, data: { sentAt: new Date() } });
         return { id: invite.id, url };
@@ -220,14 +279,23 @@ function inviteRules(invite: InviteRow): EffectiveAccessRules {
 }
 
 /** Look an invite up by whichever credential the recipient presented. */
-async function findInvite(credential: { token?: string; code?: string }): Promise<InviteRow | null> {
+async function findInvite(credential: {
+    token?: string;
+    code?: string;
+}): Promise<InviteRow | null> {
     if (credential.token) {
-        return prisma.invite.findUnique({ where: { tokenHash: hashToken(credential.token) }, select: INVITE_FIELDS });
+        return prisma.invite.findUnique({
+            where: { tokenHash: hashToken(credential.token) },
+            select: INVITE_FIELDS
+        });
     }
     if (credential.code) {
         const normalized = normalizeInviteCode(credential.code);
         if (normalized.length !== INVITE_CODE_LENGTH) return null;
-        return prisma.invite.findUnique({ where: { codeHash: hashToken(normalized) }, select: INVITE_FIELDS });
+        return prisma.invite.findUnique({
+            where: { codeHash: hashToken(normalized) },
+            select: INVITE_FIELDS
+        });
     }
     return null;
 }
@@ -272,12 +340,19 @@ export async function resolveInvite(
     if (!invite || !isOpen(invite)) return { refusal: "unavailable" };
     const decision = await evaluateNetworkRules(inviteRules(invite), ip);
     if (!decision.allowed) return { refusal: "location" };
+    const org = invite.orgId
+        ? await prisma.organization.findUnique({
+              where: { id: invite.orgId },
+              select: { name: true }
+          })
+        : null;
     return {
         invite: {
             id: invite.id,
             email: invite.email,
             method: (invite.method as InviteMethod) ?? "link",
-            needsPassword: invite.passwordHash !== null
+            needsPassword: invite.passwordHash !== null,
+            orgName: org?.name ?? null
         }
     };
 }
@@ -367,7 +442,9 @@ export interface ClaimInput {
  * submitting it the invite may have been revoked, expired, claimed by somebody
  * else, or carried to another network.
  */
-export async function claimInvite(input: ClaimInput): Promise<{ email?: string; refusal?: InviteRefusal; error?: string }> {
+export async function claimInvite(
+    input: ClaimInput
+): Promise<{ email?: string; refusal?: InviteRefusal; error?: string }> {
     if (!(await claimAttemptAllowed(input.ip))) return { refusal: "throttled" };
 
     const invite = await findInvite({ token: input.token, code: input.code });
@@ -396,7 +473,10 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
     }
 
     if (invite.roleId) {
-        const role = await prisma.role.findUnique({ where: { id: invite.roleId }, select: { name: true } });
+        const role = await prisma.role.findUnique({
+            where: { id: invite.roleId },
+            select: { name: true }
+        });
         if (role) await assignRole(user.id, role.name);
     }
 
@@ -413,6 +493,21 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
     if (restricted) await updateEnforcedRules(user.id, invite.invitedById, rules);
 
     await applyPendingGrant(invite, user.id);
+
+    // Sent from an organization, so accepting it is also accepting that. The
+    // organization's own checks run again here - the role may be gone, the
+    // roster may be full - and none of them may undo the account that was just
+    // made for somebody standing on the page waiting for it.
+    if (invite.orgId) {
+        const { joinOrgFromInvite } = await import("@/lib/orgs/invitation-service");
+        await joinOrgFromInvite({
+            inviteId: invite.id,
+            orgId: invite.orgId,
+            role: invite.orgRole,
+            userId: user.id,
+            invitedById: invite.invitedById
+        });
+    }
 
     await prisma.$transaction([
         prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
@@ -462,7 +557,9 @@ export async function listInvites(): Promise<InviteListItem[]> {
     // The invite keeps only the role id (the row it points at is not its own), so
     // the names are resolved in one query rather than one per invite.
     const roles = await prisma.role.findMany({
-        where: { id: { in: rows.map((row) => row.roleId).filter((id): id is string => id !== null) } },
+        where: {
+            id: { in: rows.map((row) => row.roleId).filter((id): id is string => id !== null) }
+        },
         select: { id: true, name: true }
     });
     const roleName = new Map(roles.map((role) => [role.id, role.name]));
@@ -486,4 +583,50 @@ export async function listInvites(): Promise<InviteListItem[]> {
 
 export async function revokeInvite(id: string): Promise<void> {
     await prisma.invite.deleteMany({ where: { id, acceptedAt: null } });
+}
+
+/**
+ * Send an emailed invite again, under a new link.
+ *
+ * The token is replaced rather than re-sent: only its hash is stored, so the old
+ * link cannot be recovered to send, and a second copy of a still-valid link is a
+ * second place for it to leak from. The old link stops working the moment this
+ * one is made, and the week starts over.
+ *
+ * `orgId` narrows it to one organization's invites, which is how the People
+ * screen calls it - an id alone would let anybody who has one resend an invite
+ * somewhere they cannot see.
+ */
+export async function resendInvite(
+    id: string,
+    options: { orgId?: string; org?: InviteOrg } = {}
+): Promise<{ url?: string; sendError?: string; error?: string }> {
+    const invite = await prisma.invite.findFirst({
+        where: {
+            id,
+            acceptedAt: null,
+            method: "magic",
+            ...(options.orgId ? { orgId: options.orgId } : {})
+        },
+        select: { id: true, email: true }
+    });
+    if (!invite) return { error: "That invitation is no longer waiting." };
+
+    const token = generateToken();
+    await prisma.invite.update({
+        where: { id: invite.id },
+        data: {
+            tokenHash: hashToken(token),
+            expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+            sentAt: null
+        }
+    });
+    const url = await inviteUrl(token);
+    const message = options.org
+        ? orgInviteMessage(url, options.org)
+        : { subject: "You have been invited to Polaris", ...inviteMessage(url) };
+    const sent = await sendAuthEmail({ to: invite.email, ...message });
+    if (sent.error) return { url, sendError: sent.error };
+    await prisma.invite.update({ where: { id: invite.id }, data: { sentAt: new Date() } });
+    return { url };
 }

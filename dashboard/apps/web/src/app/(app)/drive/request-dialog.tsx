@@ -91,7 +91,7 @@ function CategoryToggles({
 }) {
     const active =
         tone === "deny"
-            ? "border-danger bg-danger/10 text-danger"
+            ? "border-danger bg-danger-soft text-danger-ink"
             : "border-primary bg-primary/10 text-primary";
     return (
         <div className="flex flex-wrap gap-1.5">

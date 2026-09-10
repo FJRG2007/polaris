@@ -162,7 +162,7 @@ export function ActivityStream({
                         <RelativeTime iso={comment.createdAt} />
                     </span>
                     {comment.resolvedAt && (
-                        <span className="inline-flex items-center gap-1 text-[0.6875rem] text-emerald-500">
+                        <span className="inline-flex items-center gap-1 text-[0.6875rem] text-success">
                             <CheckCircle2 className="size-3" /> Resolved
                         </span>
                     )}
@@ -423,7 +423,7 @@ export function TimeSection({
                     <span>{core.formatTrackedSeconds(tracked)} tracked</span>
                     {estimate ? <span>of {core.formatDurationMinutes(estimate)}</span> : null}
                     {used !== null && (
-                        <span className={cn(used > 100 && "text-amber-500")}>({used}%)</span>
+                        <span className={cn(used > 100 && "text-warning")}>({used}%)</span>
                     )}
                 </div>
             </header>
@@ -487,7 +487,7 @@ export function TimeSection({
                                 {entry.note ? ` - ${entry.note}` : ""}
                             </span>
                             {entry.billable && (
-                                <span className="text-[0.6875rem] text-emerald-500">billable</span>
+                                <span className="text-[0.6875rem] text-success">billable</span>
                             )}
                             {(canModerate || entry.userId === currentUserId) && !entry.running && (
                                 <button

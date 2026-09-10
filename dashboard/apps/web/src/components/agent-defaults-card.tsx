@@ -391,7 +391,7 @@ export function AgentDefaultsCard({
                 </div>
 
                 <div className="flex items-center justify-end gap-3">
-                    {saved ? <span className="text-xs text-emerald-400">Saved</span> : null}
+                    {saved ? <span className="text-xs text-success">Saved</span> : null}
                     <Button size="sm" onClick={save} disabled={pending}>
                         {pending ? "Saving..." : "Save"}
                     </Button>

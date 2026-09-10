@@ -114,9 +114,11 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                             {entry.primary ? <Badge variant="primary">Primary</Badge> : null}
                             {entry.recovery ? <Badge>Recovery</Badge> : null}
                             {entry.verified ? (
-                                <Badge className="border-success/40 text-success">Verified</Badge>
+                                <Badge className="border-success-edge text-success">Verified</Badge>
                             ) : (
-                                <Badge className="border-warning/40 text-warning">Unverified</Badge>
+                                <Badge className="border-warning-edge text-warning">
+                                    Unverified
+                                </Badge>
                             )}
                             {entry.verified ? null : (
                                 <Button
@@ -143,7 +145,9 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                                 ? `Stop using ${entry.email} for recovery`
                                                 : `Use ${entry.email} for recovery`
                                         }
-                                        title={entry.recovery ? "Not for recovery" : "Use for recovery"}
+                                        title={
+                                            entry.recovery ? "Not for recovery" : "Use for recovery"
+                                        }
                                         disabled={busy === entry.id}
                                         onClick={() =>
                                             void run(entry.id ?? "", () =>
@@ -151,7 +155,12 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                             )
                                         }
                                     >
-                                        <LifeBuoy className={cn("size-4", entry.recovery && "text-primary")} />
+                                        <LifeBuoy
+                                            className={cn(
+                                                "size-4",
+                                                entry.recovery && "text-primary"
+                                            )}
+                                        />
                                     </Button>
                                     <Button
                                         variant="ghost"
@@ -188,7 +197,10 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                         autoComplete="email"
                         onChange={(event) => setAdding(event.target.value)}
                     />
-                    <Button type="submit" disabled={busy === "add" || !candidate.success || duplicate}>
+                    <Button
+                        type="submit"
+                        disabled={busy === "add" || !candidate.success || duplicate}
+                    >
                         <Plus className="size-4" />
                         Add
                     </Button>
@@ -258,7 +270,12 @@ function PromoteEmailDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         Current password
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                        />
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">

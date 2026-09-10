@@ -7,10 +7,27 @@
  */
 
 import type { Client } from "ssh2";
+import { PassThrough } from "node:stream";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
-import { parseReclaimedBytes, quoteArg, renderComposeYaml, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
+import {
+    ensurePrivateNetworksScript,
+    forCompose,
+    isReleaseImage,
+    parseReclaimedBytes,
+    quoteArg,
+    renderComposeYaml,
+    type BuildRequest,
+    type ComposeSpec,
+    type ExecResult,
+    type ExecSpec,
+    type ExecStream,
+    type LogOptions,
+    type MountTarget,
+    type OutputSink,
+    type RuntimePorts
+} from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -39,7 +56,9 @@ export class SshPorts implements RuntimePorts {
         private readonly target: SshTarget,
         signal?: AbortSignal
     ) {
-        signal?.addEventListener("abort", () => void this.dispose().catch(() => undefined), { once: true });
+        signal?.addEventListener("abort", () => void this.dispose().catch(() => undefined), {
+            once: true
+        });
     }
 
     private async connect(): Promise<Client> {
@@ -55,7 +74,8 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
+        // Escaped for compose's own interpolation - see `forCompose`.
+        const yaml = renderComposeYaml(forCompose(spec), REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
         const b64 = Buffer.from(yaml, "utf8").toString("base64");
         const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
         const file = `${dir}/compose.yml`;
@@ -63,6 +83,10 @@ export class SshPorts implements RuntimePorts {
             "set -e",
             `mkdir -p ${quoteArg(dir)} ${quoteArg(REMOTE_VOLUME_ROOT)}`,
             `printf %s ${quoteArg(b64)} | base64 -d > ${quoteArg(file)}`,
+            // Compose only joins a network that already exists; a private one is
+            // made here the first time a service names it (the daemon does the same
+            // on Polaris's own machine).
+            ...ensurePrivateNetworksScript(spec.networks, false),
             `docker compose -p ${quoteArg(spec.project)} -f ${quoteArg(file)} up -d --remove-orphans`
         ].join("; ");
         await this.run(command, onOutput);
@@ -77,7 +101,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
+        const yaml = renderComposeYaml(forCompose(spec), REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
         const b64 = Buffer.from(yaml, "utf8").toString("base64");
         const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
         const file = `${dir}/compose.yml`;
@@ -85,6 +109,7 @@ export class SshPorts implements RuntimePorts {
             "set -e",
             `mkdir -p ${quoteArg(dir)} ${quoteArg(REMOTE_VOLUME_ROOT)}`,
             `printf %s ${quoteArg(b64)} | base64 -d > ${quoteArg(file)}`,
+            ...ensurePrivateNetworksScript(spec.networks, true),
             `docker stack deploy -c ${quoteArg(file)} --detach=true --with-registry-auth --prune ${quoteArg(spec.project)}`
         ].join("; ");
         await this.run(command, onOutput);
@@ -94,14 +119,157 @@ export class SshPorts implements RuntimePorts {
         await this.run(`docker stack rm ${quoteArg(project)}`, onOutput);
     }
 
-    public async build(): Promise<string> {
-        // Remote build from a tar context streamed over an exec channel is a
-        // follow-up; the remote path currently deploys prebuilt images.
-        throw new Error("remote build is not yet supported");
+    /**
+     * Build an image on the server from a tar context streamed over the channel.
+     *
+     * The context rides the encrypted channel's stdin, the same way a registry
+     * password does, so nothing is staged on the server for Polaris to clean up:
+     * `docker build -` reads it straight in. Nixpacks needs a directory, so for it
+     * the tar is unpacked into a private temporary one that goes whatever the
+     * build does - and a server without nixpacks says so rather than failing on a
+     * command it does not have.
+     *
+     * The Dockerfile path and the root directory are confined the way the local
+     * daemon confines them: a value that climbs out of the context would let a
+     * build read whatever else is on that disk.
+     */
+    public async build(request: BuildRequest, onOutput?: OutputSink): Promise<string> {
+        const dockerfile = request.dockerfile ?? "Dockerfile";
+        const root = request.root ?? "";
+        if (!confinedPath(dockerfile) || (root !== "" && !confinedPath(root))) {
+            throw new Error("the build path leaves its context");
+        }
+        const script =
+            request.builder === "nixpacks"
+                ? [
+                      "set -e",
+                      'command -v nixpacks >/dev/null 2>&1 || { echo "nixpacks is not installed on this server" >&2; exit 127; }',
+                      "d=$(mktemp -d)",
+                      "trap 'rm -rf \"$d\"' EXIT",
+                      'tar -x -C "$d"',
+                      `nixpacks build "$d"/${quoteArg(root || ".")} --name ${quoteArg(request.tag)}`
+                  ].join("\n")
+                : `docker build -t ${quoteArg(request.tag)} -f ${quoteArg(dockerfile)} -`;
+        const client = await this.connect();
+        await new Promise<void>((resolve, reject) => {
+            client.exec(script, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let code: number | null = null;
+                channel.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.stderr.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () =>
+                    code === 0
+                        ? resolve()
+                        : reject(new Error(`the build exited with code ${code ?? -1}`))
+                );
+                channel.on("error", reject);
+                const tar = request.contextTar;
+                tar.on("error", (tarError: Error) => {
+                    channel.close();
+                    reject(tarError);
+                });
+                tar.pipe(channel);
+            });
+        });
+        return request.tag;
+    }
+
+    /** Take a pinned release image off the server once it has fallen out of the
+     *  kept window. Nothing else is ever handed here: the name is checked against
+     *  the release naming before it reaches a shell. Not forced, so an image a
+     *  container still runs is refused by the engine rather than pulled out from
+     *  under it. */
+    public async removeImage(image: string): Promise<void> {
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be removed");
+        await this.run(`docker image rm ${quoteArg(image)}`);
+    }
+
+    /** `docker image inspect` exits non-zero for an image the machine lacks. */
+    public async hasImage(image: string): Promise<boolean> {
+        return this.run(`docker image inspect --format '{{.Id}}' ${quoteArg(image)}`).then(
+            () => true,
+            () => false
+        );
     }
 
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
         await this.run(`docker pull ${quoteArg(image)}`, onOutput);
+    }
+
+    /**
+     * `docker save | gzip` on the server, as a stream. A save that fails writes
+     * to stderr and leaves gzip with nothing to compress; either ends the stream
+     * with an error rather than a valid, empty archive.
+     */
+    public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
+        if (!isReleaseImage(image))
+            throw new Error("only a kept release image can be sent to another machine");
+        const client = await this.connect();
+        return new Promise<NodeJS.ReadableStream>((resolve, reject) => {
+            client.exec(`docker save ${quoteArg(image)} | gzip -1`, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                const out = new PassThrough();
+                let said = "";
+                channel.stderr.on("data", (chunk: Buffer) => {
+                    if (said.length < 2000) said += chunk.toString("utf8");
+                });
+                channel.on("close", (code: number) => {
+                    if (code === 0 && !said.trim()) out.end();
+                    else
+                        out.destroy(
+                            new Error(
+                                `reading ${image} exited with code ${code}${said ? `: ${said.trim()}` : ""}`
+                            )
+                        );
+                });
+                channel.on("error", (channelError: Error) => out.destroy(channelError));
+                channel.pipe(out, { end: false });
+                resolve(out);
+            });
+        });
+    }
+
+    /** `docker load` on the server, fed the archive on stdin. */
+    public async importImage(
+        archive: NodeJS.ReadableStream,
+        _size: number,
+        onOutput?: OutputSink
+    ): Promise<void> {
+        const client = await this.connect();
+        await new Promise<void>((resolve, reject) => {
+            client.exec("docker load", (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let code: number | null = null;
+                channel.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.stderr.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () =>
+                    code === 0
+                        ? resolve()
+                        : reject(new Error(`loading the image exited with code ${code ?? -1}`))
+                );
+                channel.on("error", reject);
+                archive.on("error", (archiveError: Error) => {
+                    channel.close();
+                    reject(archiveError);
+                });
+                archive.pipe(channel);
+            });
+        });
     }
 
     public async inspectImage(image: string): Promise<number[]> {
@@ -216,7 +384,9 @@ export class SshPorts implements RuntimePorts {
                 channel.on("exit", (exitCode: number) => {
                     code = exitCode;
                 });
-                channel.on("close", () => (code === 0 ? resolve() : reject(new Error("registry login failed"))));
+                channel.on("close", () =>
+                    code === 0 ? resolve() : reject(new Error("registry login failed"))
+                );
                 channel.on("error", reject);
                 channel.write(password);
                 channel.end();
@@ -251,7 +421,7 @@ export class SshPorts implements RuntimePorts {
         const lines = [
             "set -e",
             `t=${quoteArg(target)}`,
-            'if awk -v t="$t" \'$5 == t { found = 1 } END { exit !found }\' /proc/self/mountinfo 2>/dev/null; then',
+            "if awk -v t=\"$t\" '$5 == t { found = 1 } END { exit !found }' /proc/self/mountinfo 2>/dev/null; then",
             '    if ls "$t" >/dev/null 2>&1; then echo polaris:already; exit 0; fi',
             '    umount -f "$t" 2>/dev/null || umount -l "$t"',
             "fi",
@@ -263,12 +433,16 @@ export class SshPorts implements RuntimePorts {
         const useCreds = spec.kind === "smb" && spec.username && spec.password;
         if (useCreds) {
             lines.push("creds=$(mktemp)", 'chmod 600 "$creds"');
-            lines.push(`printf 'username=%s\\npassword=%s\\n' ${quoteArg(spec.username as string)} ${quoteArg(spec.password as string)} > "$creds"`);
+            lines.push(
+                `printf 'username=%s\\npassword=%s\\n' ${quoteArg(spec.username as string)} ${quoteArg(spec.password as string)} > "$creds"`
+            );
             optionValue = staticOpts ? `credentials=$creds,${staticOpts}` : "credentials=$creds";
         }
         // The source is quoted; the option value is our own controlled string plus the
         // $creds shell var, so it is embedded in double quotes to let $creds expand.
-        lines.push(`mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`);
+        lines.push(
+            `mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`
+        );
         if (useCreds) lines.push('rm -f "$creds"');
         lines.push("echo polaris:created");
         let out = "";
@@ -285,7 +459,32 @@ export class SshPorts implements RuntimePorts {
         parts.push(quoteArg(ref));
         const client = await this.connect();
         // A PTY so the remote `logs -f` dies when the client disconnects.
-        await execCommand(client, parts.join(" "), { pty: true, onStdout: onData, onStderr: onData });
+        await execCommand(client, parts.join(" "), {
+            pty: true,
+            onStdout: onData,
+            onStderr: onData
+        });
+    }
+
+    /** `docker ps` by the compose and swarm labels, names only. The project name
+     *  is quoted like every other value that reaches the remote shell. */
+    public async listContainers(project: string): Promise<string[]> {
+        const names = new Set<string>();
+        for (const label of [
+            `com.docker.compose.project=${project}`,
+            `com.docker.stack.namespace=${project}`
+        ]) {
+            let out = "";
+            await this.run(
+                `docker ps --filter ${quoteArg(`label=${label}`)} --format ${quoteArg("{{.Names}}")}`,
+                (chunk) => {
+                    out += chunk.toString("utf8");
+                }
+            ).catch(() => undefined);
+            for (const name of out.split("\n").map((line) => line.trim()))
+                if (name) names.add(name);
+        }
+        return [...names].sort();
     }
 
     public async diskUsage(ref: string, path: string): Promise<number | null> {
@@ -305,8 +504,10 @@ export class SshPorts implements RuntimePorts {
     public async wipePath(ref: string, path: string): Promise<void> {
         // The path is a positional argument, never interpolated into the inner
         // command, so the same guarantee holds here as on the local daemon.
-        const script = "rm -rf -- \"$1\"/* \"$1\"/.[!.]* \"$1\"/..?* 2>/dev/null; exit 0";
-        await this.run(`docker exec ${quoteArg(ref)} sh -c ${quoteArg(script)} polaris ${quoteArg(path)}`);
+        const script = 'rm -rf -- "$1"/* "$1"/.[!.]* "$1"/..?* 2>/dev/null; exit 0';
+        await this.run(
+            `docker exec ${quoteArg(ref)} sh -c ${quoteArg(script)} polaris ${quoteArg(path)}`
+        );
     }
 
     public async exec(spec: ExecSpec): Promise<ExecStream> {
@@ -315,8 +516,10 @@ export class SshPorts implements RuntimePorts {
         const command = `docker exec -it ${quoteArg(spec.container)} ${shellCmd}`;
         // Run the container exec inside a PTY channel so it behaves like a terminal.
         const channel = await new Promise<import("ssh2").ClientChannel>((resolve, reject) => {
-            client.exec(command, { pty: { cols: spec.cols ?? 80, rows: spec.rows ?? 24 } }, (error, ch) =>
-                error ? reject(error) : resolve(ch)
+            client.exec(
+                command,
+                { pty: { cols: spec.cols ?? 80, rows: spec.rows ?? 24 } },
+                (error, ch) => (error ? reject(error) : resolve(ch))
             );
         });
         return {
@@ -370,23 +573,77 @@ export class SshPorts implements RuntimePorts {
                 });
                 const web = new ReadableStream<Uint8Array>({
                     start(controller) {
-                        channel.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+                        channel.on("data", (chunk: Buffer) =>
+                            controller.enqueue(new Uint8Array(chunk))
+                        );
                         channel.on("close", (code: number) => {
                             if (code === 0) {
                                 controller.close();
                                 return;
                             }
                             controller.error(
-                                new Error(`reading ${path} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`)
+                                new Error(
+                                    `reading ${path} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`
+                                )
                             );
                         });
-                        channel.on("error", (channelError: Error) => controller.error(channelError));
+                        channel.on("error", (channelError: Error) =>
+                            controller.error(channelError)
+                        );
                     },
                     cancel() {
                         channel.close();
                     }
                 });
                 resolve(web);
+            });
+        });
+    }
+
+    /**
+     * Stream bytes into a file inside a container on the server.
+     *
+     * `docker exec -i` with the channel's stdin as the file's contents: the path
+     * is a positional argument to the inner shell, never interpolated into it.
+     */
+    public async writeFile(
+        container: string,
+        path: string,
+        body: NodeJS.ReadableStream,
+        _size: number
+    ): Promise<void> {
+        const command = `docker exec -i ${quoteArg(container)} sh -c ${quoteArg('cat > "$1"')} polaris ${quoteArg(path)}`;
+        const client = await this.connect();
+        await new Promise<void>((resolve, reject) => {
+            client.exec(command, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let code: number | null = null;
+                let said = "";
+                channel.on("data", () => undefined);
+                channel.stderr.on("data", (chunk: Buffer) => {
+                    if (said.length < 2000) said += chunk.toString("utf8");
+                });
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () =>
+                    code === 0
+                        ? resolve()
+                        : reject(
+                              new Error(
+                                  `writing ${path} exited with code ${code ?? -1}${said ? `: ${said.trim()}` : ""}`
+                              )
+                          )
+                );
+                channel.on("error", reject);
+                body.on("error", (bodyError: Error) => {
+                    channel.close();
+                    reject(bodyError);
+                });
+                body.pipe(channel);
             });
         });
     }
@@ -401,6 +658,18 @@ export class SshPorts implements RuntimePorts {
             throw new Error(`remote command exited with code ${result.code}`);
         }
     }
+}
+
+/** A path that stays inside the build context: relative, no parent steps, no
+ *  control characters. The same rule the local daemon applies to both values. */
+function confinedPath(path: string): boolean {
+    return (
+        path.length > 0 &&
+        !path.startsWith("/") &&
+        !path.startsWith("\\") &&
+        !path.split(/[\\/]/).includes("..") &&
+        !/[\u0000-\u001f\u007f]/.test(path)
+    );
 }
 
 /** Parse docker's `ExposedPorts` map ({"5601/tcp":{},"53/udp":{}}) into the sorted

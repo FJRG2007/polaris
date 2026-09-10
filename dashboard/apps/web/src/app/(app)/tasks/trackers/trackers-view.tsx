@@ -79,7 +79,7 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
             {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
 
             <div className="flex justify-end">
@@ -114,7 +114,7 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                         {tracker.syncedAt ? "" : ", never pulled"}
                                     </p>
                                     {tracker.error ? (
-                                        <p className="mt-1 flex items-start gap-1 text-xs text-red-400">
+                                        <p className="mt-1 flex items-start gap-1 text-xs text-danger">
                                             <TriangleAlert className="mt-0.5 size-3 shrink-0" />
                                             {tracker.error}
                                         </p>
@@ -350,7 +350,7 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                         <Switch checked={pushStatus} onChange={setPushStatus} />
                     </div>
 
-                    {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 
                 <DialogFooter>

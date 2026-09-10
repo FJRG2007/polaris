@@ -28,12 +28,15 @@ describe("every link", () => {
         expect(url.pathname).toBe("/profile/api-tokens");
     });
 
-    it.each(SCOPES)("leaves the scope open, since the zone is only known once read (%s)", (scope) => {
-        const url = new URL(CLOUDFLARE_TOKEN_LINKS[scope]);
-        expect(url.searchParams.get("accountId")).toBe("*");
-        expect(url.searchParams.get("zoneId")).toBe("all");
-        expect(url.searchParams.get("name")).toMatch(/^Polaris/);
-    });
+    it.each(SCOPES)(
+        "leaves the scope open, since the zone is only known once read (%s)",
+        (scope) => {
+            const url = new URL(CLOUDFLARE_TOKEN_LINKS[scope]);
+            expect(url.searchParams.get("accountId")).toBe("*");
+            expect(url.searchParams.get("zoneId")).toBe("all");
+            expect(url.searchParams.get("name")).toMatch(/^Polaris/);
+        }
+    );
 
     it.each(SCOPES)("names as many permissions as it asks Cloudflare for (%s)", (scope) => {
         // The written list is what the operator ticks by hand if a key is ever
@@ -43,10 +46,11 @@ describe("every link", () => {
 });
 
 describe("what each link asks for", () => {
-    it("asks for exactly the two permissions the records need", () => {
+    it("asks for the records, the zone, and purging the cache of a proxied domain", () => {
         expect(permissions("dns")).toEqual([
             { key: "dns", type: "edit" },
-            { key: "zone", type: "read" }
+            { key: "zone", type: "read" },
+            { key: "cache", type: "purge" }
         ]);
     });
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ProjectShell } from "../project-shell";
 import { listProjects, getProject } from "@/lib/deploy-service";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { readerProjectGlance } from "@/lib/deploy/project-glance";
 import { listProjectStagedChanges } from "@/lib/deploy-staged-changes";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +34,10 @@ export default async function ProjectLayout({
     // The switcher in this shell lists the shelf the project itself is on, not
     // whichever one happens to be open: a project reached by link must not offer
     // to jump to services from somewhere else entirely.
-    const [projects, staged] = await Promise.all([
+    const [projects, staged, glance] = await Promise.all([
         listProjects(user.id, project.orgId),
-        listProjectStagedChanges(projectId)
+        listProjectStagedChanges(projectId),
+        readerProjectGlance(projectId, user.id)
     ]);
 
     return (
@@ -47,7 +49,8 @@ export default async function ProjectLayout({
                     id: environment.id,
                     name: environment.name,
                     isDefault: environment.isDefault
-                }))
+                })),
+                glance
             }}
             projects={projects.map((item) => ({ id: item.id, name: item.name }))}
             staged={staged}

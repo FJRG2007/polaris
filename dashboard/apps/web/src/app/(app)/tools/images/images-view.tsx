@@ -225,7 +225,7 @@ export function ImagesView() {
                         ) : null}
 
                         {facts?.hasLocation && keepMetadata ? (
-                            <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+                            <p className="flex items-start gap-2 rounded-lg border border-warning-edge bg-warning-soft p-3 text-sm">
                                 <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
                                 This picture records where it was taken, and keeping its information
                                 keeps that too.

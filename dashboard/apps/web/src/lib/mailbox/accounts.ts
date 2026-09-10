@@ -270,23 +270,18 @@ async function tryServer(check: () => Promise<void>, field: string): Promise<voi
 }
 
 /** What can be changed about a mailbox without reconnecting it. */
+/** Change a mailbox's settings. Only the fields in `edit` are written - an
+ *  absent one is left as it is, never put back to a default. */
 export async function editAccount(
     userId: string,
     accountId: string,
-    edit: {
-        displayName: string;
-        label: string;
-        color: string | null;
-        notify: boolean;
-        pollSeconds: number;
-        unified: boolean;
-        appendToSent: boolean;
-        signature: string;
-        signatureAboveQuote: boolean;
-    }
+    edit: core.MailAccountPatch
 ): Promise<MailAccountView> {
     await ownedAccount(userId, accountId);
-    await prisma.mailAccount.update({ where: { id: accountId }, data: edit });
+    const data = Object.fromEntries(
+        Object.entries(edit).filter(([, value]) => value !== undefined)
+    ) as core.MailAccountPatch;
+    await prisma.mailAccount.update({ where: { id: accountId }, data });
     return accountView(await ownedAccount(userId, accountId));
 }
 

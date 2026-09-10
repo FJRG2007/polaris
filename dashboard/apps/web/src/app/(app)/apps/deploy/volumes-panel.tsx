@@ -98,7 +98,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                 </div>
             )}
 
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
 
             <div className="overflow-hidden rounded-md border border-border/60">
                 {items && items.length === 0 && (

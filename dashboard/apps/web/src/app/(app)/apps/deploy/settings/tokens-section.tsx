@@ -3,10 +3,10 @@
 /**
  * Tokens: API access limited to this project.
  *
- * A token is issued against the project owner's account and narrowed twice - to
- * this project, and to reading unless it was asked to do more - so it can never
- * reach further than the person who minted it, and revoking their role shrinks
- * every token with it.
+ * A token is issued against the account of whoever minted it and narrowed twice -
+ * to this project, and to reading unless it was asked to do more - so it can
+ * never reach further than that person can on this project today, and changing
+ * or removing their access shrinks or stops every token they made with it.
  *
  * The secret is shown once. There is no way to recover it afterwards, which is
  * the point of storing only its hash, so the panel says so plainly rather than
@@ -100,7 +100,7 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
         <div className="flex flex-col gap-4">
             <SettingsCard
                 title="Project tokens"
-                description="Present one as `Authorization: Bearer ...`. It acts on this project only, with the permissions of whoever owns it."
+                description="Present one as `Authorization: Bearer ...`. It acts on this project only, with the access of whoever made it."
             >
                 {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -112,7 +112,9 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                     ) : tokens.length === 0 ? (
                         <div className="flex flex-col items-center gap-1 px-3 py-8 text-center">
                             <KeyRound className="size-5 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">No tokens for this project.</p>
+                            <p className="text-sm text-muted-foreground">
+                                No tokens for this project.
+                            </p>
                         </div>
                     ) : (
                         tokens.map((token) => {
@@ -129,15 +131,27 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             <span className={status.className}>{status.label}</span>
-                                            {token.scopes.includes("deploy.manage") ? " - can change" : " - read only"}
-                                            {token.expiresAt ? ` - expires ${display.date(token.expiresAt)}` : ""}
-                                            {token.lastUsedAt ? ` - last used ${display.dateTime(token.lastUsedAt)}` : " - never used"}
+                                            {token.scopes.includes("deploy.manage")
+                                                ? " - can change"
+                                                : " - read only"}
+                                            {` - made by ${token.madeBy}`}
+                                            {token.expiresAt
+                                                ? ` - expires ${display.date(token.expiresAt)}`
+                                                : ""}
+                                            {token.lastUsedAt
+                                                ? ` - last used ${display.dateTime(token.lastUsedAt)}`
+                                                : " - never used"}
                                         </p>
                                     </div>
                                     {canManage && (
                                         <div className="flex shrink-0 items-center gap-1">
                                             {!token.revokedAt && (
-                                                <Button variant="ghost" size="sm" onClick={() => revoke(token)} disabled={pending}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => revoke(token)}
+                                                    disabled={pending}
+                                                >
                                                     Revoke
                                                 </Button>
                                             )}
@@ -234,7 +248,9 @@ function CreateTokenDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>New project token</DialogTitle>
-                    <DialogDescription>Shown once when it is created, and never again.</DialogDescription>
+                    <DialogDescription>
+                        Shown once when it is created, and never again.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
@@ -251,16 +267,23 @@ function CreateTokenDialog({
                         <Select
                             value={lifetime}
                             onValueChange={(value) => setLifetime(value as TokenLifetime)}
-                            options={TOKEN_LIFETIMES.map((value) => ({ value, label: LIFETIME_LABELS[value] }))}
+                            options={TOKEN_LIFETIMES.map((value) => ({
+                                value,
+                                label: LIFETIME_LABELS[value]
+                            }))}
                             aria-label="Expires"
                         />
                     </label>
                     <label className="flex items-start gap-2 text-sm">
-                        <Checkbox checked={canManage} onChange={(event) => setCanManage(event.target.checked)} />
+                        <Checkbox
+                            checked={canManage}
+                            onChange={(event) => setCanManage(event.target.checked)}
+                        />
                         <span>
                             Allow changes
                             <span className="block text-xs text-muted-foreground">
-                                Without this the token can read the project but not deploy, edit, or delete anything in it.
+                                Without this the token can read the project but not deploy, edit, or
+                                delete anything in it. Either way it can only do what you can.
                             </span>
                         </span>
                     </label>
@@ -296,7 +319,8 @@ function IssuedTokenDialog({ secret, onClose }: { secret: string | null; onClose
                 <DialogHeader>
                     <DialogTitle>Copy your token</DialogTitle>
                     <DialogDescription>
-                        This is the only time it is shown. Polaris stores a hash, so it cannot be recovered later.
+                        This is the only time it is shown. Polaris stores a hash, so it cannot be
+                        recovered later.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
@@ -304,8 +328,18 @@ function IssuedTokenDialog({ secret, onClose }: { secret: string | null; onClose
                         <code className="min-w-0 flex-1 break-all rounded-md border border-border/60 bg-muted/40 px-2.5 py-2 font-mono text-xs">
                             {secret}
                         </code>
-                        <Button variant="ghost" size="icon" onClick={copy} aria-label="Copy token" title="Copy">
-                            {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={copy}
+                            aria-label="Copy token"
+                            title="Copy"
+                        >
+                            {copied ? (
+                                <Check className="size-4 text-success" />
+                            ) : (
+                                <Copy className="size-4" />
+                            )}
                         </Button>
                     </div>
                     <div className="flex justify-end">

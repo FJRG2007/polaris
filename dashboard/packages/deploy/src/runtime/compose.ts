@@ -8,10 +8,13 @@
 
 import type { OutputSink } from "../ports.js";
 import { parseContainerState } from "./status.js";
+import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
 import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
-import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { tailIntoLog, waitUntilServing } from "./readiness.js";
+import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
+import { appComposeSpec, dbComposeSpec, expandReplicas } from "../compose-spec.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import type {
     AppDeployPlan,
@@ -52,8 +55,10 @@ function timer(ctx: RuntimeContext): (label: string) => (note?: string) => void 
  * It is still returned as well: that is what the deployment record stores.
  */
 function fail(ctx: RuntimeContext, error: string): DeployResult {
-    ctx.log(Buffer.from(`==> Failed: ${error}
-`));
+    ctx.log(
+        Buffer.from(`==> Failed: ${error}
+`)
+    );
     return { ok: false, error };
 }
 
@@ -77,24 +82,28 @@ function reasonOf(error: unknown, fallback: string): string {
  * fetched once more and the same spec goes up. Only for this one failure, only
  * once, and only when there is an image to re-fetch - a locally built one has
  * nowhere to be fetched from, and repeating anything else would just fail twice.
+ *
+ * `refetch` is how the image is got back, not only which one: a pulled image
+ * that was pinned as a release runs under a name no registry has, so getting it
+ * back is the pull of what it was pinned from and the pin again.
  */
 async function composeUpRetryingLease(
     ctx: RuntimeContext,
     spec: ComposeSpec,
     sink: OutputSink,
-    pullable: string | null
+    refetch: { readonly image: string; readonly again: () => Promise<void> } | null
 ): Promise<void> {
     try {
         await ctx.ports.composeUp(spec, sink);
     } catch (error) {
         const said = reasonOf(error, "");
-        if (!pullable || !isStaleImageLease(said)) throw error;
+        if (!refetch || !isStaleImageLease(said)) throw error;
         ctx.log(
             Buffer.from(
-                `The image store lost the image it had just fetched; fetching ${pullable} again and starting once more.\n`
+                `The image store lost the image it had just fetched; fetching ${refetch.image} again and starting once more.\n`
             )
         );
-        await ctx.ports.pull(pullable, sink);
+        await refetch.again();
         await ctx.ports.composeUp(spec, sink);
     }
 }
@@ -188,7 +197,10 @@ export class ComposeRuntime implements RuntimeDriver {
         return undefined;
     }
 
-    public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
+    public async deployApplication(
+        plan: AppDeployPlan,
+        ctx: RuntimeContext
+    ): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         // The pipeline's own steps are timed and announced. Without this the log is
         // whatever docker happened to print, so a deploy that spends a minute
@@ -196,7 +208,15 @@ export class ComposeRuntime implements RuntimeDriver {
         // a step with no output of its own (mounting a share) looks like a hang.
         const step = timer(ctx);
         let imageTag: string;
-        if (plan.build.method === "image") {
+        let kept: string | null;
+        try {
+            kept = (await loadPrebuilt(plan, ctx)) ?? (await rollbackImageOf(plan, ctx));
+        } catch (error) {
+            return fail(ctx, reasonOf(error, RELEASE_IMAGE_GONE));
+        }
+        if (kept) {
+            imageTag = kept;
+        } else if (plan.build.method === "image") {
             if (!plan.build.imageRef) return fail(ctx, "an image source needs an image reference");
             imageTag = plan.build.imageRef;
             const done = step(`Pulling ${plan.build.imageRef}`);
@@ -209,20 +229,28 @@ export class ComposeRuntime implements RuntimeDriver {
                 // like a corrupt image and sends people to the registry.
                 return fail(
                     ctx,
-                    deployFailureReason(reasonOf(error, ""), `could not pull ${plan.build.imageRef}`)
+                    deployFailureReason(
+                        reasonOf(error, ""),
+                        `could not pull ${plan.build.imageRef}`
+                    )
                 );
             }
             done();
-        } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
+        } else if (
+            (plan.build.method === "dockerfile" || plan.build.method === "nixpacks") &&
+            ctx.buildContext
+        ) {
             // Build from the cloned repo: a Dockerfile, or Nixpacks auto-detecting the
             // framework (no Dockerfile needed). Then run the built image.
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const fetched = step("Fetching the source");
             const context = await ctx.buildContext();
             fetched();
-            const built = step("Building the image");
+            const built = step(
+                ctx.builder ? `Building the image on ${ctx.builder.name}` : "Building the image"
+            );
             try {
-                await ctx.ports.build(
+                await buildPorts(ctx).build(
                     {
                         tag: imageTag,
                         // A Dockerfile Polaris generated wins: it exists precisely
@@ -244,16 +272,43 @@ export class ComposeRuntime implements RuntimeDriver {
             } catch (error) {
                 // A build fills the same disk a pull does, and reports it the
                 // same unhelpful way.
-                return fail(ctx, deployFailureReason(reasonOf(error, ""), "the image would not build"));
+                return fail(
+                    ctx,
+                    deployFailureReason(reasonOf(error, ""), "the image would not build")
+                );
             }
             built();
         } else {
             // buildpacks/static need a builder toolchain on the target; not yet wired.
-            return fail(ctx, `build method "${plan.build.method}" is not yet supported on the compose runtime`);
+            return fail(
+                ctx,
+                `build method "${plan.build.method}" is not yet supported on the compose runtime`
+            );
+        }
+
+        // Kept under the release's own name before it runs, so the container is
+        // on the immutable image and a rollback later finds exactly this. Built
+        // on another machine, it is kept there and then carried here.
+        const builtElsewhere = !kept && plan.build.method !== "image" && ctx.builder !== undefined;
+        if (builtElsewhere) {
+            imageTag = await pinRelease(imageTag, plan, { ...ctx, ports: buildPorts(ctx) });
+            try {
+                imageTag = await shipRelease(imageTag, plan, ctx);
+            } catch (error) {
+                return fail(
+                    ctx,
+                    deployFailureReason(reasonOf(error, ""), "the image could not be copied")
+                );
+            }
+        } else if (!kept) {
+            imageTag = await pinRelease(imageTag, plan, ctx);
         }
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
-        const spec = appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork);
+        // One service per copy, since compose cannot scale a named container.
+        const spec = expandReplicas(
+            appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork)
+        );
         // Establish any NAS mounts the volumes bind onto, before the container comes
         // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.
         // Which share was being mounted when it went wrong. A deploy can bind
@@ -281,17 +336,53 @@ export class ComposeRuntime implements RuntimeDriver {
         }
         const started = step("Starting the containers");
         try {
-            await composeUpRetryingLease(ctx, spec, sink, plan.build.method === "image" ? imageTag : null);
+            // Only an image a registry can hand out again is worth re-fetching. A
+            // pinned one is got back by pulling its source and pinning it again; a
+            // built or rolled-back one exists nowhere but this machine.
+            const source = plan.build.imageRef;
+            const refetch =
+                !kept && plan.build.method === "image" && source
+                    ? {
+                          image: source,
+                          again: async () => {
+                              await ctx.ports.pull(source, sink);
+                              if (imageTag !== source) await pinRelease(source, plan, ctx);
+                          }
+                      }
+                    : null;
+            await composeUpRetryingLease(ctx, spec, sink, refetch);
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
         started();
+        // Not a success until it is serving: a container that exists and then
+        // exits, crash-loops or reports itself unhealthy must not be promoted.
+        // Every copy, one after another: a replica that cannot start is the same
+        // release failing, only less often.
+        const waited = step("Waiting for it to come up");
+        for (const service of spec.services) {
+            const ready = await waitUntilServing(ctx, service.name, plan);
+            if (!ready.ok) {
+                waited("it did not");
+                await tailIntoLog(ctx, service.name);
+                return fail(ctx, ready.reason);
+            }
+        }
+        waited();
         // The release landed, so whatever it replaced is unreferenced from this
         // moment. Handed back now rather than at a threshold: waiting means
         // carrying every superseded image until the machine is nearly full,
         // which is the state a pull cannot be recovered from.
         await tidyAfter(ctx);
-        return { ok: true, imageTag };
+        const guessed = plan.expose?.container;
+        const detected = effectivePlan.expose?.container;
+        return {
+            ok: true,
+            imageTag,
+            ...(guessed !== undefined && detected !== undefined && guessed !== detected
+                ? { detectedPort: { from: guessed, to: detected } }
+                : {})
+        };
     }
 
     /**
@@ -325,7 +416,11 @@ export class ComposeRuntime implements RuntimeDriver {
         }
         const detected = exposed[0];
         if (detected === undefined || detected === plan.expose.container) return plan;
-        ctx.log(Buffer.from(`Detected container port ${detected} from the image (was ${plan.expose.container}).\n`));
+        ctx.log(
+            Buffer.from(
+                `Detected container port ${detected} from the image (was ${plan.expose.container}).\n`
+            )
+        );
         return { ...plan, expose: { ...plan.expose, container: detected } };
     }
 
@@ -334,7 +429,10 @@ export class ComposeRuntime implements RuntimeDriver {
         await ctx.ports.pull(plan.image, sink);
         const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
         try {
-            await composeUpRetryingLease(ctx, spec, sink, plan.image);
+            await composeUpRetryingLease(ctx, spec, sink, {
+                image: plan.image,
+                again: () => ctx.ports.pull(plan.image, sink)
+            });
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));
         }

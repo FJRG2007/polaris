@@ -24,22 +24,22 @@
  * because a mailbox is mostly messages nobody will ever open again.
  */
 
-import { MailUnreachableError, withImap } from "./imap";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
-import { fileJudgedJunk, judgeArrival } from "./spam";
 import * as core from "@polaris/core";
-import { readShape } from "./structure";
 import { decodePart } from "./decode";
-import { addressesFrom, asJson } from "./json";
+import { readShape } from "./structure";
+import { replyIfAway } from "./vacation";
 import { ACCOUNT_COLUMNS } from "./access";
 import { rememberContacts } from "./contacts";
-import { recordSubscription } from "./subscriptions";
-import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
-import { replyIfAway } from "./vacation";
 import { applyRulesToMessage } from "./rules";
 import { MailAuthError } from "./credentials";
+import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
+import { recordSubscription } from "./subscriptions";
+import { fileJudgedJunk, judgeArrival } from "./spam";
+import { MailUnreachableError, withImap } from "./imap";
+import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
 
 /** How many messages of a folder are held. Four hundred is roughly two years of
@@ -212,7 +212,12 @@ type FolderRow = {
     uidValidity: bigint | null;
     uidNext: bigint | null;
     highestModseq: bigint | null;
+    /** Whether this folder is known to store keywords - see `importantFrom`. */
+    keywords: boolean;
 };
+
+const IMPORTANT = core.MAIL_IMPORTANT_KEYWORD;
+const importantFrom = core.importantAfterSync;
 
 /**
  * Bring one folder up to date on a connection somebody else already has open.
@@ -425,6 +430,12 @@ async function storeMessages(
             sentAt
         } satisfies core.MailEnvelope;
 
+        // Polaris' own copy of an unsent draft, left in Drafts for other clients.
+        // The draft itself is already here, in the Drafts screen; filed as a
+        // message it would join the conversation it answers and show up there
+        // as if it had been sent.
+        if (core.isPolarisDraftMessageId(shape.messageId)) continue;
+
         const threadId = await threadFor(account.id, shape);
         const snippet = core.snippetFrom(snippets.get(message.uid) ?? "");
         // Which tab it sits under. Decided from what is already on the row - no
@@ -446,6 +457,10 @@ async function storeMessages(
                 flagged: message.flags.has("\\Flagged"),
                 answered: message.flags.has("\\Answered"),
                 deleted: message.flags.has("\\Deleted"),
+                // Only where the server's answer is one: see `importantFrom`.
+                ...(folder.keywords || message.flags.has(IMPORTANT)
+                    ? { important: message.flags.has(IMPORTANT) }
+                    : {}),
                 // Rewritten, not left as it was found. A row stored before the
                 // decoder existed holds an escape sequence everywhere somebody
                 // put an accent, and a resync is the one moment the good line
@@ -479,6 +494,7 @@ async function storeMessages(
                 answered: message.flags.has("\\Answered"),
                 draft: message.flags.has("\\Draft"),
                 deleted: message.flags.has("\\Deleted"),
+                important: message.flags.has(IMPORTANT),
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
@@ -544,6 +560,12 @@ async function storeMessages(
     // One connection for the whole page, after the loop rather than inside it.
     await fileJudgedJunk(account.userId, judged);
 
+    // A message arriving with the keyword on it is the server saying it keeps
+    // keywords in this folder, so its silence about one is an answer from now on.
+    if (!folder.keywords && fetched.some((message) => message.flags.has(IMPORTANT))) {
+        await learnKeywords(folder.id);
+    }
+
     await refreshThreads(account.id);
     publishMail({
         accountId: account.id,
@@ -553,6 +575,21 @@ async function storeMessages(
     });
 }
 
+/** How much of a plain part is read for its preview. A plain part starts with
+ *  its words, so the first few kilobytes are always enough. */
+const TEXT_PREVIEW_BYTES = 4096;
+
+/**
+ * How much of an HTML part is read when the plain one said nothing.
+ *
+ * An HTML part does not start with its words: it starts with a `<head>`, and a
+ * marketing template's head is a stylesheet. One lender's approval notice has
+ * 13.6 KB of it before `<body>`, so the 4 KB slice a plain part gets was all
+ * CSS, the preview came out empty, and with no preview the categoriser had only
+ * the subject to go on. Only messages whose plain part was silent pay for this.
+ */
+const HTML_PREVIEW_BYTES = 65536;
+
 /** The first few kilobytes of each message's text part, for the line under the
  *  subject. A message with no text part gets none, which is what a picture-only
  *  newsletter is. */
@@ -561,7 +598,7 @@ async function fetchSnippets(
     fetched: readonly Fetched[]
 ): Promise<Map<number, string>> {
     const out = new Map<number, string>();
-    await readParts(client, fetched, out, "text");
+    await readParts(client, fetched, out, "text", TEXT_PREVIEW_BYTES);
     // A plain part with nothing in it is not a message with nothing in it.
     //
     // Plenty of senders put their words in the HTML half and leave the plain one
@@ -572,7 +609,7 @@ async function fetchSnippets(
     const silent = fetched.filter(
         (message) => !core.snippetFrom(out.get(message.uid) ?? "") && message.structure.htmlPart
     );
-    if (silent.length > 0) await readParts(client, silent, out, "html");
+    if (silent.length > 0) await readParts(client, silent, out, "html", HTML_PREVIEW_BYTES);
     return out;
 }
 
@@ -587,7 +624,8 @@ async function readParts(
     client: ImapFlow,
     fetched: readonly Fetched[],
     out: Map<number, string>,
-    half: "text" | "html"
+    half: "text" | "html",
+    maxLength: number
 ): Promise<void> {
     const byPart = new Map<string, number[]>();
     for (const message of fetched) {
@@ -605,7 +643,7 @@ async function readParts(
         try {
             for await (const message of client.fetch(
                 uids,
-                { uid: true, bodyParts: [{ key, maxLength: 4096 }] },
+                { uid: true, bodyParts: [{ key, maxLength }] },
                 { uid: true }
             )) {
                 const bytes =
@@ -716,6 +754,7 @@ export async function refreshThreads(accountId: string): Promise<void> {
             select: {
                 seen: true,
                 flagged: true,
+                important: true,
                 sentAt: true,
                 snippet: true,
                 subject: true,
@@ -747,6 +786,7 @@ export async function refreshThreads(accountId: string): Promise<void> {
                 messageCount: messages.length,
                 unreadCount: messages.filter((message) => !message.seen).length,
                 starred: messages.some((message) => message.flagged),
+                important: messages.some((message) => message.important),
                 hasAttachments: messages.some((message) => message.hasAttachments),
                 // What the server said each message weighs, added up. A message
                 // whose size the server never gave counts as nothing, which is
@@ -782,7 +822,14 @@ async function reconcileFlags(
 ): Promise<void> {
     const held = await prisma.mailMessage.findMany({
         where: { folderId: folder.id },
-        select: { id: true, uid: true, seen: true, flagged: true, answered: true },
+        select: {
+            id: true,
+            uid: true,
+            seen: true,
+            flagged: true,
+            answered: true,
+            important: true
+        },
         orderBy: { uid: "desc" },
         take: WINDOW
     });
@@ -809,18 +856,35 @@ async function reconcileFlags(
         return;
     }
 
+    // Seen on any message here, the keyword is the folder saying it keeps them.
+    const keywords = folder.keywords || [...changed.values()].some((flags) => flags.has(IMPORTANT));
+    if (keywords && !folder.keywords) await learnKeywords(folder.id);
+
     for (const row of held) {
         const flags = changed.get(Number(row.uid));
         if (!flags) continue;
         const seen = flags.has("\\Seen");
         const flagged = flags.has("\\Flagged");
         const answered = flags.has("\\Answered");
-        if (seen === row.seen && flagged === row.flagged && answered === row.answered) continue;
+        const important = importantFrom(flags, keywords, row.important);
+        if (
+            seen === row.seen &&
+            flagged === row.flagged &&
+            answered === row.answered &&
+            important === row.important
+        ) {
+            continue;
+        }
         await prisma.mailMessage.update({
             where: { id: row.id },
-            data: { seen, flagged, answered }
+            data: { seen, flagged, answered, important }
         });
     }
+}
+
+/** Remember that a folder keeps keywords, so the next pass believes its silence. */
+async function learnKeywords(folderId: string): Promise<void> {
+    await prisma.mailFolder.update({ where: { id: folderId }, data: { keywords: true } });
 }
 
 /**

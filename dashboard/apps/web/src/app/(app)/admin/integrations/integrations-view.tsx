@@ -174,7 +174,7 @@ function isConnected(card: IntegrationCard): boolean {
     return card.hasSecret || card.enabled;
 }
 
-export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
+export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
     const router = useRouter();
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
     const [query, setQuery] = useState("");
@@ -195,7 +195,8 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
      * under one of them makes them find it twice.
      */
     const sections = useMemo(() => {
-        if (needle) return [{ name: null as string | null, hint: null as string | null, cards: matches }];
+        if (needle)
+            return [{ name: null as string | null, hint: null as string | null, cards: matches }];
         return INTEGRATION_CATEGORIES.map(({ name, hint }) => ({
             name: name as string | null,
             hint: hint as string | null,
@@ -358,7 +359,7 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
         );
     }
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 p-3 text-sm">
+        <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
             <span className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                 <span>
@@ -560,7 +561,7 @@ function SetupSteps({
  */
 function AttentionNotice({ failure, name }: { failure: ConnectionFailure; name: string }) {
     return (
-        <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+        <div className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
                 <span className="text-sm font-medium">
@@ -1983,7 +1984,7 @@ function RunnerAccessNote({ card }: { card: IntegrationCard }) {
         );
     }
     return (
-        <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+        <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-warning" />
             <span>
                 <span className="block font-medium text-foreground">Self-hosted runners</span>

@@ -7,11 +7,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@polaris/db", () => ({ prisma: { deployment: { findUnique: vi.fn() } } }));
+const { findUnique } = vi.hoisted(() => ({ findUnique: vi.fn() }));
+vi.mock("@polaris/db", () => ({ prisma: { deployment: { findUnique } } }));
 
-const { keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } = await import(
-    "../../src/lib/deploy/releases"
-);
+const releases = await import("../../src/lib/deploy/releases");
+const { keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } = releases;
 
 const APP = "019f8506-683f-7dd0-9c13-1e9ee9237fe3";
 const DEPLOYMENT = "019f9000-1111-7000-8000-222233334444";
@@ -79,5 +79,109 @@ describe("portSubject", () => {
         // The flag is recorded on the deployment, so what serves the address now is
         // unaffected by a later change to whether NEW releases are kept apart.
         expect(portSubject(APP, { id: DEPLOYMENT, isolated: true })).toBe(DEPLOYMENT);
+    });
+});
+
+describe("runsCutover", () => {
+    const plain = {
+        keepReleases: false,
+        publishPort: false,
+        replicas: 1,
+        sourceType: "github",
+        sourceConfig: "{}",
+        volumes: [],
+        target: { kind: "local", runtime: "compose" }
+    };
+
+    it("changes over beside the running release for a private service on this host", () => {
+        expect(releases.runsCutover(plain)).toBe(true);
+    });
+
+    it("does not where two copies would collide or the names are not ours", () => {
+        // A published port, a volume, a second replica or a second port on the host
+        // would be fought over; a compose file of the owner's own names itself.
+        expect(releases.runsCutover({ ...plain, publishPort: true })).toBe(false);
+        expect(releases.runsCutover({ ...plain, volumes: [{}] })).toBe(false);
+        expect(releases.runsCutover({ ...plain, replicas: 2 })).toBe(false);
+        expect(
+            releases.runsCutover({
+                ...plain,
+                sourceConfig: '{"extraPorts":[{"host":1,"container":1}]}'
+            })
+        ).toBe(false);
+        expect(releases.runsCutover({ ...plain, sourceType: "compose" })).toBe(false);
+        expect(releases.runsCutover({ ...plain, sourceConfig: "not json" })).toBe(false);
+    });
+
+    it("does not on swarm, which replaces start-first on its own, or on another server", () => {
+        expect(
+            releases.runsCutover({ ...plain, target: { kind: "local", runtime: "swarm" } })
+        ).toBe(false);
+        expect(
+            releases.runsCutover({ ...plain, target: { kind: "host", runtime: "compose" } })
+        ).toBe(false);
+    });
+
+    it("leaves a service that keeps its releases to that", () => {
+        expect(releases.runsCutover({ ...plain, keepReleases: true })).toBe(false);
+    });
+});
+
+describe("markerOf", () => {
+    it("names a change-over release after the deployment, so one commit redeployed is a new container", () => {
+        const commit = "9f8e7d6c5b4a3928";
+        expect(releases.markerOf({ id: DEPLOYMENT, commitSha: commit, cutover: true })).toBe(
+            releaseMarker({ id: DEPLOYMENT })
+        );
+        expect(releases.markerOf({ id: DEPLOYMENT, commitSha: commit })).toBe("9f8e7d6");
+    });
+});
+
+describe("currentReleaseRef", () => {
+    const app = {
+        id: APP,
+        slug: "invoices",
+        currentDeploymentId: DEPLOYMENT,
+        environment: { project: { slug: "acme" } }
+    };
+    const base = serviceRef("acme", "invoices", APP);
+
+    it("reaches a change-over release in its own container, and by the service's own name", async () => {
+        findUnique.mockResolvedValueOnce({
+            id: DEPLOYMENT,
+            commitSha: "9f8e7d6c5b4a3928",
+            isolated: true,
+            cutover: true
+        });
+        const serving = await releases.currentReleaseRef(app);
+        expect(serving.name).toBe(releaseRef(base, releaseMarker({ id: DEPLOYMENT })).name);
+        expect(serving.address).toBe(base.name);
+        expect(serving.portSubject).toBe(APP);
+    });
+
+    it("reaches a kept release by its own name and port", async () => {
+        findUnique.mockResolvedValueOnce({
+            id: DEPLOYMENT,
+            commitSha: "9f8e7d6c5b4a3928",
+            isolated: true,
+            cutover: false
+        });
+        const serving = await releases.currentReleaseRef(app);
+        expect(serving.address).toBe(serving.name);
+        expect(serving.portSubject).toBe(DEPLOYMENT);
+    });
+
+    it("keeps the service's own names for a release deployed in place", async () => {
+        findUnique.mockResolvedValueOnce({
+            id: DEPLOYMENT,
+            commitSha: null,
+            isolated: false,
+            cutover: false
+        });
+        expect(await releases.currentReleaseRef(app)).toEqual({
+            ...base,
+            portSubject: APP,
+            address: base.name
+        });
     });
 });

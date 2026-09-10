@@ -72,7 +72,10 @@ interface Reading {
 /** The rate charts, engine by engine: which counters make a rate worth drawing,
  *  and which pair makes a hit rate. Everything else is drawn as a gauge. */
 const RATES: Record<string, { keys: string[]; hitRate?: [string, string] }> = {
-    redis: { keys: ["commands", "hits", "misses", "expired", "evicted"], hitRate: ["hits", "misses"] },
+    redis: {
+        keys: ["commands", "hits", "misses", "expired", "evicted"],
+        hitRate: ["hits", "misses"]
+    },
     postgres: {
         keys: ["commits", "rollbacks", "returned", "inserted", "updated", "deleted"],
         hitRate: ["hits", "misses"]
@@ -171,7 +174,10 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     return (
         <div className="flex flex-col gap-3">
             {error && (
-                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -288,7 +294,9 @@ function Bar({
                 <span className="min-w-0 flex-1 truncate font-mono text-xs" title={title ?? label}>
                     {label}
                 </span>
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{caption}</span>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                    {caption}
+                </span>
             </div>
             <div className="bg-border h-1.5 overflow-hidden rounded-full">
                 <div className="bg-primary h-full rounded-full" style={{ width: `${share}%` }} />

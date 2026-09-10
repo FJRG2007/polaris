@@ -49,6 +49,7 @@ import {
     Link2,
     ListTodo,
     Mail,
+    Mails,
     Flag,
     Mic,
     MessageCircle,
@@ -544,6 +545,20 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["projects", "services", "docker"]
         },
         {
+            label: "Capabilities",
+            href: "/apps/capabilities",
+            icon: Sparkles,
+            keywords: [
+                "features",
+                "what can it do",
+                "overview",
+                "rollbacks",
+                "previews",
+                "domains",
+                "databases"
+            ]
+        },
+        {
             label: "Marketplace",
             href: "/apps/marketplace",
             icon: Store,
@@ -673,6 +688,33 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Archive,
             group: OPERATIONS_GROUP,
             keywords: ["restore", "snapshots"]
+        },
+        {
+            // Here rather than under Management: a mail server is a service the
+            // operator runs on their machines, deployed through Deploy and backed
+            // up by Backups, beside which it sits. Management configures Polaris
+            // itself; reading mail stays in Mail.
+            label: "Mail server",
+            href: "/apps/mail-server",
+            needs: "mailserver.manage",
+            icon: Mails,
+            group: OPERATIONS_GROUP,
+            keywords: [
+                "smtp",
+                "imap",
+                "email server",
+                "mailboxes",
+                "domains",
+                "dkim",
+                "spf",
+                "dmarc",
+                "mx",
+                "relay",
+                "smarthost",
+                "aliases",
+                "forwards",
+                "catch-all"
+            ]
         }
     ],
     watch: [

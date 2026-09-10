@@ -25,8 +25,8 @@
 
 import * as core from "@polaris/core";
 import { MailOnboarding } from "./onboarding";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission } from "@/lib/session";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { ownedAccountIds } from "@/lib/mailbox/access";
 import { readMailPreferences } from "@/lib/mailbox/prefs";
 import { MailView, type MailViewContext } from "./mail-view";
@@ -174,6 +174,7 @@ function narrowOf(query: MailListQuery): MailPageNarrow {
         unreadOnly: query.unreadOnly,
         readOnly: query.readOnly,
         starredOnly: query.starredOnly,
+        importantOnly: query.importantOnly,
         snoozedOnly: query.snoozedOnly,
         withAttachments: query.withAttachments,
         category: query.category,

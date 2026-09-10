@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { WEBHOOK_FORMATS } from "./notifications.js";
+import { TELEGRAM_URL_HINT, WEBHOOK_FORMATS, webhookUrlProblem } from "./notifications.js";
 
 // ---------------------------------------------------------------------------
 // Visibility and membership
@@ -82,6 +82,13 @@ export const PROJECT_FLAGS = [
         label: "Automatic subdomain",
         description: "A new service is given a free subdomain as soon as one can be minted for it.",
         default: true
+    },
+    {
+        id: "previewEnvironments",
+        label: "Preview environments",
+        description:
+            "Every pull request gets its own copy of the default environment, with its own databases and address, deployed from the pull request's branch and removed when it closes. Secret variables are not copied into it, and pull requests from forks are skipped.",
+        default: false
     },
     {
         id: "wipeVolumesOnDelete",
@@ -206,6 +213,59 @@ export const environmentNameSchema = z.object({
     name: projectName
 });
 
+/** How an environment's services see each other - the modes `@polaris/deploy`
+ *  plans networks for. */
+export const ENVIRONMENT_NETWORK_MODES = ["shared", "environment", "links"] as const;
+export type EnvironmentNetworkMode = (typeof ENVIRONMENT_NETWORK_MODES)[number];
+
+export const environmentNetworkModeSchema = z.object({
+    environmentId: z.string().uuid(),
+    networkMode: z.enum(ENVIRONMENT_NETWORK_MODES),
+    /** Deploy every service in it straight away, so the choice takes effect now
+     *  rather than service by service as each is next deployed. */
+    apply: z.boolean().default(false)
+});
+
+/**
+ * A git branch name, by the rules `git check-ref-format` holds it to: no spaces
+ * or control characters, none of `~ ^ : ? * [ \`, no `..` or `@{`, no empty
+ * component, and nothing that reads as an option. It reaches `git clone
+ * --branch`, so this is the line between a name and a flag.
+ */
+export function isGitBranchName(value: string): boolean {
+    return (
+        value.length > 0 &&
+        value.length <= 255 &&
+        !hasControlChar(value) &&
+        !value.includes(String.fromCharCode(0x7f)) &&
+        !/[\s~^:?*[\\]/.test(value) &&
+        !value.startsWith("-") &&
+        !value.startsWith("/") &&
+        !value.endsWith("/") &&
+        !value.endsWith(".") &&
+        !value.endsWith(".lock") &&
+        !value.includes("..") &&
+        !value.includes("@{") &&
+        !value.includes("//")
+    );
+}
+
+export const gitBranchName = z
+    .string()
+    .trim()
+    .refine(isGitBranchName, "That is not a branch name git accepts");
+
+/** A new environment: its name, and optionally what it starts as and follows. */
+export const environmentCreateSchema = z.object({
+    projectId: z.string().uuid(),
+    name: projectName,
+    cloneFrom: z.string().uuid().optional(),
+    branch: gitBranchName.optional().or(z.literal("").transform(() => undefined)),
+    deploy: z.boolean().default(false)
+});
+
+export type EnvironmentCreateInput = z.infer<typeof environmentCreateSchema>;
+
 /** The deploy events an endpoint can subscribe to. An empty selection means all
  *  of them, so a webhook added without a choice still reports something. */
 export const PROJECT_WEBHOOK_EVENTS = [
@@ -232,7 +292,8 @@ export const projectWebhookInputSchema = z.object({
         .refine(
             (value) => value.startsWith("https://") || value.startsWith("http://"),
             "Only http(s) endpoints"
-        ),
+        )
+        .refine((value) => webhookUrlProblem(value) === null, TELEGRAM_URL_HINT),
     format: z.enum(WEBHOOK_FORMATS).optional(),
     events: z
         .array(z.enum(PROJECT_WEBHOOK_EVENT_IDS))

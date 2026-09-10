@@ -16,29 +16,39 @@
 
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
+import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepExpiredSends } from "@/lib/vault/sends";
+import { sweepDueSends } from "@/lib/mailbox/compose";
+import { pruneTelemetry } from "@/lib/telemetry/store";
+import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
-import { pruneTelemetry } from "@/lib/telemetry/store";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
+import { runSleepPass } from "@/lib/deploy/sleep-service";
+import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
+import { sweepMailServers } from "@/lib/mail-server/health";
+import { tickServiceCrons } from "@/lib/deploy/service-cron";
+import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
-import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
-import { wakeSnoozed } from "@/lib/mailbox/messages";
-import { sweepDueSends } from "@/lib/mailbox/compose";
-import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
-import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
+import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
+import { collectAllReports } from "@/lib/mail-server/dmarc-report";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
+import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
+import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
+import { ensureManagedCertificates } from "@/lib/tls/managed-certificates";
+import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
+import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
@@ -241,6 +251,29 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: sweepRetention
     },
     {
+        key: "audit-seal",
+        // Every minute, so an entry is part of the chain within a minute of being
+        // written - the window in which deleting it leaves no trace. Free once
+        // there is nothing unsealed.
+        everyMs: MINUTE,
+        // Leased, and this one matters more than most: it is the chain's only
+        // writer, and two passes at once would hand out the same places twice.
+        leaseMs: 5 * MINUTE,
+        run: async () => ({ sealed: await sealAuditChain() })
+    },
+    {
+        key: "audit-verify",
+        // Daily. Verification walks the whole chain, which is the one expensive
+        // read here, and the answer is kept for the screen that shows it.
+        everyMs: 24 * HOUR,
+        // Longer than the gap between passes, as every lease here is.
+        leaseMs: 25 * HOUR,
+        run: async () => {
+            const result = await verifyAuditChain();
+            return { ok: result.ok, checked: result.checked };
+        }
+    },
+    {
         key: "telemetry-prune",
         // Hourly, like retention and for the same reason: what it removes is a
         // stack trace older than the project keeps, and a pass that runs late
@@ -306,6 +339,20 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: syncMailboxes
     },
     {
+        key: "mail-server",
+        // The mail servers Polaris runs: whether each still answers, and the
+        // DMARC reports that arrived in its report mailbox since the last pass.
+        // Receivers send those daily, so a quarter of an hour is prompt enough.
+        everyMs: 15 * MINUTE,
+        // Leased: two passes would read the same report mailbox at once.
+        leaseMs: 20 * MINUTE,
+        run: async () => {
+            const health = await sweepMailServers();
+            const reports = await collectAllReports();
+            return { ...health, filed: reports.filed };
+        }
+    },
+    {
         key: "mail-categories",
         // Every minute while there is a backlog, and free once there is not:
         // the pass looks for messages with no category and stops finding any.
@@ -345,6 +392,66 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepOrphanUploads
+    },
+    {
+        key: "service-crons",
+        // Every minute, because a cron's finest grain is the minute. Not leased:
+        // each firing is claimed by a compare-and-swap on the job's own row, so
+        // two processes cannot both start the same one, and a lease here would
+        // hold every job hostage to the slowest.
+        everyMs: MINUTE,
+        leaseMs: null,
+        run: tickServiceCrons
+    },
+    {
+        key: "service-autoscale",
+        // Every minute: the decision counts consecutive readings, and a minute is
+        // the grain its thresholds are written in. Leased, so two processes never
+        // read the same streak and both add a replica.
+        everyMs: MINUTE,
+        leaseMs: 5 * MINUTE,
+        run: () => runAutoscale()
+    },
+    {
+        key: "service-sleep",
+        // Every fifteen seconds: this is also what wakes a sleeping service, and the
+        // visitor is looking at the waking page for as long as it takes. A pass with
+        // no service that sleeps reads nothing.
+        everyMs: 15_000,
+        // Leased, so two processes never both stop or start the same container.
+        leaseMs: 2 * MINUTE,
+        run: () => runSleepPass()
+    },
+    {
+        key: "update-scan",
+        // Half-hourly: a registry is asked once per image and tag and GitHub once
+        // per repository service, and nothing published is urgent to the minute.
+        // Unleased: two passes write the same answer.
+        everyMs: 30 * MINUTE,
+        leaseMs: null,
+        run: () => scanServiceUpdates()
+    },
+    {
+        key: "runtime-logs",
+        // Every minute. What a service printed is kept by reading its tail and
+        // storing what is new, so the gap between passes is the most a service
+        // can print before the middle of it is lost, and a minute is what keeps
+        // that gap to a tail's worth for anything but a flood.
+        everyMs: Number(process.env.POLARIS_RUNTIME_LOG_CAPTURE_MS) || MINUTE,
+        // Leased: each pass reads the newest line kept and stores what follows
+        // it, so two passes at once would both store the same lines.
+        leaseMs: 5 * MINUTE,
+        run: captureRuntimeLogs
+    },
+    {
+        key: "runtime-logs-prune",
+        // Hourly. The bounds are a week and a count per service, and a pass that
+        // runs an hour late removes the same lines.
+        everyMs: Number(process.env.POLARIS_RUNTIME_LOG_PRUNE_MS) || HOUR,
+        // Unleased: two runners delete the same lines and one of them counts
+        // zero.
+        leaseMs: null,
+        run: async () => ({ removed: await pruneRuntimeLogs() })
     },
     {
         key: "chat-scheduled",
@@ -503,6 +610,30 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: sweepEveryDisk
     },
     {
+        key: "private-networks",
+        // Ten minutes. An update recreates the edge without its attachments to the
+        // private networks, and until this runs a service with its port closed in
+        // an isolated environment is routed but not reached; the first pass after
+        // boot is the one that matters, and the rest catch anything since.
+        everyMs: Number(process.env.POLARIS_PRIVATE_NETWORKS_MS) || 10 * MINUTE,
+        // Unleased: attaching what is already attached and removing what is
+        // already gone are both no-ops, so a second runner changes nothing.
+        leaseMs: null,
+        run: reconcilePrivateNetworks
+    },
+    {
+        key: "managed-certificates",
+        // A quarter of an hour. A pass with nothing due reads a few rows and
+        // writes nothing a server has not already got, and a domain proven or a
+        // token saved on a screen is picked up on this cadence if the pass that
+        // screen started was already running.
+        everyMs: Number(process.env.POLARIS_MANAGED_CERTS_MS) || 15 * MINUTE,
+        // Unleased here because the pass takes its own lease: a screen starts one
+        // as well, and both must hold the same one.
+        leaseMs: null,
+        run: ensureManagedCertificates
+    },
+    {
         key: "drive-transfers",
         // Hourly, because a fortnight is what an offer stands for and nothing is
         // waiting on the minute it stops. What this ends is an offer the
@@ -524,6 +655,36 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // nothing left to do.
         leaseMs: null,
         run: liftExpiredSuspensions
+    },
+    {
+        key: "database-upgrades",
+        // A minute, because a maintenance window is picked to the minute.
+        everyMs: MINUTE,
+        // Unleased: each upgrade is claimed by moving its row out of "scheduled",
+        // so a second runner finds nothing left to start.
+        leaseMs: null,
+        run: async () => (await import("@/lib/database-ops/upgrade")).sweepDueUpgrades()
+    },
+    {
+        key: "database-archives",
+        // Hourly: a base backup is taken for each archiving instance once its
+        // newest is a day old, so an instance whose day comes round mid-hour
+        // waits at most an hour, and the log keeps it recoverable meanwhile.
+        everyMs: HOUR,
+        // Leased past the gap: a base backup of a large instance takes a while,
+        // and two runners would take two.
+        leaseMs: 3 * HOUR,
+        run: async () => (await import("@/lib/database-ops/pitr")).sweepArchives()
+    },
+    {
+        key: "object-replication",
+        // Five minutes: how long a bucket replication can be down after its
+        // store's container was recreated before it is started again.
+        everyMs: 5 * MINUTE,
+        // Leased: two runners checking the same process at once could both find
+        // it stopped and start two.
+        leaseMs: 10 * MINUTE,
+        run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
     }
 ];
 

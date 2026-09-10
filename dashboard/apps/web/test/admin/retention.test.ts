@@ -8,9 +8,9 @@
  *   were read the other way round is not a bug report, it is an empty table. A
  *   policy that cannot be parsed falls back to the defaults for the same reason,
  *   field by field, so one bad number cannot take the other two with it.
- * - **The audit table's timestamp is called something else.** It is `at`, not
- *   `createdAt`. A sweep that guessed would delete nothing forever while
- *   reporting success, which is the quietest possible failure.
+ * - **The audit table is a chain.** It is cut through the chain's own pruning,
+ *   which removes a sealed prefix and records where it cut, never by age alone -
+ *   a gap in the middle is exactly what verification reports as tampering.
  * - **A pass is bounded and says so.** The first run on a year of history is
  *   millions of rows, and one statement holding that lock is an outage; `more`
  *   is what lets the schedule take the next bite instead.
@@ -28,7 +28,13 @@ let stored: string | null = null;
 
 function table(name: "notification" | "activity" | "auditLog", column: "createdAt" | "at") {
     return {
-        findMany: async ({ where, take }: { where: Record<string, { lt: Date }>; take: number }) => {
+        findMany: async ({
+            where,
+            take
+        }: {
+            where: Record<string, { lt: Date }>;
+            take: number;
+        }) => {
             queried[name]?.push(where);
             const cutoff = where[column]?.lt;
             if (!cutoff) return [];
@@ -46,7 +52,9 @@ function table(name: "notification" | "activity" | "auditLog", column: "createdA
         },
         count: async (args?: { where?: Record<string, { lt: Date }> }) => {
             const cutoff = args?.where?.[column]?.lt;
-            return cutoff ? rows[name].filter((row) => row.when < cutoff).length : rows[name].length;
+            return cutoff
+                ? rows[name].filter((row) => row.when < cutoff).length
+                : rows[name].length;
         }
     };
 }
@@ -63,6 +71,16 @@ vi.mock("@/lib/setting-store", () => ({
     getSetting: async () => stored,
     setSetting: async (_key: string, value: string | null) => {
         stored = value;
+    }
+}));
+
+/** Every cut the sweep asked the audit chain to make. */
+let pruned: { cutoff: Date; batch: number }[] = [];
+
+vi.mock("@/lib/audit-chain", () => ({
+    pruneSealedAudit: async (cutoff: Date, batch: number) => {
+        pruned.push({ cutoff, batch });
+        return { removed: 1, more: false };
     }
 }));
 
@@ -86,6 +104,7 @@ beforeEach(() => {
     rows = { notification: [], activity: [], auditLog: [] };
     queried = { notification: [], activity: [], auditLog: [] };
     stored = null;
+    pruned = [];
 });
 
 describe("what an instance nobody has configured does", () => {
@@ -126,16 +145,18 @@ describe("one pass", () => {
         ]);
     });
 
-    it("reads the audit table by its own timestamp column", async () => {
-        // `at`, not `createdAt`. Guessing wrong here deletes nothing forever
-        // while every pass reports success.
+    it("cuts the audit trail through its chain rather than by age alone", async () => {
+        // The trail is a tamper-evident chain: deleting entries by timestamp
+        // would leave gaps that verification cannot tell from tampering. So the
+        // sweep hands the cutoff to the chain, which removes a sealed prefix and
+        // records where it cut - see audit-chain's own tests.
         await setRetentionPolicy({ notifications: 0, activity: 0, audit: 30 });
-        fill("auditLog", [10, 90]);
 
         const result = await sweepRetention(NOW);
 
         expect(result.audit).toBe(1);
-        expect(queried.auditLog[0]).toHaveProperty("at");
+        expect(pruned).toEqual([{ cutoff: daysAgo(30), batch: 5000 }]);
+        expect(queried.auditLog).toHaveLength(0);
     });
 
     it("does not touch a table set to forever", async () => {
@@ -152,6 +173,7 @@ describe("one pass", () => {
         expect(queried.notification).toHaveLength(0);
         expect(queried.activity).toHaveLength(0);
         expect(queried.auditLog).toHaveLength(0);
+        expect(pruned).toHaveLength(0);
         expect(rows.notification).toHaveLength(1);
     });
 

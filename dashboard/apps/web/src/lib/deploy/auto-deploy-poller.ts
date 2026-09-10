@@ -10,8 +10,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import { trackedBranch } from "./branches";
 import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
+import { reconcilePullRequestPreviews } from "./environments";
 import { getChangedFiles, getLatestCommit } from "../github-service";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
 import { commitPassesFilter, deployApplication } from "../deploy-service";
@@ -37,7 +39,7 @@ export async function pollAutoDeploys(): Promise<void> {
         const repoUrl = typeof source.repoUrl === "string" ? source.repoUrl : "";
         const parsed = parseGithubRepo(repoUrl);
         if (!parsed) continue;
-        const branch = (app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")).trim();
+        const branch = trackedBranch(app, app.environment);
         if (!branch) continue;
 
         // Keyed by who is asking as well as what is asked: a repository one
@@ -56,7 +58,10 @@ export async function pollAutoDeploys(): Promise<void> {
         // First sighting: baseline to the current head without deploying, so only a
         // genuinely new commit triggers a deploy (never a redeploy just for enabling).
         if (app.lastDeployedSha == null) {
-            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
+            await prisma.application.update({
+                where: { id: app.id },
+                data: { lastDeployedSha: latest.sha }
+            });
             continue;
         }
         if (!commitPassesFilter(latest.message, app.commitFilter)) continue;
@@ -67,7 +72,13 @@ export async function pollAutoDeploys(): Promise<void> {
         const watch = parseWatchPaths(app.watchPaths);
         if (watch.length > 0) {
             const token = await githubTokenForOwner(ownerId, parsed.owner);
-            const changed = await getChangedFiles(parsed.owner, parsed.repo, app.lastDeployedSha, latest.sha, token);
+            const changed = await getChangedFiles(
+                parsed.owner,
+                parsed.repo,
+                app.lastDeployedSha,
+                latest.sha,
+                token
+            );
             if (!shouldDeployForPaths(changed, watch)) {
                 console.info(
                     `polaris: skipping auto-deploy of ${app.slug}; nothing it watches changed since ${app.lastDeployedSha.slice(0, 7)}`
@@ -81,9 +92,13 @@ export async function pollAutoDeploys(): Promise<void> {
                 commitMessage: latest.message,
                 commitSha: latest.sha,
                 authorName: latest.authorName ?? undefined,
-                authorAvatarUrl: latest.authorAvatarUrl ?? undefined
+                authorAvatarUrl: latest.authorAvatarUrl ?? undefined,
+                trigger: "push"
             });
-            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
+            await prisma.application.update({
+                where: { id: app.id },
+                data: { lastDeployedSha: latest.sha }
+            });
         } catch {
             // Leave lastDeployedSha unchanged so the next tick retries this commit.
         }
@@ -95,7 +110,13 @@ export async function pollAutoDeploys(): Promise<void> {
 export function startAutoDeployPoller(): void {
     if (started) return;
     started = true;
-    const tick = (): void => void pollAutoDeploys().catch((error) => console.error("polaris: auto-deploy poll failed:", error));
+    const tick = (): void =>
+        void pollAutoDeploys()
+            .catch((error) => console.error("polaris: auto-deploy poll failed:", error))
+            // Previews ride the same tick: an install GitHub cannot reach has no
+            // other way to hear that a pull request opened or closed.
+            .then(() => reconcilePullRequestPreviews())
+            .catch((error) => console.error("polaris: preview reconcile failed:", error));
     setInterval(tick, INTERVAL_MS).unref?.();
     // First pass shortly after boot, once the server has settled.
     setTimeout(tick, 15_000).unref?.();

@@ -79,7 +79,7 @@ export function FolderPicker({
                         <Loader2 className="ml-auto size-4 animate-spin text-muted-foreground" />
                     )}
                 </div>
-                {error && <p className="text-xs text-red-400">{error}</p>}
+                {error && <p className="text-xs text-danger">{error}</p>}
                 <div className="max-h-72 overflow-auto overscroll-contain rounded-md border border-border/60">
                     {folders.length === 0 && !busy && (
                         <p className="p-3 text-xs text-muted-foreground">No sub-folders here.</p>

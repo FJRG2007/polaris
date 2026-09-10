@@ -10,10 +10,16 @@
 import { formatBytes } from "@polaris/core";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, TimeSeriesChart, cn, type GaugeTone, type TimePoint } from "@polaris/ui";
-import { LIVE_INTERVAL_MS, RANGE_ORDER, RANGE_PRESETS, type RangePreset } from "@/lib/metrics-shared";
+import {
+    LIVE_INTERVAL_MS,
+    RANGE_ORDER,
+    RANGE_PRESETS,
+    RAW_MAX_SPAN_MS,
+    type RangePreset
+} from "@/lib/metrics-shared";
 
 /** One series returned by the history endpoint. Percentages are derived here. */
 interface Point {
@@ -61,7 +67,9 @@ export interface MetricSpec<T = Point> {
     };
 }
 
-type Window = { kind: "preset"; preset: RangePreset } | { kind: "custom"; from: number; to: number };
+type Window =
+    | { kind: "preset"; preset: RangePreset }
+    | { kind: "custom"; from: number; to: number };
 
 function queryFor(window: Window): string {
     if (window.kind === "preset") return `range=${window.preset}`;
@@ -80,7 +88,9 @@ function queryFor(window: Window): string {
 const KEPT_MAX_AGE_MS = 24 * 3_600_000;
 
 function keptWindowLimit(window: Window): number {
-    return window.kind === "custom" ? KEPT_MAX_AGE_MS : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
+    return window.kind === "custom"
+        ? KEPT_MAX_AGE_MS
+        : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
 }
 
 /** "YYYY-MM-DDTHH:mm" in local time, for a datetime-local input default. */
@@ -92,10 +102,15 @@ function toLocalInput(ms: number): string {
 
 export function MetricsHistory<T extends { t: number } = Point>({
     endpoint,
-    metrics
+    metrics,
+    live
 }: {
     endpoint: string;
     metrics: MetricSpec<T>[];
+    /** A stream that says `tick` when the collector wrote new samples for this
+     *  subject. While it is connected the charts re-read on each tick instead of
+     *  polling; without one, or while it is down, they poll as before. */
+    live?: string;
 }) {
     const display = useDisplayFormat();
     const [window, setWindow] = useState<Window>({ kind: "preset", preset: "1d" });
@@ -108,6 +123,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
     // it has to move with each refresh - otherwise the points keep arriving while
     // the X axis stays where it was and the newest ones fall off the right edge.
     const [fetchedAt, setFetchedAt] = useState(() => Date.now());
+    // Whether the collector is telling this panel when to re-read.
+    const [pushed, setPushed] = useState(false);
+    const lastLoad = useRef(0);
 
     const { from, to } = useMemo(() => {
         if (window.kind === "custom") return { from: window.from, to: window.to };
@@ -126,7 +144,11 @@ export function MetricsHistory<T extends { t: number } = Point>({
             const separator = endpoint.includes("?") ? "&" : "?";
             const controller = new AbortController();
             const at = Date.now();
-            void fetch(`${endpoint}${separator}${queryFor(window)}`, { cache: "no-store", signal: controller.signal })
+            lastLoad.current = at;
+            void fetch(`${endpoint}${separator}${queryFor(window)}`, {
+                cache: "no-store",
+                signal: controller.signal
+            })
                 .then((res) => (res.ok ? res.json() : null))
                 .then((body) => {
                     const fetched = (body?.points ?? []) as T[];
@@ -185,7 +207,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
 
         let timer: ReturnType<typeof setInterval> | null = null;
         const start = (): void => {
-            if (timer === null) timer = setInterval(() => load(true), every);
+            // Pushed to: the ticks below are the cadence, and a timer beside them
+            // would only re-read what the last tick already drew.
+            if (timer === null && !pushed) timer = setInterval(() => load(true), every);
         };
         const stop = (): void => {
             if (timer !== null) {
@@ -208,7 +232,35 @@ export function MetricsHistory<T extends { t: number } = Point>({
             stop();
             document.removeEventListener("visibilitychange", onVisibility);
         };
-    }, [window, load]);
+    }, [window, load, pushed]);
+
+    /**
+     * Re-read when the collector says it wrote something for this subject.
+     *
+     * A window of raw samples gains a point on every tick, so it re-reads on every
+     * one. A wide window reads hourly rollups that a tick does not change, so it
+     * re-reads no more often than it used to poll. A hidden tab skips the tick and
+     * catches up when it is shown, through the visibility handler above.
+     */
+    const onTick = useRef<() => void>(() => undefined);
+    onTick.current = () => {
+        if (window.kind === "custom" || document.visibilityState !== "visible") return;
+        const raw = RANGE_PRESETS[window.preset] <= RAW_MAX_SPAN_MS;
+        if (raw || Date.now() - lastLoad.current >= LIVE_INTERVAL_MS[window.preset]) load(true);
+    };
+
+    useEffect(() => {
+        if (!live || typeof EventSource === "undefined") return;
+        const source = new EventSource(live);
+        source.addEventListener("ready", () => setPushed(true));
+        source.addEventListener("tick", () => onTick.current());
+        // Dropped: poll until the browser has it back and it says ready again.
+        source.onerror = () => setPushed(false);
+        return () => {
+            source.close();
+            setPushed(false);
+        };
+    }, [live]);
 
     function applyCustom() {
         const fromMs = new Date(customFrom).getTime();
@@ -222,7 +274,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
     // would not say which day it belongs to.
     const stampOf = useCallback(
         (at: number): string =>
-            to - from > 36 * 3_600_000 ? `${display.date(at)} ${display.time(at)}` : display.time(at),
+            to - from > 36 * 3_600_000
+                ? `${display.date(at)} ${display.time(at)}`
+                : display.time(at),
         [display, from, to]
     );
 
@@ -241,7 +295,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             }}
                             className={cn(
                                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                active
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             )}
                         >
                             {preset}
@@ -253,17 +309,23 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     onClick={() => setCustomOpen((value) => !value)}
                     className={cn(
                         "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                        window.kind === "custom" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        window.kind === "custom"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                 >
                     Custom
                 </button>
                 {!loading && (
                     <span className="ml-auto text-xs text-muted-foreground">
-                        {points && points.length > 0 ? `${points.length} points` : ""}
+                        {points && points.length > 0
+                            ? `${points.length} points${pushed && window.kind === "preset" ? " - live" : ""}`
+                            : ""}
                     </span>
                 )}
-                {loading && <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />}
+                {loading && (
+                    <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />
+                )}
             </div>
 
             {customOpen && (
@@ -400,7 +462,14 @@ export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[]
  * a zero: a service with no volume is not a service storing nothing.
  */
 export const CONSUMPTION_METRICS: MetricSpec[] = [
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    {
+        key: "cpu",
+        label: "CPU",
+        value: (point) => point.cpuPercent,
+        format: percent,
+        tone: "primary",
+        max: 100
+    },
     {
         key: "mem",
         label: "Memory",
@@ -428,16 +497,23 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
         tone: "warning"
     },
     {
-        // One chart for both directions would need two lines; the number people
-        // are actually watching for is how much is going out, because that is the
-        // half a home connection runs out of first. In is on hover beside it.
+        // A chart per direction rather than one with the other on hover: out is
+        // what a home connection runs out of first, and in is what a service
+        // being pulled from - a download mirror, a game world being fetched - is
+        // watched for, and neither is readable as a number on hover.
         key: "net",
         label: "Bandwidth out",
         value: (point) => point.netTxBytesPerSecond,
-        describe: (point) =>
-            point.netRxBytesPerSecond === null ? null : `${formatRate(point.netRxBytesPerSecond)} in`,
         format: formatRate,
         tone: "primary",
+        summary: "max"
+    },
+    {
+        key: "net-in",
+        label: "Bandwidth in",
+        value: (point) => point.netRxBytesPerSecond,
+        format: formatRate,
+        tone: "success",
         summary: "max"
     }
 ];

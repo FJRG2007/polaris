@@ -526,7 +526,7 @@ function AnomaliesPanel({
                                                     )
                                             )
                                         }
-                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                                     >
                                         <Ban className="size-3.5" />
                                     </button>
@@ -1022,7 +1022,7 @@ function BanReason({
     const active = ban.until === null || new Date(ban.until) > new Date();
     return (
         <div
-            className={`mb-4 flex flex-col gap-1 rounded-md border p-3 ${active ? "border-danger/40 bg-danger/5" : "border-border"}`}
+            className={`mb-4 flex flex-col gap-1 rounded-md border p-3 ${active ? "border-danger-edge bg-danger-soft" : "border-border"}`}
         >
             <p className="text-sm font-medium">
                 {active ? "Blocked by the firewall" : "Was blocked by the firewall"}

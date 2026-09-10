@@ -13,6 +13,7 @@ import { primaryDomain } from "./domain-rank";
 import { dbEngineLabel } from "@polaris/core";
 import { NewVolumeDialog } from "./volume-form";
 import { useStagedChanges } from "./staged-changes";
+import { DatabaseManageDialog } from "./database-panel";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { VolumeDetailDialog, type VolumeTab } from "./volume-detail";
 import { duplicateApplicationAction, saveLayoutAction } from "./actions";
@@ -189,17 +190,17 @@ const DOT_BG: React.CSSProperties = {
 };
 
 const TONE_DOT: Record<Tone, string> = {
-    success: "bg-success",
-    warning: "bg-warning",
-    danger: "bg-danger",
+    success: "bg-success-solid",
+    warning: "bg-warning-solid",
+    danger: "bg-danger-solid",
     idle: "bg-muted-foreground"
 };
 
 /** Status text color, like Railway's "Online" / "Crashed" node label. */
 const TONE_TEXT: Record<Tone, string> = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
+    success: "text-success-ink",
+    warning: "text-warning-ink",
+    danger: "text-danger-ink",
     idle: "text-muted-foreground"
 };
 
@@ -207,7 +208,7 @@ const TONE_TEXT: Record<Tone, string> = {
 const TONE_BORDER: Record<Tone, string> = {
     success: "border-border hover:border-muted-foreground/40",
     warning: "border-border hover:border-muted-foreground/40",
-    danger: "border-danger/40 hover:border-danger/60",
+    danger: "border-danger-edge hover:border-danger-edge",
     idle: "border-border hover:border-muted-foreground/40"
 };
 
@@ -259,6 +260,9 @@ export function DeployCanvas({
         hostedCount?: number;
     } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [managing, setManaging] = useState<{ id: string; name: string; engine: string } | null>(
+        null
+    );
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
         open: false,
@@ -454,10 +458,13 @@ export function DeployCanvas({
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             setDragId(null);
-            // A click (no meaningful drag) opens the service detail for app nodes.
+            // A click (no meaningful drag) opens the service detail for app nodes,
+            // and a database's Manage panel for database nodes.
             if (!moved) {
                 const app = environment.applications.find((item) => item.id === id);
                 if (app && onOpenService) onOpenService(app);
+                const database = environment.databases.find((item) => item.id === id);
+                if (database) setManaging(database);
                 return;
             }
             if (canManage) persist(posRef.current, links);
@@ -826,6 +833,19 @@ export function DeployCanvas({
                                                             </ContextMenuItem>
                                                         </>
                                                     )}
+                                                    {!app && (
+                                                        <ContextMenuItem
+                                                            onSelect={() =>
+                                                                setManaging({
+                                                                    id: node.id,
+                                                                    name: node.name,
+                                                                    engine: node.engine ?? ""
+                                                                })
+                                                            }
+                                                        >
+                                                            <Settings2 className="size-4" /> Manage
+                                                        </ContextMenuItem>
+                                                    )}
                                                     <ContextMenuSeparator />
                                                     <ContextMenuItem
                                                         variant="danger"
@@ -995,6 +1015,18 @@ export function DeployCanvas({
                 onOpenChange={(open) => !open && setOpenVolume(null)}
                 onChanged={() => router.refresh()}
             />
+            {managing ? (
+                <DatabaseManageDialog
+                    database={managing}
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setManaging(null);
+                            router.refresh();
+                        }
+                    }}
+                />
+            ) : null}
             {dialog}
         </div>
     );

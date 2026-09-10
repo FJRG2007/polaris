@@ -87,10 +87,10 @@ export function DeviceIcon({ kind, className }: { kind: string; className?: stri
  *  panel and anything later that shows a state must not disagree about what
  *  jammed looks like. */
 const TONE_CLASSES: Record<kinds.DeviceTone, string> = {
-    success: "border-success/30 bg-success/10 text-success",
+    success: "border-success-edge bg-success-soft text-success-ink",
     active: "border-accent/30 bg-accent/10 text-accent",
-    warning: "border-warning/30 bg-warning/10 text-warning",
-    danger: "border-danger/30 bg-danger/10 text-danger",
+    warning: "border-warning-edge bg-warning-soft text-warning-ink",
+    danger: "border-danger-edge bg-danger-soft text-danger-ink",
     muted: "border-border bg-muted text-muted-foreground"
 };
 
@@ -332,7 +332,7 @@ export function DevicePanel({
                                 {error && (
                                     <p
                                         role="alert"
-                                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
                                     >
                                         {error}
                                     </p>

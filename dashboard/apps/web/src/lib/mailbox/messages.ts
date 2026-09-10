@@ -17,20 +17,20 @@
  * told to make one rather than silently doing nothing.
  */
 
-import { after } from "next/server";
-import { withImap, type MailConnectionSource } from "./imap";
-import { prisma } from "@polaris/db";
-import { addressesFrom } from "./json";
-import { publishMail } from "./live";
 import { teachSpam } from "./spam";
-import { folderForRole } from "./folder-roles";
-import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
+import { after } from "next/server";
+import { prisma } from "@polaris/db";
+import { publishMail } from "./live";
 import * as core from "@polaris/core";
+import { addressesFrom } from "./json";
 import { readShape } from "./structure";
-import { decodePart, unflow } from "./decode";
-import { catchUpFolder, refreshThreads } from "./sync";
-import { recordSubscription } from "./subscriptions";
 import type { ImapFlow } from "imapflow";
+import { decodePart, unflow } from "./decode";
+import { folderForRole } from "./folder-roles";
+import { recordSubscription } from "./subscriptions";
+import { catchUpFolder, refreshThreads } from "./sync";
+import { withImap, type MailConnectionSource } from "./imap";
+import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 
 /** What a message action is asked for as. */
@@ -39,6 +39,8 @@ export type MailAction =
     | "unread"
     | "star"
     | "unstar"
+    | "important"
+    | "unimportant"
     | "archive"
     | "trash"
     | "delete"
@@ -46,15 +48,69 @@ export type MailAction =
     | "not-junk"
     | "inbox";
 
-/** The flag an action sets, for the four that are flags rather than moves. */
+/**
+ * The keyword Important is written as.
+ *
+ * A folder that does not store keywords is simply not told - imapflow leaves out
+ * any flag a folder's PERMANENTFLAGS refuses - and the mark stays here, which is
+ * why sync never reads its absence as a "no" until the folder is known to keep
+ * keywords (`MailFolder.keywords`).
+ */
+const IMPORTANT_KEYWORD = core.MAIL_IMPORTANT_KEYWORD;
+
+/** The flag an action sets, for the ones that are flags rather than moves. */
 const FLAG_ACTIONS: Partial<
-    Record<MailAction, { flag: string; add: boolean; column: "seen" | "flagged" }>
+    Record<MailAction, { flag: string; add: boolean; column: "seen" | "flagged" | "important" }>
 > = {
     read: { flag: "\\Seen", add: true, column: "seen" },
     unread: { flag: "\\Seen", add: false, column: "seen" },
     star: { flag: "\\Flagged", add: true, column: "flagged" },
-    unstar: { flag: "\\Flagged", add: false, column: "flagged" }
+    unstar: { flag: "\\Flagged", add: false, column: "flagged" },
+    important: { flag: IMPORTANT_KEYWORD, add: true, column: "important" },
+    unimportant: { flag: IMPORTANT_KEYWORD, add: false, column: "important" }
 };
+
+/** Whether the folder open on this connection stores `$Important`: either any
+ *  keyword (`\*`) or that one by name, in its permanent flags. */
+export function keepsKeyword(client: ImapFlow): boolean {
+    const mailbox = client.mailbox;
+    if (!mailbox || typeof mailbox === "boolean") return false;
+    const permanent = mailbox.permanentFlags;
+    return Boolean(permanent && (permanent.has("\\*") || permanent.has(IMPORTANT_KEYWORD)));
+}
+
+/**
+ * Pin or mute the conversations a set of messages belong to.
+ *
+ * Neither is a thing a mail server has a word for, so nothing is sent to one:
+ * these are columns on Polaris' own conversation row, narrowed by the reader's
+ * id inside the query that resolves them. A pinned conversation sits at the top
+ * of every list it is in (`list-order`); a muted one is never announced, which
+ * is what the new-mail notice reads.
+ */
+export async function setConversationState(
+    userId: string,
+    messageIds: readonly string[],
+    state: { pinned?: boolean; muted?: boolean }
+): Promise<number> {
+    const messages = await prisma.mailMessage.findMany({
+        where: { id: { in: [...messageIds] }, account: { userId } },
+        select: { threadId: true, accountId: true }
+    });
+    if (messages.length === 0) return 0;
+    const threadIds = [...new Set(messages.map((message) => message.threadId))];
+    const data: { pinned?: boolean; muted?: boolean } = {};
+    if (state.pinned !== undefined) data.pinned = state.pinned;
+    if (state.muted !== undefined) data.muted = state.muted;
+    const { count } = await prisma.mailThread.updateMany({
+        where: { id: { in: threadIds }, account: { userId } },
+        data
+    });
+    for (const accountId of new Set(messages.map((message) => message.accountId))) {
+        publishMail({ accountId, kind: "messages", actorId: userId });
+    }
+    return count;
+}
 
 /** Where each moving action puts a message. */
 const MOVE_ACTIONS: Partial<Record<MailAction, core.MailFolderRole>> = {
@@ -421,6 +477,16 @@ async function setFlag(
                     const uids = rows.map((row) => Number(row.uid));
                     const lock = await client.getMailboxLock(folder.path);
                     try {
+                        // A keyword is only worth mirroring where the folder keeps
+                        // it, and a writable open is the one moment the server
+                        // says so. Learned here so sync knows it may believe the
+                        // server's silence about the keyword from now on.
+                        if (flag.flag === IMPORTANT_KEYWORD && keepsKeyword(client)) {
+                            await prisma.mailFolder.update({
+                                where: { id: folderId },
+                                data: { keywords: true }
+                            });
+                        }
                         if (flag.add) {
                             await client.messageFlagsAdd(uids, [flag.flag], { uid: true });
                         } else {

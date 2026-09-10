@@ -3,14 +3,25 @@
  * notification looks and reads the same wherever it is shown.
  */
 
-import { AlertTriangle, CheckCheck, Info, ShieldAlert, ShieldCheck, type LucideIcon } from "lucide-react";
+import {
+    AlertTriangle,
+    CheckCheck,
+    Info,
+    ShieldAlert,
+    ShieldCheck,
+    type LucideIcon
+} from "lucide-react";
 import type { NotificationAudience, NotificationLevel } from "@/lib/notification-service";
 
 /** Icon and accent color for a notification's severity. */
-export function levelStyle(level: NotificationLevel, type: string): { Icon: LucideIcon; color: string } {
+export function levelStyle(
+    level: NotificationLevel,
+    type: string
+): { Icon: LucideIcon; color: string } {
     if (level === "danger") return { Icon: ShieldAlert, color: "text-danger" };
-    if (level === "warning") return { Icon: AlertTriangle, color: "text-amber-500" };
-    if (level === "success") return { Icon: type.startsWith("scan") ? ShieldCheck : CheckCheck, color: "text-success" };
+    if (level === "warning") return { Icon: AlertTriangle, color: "text-warning" };
+    if (level === "success")
+        return { Icon: type.startsWith("scan") ? ShieldCheck : CheckCheck, color: "text-success" };
     return { Icon: Info, color: "text-muted-foreground" };
 }
 
@@ -23,7 +34,8 @@ export function describeAudience(
     label: string | null
 ): { text: string; hint: string } {
     if (audience === "admins") return { text: "Admins", hint: "Sent to every administrator" };
-    if (audience === "everyone") return { text: "You and others", hint: "Sent to more than one person" };
+    if (audience === "everyone")
+        return { text: "You and others", hint: "Sent to more than one person" };
     if (audience === "group") {
         return label
             ? { text: label, hint: `Sent to the ${label} group` }

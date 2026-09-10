@@ -54,10 +54,10 @@ const REFRESH_MS = 4000;
 const TONE: Record<core.AgentSessionState, string> = {
     starting: "text-muted-foreground",
     working: "text-violet-400",
-    waiting: "text-amber-400",
+    waiting: "text-warning",
     idle: "text-foreground",
     stopped: "text-muted-foreground",
-    failed: "text-red-400"
+    failed: "text-danger"
 };
 
 /** Blocked on a person first, then still going, then done. */
@@ -106,7 +106,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setStarting(true)}>
@@ -462,7 +462,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         <Switch checked={enigma} onChange={setEnigma} />
                     </div>
 
-                    {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 
                 <DialogFooter>

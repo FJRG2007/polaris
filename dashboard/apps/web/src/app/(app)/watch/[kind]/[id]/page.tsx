@@ -55,10 +55,13 @@ export default async function WatchSubjectPage({
                             ? `${localHost.username}@${localHost.address} - the machine Polaris runs on`
                             : "The machine Polaris runs on"
                     }
-                    // An alarm on this machine was set on the server row it was
-                    // enrolled as, which is what it is called everywhere alarms
-                    // are made - the local subject holds samples, not targets.
-                    alarms={watching(localHost?.id ?? LOCAL_SERVER_ID)}
+                    // An alarm on this machine names the server row it was
+                    // enrolled as, or - before it was enrolled - its reserved
+                    // subject. Both are this page.
+                    alarms={[
+                        ...(localHost ? watching(localHost.id) : []),
+                        ...watching(LOCAL_HOST_SUBJECT)
+                    ]}
                     breakdowns={await offeredBreakdowns(viewer, { kind: "server", id })}
                 />
             );
@@ -86,7 +89,9 @@ export default async function WatchSubjectPage({
         select: {
             id: true,
             name: true,
-            environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+            environment: {
+                select: { name: true, projectId: true, project: { select: { name: true } } }
+            }
         }
     });
     if (!app) notFound();

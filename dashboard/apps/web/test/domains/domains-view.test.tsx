@@ -23,6 +23,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("../../src/app/(app)/admin/domains/actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/domains/setup-actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/integrations/actions", () => ({}));
+vi.mock("../../src/app/(app)/account/domains/dns-actions", () => ({}));
 
 const { DomainsView } = await import("../../src/app/(app)/admin/domains/domains-view");
 
@@ -37,6 +38,8 @@ describe("the domains panel before its read lands", () => {
         // Neither of these waits on anything, so neither may be held back by a card
         // that does.
         expect(markup).toContain("Trust this device");
+        // The record editor's chrome is there too, its zones pulsing below it.
+        expect(markup).toContain("DNS records");
         expect(markup).toContain("Advanced: exposure mode and DuckDNS");
     });
 

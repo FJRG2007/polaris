@@ -130,8 +130,8 @@ export function NoteShareDialog({
                 <DialogHeader>
                     <DialogTitle>Share this note</DialogTitle>
                     <DialogDescription>
-                        A link anybody can open, whether or not they have an account here. They can read
-                        &ldquo;{noteTitle}&rdquo; and nothing else, and they cannot change it.
+                        A link anybody can open, whether or not they have an account here. They can
+                        read &ldquo;{noteTitle}&rdquo; and nothing else, and they cannot change it.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -163,8 +163,9 @@ export function NoteShareDialog({
                             </div>
 
                             {!share.usable.ok && (
-                                <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
-                                    Nobody can open this link right now: it is {share.usable.reason}.
+                                <p className="rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
+                                    Nobody can open this link right now: it is {share.usable.reason}
+                                    .
                                 </p>
                             )}
 
@@ -197,7 +198,9 @@ export function NoteShareDialog({
                                     />
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">Expires on</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Expires on
+                                    </span>
                                     <Input
                                         type="date"
                                         value={expires}
@@ -218,12 +221,21 @@ export function NoteShareDialog({
                                 </div>
                             </div>
 
-                            <AccessRulesEditor value={rules} groups={[]} showGroups={false} onChange={setRules} />
+                            <AccessRulesEditor
+                                value={rules}
+                                groups={[]}
+                                showGroups={false}
+                                onChange={setRules}
+                            />
 
                             {error && <p className="text-sm text-danger">{error}</p>}
 
                             <div className="flex items-center justify-between gap-2">
-                                <Button variant="ghost" disabled={busy} onClick={() => void unpublish()}>
+                                <Button
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() => void unpublish()}
+                                >
                                     Stop sharing
                                 </Button>
                                 <Button disabled={busy} onClick={() => void save()}>

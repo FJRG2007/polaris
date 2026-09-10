@@ -104,9 +104,10 @@ export function ShareDialog({
     const [draftEmail, setDraftEmail] = useState("");
     const [note, setNote] = useState("");
     const [sending, setSending] = useState(false);
-    const [outcome, setOutcome] = useState<{ sent: string[]; failures: { recipient: string; reason: string }[] } | null>(
-        null
-    );
+    const [outcome, setOutcome] = useState<{
+        sent: string[];
+        failures: { recipient: string; reason: string }[];
+    } | null>(null);
 
     useEffect(() => {
         if (!open) return;
@@ -145,7 +146,16 @@ export function ShareDialog({
     const setPublic = async (enabled: boolean, showComments: boolean) => {
         const previous = share;
         setError("");
-        setShare(enabled ? { url: previous?.url ?? "", showComments, views: previous?.views ?? 0, createdAt: "" } : null);
+        setShare(
+            enabled
+                ? {
+                      url: previous?.url ?? "",
+                      showComments,
+                      views: previous?.views ?? 0,
+                      createdAt: ""
+                  }
+                : null
+        );
         const result = await runAction(
             () => actions.setTaskShareAction({ taskId, enabled, showComments }),
             setError
@@ -192,7 +202,10 @@ export function ShareDialog({
                 ) : (
                     <div className="flex flex-col gap-6">
                         {error && (
-                            <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                            <p
+                                role="alert"
+                                className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                            >
                                 {error}
                             </p>
                         )}
@@ -277,7 +290,12 @@ export function ShareDialog({
                                         }}
                                         className="h-8 flex-1 text-xs"
                                     />
-                                    <Button size="sm" variant="ghost" disabled={!draftEmail.trim()} onClick={addEmail}>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={!draftEmail.trim()}
+                                        onClick={addEmail}
+                                    >
                                         Add
                                     </Button>
                                 </div>
@@ -291,7 +309,7 @@ export function ShareDialog({
                                 />
 
                                 {blockedOutside && (
-                                    <p className="text-xs text-amber-500">
+                                    <p className="text-xs text-warning">
                                         Turn the public link on to email someone outside Polaris.
                                     </p>
                                 )}
@@ -299,7 +317,9 @@ export function ShareDialog({
                                 <div className="flex items-center gap-3">
                                     <Button
                                         size="sm"
-                                        disabled={sending || (userIds.length === 0 && emails.length === 0)}
+                                        disabled={
+                                            sending || (userIds.length === 0 && emails.length === 0)
+                                        }
                                         onClick={() => void send()}
                                     >
                                         {sending && <Loader2 className="size-3.5 animate-spin" />}
@@ -339,22 +359,29 @@ export function ShareDialog({
                                         {share ? "On" : "Off"}
                                         {share && share.views > 0 && (
                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                Opened {share.views} {share.views === 1 ? "time" : "times"}
+                                                Opened {share.views}{" "}
+                                                {share.views === 1 ? "time" : "times"}
                                             </span>
                                         )}
                                     </span>
                                     <Switch
                                         checked={share !== null}
                                         aria-label="Public link"
-                                        onChange={(checked) => void setPublic(checked, share?.showComments ?? false)}
+                                        onChange={(checked) =>
+                                            void setPublic(checked, share?.showComments ?? false)
+                                        }
                                     />
                                 </div>
                                 <div className={cn("flex flex-col gap-2", !share && "hidden")}>
-                                    {share?.url && <LinkRow url={share.url} label="the public link" />}
+                                    {share?.url && (
+                                        <LinkRow url={share.url} label="the public link" />
+                                    )}
                                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <Checkbox
                                             checked={share?.showComments ?? false}
-                                            onChange={(event) => void setPublic(true, event.target.checked)}
+                                            onChange={(event) =>
+                                                void setPublic(true, event.target.checked)
+                                            }
                                         />
                                         Include the discussion
                                     </label>

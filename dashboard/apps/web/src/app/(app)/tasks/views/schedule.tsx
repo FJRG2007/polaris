@@ -68,7 +68,9 @@ export function GanttView(props: ViewProps) {
                                 <span
                                     key={tick.toISOString()}
                                     className="absolute -translate-x-1/2 whitespace-nowrap"
-                                    style={{ left: `${((tick.getTime() - range.from.getTime()) / span) * 100}%` }}
+                                    style={{
+                                        left: `${((tick.getTime() - range.from.getTime()) / span) * 100}%`
+                                    }}
                                 >
                                     {format.date(tick.toISOString())}
                                 </span>
@@ -81,7 +83,9 @@ export function GanttView(props: ViewProps) {
                             <span
                                 aria-hidden
                                 className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-primary/60"
-                                style={{ left: `calc(14rem + (100% - 14rem) * ${todayPercent / 100})` }}
+                                style={{
+                                    left: `calc(14rem + (100% - 14rem) * ${todayPercent / 100})`
+                                }}
                             />
                         )}
                         {scheduled.map((task) => {
@@ -89,42 +93,49 @@ export function GanttView(props: ViewProps) {
                             if (!bar) return null;
                             return (
                                 <TaskMenu key={task.id} commands={commandsFor(props, task)}>
-                                <li className="flex items-center border-b border-border last:border-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpen(task.id)}
-                                        className="flex w-56 shrink-0 items-center gap-2 px-3 py-2 text-left"
-                                    >
-                                        <StatusIcon color={task.statusColor} type={task.statusType} size={14} />
-                                        <span className="truncate text-xs">{task.name}</span>
-                                        <PriorityMark priority={task.priority} />
-                                    </button>
-                                    <div className="relative h-9 flex-1">
+                                    <li className="flex items-center border-b border-border last:border-0">
                                         <button
                                             type="button"
                                             onClick={() => onOpen(task.id)}
-                                            title={`${task.name}: ${format.date(bar.start.toISOString())} to ${format.date(bar.end.toISOString())}`}
-                                            className={cn(
-                                                "absolute top-1/2 flex h-5 -translate-y-1/2 items-center gap-1 rounded px-1.5 text-[0.625rem] text-white transition-opacity hover:opacity-90",
-                                                task.blocked && "ring-1 ring-amber-500"
-                                            )}
-                                            style={{
-                                                left: `${bar.offsetPercent}%`,
-                                                width: `${bar.widthPercent}%`,
-                                                backgroundColor: task.statusColor
-                                            }}
+                                            className="flex w-56 shrink-0 items-center gap-2 px-3 py-2 text-left"
                                         >
-                                            {task.milestone && <Diamond className="size-3 shrink-0" />}
-                                            <span className="truncate">{task.reference}</span>
+                                            <StatusIcon
+                                                color={task.statusColor}
+                                                type={task.statusType}
+                                                size={14}
+                                            />
+                                            <span className="truncate text-xs">{task.name}</span>
+                                            <PriorityMark priority={task.priority} />
                                         </button>
-                                    </div>
-                                </li>
+                                        <div className="relative h-9 flex-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpen(task.id)}
+                                                title={`${task.name}: ${format.date(bar.start.toISOString())} to ${format.date(bar.end.toISOString())}`}
+                                                className={cn(
+                                                    "absolute top-1/2 flex h-5 -translate-y-1/2 items-center gap-1 rounded px-1.5 text-[0.625rem] text-white transition-opacity hover:opacity-90",
+                                                    task.blocked && "ring-1 ring-warning"
+                                                )}
+                                                style={{
+                                                    left: `${bar.offsetPercent}%`,
+                                                    width: `${bar.widthPercent}%`,
+                                                    backgroundColor: task.statusColor
+                                                }}
+                                            >
+                                                {task.milestone && (
+                                                    <Diamond className="size-3 shrink-0" />
+                                                )}
+                                                <span className="truncate">{task.reference}</span>
+                                            </button>
+                                        </div>
+                                    </li>
                                 </TaskMenu>
                             );
                         })}
                         {scheduled.length === 0 && (
                             <li className="px-4 py-10 text-center text-sm text-muted-foreground">
-                                Nothing is scheduled. Give a task a start or due date and it appears here.
+                                Nothing is scheduled. Give a task a start or due date and it appears
+                                here.
                             </li>
                         )}
                     </ul>
@@ -133,7 +144,8 @@ export function GanttView(props: ViewProps) {
 
             {undated > 0 && (
                 <p className="text-xs text-muted-foreground">
-                    {undated} {undated === 1 ? "task is" : "tasks are"} undated and not on the timeline.
+                    {undated} {undated === 1 ? "task is" : "tasks are"} undated and not on the
+                    timeline.
                 </p>
             )}
         </div>

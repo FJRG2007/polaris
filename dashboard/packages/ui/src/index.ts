@@ -20,14 +20,27 @@ export { useReopenElsewhere } from "./lib/menu-reopen";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { Textarea, type TextareaProps } from "./components/textarea";
-export { Badge, type BadgeProps } from "./components/badge";
+export { Badge, statusChipClass, type BadgeProps } from "./components/badge";
+export { CopyButton } from "./components/copy-button";
+export {
+    DnsRecordCard,
+    type DnsRecordField,
+    type DnsRecordStatus
+} from "./components/dns-record-card";
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
 export { EmptyState } from "./components/empty-state";
 export { ScrollRow } from "./components/scroll-row";
-export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./components/bone-skeleton";
+export {
+    BoneSkeleton,
+    type CapturedLayout,
+    type ResponsiveLayout
+} from "./components/bone-skeleton";
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
-export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from "./components/confirm-delete-dialog";
+export {
+    ConfirmDeleteDialog,
+    type ConfirmDeleteDialogProps
+} from "./components/confirm-delete-dialog";
 export { Switch } from "./components/switch";
 export { ColorPicker } from "./components/color-picker";
 export { ToastProvider, useToast, type Toast } from "./components/toast";

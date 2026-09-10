@@ -40,7 +40,10 @@ const IMPLICIT_TLS_PORT = 465;
 const CONNECT_TIMEOUT_MS = 20_000;
 const SOCKET_TIMEOUT_MS = 60_000;
 
-function transportFor(account: MailSendSource, credential: Awaited<ReturnType<typeof mailCredential>>) {
+function transportFor(
+    account: MailSendSource,
+    credential: Awaited<ReturnType<typeof mailCredential>>
+) {
     return createTransport({
         host: account.smtpHost,
         port: account.smtpPort,
@@ -48,7 +51,11 @@ function transportFor(account: MailSendSource, credential: Awaited<ReturnType<ty
         auth:
             credential.kind === "password"
                 ? { user: credential.user, pass: credential.pass }
-                : { type: "OAuth2" as const, user: credential.user, accessToken: credential.accessToken },
+                : {
+                      type: "OAuth2" as const,
+                      user: credential.user,
+                      accessToken: credential.accessToken
+                  },
         // A server that offers STARTTLS is taken up on it: without this a
         // downgrade would put the credential on a plain socket.
         requireTLS: account.smtpSecurity !== "tls" && account.smtpPort !== IMPLICIT_TLS_PORT,
@@ -123,9 +130,21 @@ function textFrom(markdown: string): string {
     return markdown;
 }
 
-/** Build the MIME bytes once. */
-export async function composeMime(message: OutgoingMessage): Promise<Buffer> {
+/**
+ * Build the MIME bytes once.
+ *
+ * `messageId` names the message where the caller must be able to find it again -
+ * a draft's copy on the server - and is otherwise left to the composer to make
+ * up. `keepBcc` is for that same copy: a draft somebody picks up in another
+ * client must still have its blind copies, and it is in their own mailbox, so
+ * nobody else reads the header. Anything sent never keeps it.
+ */
+export async function composeMime(
+    message: OutgoingMessage,
+    extra: { messageId?: string; keepBcc?: boolean } = {}
+): Promise<Buffer> {
     const options: Mail.Options = {
+        ...(extra.messageId ? { messageId: extra.messageId } : {}),
         from: core.formatAddress(message.from),
         to: message.to.map(core.formatAddress),
         ...(message.cc.length > 0 ? { cc: message.cc.map(core.formatAddress) } : {}),
@@ -153,7 +172,9 @@ export async function composeMime(message: OutgoingMessage): Promise<Buffer> {
               }
             : {})
     };
-    return new MailComposer(options).compile().build();
+    const node = new MailComposer(options).compile();
+    if (extra.keepBcc) node.keepBcc = true;
+    return node.build();
 }
 
 /**

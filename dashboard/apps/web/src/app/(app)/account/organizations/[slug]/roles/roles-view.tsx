@@ -139,6 +139,7 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                     </CardTitle>
                     <span className="text-muted-foreground text-xs">@{role.slug}</span>
                     {role.system ? <Badge>built-in</Badge> : null}
+                    {role.restricted ? <Badge variant="neutral">no implicit access</Badge> : null}
                     <span className="text-muted-foreground text-xs">
                         {role.memberCount === 1 ? "1 person" : `${role.memberCount} people`}
                     </span>
@@ -186,9 +187,13 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                         <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-muted-foreground text-xs">
-                                {held.size === 0
-                                    ? "Sees the organization and whatever their teams reach, and nothing else."
-                                    : `${held.size} of ${GRANTABLE.length} permissions.`}
+                                {role.restricted
+                                    ? held.size === 0
+                                        ? "Reaches only what is granted to them directly - not the roster, the files or internal work."
+                                        : `${held.size} of ${GRANTABLE.length} permissions, without seeing the roster, the files or internal work.`
+                                    : held.size === 0
+                                      ? "Sees the organization and whatever their teams reach, and nothing else."
+                                      : `${held.size} of ${GRANTABLE.length} permissions.`}
                             </p>
                             <Button
                                 size="sm"
@@ -369,7 +374,7 @@ function NewRoleDialog({
                     {error && (
                         <p
                             role="alert"
-                            className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                            className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
                         >
                             {error}
                         </p>

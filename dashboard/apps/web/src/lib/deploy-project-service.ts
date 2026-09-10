@@ -10,11 +10,14 @@
  */
 
 import { prisma } from "@polaris/db";
-import { loadEnv } from "@polaris/config";
-import { slugify } from "@polaris/deploy";
 import { createApiKey } from "@polaris/auth";
 import { contactLines } from "@/lib/privacy-service";
+import { readsOrgWhere } from "@/lib/orgs/org-service";
+import { linksOfLayout, slugify } from "@polaris/deploy";
+import { redactSource } from "@/lib/deploy/redact-source";
+import { getCapabilities, loadEnv } from "@polaris/config";
 import { sendWebhook } from "./notifications/webhook-sender";
+import { networkModeOf } from "@/lib/deploy/service-networks";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
     defaultProjectFlags,
@@ -28,6 +31,7 @@ import {
     ALL_PROJECT_CAPABILITIES,
     PROJECT_PRINCIPAL_LABELS,
     TOKEN_LIFETIME_DAYS,
+    type EnvironmentNetworkMode,
     type ProjectAccessInput,
     type ProjectCapability,
     type ProjectFlags,
@@ -50,6 +54,16 @@ export interface ProjectEnvironmentView {
     isDefault: boolean;
     serviceCount: number;
     createdAt: string;
+    /** The branch its repository-built services follow, when it names one. */
+    branch: string | null;
+    /** The pull request it previews, when it is a preview. */
+    pullRequest: number | null;
+    /** "owner/repo" that pull request is on. */
+    previewRepo: string | null;
+    /** How its services see each other: "shared", "environment" or "links". */
+    networkMode: EnvironmentNetworkMode;
+    /** How many links its canvas holds - in "links" mode, the connections made. */
+    linkCount: number;
 }
 
 export interface ProjectSettingsView {
@@ -64,6 +78,9 @@ export interface ProjectSettingsView {
     createdAt: string;
     environments: ProjectEnvironmentView[];
     serviceCount: number;
+    /** Whether this machine's daemon makes private networks. An older one keeps
+     *  every service here on the shared network until Polaris is updated. */
+    privateNetworksHere: boolean;
 }
 
 export async function getProjectSettings(projectId: string): Promise<ProjectSettingsView> {
@@ -79,6 +96,11 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
                     slug: true,
                     isDefault: true,
                     createdAt: true,
+                    branch: true,
+                    pullRequest: true,
+                    previewRepo: true,
+                    networkMode: true,
+                    layout: true,
                     _count: { select: { applications: true, databases: true } }
                 }
             }
@@ -91,7 +113,12 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         slug: environment.slug,
         isDefault: environment.isDefault,
         serviceCount: environment._count.applications + environment._count.databases,
-        createdAt: environment.createdAt.toISOString()
+        createdAt: environment.createdAt.toISOString(),
+        branch: environment.branch,
+        pullRequest: environment.pullRequest,
+        previewRepo: environment.previewRepo,
+        networkMode: networkModeOf(environment.networkMode),
+        linkCount: linksOfLayout(environment.layout).length
     }));
     return {
         id: project.id,
@@ -107,7 +134,8 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         serviceCount: environments.reduce(
             (total, environment) => total + environment.serviceCount,
             0
-        )
+        ),
+        privateNetworksHere: getCapabilities().privateNetworks
     };
 }
 
@@ -294,7 +322,8 @@ async function resolvePrincipal(
     input: ProjectAccessInput,
     granterId: string
 ): Promise<{ userId: string | null; teamId: string | null; orgId: string | null }> {
-    const onRoster = { OR: [{ ownerId: granterId }, { members: { some: { userId: granterId } } }] };
+    // A roster the granter reads: a restricted member is on it without seeing it.
+    const onRoster = readsOrgWhere(granterId);
     if (input.principal === "everyone") return { userId: null, teamId: null, orgId: null };
     if (input.principal === "team") {
         if (!input.principalId) throw new Error("Pick a team");
@@ -439,7 +468,7 @@ export async function listProjectAccessCandidates(
     userId: string
 ): Promise<ProjectAccessCandidates> {
     const orgs = await prisma.organization.findMany({
-        where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
+        where: readsOrgWhere(userId),
         orderBy: { name: "asc" },
         select: {
             id: true,
@@ -462,6 +491,8 @@ export interface ProjectTokenView {
     name: string;
     prefix: string;
     scopes: string[];
+    /** Whose access the token acts with: the person who made it. */
+    madeBy: string;
     expiresAt: string | null;
     lastUsedAt: string | null;
     revokedAt: string | null;
@@ -480,7 +511,8 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
             expiresAt: true,
             lastUsedAt: true,
             revokedAt: true,
-            createdAt: true
+            createdAt: true,
+            user: { select: { name: true } }
         }
     });
     return rows.map((row) => ({
@@ -488,6 +520,7 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
         name: row.name,
         prefix: row.prefix,
         scopes: safeList(row.scopes),
+        madeBy: row.user.name,
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         revokedAt: row.revokedAt?.toISOString() ?? null,
@@ -508,18 +541,20 @@ function safeList(raw: string): string[] {
 
 /**
  * Mint a token that may only act on this project. It is issued against the
- * project owner's account, so it can never do more than they can - and it is
- * further narrowed to `deploy.read`, or `deploy.manage` when the operator asked
- * for a token that can change things.
+ * account of whoever minted it, so every call it makes is authorized against
+ * what that person holds on the project at the time - their capabilities and
+ * their environments - and never against the owner's. It is further narrowed to
+ * `deploy.read`, or `deploy.manage` when a token that can change things was
+ * asked for.
  *
  * The secret is returned once. There is no second chance to read it, which is
  * the point.
  */
 export async function createProjectToken(
-    input: ProjectTokenInput & { ownerId: string }
+    input: ProjectTokenInput & { minterId: string }
 ): Promise<{ secret: string; prefix: string }> {
     const days = TOKEN_LIFETIME_DAYS[input.lifetime];
-    const key = await createApiKey(input.ownerId, {
+    const key = await createApiKey(input.minterId, {
         name: input.name,
         description: "Minted from this app's settings.",
         // A deploy token is wired into something that runs on its own, which is
@@ -1016,27 +1051,4 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
             }))
         }))
     };
-}
-
-/** A service's source with anything credential-shaped taken out. A repo URL can
- *  carry a token in its userinfo, and that must not travel with the template. */
-function redactSource(raw: string): Record<string, unknown> {
-    let parsed: Record<string, unknown>;
-    try {
-        parsed = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-        return {};
-    }
-    const repoUrl = parsed.repoUrl;
-    if (typeof repoUrl === "string") {
-        try {
-            const url = new URL(repoUrl);
-            url.username = "";
-            url.password = "";
-            parsed.repoUrl = url.toString();
-        } catch {
-            // Not a URL (an SSH remote); nothing to strip from it.
-        }
-    }
-    return parsed;
 }

@@ -73,7 +73,7 @@ export function TransfersPanel() {
                 </CardTitle>
             </CardHeader>
             <CardBody className="space-y-3">
-                {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                {error ? <p className="text-sm text-danger">{error}</p> : null}
 
                 {(waiting ?? []).map((offer) => (
                     <div
@@ -128,9 +128,9 @@ export function TransfersPanel() {
                         {wrong.map((offer) => (
                             <div
                                 key={offer.id}
-                                className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"
+                                className="flex flex-wrap items-center gap-3 rounded-md border border-warning-edge bg-warning-soft p-3"
                             >
-                                <AlertTriangle className="size-4 shrink-0 text-amber-400" />
+                                <AlertTriangle className="size-4 shrink-0 text-warning" />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium" title={offer.name}>
                                         {offer.name}

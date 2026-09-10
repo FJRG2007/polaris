@@ -40,7 +40,8 @@ export function UsageSection({ projectId }: { projectId: string }) {
 
     const load = useCallback(async (): Promise<ProjectUsage> => {
         const result = await projectUsageAction(projectId);
-        if (result.error || !result.usage) throw new Error(result.error ?? "Could not load the usage");
+        if (result.error || !result.usage)
+            throw new Error(result.error ?? "Could not load the usage");
         return result.usage;
     }, [projectId]);
 
@@ -72,13 +73,25 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 ) : (
                     <>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <Stat label="Services" value={String(usage?.totals.services ?? 0)} hint={`${usage?.totals.running ?? 0} running`} />
+                            <Stat
+                                label="Services"
+                                value={String(usage?.totals.services ?? 0)}
+                                hint={`${usage?.totals.running ?? 0} running`}
+                            />
                             <Stat
                                 label="CPU"
-                                value={usage?.totals.cpuPercent == null ? "-" : `${usage.totals.cpuPercent}%`}
+                                value={
+                                    usage?.totals.cpuPercent == null
+                                        ? "-"
+                                        : `${usage.totals.cpuPercent}%`
+                                }
                                 hint="Across reporting services"
                             />
-                            <Stat label="Memory" value={formatBytes(usage?.totals.memUsedBytes ?? null)} hint="Resident" />
+                            <Stat
+                                label="Memory"
+                                value={formatBytes(usage?.totals.memUsedBytes ?? null)}
+                                hint="Resident"
+                            />
                             <Stat
                                 label="Volumes"
                                 value={formatBytes(usage?.totals.volumeBytes ?? null)}
@@ -91,8 +104,17 @@ export function UsageSection({ projectId }: { projectId: string }) {
                                     ? `Sampled ${display.dateTime(usage.sampledAt)}`
                                     : "No samples yet. The collector writes one every few minutes."}
                             </p>
-                            <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing}>
-                                {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={refresh}
+                                disabled={refreshing}
+                            >
+                                {refreshing ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="size-4" />
+                                )}
                                 Refresh
                             </Button>
                         </div>
@@ -105,7 +127,10 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 {stale && <p className="text-sm text-warning">Showing the last figures. {stale}</p>}
             </SettingsCard>
 
-            <SettingsCard title="By service" description="A service with no figures is not reporting - usually because it is not running.">
+            <SettingsCard
+                title="By service"
+                description="A service with no figures is not reporting - usually because it is not running."
+            >
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[32rem] text-sm">
                         <thead>
@@ -119,7 +144,10 @@ export function UsageSection({ projectId }: { projectId: string }) {
                         </thead>
                         <tbody>
                             {(usage?.services ?? []).map((service) => (
-                                <tr key={service.id} className="border-b border-border/40 last:border-0">
+                                <tr
+                                    key={service.id}
+                                    className="border-b border-border/40 last:border-0"
+                                >
                                     <td className="px-2 py-2">
                                         <span className="flex min-w-0 items-center gap-2">
                                             {service.kind === "database" ? (
@@ -129,26 +157,35 @@ export function UsageSection({ projectId }: { projectId: string }) {
                                             )}
                                             <span className="truncate">{service.name}</span>
                                             <span
-                                                className={`size-1.5 shrink-0 rounded-full ${service.running ? "bg-success" : "bg-muted-foreground"}`}
+                                                className={`size-1.5 shrink-0 rounded-full ${service.running ? "bg-success-solid" : "bg-muted-foreground"}`}
                                                 title={service.running ? "Running" : "Not running"}
                                             />
                                         </span>
                                     </td>
-                                    <td className="px-2 py-2 text-muted-foreground">{service.environmentName}</td>
+                                    <td className="px-2 py-2 text-muted-foreground">
+                                        {service.environmentName}
+                                    </td>
                                     <td className="px-2 py-2 text-right tabular-nums">
-                                        {service.cpuPercent == null ? "-" : `${service.cpuPercent}%`}
+                                        {service.cpuPercent == null
+                                            ? "-"
+                                            : `${service.cpuPercent}%`}
                                     </td>
                                     <td className="px-2 py-2 text-right tabular-nums">
                                         {formatBytes(service.memUsedBytes)}
                                     </td>
                                     <td className="px-2 py-2 text-right tabular-nums">
-                                        {service.volumeCount === 0 ? "-" : formatBytes(service.volumeBytes)}
+                                        {service.volumeCount === 0
+                                            ? "-"
+                                            : formatBytes(service.volumeBytes)}
                                     </td>
                                 </tr>
                             ))}
                             {(usage?.services.length ?? 0) === 0 && !loading && (
                                 <tr>
-                                    <td colSpan={5} className="px-2 py-6 text-center text-muted-foreground">
+                                    <td
+                                        colSpan={5}
+                                        className="px-2 py-6 text-center text-muted-foreground"
+                                    >
                                         No services in this project yet.
                                     </td>
                                 </tr>

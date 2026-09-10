@@ -33,11 +33,11 @@ export const PLATFORM_LOGO: Record<
 };
 
 export const CHANNEL_STATUS_TONE: Record<string, string> = {
-    connected: "border-success/40 text-success",
-    connecting: "border-warning/40 text-warning",
-    qr: "border-warning/40 text-warning",
-    error: "border-danger/40 text-danger",
-    disconnected: "border-danger/40 text-danger"
+    connected: "border-success-edge text-success",
+    connecting: "border-warning-edge text-warning",
+    qr: "border-warning-edge text-warning",
+    error: "border-danger-edge text-danger",
+    disconnected: "border-danger-edge text-danger"
 };
 
 /** Per-platform hint for the recipient id when starting a chat or saving a handle. */

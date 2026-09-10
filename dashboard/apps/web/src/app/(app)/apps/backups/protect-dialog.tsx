@@ -101,7 +101,7 @@ export function ProtectDialog({
 
                 <div className="flex flex-col gap-3">
                     {destinations.length === 0 ? (
-                        <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                        <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
                             There is nowhere to put a backup yet. Add a destination first.
                         </p>
                     ) : null}

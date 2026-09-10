@@ -58,7 +58,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
 
     return (
         <div className="space-y-4">
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {repos.length > 0 ? (
                 <div className="flex justify-end">
@@ -115,7 +115,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                                 </a>
                                             </div>
                                             {run.error ? (
-                                                <p className="mt-1 text-xs text-red-400">
+                                                <p className="mt-1 text-xs text-danger">
                                                     {run.error}
                                                 </p>
                                             ) : null}
@@ -190,14 +190,14 @@ function GateSteps({ steps }: { steps: GateStepReport[] }) {
                         {step.state === "running" ? (
                             <Loader2 className="size-3 shrink-0 animate-spin" />
                         ) : step.state === "passed" ? (
-                            <Check className="size-3 shrink-0 text-emerald-400" />
+                            <Check className="size-3 shrink-0 text-success" />
                         ) : (
-                            <TriangleAlert className="size-3 shrink-0 text-red-400" />
+                            <TriangleAlert className="size-3 shrink-0 text-danger" />
                         )}
                         {GATE_STEP_LABELS[step.step]}
                     </span>
                     {step.state === "failed" && step.detail ? (
-                        <pre className="mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md bg-surface/60 px-2 py-1 text-[0.6875rem] text-red-300">
+                        <pre className="mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md bg-surface/60 px-2 py-1 text-[0.6875rem] text-danger">
                             {step.detail}
                         </pre>
                     ) : null}
@@ -272,7 +272,7 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                             placeholder="Add a regression test for the timezone bug in the report exporter, and open a pull request."
                         />
                     </div>
-                    {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>

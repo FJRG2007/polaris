@@ -14,11 +14,11 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
-import { ensureSystemRoles } from "./role-service";
 import { OrgAccessError, OrgError } from "./errors";
 import { contactLines } from "@/lib/privacy-service";
 import { discardAvatars } from "@/lib/avatar-service";
 import { isOrgSuccessor } from "@/lib/successor-service";
+import { ensureSystemRoles, roleIsRestricted } from "./role-service";
 
 export { OrgAccessError, OrgError } from "./errors";
 
@@ -113,11 +113,19 @@ async function roleFor(
 ): Promise<{ name: string; permissions: readonly string[] }> {
     const role = await prisma.orgRole.findUnique({
         where: { orgId_slug: { orgId, slug } },
-        select: { name: true, permissions: true }
+        select: { name: true, permissions: true, restricted: true }
     });
-    if (role) return { name: role.name, permissions: withRead(parsePermissions(role.permissions)) };
+    if (role) {
+        return {
+            name: role.name,
+            permissions: withRead(parsePermissions(role.permissions), role.restricted)
+        };
+    }
     const seeded = core.ORG_SYSTEM_ROLES[slug];
-    return { name: seeded?.name ?? slug, permissions: withRead(seeded?.permissions ?? []) };
+    return {
+        name: seeded?.name ?? slug,
+        permissions: withRead(seeded?.permissions ?? [], seeded?.restricted === true)
+    };
 }
 
 /**
@@ -127,8 +135,14 @@ async function roleFor(
  * run the teams but not open the organization is not a configuration anybody
  * wants - it is a person who belongs somewhere and gets a 404 for it. So it comes
  * with every role, and the editor does not offer to take it away.
+ *
+ * Every role but a restricted one. That role exists to hold nothing that was not
+ * granted directly, and `org.read` is exactly the implicit reach it is there to
+ * withhold: every screen on the roster, the organization's shelf and its internal
+ * work are gated on it.
  */
-function withRead(permissions: readonly string[]): readonly string[] {
+function withRead(permissions: readonly string[], restricted: boolean): readonly string[] {
+    if (restricted) return permissions.filter((permission) => permission !== "org.read");
     return permissions.includes("org.read") ? permissions : [...permissions, "org.read"];
 }
 
@@ -307,14 +321,38 @@ async function listOrgsByIds(ids: readonly string[]): Promise<{ id: string; name
     });
 }
 
-/** Every organization this account belongs to in any capacity. What `internal`
- *  visibility on an organization's space is measured against. */
+/**
+ * Every organization whose roster this account reads. What `internal` visibility
+ * on an organization's work, its shelf, and everything addressed to "everyone in
+ * the organization" is measured against.
+ *
+ * A restricted membership is left out, and that one clause is most of what makes
+ * the restricted role mean anything: every screen that answers "open to the
+ * organization" asks this, so leaving it out here leaves them out everywhere.
+ */
 export async function memberOrgIds(userId: string): Promise<string[]> {
     const [owned, member] = await Promise.all([
         prisma.organization.findMany({ where: { ownerId: userId }, select: { id: true } }),
-        prisma.organizationMember.findMany({ where: { userId }, select: { orgId: true } })
+        prisma.organizationMember.findMany({
+            where: { userId, restricted: false },
+            select: { orgId: true }
+        })
     ]);
     return [...new Set([...owned.map((org) => org.id), ...member.map((row) => row.orgId)])];
+}
+
+/**
+ * The Prisma clause for "an organization this account reads": owns it, or is on
+ * its roster under a role that is not restricted.
+ *
+ * For the queries that ask it inside a larger `where` rather than as a list of
+ * ids. The same answer as `memberOrgIds`, so a screen that uses one and a screen
+ * that uses the other cannot disagree about who is in.
+ */
+export function readsOrgWhere(userId: string) {
+    return {
+        OR: [{ ownerId: userId }, { members: { some: { userId, restricted: false } } }]
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -334,6 +372,9 @@ export interface OrgSummary {
     readonly memberCount: number;
     readonly teamCount: number;
     readonly spaceCount: number;
+    /** On the roster under a restricted role: nothing here opens for them, so
+     *  the list shows the organization and a way to leave it, and no counts. */
+    readonly restricted: boolean;
 }
 
 /**
@@ -371,7 +412,7 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
             description: true,
             image: true,
             ownerId: true,
-            members: { where: { userId }, select: { role: true } },
+            members: { where: { userId }, select: { role: true, restricted: true } },
             roles: { select: { slug: true, name: true } },
             _count: { select: { members: true, teams: true, spaces: true } }
         }
@@ -384,6 +425,7 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
             // owner named this account their successor.
             const member = org.members[0]?.role;
             const slug = owner ? "owner" : (member ?? "successor");
+            const restricted = !owner && org.members[0]?.restricted === true;
             return {
                 id: org.id,
                 slug: org.slug,
@@ -397,10 +439,12 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
                       ? roleDisplayName(org.roles, member)
                       : "Successor",
                 // The owner is not a member row, so the roster is always one
-                // longer than the table says.
-                memberCount: org._count.members + 1,
-                teamCount: org._count.teams,
-                spaceCount: org._count.spaces
+                // longer than the table says. Nothing for a restricted member:
+                // the size of a roster they do not see is still the roster.
+                memberCount: restricted ? 0 : org._count.members + 1,
+                teamCount: restricted ? 0 : org._count.teams,
+                spaceCount: restricted ? 0 : org._count.spaces,
+                restricted
             };
         })
         .sort((left, right) => Number(right.role === "owner") - Number(left.role === "owner"));
@@ -777,7 +821,8 @@ export async function createOrg(ownerId: string, input: core.OrganizationInput):
                     name: role.name,
                     description: role.description,
                     permissions: JSON.stringify(role.permissions),
-                    system: true
+                    system: true,
+                    restricted: role.restricted === true
                 }))
             }
         },
@@ -830,8 +875,8 @@ export async function transferOrg(orgId: string, toUserId: string): Promise<void
         prisma.organization.update({ where: { id: orgId }, data: { ownerId: toUserId } }),
         prisma.organizationMember.upsert({
             where: { orgId_userId: { orgId, userId: org.ownerId } },
-            update: { role: "admin" },
-            create: { orgId, userId: org.ownerId, role: "admin" }
+            update: { role: "admin", restricted: false },
+            create: { orgId, userId: org.ownerId, role: "admin", restricted: false }
         })
     ]);
 }
@@ -926,12 +971,20 @@ async function assertRoleExists(orgId: string, slug: string): Promise<void> {
  * `invitation-service`. This module writes a membership row only when one is
  * accepted, and when the organization is handed to somebody else below.
  */
+/** The role invitations offer by default. Must be one of the organization's own
+ *  roles; nothing already on the roster moves. */
+export async function setOrgDefaultInviteRole(orgId: string, role: string): Promise<void> {
+    await ensureSystemRoles(orgId);
+    await assertRoleExists(orgId, role);
+    await prisma.organization.update({ where: { id: orgId }, data: { defaultInviteRole: role } });
+}
+
 export async function setOrgMemberRole(orgId: string, userId: string, role: string): Promise<void> {
     await ensureSystemRoles(orgId);
     await assertRoleExists(orgId, role);
     await prisma.organizationMember.update({
         where: { orgId_userId: { orgId, userId } },
-        data: { role }
+        data: { role, restricted: await roleIsRestricted(orgId, role) }
     });
 }
 

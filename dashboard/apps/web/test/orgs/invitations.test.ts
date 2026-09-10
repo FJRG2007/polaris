@@ -46,7 +46,24 @@ const state = vi.hoisted(() => ({
     deleted: 1,
     /** What was written, in order, so a test can say what did and did not
      *  happen. */
-    written: [] as string[]
+    written: [] as string[],
+    /** Invitations this person already sent from this organization in the last
+     *  hour, as the trail counts them. */
+    sentThisHour: 0,
+    /** The `where` the budget counted with, so its scope can be asserted. */
+    budgetWhere: null as unknown,
+    /** Emailed invitations to people with no account, still open. */
+    emailedCount: 0,
+    policy: { maxMembers: 3, invitesPerHour: 20, newPeople: "admins" } as {
+        maxMembers: number;
+        invitesPerHour: number;
+        newPeople: "admins" | "managers" | "off";
+    },
+    /** The instance invite the email path asked for, when it asked. */
+    created: null as { email: string; org?: { id: string; role: string } } | null,
+    /** Whether the role the membership is written under holds nothing. */
+    restrictedRole: false,
+    memberWrite: null as { role: string; restricted: boolean } | null
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -55,15 +72,26 @@ vi.mock("@polaris/db", () => ({
             findFirst: async () => state.user,
             findUnique: async () => ({ name: "Ada", username: "ada" })
         },
-        organization: { findUnique: async () => state.org },
+        organization: {
+            findUnique: async () =>
+                state.org ? { ...state.org, id: "org-1", defaultInviteRole: "member" } : null
+        },
         organizationMember: {
             findUnique: async () => state.member,
             count: async () => state.memberCount,
-            upsert: async () => {
+            upsert: async ({ create }: { create: { role: string; restricted: boolean } }) => {
                 state.written.push("member");
+                state.memberWrite = { role: create.role, restricted: create.restricted };
                 return {};
             }
         },
+        auditLog: {
+            count: async ({ where }: { where: unknown }) => {
+                state.budgetWhere = where;
+                return state.sentThisHour;
+            }
+        },
+        invite: { count: async () => state.emailedCount },
         organizationInvitation: {
             // Every count here excludes the person being made room for, so a
             // test says how many OTHER invitations are outstanding.
@@ -87,17 +115,39 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/orgs/policy", () => ({ organizationPolicy: async () => ({ maxMembers: 3 }) }));
-vi.mock("@/lib/orgs/role-service", () => ({ ensureSystemRoles: async () => undefined }));
+vi.mock("@/lib/orgs/policy", () => ({ organizationPolicy: async () => state.policy }));
+vi.mock("@/lib/orgs/role-service", () => ({
+    ensureSystemRoles: async () => undefined,
+    roleIsRestricted: async () => state.restrictedRole
+}));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/privacy-service", () => ({ contactLines: async () => new Map<string, string>() }));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
+vi.mock("@/lib/sharing-policy", () => ({ sharingPolicy: async () => ({ inviteRole: "member" }) }));
+vi.mock("@/lib/invite-service", () => ({
+    createInvite: async (
+        _inviter: string,
+        input: { email: string },
+        options: { org?: { id: string; role: string } }
+    ) => {
+        state.created = { email: input.email, org: options.org };
+        return {
+            id: "instance-invite-1",
+            url: "https://polaris.example/oauth/accept-invite?token=t"
+        };
+    }
+}));
 
-const { inviteToOrg, respondToInvitation, revokeOrgInvitation } = await import(
+const { inviteToOrg, joinOrgFromInvite, respondToInvitation, revokeOrgInvitation } = await import(
     "@/lib/orgs/invitation-service"
 );
 const { OrgError } = await import("@/lib/orgs/errors");
 
 const hour = 60 * 60 * 1000;
+
+/** Who is asking: an organization's owner, and an instance administrator. */
+const owner = { id: "owner-1", isAdmin: false };
+const administrator = { id: "owner-1", isAdmin: true };
 
 beforeEach(() => {
     state.user = { id: "invitee", bannedAt: null };
@@ -117,17 +167,24 @@ beforeEach(() => {
     state.countedExcluding = null;
     state.deleted = 1;
     state.written = [];
+    state.sentThisHour = 0;
+    state.budgetWhere = null;
+    state.emailedCount = 0;
+    state.policy = { maxMembers: 3, invitesPerHour: 20, newPeople: "admins" };
+    state.created = null;
+    state.restrictedRole = false;
+    state.memberWrite = null;
 });
 
 describe("inviting somebody", () => {
     it("writes an invitation and never a membership", async () => {
-        await inviteToOrg("org-1", "ada@example.com", "member", "owner-1");
+        await inviteToOrg("org-1", "ada@example.com", "member", owner);
         expect(state.written).toEqual(["invitation"]);
     });
 
     it("refuses the owner, who is already answerable for it", async () => {
         state.user = { id: "owner-1", bannedAt: null };
-        await expect(inviteToOrg("org-1", "owner", "member", "owner-1")).rejects.toBeInstanceOf(
+        await expect(inviteToOrg("org-1", "owner", "member", owner)).rejects.toBeInstanceOf(
             OrgError
         );
         expect(state.written).toEqual([]);
@@ -135,14 +192,12 @@ describe("inviting somebody", () => {
 
     it("refuses somebody already on the roster", async () => {
         state.member = { id: "membership-1" };
-        await expect(inviteToOrg("org-1", "ada", "member", "owner-1")).rejects.toBeInstanceOf(
-            OrgError
-        );
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(OrgError);
     });
 
     it("refuses a role this organization does not have", async () => {
         state.role = null;
-        await expect(inviteToOrg("org-1", "ada", "invented", "owner-1")).rejects.toBeInstanceOf(
+        await expect(inviteToOrg("org-1", "ada", "invented", owner)).rejects.toBeInstanceOf(
             OrgError
         );
     });
@@ -154,7 +209,7 @@ describe("inviting somebody", () => {
         // explicitly did not do.
         state.memberCount = 1;
         state.invitationCount = 0;
-        await inviteToOrg("org-1", "ada", "admin", "owner-1");
+        await inviteToOrg("org-1", "ada", "admin", owner);
         expect(state.countedExcluding).toBe("invitee");
         expect(state.written).toEqual(["invitation"]);
     });
@@ -165,9 +220,7 @@ describe("inviting somebody", () => {
         // fourth person would be promising a place that does not exist.
         state.memberCount = 2;
         state.invitationCount = 1;
-        await expect(inviteToOrg("org-1", "ada", "member", "owner-1")).rejects.toBeInstanceOf(
-            OrgError
-        );
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(OrgError);
         expect(state.written).toEqual([]);
     });
 });
@@ -233,6 +286,130 @@ describe("answering one", () => {
         await expect(respondToInvitation("invitee", "inv-1", true)).rejects.toBeInstanceOf(
             OrgError
         );
+        expect(state.written).toEqual([]);
+    });
+});
+
+describe("inviting an address with no account", () => {
+    beforeEach(() => {
+        state.user = null;
+    });
+
+    it("is refused to a non-administrator by default, naming where that changes", async () => {
+        // An emailed invitation makes an account on this Polaris, which is
+        // otherwise an administrator's to do.
+        const refused = inviteToOrg("org-1", "new@example.com", "member", owner);
+        await expect(refused).rejects.toBeInstanceOf(OrgError);
+        await expect(refused).rejects.toThrow(/Organizations/);
+        expect(state.created).toBeNull();
+    });
+
+    it("emails an instance invite that carries the organization and the role", async () => {
+        const sent = await inviteToOrg("org-1", "new@example.com", "restricted", administrator);
+        expect(sent).toEqual({ kind: "email", inviteId: "instance-invite-1" });
+        expect(state.created).toMatchObject({
+            email: "new@example.com",
+            org: { id: "org-1", role: "restricted" }
+        });
+        // Nothing is written to the roster until the link is used.
+        expect(state.written).toEqual([]);
+    });
+
+    it("lets whoever runs the people do it once an administrator allows it", async () => {
+        state.policy = { ...state.policy, newPeople: "managers" };
+        await expect(
+            inviteToOrg("org-1", "new@example.com", "member", owner)
+        ).resolves.toMatchObject({
+            kind: "email"
+        });
+    });
+
+    it("is refused to everybody when switched off", async () => {
+        state.policy = { ...state.policy, newPeople: "off" };
+        await expect(
+            inviteToOrg("org-1", "new@example.com", "member", administrator)
+        ).rejects.toBeInstanceOf(OrgError);
+    });
+
+    it("counts an emailed invitation against the size limit", async () => {
+        state.memberCount = 2;
+        state.emailedCount = 1;
+        await expect(
+            inviteToOrg("org-1", "new@example.com", "member", administrator)
+        ).rejects.toBeInstanceOf(OrgError);
+        expect(state.created).toBeNull();
+    });
+
+    it("does not treat a handle as an address", async () => {
+        await expect(inviteToOrg("org-1", "nobody", "member", administrator)).rejects.toThrow(
+            /username/
+        );
+        expect(state.created).toBeNull();
+    });
+});
+
+describe("how many invitations one person may send", () => {
+    it("refuses past the hourly number, counted from the trail over a sliding hour", async () => {
+        state.policy = { ...state.policy, invitesPerHour: 5 };
+        state.sentThisHour = 5;
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toThrow(/last hour/);
+        expect(state.written).toEqual([]);
+
+        // Scoped to this person in this organization, to invitations only, and
+        // to the last hour - not to a window that resets on the hour.
+        const where = state.budgetWhere as {
+            orgId: string;
+            actorId: string;
+            action: { in: string[] };
+            at: { gte: Date };
+        };
+        expect(where.orgId).toBe("org-1");
+        expect(where.actorId).toBe("owner-1");
+        expect(where.action.in).toEqual(["org.member.invite", "org.member.invite.resend"]);
+        const age = Date.now() - where.at.gte.getTime();
+        expect(age).toBeGreaterThanOrEqual(hour - 1000);
+        expect(age).toBeLessThanOrEqual(hour + 1000);
+    });
+
+    it("lets one more through below the number, and none are counted when it is off", async () => {
+        state.policy = { ...state.policy, invitesPerHour: 5 };
+        state.sentThisHour = 4;
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).resolves.toMatchObject({
+            kind: "account"
+        });
+
+        state.policy = { ...state.policy, invitesPerHour: 0 };
+        state.sentThisHour = 999;
+        state.budgetWhere = null;
+        await inviteToOrg("org-1", "ada", "member", owner);
+        expect(state.budgetWhere).toBeNull();
+    });
+});
+
+describe("joining from an emailed invitation", () => {
+    it("writes the membership under the offered role, marked restricted when the role is", async () => {
+        state.restrictedRole = true;
+        const joined = await joinOrgFromInvite({
+            inviteId: "instance-invite-1",
+            orgId: "org-1",
+            role: "restricted",
+            userId: "new-user",
+            invitedById: "owner-1"
+        });
+        expect(joined).toBe(true);
+        expect(state.memberWrite).toEqual({ role: "restricted", restricted: true });
+    });
+
+    it("never throws, and leaves the roster alone, when the organization is full", async () => {
+        state.memberCount = 3;
+        const joined = await joinOrgFromInvite({
+            inviteId: "instance-invite-1",
+            orgId: "org-1",
+            role: "member",
+            userId: "new-user",
+            invitedById: "owner-1"
+        });
+        expect(joined).toBe(false);
         expect(state.written).toEqual([]);
     });
 });

@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    VACANT_ASLEEP_PATH,
     VACANT_DOWN_PATH,
     VACANT_PATH,
     vacantCode,
@@ -19,7 +20,11 @@ const REFERENCE = "2f9a1c5e-7b64-4c2f-9a3d-16b0c8f4e7d1";
 
 describe("vacantPage", () => {
     it("says nothing is deployed on a name no app claims", () => {
-        const page = vacantPage({ reference: REFERENCE, host: "gone.plr.example.com", state: "missing" });
+        const page = vacantPage({
+            reference: REFERENCE,
+            host: "gone.plr.example.com",
+            state: "missing"
+        });
 
         expect(page).toContain("There is nothing running here");
         expect(page).toContain("gone.plr.example.com");
@@ -28,7 +33,11 @@ describe("vacantPage", () => {
     });
 
     it("says the app is stopped when one is deployed and not answering", () => {
-        const page = vacantPage({ reference: REFERENCE, host: "app.plr.example.com", state: "down" });
+        const page = vacantPage({
+            reference: REFERENCE,
+            host: "app.plr.example.com",
+            state: "down"
+        });
 
         expect(page).toContain("This app is not running");
         expect(page).toContain("SERVICE_NOT_RUNNING");
@@ -36,7 +45,11 @@ describe("vacantPage", () => {
     });
 
     it("escapes a host that carries markup", () => {
-        const page = vacantPage({ reference: REFERENCE, host: "<script>alert(1)</script>", state: "missing" });
+        const page = vacantPage({
+            reference: REFERENCE,
+            host: "<script>alert(1)</script>",
+            state: "missing"
+        });
 
         expect(page).not.toContain("<script>alert(1)</script>");
         expect(page).toContain("&lt;script&gt;");
@@ -49,7 +62,11 @@ describe("vacantPage", () => {
     });
 
     it("keeps its own name out of what it tells a visitor about the instance", () => {
-        const page = vacantPage({ reference: REFERENCE, host: "gone.plr.example.com", state: "missing" });
+        const page = vacantPage({
+            reference: REFERENCE,
+            host: "gone.plr.example.com",
+            state: "missing"
+        });
 
         expect(page).not.toContain("polaris-app-");
         expect(page).not.toContain("plr.example.com/");
@@ -75,5 +92,27 @@ describe("the state a request is answered in", () => {
         expect(vacantStateForPath(`${VACANT_PATH}?state=down`)).toBe("missing");
         expect(vacantStateForPath(`${VACANT_PATH}?status=502`)).toBe("missing");
         expect(vacantStateForPath(`${VACANT_PATH}/../down`)).toBe("missing");
+    });
+});
+
+describe("an app that is asleep", () => {
+    it("answers 503 with a page that reloads itself while the app starts", () => {
+        expect(vacantStateForPath(VACANT_ASLEEP_PATH)).toBe("asleep");
+        expect(vacantStatus("asleep")).toBe(503);
+        expect(vacantCode("asleep")).toBe("SERVICE_WAKING_UP");
+        const page = vacantPage({
+            reference: REFERENCE,
+            host: "shop.example.com",
+            state: "asleep"
+        });
+        expect(page).toContain("This app is waking up");
+        expect(page).toContain('<meta http-equiv="refresh" content="5">');
+        expect(page).toContain("shop.example.com");
+    });
+
+    it("never reloads a page that is not waiting on anything", () => {
+        expect(
+            vacantPage({ reference: REFERENCE, host: "x.example.com", state: "down" })
+        ).not.toContain("http-equiv");
     });
 });

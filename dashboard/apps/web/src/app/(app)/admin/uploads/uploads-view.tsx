@@ -282,7 +282,7 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                                 setMegabytes(event.target.value);
                                 setSaved(false);
                             }}
-                            className={cn("w-28", !limitValid && "border-danger/50")}
+                            className={cn("w-28", !limitValid && "border-danger-edge")}
                         />
                         <span className="text-sm text-muted-foreground">MB</span>
                     </div>

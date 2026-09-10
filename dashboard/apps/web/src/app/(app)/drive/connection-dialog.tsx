@@ -407,7 +407,7 @@ export function EditConnectionDialog({
                     </DialogDescription>
                 </DialogHeader>
                 {rekey ? (
-                    <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-muted-foreground">
+                    <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-2 text-xs text-muted-foreground">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span>
                             The saved credentials were encrypted with a different master key and can

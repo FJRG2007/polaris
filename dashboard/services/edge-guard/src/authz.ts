@@ -46,9 +46,13 @@ import {
 } from "@polaris/core";
 import {
     decodeGuardRule,
+    EDGE_CHALLENGE_BITS,
+    EDGE_PASS_COOKIE,
+    issueEdgeChallenge,
     membershipTooOld,
     principalVerdict,
     principalsSuperseded,
+    verifyEdgePass,
     verifyEdgeToken,
     type GuardRule
 } from "@polaris/core/waf";
@@ -90,12 +94,23 @@ export interface GuardConfig {
     /** Bans, Tor exits and flagged addresses, held in memory. Omitted in tests that
      *  are not about it, which is the same as an empty list. */
     readonly intel?: WafIntelIndex;
+    /**
+     * What the browser challenge signs with. The shared secret when there is one; a
+     * key made when this process started when there is not, so a guard deployed without
+     * the secret still challenges - its passes only stop working when it restarts, and
+     * a visitor is then simply asked again.
+     */
+    readonly challengeSecret?: string;
+    /** A fresh random value per request, for the puzzle it may issue. Injected so this
+     *  function stays deterministic under test. */
+    readonly nonce?: string;
 }
 
 export type GuardDecision =
     | { readonly status: 200 }
     | { readonly status: 403; readonly reason: string }
-    | { readonly status: 302; readonly location: string; readonly setCookie?: string };
+    | { readonly status: 302; readonly location: string; readonly setCookie?: string }
+    | { readonly status: 503; readonly challenge: string; readonly bits: number };
 
 /** The originating client IP as Traefik forwarded it (leftmost X-Forwarded-For).
  *  Exported because the block page shows the visitor the same address the rules were
@@ -129,7 +144,9 @@ function parseUri(uri: string | undefined, proto: string, host: string | undefin
 
 /** The absolute original URL of the request (for the post-login return trip). */
 function originalUrl(req: GuardRequest, proto: string): string | undefined {
-    return req.forwardedHost ? `${proto}://${req.forwardedHost}${req.forwardedUri ?? "/"}` : undefined;
+    return req.forwardedHost
+        ? `${proto}://${req.forwardedHost}${req.forwardedUri ?? "/"}`
+        : undefined;
 }
 
 /**
@@ -143,19 +160,31 @@ function originalUrl(req: GuardRequest, proto: string): string | undefined {
  * reach. The rule is rewritten whenever routes are published, so it follows the address
  * the operator actually configured.
  */
-function loginRedirect(cfg: GuardConfig, req: GuardRequest, proto: string, rule: GuardRule): string {
+function loginRedirect(
+    cfg: GuardConfig,
+    req: GuardRequest,
+    proto: string,
+    rule: GuardRule,
+    returnTo = originalUrl(req, proto)
+): string {
     const base = rule.loginUrl ?? cfg.authorizeUrl;
-    const original = originalUrl(req, proto) ?? base;
-    return `${base}/edge/authorize?redirect=${encodeURIComponent(original)}`;
+    return `${base}/edge/authorize?redirect=${encodeURIComponent(returnTo ?? base)}`;
 }
 
-/** Confine a post-login redirect to the app's own host, so the guard is never an
- *  open redirector. Falls back to the app root. */
+/**
+ * Confine a post-login redirect to the app's own host, so the guard is never an
+ * open redirector. Falls back to the app root.
+ *
+ * Never back to the callback itself: a return trip to `/edge/callback` replays
+ * whatever token that URL carried, and once it has expired the callback sends the
+ * visitor round the login again with the same return trip - a loop no fresh token
+ * can end, because the fresh one is spent on the way to the stale one.
+ */
 function sameHostRedirect(target: string | null, proto: string, host: string): string {
     if (target) {
         try {
             const url = new URL(target);
-            if (url.host === host) return url.toString();
+            if (url.host === host && url.pathname !== CALLBACK_PATH) return url.toString();
         } catch {
             // Not an absolute URL; fall through to the root.
         }
@@ -189,7 +218,11 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // address should not be able to talk its way past with a well-chosen header.
     if (cfg.intel && cfg.intel.size > 0) {
         const hit = cfg.intel.match(clientIp(req.forwardedFor), cfg.now * 1000);
-        if (hit) return { status: 403, reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}` };
+        if (hit)
+            return {
+                status: 403,
+                reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}`
+            };
     }
 
     // Custom rules next, before the login handoff: a rule that admits a request is
@@ -219,14 +252,16 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
 
         const own = evaluateWafRules(rule.rules, facts);
         skipped = own.skipped;
-        if (own.verdict?.action === "block") return { status: 403, reason: `rule: ${own.verdict.rule.name}` };
+        if (own.verdict?.action === "block")
+            return { status: 403, reason: `rule: ${own.verdict.rule.name}` };
         if (own.verdict?.action === "allow") return { status: 200 };
 
         // The packs, unless a rule above stepped over them. They are only ever `block`
         // rules, so their outcome cannot skip anything further.
         if (!skipped.has("managed_rules") && managed.length > 0) {
             const verdict = evaluateWafRules(managed, facts).verdict;
-            if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
+            if (verdict?.action === "block")
+                return { status: 403, reason: `rule: ${verdict.rule.name}` };
             if (verdict?.action === "allow") return { status: 200 };
         }
     }
@@ -239,7 +274,10 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // check that runs for every request on every route, and the raw request line is
     // what should be scanned anyway - the signatures are matched against the bytes the
     // client actually sent, after this check's own decoding.
-    if (!skipped.has("injection_checks") && (rule.sqlInjectionProtection === true || rule.xssProtection === true)) {
+    if (
+        !skipped.has("injection_checks") &&
+        (rule.sqlInjectionProtection === true || rule.xssProtection === true)
+    ) {
         const uri = req.forwardedUri ?? "";
         const split = uri.indexOf("?");
         const failure = injectionFailure(
@@ -267,6 +305,27 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         if (failure) return { status: 403, reason: `browser integrity: ${failure}` };
     }
 
+    // The challenge comes after every refusal - a request the rules block is blocked,
+    // not asked to solve something first - and before the login, so a flood of
+    // anonymous requests never reaches the login handoff at all. A rule can step over
+    // it for a path only machines call, like a webhook, which a browser check would
+    // otherwise shut out entirely.
+    if (!skipped.has("challenge") && rule.challenge === true) {
+        if (!host) return { status: 403, reason: "host unknown" };
+        const secret = cfg.challengeSecret || cfg.secret;
+        const ip = clientIp(req.forwardedFor);
+        if (!verifyEdgePass(readCookie(req.cookie, EDGE_PASS_COOKIE), secret, cfg.now, host, ip)) {
+            return {
+                status: 503,
+                challenge: issueEdgeChallenge(
+                    { host, ip, now: cfg.now, nonce: cfg.nonce ?? "" },
+                    secret
+                ),
+                bits: EDGE_CHALLENGE_BITS
+            };
+        }
+    }
+
     if (rule.requireLogin) {
         // Without a host we can neither bind/verify the token's audience nor build a
         // redirect, so fail closed rather than admit the request.
@@ -284,7 +343,10 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
                     setCookie: buildCookie(cfg.cookieName, token, proto === "https", maxAge)
                 };
             }
-            return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+            // Round the login again, back to where the visitor was headed - not to this
+            // URL, whose token is the thing that just failed.
+            const headedFor = sameHostRedirect(uri.searchParams.get("redirect"), proto, host);
+            return { status: 302, location: loginRedirect(cfg, req, proto, rule, headedFor) };
         }
         const token = readCookie(req.cookie, cfg.cookieName);
         const verified = verifyEdgeToken(token, cfg.secret, cfg.now, host);
@@ -341,5 +403,8 @@ function admits(
     const held = new Set([`user:${token.sub}`, ...token.prn]);
     const verdict = principalVerdict(rule, held, cfg.now);
     if (verdict === "admitted") return { status: 200 };
-    return { status: 403, reason: verdict === "refused" ? "refused by this scope" : "not admitted by this scope" };
+    return {
+        status: 403,
+        reason: verdict === "refused" ? "refused by this scope" : "not admitted by this scope"
+    };
 }

@@ -12,7 +12,16 @@ import { FolderSearch } from "lucide-react";
 import { FolderPicker } from "./folder-picker";
 import { useEffect, useState, useTransition } from "react";
 import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, SegmentedControl, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    SegmentedControl,
+    Select
+} from "@polaris/ui";
 
 type Kind = "volume" | "bind" | "nas";
 type NasConnection = Awaited<ReturnType<typeof listNasConnectionsAction>>[number];
@@ -109,7 +118,10 @@ export function VolumeForm({
             } else {
                 // Auto path and named volumes are generated server-side; custom sends
                 // the typed/picked subpath.
-                const resolvedSource = kind === "volume" || pathMode === "auto" ? undefined : source.trim() || undefined;
+                const resolvedSource =
+                    kind === "volume" || pathMode === "auto"
+                        ? undefined
+                        : source.trim() || undefined;
                 result = await createVolumeAction({
                     applicationId: targetId,
                     name: name.trim(),
@@ -156,13 +168,18 @@ export function VolumeForm({
                         value={serviceId}
                         onValueChange={setServiceId}
                         aria-label="Service"
-                        options={(services ?? []).map((service) => ({ value: service.id, label: service.name }))}
+                        options={(services ?? []).map((service) => ({
+                            value: service.id,
+                            label: service.name
+                        }))}
                     />
                 </label>
             )}
 
             {editing ? (
-                <p className="text-xs text-muted-foreground">{KIND_LABELS[kind]} - {KIND_HELP[kind]}</p>
+                <p className="text-xs text-muted-foreground">
+                    {KIND_LABELS[kind]} - {KIND_HELP[kind]}
+                </p>
             ) : (
                 <>
                     <SegmentedControl
@@ -183,15 +200,27 @@ export function VolumeForm({
             <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     Name
-                    <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="secrets" />
+                    <Input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="secrets"
+                    />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     Mount path (in container)
-                    <Input value={mountPath} onChange={(event) => setMountPath(event.target.value)} placeholder="/app/secrets" />
+                    <Input
+                        value={mountPath}
+                        onChange={(event) => setMountPath(event.target.value)}
+                        placeholder="/app/secrets"
+                    />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     Size limit (optional)
-                    <Input value={sizeLimit} onChange={(event) => setSizeLimit(event.target.value)} placeholder="10G" />
+                    <Input
+                        value={sizeLimit}
+                        onChange={(event) => setSizeLimit(event.target.value)}
+                        placeholder="10G"
+                    />
                 </label>
             </div>
 
@@ -205,13 +234,16 @@ export function VolumeForm({
                         aria-label="Storage connection"
                         options={connections.map((connection) => ({
                             value: connection.id,
-                            label: connection.active ? connection.name : `${connection.name} (not connected)`,
+                            label: connection.active
+                                ? connection.name
+                                : `${connection.name} (not connected)`,
                             disabled: !connection.active
                         }))}
                     />
                     {connections.length === 0 && (
                         <span className="text-[0.6875rem] text-muted-foreground">
-                            No NAS connections found. Add an NFS, SMB, or UniFi UNAS connection in Drive first.
+                            No NAS connections found. Add an NFS, SMB, or UniFi UNAS connection in
+                            Drive first.
                         </span>
                     )}
                 </label>
@@ -233,13 +265,22 @@ export function VolumeForm({
                     )}
                     {!usesCustomPath ? (
                         <p className="text-[0.6875rem] text-muted-foreground">
-                            Polaris creates and organizes it under <code className="text-foreground">polaris/deploy/&lt;project&gt;/&lt;service&gt;/{name.trim() || "name"}</code>.
+                            Polaris creates and organizes it under{" "}
+                            <code className="text-foreground">
+                                polaris/deploy/&lt;project&gt;/&lt;service&gt;/
+                                {name.trim() || "name"}
+                            </code>
+                            .
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                             {kind === "nas" ? "Folder on the NAS" : "Folder on the server"}
                             <div className="flex items-center gap-2">
-                                <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder="data/uploads" />
+                                <Input
+                                    value={source}
+                                    onChange={(event) => setSource(event.target.value)}
+                                    placeholder="data/uploads"
+                                />
                                 {kind === "nas" && (
                                     <Button
                                         type="button"
@@ -247,13 +288,19 @@ export function VolumeForm({
                                         size="sm"
                                         disabled={!connectionId}
                                         onClick={() => setPickerOpen(true)}
-                                        title={connectionId ? "Browse folders" : "Select a NAS connection first"}
+                                        title={
+                                            connectionId
+                                                ? "Browse folders"
+                                                : "Select a NAS connection first"
+                                        }
                                     >
                                         <FolderSearch className="size-4" /> Browse
                                     </Button>
                                 )}
                             </div>
-                            <span className="text-[0.6875rem] text-muted-foreground">A subpath (no leading slash, no `..`). Created if it does not exist.</span>
+                            <span className="text-[0.6875rem] text-muted-foreground">
+                                A subpath (no leading slash, no `..`). Created if it does not exist.
+                            </span>
                         </label>
                     )}
                     {kind === "nas" && connectionId && (
@@ -270,7 +317,7 @@ export function VolumeForm({
                 </div>
             )}
 
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
             <div className="flex items-center justify-end gap-2">
                 {onCancel && (
                     <Button variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
@@ -304,7 +351,9 @@ export function NewVolumeDialog({
                     <DialogTitle>New volume</DialogTitle>
                 </DialogHeader>
                 {services.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Add a service first - a volume mounts into a service's container.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Add a service first - a volume mounts into a service's container.
+                    </p>
                 ) : (
                     <VolumeForm
                         services={services}

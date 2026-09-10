@@ -46,7 +46,9 @@ const POLL_MS = 2000;
 const SLOW_POLL_MS = 8000;
 
 /** What is being dragged: a slot already in the bag, or an item from the palette. */
-type Held = { readonly kind: "slot"; readonly slot: number } | { readonly kind: "palette"; readonly id: string };
+type Held =
+    | { readonly kind: "slot"; readonly slot: number }
+    | { readonly kind: "palette"; readonly id: string };
 
 export function InventoryEditor({
     installedAppId,
@@ -105,7 +107,9 @@ export function InventoryEditor({
      */
     const readQueue = useCallback(async () => {
         const result = await actions.pendingActionsAction(installedAppId);
-        setWaiting(result.pending.filter((entry) => entry.username.toLowerCase() === player.toLowerCase()));
+        setWaiting(
+            result.pending.filter((entry) => entry.username.toLowerCase() === player.toLowerCase())
+        );
     }, [installedAppId, player]);
 
     useEffect(() => {
@@ -117,7 +121,9 @@ export function InventoryEditor({
     // it is a hint about where to start, not a live figure.
     useEffect(() => {
         let alive = true;
-        void actions.recentItemsAction(installedAppId).then((result) => alive && setRecent(result.items));
+        void actions
+            .recentItemsAction(installedAppId)
+            .then((result) => alive && setRecent(result.items));
         return () => {
             alive = false;
         };
@@ -141,7 +147,14 @@ export function InventoryEditor({
      *  else that is waiting, which is a line under it. */
     const queuedSlots: PendingStack[] = waiting.flatMap((entry) =>
         entry.payload.kind === "set-slot"
-            ? [{ id: entry.id, slot: entry.payload.slot, item: entry.payload.item, count: entry.payload.count }]
+            ? [
+                  {
+                      id: entry.id,
+                      slot: entry.payload.slot,
+                      item: entry.payload.item,
+                      count: entry.payload.count
+                  }
+              ]
             : []
     );
     const queuedElsewhere = waiting.filter((entry) => entry.payload.kind !== "set-slot");
@@ -173,10 +186,21 @@ export function InventoryEditor({
     async function putInSlot(id: string, slot: number): Promise<{ error?: string; queued?: true }> {
         const [first, ...rest] = stacksFor(id, amount);
         if (first === undefined) return {};
-        const placed = await actions.setInventorySlotAction({ installedAppId, player, slot, item: id, count: first });
+        const placed = await actions.setInventorySlotAction({
+            installedAppId,
+            player,
+            slot,
+            item: id,
+            count: first
+        });
         if (placed.error || rest.length === 0) return placed;
         const spare = rest.reduce((sum, stack) => sum + stack, 0);
-        const given = await actions.givePlayerItemAction({ installedAppId, player, item: id, count: spare });
+        const given = await actions.givePlayerItemAction({
+            installedAppId,
+            player,
+            item: id,
+            count: spare
+        });
         if (given.error) return given;
         return placed;
     }
@@ -236,9 +260,14 @@ export function InventoryEditor({
         <div className="flex flex-col gap-4 lg:flex-row">
             <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={live ? "success" : undefined}>{live ? "Live" : "From a copy"}</Badge>
+                    <Badge variant={live ? "success" : undefined}>
+                        {live ? "Live" : "From a copy"}
+                    </Badge>
                     {!live && reading?.takenAt && (
-                        <span className="text-xs text-muted-foreground" title={display.dateTime(reading.takenAt)}>
+                        <span
+                            className="text-xs text-muted-foreground"
+                            title={display.dateTime(reading.takenAt)}
+                        >
                             kept {ago(reading.takenAt)}
                         </span>
                     )}
@@ -265,14 +294,15 @@ export function InventoryEditor({
                 </div>
 
                 {!live && !loading && (
-                    <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+                    <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                         <span className="font-medium">{player} is not on the server.</span>{" "}
                         {reading?.takenAt ? (
                             <>This is the last copy Polaris kept. Nothing in it can be moved,</>
                         ) : (
                             <>
-                                Polaris has no copy of their bag yet - one is kept every ten minutes while they play -
-                                so it is drawn empty. Nothing can be moved out of it,
+                                Polaris has no copy of their bag yet - one is kept every ten minutes
+                                while they play - so it is drawn empty. Nothing can be moved out of
+                                it,
                             </>
                         )}{" "}
                         but an item dropped onto a slot is saved and given to them when they join.
@@ -287,11 +317,14 @@ export function InventoryEditor({
                     <InventoryGrid
                         items={items}
                         pending={queuedSlots}
-                        onCancelPending={(id) => run(() => actions.cancelQueuedActionAction(installedAppId, id))}
+                        onCancelPending={(id) =>
+                            run(() => actions.cancelQueuedActionAction(installedAppId, id))
+                        }
                         {...(editable
                             ? {
                                   handlers: {
-                                      onPick: (slot) => setHeld(slot === null ? null : { kind: "slot", slot }),
+                                      onPick: (slot) =>
+                                          setHeld(slot === null ? null : { kind: "slot", slot }),
                                       onDropAt: dropOn,
                                       ...(live ? { onSplit: split } : {}),
                                       dragging: held?.kind === "slot" ? held.slot : null
@@ -313,18 +346,20 @@ export function InventoryEditor({
                     // looks exactly like a complete one, and somebody checking what
                     // a player is carrying would believe it.
                     <p className="text-xs text-warning">
-                        {reading?.unreadable} {reading?.unreadable === 1 ? "stack was" : "stacks were"} too large for
-                        the server to hand over in one reply, so {reading?.unreadable === 1 ? "it is" : "they are"}{" "}
-                        not drawn here.
+                        {reading?.unreadable}{" "}
+                        {reading?.unreadable === 1 ? "stack was" : "stacks were"} too large for the
+                        server to hand over in one reply, so{" "}
+                        {reading?.unreadable === 1 ? "it is" : "they are"} not drawn here.
                     </p>
                 )}
                 {stuck.length > 0 && (
                     // Named rather than left as slots that silently refuse to be
                     // picked up, which reads as the page being broken.
                     <p className="text-xs text-muted-foreground">
-                        {stuck.length} {stuck.length === 1 ? "stack carries" : "stacks carry"} data Polaris cannot
-                        write back exactly, so {stuck.length === 1 ? "it cannot" : "they cannot"} be moved without
-                        losing it.
+                        {stuck.length} {stuck.length === 1 ? "stack carries" : "stacks carry"} data
+                        Polaris cannot write back exactly, so{" "}
+                        {stuck.length === 1 ? "it cannot" : "they cannot"} be moved without losing
+                        it.
                     </p>
                 )}
 
@@ -333,8 +368,13 @@ export function InventoryEditor({
                         <p className="text-xs font-medium">Also waiting for {player}</p>
                         <ul className="flex flex-col gap-0.5">
                             {queuedElsewhere.map((entry) => (
-                                <li key={entry.id} className="flex items-center justify-between gap-2 text-xs">
-                                    <span className="truncate text-muted-foreground">{describeQueued(entry)}</span>
+                                <li
+                                    key={entry.id}
+                                    className="flex items-center justify-between gap-2 text-xs"
+                                >
+                                    <span className="truncate text-muted-foreground">
+                                        {describeQueued(entry)}
+                                    </span>
                                     <button
                                         type="button"
                                         disabled={pending}
@@ -342,7 +382,12 @@ export function InventoryEditor({
                                         aria-label={`Cancel ${describeQueued(entry)} for ${player}`}
                                         className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
                                         onClick={() =>
-                                            run(() => actions.cancelQueuedActionAction(installedAppId, entry.id))
+                                            run(() =>
+                                                actions.cancelQueuedActionAction(
+                                                    installedAppId,
+                                                    entry.id
+                                                )
+                                            )
                                         }
                                     >
                                         <X className="size-3.5" />
@@ -359,7 +404,9 @@ export function InventoryEditor({
             </div>
 
             <div className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
-                <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Items</span>
+                <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                    Items
+                </span>
                 {/* Dragged onto a slot rather than clicked into one: the whole
                     point of the grid is that the operator picks where it lands.
                     The two buttons under it are for when they do not care. */}
@@ -371,7 +418,10 @@ export function InventoryEditor({
                         onQueryChange={setQuery}
                         onSelect={setPicked}
                         {...(editable
-                            ? { onDragItem: (id) => setHeld(id === null ? null : { kind: "palette", id }) }
+                            ? {
+                                  onDragItem: (id) =>
+                                      setHeld(id === null ? null : { kind: "palette", id })
+                              }
                             : {})}
                     />
                 </div>
@@ -385,15 +435,20 @@ export function InventoryEditor({
                         aria-label="How many"
                         className="w-20"
                         onChange={(event) =>
-                            setAmount(Math.max(1, Math.min(MOST_THAT_FITS, Number(event.target.value) || 1)))
+                            setAmount(
+                                Math.max(
+                                    1,
+                                    Math.min(MOST_THAT_FITS, Number(event.target.value) || 1)
+                                )
+                            )
                         }
                     />
                     <span className="text-xs text-muted-foreground">at a time</span>
                 </div>
                 {picked && amount > maxStackFor(picked) && (
                     <p className="text-xs text-muted-foreground">
-                        {stacksFor(picked, amount).length} stacks. One lands where you drop it and the rest go into the
-                        bag.
+                        {stacksFor(picked, amount).length} stacks. One lands where you drop it and
+                        the rest go into the bag.
                     </p>
                 )}
 
@@ -405,7 +460,12 @@ export function InventoryEditor({
                         onClick={() =>
                             picked &&
                             run(() =>
-                                actions.givePlayerItemAction({ installedAppId, player, item: picked, count: amount })
+                                actions.givePlayerItemAction({
+                                    installedAppId,
+                                    player,
+                                    item: picked,
+                                    count: amount
+                                })
                             )
                         }
                     >
@@ -420,7 +480,12 @@ export function InventoryEditor({
                         onClick={() =>
                             picked &&
                             run(() =>
-                                actions.clearPlayerItemAction({ installedAppId, player, item: picked, count: amount })
+                                actions.clearPlayerItemAction({
+                                    installedAppId,
+                                    player,
+                                    item: picked,
+                                    count: amount
+                                })
                             )
                         }
                     >
@@ -442,12 +507,18 @@ export function InventoryEditor({
                             const carrying = held;
                             setHeld(null);
                             if (carrying?.kind !== "slot") return;
-                            run(() => actions.clearInventorySlotAction(installedAppId, player, carrying.slot));
+                            run(() =>
+                                actions.clearInventorySlotAction(
+                                    installedAppId,
+                                    player,
+                                    carrying.slot
+                                )
+                            );
                         }}
                         className={cn(
                             "flex items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-xs transition-colors",
                             held?.kind === "slot"
-                                ? "border-danger bg-danger/5 text-danger"
+                                ? "border-danger bg-danger-soft text-danger-ink"
                                 : "border-border text-muted-foreground"
                         )}
                     >

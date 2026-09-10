@@ -280,15 +280,18 @@ export type WafRuleAction = (typeof WAF_RULE_ACTIONS)[number];
  *
  * Each one names a stage of the decision rather than a product, because that is what
  * the guard actually has to skip: the rules below this one, the managed packs, the two
- * injection checks, and the browser integrity check. The address denylist is
- * deliberately absent - it is checked before any rule runs and a rule that could
- * re-admit a denied address would make the denylist advisory.
+ * injection checks, the browser integrity check, and the browser challenge - which is
+ * the one a webhook path or an API a machine calls needs stepping over, since nothing
+ * but a browser can solve it. The address denylist is deliberately absent - it is
+ * checked before any rule runs and a rule that could re-admit a denied address would
+ * make the denylist advisory.
  */
 export const WAF_SKIP_COMPONENTS = [
     "custom_rules",
     "managed_rules",
     "injection_checks",
-    "browser_integrity"
+    "browser_integrity",
+    "challenge"
 ] as const;
 export type WafSkipComponent = (typeof WAF_SKIP_COMPONENTS)[number];
 

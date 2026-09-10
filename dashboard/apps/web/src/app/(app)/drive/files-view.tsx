@@ -1319,7 +1319,7 @@ export function FilesView({
                     <>
                         <ContextMenuSeparator />
                         <ContextMenuSub>
-                            <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
+                            <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger-soft focus:bg-danger-soft">
                                 <Trash2 className="size-4" />
                                 Delete
                             </ContextMenuSubTrigger>
@@ -2424,7 +2424,7 @@ export function FilesView({
                                                                             entry.path
                                                                         ) ? (
                                                                             <KeyRound
-                                                                                className="size-3 text-amber-400"
+                                                                                className="size-3 text-warning"
                                                                                 aria-label="Needs a password"
                                                                             />
                                                                         ) : null}
@@ -2685,7 +2685,7 @@ export function FilesView({
                                                                                         entry.path
                                                                                     ) ? (
                                                                                         <KeyRound
-                                                                                            className="size-3 shrink-0 text-amber-400"
+                                                                                            className="size-3 shrink-0 text-warning"
                                                                                             aria-label="Needs a password"
                                                                                         />
                                                                                     ) : null}
@@ -2853,7 +2853,7 @@ export function FilesView({
                             {selectedEntries[0].name}
                         </span>
                         {insights.locked.has(selectedEntries[0].path) ? (
-                            <span className="flex items-center gap-1 text-xs text-amber-400">
+                            <span className="flex items-center gap-1 text-xs text-warning">
                                 <KeyRound className="size-3" />
                                 Password-protected
                             </span>
@@ -3472,7 +3472,7 @@ function ListingError({ error, onRetry }: { error: ListingFailure; onRetry: () =
     return (
         <div
             role="alert"
-            className="flex flex-col gap-2 rounded-lg border border-danger/40 bg-danger/10 p-4"
+            className="flex flex-col gap-2 rounded-lg border border-danger-edge bg-danger-soft p-4"
         >
             <div className="flex items-start gap-2.5">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />

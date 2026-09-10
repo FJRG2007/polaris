@@ -376,7 +376,7 @@ export function CallRoom({
                 call being written down is the one fact in a room that changes
                 what people are willing to say in it. */}
             {recorded && (
-                <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
                     <Circle className="size-3 shrink-0 fill-current" />
                     <span className="min-w-0 flex-1">
                         {call.recording

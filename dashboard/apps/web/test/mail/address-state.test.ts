@@ -25,6 +25,22 @@ describe("an address being typed", () => {
         expect(addressState("ana@", HELD)).toBe("invalid");
     });
 
+    it("refuses the punctuation a slip of the finger leaves behind", () => {
+        // `admin@example.com,` used to be accepted, and the servers guessed from
+        // it came back as `imap.example.com,` - a form filled in with typos.
+        expect(addressState("bo@example.com,", HELD)).toBe("invalid");
+        expect(addressState("bo@example.com;", HELD)).toBe("invalid");
+        expect(addressState("bo,ana@example.com", HELD)).toBe("invalid");
+        expect(addressState("bo@exa mple.com", HELD)).toBe("invalid");
+        expect(addressState("bo@-example.com", HELD)).toBe("invalid");
+    });
+
+    it("still takes the real mailboxes a strict parser would refuse", () => {
+        expect(addressState("o'brien@example.ie", HELD)).toBe("ok");
+        expect(addressState("josé@correo.es", HELD)).toBe("ok");
+        expect(addressState("ana.b+tag@mail.example.co.uk", HELD)).toBe("ok");
+    });
+
     it("catches the one already here", () => {
         expect(addressState("ana@example.com", HELD)).toBe("taken");
     });

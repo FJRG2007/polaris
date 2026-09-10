@@ -75,12 +75,12 @@ export function NoAudioNotice({
     return (
         <p
             role="status"
-            className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning"
+            className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-ink"
         >
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span>
-                Your microphone has not picked anything up for a while. Check that it is not muted on
-                the machine itself, and that the right one is chosen under Account &gt; Devices.
+                Your microphone has not picked anything up for a while. Check that it is not muted
+                on the machine itself, and that the right one is chosen under Account &gt; Devices.
             </span>
         </p>
     );

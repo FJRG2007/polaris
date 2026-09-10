@@ -358,8 +358,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
  */
 function guardEnv(env: Record<string, string>): Record<string, string> {
     for (const [key, value] of Object.entries(env)) {
-        // eslint-disable-next-line no-control-regex
-        if (/[\u0000-\u001f\u007f]/.test(value)) {
+        if (core.hasControlCharacter(value)) {
             throw new Error(
                 `Polaris built an unusable value for ${key} and stopped rather than start a broken session.`
             );

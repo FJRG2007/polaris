@@ -94,7 +94,10 @@ export function SettingsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -112,9 +115,7 @@ export function SettingsView({
                     {/* Under the handle because it is the one setting here that
                         changes what people see rather than what the
                         organization is called. */}
-                    {chatOffered && (
-                        <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />
-                    )}
+                    {chatOffered && <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />}
                 </>
             )}
 
@@ -141,15 +142,7 @@ export function SettingsView({
  * messages can be, reached from the shelf switch in the header. Turning it back
  * off does not lose any of them.
  */
-function ChatCard({
-    orgId,
-    isolated,
-    onRun
-}: {
-    orgId: string;
-    isolated: boolean;
-    onRun: Runner;
-}) {
+function ChatCard({ orgId, isolated, onRun }: { orgId: string; isolated: boolean; onRun: Runner }) {
     const [on, setOn] = useState(isolated);
     const [saving, setSaving] = useState(false);
 
@@ -175,8 +168,8 @@ function ChatCard({
                         <p className="text-sm font-medium">A chat of its own</p>
                         <p className="text-muted-foreground text-xs">
                             Conversations between the people here stay here, apart from the ones
-                            they have with everybody else. They switch between the two the way
-                            they switch shelves, in the header. Turning this off later puts the
+                            they have with everybody else. They switch between the two the way they
+                            switch shelves, in the header. Turning this off later puts the
                             conversations back rather than hiding them.
                         </p>
                     </div>

@@ -276,7 +276,7 @@ export function machineOf(value: string): boolean {
  */
 export function SignInNotice({ agent }: { agent: AgentOption }) {
     return (
-        <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3">
+        <div className="space-y-2 rounded-md border border-warning-edge bg-warning-soft p-3">
             <p className="text-sm">Nothing here signs {agent.label} in.</p>
             <p className="text-xs text-muted-foreground">
                 On this box it would start and sit at its own login prompt, where nobody would ever

@@ -26,25 +26,23 @@
  * and the missing attachment, which are the two mistakes everybody makes.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
-import { useMail, type ComposerSeed } from "./mail-shell";
 import { RecipientField } from "./recipient-field";
+import { useMail, type ComposerSeed } from "./mail-shell";
 import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
-import {
-    attachFromAddressAction,
-    attachFromDriveAction,
-    saveDraftAction,
-    sendAction,
-    undoSendAction
-} from "./actions";
-import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
+import { useRef, useMemo, useState, useEffect, useCallback, useTransition } from "react";
+import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
 import {
     ChevronDown,
     Clock,
+    FileText,
     Loader2,
     Maximize2,
     Minimize2,
@@ -54,6 +52,16 @@ import {
     Send,
     X
 } from "lucide-react";
+import {
+    attachFromAddressAction,
+    attachFromDriveAction,
+    attachFromMessageAction,
+    fileDraftOnServerAction,
+    listTemplatesAction,
+    saveDraftAction,
+    sendAction,
+    undoSendAction
+} from "./actions";
 import {
     Button,
     Dialog,
@@ -85,6 +93,12 @@ interface Attached {
     readonly size: number;
 }
 
+/** Where a draft is written, for the composer's `draftSaves` queue. */
+const writeDraft: DraftWriter = async (fields, id) => {
+    const outcome = await saveDraftAction({ id, ...fields });
+    return "draftId" in outcome && outcome.draftId ? outcome.draftId : null;
+};
+
 export function Composer() {
     const { accounts, identities, composing, openComposer, refresh, viewerName } = useMail();
     const toast = useToast();
@@ -100,7 +114,7 @@ export function Composer() {
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<Attached[]>([]);
-    const [draftId, setDraftId] = useState<string | null>(null);
+    const saves = useRef<DraftSaves | null>(null);
     const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");
@@ -110,24 +124,90 @@ export function Composer() {
     // Opening the composer seeds it. Keyed on the seed object, which is replaced
     // whenever something asks for a new one, so pressing Reply on two different
     // conversations does not keep the first one's recipients.
+    //
+    // Only a NEW seed seeds. The mailboxes and their identities come from the
+    // server and are fresh objects after every live refresh - which the draft's
+    // own autosave causes, and any arriving message too - so running on them
+    // wiped the recipients and the subject a few seconds into typing.
+    const seeded = useRef<ComposerSeed | null>(null);
     useEffect(() => {
-        if (!composing) return;
+        if (!composing) {
+            seeded.current = null;
+            return;
+        }
+        if (seeded.current === composing) return;
+        seeded.current = composing;
         const account = composing.accountId ?? accounts[0]?.id ?? "";
+        const identity = (identities[account] ?? []).find((one) => one.isDefault);
         setAccountId(account);
-        setIdentityId((identities[account] ?? []).find((one) => one.isDefault)?.id ?? "");
+        setIdentityId(identity?.id ?? "");
         setTo([...(composing.to ?? [])]);
         setCc([...(composing.cc ?? [])]);
-        setBcc([]);
-        setShowCopies((composing.cc ?? []).length > 0);
+        setBcc([...(composing.bcc ?? [])]);
+        setShowCopies((composing.cc ?? []).length + (composing.bcc ?? []).length > 0);
         setSubject(composing.subject ?? "");
-        setBody(withSignature(composing, accounts, identities, account));
+        const body = withSignature(
+            composing,
+            accounts.find((one) => one.id === account),
+            identity
+        );
+        setBody(body);
         setFiles([]);
-        setDraftId(composing.draftId ?? null);
+        saves.current = draftSaves(
+            {
+                accountId: account,
+                identityId: identity?.id ?? null,
+                to: [...(composing.to ?? [])],
+                cc: [...(composing.cc ?? [])],
+                bcc: [...(composing.bcc ?? [])],
+                subject: composing.subject ?? "",
+                body,
+                attachmentIds: []
+            },
+            composing.draftId ?? null,
+            writeDraft
+        );
         setSendAt(null);
         setQueued(null);
         setProblem("");
         setPosture("docked");
     }, [composing, accounts, identities]);
+
+    /** Files being brought over from the message being forwarded, and the ones
+     *  that could not be. */
+    const [carrying, setCarrying] = useState(false);
+    const [notCarried, setNotCarried] = useState<string[]>([]);
+
+    // A forward brings the original's files with it. A reopened draft already
+    // has whatever survived of them, so only a fresh forward asks.
+    useEffect(() => {
+        setNotCarried([]);
+        if (!composing?.forward || !composing.inReplyToId || composing.draftId) {
+            setCarrying(false);
+            return;
+        }
+        let current = true;
+        setCarrying(true);
+        void (async () => {
+            const outcome = await attachFromMessageAction({ messageId: composing.inReplyToId });
+            if (!current) return;
+            setCarrying(false);
+            const said = refusalOf(outcome);
+            if (said) {
+                setNotCarried([said]);
+                return;
+            }
+            if ("uploads" in outcome) {
+                const carried = outcome.uploads as Attached[];
+                setFiles((held) => [...held, ...carried]);
+                saves.current?.carry(carried.map((file) => file.id));
+                setNotCarried(outcome.skipped);
+            }
+        })();
+        return () => {
+            current = false;
+        };
+    }, [composing]);
 
     const dirty = to.length > 0 || subject.trim() !== "" || body.trim() !== "" || files.length > 0;
 
@@ -136,36 +216,19 @@ export function Composer() {
     useEffect(() => {
         if (!composing || !accountId || !dirty || queued) return;
         const timer = setTimeout(() => {
-            void (async () => {
-                const outcome = await saveDraftAction({
-                    id: draftId,
-                    accountId,
-                    identityId: identityId || null,
-                    to,
-                    cc,
-                    bcc,
-                    subject,
-                    body,
-                    attachmentIds: files.map((file) => file.id)
-                });
-                if ("draftId" in outcome && outcome.draftId) setDraftId(outcome.draftId);
-            })();
+            void saves.current?.save({
+                accountId,
+                identityId: identityId || null,
+                to,
+                cc,
+                bcc,
+                subject,
+                body,
+                attachmentIds: files.map((file) => file.id)
+            });
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [
-        composing,
-        accountId,
-        identityId,
-        to,
-        cc,
-        bcc,
-        subject,
-        body,
-        files,
-        draftId,
-        dirty,
-        queued
-    ]);
+    }, [composing, accountId, identityId, to, cc, bcc, subject, body, files, dirty, queued]);
 
     const attach = useCallback(
         async (chosen: readonly File[]) => {
@@ -240,7 +303,7 @@ export function Composer() {
         (when: Date | null) => {
             setProblem("");
             startSending(async () => {
-                const outcome = await sendAction({
+                const fields: DraftFields = {
                     accountId,
                     identityId: identityId || null,
                     to,
@@ -248,7 +311,12 @@ export function Composer() {
                     bcc,
                     subject,
                     body,
-                    attachmentIds: files.map((file) => file.id),
+                    attachmentIds: files.map((file) => file.id)
+                };
+                const draftId = (await saves.current?.after((id) => Promise.resolve(id))) ?? null;
+                saves.current?.hold();
+                const outcome = await sendAction({
+                    ...fields,
                     inReplyToId: composing?.inReplyToId ?? null,
                     forward: composing?.forward ?? false,
                     sendAt: when,
@@ -256,6 +324,7 @@ export function Composer() {
                 });
                 const said = refusalOf(outcome);
                 if (said) {
+                    saves.current?.release();
                     setProblem(said);
                     return;
                 }
@@ -265,6 +334,7 @@ export function Composer() {
                     "sendAt" in outcome &&
                     outcome.sendAt
                 ) {
+                    saves.current?.adopt(outcome.draftId, fields);
                     setQueued({
                         draftId: outcome.draftId,
                         until: new Date(outcome.sendAt).getTime()
@@ -273,8 +343,36 @@ export function Composer() {
                 refresh();
             });
         },
-        [accountId, identityId, to, cc, bcc, subject, body, files, composing, draftId, refresh]
+        [accountId, identityId, to, cc, bcc, subject, body, files, composing, refresh]
     );
+
+    /**
+     * Close, keeping what was written.
+     *
+     * The draft is saved a few seconds after typing stops, so the last words
+     * typed before closing were not saved yet - they are now. Then the draft's
+     * copy goes to the server's Drafts folder, so it can be finished on another
+     * device. A message waiting to go is left to the queue.
+     */
+    const close = useCallback(() => {
+        openComposer(null);
+        if (queued || !accountId) return;
+        const fields: DraftFields = {
+            accountId,
+            identityId: identityId || null,
+            to,
+            cc,
+            bcc,
+            subject,
+            body,
+            attachmentIds: files.map((file) => file.id)
+        };
+        void (async () => {
+            const id = await saves.current?.save(fields);
+            if (id) await fileDraftOnServerAction(id);
+            refresh();
+        })();
+    }, [openComposer, queued, accountId, identityId, to, cc, bcc, subject, body, files, refresh]);
 
     const account = accounts.find((one) => one.id === accountId);
     const own = useMemo(() => identities[accountId] ?? [], [identities, accountId]);
@@ -282,7 +380,10 @@ export function Composer() {
     /** What this message would sign with, for the Insert button. */
     const signature = (identity?.signature || account?.signature || "").trim();
 
-    if (!composing) return null;
+    // A message with nowhere to leave from is not a message: the shell sends a
+    // Write with no mailbox to connecting one, and a mailbox removed while a
+    // draft was open takes the composer with it.
+    if (!composing || accounts.length === 0) return null;
 
     const from = account
         ? core.formatAddress({
@@ -347,7 +448,7 @@ export function Composer() {
                     size="icon"
                     aria-label="Close the composer"
                     title="Close the composer"
-                    onClick={() => openComposer(null)}
+                    onClick={close}
                 >
                     <X className="size-4 shrink-0" aria-hidden />
                 </Button>
@@ -361,7 +462,7 @@ export function Composer() {
                             const outcome = await undoSendAction(queued.draftId);
                             if ("undone" in outcome && outcome.undone) {
                                 setQueued(null);
-                                setDraftId(queued.draftId);
+                                saves.current?.release();
                                 toast.show({ title: "Brought back. Nothing was sent." });
                                 refresh();
                                 return;
@@ -449,7 +550,7 @@ export function Composer() {
                         <div className="flex min-h-0 flex-1 flex-col px-2 py-2">
                             <RichTextEditor
                                 value={body}
-                                onChange={setBody}
+                                onChange={(next) => setBody(keepSignatureDelimiter(next))}
                                 insert={insert}
                                 placeholder="Write your message"
                                 className="flex min-h-[14rem] flex-1 flex-col"
@@ -464,10 +565,14 @@ export function Composer() {
                             />
                         </div>
 
-                        {composing.forward ? (
+                        {carrying ? (
+                            <p className="flex items-center gap-1.5 px-3 pb-2 text-[12px] text-foreground-subtle">
+                                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                                Bringing the files over from the original message
+                            </p>
+                        ) : notCarried.length > 0 ? (
                             <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
-                                Files on the message you are forwarding are not carried with it yet.
-                                Attach them again if they matter.
+                                Not carried over: {notCarried.join(", ")}. Attach again if needed.
                             </p>
                         ) : null}
 
@@ -540,6 +645,17 @@ export function Composer() {
                             onEmoji={(emoji) => setInsert({ token: Date.now(), text: emoji })}
                         />
 
+                        <TemplateMenu
+                            accountId={accountId}
+                            onPick={(template) => {
+                                setInsert({ token: Date.now(), text: template.body });
+                                // A template's subject fills an empty line and
+                                // never replaces one somebody already wrote.
+                                if (template.subject && !subject.trim())
+                                    setSubject(template.subject);
+                            }}
+                        />
+
                         {signature ? (
                             <Button
                                 variant="ghost"
@@ -547,7 +663,10 @@ export function Composer() {
                                 aria-label="Insert your signature"
                                 title="Insert your signature"
                                 onClick={() =>
-                                    setInsert({ token: Date.now(), text: `\n\n-- \n${signature}` })
+                                    setInsert({
+                                        token: Date.now(),
+                                        text: `\n\n${signatureBlock(signature)}`
+                                    })
                                 }
                             >
                                 <PenLine className="size-4 shrink-0" aria-hidden />
@@ -571,6 +690,71 @@ export function Composer() {
                 />
             ) : null}
         </div>
+    );
+}
+
+/**
+ * Insert a template.
+ *
+ * The list is asked for when the menu opens rather than with the page: most
+ * messages are written without one, and a template made in another tab a minute
+ * ago should be in the list. Only the ones offered for the mailbox this message
+ * goes from are shown - a support reply tied to the support address has no
+ * business in a personal message.
+ */
+function TemplateMenu({
+    accountId,
+    onPick
+}: {
+    accountId: string;
+    onPick: (template: MailTemplateView) => void;
+}) {
+    const [templates, setTemplates] = useState<MailTemplateView[] | null>(null);
+
+    const offered = (templates ?? []).filter(
+        (template) => template.accountId === null || template.accountId === accountId
+    );
+
+    return (
+        <DropdownMenu
+            onOpenChange={(open) => {
+                if (!open) return;
+                void listTemplatesAction().then((answer) => setTemplates(answer.templates));
+            }}
+        >
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Insert a template"
+                    title="Insert a template"
+                >
+                    <FileText className="size-4 shrink-0" aria-hidden />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-w-72">
+                {templates === null ? (
+                    <DropdownMenuItem disabled>
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                        Loading templates
+                    </DropdownMenuItem>
+                ) : offered.length === 0 ? (
+                    <DropdownMenuItem disabled>No templates for this mailbox yet</DropdownMenuItem>
+                ) : (
+                    offered.map((template) => (
+                        <DropdownMenuItem key={template.id} onSelect={() => onPick(template)}>
+                            <span className="truncate" title={template.name}>
+                                {template.name}
+                            </span>
+                        </DropdownMenuItem>
+                    ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <Link href="/mail/settings/templates">Manage templates</Link>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -657,60 +841,6 @@ function SendLaterMenu({
             ) : null}
         </>
     );
-}
-
-/**
- * What the composer opens with, signature included.
- *
- * A signature that has to be inserted by hand every time is one nobody ever
- * sends, which is what "very basic" meant. Each mailbox says when its own goes
- * in: never, on a message somebody starts, or on replies and forwards as well.
- *
- * Where it goes is the other half and it is not decoration. Above the quoted
- * history is what everybody expects and what makes a reply readable; below it is
- * what a mailing list expects. The mailbox already carried that choice and
- * nothing had ever read it.
- *
- * A draft being reopened is left exactly as it was: it already has whatever its
- * author decided, and adding a second signature to it every time they come back
- * to it is the bug this feature usually ships with.
- */
-function withSignature(
-    seed: ComposerSeed,
-    accounts: ReturnType<typeof useMail>["accounts"],
-    identities: ReturnType<typeof useMail>["identities"],
-    accountId: string
-): string {
-    const body = seed.body ?? "";
-    if (seed.draftId) return body;
-
-    const account = accounts.find((one) => one.id === accountId);
-    const own = identities[accountId] ?? [];
-    const identity = own.find((one) => one.isDefault);
-    const signature = (identity?.signature || account?.signature || "").trim();
-    if (!signature) return body;
-
-    const when = account?.signatureAuto ?? "new";
-    const answering = Boolean(seed.inReplyToId);
-    if (when === "never") return body;
-    if (when === "new" && answering) return body;
-
-    // The two dashes and the space are the convention every client recognises,
-    // and what lets the next one fold the signature away.
-    const block = `-- 
-${signature}`;
-    if (!body.trim())
-        return `
-
-${block}`;
-    return account?.signatureAboveQuote === false
-        ? `${body}
-
-${block}`
-        : `
-
-${block}
-${body}`;
 }
 
 /** The times worth having on a menu. Anything else is the picker. */

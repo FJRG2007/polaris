@@ -29,8 +29,8 @@ import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { canOn, grantedResourceIds } from "@polaris/auth";
-import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
+import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 
 /** The caller, as the action layer resolved them. */
 export interface TaskActor {
@@ -85,7 +85,10 @@ export async function resolveSpaceRole(
             org: {
                 select: {
                     ownerId: true,
-                    members: { where: { userId: actor.id }, select: { role: true } },
+                    members: {
+                        where: { userId: actor.id },
+                        select: { role: true, restricted: true }
+                    },
                     roles: { select: { slug: true, permissions: true } }
                 }
             }
@@ -128,7 +131,10 @@ export async function resolveSpaceRole(
     // everybody on the instance.
     if (space.visibility !== "internal") return null;
     if (!space.orgId) return "guest";
-    return space.org && space.org.members.length > 0 ? "guest" : null;
+    // The roster, less its restricted members: internal work is exactly the
+    // implicit reach that role exists to withhold.
+    const membership = space.org?.members[0];
+    return membership && !membership.restricted ? "guest" : null;
 }
 
 /** What a grant written for this space alone is worth, on the same ladder every

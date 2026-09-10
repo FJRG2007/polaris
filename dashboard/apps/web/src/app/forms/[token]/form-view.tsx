@@ -57,7 +57,7 @@ export function PublicForm({
         return (
             <Card className="mx-auto w-full max-w-lg">
                 <CardBody className="flex flex-col items-center gap-3 p-8 text-center">
-                    <CircleCheck className="size-8 text-emerald-500" />
+                    <CircleCheck className="size-8 text-success" />
                     <p className="text-sm">{sent}</p>
                 </CardBody>
             </Card>
@@ -69,7 +69,9 @@ export function PublicForm({
             <Card className="mx-auto w-full max-w-lg">
                 <CardBody className="flex flex-col gap-3 p-8 text-center">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
-                    <p className="text-sm text-muted-foreground">This form is only open to people with an account.</p>
+                    <p className="text-sm text-muted-foreground">
+                        This form is only open to people with an account.
+                    </p>
                     <a href="/oauth/login" className="text-sm text-primary hover:underline">
                         Sign in to continue
                     </a>
@@ -89,7 +91,8 @@ export function PublicForm({
                 {fields.map((field) => {
                     const value = answers[field.id] ?? "";
                     const invalid = touched[field.id] && missing(field);
-                    const set = (next: string) => setAnswers((current) => ({ ...current, [field.id]: next }));
+                    const set = (next: string) =>
+                        setAnswers((current) => ({ ...current, [field.id]: next }));
 
                     return (
                         <label key={field.id} className="flex flex-col gap-1 text-sm">
@@ -97,7 +100,9 @@ export function PublicForm({
                                 {field.label}
                                 {field.required && <span className="ml-1 text-danger">*</span>}
                             </span>
-                            {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
+                            {field.help && (
+                                <span className="text-xs text-muted-foreground">{field.help}</span>
+                            )}
 
                             {field.type === "longText" ? (
                                 <Textarea
@@ -105,14 +110,19 @@ export function PublicForm({
                                     rows={4}
                                     aria-invalid={invalid}
                                     onChange={(event) => set(event.target.value)}
-                                    onBlur={() => setTouched((current) => ({ ...current, [field.id]: true }))}
+                                    onBlur={() =>
+                                        setTouched((current) => ({ ...current, [field.id]: true }))
+                                    }
                                     className="w-full resize-y rounded-md border border-border bg-field px-3 py-2 text-sm hover:border-border-strong focus:border-border-strong"
                                 />
                             ) : field.type === "dropdown" ? (
                                 <Select
                                     value={value}
                                     onValueChange={set}
-                                    options={field.options.map((option) => ({ value: option, label: option }))}
+                                    options={field.options.map((option) => ({
+                                        value: option,
+                                        label: option
+                                    }))}
                                     placeholder="Choose one"
                                     aria-label={field.label}
                                 />
@@ -137,17 +147,24 @@ export function PublicForm({
                                     value={value}
                                     aria-invalid={invalid}
                                     onChange={(event) => set(event.target.value)}
-                                    onBlur={() => setTouched((current) => ({ ...current, [field.id]: true }))}
+                                    onBlur={() =>
+                                        setTouched((current) => ({ ...current, [field.id]: true }))
+                                    }
                                 />
                             )}
 
-                            {invalid && <span className="text-xs text-danger">This one is required.</span>}
+                            {invalid && (
+                                <span className="text-xs text-danger">This one is required.</span>
+                            )}
                         </label>
                     );
                 })}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                    >
                         {error}
                     </p>
                 )}

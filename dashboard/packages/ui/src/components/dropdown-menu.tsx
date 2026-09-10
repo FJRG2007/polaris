@@ -70,7 +70,7 @@ export const DropdownMenuItem = forwardRef<
         ref={ref}
         className={cn(
             "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
-            variant === "danger" && "text-danger focus:bg-danger/10 focus:text-danger",
+            variant === "danger" && "text-danger focus:bg-danger-soft focus:text-danger",
             className
         )}
         {...props}
@@ -93,7 +93,8 @@ export const DropdownMenuSubTrigger = forwardRef<
                 // A submenu whose options all do the same heavy thing is that
                 // thing, and the trigger is the only part of it anybody reads
                 // before deciding. Same red as an item, for the same reason.
-                variant === "danger" && "text-danger focus:bg-danger/10 data-[state=open]:bg-danger/10",
+                variant === "danger" &&
+                    "text-danger focus:bg-danger-soft data-[state=open]:bg-danger-soft",
                 className
             )}
             {...props}
@@ -141,7 +142,10 @@ export function DropdownMenuSeparator({ className }: { className?: string }) {
     return <RadixMenu.Separator className={cn("-mx-1 my-1 h-px bg-border", className)} />;
 }
 
-export function DropdownMenuLabel({ className, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
+export function DropdownMenuLabel({
+    className,
+    ...props
+}: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
     return (
         <RadixMenu.Label
             className={cn(

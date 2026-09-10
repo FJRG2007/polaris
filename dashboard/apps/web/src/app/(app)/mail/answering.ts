@@ -68,7 +68,9 @@ export function replySeed(
         to: [...to],
         cc: [...cc],
         subject: core.replySubject(message.subject),
-        body: quoted.trim() ? `\n\n${core.quoteForReply(quoted, sender, new Date(message.sentAt))}` : "",
+        body: quoted.trim()
+            ? `\n\n${core.quoteForReply(quoted, sender, new Date(message.sentAt))}`
+            : "",
         inReplyToId: message.id,
         forward: false
     };
@@ -81,10 +83,9 @@ export function replySeed(
  * recognises, which matters more here than anywhere else: a forward with no
  * header is a message whose recipient cannot tell who originally sent it.
  *
- * The original's attachments do not come with it. That is a real gap and it is
- * said on the composer rather than left for somebody to discover after sending -
- * carrying them needs the parts fetched and re-uploaded, which is a server path
- * that does not exist yet.
+ * The original's files are brought over by the composer once it opens
+ * (`attachFromMessage`), because that is a fetch from the mail server and this
+ * function only shapes the text.
  */
 export function forwardSeed(message: AnswerableMessage, quoted: string) {
     const sender = message.from[0];

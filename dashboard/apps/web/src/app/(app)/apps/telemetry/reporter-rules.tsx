@@ -33,7 +33,7 @@ import { ipRuleField, type TelemetryReporters } from "@polaris/core";
 import type { ProjectSummary } from "@/lib/telemetry/project-service";
 import { ChevronDown, KeyRound, ShieldCheck, ShieldAlert } from "lucide-react";
 
-const POLICIES: { value: TelemetryReporters; label: string; hint: string; }[] = [
+const POLICIES: { value: TelemetryReporters; label: string; hint: string }[] = [
     {
         value: "internal",
         label: "This network, and anything listed",
@@ -162,12 +162,15 @@ export function ReporterRules({
                     {summary}
                 </span>
                 <ChevronDown
-                    className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+                    className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        open && "rotate-180"
+                    )}
                 />
             </button>
 
             {project.refused.count > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning/10 px-2.5 py-2 text-xs text-warning-foreground">
+                <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning-foreground">
                     <span className="min-w-0 flex-1">
                         {project.refused.count === 1
                             ? "One report was turned away"
@@ -207,7 +210,9 @@ export function ReporterRules({
             {open && (
                 <div className="flex flex-col gap-3 border-t border-border pt-3">
                     <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Reports are accepted from</span>
+                        <span className="text-xs text-muted-foreground">
+                            Reports are accepted from
+                        </span>
                         <Select
                             value={draft.reporters}
                             onValueChange={(value) =>
@@ -341,9 +346,9 @@ function ProjectKey({
                 />
             </div>
             <p className="text-xs text-muted-foreground">
-                A second value the reporter has to send, as an <code>X-Polaris-Key</code> header or an
-                ordinary bearer token. A Sentry client that lets you set transport headers can carry
-                it; one that does not cannot, which is why this is off unless you turn it on.
+                A second value the reporter has to send, as an <code>X-Polaris-Key</code> header or
+                an ordinary bearer token. A Sentry client that lets you set transport headers can
+                carry it; one that does not cannot, which is why this is off unless you turn it on.
             </p>
             {issued ? (
                 <div className="flex items-center gap-2">

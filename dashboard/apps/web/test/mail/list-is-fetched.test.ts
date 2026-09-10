@@ -138,7 +138,18 @@ describe("the list route", () => {
         const shell = await readFile(`${SCREENS}mail-shell.tsx`, "utf8");
         expect(shell).toContain("setRevision((count) => count + 1)");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
-        expect(view).toContain("useMailList(page, revision)");
+        expect(view).toContain("useMailList(page, revision, shelf)");
         expect(view).toContain("useMailThread(openThreadId, revision)");
+    });
+
+    it("draws the shelf on screen, never the one just left", async () => {
+        // Switching from personal mail to an organization's redrew the rail and
+        // kept the other shelf's list and open conversation.
+        const list = await readFile(`${SCREENS}use-mail-list.ts`, "utf8");
+        expect(list).toContain("cacheKey: `mail.list.${shelf}.${params}`");
+        const shell = await readFile(`${SCREENS}mail-shell.tsx`, "utf8");
+        expect(shell).toMatch(
+            /if \(shownShelf\.current === shelf\) return;[\s\S]*reloadLists\(\);[\s\S]*router\.replace\("\/mail"/
+        );
     });
 });

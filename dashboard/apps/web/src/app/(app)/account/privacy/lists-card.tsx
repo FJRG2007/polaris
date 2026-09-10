@@ -93,7 +93,10 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                 className="flex flex-wrap items-center gap-2 px-3 py-2"
                             >
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[0.8125rem]" title={list.name}>
+                                    <span
+                                        className="block truncate text-[0.8125rem]"
+                                        title={list.name}
+                                    >
                                         {list.name}
                                     </span>
                                     <span className="block text-[0.6875rem] text-foreground-subtle">
@@ -147,7 +150,7 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                         });
                                         if (ok) await act(() => deletePrivacyListAction(list.id));
                                     }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
                                 >
                                     <Trash2 className="size-4 shrink-0" />
                                 </button>

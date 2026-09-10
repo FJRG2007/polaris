@@ -1,11 +1,12 @@
 /**
  * How the guard answers for a hostname with nothing serving it.
  *
- * The edge reaches here two ways, and the page is the same object in both: a router of
- * last resort for a name in the wildcard zone that no app claims, and an error page for
- * an app router whose upstream refused the connection. Traefik rewrites the visitor's
- * path to one of the two vacant paths, and which one it picked is the only thing that
- * tells the cases apart from in here.
+ * The edge reaches here three ways, and the page is the same object in all: a router of
+ * last resort for a name in the wildcard zone that no app claims, an error page for an
+ * app router whose upstream refused the connection, and the same for an app put to sleep
+ * for being idle, which is starting again. Traefik rewrites the visitor's path to one of
+ * the vacant paths, and which one it picked is the only thing that tells the cases apart
+ * from in here.
  *
  * It is served before the signed-origin check, unlike everything else on this listener:
  * there is no origin to sign, because the whole point is that there is nothing to
@@ -17,6 +18,7 @@ import type { ServerResponse } from "node:http";
 import {
     VACANT_HEADER,
     VACANT_HEADER_VALUE,
+    WAKING_REFRESH_SECONDS,
     vacantCode,
     vacantPage,
     vacantStateForPath,
@@ -51,6 +53,8 @@ export function sendVacant(res: ServerResponse, ctx: VacantContext): void {
         "content-type": document ? "text/html; charset=utf-8" : "text/plain; charset=utf-8",
         "cache-control": "no-store",
         "x-content-type-options": "nosniff",
+        // An app waking up is worth asking again shortly; say when.
+        ...(state === "asleep" ? { "retry-after": String(WAKING_REFRESH_SECONDS) } : {}),
         // Read by the control plane before it points the edge here, and by anything
         // else that needs to know this page came from Polaris rather than an app.
         [VACANT_HEADER]: VACANT_HEADER_VALUE

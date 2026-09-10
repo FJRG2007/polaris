@@ -17,6 +17,15 @@ interface CfEnvelope<T> {
     result: T;
 }
 
+/** What Cloudflare said when it refused a request, or that it could not be
+ *  reached - sentences about the request, safe to show whoever made it. */
+export class CloudflareApiError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "CloudflareApiError";
+    }
+}
+
 /** Call the Cloudflare API and return `result`, throwing the API's own error text. */
 async function cf<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
@@ -31,12 +40,19 @@ async function cf<T>(token: string, method: string, path: string, body?: unknown
             body: body === undefined ? undefined : JSON.stringify(body)
         });
     } catch (caught) {
-        throw new Error(caught instanceof Error ? `Cloudflare unreachable: ${caught.message}` : "Cloudflare unreachable");
+        throw new CloudflareApiError(
+            caught instanceof Error
+                ? `Cloudflare unreachable: ${caught.message}`
+                : "Cloudflare unreachable"
+        );
     }
     const payload = (await res.json().catch(() => null)) as CfEnvelope<T> | null;
     if (!payload || typeof payload !== "object" || !payload.success) {
-        const detail = payload?.errors?.map((error) => error.message).filter(Boolean).join("; ");
-        throw new Error(detail || `Cloudflare API error (HTTP ${res.status})`);
+        const detail = payload?.errors
+            ?.map((error) => error.message)
+            .filter(Boolean)
+            .join("; ");
+        throw new CloudflareApiError(detail || `Cloudflare API error (HTTP ${res.status})`);
     }
     return payload.result;
 }
@@ -56,11 +72,18 @@ export interface CfAccount {
 
 /** The accounts this token can act on (usually one). */
 export async function listAccounts(token: string): Promise<CfAccount[]> {
-    const result = await cf<Array<{ id?: unknown; name?: unknown }>>(token, "GET", "/accounts?per_page=50");
+    const result = await cf<Array<{ id?: unknown; name?: unknown }>>(
+        token,
+        "GET",
+        "/accounts?per_page=50"
+    );
     if (!Array.isArray(result)) throw new Error("Unexpected accounts response from Cloudflare");
     return result
         .filter((entry): entry is { id: string; name: string } => typeof entry?.id === "string")
-        .map((entry) => ({ id: entry.id, name: typeof entry.name === "string" ? entry.name : entry.id }));
+        .map((entry) => ({
+            id: entry.id,
+            name: typeof entry.name === "string" ? entry.name : entry.id
+        }));
 }
 
 export interface CfZone {
@@ -70,10 +93,17 @@ export interface CfZone {
 
 /** The zones (domains) this token can manage DNS for. */
 export async function listZones(token: string): Promise<CfZone[]> {
-    const result = await cf<Array<{ id?: unknown; name?: unknown }>>(token, "GET", "/zones?per_page=50");
+    const result = await cf<Array<{ id?: unknown; name?: unknown }>>(
+        token,
+        "GET",
+        "/zones?per_page=50"
+    );
     if (!Array.isArray(result)) throw new Error("Unexpected zones response from Cloudflare");
     return result
-        .filter((entry): entry is { id: string; name: string } => typeof entry?.id === "string" && typeof entry?.name === "string")
+        .filter(
+            (entry): entry is { id: string; name: string } =>
+                typeof entry?.id === "string" && typeof entry?.name === "string"
+        )
         .map((entry) => ({ id: entry.id, name: entry.name }));
 }
 
@@ -84,7 +114,9 @@ export async function resolveZoneForHostname(token: string, hostname: string): P
         .filter((zone) => hostname === zone.name || hostname.endsWith(`.${zone.name}`))
         .sort((a, b) => b.name.length - a.name.length)[0];
     if (!match) {
-        throw new Error(`${hostname} is not on a domain in this Cloudflare account. Add the domain to Cloudflare first.`);
+        throw new CloudflareApiError(
+            `${hostname} is not on a domain in this Cloudflare account. Add the domain to Cloudflare first.`
+        );
     }
     return match;
 }
@@ -95,19 +127,37 @@ export interface CfTunnel {
 }
 
 /** Create a remotely-managed tunnel (its ingress config lives on Cloudflare's edge). */
-export async function createTunnel(token: string, accountId: string, name: string): Promise<CfTunnel> {
-    const result = await cf<{ id?: unknown; name?: unknown }>(token, "POST", `/accounts/${accountId}/cfd_tunnel`, {
-        name,
-        config_src: "cloudflare"
-    });
+export async function createTunnel(
+    token: string,
+    accountId: string,
+    name: string
+): Promise<CfTunnel> {
+    const result = await cf<{ id?: unknown; name?: unknown }>(
+        token,
+        "POST",
+        `/accounts/${accountId}/cfd_tunnel`,
+        {
+            name,
+            config_src: "cloudflare"
+        }
+    );
     if (typeof result?.id !== "string") throw new Error("Cloudflare did not return a tunnel id");
     return { id: result.id, name: typeof result.name === "string" ? result.name : name };
 }
 
 /** Fetch a tunnel's connector token (the value cloudflared runs with). */
-export async function getTunnelToken(token: string, accountId: string, tunnelId: string): Promise<string> {
-    const result = await cf<unknown>(token, "GET", `/accounts/${accountId}/cfd_tunnel/${tunnelId}/token`);
-    if (typeof result !== "string" || !result) throw new Error("Cloudflare did not return a connector token");
+export async function getTunnelToken(
+    token: string,
+    accountId: string,
+    tunnelId: string
+): Promise<string> {
+    const result = await cf<unknown>(
+        token,
+        "GET",
+        `/accounts/${accountId}/cfd_tunnel/${tunnelId}/token`
+    );
+    if (typeof result !== "string" || !result)
+        throw new Error("Cloudflare did not return a connector token");
     return result;
 }
 
@@ -121,10 +171,7 @@ export async function putTunnelIngress(
 ): Promise<void> {
     await cf(token, "PUT", `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
         config: {
-            ingress: [
-                { hostname, service: originUrl },
-                { service: "http_status:404" }
-            ]
+            ingress: [{ hostname, service: originUrl }, { service: "http_status:404" }]
         }
     });
 }
@@ -181,13 +228,23 @@ export async function findDnsRecords(
     );
     if (!Array.isArray(existing)) return [];
     return existing
-        .filter((entry): entry is { id: string; content?: unknown } => typeof entry?.id === "string")
-        .map((entry) => ({ id: entry.id, content: typeof entry.content === "string" ? entry.content : "" }));
+        .filter(
+            (entry): entry is { id: string; content?: unknown } => typeof entry?.id === "string"
+        )
+        .map((entry) => ({
+            id: entry.id,
+            content: typeof entry.content === "string" ? entry.content : ""
+        }));
 }
 
 /** Delete every record of a type/name except one, so a name that round-robined between
  *  several addresses ends up pointing only where the caller asked. */
-export async function pruneDnsRecords(token: string, zoneId: string, keepId: string, records: CfDnsRecord[]): Promise<void> {
+export async function pruneDnsRecords(
+    token: string,
+    zoneId: string,
+    keepId: string,
+    records: CfDnsRecord[]
+): Promise<void> {
     for (const record of records) {
         if (record.id !== keepId) await deleteDnsRecord(token, zoneId, record.id);
     }
@@ -206,9 +263,110 @@ async function upsertRecord(
         await cf(token, "PUT", `/zones/${zoneId}/dns_records/${current.id}`, record);
         return current.id;
     }
-    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, record);
-    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    const created = await cf<{ id?: unknown }>(
+        token,
+        "POST",
+        `/zones/${zoneId}/dns_records`,
+        record
+    );
+    if (typeof created?.id !== "string")
+        throw new Error("Cloudflare did not return a DNS record id");
     return created.id;
+}
+
+/** A record as the proxy toggle needs it: what it is, where it points, and
+ *  whether Cloudflare's proxy sits in front of it. */
+export interface CfProxiableRecord {
+    id: string;
+    type: string;
+    name: string;
+    content: string;
+    proxied: boolean;
+    ttl: number;
+}
+
+/** The address records (A, AAAA, CNAME) of one exact name. */
+export async function findAddressRecords(
+    token: string,
+    zoneId: string,
+    name: string
+): Promise<CfProxiableRecord[]> {
+    const rows = await cf<Array<Record<string, unknown>>>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?name=${encodeURIComponent(name)}&per_page=100`
+    );
+    if (!Array.isArray(rows)) return [];
+    return rows
+        .filter(
+            (row) =>
+                typeof row.id === "string" &&
+                typeof row.type === "string" &&
+                ["A", "AAAA", "CNAME"].includes(row.type) &&
+                typeof row.content === "string"
+        )
+        .map((row) => ({
+            id: row.id as string,
+            type: row.type as string,
+            name: typeof row.name === "string" ? row.name : name,
+            content: row.content as string,
+            proxied: row.proxied === true,
+            ttl: typeof row.ttl === "number" ? row.ttl : 1
+        }));
+}
+
+/** Put a record behind Cloudflare's proxy, or take it out. Only `proxied`
+ *  changes; the record keeps pointing where it did. */
+export async function setRecordProxied(
+    token: string,
+    zoneId: string,
+    recordId: string,
+    proxied: boolean
+): Promise<void> {
+    await cf(token, "PATCH", `/zones/${zoneId}/dns_records/${recordId}`, { proxied });
+}
+
+/** Create one address record, for a name a wildcard answered until now. */
+export async function createAddressRecord(
+    token: string,
+    zoneId: string,
+    record: { type: string; name: string; content: string; proxied: boolean }
+): Promise<string> {
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, {
+        ...record,
+        ttl: 1
+    });
+    if (typeof created?.id !== "string")
+        throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
+/**
+ * The zone's SSL/TLS mode - off, flexible, full or strict - or null when the
+ * token cannot read zone settings. Behind the proxy, `flexible` reaches the
+ * origin over plain HTTP, which Polaris' edge answers with a redirect to HTTPS:
+ * a loop no visitor gets out of.
+ */
+export async function zoneSslMode(token: string, zoneId: string): Promise<string | null> {
+    try {
+        const result = await cf<{ value?: unknown }>(token, "GET", `/zones/${zoneId}/settings/ssl`);
+        return typeof result?.value === "string" ? result.value : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Empty Cloudflare's cache for whole hostnames, or for URL prefixes
+ * (`host/path`). Cloudflare takes up to 100 per call on every plan, and on the
+ * Free plan five calls a minute.
+ */
+export async function purgeCache(
+    token: string,
+    zoneId: string,
+    what: { hosts: string[] } | { prefixes: string[] }
+): Promise<void> {
+    await cf(token, "POST", `/zones/${zoneId}/purge_cache`, what);
 }
 
 /** Point `hostname` at the tunnel via a proxied CNAME, creating or updating the record. */
@@ -232,8 +390,19 @@ export async function upsertTunnelCname(
  * unproxied: the record must resolve to the server's own address so Let's Encrypt
  * can validate it over HTTP and so the edge, not Cloudflare, terminates TLS.
  */
-export async function upsertARecord(token: string, zoneId: string, hostname: string, ip: string): Promise<string> {
-    return upsertRecord(token, zoneId, { type: "A", name: hostname, content: ip, proxied: false, ttl: 300 });
+export async function upsertARecord(
+    token: string,
+    zoneId: string,
+    hostname: string,
+    ip: string
+): Promise<string> {
+    return upsertRecord(token, zoneId, {
+        type: "A",
+        name: hostname,
+        content: ip,
+        proxied: false,
+        ttl: 300
+    });
 }
 
 /**
@@ -263,39 +432,278 @@ export async function upsertSrvRecord(
         await cf(token, "PUT", `/zones/${zoneId}/dns_records/${current.id}`, record);
         return current.id;
     }
-    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, record);
-    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    const created = await cf<{ id?: unknown }>(
+        token,
+        "POST",
+        `/zones/${zoneId}/dns_records`,
+        record
+    );
+    if (typeof created?.id !== "string")
+        throw new Error("Cloudflare did not return a DNS record id");
     return created.id;
 }
 
 /**
- * Write the TXT record an ACME DNS-01 challenge is answered with, returning its id so
- * the caller can take it away again.
+ * Add one TXT record beside whatever is already at that name, returning its id so
+ * the caller can take exactly that one away again.
  *
- * A short TTL because the record exists for the length of one validation and a long
- * one would keep a spent answer resolvable. Never proxied - Cloudflare's proxy is for
- * traffic, and this record is only ever read by a resolver.
+ * Never an update: a certificate for `example.com` and `*.example.com` is proven
+ * by two different answers published at the same `_acme-challenge` name at the
+ * same time, and rewriting the record in place leaves only the second - so the
+ * first validation reads the wrong value and the whole order fails. A short TTL
+ * because the record exists for the length of one validation.
  */
-export async function upsertTxtRecord(
+export async function createTxtRecord(
     token: string,
     zoneId: string,
     name: string,
     content: string
 ): Promise<string> {
-    return upsertRecord(token, zoneId, { type: "TXT", name, content, proxied: false, ttl: 60 });
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, {
+        type: "TXT",
+        name,
+        content,
+        ttl: 60
+    });
+    if (typeof created?.id !== "string")
+        throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
 }
 
-/** Every TXT record at a name, so a challenge can clear the ones it wrote. */
-export function findTxtRecords(token: string, zoneId: string, name: string): Promise<CfDnsRecord[]> {
-    return findDnsRecords(token, zoneId, "TXT", name);
+/** One record as a mail server's DNS needs to read it: an MX has a priority,
+ *  an SRV has its fields in `data`. */
+export interface CfZoneRecord {
+    readonly id: string;
+    readonly type: string;
+    readonly name: string;
+    readonly content: string;
+    readonly priority: number | null;
+}
+
+/**
+ * A TXT record's value as one string. Cloudflare may hand the content back as
+ * the quoted character-strings it is stored as (`"v=spf1 " "mx -all"`); read
+ * that way, an SPF record would not be recognised as one, and a second would be
+ * published beside it - which invalidates both.
+ */
+export function unquoteTxt(content: string): string {
+    const trimmed = content.trim();
+    if (!trimmed.startsWith('"')) return trimmed;
+    const parts = [...trimmed.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) =>
+        (match[1] ?? "").replace(/\\(.)/g, "$1")
+    );
+    return parts.length > 0 ? parts.join("") : trimmed;
+}
+
+/** Every record of one type at one name, with the fields a comparison needs. */
+export async function listZoneRecords(
+    token: string,
+    zoneId: string,
+    type: string,
+    name: string
+): Promise<CfZoneRecord[]> {
+    const rows = await cf<Array<Record<string, unknown>>>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?type=${encodeURIComponent(type)}&name=${encodeURIComponent(name)}`
+    );
+    if (!Array.isArray(rows)) return [];
+    return rows.flatMap((row) => {
+        if (typeof row.id !== "string") return [];
+        const data = (row.data ?? {}) as Record<string, unknown>;
+        const raw = typeof row.content === "string" ? row.content : "";
+        const content =
+            type === "SRV"
+                ? `${String(data.priority ?? 0)} ${String(data.weight ?? 0)} ${String(data.port ?? 0)} ${String(data.target ?? "")}`
+                : type === "TXT"
+                  ? unquoteTxt(raw)
+                  : raw;
+        return [
+            {
+                id: row.id,
+                type,
+                name: typeof row.name === "string" ? row.name : name,
+                content,
+                priority: typeof row.priority === "number" ? row.priority : null
+            }
+        ];
+    });
+}
+
+/** The body Cloudflare takes for a mail record: MX carries a priority, SRV its
+ *  fields in `data`, everything else a content string. Never proxied - a mail
+ *  record is read by resolvers and mail servers, not browsers. */
+function zoneRecordBody(record: {
+    type: string;
+    name: string;
+    value: string;
+    priority: number | null;
+}): Record<string, unknown> {
+    if (record.type === "SRV") {
+        const [priority, weight, port, target] = record.value.split(" ");
+        return {
+            type: "SRV",
+            name: record.name,
+            ttl: 3600,
+            data: { priority: Number(priority), weight: Number(weight), port: Number(port), target }
+        };
+    }
+    return {
+        type: record.type,
+        name: record.name,
+        content: record.value,
+        ttl: 3600,
+        proxied: false,
+        ...(record.type === "MX" ? { priority: record.priority ?? 10 } : {})
+    };
+}
+
+export async function createZoneRecord(
+    token: string,
+    zoneId: string,
+    record: { type: string; name: string; value: string; priority: number | null }
+): Promise<string> {
+    const created = await cf<{ id?: unknown }>(
+        token,
+        "POST",
+        `/zones/${zoneId}/dns_records`,
+        zoneRecordBody(record)
+    );
+    if (typeof created?.id !== "string")
+        throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
+/** One record as the zone holds it, for the record editor. */
+export interface CfEditableRecord {
+    id: string;
+    type: string;
+    name: string;
+    /** The value as Cloudflare writes it out - for SRV and CAA, their fields in one line. */
+    content: string;
+    ttl: number;
+    proxied: boolean;
+    proxiable: boolean;
+    priority: number | null;
+    /** The separate fields of an SRV or CAA record. */
+    data: Record<string, unknown> | null;
+}
+
+/** How many records are read per request, and the most pages read for one zone. */
+const RECORDS_PER_PAGE = 100;
+const MAX_RECORD_PAGES = 50;
+
+/** Every record in a zone, page by page, in the order Cloudflare keeps them. */
+export async function listDnsRecords(token: string, zoneId: string): Promise<CfEditableRecord[]> {
+    const records: CfEditableRecord[] = [];
+    for (let page = 1; page <= MAX_RECORD_PAGES; page += 1) {
+        const batch = await cf<unknown[]>(
+            token,
+            "GET",
+            `/zones/${zoneId}/dns_records?per_page=${RECORDS_PER_PAGE}&page=${page}`
+        );
+        if (!Array.isArray(batch))
+            throw new Error("Unexpected DNS records response from Cloudflare");
+        for (const entry of batch) {
+            const row = entry as Record<string, unknown>;
+            if (
+                typeof row.id !== "string" ||
+                typeof row.type !== "string" ||
+                typeof row.name !== "string"
+            )
+                continue;
+            records.push({
+                id: row.id,
+                type: row.type,
+                name: row.name,
+                content: typeof row.content === "string" ? row.content : "",
+                ttl: typeof row.ttl === "number" ? row.ttl : 1,
+                proxied: row.proxied === true,
+                proxiable: row.proxiable === true,
+                priority: typeof row.priority === "number" ? row.priority : null,
+                data:
+                    row.data && typeof row.data === "object"
+                        ? (row.data as Record<string, unknown>)
+                        : null
+            });
+        }
+        if (batch.length < RECORDS_PER_PAGE) break;
+    }
+    return records;
+}
+
+/** Add a record, returning its id. `record` is the API's own shape. */
+export async function createDnsRecord(
+    token: string,
+    zoneId: string,
+    record: object
+): Promise<string> {
+    const created = await cf<{ id?: unknown }>(
+        token,
+        "POST",
+        `/zones/${zoneId}/dns_records`,
+        record
+    );
+    if (typeof created?.id !== "string")
+        throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
+export async function updateZoneRecord(
+    token: string,
+    zoneId: string,
+    recordId: string,
+    record: { type: string; name: string; value: string; priority: number | null }
+): Promise<void> {
+    await cf(token, "PUT", `/zones/${zoneId}/dns_records/${recordId}`, zoneRecordBody(record));
+}
+
+/** Replace a record's every field with these. */
+export async function updateDnsRecord(
+    token: string,
+    zoneId: string,
+    recordId: string,
+    record: object
+): Promise<void> {
+    await cf(token, "PUT", `/zones/${zoneId}/dns_records/${recordId}`, record);
+}
+
+/** One record, or null when the zone has no record by that id. */
+export async function getDnsRecord(
+    token: string,
+    zoneId: string,
+    recordId: string
+): Promise<{ id: string; type: string; name: string } | null> {
+    try {
+        const row = await cf<{ id?: unknown; type?: unknown; name?: unknown }>(
+            token,
+            "GET",
+            `/zones/${zoneId}/dns_records/${recordId}`
+        );
+        return typeof row?.id === "string" &&
+            typeof row.type === "string" &&
+            typeof row.name === "string"
+            ? { id: row.id, type: row.type, name: row.name }
+            : null;
+    } catch {
+        return null;
+    }
 }
 
 /** Best-effort deletion of a DNS record (teardown never blocks on it). */
-export async function deleteDnsRecord(token: string, zoneId: string, recordId: string): Promise<void> {
+export async function deleteDnsRecord(
+    token: string,
+    zoneId: string,
+    recordId: string
+): Promise<void> {
     await cf(token, "DELETE", `/zones/${zoneId}/dns_records/${recordId}`);
 }
 
 /** Best-effort deletion of a tunnel (only succeeds once its connector has stopped). */
-export async function deleteTunnel(token: string, accountId: string, tunnelId: string): Promise<void> {
+export async function deleteTunnel(
+    token: string,
+    accountId: string,
+    tunnelId: string
+): Promise<void> {
     await cf(token, "DELETE", `/accounts/${accountId}/cfd_tunnel/${tunnelId}`);
 }

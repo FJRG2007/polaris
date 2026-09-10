@@ -28,6 +28,13 @@ import { EDGE_TOKEN_TTL_SECONDS, principalVerdict, signEdgeToken } from "@polari
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Never stored: a tab reopened the next day loads preferring the browser's cache,
+ *  and a stored hop here replays a token that expired overnight - the edge guard
+ *  sends it straight back, and the two bounce until the browser gives up. */
+function redirect(location: string): Response {
+    return new Response(null, { status: 302, headers: { location, "cache-control": "no-store" } });
+}
+
 export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const target = url.searchParams.get("redirect");
@@ -54,15 +61,15 @@ export async function GET(request: Request): Promise<Response> {
         // relative Location resolves against the public URL (request.url is the
         // internal upstream behind the reverse proxy).
         const back = `/edge/authorize?redirect=${encodeURIComponent(target as string)}`;
-        return new Response(null, {
-            status: 302,
-            headers: { location: `/oauth/login?redirect=${encodeURIComponent(back)}` }
-        });
+        return redirect(`/oauth/login?redirect=${encodeURIComponent(back)}`);
     }
 
     const userId = (session.user as { id: string }).id;
     const now = Math.floor(Date.now() / 1000);
-    const [waf, principals] = await Promise.all([resolveWaf(applicationId), principalsOfUser(userId)]);
+    const [waf, principals] = await Promise.all([
+        resolveWaf(applicationId),
+        principalsOfUser(userId)
+    ]);
     const held = new Set(principals.map((entry) => `${entry.principalType}:${entry.principalId}`));
     // Signed in, but this service's firewall names who may reach it and this account is
     // not one of them - or is one of the accounts it refuses. Answered here rather than
@@ -111,5 +118,5 @@ export async function GET(request: Request): Promise<Response> {
     const callback = new URL("/edge/callback", appOrigin);
     callback.searchParams.set("token", token);
     callback.searchParams.set("redirect", target as string);
-    return new Response(null, { status: 302, headers: { location: callback.toString() } });
+    return redirect(callback.toString());
 }

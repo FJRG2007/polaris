@@ -60,7 +60,10 @@ export function TeamsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -107,71 +110,77 @@ export function TeamsView({
                                             colSpan={4}
                                             className="text-muted-foreground px-3 py-8 text-center"
                                         >
-                                            A team is what a space is given to. Nothing here
-                                            reaches any work yet.
+                                            A team is what a space is given to. Nothing here reaches
+                                            any work yet.
                                         </td>
                                     </tr>
                                 ) : (
-                        teams.map((team) => (
-                            <tr
-                                key={team.id}
-                                className="border-border hover:bg-muted border-t"
-                            >
-                                <td className="px-3 py-2">
-                                    <button
-                                        type="button"
-                                        className="min-w-0 text-left"
-                                        onClick={() => setOpen(team)}
-                                    >
-                                        <span className="flex min-w-0 flex-col leading-tight">
-                                            <span className="truncate text-sm" title={team.name}>
-                                                {team.name}
-                                            </span>
-                                            <span className="text-muted-foreground truncate text-xs">
-                                                @{team.slug}
-                                            </span>
-                                        </span>
-                                    </button>
-                                </td>
-                                <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs tabular-nums">
-                                    {team.memberCount}
-                                </td>
-                                <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs">
-                                    {team.spaceCount + team.folderCount === 0
-                                        ? "None yet"
-                                        : `${team.spaceCount + team.folderCount} grant${
-                                              team.spaceCount + team.folderCount === 1 ? "" : "s"
-                                          }`}
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                    {canManage && (
-                                        <button
-                                            type="button"
-                                            aria-label={`Delete ${team.name}`}
-                                            title="Delete"
-                                            className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
-                                            onClick={async () => {
-                                                const ok = await confirm({
-                                                    title: `Delete ${team.name}?`,
-                                                    description:
-                                                        "Everybody on it loses whatever this team reached. The work itself is untouched.",
-                                                    confirmLabel: "Delete",
-                                                    danger: true
-                                                });
-                                                if (!ok) return;
-                                                const result = await runAction(
-                                                    () => deleteTeamAction(team.id),
-                                                    setError
-                                                );
-                                                if (result && !result.error) router.refresh();
-                                            }}
+                                    teams.map((team) => (
+                                        <tr
+                                            key={team.id}
+                                            className="border-border hover:bg-muted border-t"
                                         >
-                                            <Trash2 className="size-4 shrink-0" />
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                                ))
+                                            <td className="px-3 py-2">
+                                                <button
+                                                    type="button"
+                                                    className="min-w-0 text-left"
+                                                    onClick={() => setOpen(team)}
+                                                >
+                                                    <span className="flex min-w-0 flex-col leading-tight">
+                                                        <span
+                                                            className="truncate text-sm"
+                                                            title={team.name}
+                                                        >
+                                                            {team.name}
+                                                        </span>
+                                                        <span className="text-muted-foreground truncate text-xs">
+                                                            @{team.slug}
+                                                        </span>
+                                                    </span>
+                                                </button>
+                                            </td>
+                                            <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs tabular-nums">
+                                                {team.memberCount}
+                                            </td>
+                                            <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs">
+                                                {team.spaceCount + team.folderCount === 0
+                                                    ? "None yet"
+                                                    : `${team.spaceCount + team.folderCount} grant${
+                                                          team.spaceCount + team.folderCount === 1
+                                                              ? ""
+                                                              : "s"
+                                                      }`}
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                {canManage && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Delete ${team.name}`}
+                                                        title="Delete"
+                                                        className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
+                                                        onClick={async () => {
+                                                            const ok = await confirm({
+                                                                title: `Delete ${team.name}?`,
+                                                                description:
+                                                                    "Everybody on it loses whatever this team reached. The work itself is untouched.",
+                                                                confirmLabel: "Delete",
+                                                                danger: true
+                                                            });
+                                                            if (!ok) return;
+                                                            const result = await runAction(
+                                                                () => deleteTeamAction(team.id),
+                                                                setError
+                                                            );
+                                                            if (result && !result.error)
+                                                                router.refresh();
+                                                        }}
+                                                    >
+                                                        <Trash2 className="size-4 shrink-0" />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
                                 )}
                             </tbody>
                         </table>
@@ -300,7 +309,7 @@ function NewTeamDialog({
                     {error && (
                         <p
                             role="alert"
-                            className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                            className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
                         >
                             {error}
                         </p>

@@ -37,6 +37,12 @@ import { edgePage, edgeText } from "./edge-page.js";
  */
 export const VACANT_PATH = "/__polaris/vacant";
 export const VACANT_DOWN_PATH = `${VACANT_PATH}/down`;
+/** An app that is asleep: stopped because nobody visited, and started again by the
+ *  request that landed here. */
+export const VACANT_ASLEEP_PATH = `${VACANT_PATH}/asleep`;
+
+/** How often the waking page reloads itself while the app starts. */
+export const WAKING_REFRESH_SECONDS = 5;
 
 /**
  * Response header the page carries, so the control plane can tell a guard that serves
@@ -49,8 +55,8 @@ export const VACANT_DOWN_PATH = `${VACANT_PATH}/down`;
 export const VACANT_HEADER = "x-polaris-page";
 export const VACANT_HEADER_VALUE = "vacant";
 
-/** Which of the two nothings this is. */
-export type VacantState = "missing" | "down";
+/** Which of the nothings this is. */
+export type VacantState = "missing" | "down" | "asleep";
 
 export interface VacantPageInput {
     /** An id for the visitor to quote back. */
@@ -58,7 +64,7 @@ export interface VacantPageInput {
     /** The hostname that was asked for. */
     readonly host?: string;
     /** `missing` when no service claims the name, `down` when one does and is not
-     *  answering. */
+     *  answering, `asleep` when it was stopped for being idle and is starting. */
     readonly state: VacantState;
 }
 
@@ -69,27 +75,57 @@ const EMPTY = '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>';
 /** A stopped square inside a circle, for an app that is deployed and not running. */
 const STOPPED = '<circle cx="12" cy="12" r="10"/><rect x="9" y="9" width="6" height="6" rx="1"/>';
 
-/** The HTTP status each state answers with. */
+/** A moon, for an app that is asleep. */
+const ASLEEP = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+
+/** The HTTP status each state answers with. An app waking up is unavailable for
+ *  now, which is what 503 says - and a client that reads Retry-After waits. */
 export function vacantStatus(state: VacantState): number {
-    return state === "down" ? 502 : 404;
+    return state === "down" ? 502 : state === "asleep" ? 503 : 404;
 }
 
 /** The machine-readable code the page shows, for a report that quotes it. */
 export function vacantCode(state: VacantState): string {
-    return state === "down" ? "SERVICE_NOT_RUNNING" : "NO_SERVICE_HERE";
+    return state === "down"
+        ? "SERVICE_NOT_RUNNING"
+        : state === "asleep"
+          ? "SERVICE_WAKING_UP"
+          : "NO_SERVICE_HERE";
 }
 
-/** Which of the two the edge asked for, read off the rewritten path. Anything that is
- *  not the down path is a name nothing claims - including the bare path, which is what
- *  the catch-all router rewrites to. */
+/** Which state the edge asked for, read off the rewritten path. Anything that is not
+ *  the down or asleep path is a name nothing claims - including the bare path, which is
+ *  what the catch-all router rewrites to. */
 export function vacantStateForPath(path: string): VacantState {
-    const bare = path.split("?")[0] ?? "";
-    return bare.replace(/\/+$/, "") === VACANT_DOWN_PATH ? "down" : "missing";
+    const bare = (path.split("?")[0] ?? "").replace(/\/+$/, "");
+    return bare === VACANT_DOWN_PATH ? "down" : bare === VACANT_ASLEEP_PATH ? "asleep" : "missing";
 }
 
 /** Render the page for a hostname with nothing serving it. */
 export function vacantPage(input: VacantPageInput): string {
     const host = edgeText(input.host, "this address");
+    if (input.state === "asleep") {
+        return edgePage({
+            title: "503: SERVICE_WAKING_UP",
+            badge: "Waking up",
+            tone: "muted",
+            icon: ASLEEP,
+            heading: "This app is waking up",
+            lead: `The app on ${host} was asleep because nobody had visited for a while. It is starting now.`,
+            sections: [
+                {
+                    heading: "What happens next?",
+                    body: "This page reloads by itself every few seconds and shows the app as soon as it answers. Most apps take a few seconds; a large one can take a minute."
+                }
+            ],
+            facts: [
+                { label: "Code", value: vacantCode(input.state) },
+                { label: "Reference ID", value: edgeText(input.reference, "unavailable", 64) }
+            ],
+            note: "Served by Polaris",
+            refreshSeconds: WAKING_REFRESH_SECONDS
+        });
+    }
     const down = input.state === "down";
     return edgePage({
         title: down ? "502: SERVICE_NOT_RUNNING" : "404: NO_SERVICE_HERE",

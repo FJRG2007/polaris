@@ -14,21 +14,53 @@
  * back here to guess.
  */
 
-import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { CopyButton } from "@/components/copy-button";
+import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OwnerDomainView } from "@/lib/owner-domains";
-import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useDisplayFormat } from "@/components/display-format";
-import { CheckCircle2, Clock, Globe, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
+import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    DnsRecordCard,
+    Input
+} from "@polaris/ui";
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ChevronDown,
+    ChevronRight,
+    Clock,
+    Globe,
+    KeyRound,
+    Loader2,
+    Plus,
+    RefreshCw,
+    ShieldCheck,
+    Trash2
+} from "lucide-react";
 import {
     addOwnerDomainAction,
     checkOwnerDomainAction,
+    readOwnerDomainAction,
     removeOwnerDomainAction,
+    retryOwnerDomainCertificateAction,
+    setOwnerDomainDnsTokenAction,
     type DomainOwnerRef
 } from "@/app/(app)/account/domains/actions";
+
+/** How long a domain waiting on DNS goes between checks on its own. Records take
+ *  minutes to appear, so a tighter loop only spends lookups. */
+const RECHECK_SECONDS = 30;
+/** How often a certificate being ordered is asked about. An order waits on DNS
+ *  and Let's Encrypt and usually lands inside a minute. */
+const ORDER_POLL_MS = 10_000;
 
 export function OwnerDomainsView({
     owner,
@@ -65,7 +97,8 @@ export function OwnerDomainsView({
     // to be a domain before there is any point asking whether it is one Polaris
     // already occupies.
     const malformed = domainProblem(value);
-    const reserved = !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
+    const reserved =
+        !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
     // What stops the Add button. A single letter is not a domain, and a button
     // that offers itself for input it will refuse has to be pressed before it
     // can be understood.
@@ -80,7 +113,10 @@ export function OwnerDomainsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -91,8 +127,8 @@ export function OwnerDomainsView({
                         <Globe className="text-muted-foreground size-6 shrink-0" />
                         <p className="text-sm font-medium">No domain of your own yet</p>
                         <p className="text-muted-foreground max-w-md text-sm">
-                            Add one you already own and Polaris will give services here hostnames under it. Until
-                            then they take this Polaris&rsquo;s own domains.
+                            Add one you already own and Polaris will give services here hostnames
+                            under it. Until then they take this Polaris&rsquo;s own domains.
                         </p>
                     </CardBody>
                 </Card>
@@ -105,7 +141,9 @@ export function OwnerDomainsView({
                         publicIp={publicIp}
                         confirm={confirm}
                         onChecked={replace}
-                        onRemoved={(id) => setDomains((current) => current.filter((row) => row.id !== id))}
+                        onRemoved={(id) =>
+                            setDomains((current) => current.filter((row) => row.id !== id))
+                        }
                         onError={setError}
                     />
                 ))
@@ -133,7 +171,8 @@ export function OwnerDomainsView({
                                     if (result?.error) setError(result.error);
                                     return;
                                 }
-                                if (result.domain) setDomains((current) => [...current, result.domain!]);
+                                if (result.domain)
+                                    setDomains((current) => [...current, result.domain!]);
                                 setValue("");
                             }}
                         >
@@ -163,7 +202,8 @@ export function OwnerDomainsView({
                             ) : (
                                 <p className="text-muted-foreground w-full text-xs">
                                     A domain or a subdomain you have delegated - `example.com` or
-                                    `apps.example.com`. Polaris will show you the two records to publish.
+                                    `apps.example.com`. Polaris will show you the two records to
+                                    publish.
                                 </p>
                             )}
                         </form>
@@ -196,8 +236,23 @@ function DomainCard({
 }) {
     const format = useDisplayFormat();
     const [busy, setBusy] = useState(false);
+    const [recordsOpen, setRecordsOpen] = useState(false);
 
     const ready = domain.verified && domain.wildcardOk;
+
+    async function check() {
+        setBusy(true);
+        onError("");
+        const result = await runAction(() => checkOwnerDomainAction(owner, domain.id), onError);
+        setBusy(false);
+        if (result?.domain) onChecked(result.domain);
+        else if (result?.error) onError(result.error);
+    }
+
+    // A domain waiting on DNS checks itself on a timer, so whoever is adding the
+    // records at their registrar in another tab sees it turn ready without coming
+    // back to press anything. Paused while the tab is hidden.
+    const secondsLeft = useRecheck(!ready && !busy, check);
 
     return (
         <Card>
@@ -222,16 +277,11 @@ function DomainCard({
                         disabled={busy}
                         aria-label={`Check ${domain.domain}`}
                         title="Check DNS now"
-                        onClick={async () => {
-                            setBusy(true);
-                            onError("");
-                            const result = await runAction(() => checkOwnerDomainAction(owner, domain.id), onError);
-                            setBusy(false);
-                            if (result?.domain) onChecked(result.domain);
-                            else if (result?.error) onError(result.error);
-                        }}
+                        onClick={() => void check()}
                     >
-                        <RefreshCw className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"} />
+                        <RefreshCw
+                            className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"}
+                        />
                         Check
                     </Button>
                     <Button
@@ -250,7 +300,10 @@ function DomainCard({
                             });
                             if (!ok) return;
                             setBusy(true);
-                            const result = await runAction(() => removeOwnerDomainAction(owner, domain.id), onError);
+                            const result = await runAction(
+                                () => removeOwnerDomainAction(owner, domain.id),
+                                onError
+                            );
                             setBusy(false);
                             if (result && !result.error) onRemoved(domain.id);
                             else if (result?.error) onError(result.error);
@@ -265,65 +318,256 @@ function DomainCard({
 
                 {!ready && (
                     <div className="flex flex-col gap-2">
-                        <Record
-                            done={domain.verified}
+                        <DnsRecordCard
+                            status={domain.verified ? "done" : "waiting"}
                             type="TXT"
                             name={domain.txtName}
                             value={domain.txtValue}
                             note="Proves the domain is yours."
                         />
-                        <Record
-                            done={domain.wildcardOk}
+                        <DnsRecordCard
+                            status={domain.wildcardOk ? "done" : "waiting"}
                             type="A"
                             name={domain.wildcard}
-                            value={publicIp ?? "this server's public address"}
+                            value={publicIp}
+                            valueFallback="this server's public address, once it is detected"
                             note="Makes every hostname Polaris mints under it arrive here."
                         />
                     </div>
                 )}
 
-                <p className="text-muted-foreground text-xs">
-                    {domain.checkedAt ? `Last checked ${format.dateTime(domain.checkedAt)}.` : "Not checked yet."}
+                {domain.verified && (
+                    <CertificatePanel
+                        owner={owner}
+                        domain={domain}
+                        onChanged={onChecked}
+                        onError={onError}
+                    />
+                )}
+
+                {/* Editing records takes the domain's own token: this Polaris's
+                    token may reach the zone, but it was never handed over for this. */}
+                {domain.verified && domain.hasDnsToken && (
+                    <div className="flex flex-col gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setRecordsOpen((open) => !open)}
+                            aria-expanded={recordsOpen}
+                            className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs"
+                        >
+                            {recordsOpen ? (
+                                <ChevronDown className="size-3.5 shrink-0" />
+                            ) : (
+                                <ChevronRight className="size-3.5 shrink-0" />
+                            )}
+                            DNS records
+                        </button>
+                        {recordsOpen && (
+                            <DnsZoneEditor
+                                scope={{ kind: "owner", ref: owner, domainId: domain.id }}
+                            />
+                        )}
+                    </div>
+                )}
+
+                <p className="text-muted-foreground text-xs" aria-live="polite">
+                    {domain.checkedAt
+                        ? `Last checked ${format.dateTime(domain.checkedAt)}.`
+                        : "Not checked yet."}
+                    {!ready && secondsLeft !== null && ` Checking again in ${secondsLeft}s.`}
                 </p>
             </CardBody>
         </Card>
     );
 }
 
-/** One DNS record to publish. The value is copyable because the next thing that
- *  happens to it is being pasted into a registrar's form. */
-function Record({
-    done,
-    type,
-    name,
-    value,
-    note
+/**
+ * Count down to the next check and run it, while `active`. Answers the seconds
+ * left, or null when it is not counting.
+ */
+function useRecheck(active: boolean, run: () => Promise<void>): number | null {
+    const [left, setLeft] = useState<number | null>(null);
+    const runRef = useRef(run);
+    runRef.current = run;
+    useEffect(() => {
+        if (!active) {
+            setLeft(null);
+            return;
+        }
+        let remaining = RECHECK_SECONDS;
+        setLeft(remaining);
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === "hidden") return;
+            remaining -= 1;
+            if (remaining <= 0) {
+                remaining = RECHECK_SECONDS;
+                void runRef.current();
+            }
+            setLeft(remaining);
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [active]);
+    return left;
+}
+
+/**
+ * The wildcard certificate for a verified domain: what state it is in, and the
+ * DNS token it is ordered with when this Polaris's own does not reach the zone.
+ */
+function CertificatePanel({
+    owner,
+    domain,
+    onChanged,
+    onError
 }: {
-    done: boolean;
-    type: string;
-    name: string;
-    value: string;
-    note: string;
+    owner: DomainOwnerRef;
+    domain: OwnerDomainView;
+    onChanged: (domain: OwnerDomainView) => void;
+    onError: (message: string) => void;
 }) {
+    const format = useDisplayFormat();
+    const [token, setToken] = useState("");
+    const [saving, setSaving] = useState(false);
+    const certificate = domain.certificate;
+    // Pending with no wait set is an order that is due or running now.
+    const ordering = certificate?.status === "pending" && certificate.nextAttemptAt === null;
+    const changedRef = useRef(onChanged);
+    changedRef.current = onChanged;
+
+    // While an order is in flight - or about to be, for a domain proven a moment
+    // ago - read the row until it lands. Only the row: the order itself runs on
+    // the server whether or not this screen is open.
+    const waiting = ordering || certificate === null;
+    useEffect(() => {
+        if (!waiting) return;
+        const timer = window.setInterval(async () => {
+            const result = await readOwnerDomainAction(owner, domain.id).catch(() => null);
+            if (result?.domain) changedRef.current(result.domain);
+        }, ORDER_POLL_MS);
+        return () => window.clearInterval(timer);
+    }, [waiting, owner, domain.id]);
+
+    async function saveToken(value: string) {
+        setSaving(true);
+        onError("");
+        const result = await runAction(
+            () => setOwnerDomainDnsTokenAction(owner, domain.id, value),
+            onError
+        );
+        setSaving(false);
+        if (result?.domain) {
+            onChanged(result.domain);
+            setToken("");
+        } else if (result?.error) onError(result.error);
+    }
+
+    async function retry() {
+        setSaving(true);
+        onError("");
+        const result = await runAction(
+            () => retryOwnerDomainCertificateAction(owner, domain.id),
+            onError
+        );
+        setSaving(false);
+        if (result?.domain) onChanged(result.domain);
+        else if (result?.error) onError(result.error);
+    }
+
+    const covered = `${domain.wildcard} and ${domain.domain}`;
+    const summary =
+        certificate?.status === "issued" && certificate.expiresAt
+            ? `Covers ${covered} until ${format.date(certificate.expiresAt)}. Renewed automatically 30 days before it expires.`
+            : ordering
+              ? `Ordering for ${covered}. This usually takes under a minute.`
+              : `Covers ${covered} once it is issued.`;
+
     return (
-        <div className="border-border bg-surface/40 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-            {done ? (
-                <CheckCircle2 className="text-primary size-4 shrink-0" />
-            ) : (
-                <Clock className="text-muted-foreground size-4 shrink-0" />
+        <div className="border-border flex flex-col gap-2 rounded-md border px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+                <ShieldCheck className="text-muted-foreground size-4 shrink-0" />
+                <span className="font-medium">Wildcard certificate</span>
+                {certificate?.status === "issued" ? (
+                    <Badge variant="success">Issued</Badge>
+                ) : certificate?.status === "failed" ? (
+                    <Badge variant="danger">Not issued</Badge>
+                ) : (
+                    <Badge variant="neutral">{ordering ? "Ordering" : "Waiting"}</Badge>
+                )}
+                {ordering && (
+                    <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+                )}
+            </div>
+            <p className="text-muted-foreground text-xs">{summary}</p>
+            {certificate?.detail && (
+                <p className="text-warning flex items-start gap-1.5 text-xs">
+                    <AlertTriangle className="mt-px size-3.5 shrink-0" />
+                    <span>
+                        {certificate.detail}
+                        {certificate.nextAttemptAt &&
+                            ` Next try ${format.dateTime(certificate.nextAttemptAt)}.`}
+                    </span>
+                </p>
             )}
-            <Badge variant="neutral">{type}</Badge>
-            <code className="min-w-0 flex-1 truncate text-xs" title={name}>
-                {name}
-            </code>
-            <CopyButton value={name} label={`Copy ${name}`} />
-            <code className="text-muted-foreground min-w-0 max-w-full truncate text-xs" title={value}>
-                {value}
-            </code>
-            {/* The address is resolved by the server and is not a fixed string,
-                so only the value that actually is one can be copied. */}
-            {value.includes(" ") ? null : <CopyButton value={value} label={`Copy ${value}`} />}
-            <p className="text-muted-foreground w-full text-xs">{note}</p>
+            {certificate?.nextAttemptAt && (
+                <div>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={saving}
+                        onClick={() => void retry()}
+                    >
+                        <RefreshCw className="size-4 shrink-0" /> Try now
+                    </Button>
+                </div>
+            )}
+            {domain.hasDnsToken ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <KeyRound className="text-muted-foreground size-3.5 shrink-0" />
+                    <span className="text-muted-foreground">
+                        Ordered with this domain&rsquo;s own Cloudflare token.
+                    </span>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={saving}
+                        onClick={() => void saveToken("")}
+                    >
+                        Remove token
+                    </Button>
+                </div>
+            ) : (
+                <form
+                    className="flex flex-wrap items-end gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (token.trim()) void saveToken(token.trim());
+                    }}
+                >
+                    <label className="text-muted-foreground flex min-w-56 flex-1 flex-col gap-1 text-xs">
+                        Cloudflare API token
+                        <Input
+                            type="password"
+                            value={token}
+                            autoComplete="off"
+                            placeholder="Only if the domain is in your own Cloudflare account"
+                            className="h-9"
+                            onChange={(event) => setToken(event.target.value)}
+                        />
+                    </label>
+                    <Button
+                        type="submit"
+                        size="sm"
+                        variant="secondary"
+                        disabled={saving || !token.trim()}
+                    >
+                        {saving && <Loader2 className="size-4 shrink-0 animate-spin" />} Save token
+                    </Button>
+                    <p className="text-muted-foreground w-full text-xs">
+                        Needs Zone: DNS: Edit and Zone: Read on {domain.domain}. Without one, the
+                        token this Polaris has connected is used when it can edit this domain.
+                    </p>
+                </form>
+            )}
         </div>
     );
 }
