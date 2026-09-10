@@ -43,10 +43,11 @@ describe("every link", () => {
 });
 
 describe("what each link asks for", () => {
-    it("asks for exactly the two permissions the records need", () => {
+    it("asks for the records, the zone, and purging the cache of a proxied domain", () => {
         expect(permissions("dns")).toEqual([
             { key: "dns", type: "edit" },
-            { key: "zone", type: "read" }
+            { key: "zone", type: "read" },
+            { key: "cache", type: "purge" }
         ]);
     });
 

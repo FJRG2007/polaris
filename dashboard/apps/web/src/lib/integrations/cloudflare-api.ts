@@ -224,6 +224,88 @@ async function upsertRecord(
     return created.id;
 }
 
+/** A record as the proxy toggle needs it: what it is, where it points, and
+ *  whether Cloudflare's proxy sits in front of it. */
+export interface CfProxiableRecord {
+    id: string;
+    type: string;
+    name: string;
+    content: string;
+    proxied: boolean;
+    ttl: number;
+}
+
+/** The address records (A, AAAA, CNAME) of one exact name. */
+export async function findAddressRecords(token: string, zoneId: string, name: string): Promise<CfProxiableRecord[]> {
+    const rows = await cf<Array<Record<string, unknown>>>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?name=${encodeURIComponent(name)}&per_page=100`
+    );
+    if (!Array.isArray(rows)) return [];
+    return rows
+        .filter(
+            (row) =>
+                typeof row.id === "string" &&
+                typeof row.type === "string" &&
+                ["A", "AAAA", "CNAME"].includes(row.type) &&
+                typeof row.content === "string"
+        )
+        .map((row) => ({
+            id: row.id as string,
+            type: row.type as string,
+            name: typeof row.name === "string" ? row.name : name,
+            content: row.content as string,
+            proxied: row.proxied === true,
+            ttl: typeof row.ttl === "number" ? row.ttl : 1
+        }));
+}
+
+/** Put a record behind Cloudflare's proxy, or take it out. Only `proxied`
+ *  changes; the record keeps pointing where it did. */
+export async function setRecordProxied(token: string, zoneId: string, recordId: string, proxied: boolean): Promise<void> {
+    await cf(token, "PATCH", `/zones/${zoneId}/dns_records/${recordId}`, { proxied });
+}
+
+/** Create one address record, for a name a wildcard answered until now. */
+export async function createAddressRecord(
+    token: string,
+    zoneId: string,
+    record: { type: string; name: string; content: string; proxied: boolean }
+): Promise<string> {
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, { ...record, ttl: 1 });
+    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
+/**
+ * The zone's SSL/TLS mode - off, flexible, full or strict - or null when the
+ * token cannot read zone settings. Behind the proxy, `flexible` reaches the
+ * origin over plain HTTP, which Polaris' edge answers with a redirect to HTTPS:
+ * a loop no visitor gets out of.
+ */
+export async function zoneSslMode(token: string, zoneId: string): Promise<string | null> {
+    try {
+        const result = await cf<{ value?: unknown }>(token, "GET", `/zones/${zoneId}/settings/ssl`);
+        return typeof result?.value === "string" ? result.value : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Empty Cloudflare's cache for whole hostnames, or for URL prefixes
+ * (`host/path`). Cloudflare takes up to 100 per call on every plan, and on the
+ * Free plan five calls a minute.
+ */
+export async function purgeCache(
+    token: string,
+    zoneId: string,
+    what: { hosts: string[] } | { prefixes: string[] }
+): Promise<void> {
+    await cf(token, "POST", `/zones/${zoneId}/purge_cache`, what);
+}
+
 /** Point `hostname` at the tunnel via a proxied CNAME, creating or updating the record. */
 export async function upsertTunnelCname(
     token: string,

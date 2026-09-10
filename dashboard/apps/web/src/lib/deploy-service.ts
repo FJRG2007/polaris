@@ -4044,6 +4044,8 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
     await retireReplaced(dep.deployableId, replaced).catch((error) => {
         console.error("polaris: could not take the replaced release down:", error);
     });
+    // Cloudflare would keep serving the previous release's assets from its cache.
+    void import("./cdn").then(({ purgeAfterPromotion }) => purgeAfterPromotion(dep.deployableId));
 }
 
 /** How long a replaced release keeps answering after the change-over, for the

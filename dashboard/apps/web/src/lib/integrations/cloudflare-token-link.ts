@@ -19,10 +19,12 @@ interface Permission {
     type: string;
 }
 
-/** Writes the records and finds the zone they belong to. Nothing else. */
+/** Writes the records and finds the zone they belong to, and empties Cloudflare's
+ *  cache for a domain served through its proxy after each deploy. Nothing else. */
 const DNS_PERMISSIONS: Permission[] = [
     { key: "dns", type: "edit" },
-    { key: "zone", type: "read" }
+    { key: "zone", type: "read" },
+    { key: "cache", type: "purge" }
 ];
 
 /**
@@ -40,11 +42,8 @@ const TUNNEL_PERMISSIONS: Permission[] = [{ key: "argo_tunnel", type: "edit" }];
  * to pick their domain a second time, on a page that does not know which one it is.
  */
 function tokenUrl(permissions: Permission[], name: string): string {
-    return (
-        "https://dash.cloudflare.com/profile/api-tokens" +
-        `?permissionGroupKeys=${encodeURIComponent(JSON.stringify(permissions))}` +
-        `&accountId=%2A&zoneId=all&name=${encodeURIComponent(name)}`
-    );
+    const query = `permissionGroupKeys=${encodeURIComponent(JSON.stringify(permissions))}&accountId=%2A&zoneId=all&name=${encodeURIComponent(name)}`;
+    return `https://dash.cloudflare.com/profile/api-tokens?${query}`;
 }
 
 /** What a token can be created for. `all` is one token carrying both sets. */
@@ -59,8 +58,8 @@ export const CLOUDFLARE_TOKEN_LINKS: Record<CloudflareTokenScope, string> = {
 /** The permissions each scope asks for, written out for the operator to check
  *  against the form - and to tick by hand if the pre-fill ever misses one. */
 export const CLOUDFLARE_TOKEN_PERMISSIONS: Record<CloudflareTokenScope, string[]> = {
-    all: ["Zone - DNS: Edit", "Zone - Zone: Read", "Account - Cloudflare Tunnel: Edit"],
-    dns: ["Zone - DNS: Edit", "Zone - Zone: Read"],
+    all: ["Zone - DNS: Edit", "Zone - Zone: Read", "Zone - Cache Purge: Purge", "Account - Cloudflare Tunnel: Edit"],
+    dns: ["Zone - DNS: Edit", "Zone - Zone: Read", "Zone - Cache Purge: Purge"],
     tunnel: ["Account - Cloudflare Tunnel: Edit"]
 };
 
