@@ -7,6 +7,7 @@ import {
     Bot,
     Building2,
     ChevronRight,
+    ClipboardCheck,
     Gauge,
     Globe,
     HardDrive,
@@ -51,6 +52,12 @@ const SECTIONS = [
         description: "Whether an account has to carry a second factor, and which ones count."
     },
     { href: "/admin/activity", icon: Activity, title: "Activity", description: "Audit log of actions across Polaris." },
+    {
+        href: "/admin/evidence",
+        icon: ClipboardCheck,
+        title: "Evidence",
+        description: "The controls in force, for an audit, as a dated report you can export."
+    },
     {
         href: "/admin/inbox",
         icon: MessagesSquare,

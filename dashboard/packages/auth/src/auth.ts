@@ -61,9 +61,13 @@ function requestOrigin(headers: Headers | undefined): DeviceOrigin {
     };
 }
 
-/** Session lifetime: 7 days, refreshed at most once per day. */
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
-const SESSION_UPDATE_AGE = 60 * 60 * 24;
+/** Session lifetime: 7 days, refreshed at most once per day. Exported so the
+ *  compliance evidence reports the lifetime this instance actually runs. */
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+export const SESSION_UPDATE_AGE = 60 * 60 * 24;
+
+/** The shortest password an account may set, reported by the same evidence. */
+export const MIN_PASSWORD_LENGTH = 10;
 
 /** How long an emailed sign-in link stays good. Short: it is a bearer credential
  *  sitting in an inbox, and the user is asking to sign in right now. */
@@ -696,7 +700,7 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             // user server-side (see provisionUser). Sign-in stays open.
             disableSignUp: true,
             requireEmailVerification: false,
-            minPasswordLength: 10
+            minPasswordLength: MIN_PASSWORD_LENGTH
         },
         session: {
             expiresIn: SESSION_MAX_AGE,

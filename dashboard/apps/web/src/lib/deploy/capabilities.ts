@@ -492,6 +492,14 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 adminOnly: true
             },
             {
+                title: "Compliance evidence",
+                description:
+                    "The controls in force for a SOC 2 or ISO 27001 audit - sign-in, sessions, backups, encryption, TLS, firewall - exported as JSON and a printable report, with a SHA-256 kept in the audit trail.",
+                where: "Management > Evidence",
+                href: "/admin/evidence",
+                adminOnly: true
+            },
+            {
                 title: "Two-factor sign-in",
                 description: "Passkeys, authenticator apps and trusted devices.",
                 where: "My account > Security",

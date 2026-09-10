@@ -21,6 +21,7 @@ import {
     ChartColumn,
     CalendarClock,
     ChartPie,
+    ClipboardCheck,
     Clock,
     Code2,
     Contact,
@@ -1324,6 +1325,22 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             adminOnly: true,
             icon: Activity,
             keywords: ["audit", "logs"]
+        },
+        {
+            label: "Evidence",
+            href: "/admin/evidence",
+            adminOnly: true,
+            icon: ClipboardCheck,
+            keywords: [
+                "compliance",
+                "soc 2",
+                "iso 27001",
+                "auditor",
+                "controls",
+                "report",
+                "export",
+                "certification"
+            ]
         },
         {
             label: "Users",
