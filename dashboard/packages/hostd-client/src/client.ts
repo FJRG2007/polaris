@@ -270,6 +270,41 @@ export class HostdClient {
         });
     }
 
+    /**
+     * Write a file inside a container from a stream of known length.
+     *
+     * The same route as `fsWrite`, without the whole body held in memory first:
+     * a database dump being restored can be gigabytes. The daemon reads exactly
+     * `size` bytes, so the length is declared rather than chunked.
+     */
+    public async fsWriteStream(
+        container: string,
+        path: string,
+        body: NodeJS.ReadableStream,
+        size: number
+    ): Promise<IncomingMessage> {
+        const token = await this.token();
+        const headers: Record<string, string> = {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/octet-stream",
+            "content-length": String(size),
+            "x-polaris-container": container,
+            "x-polaris-path": path
+        };
+        const options: RequestOptions = this.tcpUrl
+            ? { ...splitTcp(this.tcpUrl), path: "/v1/deploy/fs/write", method: "POST", headers, signal: this.signal }
+            : { socketPath: this.socketPath, path: "/v1/deploy/fs/write", method: "POST", headers, signal: this.signal };
+        return new Promise<IncomingMessage>((resolve, reject) => {
+            const req = httpRequest(options, (res) => resolve(res));
+            req.on("error", reject);
+            body.on("error", (error: Error) => {
+                req.destroy(error);
+                reject(error);
+            });
+            body.pipe(req);
+        });
+    }
+
     /** Empty a volume's mount point inside a container, keeping the directory. */
     public async volumeWipe(container: string, path: string): Promise<IncomingMessage> {
         return this.callStream("POST", "/v1/deploy/volume/wipe", JSON.stringify({ container, path }));

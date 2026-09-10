@@ -139,6 +139,14 @@ export interface DbDeployPlan {
     /** The networks the database joins in place of the proxy network, as for an
      *  application. Absent or empty means the proxy network. */
     readonly networks?: readonly string[];
+    /** Further mounts beside the data volume. A PostgreSQL instance with
+     *  point-in-time recovery mounts its archive folder here - a host folder
+     *  confined under the volume root, which a recovered instance can mount too. */
+    readonly extraVolumes?: readonly {
+        readonly source: string;
+        readonly target: string;
+        readonly kind: "bind" | "volume";
+    }[];
 }
 
 export interface DeployResult {

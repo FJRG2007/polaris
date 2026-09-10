@@ -482,6 +482,50 @@ export class SshPorts implements RuntimePorts {
         });
     }
 
+    /**
+     * Stream bytes into a file inside a container on the server.
+     *
+     * `docker exec -i` with the channel's stdin as the file's contents: the path
+     * is a positional argument to the inner shell, never interpolated into it.
+     */
+    public async writeFile(
+        container: string,
+        path: string,
+        body: NodeJS.ReadableStream,
+        _size: number
+    ): Promise<void> {
+        const command = `docker exec -i ${quoteArg(container)} sh -c ${quoteArg('cat > "$1"')} polaris ${quoteArg(path)}`;
+        const client = await this.connect();
+        await new Promise<void>((resolve, reject) => {
+            client.exec(command, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let code: number | null = null;
+                let said = "";
+                channel.on("data", () => undefined);
+                channel.stderr.on("data", (chunk: Buffer) => {
+                    if (said.length < 2000) said += chunk.toString("utf8");
+                });
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () =>
+                    code === 0
+                        ? resolve()
+                        : reject(new Error(`writing ${path} exited with code ${code ?? -1}${said ? `: ${said.trim()}` : ""}`))
+                );
+                channel.on("error", reject);
+                body.on("error", (bodyError: Error) => {
+                    channel.close();
+                    reject(bodyError);
+                });
+                body.pipe(channel);
+            });
+        });
+    }
+
     private async run(command: string, onOutput?: OutputSink): Promise<void> {
         const client = await this.connect();
         const result = await execCommand(client, command, {

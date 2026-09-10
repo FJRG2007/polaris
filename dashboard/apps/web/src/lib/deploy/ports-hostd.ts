@@ -202,6 +202,18 @@ export class HostdPorts implements RuntimePorts {
         return Readable.toWeb(response) as ReadableStream<Uint8Array>;
     }
 
+    /** Streamed through the daemon's write route. The daemon streams back what
+     *  the write printed; that is drained so a refusal surfaces as an error. */
+    public async writeFile(
+        container: string,
+        path: string,
+        body: NodeJS.ReadableStream,
+        size: number
+    ): Promise<void> {
+        const response = await this.client.fsWriteStream(container, path, body, size);
+        await drain(response);
+    }
+
     public async dispose(): Promise<void> {
         return undefined;
     }

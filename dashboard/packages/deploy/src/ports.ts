@@ -158,5 +158,15 @@ export interface RuntimePorts {
      * themselves, so they get a stream and never a string.
      */
     readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>>;
+    /**
+     * Stream bytes into a file inside a container - the reverse of `readFile`.
+     *
+     * A restore puts a dump back, and a dump is exactly the artifact that must
+     * not be held in memory or pushed through a command line. `size` is known
+     * because the caller staged the file first, and the local daemon needs it up
+     * front. Optional so a runtime without the route fails in words rather than
+     * pretending.
+     */
+    writeFile?(container: string, path: string, body: NodeJS.ReadableStream, size: number): Promise<void>;
     dispose(): Promise<void>;
 }

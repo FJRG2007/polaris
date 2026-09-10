@@ -334,14 +334,20 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 env: { ...plan.env },
                 command: plan.command ? [...plan.command] : undefined,
                 ports,
-                volumes: [{ source: plan.volumeName, target: plan.dataPath, kind: "volume" }],
+                volumes: [
+                    { source: plan.volumeName, target: plan.dataPath, kind: "volume" },
+                    ...(plan.extraVolumes ?? []).map((volume) => ({ ...volume }))
+                ],
                 labels: {},
                 networks,
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped"
             }
         ],
-        volumes: [plan.volumeName],
+        volumes: [
+            plan.volumeName,
+            ...(plan.extraVolumes ?? []).filter((volume) => volume.kind === "volume").map((volume) => volume.source)
+        ],
         networks
     };
 }
