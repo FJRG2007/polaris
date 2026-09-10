@@ -99,7 +99,10 @@ export function DatabaseManageDialog({
                   ? [{ value: "settings" as const, label: "Settings" }]
                   : []),
               ...(overview.pitr ? [{ value: "pitr" as const, label: "Point in time" }] : []),
-              ...(!overview.storage ? [{ value: "copy" as const, label: "Copy data in" }] : []),
+              // A cluster's keys are spread over its masters; one dump cannot be loaded into it.
+              ...(!overview.storage && !overview.redis?.clusterMasters
+                  ? [{ value: "copy" as const, label: "Copy data in" }]
+                  : []),
               ...(overview.storage ? [{ value: "buckets" as const, label: "Buckets" }] : []),
               { value: "activity" as const, label: "Activity" }
           ]
@@ -474,56 +477,70 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
 
     if (redis) {
         const changed = mode !== redis.mode || (mode === "cache" && Number(size) !== (redis.maxMemoryMb ?? 256));
+        const masters = redis.clusterMasters;
         return (
-            <Section title="How Redis keeps its data" hint={core.REDIS_MODE_NOTES[mode]}>
-                <SegmentedControl
-                    aria-label="Mode"
-                    value={mode}
-                    onValueChange={setMode}
-                    options={core.REDIS_MODES.map((value) => ({ value, label: core.REDIS_MODE_LABELS[value] }))}
-                />
-                {mode === "cache" ? (
-                    <div className="w-48">
-                        <Select
-                            value={size}
-                            onValueChange={setSize}
-                            options={core.REDIS_CACHE_SIZES_MB.map((value) => ({
-                                value: String(value),
-                                label: value >= 1024 ? `${value / 1024} GB limit` : `${value} MB limit`
-                            }))}
-                        />
-                    </div>
+            <>
+                {masters ? (
+                    <Section
+                        title="Cluster"
+                        hint={`${masters} masters, each with one replica, on this server. Clients connect in cluster mode; publish and subscribe, and streams, work as they do on one instance.`}
+                    >
+                        <p className="text-xs text-muted-foreground">
+                            A backup copies every master&apos;s data file into one archive. A cluster is not restored or upgraded in place, and a backup of part of one is refused.
+                        </p>
+                    </Section>
                 ) : null}
-                <p className="text-xs text-muted-foreground">Publish and subscribe work in every mode.</p>
-                {manage ? (
-                    <div>
-                        <Button
-                            size="sm"
-                            disabled={!changed}
-                            onClick={() =>
-                                ask({
-                                    title: `Switch to ${core.REDIS_MODE_LABELS[mode].toLowerCase()} mode?`,
-                                    body:
-                                        mode === "persistent"
-                                            ? "Redis writes everything it holds to its log first, then restarts with the log on."
-                                            : mode === "cache"
-                                              ? "Redis saves a snapshot, then restarts without writing to disk. Keys are evicted when it reaches the limit."
-                                              : "Redis saves a snapshot, then restarts on its own snapshot schedule.",
-                                    label: "Switch",
-                                    run: () =>
-                                        actions.setRedisModeAction({
-                                            databaseId: overview.id,
-                                            mode,
-                                            ...(mode === "cache" ? { maxMemoryMb: Number(size) } : {})
-                                        })
-                                })
-                            }
-                        >
-                            Apply
-                        </Button>
-                    </div>
-                ) : null}
-            </Section>
+                <Section title="How Redis keeps its data" hint={core.REDIS_MODE_NOTES[mode]}>
+                    <SegmentedControl
+                        aria-label="Mode"
+                        value={mode}
+                        onValueChange={setMode}
+                        options={core.REDIS_MODES.map((value) => ({ value, label: core.REDIS_MODE_LABELS[value] }))}
+                    />
+                    {mode === "cache" ? (
+                        <div className="w-48">
+                            <Select
+                                value={size}
+                                onValueChange={setSize}
+                                options={core.REDIS_CACHE_SIZES_MB.map((value) => ({
+                                    value: String(value),
+                                    label: value >= 1024 ? `${value / 1024} GB limit` : `${value} MB limit`
+                                }))}
+                            />
+                        </div>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">Publish and subscribe work in every mode.</p>
+                    {manage ? (
+                        <div>
+                            <Button
+                                size="sm"
+                                disabled={!changed}
+                                onClick={() =>
+                                    ask({
+                                        title: `Switch to ${core.REDIS_MODE_LABELS[mode].toLowerCase()} mode?`,
+                                        body: `${masters ? "Every node of the cluster is switched in turn. " : ""}${
+                                            mode === "persistent"
+                                                ? "Redis writes everything it holds to its log first, then restarts with the log on."
+                                                : mode === "cache"
+                                                  ? "Redis saves a snapshot, then restarts without writing to disk. Keys are evicted when it reaches the limit."
+                                                  : "Redis saves a snapshot, then restarts on its own snapshot schedule."
+                                        }`,
+                                        label: "Switch",
+                                        run: () =>
+                                            actions.setRedisModeAction({
+                                                databaseId: overview.id,
+                                                mode,
+                                                ...(mode === "cache" ? { maxMemoryMb: Number(size) } : {})
+                                            })
+                                    })
+                                }
+                            >
+                                Apply
+                            </Button>
+                        </div>
+                    ) : null}
+                </Section>
+            </>
         );
     }
 

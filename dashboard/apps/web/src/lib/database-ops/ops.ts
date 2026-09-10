@@ -15,7 +15,7 @@ import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import type { RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
-import { databaseCredentials, type DbCredentials } from "@/lib/database-service";
+import { databaseClusterNodes, databaseCredentials, type DbCredentials } from "@/lib/database-service";
 import {
     readinessCommand,
     isManagedEngine,
@@ -41,6 +41,9 @@ export interface InstanceContext {
     readonly admin: DbCredentials;
     readonly hosted: boolean;
     readonly privileges: string;
+    /** A Redis Cluster's nodes, `container` first; null for anything else. An
+     *  operation that acts on `container` alone reaches one node of several. */
+    readonly cluster: readonly string[] | null;
 }
 
 /** Raised for a refusal whose words are meant for the screen. */
@@ -80,7 +83,8 @@ export async function instanceContext(databaseId: string, ownerId: string): Prom
         own,
         admin,
         hosted: row.parent !== null,
-        privileges: row.privileges
+        privileges: row.privileges,
+        cluster: row.parent ? null : databaseClusterNodes(row)
     };
 }
 
@@ -108,6 +112,34 @@ export function lastLine(output: string, secrets: readonly string[] = []): strin
             .at(-1) ?? "";
     for (const secret of secrets) if (secret) line = line.split(secret).join("********");
     return line.slice(0, 400);
+}
+
+/**
+ * Run one command in a container, bounded, so a container that never answers
+ * cannot hold whoever waits on it forever. A transport failure is logged here
+ * and reported in words that name nothing internal.
+ */
+export async function runWithin(
+    ports: Pick<RuntimePorts, "runIn">,
+    container: string,
+    argv: readonly string[],
+    limitMs: number
+): Promise<{ code: number; output: string }> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`It did not finish within ${limitMs / 60_000} minutes.`)), limitMs);
+    });
+    try {
+        return await Promise.race([
+            ports.runIn(container, argv).catch((error: unknown) => {
+                console.error("polaris: a command could not reach its container:", error);
+                throw new Error("The container did not answer.");
+            }),
+            late
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
 }
 
 /** Run one step, or throw naming it. */

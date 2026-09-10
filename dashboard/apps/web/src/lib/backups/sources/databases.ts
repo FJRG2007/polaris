@@ -21,9 +21,10 @@ import { createWriteStream } from "node:fs";
 import { prisma, Prisma } from "@polaris/db";
 import { pipeline } from "node:stream/promises";
 import { getPorts } from "@/lib/deploy/runtime";
-import { databaseConnection } from "@/lib/database-service";
 import { restoreDumpInto } from "@/lib/database-ops/restore";
+import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
+import { databaseClusterNodes, databaseConnection } from "@/lib/database-service";
 import {
     SourceUnavailableError,
     shellQuote,
@@ -184,13 +185,24 @@ export const managedDatabaseSource: BackupSource = {
         if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
         const row = await prisma.managedDatabase.findUnique({
             where: { id },
-            select: { engine: true, containerName: true, targetId: true, parentId: true, name: true }
+            select: { engine: true, containerName: true, targetId: true, parentId: true, name: true, clusterMasters: true }
         });
         if (!row) throw new SourceUnavailableError("That database no longer exists");
         if (!isEngine(row.engine)) {
             throw new SourceUnavailableError(`Polaris cannot dump a ${row.engine} database yet`);
         }
         const connection = await databaseConnection(id, resource.ownerId);
+        const nodes = databaseClusterNodes(row);
+        if (nodes && row.clusterMasters) {
+            return dumpRedisCluster({
+                ownerId: resource.ownerId,
+                targetId: row.targetId,
+                nodes,
+                masters: row.clusterMasters,
+                password: connection.password,
+                label: resource.name || row.name
+            });
+        }
         // A logical database inside another instance is reached through its
         // parent's container; it has none of its own, so the connection's host -
         // which IS the container name on the proxy network - is what to exec in.
@@ -228,6 +240,19 @@ export const managedDatabaseSource: BackupSource = {
     ): Promise<void> {
         const id = resource.selector.split(":")[1];
         if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
+        // Refused before the safety copy: neither can go anywhere, and a copy
+        // taken for a restore that never happens is only noise in the history.
+        const row = await prisma.managedDatabase.findUnique({ where: { id }, select: { clusterMasters: true } });
+        if (row?.clusterMasters) {
+            throw new SourceUnavailableError(
+                "A Redis cluster cannot be restored in place: each master holds its own share of the keys. Nothing was changed."
+            );
+        }
+        if (metadata.cluster || String(metadata.fileName ?? "").endsWith(".redis-cluster.zip")) {
+            throw new SourceUnavailableError(
+                "This backup is of a Redis cluster: it holds each master's snapshot separately, and cannot be loaded into a single instance. Nothing was changed."
+            );
+        }
         const { runBackup } = await import("../service");
         const safety = await runBackup(resource.id, { trigger: "pre-restore", actorUserId: actorId });
         if (safety.status === "failed") {
@@ -356,6 +381,109 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         });
     } finally {
         await ports.runIn(container, ["rm", "-f", "--", inContainer]).catch(() => undefined);
+        await ports.dispose();
+    }
+}
+
+export interface ClusterDumpRequest {
+    readonly ownerId: string;
+    readonly targetId: string;
+    /** Every node of the cluster, the first node first. */
+    readonly nodes: readonly string[];
+    /** How many masters the cluster was created with. */
+    readonly masters: number;
+    readonly password: string;
+    readonly label: string;
+}
+
+/**
+ * Back a Redis Cluster up: every master's snapshot, in one zip.
+ *
+ * Each master holds its own share of the keys, and a replica only a copy of its
+ * master's, so the backup is one RDB file per master - written by SAVE on that
+ * master, one master after another - beside `nodes.txt`, the cluster's own
+ * account of which node served which slots when it was taken. Refused unless
+ * every master answers: a backup of part of a cluster looks whole and is not.
+ */
+export async function dumpRedisCluster(request: ClusterDumpRequest): Promise<StagedArtifact> {
+    const at = new Date();
+    const safeLabel = request.label.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 60) || "database";
+    const fileName = `${safeLabel}-${stamp(at)}.redis-cluster.zip`;
+    const inContainer = `/tmp/polaris-backup-${stamp(at)}.rdb`;
+    const first = request.nodes[0];
+    if (!first) throw new SourceUnavailableError("That cluster has no nodes to take a backup of");
+
+    const target = await prisma.deployTarget.findFirst({
+        where: { id: request.targetId },
+        select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
+    });
+    if (!target) throw new SourceUnavailableError("The server this database runs on is not registered");
+
+    const ports = await getPorts(target, request.ownerId);
+    const auth = `REDISCLI_AUTH=${request.password}`;
+    const written: string[] = [];
+    try {
+        // Which node is a master is the cluster's to decide, and moves when one
+        // fails over, so it is asked rather than assumed.
+        const masters: string[] = [];
+        for (const node of request.nodes) {
+            const role = await ports.runIn(node, ["env", auth, "redis-cli", "--no-auth-warning", "ROLE"]).catch(() => null);
+            if (role?.code === 0 && role.output.trim().split(/\r?\n/)[0]?.trim() === "master") masters.push(node);
+        }
+        if (masters.length !== request.masters) {
+            throw new SourceUnavailableError(
+                `${masters.length} of the cluster's ${request.masters} masters answered, so no backup was taken: a copy of part of a cluster is not a backup of it.`
+            );
+        }
+        for (const node of masters) {
+            // redis-cli exits 0 on an error reply, so the answer itself is checked.
+            const result = await ports.runIn(node, [
+                "env",
+                auth,
+                "sh",
+                "-c",
+                `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`
+            ]);
+            written.push(node);
+            if (result.code !== 0) {
+                throw new SourceUnavailableError(
+                    `The snapshot failed on ${node}: ${result.output.trim().slice(0, 400) || `exit ${result.code}`}`
+                );
+            }
+        }
+        const topology = await ports.runIn(first, ["env", auth, "redis-cli", "--no-auth-warning", "CLUSTER", "NODES"]);
+        const nodesText = Buffer.from(topology.code === 0 ? topology.output : "");
+
+        const sources: ZipSource[] = [
+            ...masters.map((node) => ({
+                name: `${node}.rdb`,
+                kind: "file" as const,
+                size: 0n,
+                mtime: at,
+                body: () => ports.readFile(node, inContainer)
+            })),
+            {
+                name: "nodes.txt",
+                kind: "file",
+                size: BigInt(nodesText.length),
+                mtime: at,
+                body: async () => new Blob([nodesText]).stream()
+            }
+        ];
+        const dir = await stageDir();
+        const staged = join(dir, fileName);
+        await pipeline(
+            Readable.fromWeb(createZipStream(sources) as import("node:stream/web").ReadableStream),
+            createWriteStream(staged)
+        );
+        return stagedFrom(dir, staged, fileName, {
+            engine: "redis",
+            // What a restore reads to know this is not one instance's snapshot.
+            cluster: { masters: masters.length, files: masters.map((node) => `${node}.rdb`) },
+            takenAt: at.toISOString()
+        });
+    } finally {
+        for (const node of written) await ports.runIn(node, ["rm", "-f", "--", inContainer]).catch(() => undefined);
         await ports.dispose();
     }
 }

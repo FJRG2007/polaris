@@ -24,7 +24,6 @@ import { randomBytes } from "node:crypto";
 import { scopeValues } from "./env-values";
 import { currentReleaseRef } from "./releases";
 import { setEnvVars } from "@/lib/env-var-service";
-import type { RuntimePorts } from "@polaris/deploy";
 import * as activity from "@/lib/activity/activity";
 import { getPorts, type TargetRow } from "./runtime";
 import * as databaseOps from "@/lib/database-ops/ops";
@@ -279,7 +278,7 @@ export async function runTemplateSetup(
             const release = await currentReleaseRef(app);
             outcomes = await core.runPrepareSteps(
                 steps,
-                (command) => execIn(ports, release.name, command),
+                (command) => databaseOps.runWithin(ports, release.name, ["sh", "-c", command], EXEC_LIMIT_MS),
                 (ms) => new Promise((resolve) => setTimeout(resolve, ms))
             );
         } finally {
@@ -328,29 +327,6 @@ function templateOf(sourceConfig: string): core.ServiceTemplate | null {
         return id.success ? core.serviceTemplate(id.data) : null;
     } catch {
         return null;
-    }
-}
-
-/** One command inside the container, bounded, with a transport failure logged
- *  here and reported in words that name nothing internal. */
-async function execIn(ports: RuntimePorts, container: string, command: string): Promise<core.PrepareExecResult> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-            () => reject(new Error(`It did not finish within ${EXEC_LIMIT_MS / 60_000} minutes.`)),
-            EXEC_LIMIT_MS
-        );
-    });
-    try {
-        return await Promise.race([
-            ports.runIn(container, ["sh", "-c", command]).catch((error: unknown) => {
-                console.error("polaris: a setup command could not reach its container:", error);
-                throw new Error("The container did not answer.");
-            }),
-            late
-        ]);
-    } finally {
-        if (timer) clearTimeout(timer);
     }
 }
 

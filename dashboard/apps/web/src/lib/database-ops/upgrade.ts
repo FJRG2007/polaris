@@ -59,6 +59,11 @@ async function upgradable(databaseId: string, ownerId: string) {
         throw new DatabaseOperationError("This database lives inside another instance; it moves when the instance is upgraded.");
     }
     if (!row.containerName) throw new DatabaseOperationError("Deploy this instance before upgrading it.");
+    // An upgrade moves data by dumping it and loading it into the new version,
+    // and a cluster cannot be loaded that way (see `restoreDumpInto`).
+    if (row.clusterMasters) {
+        throw new DatabaseOperationError("A Redis cluster cannot be upgraded in place. Create a new cluster on the version you want.");
+    }
     if (row.recoveryBase) {
         // Its command unpacks a base backup on an empty data folder; on a new
         // volume that would be a second recovery, not an upgrade.

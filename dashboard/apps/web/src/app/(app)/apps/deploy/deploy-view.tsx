@@ -44,6 +44,7 @@ import {
     dbEngineLabel,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
+    REDIS_CLUSTER_MASTERS,
     SERVICE_TEMPLATES,
     type ServiceTemplate,
     type DatabaseCreateInput,
@@ -711,10 +712,27 @@ function DatabaseConnectionDialog({
                         </Field>
                         <Field
                             label="Connection URI"
-                            hint="Reachable by name from any service in this environment."
+                            hint={
+                                connection.cluster
+                                    ? "One node of the cluster, reachable by name from any service in this environment."
+                                    : "Reachable by name from any service in this environment."
+                            }
                         >
                             <CopyRow value={connection.uri} secret={!revealed} />
                         </Field>
+                        {connection.cluster && (
+                            <>
+                                <Field
+                                    label="Cluster nodes"
+                                    hint={`A Redis cluster of ${connection.cluster.masters} masters and ${connection.cluster.masters} replicas. Connect with a client in cluster mode and give it these nodes; it is sent to the right one for each key.`}
+                                >
+                                    <CopyRow value={connection.cluster.nodes.join(",")} />
+                                </Field>
+                                <Field label="Nodes reference" hint="Resolves to the list above, for a client that takes every node.">
+                                    <CopyRow value={connection.cluster.reference} />
+                                </Field>
+                            </>
+                        )}
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field label="Host">
                                 <CopyRow value={connection.host} />
@@ -1434,6 +1452,16 @@ const PRIVILEGE_OPTIONS: SelectOption[] = [
     { value: "readonly", label: "Read only" }
 ];
 
+/** How a new Redis runs: one instance, or a cluster of so many masters. */
+const SINGLE = "single";
+const REDIS_TOPOLOGY_OPTIONS: SelectOption[] = [
+    { value: SINGLE, label: "A single instance" },
+    ...REDIS_CLUSTER_MASTERS.map((masters) => ({
+        value: String(masters),
+        label: `A cluster - ${masters} masters, ${masters} replicas`
+    }))
+];
+
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");
@@ -1452,9 +1480,11 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [privileges, setPrivileges] = useState("owner");
+    const [topology, setTopology] = useState(SINGLE);
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
+    const clusterMasters = engine === "redis" && topology !== SINGLE ? Number(topology) : undefined;
 
     // Which instances this engine could be placed on. Reloaded when the engine
     // changes, because an instance only hosts databases of its own engine.
@@ -1483,11 +1513,12 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             serverId: hosted ? undefined : serverId,
             instanceId: hosted ? instanceId : undefined,
             version: !hosted && version ? version : undefined,
-            exposePort: !hosted && exposePort.trim() ? Number(exposePort) : undefined,
+            exposePort: !hosted && clusterMasters === undefined && exposePort.trim() ? Number(exposePort) : undefined,
             databaseName: databaseName.trim() || undefined,
             username: username.trim() || undefined,
             password: info.storage ? undefined : password || undefined,
-            privileges: privileges as "owner" | "readwrite" | "readonly"
+            privileges: privileges as "owner" | "readwrite" | "readonly",
+            clusterMasters
         };
     }
 
@@ -1522,6 +1553,18 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     options={ENGINE_OPTIONS}
                 />
             </Field>
+            {engine === "redis" && (
+                <Field
+                    label="Runs as"
+                    hint={
+                        clusterMasters === undefined
+                            ? "One Redis, reached at one address."
+                            : `Keys are spread over ${clusterMasters} masters on this server, each with a replica that takes over if it stops. Clients connect in cluster mode.`
+                    }
+                >
+                    <Select value={topology} onValueChange={setTopology} options={REDIS_TOPOLOGY_OPTIONS} />
+                </Field>
+            )}
             {!hosted && <ServerField servers={servers} value={serverId} onChange={setServerId} />}
 
             <button
@@ -1573,18 +1616,23 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                                     }))}
                                 />
                             </Field>
-                            <Field
-                                label="Published port"
-                                hint="Blank keeps it reachable only by the services in this environment, which is what most databases want."
-                            >
-                                <Input
-                                    value={exposePort}
-                                    onChange={(event) => setExposePort(event.target.value)}
-                                    placeholder={String(info.port)}
-                                    inputMode="numeric"
-                                    className="w-32"
-                                />
-                            </Field>
+                            {/* A cluster sends clients between its nodes by name,
+                                which only its network resolves; one published
+                                port could not follow them. */}
+                            {clusterMasters === undefined && (
+                                <Field
+                                    label="Published port"
+                                    hint="Blank keeps it reachable only by the services in this environment, which is what most databases want."
+                                >
+                                    <Input
+                                        value={exposePort}
+                                        onChange={(event) => setExposePort(event.target.value)}
+                                        placeholder={String(info.port)}
+                                        inputMode="numeric"
+                                        className="w-32"
+                                    />
+                                </Field>
+                            )}
                         </>
                     )}
 

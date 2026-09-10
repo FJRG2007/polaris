@@ -6,8 +6,9 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { RedisMode, ResourceLimitsInput } from "@polaris/core";
 import { ensureMongoReplicaSet } from "./provision";
+import type { RuntimePorts } from "@polaris/deploy";
+import type { RedisMode, ResourceLimitsInput } from "@polaris/core";
 import { deployDatabase, deployDatabaseAndWait } from "@/lib/database-service";
 import { DatabaseOperationError, instanceContext, lastLine, runStep, waitReady, withPorts } from "./ops";
 
@@ -34,6 +35,9 @@ const AOF_WAIT_MS = 10 * 60_000;
  * the log on first - it then writes the whole dataset into a new log - and the
  * redeploy waits until that has finished. Going the other way, a snapshot is
  * written first so the restart loads what is there now.
+ *
+ * A cluster's nodes each keep their own share of the keys, so each is switched
+ * the same way before the cluster is deployed again.
  */
 export async function setRedisMode(
     databaseId: string,
@@ -47,45 +51,8 @@ export async function setRedisMode(
         const auth = `REDISCLI_AUTH=${context.admin.password}`;
         await withPorts(context, async (ports) => {
             await waitReady(ports, context);
-            if (input.mode === "persistent") {
-                await runStep(ports, context.container, {
-                    argv: ["env", auth, "redis-cli", "CONFIG", "SET", "appendonly", "yes"],
-                    describe: "Turning the append-only log on"
-                });
-                const deadline = Date.now() + AOF_WAIT_MS;
-                for (;;) {
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                    const info = await runStep(ports, context.container, {
-                        argv: ["env", auth, "redis-cli", "INFO", "persistence"],
-                        describe: "Checking the log"
-                    });
-                    const field = (name: string) =>
-                        info
-                            .split(/\r?\n/)
-                            .find((line) => line.startsWith(`${name}:`))
-                            ?.slice(name.length + 1)
-                            .trim();
-                    if (field("aof_last_bgrewrite_status") === "err") {
-                        throw new DatabaseOperationError("Redis could not write its append-only log; nothing was changed.");
-                    }
-                    if (
-                        field("aof_enabled") === "1" &&
-                        field("aof_rewrite_in_progress") === "0" &&
-                        field("aof_rewrite_scheduled") === "0"
-                    ) {
-                        break;
-                    }
-                    if (Date.now() > deadline) {
-                        throw new DatabaseOperationError("Redis did not finish writing its append-only log in ten minutes.");
-                    }
-                }
-            } else {
-                const saved = await ports.runIn(context.container, ["env", auth, "redis-cli", "SAVE"]);
-                if (saved.code !== 0 || lastLine(saved.output) !== "OK") {
-                    throw new DatabaseOperationError(
-                        `Redis could not write a snapshot first, so nothing was changed: ${lastLine(saved.output, [context.admin.password])}`
-                    );
-                }
+            for (const container of context.cluster ?? [context.container]) {
+                await prepareRedisMode(ports, container, auth, input.mode, context.admin.password);
             }
         });
     }
@@ -94,6 +61,52 @@ export async function setRedisMode(
         data: { mode: input.mode, maxMemoryMb: input.mode === "cache" ? (input.maxMemoryMb ?? 256) : row.maxMemoryMb }
     });
     return { deploymentId: await deployDatabase(databaseId, ownerId, userId) };
+}
+
+/** Get one Redis ready to restart in `mode` without losing what it holds. */
+async function prepareRedisMode(
+    ports: RuntimePorts,
+    container: string,
+    auth: string,
+    mode: RedisMode,
+    password: string
+): Promise<void> {
+    if (mode !== "persistent") {
+        const saved = await ports.runIn(container, ["env", auth, "redis-cli", "SAVE"]);
+        if (saved.code !== 0 || lastLine(saved.output) !== "OK") {
+            throw new DatabaseOperationError(
+                `Redis could not write a snapshot first, so nothing was changed: ${lastLine(saved.output, [password])}`
+            );
+        }
+        return;
+    }
+    await runStep(ports, container, {
+        argv: ["env", auth, "redis-cli", "CONFIG", "SET", "appendonly", "yes"],
+        describe: "Turning the append-only log on"
+    });
+    const deadline = Date.now() + AOF_WAIT_MS;
+    for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const info = await runStep(ports, container, {
+            argv: ["env", auth, "redis-cli", "INFO", "persistence"],
+            describe: "Checking the log"
+        });
+        const field = (name: string) =>
+            info
+                .split(/\r?\n/)
+                .find((line) => line.startsWith(`${name}:`))
+                ?.slice(name.length + 1)
+                .trim();
+        if (field("aof_last_bgrewrite_status") === "err") {
+            throw new DatabaseOperationError("Redis could not write its append-only log; nothing was changed.");
+        }
+        if (field("aof_enabled") === "1" && field("aof_rewrite_in_progress") === "0" && field("aof_rewrite_scheduled") === "0") {
+            return;
+        }
+        if (Date.now() > deadline) {
+            throw new DatabaseOperationError("Redis did not finish writing its append-only log in ten minutes.");
+        }
+    }
 }
 
 /**

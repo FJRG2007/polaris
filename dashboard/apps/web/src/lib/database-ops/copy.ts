@@ -48,12 +48,15 @@ export async function copyInto(
 ): Promise<{ operationId: string }> {
     const into = await instanceContext(databaseId, ownerId);
     if (!isDumpableEngine(into.engine)) throw new DatabaseOperationError("Data cannot be copied into an object store this way.");
+    if (into.cluster) throw new DatabaseOperationError("Data cannot be copied into a Redis cluster: each master holds its own share of the keys.");
 
     let from: InstanceContext | null = null;
     let external: ReturnType<typeof parseExternalSource> = null;
     if ("fromDatabaseId" in source) {
         if (source.fromDatabaseId === databaseId) throw new DatabaseOperationError("A database cannot be copied into itself.");
         from = await instanceContext(source.fromDatabaseId, ownerId);
+        // A dump of one node would be a copy of that node's share of the keys.
+        if (from.cluster) throw new DatabaseOperationError(`${from.name} is a Redis cluster; it cannot be copied from as one database.`);
         if (family(from.engine) !== family(into.engine)) {
             throw new DatabaseOperationError(`${from.name} runs a different engine from ${into.name}.`);
         }

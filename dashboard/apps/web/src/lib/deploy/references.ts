@@ -10,7 +10,8 @@
  *   name other containers reach it by), `PORT`, `POLARIS_PUBLIC_DOMAIN` and
  *   `POLARIS_PUBLIC_URL`.
  * - a managed database answers with how to connect to it (`databaseReferenceKeys`),
- *   and an object store with its endpoint and S3 keys the same way.
+ *   a Redis cluster with its nodes as well (`REDIS_CLUSTER_NODES`), and an object
+ *   store with its endpoint and S3 keys the same way.
  *
  * Only names that actually appear are read, so a service with no references
  * costs nothing, and one that names a database costs one credential decrypt.
@@ -130,7 +131,12 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
             const connection = await databaseConnection(database.id, scope.ownerId).catch(() => null);
             // A database never deployed has no address yet; the reference stays
             // unresolved and the refusal says which one.
-            if (connection) remember(name, core.databaseReferenceKeys({ engine: database.engine, ...connection }));
+            if (connection) {
+                remember(
+                    name,
+                    core.databaseReferenceKeys({ engine: database.engine, ...connection, clusterNodes: connection.cluster?.nodes })
+                );
+            }
         }
     }
     return texts;

@@ -288,6 +288,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 href: PROJECTS
             },
             {
+                title: "Redis Cluster",
+                description:
+                    "A Redis of 3, 5 or 7 masters, each with a replica that takes over when it stops, created as one database. Its nodes come as a reference variable; publish and subscribe, and streams, need nothing extra. Backups copy every master's data.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
                 title: "Database upkeep",
                 description:
                     "Restore from a backup, upgrade with a way back, recover PostgreSQL to a moment, and copy data in.",

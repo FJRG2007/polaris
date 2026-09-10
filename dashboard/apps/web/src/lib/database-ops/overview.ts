@@ -18,6 +18,8 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
     const engine = row.engine as ManagedEngine;
     const hosted = row.parentId !== null;
     const dedicated = !hosted && !row.recoveryBase;
+    // Moved by a dump and a reload, which a cluster cannot take (`upgradable`).
+    const upgradable = dedicated && !row.clusterMasters;
     const recoveredFrom = row.recoveredFromId
         ? await prisma.managedDatabase.findUnique({ where: { id: row.recoveredFromId }, select: { name: true } })
         : null;
@@ -31,7 +33,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
         hosted,
         hostName: row.parent?.name ?? null,
         storage: isStorageEngine(engine),
-        upgrade: dedicated
+        upgrade: upgradable
             ? {
                   versions: upgradeTargets(engine, row.version),
                   state: row.upgradeState,
@@ -42,7 +44,10 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
                   previousVolume: row.previousVolumeName
               }
             : null,
-        redis: engine === "redis" && !hosted ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb } : null,
+        redis:
+            engine === "redis" && !hosted
+                ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb, clusterMasters: row.clusterMasters }
+                : null,
         mongo: engine === "mongo" && !hosted ? { replicaSet: row.replicaSet } : null,
         // A hosted database runs in its parent's container, so the parent's limits are its own.
         limits: hosted ? null : { cpus: row.cpuLimit, memoryMb: row.memoryLimitMb },
@@ -70,6 +75,8 @@ export async function copySources(databaseId: string, ownerId: string) {
         where: {
             id: { not: databaseId },
             engine: { in: engines },
+            // A cluster cannot be dumped as one database (see `copyInto`).
+            clusterMasters: null,
             environment: { projectId: row.environment.projectId, project: { ownerId } },
             OR: [{ containerName: { not: "" } }, { parent: { containerName: { not: "" } } }]
         },

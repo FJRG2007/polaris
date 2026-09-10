@@ -1,8 +1,8 @@
 /**
  * What an instance needs once its container answers, that a compose file cannot
- * say: an object store's identities, a MongoDB replica set's initiation, and the
- * archive folder and first base backup of a PostgreSQL instance kept for
- * point-in-time recovery.
+ * say: a Redis Cluster's creation, an object store's identities, a MongoDB
+ * replica set's initiation, and the archive folder and first base backup of a
+ * PostgreSQL instance kept for point-in-time recovery.
  *
  * Run after every successful deploy of a dedicated instance, so each step is
  * safe to repeat. A failure is recorded among the instance's operations - the
@@ -13,6 +13,7 @@
 import { prisma } from "@polaris/db";
 import type { RuntimePorts } from "@polaris/deploy";
 import { mongoInitiateCommand } from "@polaris/core";
+import { ensureRedisCluster } from "./redis-cluster";
 import { DatabaseOperationError, instanceContext, runStep, waitReady, withPorts, type InstanceContext } from "./ops";
 
 /** How long a new replica set is given to elect its only member. */
@@ -21,12 +22,16 @@ const PRIMARY_WAIT_MS = 60_000;
 export async function afterProvision(databaseId: string, ownerId: string): Promise<void> {
     const row = await prisma.managedDatabase.findUnique({
         where: { id: databaseId },
-        select: { engine: true, parentId: true, replicaSet: true, pitr: true, upgradeState: true }
+        select: { engine: true, parentId: true, replicaSet: true, pitr: true, upgradeState: true, clusterMasters: true }
     });
     if (!row || row.parentId) return;
     let step = "Setting up";
     try {
-        if (row.engine === "seaweedfs") {
+        if (row.engine === "redis" && row.clusterMasters) {
+            step = "Creating the Redis cluster";
+            const context = await instanceContext(databaseId, ownerId);
+            await withPorts(context, (ports) => ensureRedisCluster(ports, context));
+        } else if (row.engine === "seaweedfs") {
             step = "Writing the store's keys";
             const { ensureStoreIdentities, resumeStoreReplications } = await import("@/lib/object-storage/store");
             await ensureStoreIdentities(databaseId, ownerId);

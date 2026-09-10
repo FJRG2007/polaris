@@ -76,6 +76,7 @@ vi.mock("@/lib/database-ops/ops", async () => {
     return {
         DatabaseOperationError: actual.DatabaseOperationError,
         lastLine: actual.lastLine,
+        runWithin: actual.runWithin,
         instanceContext: async () => ({ name: "blog-db" }),
         withPorts: async (_context: unknown, work: (ports: unknown) => Promise<unknown>) => work({}),
         waitReady: async () => {

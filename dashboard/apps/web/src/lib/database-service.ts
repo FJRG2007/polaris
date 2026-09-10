@@ -22,8 +22,8 @@ import { loadEnv } from "@polaris/config";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
-import { serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
 import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
+import { clusterNodeNames, serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
 import {
     createDatabaseCommands,
     databaseCreateSchema,
@@ -34,6 +34,9 @@ import {
     pitrHostFolder,
     pitrRecoveryCommand,
     pitrServerCommand,
+    redisClusterNodeCount,
+    redisClusterSeeds,
+    redisClusterServerCommand,
     redisServerCommand,
     DB_ENGINE_INFO,
     MONGO_REPLICA_SET,
@@ -60,6 +63,7 @@ interface EngineRow {
     readonly version: string;
     readonly mode: string;
     readonly maxMemoryMb: number | null;
+    readonly clusterMasters: number | null;
     readonly replicaSet: boolean;
     readonly pitr: boolean;
     readonly recoveryBase: string | null;
@@ -172,6 +176,21 @@ export function engineImage(engine: string, version: string): string {
     return engineSpec(engine).image(version);
 }
 
+/**
+ * The containers a Redis Cluster runs as - the database's own first - or null
+ * for anything that is not one, or not deployed yet. Derived from the stored
+ * container name the way the deploy names the nodes, so an operation, a backup
+ * and the connection details all reach the same ones.
+ */
+export function databaseClusterNodes(row: {
+    readonly engine: string;
+    readonly containerName: string;
+    readonly clusterMasters: number | null;
+}): string[] | null {
+    if (row.engine !== "redis" || !row.clusterMasters || !row.containerName) return null;
+    return clusterNodeNames(row.containerName, redisClusterNodeCount(row.clusterMasters));
+}
+
 /** A URL-safe generated secret for database credentials. The alphabet is
  *  base64url, so it never contains a quote or a backslash and always satisfies
  *  what the statement builder accepts. */
@@ -267,6 +286,7 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
             volumeName: "",
             containerName: "",
             exposePort: parsed.exposePort ?? null,
+            clusterMasters: parsed.clusterMasters ?? null,
             parentId: parent?.id ?? null,
             privileges: parsed.privileges,
             encryptedCredential: blob.ciphertext,
@@ -342,6 +362,15 @@ export interface DatabaseConnection {
     /** What a service's variable says to point at this database by name, so a
      *  copy of the environment points at the copy's database instead. */
     readonly reference: string;
+    /** Set for a Redis Cluster: a client has to run in cluster mode, and is given
+     *  every node as a seed. `host` and `uri` then name the first node. */
+    readonly cluster: {
+        readonly masters: number;
+        /** Every node as `host:port`. */
+        readonly nodes: readonly string[];
+        /** The reference to the node list, beside the URL's. */
+        readonly reference: string;
+    } | null;
 }
 
 /**
@@ -385,6 +414,7 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
                   ? `postgresql://${user}:${secret}@${host}:${port}/${creds.database}`
                   : `mysql://${user}:${secret}@${host}:${port}/${creds.database}`;
 
+    const nodes = row.parent ? null : databaseClusterNodes(row);
     return {
         host,
         port,
@@ -393,7 +423,15 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
         password: creds.password,
         uri,
         exposedPort: (row.parent ? row.parent.exposePort : row.exposePort) ?? null,
-        reference: `\${{${row.slug}.DATABASE_URL}}`
+        reference: `\${{${row.slug}.DATABASE_URL}}`,
+        cluster:
+            nodes && row.clusterMasters
+                ? {
+                      masters: row.clusterMasters,
+                      nodes: redisClusterSeeds(nodes),
+                      reference: `\${{${row.slug}.REDIS_CLUSTER_NODES}}`
+                  }
+                : null
     };
 }
 
@@ -498,6 +536,10 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
     // The archive folder is mounted into an archiving instance and into one
     // recovered from it - the recovered one reads the original's archive.
     const archiveOf = db.recoveredFromId ?? (db.pitr ? db.id : null);
+    // A cluster's nodes are named, and their volumes too, after the database's
+    // own: the first node is the container everything else asks for.
+    const nodes = databaseClusterNodes({ ...db, containerName: name });
+    const nodeVolumes = nodes ? clusterNodeNames(volumeName, nodes.length) : [];
     const plan: DbDeployPlan = {
         ref: { name, project },
         image: db.image,
@@ -508,6 +550,20 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         exposePort: db.exposePort ?? undefined,
         limits: limitsOf(db),
         ...(archiveOf ? { extraVolumes: [{ source: pitrHostFolder(archiveOf), target: PITR_MOUNT, kind: "bind" as const }] } : {}),
+        ...(nodes
+            ? {
+                  nodes: nodes.map((node, index) => ({
+                      name: node,
+                      command: redisClusterServerCommand(
+                          creds.password,
+                          db.mode as RedisMode,
+                          db.maxMemoryMb ?? undefined,
+                          node
+                      ),
+                      volumeName: nodeVolumes[index]!
+                  }))
+              }
+            : {}),
         // Nothing routes to a database, so in an isolated environment it leaves the
         // proxy network entirely: the services beside it reach it on their own
         // network, and the daemon attaches the dashboard there for the data browser.

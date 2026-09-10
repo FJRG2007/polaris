@@ -32,7 +32,7 @@ import * as activity from "../activity/activity";
 import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
 import { createNotification } from "../notification-service";
-import { isGitBranchName, parseProjectFlags } from "@polaris/core";
+import { isGitBranchName, isRedisClusterMasters, parseProjectFlags } from "@polaris/core";
 import { listOpenPullRequests, pullRequestIsOpen, type OpenPullRequest } from "../github-service";
 
 /** What makes an environment a preview. */
@@ -165,7 +165,9 @@ export async function cloneEnvironment(
                 engine: database.engine as Parameters<typeof createDatabase>[1]["engine"],
                 version: database.version,
                 privileges: database.privileges as Parameters<typeof createDatabase>[1]["privileges"],
-                ...(instanceId ? { instanceId } : {})
+                ...(instanceId ? { instanceId } : {}),
+                // A copy of a cluster is a cluster of the same size.
+                ...(isRedisClusterMasters(database.clusterMasters) ? { clusterMasters: database.clusterMasters } : {})
             });
             ids.set(database.id, created.id);
         }

@@ -30,10 +30,19 @@ export interface VariableLink {
 const SERVICE_KEYS = ["POLARIS_PRIVATE_DOMAIN", "PORT", "POLARIS_PUBLIC_DOMAIN", "POLARIS_PUBLIC_URL"];
 
 /** The keys a managed database answers to; the values do not matter here. */
-function databaseKeys(engine: string): Set<string> {
+function databaseKeys(engine: string, cluster: boolean): Set<string> {
     return new Set(
         Object.keys(
-            core.databaseReferenceKeys({ engine, host: "", port: 0, database: "", username: "", password: "", uri: "" })
+            core.databaseReferenceKeys({
+                engine,
+                host: "",
+                port: 0,
+                database: "",
+                username: "",
+                password: "",
+                uri: "",
+                clusterNodes: cluster ? [""] : null
+            })
         )
     );
 }
@@ -66,7 +75,10 @@ export async function variableLinks(
 
     const [applications, databases, shared] = await Promise.all([
         prisma.application.findMany({ where: { environmentId }, select: { id: true, slug: true, name: true } }),
-        prisma.managedDatabase.findMany({ where: { environmentId }, select: { slug: true, name: true, engine: true } }),
+        prisma.managedDatabase.findMany({
+            where: { environmentId },
+            select: { slug: true, name: true, engine: true, clusterMasters: true }
+        }),
         prisma.envVar.findMany({ where: { scopeType: "environment", scopeId: environmentId }, select: { key: true } })
     ]);
     const serviceKeys = new Map<string, Set<string>>();
@@ -100,7 +112,7 @@ export async function variableLinks(
             return {
                 ...base,
                 target: { kind: "database", label: database.name },
-                keyKnown: databaseKeys(database.engine).has(reference.key)
+                keyKnown: databaseKeys(database.engine, database.clusterMasters !== null).has(reference.key)
             };
         }
         return { ...base, target: null, keyKnown: false };

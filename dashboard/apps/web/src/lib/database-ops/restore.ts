@@ -52,6 +52,14 @@ export async function restoreDumpInto(
     if (engine === "seaweedfs") {
         throw new DatabaseOperationError("An object store is restored from its own bucket copies, not from a dump.");
     }
+    // A snapshot loaded into one node of a cluster holds keys whose slots other
+    // nodes own, and a node of a cluster cannot be made the replica this load
+    // relies on. Refused whole rather than leaving a cluster half replaced.
+    if (context.cluster) {
+        throw new DatabaseOperationError(
+            "A Redis cluster cannot be restored in place: each master holds its own share of the keys. Nothing was changed."
+        );
+    }
     const { operation } = options;
     await withPorts(context, async (ports) => {
         await operation.step("Waiting for the database to answer");

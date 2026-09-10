@@ -118,6 +118,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Item | Status | Prio | Notes |
 |------|--------|------|-------|
 | Postgres/MySQL/MariaDB/Mongo/Redis | done | P0 | |
+| Redis Cluster | partial | P2 | 3/5/7 masters with one replica each, on one server; nodes in `REDIS_CLUSTER_NODES`; backups take every master's RDB; restore, upgrade and copy-in refuse a cluster; no resharding or nodes spread over servers |
 | Connection string surfaced | done | P0 | |
 | Scheduled backups | done | P0 | encrypted before they leave |
 | Restore from backup | done | P1 | safety copy first |
