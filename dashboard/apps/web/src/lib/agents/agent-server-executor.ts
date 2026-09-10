@@ -140,7 +140,9 @@ const BOOT = [
     // starts. GH_TOKEN stays: the agent's own git and GitHub tools need it.
     "unset GIT_AUTH_HEADER",
     "exec node /tmp/agent.mjs"
-].join("\n");
+    // One line: the host daemon refuses a command argument holding a line break,
+    // and a remote server's compose file folds one into a space.
+].join("; ");
 
 /** What the container has printed so far. Polled by the run screen while a run is
  *  in flight; the same call answers after it ends, which is what makes a finished
