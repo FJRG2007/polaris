@@ -7,8 +7,15 @@
  */
 
 import { sendBlocked } from "./block-page.js";
+import { sendChallenge } from "./challenge-page.js";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
 import { createServer, type IncomingMessage, type Server } from "node:http";
+
+/** The header `/health` names this guard's optional abilities in, comma-separated. */
+export const GUARD_FEATURES_HEADER = "x-polaris-guard-features";
+
+/** What this guard enforces beyond the rules every guard has always read. */
+export const GUARD_FEATURES = "challenge";
 
 /** First value of a request header (Node lower-cases header names). */
 function header(req: IncomingMessage, name: string): string | undefined {
@@ -22,7 +29,10 @@ export function createGuardServer(config: () => GuardConfig): Server {
     return createServer((req, res) => {
         const url = req.url ?? "/";
         if (url === "/health" || url.startsWith("/health?")) {
-            res.writeHead(200, { "content-type": "text/plain" });
+            // What this guard can do, for a dashboard that has to know whether a
+            // setting it writes will actually be enforced here: a guard too old to
+            // challenge would read the flag and ignore it without a word.
+            res.writeHead(200, { "content-type": "text/plain", [GUARD_FEATURES_HEADER]: GUARD_FEATURES });
             res.end("ok");
             return;
         }
@@ -51,6 +61,17 @@ export function createGuardServer(config: () => GuardConfig): Server {
             if (decision.setCookie) headers["set-cookie"] = decision.setCookie;
             res.writeHead(302, headers);
             res.end();
+            return;
+        }
+        if (decision.status === 503) {
+            sendChallenge(res, {
+                challenge: decision.challenge,
+                bits: decision.bits,
+                host: header(req, "x-forwarded-host"),
+                ip: clientIp(header(req, "x-forwarded-for")),
+                accept: header(req, "accept"),
+                secure: (header(req, "x-forwarded-proto") ?? "https") === "https"
+            });
             return;
         }
         if (decision.status === 403) {

@@ -20,6 +20,7 @@ import type { DomainOwner } from "@/lib/owner-domains";
 import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
 import * as environments from "@/lib/deploy/environments";
+import { guardSupportsChallenge } from "@/lib/deploy/router";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
@@ -103,6 +104,7 @@ import {
     requireProjectAccess
 } from "@/lib/deploy-project-access";
 import {
+    appEdgeConfigSchema,
     canHostMount,
     subjectCommentSchema,
     databaseCreateSchema,
@@ -407,7 +409,10 @@ export async function createApplicationAction(input: {
             sourceConfig,
             autoDeploy: flags.autoDeployNewServices && isGit && Boolean(branch),
             deployBranch: isGit ? (branch ?? null) : null,
-            keepReleases: flags.keepReleasesByDefault
+            keepReleases: flags.keepReleasesByDefault,
+            // Reached through the edge only, until somebody deliberately opens its port
+            // on the machine's own address. Closed is the default a firewall should have.
+            publishPort: false
         });
         await recordDeployAudit({
             actorId: user.id,
@@ -1389,6 +1394,90 @@ export async function setServedByAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not update the domain" };
+    }
+}
+
+/**
+ * A service's edge settings, plus whether this machine's edge guard can enforce the
+ * browser challenge - a guard older than the setting reads it and ignores it, and the
+ * screen says so instead of letting somebody believe a service is protected.
+ */
+export async function edgeSettingsAction(
+    applicationId: string
+): Promise<{ error: string } | (deployService.EdgeSettingsView & { guardChallenge: boolean | null })> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        const view = await deployService.getApplicationEdgeSettings(applicationId, access.ownerId);
+        // Only this machine's guard can be asked; a remote server's is reached over SSH
+        // and is updated with the rest of that server's edge.
+        return { ...view, guardChallenge: view.local ? await guardSupportsChallenge() : null };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the edge settings" };
+    }
+}
+
+/** Save what the edge does in front of a service. Validated whole, and in force on
+ *  every edge serving it as soon as it is saved. */
+export async function saveEdgeSettingsAction(
+    applicationId: string,
+    input: unknown
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = appEdgeConfigSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Those settings are not valid" };
+    }
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        await deployService.setApplicationEdgeConfig(applicationId, access.ownerId, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.edge.update",
+            targetType: "application",
+            targetId: applicationId,
+            metadata: {
+                rateLimits: parsed.data.rateLimits.length,
+                concurrency: parsed.data.concurrency,
+                challenge: parsed.data.challenge,
+                headers: parsed.data.headers.preset,
+                redirects: parsed.data.redirects.length,
+                rewrites: parsed.data.rewrites.length
+            }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the edge settings" };
+    }
+}
+
+/** Open or close a service's port on the host's own address. Redeploys a deployed
+ *  service, since the port only opens or closes when its container is recreated. */
+export async function setPublishPortAction(
+    applicationId: string,
+    publish: boolean
+): Promise<{ error?: string; redeployed?: boolean }> {
+    const user = await requirePermission("deploy.manage");
+    if (typeof publish !== "boolean") return { error: "Unknown choice" };
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
+        const outcome = await deployService.setApplicationPublishPort(
+            applicationId,
+            access.ownerId,
+            publish
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.app.publishPort",
+            targetType: "application",
+            targetId: applicationId,
+            metadata: { publish }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return { redeployed: outcome.redeployed };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the port" };
     }
 }
 

@@ -12,6 +12,7 @@ import { CronPanel } from "./cron-panel";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
+import { EdgeSettings } from "./edge-settings";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
@@ -3326,6 +3327,15 @@ function SettingsTab({
                         </div>
                     </MethodBlock>
                 </section>
+            )}
+
+            {(can("domains.manage") || can("service.configure")) && (
+                <EdgeSettings
+                    applicationId={app.id}
+                    canEdit={can("domains.manage")}
+                    canConfigure={can("service.configure")}
+                    onChanged={onChanged}
+                />
             )}
 
             {isGit && can("service.configure") && (

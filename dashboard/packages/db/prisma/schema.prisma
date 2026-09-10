@@ -3978,6 +3978,17 @@ model Application {
     // Keep previous deployments running (Railway-style multi-version). Off by
     // default: a new deploy replaces the old container.
     keepReleases        Boolean   @default(false)
+    // Whether the container port is published on the host's interfaces, so the
+    // service answers on the machine's IP and a port with no proxy in the way.
+    // True for every service that existed before this could be switched off, so
+    // nothing an install already reaches that way stops answering; a service made
+    // from the Deploy screen starts with it off, reached only through the edge.
+    publishPort         Boolean   @default(true)
+    // JSON: what the edge does in front of this service beyond routing to it - rate
+    // limits, a concurrency cap, the browser challenge, security headers,
+    // redirects and rewrites. Read whole through `parseAppEdgeConfig`, which
+    // rebuilds the shape, because a row is always older than the code reading it.
+    edgeConfig          String    @default("{}")
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
 

@@ -6,9 +6,9 @@
  */
 
 import { Readable } from "node:stream";
-import { isReleaseImage } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
+import { forCompose, isReleaseImage } from "@polaris/deploy";
 import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
@@ -25,7 +25,9 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const res = await this.client.deployUp(spec);
+        // The daemon writes values into the compose file as they are, so a `$` in any
+        // of them is escaped here - see `forCompose`.
+        const res = await this.client.deployUp(forCompose(spec));
         await drain(res, onOutput);
     }
 
@@ -35,7 +37,7 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const res = await this.client.stackUp(spec);
+        const res = await this.client.stackUp(forCompose(spec));
         await drain(res, onOutput);
     }
 

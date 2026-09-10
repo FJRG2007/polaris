@@ -31,6 +31,7 @@ import { sendVacant } from "./vacant.js";
 import type { Duplex } from "node:stream";
 import { sendBlocked } from "./block-page.js";
 import { connect as netConnect } from "node:net";
+import { sendChallenge } from "./challenge-page.js";
 import { request as httpsRequest } from "node:https";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
 import { decodeGuardRule, verifyEdgeOrigin } from "@polaris/core/waf";
@@ -228,6 +229,17 @@ export function createProxyServer(config: () => GuardConfig): Server {
             if (decision.setCookie) headers["set-cookie"] = decision.setCookie;
             res.writeHead(302, headers);
             res.end();
+            return;
+        }
+        if (decision.status === 503) {
+            sendChallenge(res, {
+                challenge: decision.challenge,
+                bits: decision.bits,
+                host: header(req, "x-forwarded-host") ?? header(req, "host"),
+                ip: clientIp(header(req, "x-forwarded-for")),
+                accept: header(req, "accept"),
+                secure: (header(req, "x-forwarded-proto") ?? "https") === "https"
+            });
             return;
         }
 

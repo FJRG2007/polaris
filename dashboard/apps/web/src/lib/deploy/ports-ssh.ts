@@ -10,7 +10,7 @@ import type { Client } from "ssh2";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
-import { isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -55,7 +55,8 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
+        // Escaped for compose's own interpolation - see `forCompose`.
+        const yaml = renderComposeYaml(forCompose(spec), REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
         const b64 = Buffer.from(yaml, "utf8").toString("base64");
         const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
         const file = `${dir}/compose.yml`;
@@ -77,7 +78,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
+        const yaml = renderComposeYaml(forCompose(spec), REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
         const b64 = Buffer.from(yaml, "utf8").toString("base64");
         const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
         const file = `${dir}/compose.yml`;

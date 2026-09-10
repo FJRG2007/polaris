@@ -17,6 +17,7 @@ import { runWafJails } from "@/lib/waf-ban-service";
 import { runSshJails } from "@/lib/waf-ssh-service";
 import { armPolarisPresets } from "@/lib/waf-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
+import { runFloodWatch } from "@/lib/deploy/flood-watch";
 import { runWafAnomalies } from "@/lib/waf-anomaly-service";
 import { pruneAddressReputation } from "@/lib/address-reputation";
 import { publishWafIntel, pruneWafBans, refreshWafFeeds } from "@/lib/waf-intel-service";
@@ -61,6 +62,12 @@ export function startWafSentinel(): void {
             // Same log, a different question: not who was refused, but who is using a
             // route in a way the rest of its traffic does not.
             await runWafAnomalies();
+            // And a third: is a whole service being flooded, so the ones set to
+            // challenge automatically should start asking their visitors to prove
+            // they are browsers. Its own try, so a failure here never costs the bans.
+            await runFloodWatch().catch((error: unknown) =>
+                console.error("polaris: the flood check failed:", error)
+            );
             if (ticks % SSH_EVERY_TICKS === 0) await runSshJails();
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) {
                 await refreshWafFeeds();

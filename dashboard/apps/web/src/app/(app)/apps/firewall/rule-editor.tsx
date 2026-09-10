@@ -55,6 +55,10 @@ const SKIP_LABELS: Record<WafSkipComponent, { title: string; detail: string }> =
     browser_integrity: {
         title: "The browser integrity check",
         detail: "The heuristic that refuses a client claiming to be a browser and not behaving like one."
+    },
+    challenge: {
+        title: "The browser challenge",
+        detail: "The check page a service asks visitors to pass while it is under attack. Skip it for webhooks and APIs that machines call."
     }
 };
 

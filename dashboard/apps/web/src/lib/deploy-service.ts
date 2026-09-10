@@ -10,7 +10,6 @@ import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
-import { appBaseUrl } from "./domain-service";
 import * as activity from "./activity/activity";
 import * as comments from "./comments/comments";
 import { commitUrl } from "./deploy/commit-url";
@@ -23,6 +22,7 @@ import { parseGithubRepo } from "./repo-reference";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
+import { appBaseUrl, getPublicIp } from "./domain-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { LocalRouter, type AppRoute } from "./deploy/router";
@@ -33,8 +33,8 @@ import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { copyScopeValues, decryptedValue } from "./deploy/env-values";
+import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
-import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
@@ -71,6 +71,16 @@ import {
     releaseRef,
     serviceRef
 } from "./deploy/releases";
+import {
+    appEdgeConfigSchema,
+    applicationDefaultWafPresets,
+    type AppEdgeConfig,
+    hostnameCovers,
+    isTunnelHostname,
+    isWildcardHostname,
+    normalizeDeployHostname,
+    parseAppEdgeConfig
+} from "@polaris/core";
 import {
     bucketHttpMetrics,
     isReleaseImage,
@@ -521,6 +531,12 @@ export interface CreateApplicationInput {
     /** Keep earlier builds running beside the current one, Railway-style. Comes
      *  from the project's flags, so a project can set the house style once. */
     keepReleases?: boolean;
+    /** Publish the container port on the host's interfaces. Absent keeps the
+     *  historical behaviour (published), which every caller that reaches a service by
+     *  its host port - a catalog install, a game server - relies on; the Deploy
+     *  screen passes false, so what somebody deploys there is reached through the
+     *  edge and nothing else. */
+    publishPort?: boolean;
 }
 
 export async function createApplication(ownerId: string, input: CreateApplicationInput) {
@@ -543,7 +559,8 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             sourceConfig: JSON.stringify(input.sourceConfig),
             autoDeploy: input.autoDeploy ?? false,
             deployBranch: input.deployBranch ?? null,
-            keepReleases: input.keepReleases ?? false
+            keepReleases: input.keepReleases ?? false,
+            publishPort: input.publishPort ?? true
         }
     });
     // Stack-specific rule packs are decided here, at the one moment the stack is
@@ -737,7 +754,19 @@ export async function addApplicationDomain(
     // Polaris host's, which would point the name at the wrong box.
     const remoteHost = app.target.kind !== "local" ? app.target.host : null;
     const remoteIp = remoteHost?.address?.trim();
-    let hostname = opts.hostname?.trim();
+    // A typed hostname is written straight into the edge's rule strings, so it is
+    // normalized and refused here if it is not one - a stray quote or backtick in a
+    // domain was a routing file the edge would refuse to load, for every service.
+    let hostname: string | undefined;
+    if (opts.hostname?.trim()) {
+        const normalized = normalizeDeployHostname(opts.hostname);
+        if (!normalized) {
+            throw new Error(
+                "Use a domain like app.example.com, or *.example.com for every subdomain of it."
+            );
+        }
+        hostname = normalized;
+    }
     let kind = "custom";
     // Cert/exposure resolution: a caller-chosen mode wins (e.g. "none" for a domain
     // fronted by a tunnel/proxy that terminates TLS). Otherwise a custom domain gets
@@ -958,11 +987,157 @@ export async function setApplicationServedBy(
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true, publishPort: true, target: { select: { kind: true } } }
+    });
+    if (!app) throw new Error("Application not found");
+    // This edge reaches another server's service on the port that server publishes
+    // for it; a service kept off its host's interfaces has none to reach.
+    if (servedBy === "polaris" && app.target.kind !== "local" && !app.publishPort) {
+        throw new Error(
+            "This service is kept off its server's own address, so Polaris cannot reach it to serve it. Open its port under Networking first."
+        );
+    }
+    await prisma.domain.updateMany({ where: { applicationId: app.id }, data: { servedBy } });
+    await syncAppRoutes();
+}
+
+/** What a service's edge settings screen needs: the settings, and the facts that
+ *  decide which of them can be changed. */
+export interface EdgeSettingsView {
+    readonly config: AppEdgeConfig;
+    readonly publishPort: boolean;
+    /** Whether the flood check has the service marked right now, for "auto". */
+    readonly flooded: boolean;
+    /** Installed from the catalog: Polaris itself reaches those on their port. */
+    readonly catalog: boolean;
+    /** Runs on another server whose domains are served through this edge. */
+    readonly servedThroughPolaris: boolean;
+    /** Runs on the machine Polaris runs on. */
+    readonly local: boolean;
+}
+
+export async function getApplicationEdgeSettings(
+    applicationId: string,
+    ownerId: string
+): Promise<EdgeSettingsView> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: {
+            id: true,
+            edgeConfig: true,
+            publishPort: true,
+            target: { select: { kind: true } },
+            domains: { where: { servedBy: "polaris" }, select: { id: true }, take: 1 }
+        }
+    });
+    if (!app) throw new Error("Application not found");
+    const catalog = await prisma.installedApp.findFirst({
+        where: { applicationId, status: { not: "removed" } },
+        select: { id: true }
+    });
+    return {
+        config: parseAppEdgeConfig(app.edgeConfig),
+        publishPort: app.publishPort,
+        flooded: (await floodedServices()).has(app.id),
+        catalog: Boolean(catalog),
+        servedThroughPolaris: app.target.kind !== "local" && app.domains.length > 0,
+        local: app.target.kind === "local"
+    };
+}
+
+/**
+ * Save what the edge does in front of a service, and put it in force at once.
+ *
+ * Both edges take it without a deploy: the local one from the file this rewrites, and a
+ * remote server's from the routes pushed to it in the same pass. A remote server's
+ * container labels catch up on its next deploy, which only matters if Polaris is never
+ * reachable from it again.
+ */
+export async function setApplicationEdgeConfig(
+    applicationId: string,
+    ownerId: string,
+    config: AppEdgeConfig
+): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
         select: { id: true }
     });
     if (!app) throw new Error("Application not found");
-    await prisma.domain.updateMany({ where: { applicationId: app.id }, data: { servedBy } });
+    await prisma.application.update({
+        where: { id: app.id },
+        data: { edgeConfig: JSON.stringify(appEdgeConfigSchema.parse(config)) }
+    });
     await syncAppRoutes();
+}
+
+/**
+ * Open or close a service's port on the host's own interfaces.
+ *
+ * Closed, the service is reached through the edge and nothing else - no IP and port on
+ * the LAN, nothing a forwarded router port could expose by accident. The route switches
+ * at once; the port itself only opens or closes when the container is recreated, so a
+ * deployed service is redeployed here rather than left half-way between the two.
+ *
+ * Refused for a catalog install, which Polaris itself reaches on that port (a game is
+ * joined by address, a bridge is called by the dashboard), and for a service on another
+ * server whose domains this edge serves, which it can only reach on that server's port.
+ */
+export async function setApplicationPublishPort(
+    applicationId: string,
+    ownerId: string,
+    publish: boolean
+): Promise<{ redeployed: boolean }> {
+    const view = await getApplicationEdgeSettings(applicationId, ownerId);
+    if (!publish && view.catalog) {
+        throw new Error("Polaris reaches this installed app on its port, so it has to stay open.");
+    }
+    if (!publish && view.servedThroughPolaris) {
+        throw new Error(
+            "Polaris serves this service's domains from here and reaches it on its server's port. Switch its domains to be served by its own server first."
+        );
+    }
+    if (view.publishPort === publish) return { redeployed: false };
+    const app = await prisma.application.update({
+        where: { id: applicationId },
+        data: { publishPort: publish },
+        select: { currentDeploymentId: true }
+    });
+    await syncAppRoutes();
+    if (view.local) await repointConnectors(applicationId, ownerId);
+    if (!app.currentDeploymentId) return { redeployed: false };
+    await deployApplication(applicationId, ownerId, ownerId);
+    return { redeployed: true };
+}
+
+/**
+ * Point a service's running tunnel connectors at where it can be reached now.
+ *
+ * An ngrok connector carries its origin in its own command, and a managed Cloudflare
+ * tunnel carries it in the account's ingress, so neither follows a port being opened
+ * or closed on its own. A connector somebody set up by hand in their own Cloudflare
+ * account is theirs to point, and is left alone. Best-effort: the port change has
+ * already happened, and a connector that could not be moved is said in the log rather
+ * than thrown over it.
+ */
+async function repointConnectors(applicationId: string, ownerId: string): Promise<void> {
+    const [ngrok, named] = await Promise.all([
+        import("./deploy/ngrok-tunnel-service"),
+        import("./deploy/named-tunnel-service")
+    ]);
+    try {
+        if ((await ngrok.getNgrokTunnelStatus(applicationId, ownerId)).running) {
+            await ngrok.startNgrokTunnel(applicationId, ownerId);
+        }
+        const status = await named.getNamedTunnelStatus(applicationId, ownerId);
+        if (status.managed && status.enabled) {
+            await named.setNamedTunnelEnabled(applicationId, ownerId, true);
+        }
+    } catch (error) {
+        console.warn(
+            `polaris: a tunnel for ${applicationId} could not be re-pointed after its port changed:`,
+            error instanceof Error ? error.message : error
+        );
+    }
 }
 
 export async function syncAppRoutes(): Promise<void> {
@@ -971,6 +1146,7 @@ export async function syncAppRoutes(): Promise<void> {
         select: {
             id: true,
             hostname: true,
+            pathPrefix: true,
             certResolver: true,
             targetPort: true,
             servedBy: true,
@@ -981,6 +1157,10 @@ export async function syncAppRoutes(): Promise<void> {
                     slug: true,
                     keepReleases: true,
                     currentDeploymentId: true,
+                    publishPort: true,
+                    edgeConfig: true,
+                    sourceType: true,
+                    sourceConfig: true,
                     target: { select: { kind: true, hostId: true } },
                     environment: {
                         select: { project: { select: { slug: true, ownerId: true } } }
@@ -989,6 +1169,21 @@ export async function syncAppRoutes(): Promise<void> {
             }
         }
     });
+    // What each service asks of the edge, read once per service rather than per
+    // hostname, and which services are under the flood check's challenge right now.
+    const flooded = await floodedServices();
+    const edgeOf = new Map<string, EdgeRouteFields>();
+    for (const domain of domains) {
+        if (edgeOf.has(domain.applicationId)) continue;
+        const edge = parseAppEdgeConfig(domain.application.edgeConfig);
+        edgeOf.set(domain.applicationId, {
+            edge,
+            challenge: await challengeActive(domain.applicationId, edge.challenge, flooded),
+            appHostnames: domains
+                .filter((other) => other.applicationId === domain.applicationId)
+                .map((other) => normalizeDeployHostname(other.hostname) ?? other.hostname)
+        });
+    }
     // Which of the serving releases run in a project of their own, and so publish on
     // a port of their own. One query for the whole edge rather than one per domain.
     const isolated = new Set(
@@ -1055,9 +1250,36 @@ export async function syncAppRoutes(): Promise<void> {
             tunnelAppIds.length > 0
                 ? await prisma.application.findMany({
                       where: { id: { in: tunnelAppIds }, target: { kind: "local" } },
-                      select: { id: true }
+                      select: {
+                          id: true,
+                          slug: true,
+                          publishPort: true,
+                          currentDeploymentId: true,
+                          sourceType: true,
+                          sourceConfig: true,
+                          edgeConfig: true,
+                          environment: { select: { project: { select: { slug: true } } } },
+                          domains: { select: { targetPort: true }, take: 1 }
+                      }
                   })
                 : [];
+        // A tunnel-only service is not in the isolation lookup above, which only
+        // asked about services with a domain.
+        const tunnelIsolated = new Set(
+            (
+                await prisma.deployment.findMany({
+                    where: {
+                        isolated: true,
+                        id: {
+                            in: localTunnelApps
+                                .map((app) => app.currentDeploymentId)
+                                .filter((id): id is string => id !== null)
+                        }
+                    },
+                    select: { id: true }
+                })
+            ).map((deployment) => deployment.id)
+        );
         // Resolve every route's WAF decision in one batched pair of queries, not a serial
         // round-trip per domain and per tunnel.
         const waf = await resolveWafBatch([
@@ -1089,14 +1311,35 @@ export async function syncAppRoutes(): Promise<void> {
             // address is not known rather than dialled on this box, which would
             // route somebody's domain at whatever happens to be listening here.
             const remoteHostId = domain.application.target.hostId;
-            const dialHost = remoteHostId ? (serverAddress.get(remoteHostId) ?? "") : localIp;
+            // A service kept off this host's interfaces publishes no port to dial, so
+            // the edge reaches the container by name on the proxy network both are on
+            // - the way a remote server's edge always has. Never a kept release, which
+            // is reached on its own published port whatever the setting says.
+            const privately =
+                !remoteHostId &&
+                !domain.application.publishPort &&
+                !domain.deploymentId &&
+                !isolated.has(domain.application.currentDeploymentId ?? "");
+            const dialHost = privately
+                ? serviceName(
+                      domain.application.environment.project.slug,
+                      domain.application.slug,
+                      domain.applicationId
+                  )
+                : remoteHostId
+                  ? (serverAddress.get(remoteHostId) ?? "")
+                  : localIp;
             if (!dialHost) continue;
             localRoutes.push({
                 id: domain.id,
                 hostname: domain.hostname,
+                pathPrefix: domain.pathPrefix ?? undefined,
+                ...edgeOf.get(domain.applicationId),
                 certResolver: domain.certResolver,
                 dialHost,
-                dialPort: hostPortForApp(dialTarget(domain, isolated)),
+                dialPort: privately
+                    ? containerPortOf({ ...domain.application, domains: [domain] })
+                    : hostPortForApp(dialTarget(domain, isolated)),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 presets: rule.presets,
@@ -1113,12 +1356,22 @@ export async function syncAppRoutes(): Promise<void> {
         }
         for (const app of localTunnelApps) {
             const rule = waf.get(app.id) ?? emptyWaf;
+            // The same private reach as a domain: by name, where nothing is published.
+            const privately =
+                !app.publishPort &&
+                !isolated.has(app.currentDeploymentId ?? "") &&
+                !tunnelIsolated.has(app.currentDeploymentId ?? "");
+            const edge = parseAppEdgeConfig(app.edgeConfig);
             localRoutes.push({
                 id: `qtunnel-${shortHash(app.id, 8)}`,
                 hostname: tunnelHostForApp(app.id),
                 certResolver: "none",
-                dialHost: localIp,
-                dialPort: hostPortForApp(app.id),
+                edge,
+                challenge: await challengeActive(app.id, edge.challenge, flooded),
+                dialHost: privately
+                    ? serviceName(app.environment.project.slug, app.slug, app.id)
+                    : localIp,
+                dialPort: privately ? containerPortOf(app) : hostPortForApp(app.id),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 presets: rule.presets,
@@ -1139,13 +1392,17 @@ export async function syncAppRoutes(): Promise<void> {
     // is asleep, moved or refusing a connection is a server whose own edge goes on
     // serving whatever it was already serving, and no reason for the routes on this
     // machine to be left unwritten.
-    await pushRemoteRoutes(remoteDomains);
+    await pushRemoteRoutes(remoteDomains, edgeOf);
 }
+
+/** The per-service edge settings a route carries, resolved once per service. */
+type EdgeRouteFields = Pick<AppRoute, "edge" | "challenge" | "appHostnames">;
 
 /** One row of the query above, narrowed to what a remote push reads. */
 type RoutableDomain = {
     id: string;
     hostname: string;
+    pathPrefix: string | null;
     certResolver: string;
     targetPort: number;
     servedBy: string;
@@ -1155,6 +1412,8 @@ type RoutableDomain = {
         slug: string;
         keepReleases: boolean;
         currentDeploymentId: string | null;
+        sourceType: string;
+        sourceConfig: string;
         target: { kind: string; hostId: string | null };
         environment: { project: { slug: string; ownerId: string } };
     };
@@ -1177,7 +1436,10 @@ type RoutableDomain = {
  * name without guessing, and a guessed upstream is a 502 in place of a working
  * site.
  */
-async function pushRemoteRoutes(domains: readonly RoutableDomain[]): Promise<void> {
+async function pushRemoteRoutes(
+    domains: readonly RoutableDomain[],
+    edgeOf: ReadonlyMap<string, EdgeRouteFields>
+): Promise<void> {
     const pushable = domains.filter(
         (domain) => !domain.deploymentId && !domain.application.keepReleases
     );
@@ -1210,6 +1472,8 @@ async function pushRemoteRoutes(domains: readonly RoutableDomain[]): Promise<voi
                     return {
                         id: domain.id,
                         hostname: domain.hostname,
+                        pathPrefix: domain.pathPrefix ?? undefined,
+                        ...edgeOf.get(domain.applicationId),
                         certResolver: domain.certResolver,
                         // The container itself, by name, on the proxy network both
                         // it and that server's edge are on - which is what the
@@ -1278,6 +1542,16 @@ export async function deployAppIdForHost(host: string): Promise<string | null> {
         select: { applicationId: true }
     });
     if (domain) return domain.applicationId;
+    // A name under a wildcard domain is that service's too: the exact name was not
+    // found, so the one stored for it is `*.` over its parent.
+    const dot = trimmed.indexOf(".");
+    if (dot > 0) {
+        const wildcard = await prisma.domain.findFirst({
+            where: { enabled: true, hostname: `*.${trimmed.slice(dot + 1).toLowerCase()}` },
+            select: { applicationId: true }
+        });
+        if (wildcard) return wildcard.applicationId;
+    }
     const needle = trimmed.toLowerCase();
     const tunnelAppIds = await quickTunnelAppIds();
     return tunnelAppIds.find((appId) => tunnelHostForApp(appId).toLowerCase() === needle) ?? null;
@@ -1559,8 +1833,15 @@ async function readProxyAccessEntries(hosts: Set<string>, tail: number): Promise
     if (hosts.size === 0) return [];
     const raw = await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES);
     if (!raw) return [];
+    // A wildcard domain's requests are logged under the name each visitor asked for,
+    // never under `*.`, so those are matched by what they cover.
+    const wildcards = [...hosts].filter(isWildcardHostname);
     return parseHttpLogs(raw)
-        .filter((entry) => entry.host !== null && hosts.has(entry.host.toLowerCase()))
+        .filter((entry) => {
+            if (entry.host === null) return false;
+            const host = entry.host.toLowerCase();
+            return hosts.has(host) || wildcards.some((wildcard) => hostnameCovers(wildcard, host));
+        })
         .slice(-tail);
 }
 
@@ -1805,7 +2086,10 @@ export async function duplicateApplication(
             replicas: app.replicas,
             deployBranch: app.deployBranch,
             commitFilter: app.commitFilter,
-            keepReleases: app.keepReleases
+            keepReleases: app.keepReleases,
+            // A copy is reached the way the original is, and guarded the same way.
+            publishPort: app.publishPort,
+            edgeConfig: app.edgeConfig
         }
     });
     // With their ciphertext: copying only `value` gave every secret on the copy
@@ -1900,6 +2184,11 @@ async function buildAppPlan(
     // where they apply, so a service that has nothing else set still needs the guard to
     // get them. It costs no extra hop in practice - the instance-wide packs already put
     // the guard in front of every route on a default instance.
+    // What the edge does in front of the service beyond routing to it, and whether it
+    // is asking visitors for proof of a browser right now - "auto" follows the flood
+    // check, read once here and carried into the labels like the rest of the plan.
+    const edge = parseAppEdgeConfig(app.edgeConfig);
+    const challenge = await challengeActive(app.id, edge.challenge);
     const waf =
         resolvedWaf.allowLists.length > 0 ||
         resolvedWaf.deny.length > 0 ||
@@ -1908,7 +2197,8 @@ async function buildAppPlan(
         resolvedWaf.requireLogin ||
         resolvedWaf.browserIntegrity ||
         resolvedWaf.sqlInjectionProtection ||
-        resolvedWaf.xssProtection
+        resolvedWaf.xssProtection ||
+        challenge
             ? // The login address rides along for the same reason it does on a local
               // route: the remote server's guard would otherwise redirect to whatever
               // address it was deployed with. Baked in at deploy here rather than
@@ -1917,18 +2207,18 @@ async function buildAppPlan(
               // their next deploy.
               {
                   ...resolvedWaf,
+                  challenge,
                   loginUrl: resolvedWaf.requireLogin ? await appBaseUrl() : undefined
               }
             : undefined;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
     // (intranet) with no proxy. The container port is the app's stored listening
-    // port (set at create, editable), falling back to a domain's target port or a
-    // source default; the host port is derived from the app id so it stays
-    // consistent across redeploys without a schema column.
+    // port (set at create, editable), falling back to what the last deploy read from
+    // the image, a domain's target port or a source default; the host port is derived
+    // from the app id so it stays consistent across redeploys without a schema column.
     const storedPort = typeof source.port === "number" ? source.port : undefined;
-    const containerPort =
-        storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
+    const containerPort = containerPortOf(app);
     // A game server is reached by typing an address into a game, not by a proxy, so
     // it publishes on the port that game expects (25565, 19132) instead of the
     // derived one nobody would guess. Pinned at install; absent for everything else.
@@ -1997,6 +2287,11 @@ async function buildAppPlan(
             container: containerPort,
             ...(hostProtocol ? { protocol: hostProtocol } : {})
         },
+        // Kept off the host's interfaces when the operator said so. Never a kept
+        // release: those are each reached on a port of their own, which is the whole
+        // of how the release beside the current one stays reachable.
+        private: !app.publishPort && !kept,
+        edge,
         ...(extraPorts.length > 0 ? { extraPorts } : {}),
         // When the user has not pinned a container port, the value above is a guess
         // (a domain's target port or a source default); let the runtime refine it from
@@ -3168,11 +3463,118 @@ function runDeployment(
         deploymentId,
         target,
         ownerId,
-        (ctx, driver) => driver.deployApplication(plan, ctx),
+        (ctx, driver) =>
+            driver.deployApplication(plan, ctx).then(async (result) => {
+                if (result.ok && result.detectedPort) {
+                    await rememberDetectedPort(deploymentId, result.detectedPort);
+                }
+                return result;
+            }),
         gitSource,
         pullImages,
         buildCommands
     );
+}
+
+/**
+ * Keep the container port a deploy read from the image.
+ *
+ * Kept as its own key rather than as `port`, because `port` is the operator's pin and
+ * its presence is what turns the detection off - writing a detected value there would
+ * silently stop the next image's port being read. What reads this is everything that
+ * dials the container itself rather than the port the host publishes for it: the edge
+ * and the tunnel connectors, for a service kept off the host's interfaces. A guessed
+ * port there is a 502 with a healthy container behind it.
+ *
+ * The domains still holding the guess are corrected too, and only those: a remote
+ * server's edge dials each domain's own port, and a domain whose port somebody set on
+ * purpose - a second port the service answers on - is not the guess and stays.
+ */
+async function rememberDetectedPort(
+    deploymentId: string,
+    port: { readonly from: number; readonly to: number }
+): Promise<void> {
+    const deployment = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { deployableType: true, deployableId: true }
+    });
+    if (deployment?.deployableType !== "application") return;
+    const app = await prisma.application.findUnique({
+        where: { id: deployment.deployableId },
+        select: { sourceConfig: true }
+    });
+    if (!app) return;
+    const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    if (source.detectedPort !== port.to) {
+        await prisma.application.update({
+            where: { id: deployment.deployableId },
+            data: { sourceConfig: JSON.stringify({ ...source, detectedPort: port.to }) }
+        });
+    }
+    await prisma.domain.updateMany({
+        where: { applicationId: deployment.deployableId, targetPort: port.from },
+        data: { targetPort: port.to }
+    });
+}
+
+/**
+ * Where a connector on the proxy network reaches a local service, as `host:port`.
+ *
+ * A tunnel connector (ngrok, a Cloudflare named tunnel) runs as a container beside the
+ * service. It has always been pointed at the port the host publishes for it; a service
+ * kept off the host's interfaces publishes none, so there the connector is pointed at
+ * the container itself, by name - the network the two share is the one thing it can
+ * always reach. Null when a published service has no address to be reached at yet.
+ */
+export async function connectorOrigin(appId: string): Promise<string | null> {
+    const app = await prisma.application.findUnique({
+        where: { id: appId },
+        select: {
+            slug: true,
+            publishPort: true,
+            currentDeploymentId: true,
+            sourceType: true,
+            sourceConfig: true,
+            environment: { select: { project: { select: { slug: true } } } },
+            domains: { select: { targetPort: true }, take: 1 }
+        }
+    });
+    if (!app) return null;
+    const isolated = app.currentDeploymentId
+        ? Boolean(
+              await prisma.deployment.findFirst({
+                  where: { id: app.currentDeploymentId, isolated: true },
+                  select: { id: true }
+              })
+          )
+        : false;
+    if (!app.publishPort && !isolated) {
+        return `${serviceName(app.environment.project.slug, app.slug, appId)}:${containerPortOf(app)}`;
+    }
+    const ip = await getPublicIp();
+    return ip ? `${ip}:${hostPortForApp(appId)}` : null;
+}
+
+/**
+ * The port a service listens on inside its container: the operator's pin, else what
+ * the last deploy read from the image, else a domain's target port, else the source's
+ * default. The same order `buildAppPlan` publishes by, plus the detection it learns
+ * after the fact - so a service dialled by name is dialled where it actually listens.
+ */
+export function containerPortOf(app: {
+    sourceType: string;
+    sourceConfig: string;
+    domains?: readonly { targetPort: number }[];
+}): number {
+    let source: Record<string, unknown> = {};
+    try {
+        source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    } catch {
+        // A config that does not parse pins nothing.
+    }
+    if (typeof source.port === "number") return source.port;
+    if (typeof source.detectedPort === "number") return source.detectedPort;
+    return app.domains?.[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
 }
 
 /**

@@ -17,9 +17,8 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
-import { getPublicIp } from "../domain-service";
 import type { ComposeSpec } from "@polaris/deploy";
-import { hostPortForApp } from "../deploy-service";
+import { connectorOrigin } from "../deploy-service";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { requireCloudflareAccount } from "../integrations/cloudflare-account-service";
 import {
@@ -223,9 +222,10 @@ export async function provisionNamedTunnel(
     const { token, accountId } = await requireCloudflareAccount();
     const zone = await resolveZoneForHostname(token, hostname);
 
-    const originIp = await getPublicIp();
-    if (!originIp) throw new Error("This server has no reachable IP to route the tunnel to");
-    const originUrl = `http://${originIp}:${hostPortForApp(appId)}`;
+    // The published port, or the container by name for a service kept off the host.
+    const origin = await connectorOrigin(appId);
+    if (!origin) throw new Error("This server has no reachable IP to route the tunnel to");
+    const originUrl = `http://${origin}`;
 
     // Retire a previous managed tunnel for this app before creating the new one, so
     // repeated provisioning does not leak tunnels in the operator's account.
@@ -278,9 +278,9 @@ export async function setNamedTunnelEnabled(appId: string, ownerId: string, enab
         if (managed) {
             const account = await requireCloudflareAccount();
             if (enabled) {
-                const originIp = await getPublicIp();
-                if (!originIp) throw new Error("This server has no reachable IP to route the tunnel to");
-                await putTunnelIngress(account.token, account.accountId, managed.tunnelId, hostname, `http://${originIp}:${hostPortForApp(appId)}`);
+                const origin = await connectorOrigin(appId);
+                if (!origin) throw new Error("This server has no reachable IP to route the tunnel to");
+                await putTunnelIngress(account.token, account.accountId, managed.tunnelId, hostname, `http://${origin}`);
             } else {
                 await putTunnelPlaceholder(account.token, account.accountId, managed.tunnelId, hostname);
             }

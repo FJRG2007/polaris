@@ -6,6 +6,7 @@
  * the implementations and the deploy pipeline that calls them come in P3/P5.
  */
 
+import type { AppEdgeConfig } from "@polaris/core";
 import type { BuildInput } from "../builders/types.js";
 import type { BuildContext } from "../build-context.js";
 import type { RuntimePorts, OutputSink } from "../ports.js";
@@ -79,6 +80,16 @@ export interface AppDeployPlan {
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
     readonly expose?: { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" };
+    /**
+     * Keep the service off every interface of the host: its port is not published at
+     * all, and the edge reaches it by name on the proxy network instead. `expose` still
+     * says which port the app listens on inside the container - that is what the edge
+     * dials - but nothing outside Docker can open it.
+     */
+    readonly private?: boolean;
+    /** Rate limits, concurrency, security headers, redirects and rewrites, written into
+     *  the edge labels beside the WAF so a remote server's own edge applies them. */
+    readonly edge?: AppEdgeConfig;
     /** Further ports to publish beside the main one. A Java Minecraft server that
      *  Bedrock clients can also join answers on a second, UDP port - one service,
      *  two doors, so it cannot be modelled as the single exposed port. */
@@ -120,6 +131,13 @@ export interface DeployResult {
     readonly ok: boolean;
     readonly imageTag?: string;
     readonly error?: string;
+    /**
+     * The container port read from the image, when it differed from the one the plan
+     * guessed. Handed back so the caller can store it: a service kept off the host's
+     * interfaces is dialled by the edge on exactly this port, and a guess left in the
+     * route is a 502 with a healthy container behind it.
+     */
+    readonly detectedPort?: { readonly from: number; readonly to: number };
 }
 
 export interface RuntimeStatus {

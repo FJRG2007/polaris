@@ -46,9 +46,13 @@ import {
 } from "@polaris/core";
 import {
     decodeGuardRule,
+    EDGE_CHALLENGE_BITS,
+    EDGE_PASS_COOKIE,
+    issueEdgeChallenge,
     membershipTooOld,
     principalVerdict,
     principalsSuperseded,
+    verifyEdgePass,
     verifyEdgeToken,
     type GuardRule
 } from "@polaris/core/waf";
@@ -90,12 +94,23 @@ export interface GuardConfig {
     /** Bans, Tor exits and flagged addresses, held in memory. Omitted in tests that
      *  are not about it, which is the same as an empty list. */
     readonly intel?: WafIntelIndex;
+    /**
+     * What the browser challenge signs with. The shared secret when there is one; a
+     * key made when this process started when there is not, so a guard deployed without
+     * the secret still challenges - its passes only stop working when it restarts, and
+     * a visitor is then simply asked again.
+     */
+    readonly challengeSecret?: string;
+    /** A fresh random value per request, for the puzzle it may issue. Injected so this
+     *  function stays deterministic under test. */
+    readonly nonce?: string;
 }
 
 export type GuardDecision =
     | { readonly status: 200 }
     | { readonly status: 403; readonly reason: string }
-    | { readonly status: 302; readonly location: string; readonly setCookie?: string };
+    | { readonly status: 302; readonly location: string; readonly setCookie?: string }
+    | { readonly status: 503; readonly challenge: string; readonly bits: number };
 
 /** The originating client IP as Traefik forwarded it (leftmost X-Forwarded-For).
  *  Exported because the block page shows the visitor the same address the rules were
@@ -265,6 +280,24 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
             acceptEncoding: req.acceptEncoding
         });
         if (failure) return { status: 403, reason: `browser integrity: ${failure}` };
+    }
+
+    // The challenge comes after every refusal - a request the rules block is blocked,
+    // not asked to solve something first - and before the login, so a flood of
+    // anonymous requests never reaches the login handoff at all. A rule can step over
+    // it for a path only machines call, like a webhook, which a browser check would
+    // otherwise shut out entirely.
+    if (!skipped.has("challenge") && rule.challenge === true) {
+        if (!host) return { status: 403, reason: "host unknown" };
+        const secret = cfg.challengeSecret || cfg.secret;
+        const ip = clientIp(req.forwardedFor);
+        if (!verifyEdgePass(readCookie(req.cookie, EDGE_PASS_COOKIE), secret, cfg.now, host, ip)) {
+            return {
+                status: 503,
+                challenge: issueEdgeChallenge({ host, ip, now: cfg.now, nonce: cfg.nonce ?? "" }, secret),
+                bits: EDGE_CHALLENGE_BITS
+            };
+        }
     }
 
     if (rule.requireLogin) {

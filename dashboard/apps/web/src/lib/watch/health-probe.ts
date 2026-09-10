@@ -270,7 +270,9 @@ let repair: RepairState = NO_REPAIR;
 /** Probe every enabled domain, with bounded concurrency. */
 export async function probeAllDomains(): Promise<void> {
     const domains = await prisma.domain.findMany({
-        where: { enabled: true },
+        // A wildcard names no one address to probe - `https://*.example.com` is not a
+        // URL - and a probe that cannot even be made would read as the site being down.
+        where: { enabled: true, NOT: { hostname: { startsWith: "*." } } },
         select: {
             id: true,
             hostname: true,

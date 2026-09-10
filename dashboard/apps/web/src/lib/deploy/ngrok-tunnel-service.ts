@@ -2,7 +2,7 @@
  * Per-app ngrok tunnels: expose one deployed app on a public ngrok URL with no
  * port-forwarding, using the authtoken from the ngrok integration. An `ngrok`
  * sidecar connects out to ngrok's edge and forwards inbound traffic to the app's
- * already-published host port (see hostPortForApp), mirroring quick-tunnel-service
+ * already-published host port (see connectorOrigin), mirroring quick-tunnel-service
  * for the sidecar lifecycle. The URL is read back from the agent's logs (ngrok
  * prints `url=https://...` on startup) and cached in a Setting for the UI.
  *
@@ -15,9 +15,8 @@ import { prisma } from "@polaris/db";
 import { newestUrl } from "./tunnel-url";
 import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
-import { getPublicIp } from "../domain-service";
 import type { ComposeSpec } from "@polaris/deploy";
-import { hostPortForApp } from "../deploy-service";
+import { connectorOrigin } from "../deploy-service";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
 
 const PROXY_NETWORK = "polaris-proxy";
@@ -111,11 +110,11 @@ export async function startNgrokTunnel(appId: string, ownerId: string): Promise<
     await requireLocalApp(appId, ownerId);
     const token = await ngrokToken();
     if (!token) throw new Error("Add your ngrok authtoken under Integrations first");
-    const ip = await getPublicIp();
-    if (!ip) throw new Error("Set this server's IP under Deploy settings first");
+    // The published port, or the container by name for a service kept off the host.
+    const origin = await connectorOrigin(appId);
+    if (!origin) throw new Error("Set this server's IP under Deploy settings first");
 
     const { project, service } = names(appId);
-    const origin = `${ip}:${hostPortForApp(appId)}`;
     const ports = new HostdPorts();
     try {
         await ports.composeDown(project).catch(() => undefined);

@@ -7,6 +7,7 @@
  * tokens offline; deny-only routes need no secret at all.
  */
 
+import { randomBytes } from "node:crypto";
 import type { GuardConfig } from "./authz.js";
 import { createIntelSource } from "./intel.js";
 import { createProxyServer } from "./proxy.js";
@@ -17,15 +18,23 @@ import { createGuardServer } from "./server.js";
  *  enforces only what each request's own header carries. */
 const intel = createIntelSource(process.env.POLARIS_EDGE_INTEL_FILE);
 
+/** What the browser challenge signs with when no shared secret was given - made once
+ *  per process, so the challenge works on any guard and its passes simply lapse with
+ *  a restart. */
+const processKey = randomBytes(32).toString("base64url");
+
 /** Resolve the guard config from the environment (re-read per request). */
 function loadConfig(): GuardConfig {
     const now = Date.now();
+    const secret = process.env.POLARIS_AUTH_SECRET ?? "";
     return {
-        secret: process.env.POLARIS_AUTH_SECRET ?? "",
+        secret,
         authorizeUrl: (process.env.POLARIS_PUBLIC_URL ?? "").replace(/\/+$/, ""),
         cookieName: process.env.POLARIS_EDGE_COOKIE ?? "polaris.edge",
         now: Math.floor(now / 1000),
-        intel: intel.current(now)
+        intel: intel.current(now),
+        challengeSecret: secret || processKey,
+        nonce: randomBytes(12).toString("base64url")
     };
 }
 

@@ -74,6 +74,8 @@ export {
     appComposeSpec,
     dbComposeSpec,
     defaultDbPort,
+    forCompose,
+    composeValue,
     renderComposeYaml,
     type ComposeSpec,
     type ComposeSpecService,

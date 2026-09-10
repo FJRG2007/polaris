@@ -91,9 +91,58 @@ export interface ComposeSpec {
     readonly networks: string[];
 }
 
+/**
+ * A value as compose must be given it: every `$` doubled.
+ *
+ * Compose interpolates `$NAME` and `${NAME}` in everything it reads - environment,
+ * labels, the command, a healthcheck - and a `$` it cannot resolve becomes nothing. So
+ * a password with a dollar in it arrived in the container without the dollar and the
+ * word after it, and a redirect replacement written `${1}` would have been swallowed
+ * whole. `$$` is compose's own escape and reaches the container as one `$`.
+ */
+export function composeValue(value: string): string {
+    return value.replace(/\$/g, "$$$$");
+}
+
+/** Every value in a map, escaped for compose. */
+function composeValues(values: Readonly<Record<string, string>>): Record<string, string> {
+    return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, composeValue(value)]));
+}
+
+/**
+ * A spec as it is handed to compose, with every interpolated value escaped.
+ *
+ * Applied at the one boundary every spec crosses on its way to a compose file - the
+ * ports' `composeUp` and `stackUp`, local daemon and remote renderer alike - rather than
+ * by each thing that builds a spec: an application, a tunnel connector, an agent
+ * session and a runner all build their own, and escaping in some of them is the bug
+ * this exists to end. Everything else about the spec is names and numbers compose does
+ * not interpolate.
+ */
+export function forCompose(spec: ComposeSpec): ComposeSpec {
+    return {
+        ...spec,
+        services: spec.services.map((service) => ({
+            ...service,
+            env: composeValues(service.env),
+            labels: composeValues(service.labels),
+            command: service.command?.map(composeValue),
+            healthcheck: service.healthcheck
+                ? { ...service.healthcheck, test: service.healthcheck.test.map(composeValue) }
+                : undefined
+        }))
+    };
+}
+
 /** Build the structured spec for an application deployment. */
 export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
-    const labels = traefikLabels({ serviceName: plan.ref.name, network, domains: plan.domains, waf: plan.waf });
+    const labels = traefikLabels({
+        serviceName: plan.ref.name,
+        network,
+        domains: plan.domains,
+        waf: plan.waf,
+        edge: plan.edge
+    });
     const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
     // The proxy network plus any extra networks the plan requests (deduped, proxy
     // first so edge routing is unchanged). Both the daemon and the remote YAML
@@ -111,8 +160,9 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 // Publish a host port so the app is reachable over the host's IP
                 // (LAN/intranet) with no reverse proxy - bound on all interfaces,
                 // so it is only internet-facing if the operator forwards the port.
+                // A private service publishes nothing: the edge reaches it by name.
                 ports: [
-                    ...(plan.expose
+                    ...(plan.expose && !plan.private
                         ? [
                               {
                                   host: plan.expose.host,

@@ -322,7 +322,15 @@ export class ComposeRuntime implements RuntimeDriver {
         // carrying every superseded image until the machine is nearly full,
         // which is the state a pull cannot be recovered from.
         await tidyAfter(ctx);
-        return { ok: true, imageTag };
+        const guessed = plan.expose?.container;
+        const detected = effectivePlan.expose?.container;
+        return {
+            ok: true,
+            imageTag,
+            ...(guessed !== undefined && detected !== undefined && guessed !== detected
+                ? { detectedPort: { from: guessed, to: detected } }
+                : {})
+        };
     }
 
     /**
