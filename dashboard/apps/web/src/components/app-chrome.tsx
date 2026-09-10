@@ -47,6 +47,7 @@ import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
 import { AppShell, CapabilityProvider, PolarisMark, ToastProvider } from "@polaris/ui";
 import { TimeZoneReporter } from "@/components/time-zone-reporter";
+import { ServiceWorkerRegistration } from "@/components/installed-app";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { unreadTotal } from "@/lib/chat/chat-service";
@@ -182,6 +183,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                         <NotificationFavicon />
                                                         <PresenceReporter />
                                                         <TimeZoneReporter reported={reportedZone} />
+                                                        <ServiceWorkerRegistration />
                                                         <VisitRecorder />
                                                         {/* The bottom corner, laid out once. Each of these
                                     used to pin itself there, so an update landing

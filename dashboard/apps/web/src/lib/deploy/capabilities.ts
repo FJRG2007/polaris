@@ -144,6 +144,20 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 description: "Every address is checked, and one that stops answering is flagged on the service.",
                 where: "Service > Settings",
                 href: PROJECTS
+            },
+            {
+                title: "Deploys with no gap",
+                description:
+                    "A new version counts only once it is serving, and a private service starts it beside the running one and changes over.",
+                where: "Service > Deployments",
+                href: PROJECTS
+            },
+            {
+                title: "Copies and autoscaling",
+                description:
+                    "Run up to ten copies, spread by the edge with sticky visitors and a health path, and let the count follow CPU.",
+                where: "Service > Settings > Scaling",
+                href: PROJECTS
             }
         ]
     },
@@ -244,6 +258,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 description: "Services grouped into projects, each with as many environments as it needs, each on its own branch.",
                 where: "Deploy",
                 href: PROJECTS
+            },
+            {
+                title: "Desktop app",
+                description: "Polaris installed as an app with its own window and icon, on any computer or phone.",
+                where: "Account > Preferences",
+                href: "/account/preferences"
             },
             {
                 title: "Usage",
