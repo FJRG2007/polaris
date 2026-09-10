@@ -107,7 +107,8 @@ export async function addTemplateParts(input: {
             sourceConfig: templateSource(part),
             keepReleases: input.keepReleases,
             // Reached by name from the service beside it, and from nothing else.
-            publishPort: false
+            publishPort: false,
+            safeHeaders: true
         });
         await addVolumes(row.id, ownerId, `${template.id}-${part.suffix}`, part.volumes);
         await setEnvVars("application", row.id, ownerId, core.templateVariables(part, { self: row.slug }, generateSecret));

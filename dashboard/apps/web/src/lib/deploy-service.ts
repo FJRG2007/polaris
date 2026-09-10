@@ -565,6 +565,12 @@ export interface CreateApplicationInput {
      *  manages over it - opens it. A default of "open" is how a cloned or migrated
      *  service came up exposed when the one it copied was not. */
     publishPort: boolean;
+    /** Start with the security headers that go in front of any app without
+     *  breaking it (HSTS, no sniffing, a sane referrer, same-site framing - see
+     *  `recommended` in core's edge config). For what somebody deploys; a catalog
+     *  app another page may embed starts with none, as every service made before
+     *  this did. */
+    safeHeaders?: boolean;
     /** How it builds: commands and settings picked up from the repository. */
     buildConfig?: Record<string, unknown>;
     /** How many copies run, from a config file that said. */
@@ -593,6 +599,7 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             deployBranch: input.deployBranch ?? null,
             keepReleases: input.keepReleases ?? false,
             publishPort: input.publishPort,
+            ...(input.safeHeaders ? { edgeConfig: JSON.stringify({ headers: { preset: "recommended" } }) } : {}),
             ...(input.buildConfig ? { buildConfig: JSON.stringify(input.buildConfig) } : {}),
             ...(input.replicas ? { replicas: input.replicas } : {})
         }

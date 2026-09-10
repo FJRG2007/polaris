@@ -31,6 +31,17 @@ describe("the port a new service publishes", () => {
         expect(await read("lib/deploy/environments.ts")).toContain("publishPort: application.publishPort");
     });
 
+    it("starts what somebody deploys with the headers any app survives", async () => {
+        // Production defaults for a new service: HSTS, nosniff, a sane referrer,
+        // same-site framing. Existing services keep theirs; catalog apps that
+        // another page may embed start with none.
+        const service = await read("lib/deploy-service.ts");
+        expect(service).toContain('edgeConfig: JSON.stringify({ headers: { preset: "recommended" } })');
+        expect(await read("app/(app)/apps/deploy/actions.ts")).toContain("safeHeaders: true");
+        expect(await read("lib/deploy/template-setup.ts")).toContain("safeHeaders: true");
+        expect(await read("lib/deploy/migrate.ts")).toContain("safeHeaders: true");
+    });
+
     it("is open only where the host port is how it is reached", async () => {
         // A catalog install (a game server's clients type that port) and the mail
         // server Polaris manages over it.

@@ -437,7 +437,8 @@ export async function moveHome(
         autoDeploy: true,
         deployBranch: input.branch.trim() || null,
         // Reached through its domains, as it was on the provider it came from.
-        publishPort: false
+        publishPort: false,
+        safeHeaders: true
     });
 
     const entries = Object.entries(values).map(([key, value]) => ({
