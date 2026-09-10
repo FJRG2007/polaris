@@ -10,18 +10,20 @@ import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
+import { stagingDir } from "./deploy/staging";
 import * as activity from "./activity/activity";
 import * as comments from "./comments/comments";
 import { commitUrl } from "./deploy/commit-url";
 import { trackedBranch } from "./deploy/branches";
-import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
 import { getLatestCommit } from "./github-service";
 import type { DomainOwner } from "./owner-domains";
 import { parseGithubRepo } from "./repo-reference";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { resolveMountTarget } from "./storage-service";
+import * as sourceUpload from "./deploy/source-upload";
 import { appBaseUrl, getPublicIp } from "./domain-service";
 import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
@@ -37,6 +39,7 @@ import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { hasTunnel, networksForService } from "./deploy/service-networks";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
+import { resolveBuildMachine, type BuildMachine } from "./deploy/build-machine";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
@@ -2105,6 +2108,8 @@ export async function deleteApplication(applicationId: string, ownerId: string):
     });
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
     await prisma.application.delete({ where: { id: applicationId } });
+    // The folder it was built from, when it was uploaded rather than cloned.
+    await sourceUpload.forgetUploadedSources(applicationId).catch(() => undefined);
     await releaseInstallsOf(applicationId);
     // The delete cascades the app's Domain rows, but the edge is not the database: its
     // routers stay until they are rewritten, and one pointing at a container that no
@@ -2214,8 +2219,12 @@ async function buildAppPlan(
     release?: { id: string; commitSha: string | null }
 ): Promise<{
     plan: AppDeployPlan;
-    target: TargetRow;
+    target: TargetRow & { name: string };
     gitSource?: GitSource;
+    /** The kept archive of an uploaded folder, for a service built from one. */
+    uploadArchive?: string;
+    /** The stored build settings, for the machine it builds on. */
+    buildConfig: string;
     buildCommands?: BuildCommands;
     keepsHistory: boolean;
     /** Whether a deploy starts beside the running release and changes over. */
@@ -2496,6 +2505,9 @@ async function buildAppPlan(
             gitSource.explain = () => githubCloneProblem(ownerId, repo.owner, repo.repo);
         }
     }
+    // A folder somebody uploaded is built the way a clone is, from the newest upload.
+    const upload = gitSource ? null : sourceUpload.uploadedSourceOf(source);
+    const uploadArchive = upload ? sourceUpload.uploadedSourcePath(app.id, upload.id) : undefined;
     // What this service says about building itself, over and above what the clone
     // turns out to contain. Only a source build without a Dockerfile consults it:
     // a Dockerfile states its own everything.
@@ -2519,6 +2531,8 @@ async function buildAppPlan(
         plan: planned,
         target: app.target,
         gitSource,
+        uploadArchive,
+        buildConfig: app.buildConfig,
         buildCommands,
         keepsHistory: keepsReleases(app),
         cutover: runsCutover(app),
@@ -2716,6 +2730,9 @@ export async function deployApplication(
         authorAvatarUrl?: string;
         /** What started it, for the history. Manual when nobody says. */
         trigger?: DeploymentTrigger;
+        /** A release built on somebody's own machine and uploaded: loaded and run
+         *  as it is, with nothing cloned or built. */
+        prebuilt?: { image: string; archive: string; bytes: number };
     },
     /** Run a kept release image instead of building: a rollback, or the live
      *  release started again with changed variables. */
@@ -2731,9 +2748,20 @@ export async function deployApplication(
             `${built.unresolved.join(", ")} ${built.unresolved.length === 1 ? "refers" : "refer"} to nothing in this environment. Check the name, or deploy the database it names first.`
         );
     }
-    // A rollback runs an image that already exists, so there is no source to
-    // reach and nothing to clone.
-    const gitSource = rollback ? undefined : built.gitSource;
+    // A rollback or an uploaded release runs an image that already exists, so
+    // there is no source to reach and nothing to clone.
+    const prebuilt = rollback ? undefined : meta?.prebuilt;
+    const gitSource = rollback || prebuilt ? undefined : built.gitSource;
+    const uploadArchive = rollback || prebuilt ? undefined : built.uploadArchive;
+    const fromSource = plan.build.method === "dockerfile" || plan.build.method === "nixpacks";
+    if (fromSource && !rollback && !prebuilt && !gitSource && !uploadArchive) {
+        throw new Error("This service has no source yet. Upload a folder or connect a repository first.");
+    }
+    // Where a build from source runs, when that is not where the service does.
+    const builder =
+        gitSource || uploadArchive
+            ? await resolveBuildMachine({ buildConfig: built.buildConfig, target }, ownerId)
+            : null;
 
     // Asked before anything is started, and refused here rather than eight
     // minutes later at the clone.
@@ -2826,12 +2854,14 @@ export async function deployApplication(
             ...planned.build,
             ...(rollback
                 ? { rollbackImage: rollback.imageTag }
-                : {
-                      release: {
-                          image: releaseImage(planned.ref.name, deployment.id),
-                          deploymentId: deployment.id
-                      }
-                  })
+                : prebuilt
+                  ? { prebuilt }
+                  : {
+                        release: {
+                            image: releaseImage(planned.ref.name, deployment.id),
+                            deploymentId: deployment.id
+                        }
+                    })
         }
     };
     const pinnedSource = gitSource && commitSha ? { ...gitSource, commitSha } : gitSource;
@@ -2840,14 +2870,30 @@ export async function deployApplication(
     // as "current" before it finishes, and the old version stays active until the
     // new one is up (zero-downtime cutover, the way Railway does it).
     queue.enqueue(target.id, () =>
-        runDeployment(deployment.id, planned, target, ownerId, pinnedSource, buildCommands)
+        runDeployment(
+            deployment.id,
+            planned,
+            target,
+            ownerId,
+            pinnedSource ?? (uploadArchive ? { archive: uploadArchive } : undefined),
+            buildCommands,
+            builder ?? undefined
+        )
     );
     return deployment.id;
 }
 
 /** What started a deployment, as the history names it. `settings` is the live
  *  release started again because something about how it runs changed. */
-export type DeploymentTrigger = "manual" | "push" | "preview" | "rollback" | "variables" | "settings" | "scale";
+export type DeploymentTrigger =
+    | "manual"
+    | "push"
+    | "preview"
+    | "rollback"
+    | "variables"
+    | "settings"
+    | "scale"
+    | "upload";
 
 /** What a run of a kept image carries over from the release it runs. */
 export interface RollbackSource {
@@ -3707,8 +3753,9 @@ function runDeployment(
     plan: AppDeployPlan,
     target: TargetRow,
     ownerId: string,
-    gitSource?: GitSource,
-    buildCommands?: BuildCommands
+    source?: BuildSource,
+    buildCommands?: BuildCommands,
+    builder?: BuildMachine
 ): Promise<void> {
     // Only an image source pulls a registry image that may need a login.
     const pullImages =
@@ -3724,11 +3771,19 @@ function runDeployment(
                 }
                 return result;
             }),
-        gitSource,
+        source,
         pullImages,
-        buildCommands
-    );
+        buildCommands,
+        builder
+    ).finally(async () => {
+        // An uploaded release is loaded onto its machine by now, or never will be.
+        if (plan.build.prebuilt) await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
+    });
 }
+
+/** Where a build from source comes from: a repository, or an uploaded folder's
+ *  kept archive. */
+export type BuildSource = GitSource | { readonly archive: string };
 
 /**
  * Keep the container port a deploy read from the image.
@@ -3935,9 +3990,11 @@ export async function executeDeployment(
     target: TargetRow,
     ownerId: string,
     run: (ctx: RuntimeContext, driver: RuntimeDriver) => Promise<DeployResult>,
-    buildSource?: GitSource,
+    buildSource?: BuildSource,
     pullImages: string[] = [],
-    buildCommands?: BuildCommands
+    buildCommands?: BuildCommands,
+    /** The machine a build from source runs on, when it is not this target. */
+    builder?: BuildMachine
 ): Promise<void> {
     // Cancelled while it waited its turn on the target's queue. Nothing has started,
     // so there is nothing to unwind - and starting now would ignore the operator.
@@ -3977,11 +4034,17 @@ export async function executeDeployment(
     // when this sat above the try that failure escaped with the row still saying
     // DEPLOYING - a deploy that had already stopped and looked like one still going.
     let ports: RuntimePorts | undefined;
+    let builderPorts: RuntimePorts | undefined;
     try {
         ports = await getPorts(target, ownerId, controller.signal);
+        // The build machine, opened alongside the one that runs it and bound to the
+        // same cancel.
+        if (builder) builderPorts = await getPorts(builder.target, ownerId, controller.signal);
         const driver = getDriver(target);
         const buildContext = buildSource
-            ? gitBuildContext(buildSource, log, buildCommands)
+            ? "archive" in buildSource
+                ? sourceUpload.uploadedBuildContext(buildSource.archive, log, buildCommands)
+                : gitBuildContext(buildSource, log, buildCommands)
             : undefined;
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but
@@ -3997,7 +4060,22 @@ export async function executeDeployment(
             }
         }
         const result = await run(
-            { ports, target: toTargetInfo(target), log, buildContext },
+            {
+                ports,
+                target: toTargetInfo(target),
+                log,
+                buildContext,
+                ...(builder && builderPorts
+                    ? {
+                          builder: {
+                              ports: builderPorts,
+                              name: builder.name,
+                              runsOn: builder.runsOn,
+                              stageDir: stagingDir()
+                          }
+                      }
+                    : {})
+            },
             driver
         );
         // An abort usually surfaces as a thrown connection error below, but work that
@@ -4037,6 +4115,7 @@ export async function executeDeployment(
         clearTimeout(deadline);
         if (running.get(deploymentId) === controller) running.delete(deploymentId);
         await ports?.dispose().catch(() => undefined);
+        await builderPorts?.dispose().catch(() => undefined);
         logStream.end();
     }
 }

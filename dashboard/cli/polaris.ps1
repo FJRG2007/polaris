@@ -358,7 +358,7 @@ function Get-Flag {
 # The arguments that are neither a flag nor a flag's value.
 function Get-Positional {
     param([string[]]$Arguments)
-    $valued = @("--tail", "--port", "--cert")
+    $valued = @("--tail", "--port", "--cert", "--context", "--dockerfile", "--platform")
     $out = @()
     for ($i = 0; $i -lt $Arguments.Count; $i++) {
         $arg = $Arguments[$i]
@@ -440,9 +440,111 @@ function Invoke-DeployNow {
     param([hashtable]$Context, [string[]]$Arguments)
     $positional = Get-Positional $Arguments
     $id = Resolve-Service $Context $(if ($positional.Count -gt 0) { $positional[0] } else { "" })
-    $answer = Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/deploy"
-    Write-Host "Deployment $($answer.deploymentId) started."
-    if (Test-Follow $Arguments) { Watch-Build $Context $answer.deploymentId }
+    if ($Arguments -contains "--local") {
+        $deploymentId = Invoke-LocalBuild $Context $id $Arguments
+    }
+    else {
+        $deploymentId = (Invoke-Api $Context "POST" "/api/v1/deploy/services/$id/deploy").deploymentId
+    }
+    Write-Host "Deployment $deploymentId started."
+    if (Test-Follow $Arguments) { Watch-Build $Context $deploymentId }
+}
+
+# Build here with this machine's own docker and send the image, rather than have
+# Polaris build the service's source. The image is tagged under the service's
+# release repository with a fresh tag, saved, gzipped to a temporary file and
+# streamed up without being held in memory. Answers the deployment id.
+function Invoke-LocalBuild {
+    param([hashtable]$Context, [string]$Id, [string[]]$Arguments)
+    Assert-Docker
+    $contextDir = Get-Flag $Arguments "--context" "."
+    $dockerfile = Get-Flag $Arguments "--dockerfile"
+    $platform = Get-Flag $Arguments "--platform"
+    if (-not (Test-Path $contextDir -PathType Container)) { Stop-WithError "$contextDir is not a folder" }
+    $repository = (Invoke-Api $Context "GET" "/api/v1/deploy/services/$Id/image").repository
+    $bytes = New-Object byte[] 6
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $image = "${repository}:" + (($bytes | ForEach-Object { $_.ToString("x2") }) -join "")
+    $buildArgs = @("build", "-t", $image)
+    if ($dockerfile) { $buildArgs += @("-f", $dockerfile) }
+    if ($platform) { $buildArgs += @("--platform", $platform) }
+    Write-Host "Building $image here..."
+    & docker @buildArgs $contextDir
+    if ($LASTEXITCODE -ne 0) { Stop-WithError "the build failed" }
+    $tar = [System.IO.Path]::GetTempFileName()
+    $archive = "$tar.gz"
+    try {
+        Write-Host "Saving it..."
+        & docker save -o $tar $image
+        if ($LASTEXITCODE -ne 0) { Stop-WithError "could not save the image" }
+        # Only the upload needs the tag; the layers stay in this machine's cache.
+        & docker image rm $image | Out-Null
+        $in = [System.IO.File]::OpenRead($tar)
+        $out = [System.IO.File]::Create($archive)
+        $gzip = New-Object System.IO.Compression.GZipStream($out, [System.IO.Compression.CompressionLevel]::Fastest)
+        try { $in.CopyTo($gzip) } finally { $gzip.Dispose(); $out.Dispose(); $in.Dispose() }
+        Remove-Item $tar -Force
+        $headers = @{ Authorization = "Bearer $($Context.Token)" }
+        # What it was built from, when the folder is a git checkout.
+        if (Get-Command git -ErrorAction SilentlyContinue) {
+            $commit = "$(Get-Quiet { git -C $contextDir rev-parse HEAD } | Select-Object -First 1)".Trim()
+            if ($commit -match '^[0-9a-f]{40}$') {
+                $headers["x-polaris-commit"] = $commit
+                $subject = "$(Get-Quiet { git -C $contextDir log -1 --pretty=%s } | Select-Object -First 1)"
+                if ($subject.Length -gt 400) { $subject = $subject.Substring(0, 400) }
+                if ($subject) { $headers["x-polaris-message"] = [uri]::EscapeDataString($subject) }
+            }
+        }
+        $size = (Get-Item $archive).Length
+        Write-Host "Sending $([Math]::Round($size / 1MB)) MB..."
+        return Send-Archive $Context "/api/v1/deploy/services/$Id/image" $archive $headers
+    }
+    finally {
+        Remove-Item $tar, $archive -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# POST a file as the body with its length declared and write buffering off, so
+# Windows PowerShell streams it instead of reading gigabytes into memory first.
+function Send-Archive {
+    param([hashtable]$Context, [string]$Path, [string]$File, [hashtable]$Headers)
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    if ($Context.Insecure) {
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+    }
+    $request = [System.Net.HttpWebRequest]::Create("$($Context.Url)$Path")
+    $request.Method = "POST"
+    $request.ContentType = "application/gzip"
+    $request.AllowWriteStreamBuffering = $false
+    $request.Timeout = [System.Threading.Timeout]::Infinite
+    $request.ReadWriteTimeout = 30 * 60 * 1000
+    $request.ContentLength = (Get-Item $File).Length
+    foreach ($name in $Headers.Keys) { $request.Headers[$name] = $Headers[$name] }
+    $source = [System.IO.File]::OpenRead($File)
+    try {
+        $body = $request.GetRequestStream()
+        try { $source.CopyTo($body) } finally { $body.Dispose() }
+    }
+    finally { $source.Dispose() }
+    try {
+        $response = $request.GetResponse()
+    }
+    catch [System.Net.WebException] {
+        $response = $_.Exception.Response
+        if (-not $response) { Stop-WithError "could not reach $($Context.Url)" }
+    }
+    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+    $said = $reader.ReadToEnd()
+    $reader.Close()
+    $status = [int]$response.StatusCode
+    if ($status -eq 401) { Stop-WithError "the key was refused - it may be revoked or expired; run 'polaris login'" }
+    $answer = $null
+    try { $answer = $said | ConvertFrom-Json } catch { }
+    if ($status -lt 200 -or $status -ge 300) {
+        if ($answer -and $answer.error) { Stop-WithError $answer.error }
+        Stop-WithError "the request failed with HTTP $status"
+    }
+    return $answer.deploymentId
 }
 
 function Show-Deployments {
@@ -664,6 +766,8 @@ Deploy (from anywhere, with an API key):
   polaris whoami                       Who the key acts as
   polaris projects                     Every service you can reach
   polaris deploy <service> [--follow]  Deploy, and watch the build
+  polaris deploy <service> --local [--context dir] [--dockerfile f] [--platform p]
+                                       Build here with docker and send the image
   polaris deployments <service>        Recent deployments
   polaris build-log <id> [--follow]    A deployment's build log
   polaris rollback <id> [--follow]     Put an earlier deployment back

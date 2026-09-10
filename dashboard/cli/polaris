@@ -211,8 +211,11 @@ is_ref() {
     printf '%s' "$1" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 }
 
+# A stored setting, or nothing. Never a failure: with no file (CI, driven by
+# POLARIS_URL and POLARIS_TOKEN) a failing `[ -f ]` here ended the whole command
+# under `set -e`, silently.
 conf() {
-    [ -f "$CONFIG_FILE" ] && sed -n "s#^$1=##p" "$CONFIG_FILE" | head -n1
+    if [ -f "$CONFIG_FILE" ]; then sed -n "s#^$1=##p" "$CONFIG_FILE" | head -n1; fi
 }
 
 load_credentials() {
@@ -363,17 +366,76 @@ follow_build() {
 deploy_now() {
     load_credentials
     follow=0
+    local_build=0
+    context=.
+    dockerfile=""
+    platform=""
     ref=""
-    for arg in "$@"; do
-        case "$arg" in
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
             --follow | -f) follow=1 ;;
-            *) ref=$arg ;;
+            --local) local_build=1 ;;
+            --context) shift; context=${1:-.} ;;
+            --dockerfile) shift; dockerfile=${1:-} ;;
+            --platform) shift; platform=${1:-} ;;
+            *) ref=$1 ;;
         esac
+        shift
     done
     id=$(pick_service "$ref")
-    deployment=$(api POST "/api/v1/deploy/services/$id/deploy?format=text")
+    if [ "$local_build" = "1" ]; then
+        deployment=$(deploy_local "$id" "$context" "$dockerfile" "$platform") || exit 1
+    else
+        deployment=$(api POST "/api/v1/deploy/services/$id/deploy?format=text")
+    fi
     echo "Deployment $deployment started."
     if [ "$follow" = "1" ]; then follow_build "$deployment"; fi
+}
+
+# Every byte of a string percent-encoded, which any URI decoder reads back.
+url_encode() {
+    printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n' | sed 's/../%&/g'
+}
+
+# Build here with this machine's own docker and send the image, rather than have
+# Polaris build the service's source. The image is tagged under the service's
+# release repository with a fresh tag, saved and gzipped to a private temporary
+# file, and streamed up; the deployment id is printed.
+deploy_local() {
+    id=$1
+    context=$2
+    dockerfile=$3
+    platform=$4
+    command -v docker >/dev/null 2>&1 || die "docker is required to build here"
+    command -v gzip >/dev/null 2>&1 || die "gzip is required to send the image"
+    [ -d "$context" ] || die "$context is not a folder"
+    repository=$(api GET "/api/v1/deploy/services/$id/image?format=text") || exit 1
+    tag=$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')
+    [ "${#tag}" -eq 12 ] || die "could not make a tag"
+    image="$repository:$tag"
+    set -- build -t "$image"
+    if [ -n "$dockerfile" ]; then set -- "$@" -f "$dockerfile"; fi
+    if [ -n "$platform" ]; then set -- "$@" --platform "$platform"; fi
+    echo "Building $image here..." >&2
+    docker "$@" "$context" >&2 || die "the build failed"
+    archive=$(umask 077 && mktemp) || die "cannot create a temporary file"
+    echo "Saving it..." >&2
+    if ! docker save "$image" | gzip -1 >"$archive"; then
+        rm -f "$archive"
+        die "could not save the image"
+    fi
+    # Only the upload needs the tag; the layers stay in this machine's cache.
+    docker image rm "$image" >/dev/null 2>&1 || true
+    set -- -H "content-type: application/gzip" -T "$archive"
+    if command -v git >/dev/null 2>&1 && git -C "$context" rev-parse --verify HEAD >/dev/null 2>&1; then
+        set -- "$@" -H "x-polaris-commit: $(git -C "$context" rev-parse HEAD)"
+        set -- "$@" -H "x-polaris-message: $(url_encode "$(git -C "$context" log -1 --pretty=%s | cut -c1-400)")"
+    fi
+    echo "Sending $(($(wc -c <"$archive") / 1048576)) MB..." >&2
+    rc=0
+    (api POST "/api/v1/deploy/services/$id/image?format=text" "$@") || rc=$?
+    rm -f "$archive"
+    return "$rc"
 }
 
 deploy_deployments() {
@@ -557,6 +619,8 @@ _polaris() {
     esac
     case "$prev" in
         --cert) COMPREPLY=($(compgen -W "le internal none" -- "$cur")); return ;;
+        --context) COMPREPLY=($(compgen -d -- "$cur")); return ;;
+        --dockerfile) COMPREPLY=($(compgen -f -- "$cur")); return ;;
     esac
     case "${COMP_WORDS[1]}" in
         deploy | deployments | logs | status | restart | stop | start | env | domains)
@@ -630,6 +694,8 @@ Deploy (from anywhere, with an API key):
   polaris whoami                       Who the key acts as
   polaris projects                     Every service you can reach
   polaris deploy <service> [--follow]  Deploy, and watch the build
+  polaris deploy <service> --local [--context dir] [--dockerfile f] [--platform p]
+                                       Build here with docker and send the image
   polaris deployments <service>        Recent deployments
   polaris build-log <id> [--follow]    A deployment's build log
   polaris rollback <id> [--follow]     Put an earlier deployment back

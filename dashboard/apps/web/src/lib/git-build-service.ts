@@ -319,25 +319,39 @@ export function gitBuildContext(
             }
         }
 
-        // Best-effort: a repository that defeats detection still deploys exactly as
-        // it did before, with the builder left to its own devices.
-        let configured: { root?: string; dockerfile?: string } = {};
-        if (commands) {
-            try {
-                configured = await configureBuild(dir, commands, log);
-            } catch (error) {
-                log(`Could not inspect the source: ${error instanceof Error ? error.message : "unknown error"}\n`);
-            }
-        }
-
-        // Tar the working tree (excluding the .git dir) as the build context.
-        const child = spawn("tar", ["-C", dir, "--exclude=./.git", "-c", "."]);
-        child.stderr.on("data", (chunk: Buffer) => onOutput(chunk));
-        const cleanup = (): void => void rm(dir, { recursive: true, force: true });
-        child.stdout.on("close", cleanup);
-        child.stdout.on("error", cleanup);
-        return { tar: child.stdout, ...configured };
+        return contextFromDirectory(dir, onOutput, commands);
     };
+}
+
+/**
+ * A build context from a directory already holding the source - a clone, or an
+ * uploaded folder unpacked: work out how to build it, then stream a tar of it.
+ * The directory is removed once the tar has been read.
+ */
+export async function contextFromDirectory(
+    dir: string,
+    onOutput: (chunk: Buffer) => void,
+    commands?: BuildCommands
+): Promise<BuildContext> {
+    const log = (line: string): void => onOutput(Buffer.from(line));
+    // Best-effort: a source that defeats detection still deploys exactly as it
+    // did before, with the builder left to its own devices.
+    let configured: { root?: string; dockerfile?: string } = {};
+    if (commands) {
+        try {
+            configured = await configureBuild(dir, commands, log);
+        } catch (error) {
+            log(`Could not inspect the source: ${error instanceof Error ? error.message : "unknown error"}\n`);
+        }
+    }
+
+    // Tar the working tree (excluding any .git dir) as the build context.
+    const child = spawn("tar", ["-C", dir, "--exclude=./.git", "-c", "."]);
+    child.stderr.on("data", (chunk: Buffer) => onOutput(chunk));
+    const cleanup = (): void => void rm(dir, { recursive: true, force: true });
+    child.stdout.on("close", cleanup);
+    child.stdout.on("error", cleanup);
+    return { tar: child.stdout, ...configured };
 }
 
 /**
