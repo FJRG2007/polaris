@@ -9,13 +9,13 @@
  */
 
 import { FilesPanel } from "./files-panel";
-import { RepoConfigPreview } from "./repo-config-preview";
-import type { ImportedConfig } from "@polaris/deploy";
 import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { LogViewer } from "@/components/log-viewer";
+import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
+import { RepoConfigPreview } from "./repo-config-preview";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
@@ -128,6 +128,8 @@ export interface ProjectSummary {
             runtimeVersion: string | null;
             /** Where a built site's files end up, when not the framework's default. */
             outputDirectory: string | null;
+            /** How many copies of it run now. */
+            replicas: number;
             /** The container port the app listens on (for the IP:port link and routes). */
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */

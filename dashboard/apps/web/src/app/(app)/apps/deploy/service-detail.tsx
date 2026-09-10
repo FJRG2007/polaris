@@ -724,7 +724,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" /> {region}
                     </span>
-                    <span>1 Replica</span>
+                    <span>
+                        {app.replicas} {app.replicas === 1 ? "Replica" : "Replicas"}
+                    </span>
                 </div>
                 {can("deploy.run") && (
                     <Button size="sm" disabled={busy} onClick={deploy}>
