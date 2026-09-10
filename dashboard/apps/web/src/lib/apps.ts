@@ -547,12 +547,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["projects", "services", "docker"]
         },
         {
-            label: "Capabilities",
-            href: "/apps/capabilities",
-            icon: Sparkles,
-            keywords: ["features", "what can it do", "overview", "rollbacks", "previews", "domains", "databases"]
-        },
-        {
             label: "Marketplace",
             href: "/apps/marketplace",
             icon: Store,

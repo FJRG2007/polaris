@@ -2,8 +2,7 @@
 
 Backlog of what the reference PaaS tools offer that Polaris Deploy should have.
 Statuses were checked against the code on 2026-09-10; keep them updated as items
-land. What a user can find today is listed, screen by screen, on the Deploy
-Capabilities page (`apps/web/src/lib/deploy/capabilities.ts`).
+land.
 
 **Status:** done - a user can do it from the dashboard (or the CLI/API row from
 there) - partial - todo.
