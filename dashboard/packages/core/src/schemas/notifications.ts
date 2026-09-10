@@ -176,6 +176,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "billing.budget",
+        group: "deploy",
+        label: "An organization's budget is running out",
+        description: "What an organization you run spent this month reached 80% of its budget, or went past it.",
+        level: "warning",
+        // Mail on: whoever set a budget wants to hear about it before the month
+        // is over, and the bell is not where anybody watches spending.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "tasks.assigned",
         group: "tasks",
         label: "Assigned a task",
