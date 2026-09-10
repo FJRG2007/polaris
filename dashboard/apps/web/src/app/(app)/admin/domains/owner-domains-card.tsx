@@ -13,7 +13,8 @@
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveOwnerDomainPolicyAction } from "./actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import { Button, Input, Select } from "@polaris/ui";
+import { PageSection } from "@/components/page-section";
 import {
     OWNER_DOMAIN_HINTS,
     OWNER_DOMAIN_LABELS,
@@ -45,69 +46,62 @@ export function OwnerDomainsCard({
     const changed = mode !== policy.mode || parsedCap !== policy.maxPerOwner;
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Domains of their own</CardTitle>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-                <p className="text-muted-foreground text-sm">
-                    An account or an organization can add a domain it owns, prove it with a DNS record, and have its
-                    services answer on it. Polaris orders certificates for those hostnames, so this decides who may
-                    point a name at this server.
+        <PageSection
+            title="Domains of their own"
+            description="An account or an organization can add a domain it owns, prove it with a DNS record, and have its services answer on it. Polaris orders certificates for those hostnames, so this decides who may point a name at this server."
+        >
+            <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (!capValid) return;
+                    setBusy(true);
+                    setError("");
+                    const result = await runAction(
+                        () => saveOwnerDomainPolicyAction({ mode, maxPerOwner: parsedCap }),
+                        setError
+                    );
+                    setBusy(false);
+                    if (!result?.policy || result.error) {
+                        if (result?.error) setError(result.error);
+                        return;
+                    }
+                    onSaved(result.policy);
+                }}
+            >
+                <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
+                    Who may add one
+                    <Select
+                        value={mode}
+                        options={OPTIONS}
+                        aria-label="Who may add a domain of their own"
+                        className="h-9"
+                        onValueChange={(next) => setMode(next as OwnerDomainMode)}
+                    />
+                </label>
+                <label className="text-muted-foreground flex w-32 flex-col gap-1 text-xs">
+                    Limit each to
+                    <Input
+                        value={cap}
+                        inputMode="numeric"
+                        className="h-9"
+                        aria-label="Domains per owner"
+                        onChange={(event) => setCap(event.target.value)}
+                    />
+                </label>
+                <Button type="submit" size="sm" disabled={busy || !changed || !capValid}>
+                    Save
+                </Button>
+                <p className="text-muted-foreground w-full text-xs">
+                    {!capValid ? "Enter a whole number, or 0 for no limit." : OWNER_DOMAIN_HINTS[mode]}
+                    {capValid && parsedCap === 0 ? " No limit on how many each may hold." : ""}
                 </p>
-                <form
-                    className="flex flex-wrap items-end gap-2"
-                    onSubmit={async (event) => {
-                        event.preventDefault();
-                        if (!capValid) return;
-                        setBusy(true);
-                        setError("");
-                        const result = await runAction(
-                            () => saveOwnerDomainPolicyAction({ mode, maxPerOwner: parsedCap }),
-                            setError
-                        );
-                        setBusy(false);
-                        if (!result?.policy || result.error) {
-                            if (result?.error) setError(result.error);
-                            return;
-                        }
-                        onSaved(result.policy);
-                    }}
-                >
-                    <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
-                        Who may add one
-                        <Select
-                            value={mode}
-                            options={OPTIONS}
-                            aria-label="Who may add a domain of their own"
-                            className="h-9"
-                            onValueChange={(next) => setMode(next as OwnerDomainMode)}
-                        />
-                    </label>
-                    <label className="text-muted-foreground flex w-32 flex-col gap-1 text-xs">
-                        Limit each to
-                        <Input
-                            value={cap}
-                            inputMode="numeric"
-                            className="h-9"
-                            aria-label="Domains per owner"
-                            onChange={(event) => setCap(event.target.value)}
-                        />
-                    </label>
-                    <Button type="submit" size="sm" disabled={busy || !changed || !capValid}>
-                        Save
-                    </Button>
-                    <p className="text-muted-foreground w-full text-xs">
-                        {!capValid ? "Enter a whole number, or 0 for no limit." : OWNER_DOMAIN_HINTS[mode]}
-                        {capValid && parsedCap === 0 ? " No limit on how many each may hold." : ""}
+                {error && (
+                    <p role="alert" className="text-danger w-full text-xs">
+                        {error}
                     </p>
-                    {error && (
-                        <p role="alert" className="text-danger w-full text-xs">
-                            {error}
-                        </p>
-                    )}
-                </form>
-            </CardBody>
-        </Card>
+                )}
+            </form>
+        </PageSection>
     );
 }

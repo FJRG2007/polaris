@@ -60,7 +60,7 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
-    DnsRecordCard,
+    DnsRecordTable,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -3228,11 +3228,15 @@ function SettingsTab({
                             )}
                             {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote.text}</p>}
                             {dnsNote?.record && (
-                                <DnsRecordCard
-                                    type="A"
-                                    name={dnsNote.record.name}
-                                    value={dnsNote.record.ip}
-                                    status={dnsNote.record.conflict ? "conflict" : "waiting"}
+                                <DnsRecordTable
+                                    records={[
+                                        {
+                                            type: "A",
+                                            name: dnsNote.record.name,
+                                            value: dnsNote.record.ip,
+                                            status: dnsNote.record.conflict ? "conflict" : "waiting"
+                                        }
+                                    ]}
                                 />
                             )}
                             <div className="flex justify-end">

@@ -16,26 +16,13 @@
 
 import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
-import { useConfirm } from "@/components/confirm-dialog";
+import { PageSection } from "@/components/page-section";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, DnsRecordCard, Input } from "@polaris/ui";
-import {
-    AlertTriangle,
-    CheckCircle2,
-    ChevronDown,
-    ChevronRight,
-    Clock,
-    Globe,
-    KeyRound,
-    Loader2,
-    Plus,
-    RefreshCw,
-    ShieldCheck,
-    Trash2
-} from "lucide-react";
+import { Badge, Button, ConfirmDeleteDialog, DnsRecordTable, EmptyState, Input } from "@polaris/ui";
+import { AlertTriangle, CheckCircle2, Clock, Globe, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
     addOwnerDomainAction,
     checkOwnerDomainAction,
@@ -76,7 +63,6 @@ export function OwnerDomainsView({
      *  input for the same reason, which is what actually enforces it. */
     instanceDomains: string[];
 }) {
-    const [confirm, confirmElement] = useConfirm();
     const [domains, setDomains] = useState(initial);
     const [value, setValue] = useState("");
     const [busy, setBusy] = useState(false);
@@ -101,7 +87,7 @@ export function OwnerDomainsView({
         setDomains((current) => current.map((entry) => (entry.id === next.id ? next : entry)));
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
             {error && (
                 <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
                     {error}
@@ -109,24 +95,18 @@ export function OwnerDomainsView({
             )}
 
             {domains.length === 0 ? (
-                <Card>
-                    <CardBody className="flex flex-col items-center gap-2 py-10 text-center">
-                        <Globe className="text-muted-foreground size-6 shrink-0" />
-                        <p className="text-sm font-medium">No domain of your own yet</p>
-                        <p className="text-muted-foreground max-w-md text-sm">
-                            Add one you already own and Polaris will give services here hostnames under it. Until
-                            then they take this Polaris&rsquo;s own domains.
-                        </p>
-                    </CardBody>
-                </Card>
+                <EmptyState
+                    icon={<Globe />}
+                    title="No domain of your own yet"
+                    description="Add one you already own and Polaris will give services here hostnames under it. Until then they take this Polaris's own domains."
+                />
             ) : (
                 domains.map((entry) => (
-                    <DomainCard
+                    <DomainSection
                         key={entry.id}
                         owner={owner}
                         domain={entry}
                         publicIp={publicIp}
-                        confirm={confirm}
                         onChecked={replace}
                         onRemoved={(id) => setDomains((current) => current.filter((row) => row.id !== id))}
                         onError={setError}
@@ -135,76 +115,71 @@ export function OwnerDomainsView({
             )}
 
             {canAdd ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Add a domain</CardTitle>
-                    </CardHeader>
-                    <CardBody>
-                        <form
-                            className="flex flex-wrap items-end gap-2"
-                            onSubmit={async (event) => {
-                                event.preventDefault();
-                                if (!value.trim() || refusal) return;
-                                setBusy(true);
-                                setError("");
-                                const result = await runAction(
-                                    () => addOwnerDomainAction(owner, value.trim()),
-                                    setError
-                                );
-                                setBusy(false);
-                                if (!result || result.error) {
-                                    if (result?.error) setError(result.error);
-                                    return;
-                                }
-                                if (result.domain) setDomains((current) => [...current, result.domain!]);
-                                setValue("");
-                            }}
+                <PageSection title="Add a domain">
+                    <form
+                        className="flex flex-wrap items-end gap-2"
+                        onSubmit={async (event) => {
+                            event.preventDefault();
+                            if (!value.trim() || refusal) return;
+                            setBusy(true);
+                            setError("");
+                            const result = await runAction(
+                                () => addOwnerDomainAction(owner, value.trim()),
+                                setError
+                            );
+                            setBusy(false);
+                            if (!result || result.error) {
+                                if (result?.error) setError(result.error);
+                                return;
+                            }
+                            if (result.domain) setDomains((current) => [...current, result.domain!]);
+                            setValue("");
+                        }}
+                    >
+                        <label className="text-muted-foreground flex min-w-56 flex-1 flex-col gap-1 text-xs">
+                            Domain
+                            <Input
+                                value={value}
+                                placeholder="example.com"
+                                className="h-9"
+                                aria-invalid={refusal ? true : undefined}
+                                aria-describedby={refusal ? "owner-domain-refusal" : undefined}
+                                onChange={(event) => setValue(event.target.value)}
+                            />
+                        </label>
+                        <Button
+                            type="submit"
+                            size="sm"
+                            aria-disabled={busy || !value.trim() || refusal !== null}
+                            disabled={busy || !value.trim() || refusal !== null}
                         >
-                            <label className="text-muted-foreground flex min-w-56 flex-1 flex-col gap-1 text-xs">
-                                Domain
-                                <Input
-                                    value={value}
-                                    placeholder="example.com"
-                                    className="h-9"
-                                    aria-invalid={refusal ? true : undefined}
-                                    aria-describedby={refusal ? "owner-domain-refusal" : undefined}
-                                    onChange={(event) => setValue(event.target.value)}
-                                />
-                            </label>
-                            <Button
-                                type="submit"
-                                size="sm"
-                                aria-disabled={busy || !value.trim() || refusal !== null}
-                                disabled={busy || !value.trim() || refusal !== null}
-                            >
-                                <Plus className="size-4 shrink-0" /> Add
-                            </Button>
-                            {refusal ? (
-                                <p id="owner-domain-refusal" className="text-danger w-full text-xs">
-                                    {refusal}
-                                </p>
-                            ) : (
-                                <p className="text-muted-foreground w-full text-xs">
-                                    A domain or a subdomain you have delegated - `example.com` or
-                                    `apps.example.com`. Polaris will show you the two records to publish.
-                                </p>
-                            )}
-                        </form>
-                    </CardBody>
-                </Card>
+                            <Plus className="size-4 shrink-0" /> Add
+                        </Button>
+                        {refusal ? (
+                            <p id="owner-domain-refusal" className="text-danger w-full text-xs">
+                                {refusal}
+                            </p>
+                        ) : (
+                            <p className="text-muted-foreground w-full text-xs">
+                                A domain or a subdomain you have delegated - `example.com` or
+                                `apps.example.com`. Polaris will show you the two records to publish.
+                            </p>
+                        )}
+                    </form>
+                </PageSection>
             ) : (
                 <p className="text-muted-foreground text-sm">{blockedReason}</p>
             )}
-            {confirmElement}
         </div>
     );
 }
 
-function DomainCard({
+/** One domain: whether it is ready, the records it still needs, its certificate,
+ *  and - with a DNS token of its own - its zone's records. */
+function DomainSection({
     owner,
     domain,
     publicIp,
-    confirm,
     onChecked,
     onRemoved,
     onError
@@ -212,16 +187,24 @@ function DomainCard({
     owner: DomainOwnerRef;
     domain: OwnerDomainView;
     publicIp: string | null;
-    confirm: ReturnType<typeof useConfirm>[0];
     onChecked: (domain: OwnerDomainView) => void;
     onRemoved: (id: string) => void;
     onError: (message: string) => void;
 }) {
     const format = useDisplayFormat();
     const [busy, setBusy] = useState(false);
-    const [recordsOpen, setRecordsOpen] = useState(false);
+    const [removing, setRemoving] = useState(false);
 
     const ready = domain.verified && domain.wildcardOk;
+
+    async function remove() {
+        setRemoving(false);
+        setBusy(true);
+        const result = await runAction(() => removeOwnerDomainAction(owner, domain.id), onError);
+        setBusy(false);
+        if (result && !result.error) onRemoved(domain.id);
+        else if (result?.error) onError(result.error);
+    }
 
     async function check() {
         setBusy(true);
@@ -238,13 +221,13 @@ function DomainCard({
     const secondsLeft = useRecheck(!ready && !busy, check);
 
     return (
-        <Card>
-            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-2">
-                    <Globe className="size-4 shrink-0" />
-                    {domain.domain}
+        <PageSection
+            wide
+            title={
+                <>
+                    <span className="min-w-0 break-all">{domain.domain}</span>
                     {ready ? (
-                        <Badge variant="primary">
+                        <Badge variant="success">
                             <CheckCircle2 className="size-3 shrink-0" /> Ready
                         </Badge>
                     ) : (
@@ -252,8 +235,16 @@ function DomainCard({
                             <Clock className="size-3 shrink-0" /> Waiting on DNS
                         </Badge>
                     )}
-                </CardTitle>
-                <div className="flex shrink-0 items-center gap-1">
+                </>
+            }
+            description={
+                <span aria-live="polite">
+                    {domain.checkedAt ? `Last checked ${format.dateTime(domain.checkedAt)}.` : "Not checked yet."}
+                    {!ready && secondsLeft !== null && ` Checking again in ${secondsLeft}s.`}
+                </span>
+            }
+            actions={
+                <>
                     <Button
                         size="sm"
                         variant="ghost"
@@ -266,85 +257,72 @@ function DomainCard({
                         Check
                     </Button>
                     <Button
-                        size="sm"
+                        size="icon-sm"
                         variant="ghost"
                         disabled={busy}
                         aria-label={`Remove ${domain.domain}`}
                         title="Remove"
-                        onClick={async () => {
-                            const ok = await confirm({
-                                title: `Remove ${domain.domain}?`,
-                                description:
-                                    "New services stop being offered hostnames under it. Anything already deployed on one keeps its address until you change it.",
-                                confirmLabel: "Remove",
-                                danger: true
-                            });
-                            if (!ok) return;
-                            setBusy(true);
-                            const result = await runAction(() => removeOwnerDomainAction(owner, domain.id), onError);
-                            setBusy(false);
-                            if (result && !result.error) onRemoved(domain.id);
-                            else if (result?.error) onError(result.error);
-                        }}
+                        onClick={() => setRemoving(true)}
                     >
                         <Trash2 className="size-4 shrink-0" />
                     </Button>
+                </>
+            }
+        >
+            {domain.detail && <p className="text-muted-foreground text-sm">{domain.detail}</p>}
+
+            {!ready && (
+                <DnsRecordTable
+                    records={[
+                        {
+                            type: "TXT",
+                            name: domain.txtName,
+                            value: domain.txtValue,
+                            status: domain.verified ? "done" : "waiting",
+                            note: "Proves the domain is yours."
+                        },
+                        {
+                            type: "A",
+                            name: domain.wildcard,
+                            value: publicIp,
+                            valueFallback: "this server's public address, once it is detected",
+                            status: domain.wildcardOk ? "done" : "waiting",
+                            note: "Makes every hostname Polaris mints under it arrive here."
+                        }
+                    ]}
+                />
+            )}
+
+            {domain.verified && (
+                <CertificatePanel owner={owner} domain={domain} onChanged={onChecked} onError={onError} />
+            )}
+
+            {/* Editing records takes the domain's own token: this Polaris's
+                token may reach the zone, but it was never handed over for this. */}
+            {domain.verified && domain.hasDnsToken && (
+                <div className="flex flex-col gap-3">
+                    <h3 className="text-sm font-medium">DNS records</h3>
+                    <DnsZoneEditor scope={{ kind: "owner", ref: owner, domainId: domain.id }} />
                 </div>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-                {domain.detail && <p className="text-muted-foreground text-sm">{domain.detail}</p>}
+            )}
 
-                {!ready && (
-                    <div className="flex flex-col gap-2">
-                        <DnsRecordCard
-                            status={domain.verified ? "done" : "waiting"}
-                            type="TXT"
-                            name={domain.txtName}
-                            value={domain.txtValue}
-                            note="Proves the domain is yours."
-                        />
-                        <DnsRecordCard
-                            status={domain.wildcardOk ? "done" : "waiting"}
-                            type="A"
-                            name={domain.wildcard}
-                            value={publicIp}
-                            valueFallback="this server's public address, once it is detected"
-                            note="Makes every hostname Polaris mints under it arrive here."
-                        />
-                    </div>
-                )}
-
-                {domain.verified && (
-                    <CertificatePanel owner={owner} domain={domain} onChanged={onChecked} onError={onError} />
-                )}
-
-                {/* Editing records takes the domain's own token: this Polaris's
-                    token may reach the zone, but it was never handed over for this. */}
-                {domain.verified && domain.hasDnsToken && (
-                    <div className="flex flex-col gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setRecordsOpen((open) => !open)}
-                            aria-expanded={recordsOpen}
-                            className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs"
-                        >
-                            {recordsOpen ? (
-                                <ChevronDown className="size-3.5 shrink-0" />
-                            ) : (
-                                <ChevronRight className="size-3.5 shrink-0" />
-                            )}
-                            DNS records
-                        </button>
-                        {recordsOpen && <DnsZoneEditor scope={{ kind: "owner", ref: owner, domainId: domain.id }} />}
-                    </div>
-                )}
-
-                <p className="text-muted-foreground text-xs" aria-live="polite">
-                    {domain.checkedAt ? `Last checked ${format.dateTime(domain.checkedAt)}.` : "Not checked yet."}
-                    {!ready && secondsLeft !== null && ` Checking again in ${secondsLeft}s.`}
-                </p>
-            </CardBody>
-        </Card>
+            <ConfirmDeleteDialog
+                open={removing}
+                onOpenChange={setRemoving}
+                kind="domain"
+                name={domain.domain}
+                requireTyping={false}
+                title="Remove domain"
+                question={
+                    <>
+                        Remove <span className="font-medium text-foreground">{domain.domain}</span>?
+                    </>
+                }
+                description="New services stop being offered hostnames under it. Anything already deployed on one keeps its address until you change it."
+                confirmLabel="Remove"
+                onConfirm={() => void remove()}
+            />
+        </PageSection>
     );
 }
 
@@ -443,10 +421,9 @@ function CertificatePanel({
               : `Covers ${covered} once it is issued.`;
 
     return (
-        <div className="border-border flex flex-col gap-2 rounded-md border px-3 py-2">
+        <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-                <ShieldCheck className="text-muted-foreground size-4 shrink-0" />
-                <span className="font-medium">Wildcard certificate</span>
+                <h3 className="font-medium">Wildcard certificate</h3>
                 {certificate?.status === "issued" ? (
                     <Badge variant="success">Issued</Badge>
                 ) : certificate?.status === "failed" ? (

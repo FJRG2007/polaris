@@ -18,26 +18,15 @@
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
 import type { ServerEnvironment } from "@polaris/core";
+import { PageSection } from "@/components/page-section";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
-import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/actions";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
+import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/actions";
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
+import { Badge, Button, Checkbox, DnsRecordTable, Input, Select, Skeleton } from "@polaris/ui";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "@/app/(app)/apps/servers/environment-meta";
 import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    Checkbox,
-    DnsRecordCard,
-    Input,
-    Select,
-    Skeleton
-} from "@polaris/ui";
 import {
     approachesFor,
     approachOf,
@@ -69,8 +58,7 @@ import {
     Router,
     Sparkles,
     Trash2,
-    TriangleAlert,
-    Wand2
+    TriangleAlert
 } from "lucide-react";
 
 /** A zone row as the wizard edits it (the saved shape, plus a key for React). */
@@ -199,50 +187,45 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
 
     if (!state) {
         return (
-            // The card's own chrome, because none of it waits on the read: the setup is
-            // recognisable and its place on the page is held while the state - which
+            // The section's own heading, because none of it waits on the read: the setup
+            // is recognisable and its place on the page is held while the state - which
             // re-checks DNS and looks up the public IP - is still on its way.
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2">
-                            <Wand2 className="size-4 text-primary" /> Guided setup
-                        </CardTitle>
-                        <div className="flex items-center gap-1.5">
-                            {STEPS.map((title) => (
-                                <span key={title} className="h-1.5 w-6 rounded-full bg-border" title={title} />
+            <PageSection
+                title="Guided setup"
+                actions={
+                    <div className="flex items-center gap-1.5">
+                        {STEPS.map((title) => (
+                            <span key={title} className="h-1.5 w-6 rounded-full bg-border" title={title} />
+                        ))}
+                    </div>
+                }
+            >
+                {loadError ? (
+                    <>
+                        <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {loadError}
+                        </p>
+                        <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
+                            <RefreshCw className="size-4" /> Try again
+                        </Button>
+                    </>
+                ) : (
+                    // The shape of the first question: what it asks, the choices it
+                    // lays out, and what picking one would mean.
+                    <>
+                        <div className="flex flex-col gap-1.5">
+                            <Skeleton className="h-4 w-56" />
+                            <Skeleton className="h-3 w-4/5" />
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            {ENVIRONMENT_CHOICES.map((option) => (
+                                <Skeleton key={option} className="h-16" />
                             ))}
                         </div>
-                    </div>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4">
-                    {loadError ? (
-                        <>
-                            <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
-                                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {loadError}
-                            </p>
-                            <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
-                                <RefreshCw className="size-4" /> Try again
-                            </Button>
-                        </>
-                    ) : (
-                        // The shape of the first question: what it asks, the choices it
-                        // lays out, and what picking one would mean.
-                        <>
-                            <div className="flex flex-col gap-1.5">
-                                <Skeleton className="h-4 w-56" />
-                                <Skeleton className="h-3 w-4/5" />
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {ENVIRONMENT_CHOICES.map((option) => (
-                                    <Skeleton key={option} className="h-16" />
-                                ))}
-                            </div>
-                            <Skeleton className="h-10 w-full" />
-                        </>
-                    )}
-                </CardBody>
-            </Card>
+                        <Skeleton className="h-10 w-full" />
+                    </>
+                )}
+            </PageSection>
         );
     }
 
@@ -327,134 +310,129 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2">
-                        <Wand2 className="size-4 text-primary" /> Guided setup
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5">
-                        {/* The domain in use, on every step: the answer to "what is this
-                            box on" was two steps deep before, so reopening the setup read
-                            as though the domain had never been saved. */}
-                        {state.zones.baseDomain && <Badge variant="neutral">{state.zones.baseDomain}</Badge>}
-                        {STEPS.map((title, index) => (
-                            <span
-                                key={title}
-                                className={`h-1.5 w-6 rounded-full ${index <= step ? "bg-primary" : "bg-border"}`}
-                                title={title}
-                            />
-                        ))}
-                    </div>
+        <PageSection
+            title="Guided setup"
+            actions={
+                <div className="flex items-center gap-1.5">
+                    {/* The domain in use, on every step: the answer to "what is this
+                        box on" was two steps deep before, so reopening the setup read
+                        as though the domain had never been saved. */}
+                    {state.zones.baseDomain && <Badge variant="neutral">{state.zones.baseDomain}</Badge>}
+                    {STEPS.map((title, index) => (
+                        <span
+                            key={title}
+                            className={`h-1.5 w-6 rounded-full ${index <= step ? "bg-primary" : "bg-border"}`}
+                            title={title}
+                        />
+                    ))}
                 </div>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-4">
-                {resumed && step <= 2 && (
-                    <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                        <span>Picked up where you left off.</span>
-                        <button
-                            type="button"
-                            onClick={startOver}
-                            className="font-medium text-foreground underline-offset-2 hover:underline"
-                        >
-                            Start over
-                        </button>
-                    </div>
-                )}
-
-                {step === 0 && (
-                    <EnvironmentStep
-                        selected={environment}
-                        detected={state.environment.detected}
-                        onSelect={pickEnvironment}
-                    />
-                )}
-
-                {step === 1 && (
-                    <StrategyStep
-                        environment={environment}
-                        choice={choice}
-                        approaches={approaches}
-                        selected={strategy}
-                        tunnelReady={state.cloudflareTunnelReady}
-                        lanIp={state.lanIp}
-                        gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)}
-                        onSelect={setStrategy}
-                    />
-                )}
-
-                {step === 2 && (
-                    <DomainStep
-                        strategy={strategy}
-                        baseDomain={baseDomain}
-                        effectiveBase={effectiveBase}
-                        zones={zones}
-                        duckSub={duckSub}
-                        duckToken={duckToken}
-                        hasDuckToken={state.domains.hasDuckdnsToken}
-                        useForDashboard={useForDashboard}
-                        provider={provider}
-                        cloudflareConnected={state.cloudflareConnected}
-                        onBaseDomain={setBaseDomain}
-                        onZones={setZones}
-                        onDuckSub={setDuckSub}
-                        onDuckToken={setDuckToken}
-                        onUseForDashboard={setUseForDashboard}
-                    />
-                )}
-
-                {step === 3 && (
-                    <DnsStep
-                        state={state}
-                        publicIp={state.network.publicIp}
-                        provider={provider}
-                        onRefresh={refresh}
-                    />
-                )}
-
-                {error && (
-                    <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
-                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {error}
-                    </p>
-                )}
-
-                <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStep((current) => Math.max(0, current - 1))}
-                        disabled={step === 0 || busy}
+            }
+        >
+            {resumed && step <= 2 && (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                    <span>Picked up where you left off.</span>
+                    <button
+                        type="button"
+                        onClick={startOver}
+                        className="font-medium text-foreground underline-offset-2 hover:underline"
                     >
-                        <ChevronLeft className="size-4" /> Back
-                    </Button>
-                    {step < 2 && (
-                        // Nothing past here reads well without an answer: the exposure
-                        // step would rank for a server it knows nothing about, promise
-                        // forwarding rules and have no router to point at. Detection
-                        // preselects a real answer whenever it managed one, so this
-                        // only stops someone whose box could not be classified.
-                        <Button
-                            size="sm"
-                            onClick={() => setStep((current) => current + 1)}
-                            disabled={step === 0 && environment === "unknown"}
-                        >
-                            Continue
-                        </Button>
-                    )}
-                    {step === 2 && (
-                        <Button size="sm" onClick={save} disabled={busy}>
-                            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {busy ? "Saving..." : "Save and continue"}
-                        </Button>
-                    )}
-                    {step === 3 && (
-                        <span className="flex items-center gap-1.5 text-sm text-success">
-                            <CheckCircle2 className="size-4" /> Setup saved.
-                        </span>
-                    )}
+                        Start over
+                    </button>
                 </div>
-            </CardBody>
-        </Card>
+            )}
+
+            {step === 0 && (
+                <EnvironmentStep
+                    selected={environment}
+                    detected={state.environment.detected}
+                    onSelect={pickEnvironment}
+                />
+            )}
+
+            {step === 1 && (
+                <StrategyStep
+                    environment={environment}
+                    choice={choice}
+                    approaches={approaches}
+                    selected={strategy}
+                    tunnelReady={state.cloudflareTunnelReady}
+                    lanIp={state.lanIp}
+                    gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)}
+                    onSelect={setStrategy}
+                />
+            )}
+
+            {step === 2 && (
+                <DomainStep
+                    strategy={strategy}
+                    baseDomain={baseDomain}
+                    effectiveBase={effectiveBase}
+                    zones={zones}
+                    duckSub={duckSub}
+                    duckToken={duckToken}
+                    hasDuckToken={state.domains.hasDuckdnsToken}
+                    useForDashboard={useForDashboard}
+                    provider={provider}
+                    cloudflareConnected={state.cloudflareConnected}
+                    onBaseDomain={setBaseDomain}
+                    onZones={setZones}
+                    onDuckSub={setDuckSub}
+                    onDuckToken={setDuckToken}
+                    onUseForDashboard={setUseForDashboard}
+                />
+            )}
+
+            {step === 3 && (
+                <DnsStep
+                    state={state}
+                    publicIp={state.network.publicIp}
+                    provider={provider}
+                    onRefresh={refresh}
+                />
+            )}
+
+            {error && (
+                <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {error}
+                </p>
+            )}
+
+            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStep((current) => Math.max(0, current - 1))}
+                    disabled={step === 0 || busy}
+                >
+                    <ChevronLeft className="size-4" /> Back
+                </Button>
+                {step < 2 && (
+                    // Nothing past here reads well without an answer: the exposure
+                    // step would rank for a server it knows nothing about, promise
+                    // forwarding rules and have no router to point at. Detection
+                    // preselects a real answer whenever it managed one, so this
+                    // only stops someone whose box could not be classified.
+                    <Button
+                        size="sm"
+                        onClick={() => setStep((current) => current + 1)}
+                        disabled={step === 0 && environment === "unknown"}
+                    >
+                        Continue
+                    </Button>
+                )}
+                {step === 2 && (
+                    <Button size="sm" onClick={save} disabled={busy}>
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                        {busy ? "Saving..." : "Save and continue"}
+                    </Button>
+                )}
+                {step === 3 && (
+                    <span className="flex items-center gap-1.5 text-sm text-success">
+                        <CheckCircle2 className="size-4" /> Setup saved.
+                    </span>
+                )}
+            </div>
+        </PageSection>
     );
 }
 
@@ -1008,35 +986,31 @@ function DnsStep({
                           : "Polaris could not detect this server's public IP."
                 }
             />
-            <div className="grid gap-2 md:grid-cols-2">
-                {state.records.flatMap((record) =>
-                    [record.host, record.wildcard].map((name) => (
-                        <DnsRecordCard
-                            key={name}
-                            type="A"
-                            name={name}
-                            value={publicIp}
-                            valueFallback="your public IP"
-                            status={done.get(record.wildcard) === true ? "done" : "waiting"}
-                        />
-                    ))
-                )}
-                {/* One per game, and said as such: an operator who has never deployed a
-                    game server has no reason to guess what `*.mc` is for. Without it
-                    every server writes a record of its own, which is the thing that
-                    fills a zone up. */}
-                {state.gameRecords.map((record) => (
-                    <DnsRecordCard
-                        key={record.wildcard}
-                        type="A"
-                        name={record.wildcard}
-                        value={publicIp}
-                        valueFallback="your public IP"
-                        status={done.get(record.wildcard) === true ? "done" : "waiting"}
-                        note={`Covers every ${record.game} server, so each one costs no DNS record.`}
-                    />
-                ))}
-            </div>
+            <DnsRecordTable
+                records={[
+                    ...state.records.flatMap((record) =>
+                        [record.host, record.wildcard].map((name) => ({
+                            type: "A",
+                            name,
+                            value: publicIp,
+                            valueFallback: "your public IP",
+                            status: done.get(record.wildcard) === true ? ("done" as const) : ("waiting" as const)
+                        }))
+                    ),
+                    // One per game, and said as such: an operator who has never deployed a
+                    // game server has no reason to guess what `*.mc` is for. Without it
+                    // every server writes a record of its own, which is the thing that
+                    // fills a zone up.
+                    ...state.gameRecords.map((record) => ({
+                        type: "A",
+                        name: record.wildcard,
+                        value: publicIp,
+                        valueFallback: "your public IP",
+                        status: done.get(record.wildcard) === true ? ("done" as const) : ("waiting" as const),
+                        note: `Covers every ${record.game} server, so each one costs no DNS record.`
+                    }))
+                ]}
+            />
 
             {provider && <ProviderHint provider={provider} cloudflareConnected={state.cloudflareConnected} />}
 

@@ -22,7 +22,7 @@ export { Input, type InputProps } from "./components/input";
 export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton } from "./components/copy-button";
-export { DnsRecordCard, type DnsRecordField, type DnsRecordStatus } from "./components/dns-record-card";
+export { DnsRecordTable, type DnsRecordRow, type DnsRecordStatus } from "./components/dns-record-table";
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
 export { EmptyState } from "./components/empty-state";

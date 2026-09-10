@@ -23,8 +23,9 @@ export default async function DomainsPage() {
     await requireAdmin();
 
     return (
-        // Narrow page: centre the column in the content area, header included.
-        <div className="mx-auto flex w-full max-w-2xl flex-col">
+        // Wide, because the records table needs every column it can get; the forms
+        // cap their own width beside their headings (see `PageSection`).
+        <div className="mx-auto flex w-full max-w-7xl flex-col">
             <PageHeader
                 title="Domains"
                 description="Choose the domains Polaris uses for the dashboard and for the links it hands out."
