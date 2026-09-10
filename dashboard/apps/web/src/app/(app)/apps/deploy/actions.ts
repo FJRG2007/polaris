@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import { headers } from "next/headers";
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
@@ -32,6 +33,7 @@ import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { applyImportedAfterCreate, importedCreate } from "@/lib/deploy/repo-import";
+import { serviceTemplate, serviceTemplateIdSchema, templateVariables } from "@polaris/core";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { inspectGithubRepo, readGithubRepoSetup, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import {
@@ -45,19 +47,20 @@ import {
     type CloudflareAccountStatus
 } from "@/lib/integrations/cloudflare-account-service";
 import {
-    envVarScope,
-    listEnvVars,
-    revealEnvVar,
-    type EnvScope,
-    type EnvVarView
-} from "@/lib/env-var-service";
-import {
     listVolumes,
     createVolume,
     updateVolume,
     deleteVolume,
     type VolumeView
 } from "@/lib/deploy-volume-service";
+import {
+    envVarScope,
+    listEnvVars,
+    revealEnvVar,
+    setEnvVars,
+    type EnvScope,
+    type EnvVarView
+} from "@/lib/env-var-service";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -347,9 +350,19 @@ export async function createApplicationAction(input: {
     /** Take the settings the repository's own deploy files set (railway.json,
      *  render.yaml, netlify.toml, vercel.json, Procfile, app.json). */
     useRepoConfig?: boolean;
+    /** A one-click service: its image, port, volumes and variables come from the
+     *  template, and anything given here beside a name is ignored. */
+    templateId?: string;
 }): Promise<{ error?: string; deploymentId?: string; applicationId?: string; needs?: string[] }> {
     const user = await requirePermission("deploy.manage");
-    const name = input.name?.trim();
+    let template: ReturnType<typeof serviceTemplate> = null;
+    if (input.templateId !== undefined) {
+        const id = serviceTemplateIdSchema.safeParse(input.templateId);
+        if (!id.success) return { error: "That template is not in the list" };
+        template = serviceTemplate(id.data);
+        if (template) input = { ...input, sourceType: "image", imageRef: template.image, port: template.port };
+    }
+    const name = input.name?.trim() || template?.name;
     if (!name) return { error: "An application name is required" };
     const isNixpacks = input.sourceType === "nixpacks";
     const isGit = input.sourceType === "dockerfile" || input.sourceType === "git" || isNixpacks;
@@ -454,6 +467,23 @@ export async function createApplicationAction(input: {
             targetType: "application",
             targetId: app.id
         });
+        // A template's volumes and variables go on before the first deploy reads them.
+        if (template) {
+            for (const volume of template.volumes) {
+                await createVolume(owner, {
+                    applicationId: app.id,
+                    name: `${template.id}-${volume.name}`,
+                    mountPath: volume.mountPath,
+                    kind: "volume"
+                });
+            }
+            await setEnvVars(
+                "application",
+                app.id,
+                owner,
+                templateVariables(template, app.slug, () => randomBytes(32).toString("hex"))
+            );
+        }
         // Give it a free testing subdomain and kick off the first deploy right away,
         // like Railway/Dokploy. Auto-detect the server IP (Caddy's X-Server-Ip) so the
         // free sslip.io subdomain works with no setup even on a LAN.

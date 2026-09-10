@@ -9,8 +9,8 @@
  */
 
 import { FilesPanel } from "./files-panel";
-import { NewFolderForm } from "./upload-source";
 import * as deployActions from "./actions";
+import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { LogViewer } from "@/components/log-viewer";
@@ -26,14 +26,6 @@ import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
-    databaseCreateSchema,
-    dbEngineLabel,
-    MANAGED_ENGINES,
-    MANAGED_ENGINE_INFO,
-    type DatabaseCreateInput,
-    type ManagedEngine
-} from "@polaris/core";
-import {
     Badge,
     Button,
     ConfirmDeleteDialog,
@@ -48,8 +40,19 @@ import {
     type SelectOption
 } from "@polaris/ui";
 import {
+    databaseCreateSchema,
+    dbEngineLabel,
+    MANAGED_ENGINES,
+    MANAGED_ENGINE_INFO,
+    SERVICE_TEMPLATES,
+    type ServiceTemplate,
+    type DatabaseCreateInput,
+    type ManagedEngine
+} from "@polaris/core";
+import {
     ArrowLeft,
     CheckCircle2,
+    LayoutTemplate,
     ChevronRight,
     Copy,
     Database,
@@ -804,15 +807,17 @@ export const SERVICE_TYPES = [
     { id: "github", label: "GitHub Repository", icon: <GitHubMark className="size-5" /> },
     { id: "docker", label: "Docker Image", icon: <DockerMark className="size-5" /> },
     { id: "folder", label: "Upload a folder", icon: <FolderUp className="size-5" /> },
+    { id: "template", label: "Template", icon: <LayoutTemplate className="size-5" /> },
     { id: "database", label: "Database", icon: <Database className="size-5" /> }
 ] as const;
 
-export type ServiceView = "list" | "github" | "docker" | "folder" | "database";
+export type ServiceView = "list" | "github" | "docker" | "folder" | "template" | "database";
 
 const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
     github: "GitHub Repository",
     docker: "Docker Image",
     folder: "Upload a folder",
+    template: "From a template",
     database: "Database"
 };
 
@@ -864,6 +869,9 @@ export function NewServiceDialog({
                     <NewGithubForm environmentId={environmentId} onDone={done} />
                 ) : view === "folder" ? (
                     <NewUploadForm environmentId={environmentId} onDone={done} />
+                ) : view === "template" ? (
+                    <NewTemplateForm environmentId={environmentId} onDone={done} />
+
                 ) : (
                     <NewImageForm environmentId={environmentId} onDone={done} />
                 )}
@@ -995,6 +1003,80 @@ function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDon
             serverField={<ServerField servers={servers} value={serverId} onChange={setServerId} />}
             onDone={onDone}
         />
+    );
+}
+
+/** A one-click service: pick a template, name it, and it deploys with its
+ *  volumes and variables already set. */
+function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const [picked, setPicked] = useState<ServiceTemplate | null>(null);
+    const [name, setName] = useState("");
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        if (!picked) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await deployActions.createApplicationAction({
+                environmentId,
+                name: name.trim() || picked.name,
+                templateId: picked.id,
+                serverId
+            });
+            if (result.error) setError(result.error);
+            else onDone();
+        });
+    }
+
+    if (!picked) {
+        return (
+            <div className="flex max-h-96 flex-col gap-1 overflow-y-auto overscroll-contain">
+                {SERVICE_TEMPLATES.map((template) => (
+                    <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => {
+                            setPicked(template);
+                            setName(template.name);
+                        }}
+                        className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                    >
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-foreground">{template.name}</span>
+                            <span className="block truncate text-xs text-muted-foreground" title={template.description}>{template.description}</span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </button>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+                {picked.description} <span className="font-mono text-xs">{picked.image}</span>
+            </p>
+            <Field label="Name">
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={picked.name} />
+            </Field>
+            <ServerField servers={servers} value={serverId} onChange={setServerId} />
+            <p className="text-xs text-muted-foreground">
+                {picked.firstRun}
+                {picked.secrets.length > 0 && " Generated secrets are in the service's Variables."}
+            </p>
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-between gap-2">
+                <Button variant="ghost" onClick={() => setPicked(null)} disabled={pending}>
+                    Other templates
+                </Button>
+                <Button onClick={submit} disabled={pending}>
+                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy
+                </Button>
+            </div>
+        </div>
     );
 }
 

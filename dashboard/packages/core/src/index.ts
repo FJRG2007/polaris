@@ -38,6 +38,7 @@ export * from "./deploy-references.js";
 export * from "./cron.js";
 export * from "./scaling.js";
 export * from "./sleep.js";
+export * from "./service-templates.js";
 export * from "./mailbox-folder-look.js";
 export * from "./mailbox-list.js";
 export * from "./mail-prefs.js";
