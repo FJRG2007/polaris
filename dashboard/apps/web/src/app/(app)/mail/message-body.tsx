@@ -30,8 +30,8 @@
  */
 
 import { cn } from "@polaris/ui";
-import { ShieldCheck } from "lucide-react";
 import * as core from "@polaris/core";
+import { ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export function MessageBody({
@@ -98,7 +98,6 @@ export function MessageBody({
         </div>
     );
 }
-
 
 /**
  * Addresses a sender typed but did not link.
@@ -322,7 +321,9 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
  *  screen away; past this it scrolls inside its own frame. */
 const MAX_FRAME_HEIGHT = 20000;
 
-function SandboxedHtml({
+/** The frame itself, exported for the print page - which must draw a message
+ *  through exactly these three layers and nothing less. */
+export function SandboxedHtml({
     html,
     showRemote,
     paper
