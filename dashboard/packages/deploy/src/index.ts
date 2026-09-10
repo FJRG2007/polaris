@@ -110,7 +110,17 @@ export { SwarmRuntime } from "./runtime/swarm.js";
 export { parseContainerState, type ContainerState } from "./runtime/status.js";
 export { onboardingScript, DYNAMIC_DIR, type OnboardingOptions } from "./onboarding.js";
 export { parseHttpLogs, bucketHttpMetrics, type HttpLogEntry, type HttpMetricPoint } from "./http-logs.js";
-export { detectBuild, type DetectedBuild, type PackageManifest, type RepoSnapshot } from "./detect.js";
+export { detectBuild, type DetectedBuild, type DetectOptions, type PackageManifest, type RepoSnapshot } from "./detect.js";
+export { detectLanguageBuild, LANGUAGE_FILES, procfileWeb } from "./detect-languages.js";
+export { diagnoseDeploy, type DeployFix, type Diagnosis, type DiagnoseContext } from "./diagnose.js";
+export {
+    CONFIG_FILES,
+    importDeployConfig,
+    importedAnything,
+    type ConfigFile,
+    type ImportedConfig,
+    type PickedSetting
+} from "./config-import.js";
 export { nixpacksConfig, type NixpacksConfig } from "./nixpacks.js";
 export { INSTALL_ENV } from "./install-env.js";
 export { generateDockerfile, GENERATED_DOCKERFILE, type DockerfilePlan } from "./dockerfile.js";
