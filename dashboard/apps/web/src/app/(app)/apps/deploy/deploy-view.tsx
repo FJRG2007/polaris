@@ -25,6 +25,7 @@ import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { DatabaseTopologyField, hasTopologyChoice, SINGLE_TOPOLOGY, type TopologyValue } from "./database-topology-field";
 import {
     Badge,
     Button,
@@ -715,7 +716,9 @@ function DatabaseConnectionDialog({
                             hint={
                                 connection.cluster
                                     ? "One node of the cluster, reachable by name from any service in this environment."
-                                    : "Reachable by name from any service in this environment."
+                                    : connection.hosts.length > 1
+                                      ? `Lists all ${connection.hosts.length} members, so a client finds the primary wherever it is.`
+                                      : "Reachable by name from any service in this environment."
                             }
                         >
                             <CopyRow value={connection.uri} secret={!revealed} />
@@ -732,6 +735,14 @@ function DatabaseConnectionDialog({
                                     <CopyRow value={connection.cluster.reference} />
                                 </Field>
                             </>
+                        )}
+                        {connection.readUri && (
+                            <Field
+                                label="Read replicas URI"
+                                hint={`Reads only, spread over the replicas. As a reference: ${connection.reference.replace("DATABASE_URL", "READ_URL")}`}
+                            >
+                                <CopyRow value={connection.readUri} secret={!revealed} />
+                            </Field>
                         )}
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field label="Host">
@@ -1480,16 +1491,21 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [privileges, setPrivileges] = useState("owner");
-    const [topology, setTopology] = useState(SINGLE);
+    const [redisLayout, setRedisLayout] = useState(SINGLE);
+    const [topology, setTopology] = useState<TopologyValue>(SINGLE_TOPOLOGY);
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
-    const clusterMasters = engine === "redis" && topology !== SINGLE ? Number(topology) : undefined;
+    const clusterMasters = engine === "redis" && redisLayout !== SINGLE ? Number(redisLayout) : undefined;
+    const layout = !hosted && hasTopologyChoice(engine) ? topology : SINGLE_TOPOLOGY;
 
     // Which instances this engine could be placed on. Reloaded when the engine
-    // changes, because an instance only hosts databases of its own engine.
+    // changes, because an instance only hosts databases of its own engine - and
+    // so is the layout, which each engine offers differently.
     useEffect(() => {
         setInstanceId(DEDICATED);
+        setTopology(SINGLE_TOPOLOGY);
+        setRedisLayout(SINGLE);
         if (!info.namedDatabases) {
             setInstances([]);
             return;
@@ -1513,12 +1529,16 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             serverId: hosted ? undefined : serverId,
             instanceId: hosted ? instanceId : undefined,
             version: !hosted && version ? version : undefined,
-            exposePort: !hosted && clusterMasters === undefined && exposePort.trim() ? Number(exposePort) : undefined,
+            exposePort:
+                !hosted && clusterMasters === undefined && layout.topology !== "replicaSet" && exposePort.trim()
+                    ? Number(exposePort)
+                    : undefined,
             databaseName: databaseName.trim() || undefined,
             username: username.trim() || undefined,
             password: info.storage ? undefined : password || undefined,
             privileges: privileges as "owner" | "readwrite" | "readonly",
-            clusterMasters
+            clusterMasters,
+            ...layout
         };
     }
 
@@ -1562,10 +1582,13 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                             : `Keys are spread over ${clusterMasters} masters on this server, each with a replica that takes over if it stops. Clients connect in cluster mode.`
                     }
                 >
-                    <Select value={topology} onValueChange={setTopology} options={REDIS_TOPOLOGY_OPTIONS} />
+                    <Select value={redisLayout} onValueChange={setRedisLayout} options={REDIS_TOPOLOGY_OPTIONS} />
                 </Field>
             )}
             {!hosted && <ServerField servers={servers} value={serverId} onChange={setServerId} />}
+            {!hosted && hasTopologyChoice(engine) && (
+                <DatabaseTopologyField engine={engine} value={topology} onChange={setTopology} />
+            )}
 
             <button
                 type="button"
@@ -1617,12 +1640,17 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                                 />
                             </Field>
                             {/* A cluster sends clients between its nodes by name,
-                                which only its network resolves; one published
-                                port could not follow them. */}
-                            {clusterMasters === undefined && (
+                                which only its network resolves, and a replica set's
+                                members are known by names only the environment
+                                resolves: neither is ever published. */}
+                            {clusterMasters === undefined && layout.topology !== "replicaSet" && (
                                 <Field
                                     label="Published port"
-                                    hint="Blank keeps it reachable only by the services in this environment, which is what most databases want."
+                                    hint={
+                                        layout.topology === "sharded"
+                                            ? "Publishes the cluster's router. Blank keeps it reachable only by the services in this environment."
+                                            : "Blank keeps it reachable only by the services in this environment, which is what most databases want."
+                                    }
                                 >
                                     <Input
                                         value={exposePort}

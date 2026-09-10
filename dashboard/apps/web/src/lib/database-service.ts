@@ -17,37 +17,23 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { loadEnv } from "@polaris/config";
+import { topologyMemberPlans } from "./database-topology";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
-import { clusterNodeNames, serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
-import {
-    createDatabaseCommands,
-    databaseCreateSchema,
-    databaseDataPath,
-    dropDatabaseCommands,
-    isStorageEngine,
-    mongoReplicaSetCommand,
-    pitrHostFolder,
-    pitrRecoveryCommand,
-    pitrServerCommand,
-    redisClusterNodeCount,
-    redisClusterSeeds,
-    redisClusterServerCommand,
-    redisServerCommand,
-    DB_ENGINE_INFO,
-    MONGO_REPLICA_SET,
-    PITR_MOUNT,
-    type ContainerCommand,
-    type DatabaseCreate,
-    type DatabaseGrant,
-    type DbEngine,
-    type DbPrivilege,
-    type ManagedEngine,
-    type RedisMode
+import { clusterNodeNames, dbPlanImages, serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
+import type {
+    ContainerCommand,
+    DatabaseCreate,
+    DatabaseGrant,
+    DbEngine,
+    DbPrivilege,
+    ManagedEngine,
+    RedisMode
 } from "@polaris/core";
 
 export type { DbEngine };
@@ -56,6 +42,11 @@ export interface DbCredentials {
     username: string;
     password: string;
     database: string;
+    /** MongoDB laid out over several containers: the key its members sign in to
+     *  each other with (see `MONGO_KEY_ENV`). */
+    clusterKey?: string;
+    /** MySQL with read replicas: the replication account's password. */
+    replicationPassword?: string;
 }
 
 /** What decides the command an instance runs with, beyond its credentials. */
@@ -68,6 +59,7 @@ interface EngineRow {
     readonly pitr: boolean;
     readonly recoveryBase: string | null;
     readonly recoveryTarget: Date | null;
+    readonly topology: string;
 }
 
 interface EngineSpec {
@@ -96,9 +88,9 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
         // says on every start.
         command: (_creds, row) =>
             row.recoveryBase && row.recoveryTarget
-                ? pitrRecoveryCommand(row.recoveryBase, row.recoveryTarget)
+                ? core.pitrRecoveryCommand(row.recoveryBase, row.recoveryTarget)
                 : row.pitr
-                  ? pitrServerCommand()
+                  ? core.pitrServerCommand()
                   : undefined
     },
     mysql: {
@@ -132,7 +124,8 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
             MONGO_INITDB_ROOT_PASSWORD: creds.password,
             MONGO_INITDB_DATABASE: creds.database
         }),
-        command: (_creds, row) => (row.replicaSet ? mongoReplicaSetCommand() : undefined)
+        // A set of several members starts from `topologyMemberPlans` instead.
+        command: (_creds, row) => (row.replicaSet && row.topology === "single" ? core.mongoReplicaSetCommand() : undefined)
     },
     redis: {
         defaultVersion: "7",
@@ -144,7 +137,7 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
         // is what actually makes the stored password mean something.
         env: () => ({}),
         command: (creds, row) =>
-            redisServerCommand(creds.password, row.mode as RedisMode, row.maxMemoryMb ?? undefined)
+            core.redisServerCommand(creds.password, row.mode as RedisMode, row.maxMemoryMb ?? undefined)
     },
     seaweedfs: {
         defaultVersion: "4.46",
@@ -188,7 +181,7 @@ export function databaseClusterNodes(row: {
     readonly clusterMasters: number | null;
 }): string[] | null {
     if (row.engine !== "redis" || !row.clusterMasters || !row.containerName) return null;
-    return clusterNodeNames(row.containerName, redisClusterNodeCount(row.clusterMasters));
+    return clusterNodeNames(row.containerName, core.redisClusterNodeCount(row.clusterMasters));
 }
 
 /** A URL-safe generated secret for database credentials. The alphabet is
@@ -224,13 +217,17 @@ function toIdentifier(slug: string): string {
     return /^[a-zA-Z]/.test(base) ? base.slice(0, 63) : `db_${base}`.slice(0, 63);
 }
 
-export type CreateDatabaseInput = Omit<DatabaseCreate, "serverId"> & { targetId: string };
+/** A create request with its server resolved. The layout may be left off, as
+ *  in the request itself: it is a single instance then. */
+export type CreateDatabaseInput = Omit<DatabaseCreate, "serverId" | "topology"> &
+    Partial<Pick<DatabaseCreate, "topology">> & { targetId: string };
 
 export async function createDatabase(ownerId: string, input: CreateDatabaseInput) {
     // Re-validated here rather than trusted from the action: this is the last
     // place before the values reach a statement builder. The server has already
     // been resolved to a target by now, so it is dropped from what is checked.
-    const parsed: DatabaseCreate = databaseCreateSchema.parse({ ...input, serverId: undefined });
+    const parsed: DatabaseCreate = core.databaseCreateSchema.parse({ ...input, serverId: undefined });
+    const topology = core.topologyOf(parsed);
 
     const environment = await prisma.environment.findFirst({
         where: { id: parsed.environmentId, project: { ownerId } }
@@ -238,6 +235,7 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     if (!environment) throw new Error("Environment not found");
     const target = await prisma.deployTarget.findFirst({ where: { id: input.targetId, ownerId } });
     if (!target) throw new Error("Deploy target not found");
+    if (topology.kind !== "single" && target.runtime === "swarm") throw new Error(SWARM_REFUSAL);
 
     const spec = engineSpec(parsed.engine);
     const slug = slugify(parsed.name);
@@ -255,7 +253,7 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     const parent = parsed.instanceId ? await instanceFor(parsed.instanceId, ownerId) : null;
     if (parsed.instanceId && !parent) throw new Error("The selected instance was not found");
     if (parent && parent.engine !== parsed.engine) {
-        throw new Error(`That instance runs ${DB_ENGINE_INFO[parent.engine as DbEngine]?.label ?? parent.engine}`);
+        throw new Error(`That instance runs ${core.dbEngineLabel(parent.engine)}`);
     }
     if (parent?.parentId) throw new Error("That database is itself hosted on an instance");
 
@@ -263,12 +261,18 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     // An object store's account is an S3 key pair: the access key id is the
     // "username" and the secret the "password", so everything that reads the
     // stored credentials reads a store's the same way.
-    const creds: DbCredentials = isStorageEngine(parsed.engine)
+    const creds: DbCredentials = core.isStorageEngine(parsed.engine)
         ? { username: generateAccessKey(), password: generateSecretKey(), database: "" }
         : {
               username: parsed.username ?? (parent ? toIdentifier(slug) : "polaris"),
               password: parsed.password ?? generatePassword(),
-              database: parsed.databaseName ?? toIdentifier(slug)
+              database: parsed.databaseName ?? toIdentifier(slug),
+              // 384 random bytes as hex: see `isClusterKey`.
+              ...(topology.kind === "replicaSet" || topology.kind === "sharded"
+                  ? { clusterKey: randomBytes(384).toString("hex") }
+                  : {}),
+              // 32 characters, the most `SOURCE_PASSWORD` takes.
+              ...(topology.kind === "replicas" ? { replicationPassword: generatePassword() } : {})
           };
     const blob = encryptCredentials(creds, loadEnv().POLARIS_MASTER_KEY);
 
@@ -289,12 +293,19 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
             clusterMasters: parsed.clusterMasters ?? null,
             parentId: parent?.id ?? null,
             privileges: parsed.privileges,
+            ...core.topologyColumns(topology),
             encryptedCredential: blob.ciphertext,
             credentialNonce: blob.nonce,
             credentialKeyId: blob.keyId
         }
     });
 }
+
+/** Why a database laid out over several containers is not put on a swarm: its
+ *  members are joined by running commands in each one by its container name,
+ *  and a swarm names its containers itself. */
+const SWARM_REFUSAL =
+    "That server deploys through a swarm, which names each container itself. A replica set, a sharded cluster or read replicas are joined by their names, so choose a server that runs plain containers.";
 
 /** An instance the caller owns that can host more databases. */
 async function instanceFor(id: string, ownerId: string) {
@@ -310,7 +321,7 @@ async function instanceFor(id: string, ownerId: string) {
  * has nothing to run a statement in), and not themselves hosted on another.
  */
 export async function listDatabaseInstances(environmentId: string, engine: DbEngine, ownerId: string) {
-    if (!DB_ENGINE_INFO[engine].namedDatabases) return [];
+    if (!core.DB_ENGINE_INFO[engine].namedDatabases) return [];
     const rows = await prisma.managedDatabase.findMany({
         where: {
             environmentId,
@@ -371,6 +382,13 @@ export interface DatabaseConnection {
         /** The reference to the node list, beside the URL's. */
         readonly reference: string;
     } | null;
+    /** Every host the URI lists - a replica set's members; otherwise `host`. */
+    readonly hosts: readonly string[];
+    /** The replica set the URI names, when it names one. */
+    readonly replicaSet: string | null;
+    /** MySQL with read replicas: a URI for reading from them, over the name
+     *  they share. */
+    readonly readUri: string | null;
 }
 
 /**
@@ -384,11 +402,25 @@ export interface DatabaseConnection {
 export async function databaseConnection(databaseId: string, ownerId: string): Promise<DatabaseConnection> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        include: { parent: { select: { containerName: true, exposePort: true, replicaSet: true } } }
+        include: {
+            parent: {
+                select: {
+                    containerName: true,
+                    exposePort: true,
+                    replicaSet: true,
+                    topology: true,
+                    members: true,
+                    shards: true,
+                    readReplicas: true
+                }
+            }
+        }
     });
     if (!row) throw new Error("Database not found");
     const host = row.parent ? row.parent.containerName : row.containerName;
     if (!host) throw new Error("This database has not been provisioned yet");
+    // A hosted database is reached the way its instance is.
+    const address = core.topologyAddress(core.resolveTopology(row.parent ?? row), host);
 
     const creds = await databaseCredentials(databaseId, ownerId);
     const engine = row.engine as ManagedEngine;
@@ -399,17 +431,21 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
     // creates, which lives in `admin`; a database hosted on an instance has its
     // account created inside itself. The URI used to name the database for
     // both, which a dedicated instance's own account could not sign in with.
-    const mongoParams = [
-        `authSource=${row.parent ? creds.database : "admin"}`,
-        ...((row.parent ? row.parent.replicaSet : row.replicaSet) ? [`replicaSet=${MONGO_REPLICA_SET}`] : [])
-    ].join("&");
+    // A replica set of several members is named with all of them, so a client
+    // finds the primary wherever it is; a single-member set with its one.
+    const replicaSet =
+        address.replicaSet ?? ((row.parent ? row.parent.replicaSet : row.replicaSet) ? core.MONGO_REPLICA_SET : null);
+    const mongoParams = [`authSource=${row.parent ? creds.database : "admin"}`, ...(replicaSet ? [`replicaSet=${replicaSet}`] : [])].join(
+        "&"
+    );
+    const mongoHosts = address.hosts.map((one) => `${one}:${port}`).join(",");
     const uri =
         engine === "seaweedfs"
             ? `http://${host}:${port}`
             : engine === "redis"
               ? `redis://:${secret}@${host}:${port}`
               : engine === "mongo"
-                ? `mongodb://${user}:${secret}@${host}:${port}/${creds.database}?${mongoParams}`
+                ? `mongodb://${user}:${secret}@${mongoHosts}/${creds.database}?${mongoParams}`
                 : engine === "postgres"
                   ? `postgresql://${user}:${secret}@${host}:${port}/${creds.database}`
                   : `mysql://${user}:${secret}@${host}:${port}/${creds.database}`;
@@ -428,10 +464,13 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
             nodes && row.clusterMasters
                 ? {
                       masters: row.clusterMasters,
-                      nodes: redisClusterSeeds(nodes),
+                      nodes: core.redisClusterSeeds(nodes),
                       reference: `\${{${row.slug}.REDIS_CLUSTER_NODES}}`
                   }
-                : null
+                : null,
+        hosts: engine === "mongo" ? address.hosts : [host],
+        replicaSet: engine === "mongo" ? replicaSet : null,
+        readUri: address.readHost ? `mysql://${user}:${secret}@${address.readHost}:${port}/${creds.database}` : null
     };
 }
 
@@ -463,7 +502,7 @@ export async function provisionInInstance(databaseId: string, ownerId: string): 
 
     const ports = await getPorts(db.parent.target as TargetRow, ownerId);
     try {
-        await runCommands(ports, db.parent.containerName, createDatabaseCommands(db.engine as DbEngine, grant));
+        await runCommands(ports, db.parent.containerName, core.createDatabaseCommands(db.engine as DbEngine, grant));
     } finally {
         await ports.dispose();
     }
@@ -484,8 +523,20 @@ async function runCommands(
     }
 }
 
+/** What a deploy can be told beyond the instance's stored settings. */
+export interface DeployDatabaseOptions {
+    /** Members of a replica set already moved to another image by a rolling
+     *  upgrade, by container name; every other member runs the stored image. */
+    readonly memberImages?: Readonly<Record<string, string>>;
+}
+
 /** Provision (or re-provision) a managed database. */
-export async function deployDatabase(databaseId: string, ownerId: string, userId: string): Promise<string> {
+export async function deployDatabase(
+    databaseId: string,
+    ownerId: string,
+    userId: string,
+    options: DeployDatabaseOptions = {}
+): Promise<string> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true }
@@ -518,6 +569,8 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
     }
 
     const spec = engineSpec(db.engine);
+    const topology = core.resolveTopology(db);
+    if (topology.kind !== "single" && db.target.runtime === "swarm") throw new Error(SWARM_REFUSAL);
     const creds = await databaseCredentials(databaseId, ownerId);
     const name = serviceName(db.environment.project.slug, db.slug, db.id);
     // The stored volume wins over the derived one: an upgrade moves an instance
@@ -546,15 +599,14 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         env: spec.env(creds),
         command: spec.command?.(creds, db),
         volumeName,
-        dataPath: databaseDataPath(db.engine, db.version),
+        dataPath: core.databaseDataPath(db.engine, db.version),
         exposePort: db.exposePort ?? undefined,
         limits: limitsOf(db),
-        ...(archiveOf ? { extraVolumes: [{ source: pitrHostFolder(archiveOf), target: PITR_MOUNT, kind: "bind" as const }] } : {}),
         ...(nodes
             ? {
                   nodes: nodes.map((node, index) => ({
                       name: node,
-                      command: redisClusterServerCommand(
+                      command: core.redisClusterServerCommand(
                           creds.password,
                           db.mode as RedisMode,
                           db.maxMemoryMb ?? undefined,
@@ -564,6 +616,17 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
                   }))
               }
             : {}),
+        ...(archiveOf ? { extraVolumes: [{ source: core.pitrHostFolder(archiveOf), target: core.PITR_MOUNT, kind: "bind" as const }] } : {}),
+        members: topologyMemberPlans({
+            topology,
+            name,
+            volumeName,
+            engineEnv: spec.env(creds),
+            password: creds.password,
+            clusterKey: creds.clusterKey,
+            exposePort: db.exposePort ?? undefined,
+            memberImages: options.memberImages
+        }),
         // Nothing routes to a database, so in an isolated environment it leaves the
         // proxy network entirely: the services beside it reach it on their own
         // network, and the daemon attaches the dashboard there for the data browser.
@@ -593,7 +656,7 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
             ownerId,
             (ctx, driver) => driver.deployDatabase(plan, ctx),
             undefined,
-            plan.image ? [plan.image] : []
+            dbPlanImages(plan)
         );
         const final = await prisma.deployment.findUnique({ where: { id: deployment.id }, select: { status: true } });
         const running = final?.status === "running";
@@ -632,11 +695,12 @@ const DEPLOY_WAIT_MS = 20 * 60_000;
 export async function deployDatabaseAndWait(
     databaseId: string,
     ownerId: string,
-    userId: string
+    userId: string,
+    options: DeployDatabaseOptions = {}
 ): Promise<string | null> {
     let deploymentId: string;
     try {
-        deploymentId = await deployDatabase(databaseId, ownerId, userId);
+        deploymentId = await deployDatabase(databaseId, ownerId, userId, options);
     } catch (caught) {
         return caught instanceof Error ? caught.message : "the deploy could not be started";
     }
@@ -682,7 +746,7 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
                     await runCommands(
                         ports,
                         db.parent.containerName,
-                        dropDatabaseCommands(db.engine as DbEngine, {
+                        core.dropDatabaseCommands(db.engine as DbEngine, {
                             database: own.database,
                             username: own.username,
                             password: own.password,

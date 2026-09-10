@@ -24,6 +24,7 @@ import * as store from "@/lib/object-storage/store";
 import * as upgrade from "@/lib/database-ops/upgrade";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as settings from "@/lib/database-ops/settings";
+import { databaseMembers } from "@/lib/database-ops/topology";
 import { requireDatabaseAccess, requireDomainAccess } from "@/lib/deploy-project-access";
 import { copySources, databaseOverview, type DatabaseOverview } from "@/lib/database-ops/overview";
 
@@ -70,6 +71,22 @@ export async function databaseOverviewAction(databaseId: string): Promise<Result
         return { overview: await databaseOverview(parsed.data, access.ownerId) };
     } catch (caught) {
         return failure(caught, "Could not read this database");
+    }
+}
+
+/** How each member of a replica set, sharded cluster or primary with read
+ *  replicas is doing, read from the members themselves. */
+export async function databaseMembersAction(
+    databaseId: string
+): Promise<Result<{ members: Awaited<ReturnType<typeof databaseMembers>> }>> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const user = await requirePermission("deploy.read");
+        const access = await requireDatabaseAccess(parsed.data, user.id, "project.read");
+        return { members: await databaseMembers(parsed.data, access.ownerId) };
+    } catch (caught) {
+        return failure(caught, "Could not read the members");
     }
 }
 

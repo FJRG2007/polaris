@@ -17,7 +17,7 @@ import { prisma } from "@polaris/db";
 import { restoreDumpInto } from "./restore";
 import { buildSelector } from "@/lib/backups/schemas";
 import { dumpInContainer, isDumpableEngine } from "@/lib/backups/sources/databases";
-import { externalDumpCommand, parseExternalSource, type ManagedEngine } from "@polaris/core";
+import { externalDumpCommand, parseExternalSource, SHARDED_DUMP_REFUSAL, type ManagedEngine } from "@polaris/core";
 import {
     DatabaseOperationError,
     instanceContext,
@@ -60,6 +60,7 @@ export async function copyInto(
         if (family(from.engine) !== family(into.engine)) {
             throw new DatabaseOperationError(`${from.name} runs a different engine from ${into.name}.`);
         }
+        if (from.topology.kind === "sharded") throw new DatabaseOperationError(SHARDED_DUMP_REFUSAL);
     } else {
         external = parseExternalSource(source.fromUrl, into.engine as ManagedEngine);
         if (!external) {
@@ -122,7 +123,8 @@ async function copyFromManaged(
         username: from.own.username,
         password: from.own.password,
         authDatabase: from.hosted ? from.own.database : "admin",
-        label: from.slug
+        label: from.slug,
+        ...(from.mongoSeeds ? { mongoSeeds: from.mongoSeeds } : {})
     }).catch((error: unknown) => {
         throw new DatabaseOperationError(`Copying out ${from.name} failed${error instanceof Error ? `: ${error.message}` : ""}`);
     });

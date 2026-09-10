@@ -9,9 +9,9 @@
 
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
-import { appComposeSpec, dbComposeSpec, forSwarm } from "../compose-spec.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
+import { appComposeSpec, dbComposeSpec, dbPlanImages, forSwarm } from "../compose-spec.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -86,7 +86,7 @@ export class SwarmRuntime implements RuntimeDriver {
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
-        await ctx.ports.pull(plan.image, sink);
+        for (const image of dbPlanImages(plan)) await ctx.ports.pull(image, sink);
         const spec = forSwarm(dbComposeSpec(plan, ctx.target.proxyNetwork));
         try {
             await ctx.ports.stackUp(spec, sink);

@@ -1,7 +1,8 @@
 /**
  * What an instance needs once its container answers, that a compose file cannot
  * say: a Redis Cluster's creation, an object store's identities, a MongoDB
- * replica set's initiation, and the archive folder and first base backup of a
+ * replica set's initiation, the joining of a database laid out over several
+ * containers (`./topology`), and the archive folder and first base backup of a
  * PostgreSQL instance kept for point-in-time recovery.
  *
  * Run after every successful deploy of a dedicated instance, so each step is
@@ -12,8 +13,9 @@
 
 import { prisma } from "@polaris/db";
 import type { RuntimePorts } from "@polaris/deploy";
-import { mongoInitiateCommand } from "@polaris/core";
 import { ensureRedisCluster } from "./redis-cluster";
+import { ensureTopology, topologySetup } from "./topology";
+import { mongoInitiateCommand, resolveTopology } from "@polaris/core";
 import { DatabaseOperationError, instanceContext, runStep, waitReady, withPorts, type InstanceContext } from "./ops";
 
 /** How long a new replica set is given to elect its only member. */
@@ -22,15 +24,36 @@ const PRIMARY_WAIT_MS = 60_000;
 export async function afterProvision(databaseId: string, ownerId: string): Promise<void> {
     const row = await prisma.managedDatabase.findUnique({
         where: { id: databaseId },
-        select: { engine: true, parentId: true, replicaSet: true, pitr: true, upgradeState: true, clusterMasters: true }
+        select: {
+            engine: true,
+            parentId: true,
+            replicaSet: true,
+            pitr: true,
+            upgradeState: true,
+            clusterMasters: true,
+            topology: true,
+            members: true,
+            shards: true,
+            readReplicas: true
+        }
     });
     if (!row || row.parentId) return;
+    const topology = resolveTopology(row);
     let step = "Setting up";
     try {
         if (row.engine === "redis" && row.clusterMasters) {
             step = "Creating the Redis cluster";
             const context = await instanceContext(databaseId, ownerId);
             await withPorts(context, (ports) => ensureRedisCluster(ports, context));
+        } else if (topology.kind === "replicaSet" && row.upgradeState === "running") {
+            // A replica set being upgraded is deployed once per member while its
+            // primary moves between them; the upgrade waits on the set itself, and
+            // a wait for the first member to be primary here would fail mid-way.
+            return;
+        } else if (topology.kind !== "single") {
+            step = topology.kind === "replicas" ? "Starting the read replicas" : "Joining the members";
+            const context = await instanceContext(databaseId, ownerId);
+            await withPorts(context, (ports) => ensureTopology(ports, topologySetup(context)));
         } else if (row.engine === "seaweedfs") {
             step = "Writing the store's keys";
             const { ensureStoreIdentities, resumeStoreReplications } = await import("@/lib/object-storage/store");

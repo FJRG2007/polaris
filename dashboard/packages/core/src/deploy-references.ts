@@ -129,6 +129,7 @@ export function databaseReferenceKeys(connection: {
     /** A Redis Cluster's nodes as `host:port`, the seeds a cluster client takes.
      *  Absent for anything that is not a cluster. */
     readonly clusterNodes?: readonly string[] | null;
+    readonly readUri?: string | null;
 }): Record<string, string> {
     const port = String(connection.port);
     const keys: Record<string, string> = {
@@ -160,6 +161,9 @@ export function databaseReferenceKeys(connection: {
             MYSQLPASSWORD: connection.password,
             MYSQLDATABASE: connection.database
         });
+        // A primary with read replicas: where to read from, over the name the
+        // replicas share.
+        if (connection.readUri) Object.assign(keys, { READ_URL: connection.readUri, MYSQL_READ_URL: connection.readUri });
     } else if (connection.engine === "mongo") {
         keys.MONGO_URL = connection.uri;
     } else if (connection.engine === "redis") {

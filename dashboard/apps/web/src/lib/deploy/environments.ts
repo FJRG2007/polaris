@@ -32,7 +32,13 @@ import * as activity from "../activity/activity";
 import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
 import { createNotification } from "../notification-service";
-import { isGitBranchName, isRedisClusterMasters, parseProjectFlags } from "@polaris/core";
+import {
+    isGitBranchName,
+    isRedisClusterMasters,
+    parseProjectFlags,
+    resolveTopology,
+    topologyRequest
+} from "@polaris/core";
 import { listOpenPullRequests, pullRequestIsOpen, type OpenPullRequest } from "../github-service";
 
 /** What makes an environment a preview. */
@@ -163,9 +169,13 @@ export async function cloneEnvironment(
                 targetId: database.targetId,
                 name: database.name,
                 engine: database.engine as Parameters<typeof createDatabase>[1]["engine"],
-                version: database.version,
                 privileges: database.privileges as Parameters<typeof createDatabase>[1]["privileges"],
-                ...(instanceId ? { instanceId } : {}),
+                // A hosted database runs the version and the layout of the
+                // instance it is placed on, and the schema refuses either beside
+                // an instance; a dedicated one keeps its own.
+                ...(instanceId
+                    ? { instanceId }
+                    : { version: database.version, ...topologyRequest(resolveTopology(database)) }),
                 // A copy of a cluster is a cluster of the same size.
                 ...(isRedisClusterMasters(database.clusterMasters) ? { clusterMasters: database.clusterMasters } : {})
             });

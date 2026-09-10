@@ -19,6 +19,10 @@ import { databaseClusterNodes, databaseCredentials, type DbCredentials } from "@
 import {
     readinessCommand,
     isManagedEngine,
+    mongoSets,
+    resolveTopology,
+    seedList,
+    type DbTopology,
     type ManagedEngine,
     type MaintenanceCommand
 } from "@polaris/core";
@@ -44,6 +48,11 @@ export interface InstanceContext {
     /** A Redis Cluster's nodes, `container` first; null for anything else. An
      *  operation that acts on `container` alone reaches one node of several. */
     readonly cluster: readonly string[] | null;
+    /** How the instance is laid out - for a hosted database, its instance's. */
+    readonly topology: DbTopology;
+    /** A MongoDB replica set of several members as a seed list, for the dump
+     *  and restore tools' `--host`; null otherwise. */
+    readonly mongoSeeds: string | null;
 }
 
 /** Raised for a refusal whose words are meant for the screen. */
@@ -61,7 +70,12 @@ export class DatabaseOperationError extends Error {
 export async function instanceContext(databaseId: string, ownerId: string): Promise<InstanceContext> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        include: { target: true, parent: { select: { id: true, containerName: true } } }
+        include: {
+            target: true,
+            parent: {
+                select: { id: true, containerName: true, topology: true, members: true, shards: true, readReplicas: true }
+            }
+        }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     if (!isManagedEngine(row.engine)) {
@@ -71,6 +85,8 @@ export async function instanceContext(databaseId: string, ownerId: string): Prom
     if (!container) throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
     const own = await databaseCredentials(row.id, ownerId);
     const admin = row.parent ? await databaseCredentials(row.parent.id, ownerId) : own;
+    const topology = resolveTopology(row.parent ?? row);
+    const set = topology.kind === "replicaSet" ? mongoSets(topology, container)[0] : undefined;
     return {
         id: row.id,
         name: row.name,
@@ -84,7 +100,9 @@ export async function instanceContext(databaseId: string, ownerId: string): Prom
         admin,
         hosted: row.parent !== null,
         privileges: row.privileges,
-        cluster: row.parent ? null : databaseClusterNodes(row)
+        cluster: row.parent ? null : databaseClusterNodes(row),
+        topology,
+        mongoSeeds: set ? seedList(set) : null
     };
 }
 
@@ -144,7 +162,7 @@ export async function runWithin(
 
 /** Run one step, or throw naming it. */
 export async function runStep(
-    ports: RuntimePorts,
+    ports: Pick<RuntimePorts, "runIn">,
     container: string,
     command: MaintenanceCommand,
     secrets: readonly string[] = []

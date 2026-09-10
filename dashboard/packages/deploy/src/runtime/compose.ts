@@ -14,8 +14,8 @@ import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { tailIntoLog, waitUntilServing } from "./readiness.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
-import { appComposeSpec, dbComposeSpec, expandReplicas } from "../compose-spec.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
+import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -398,7 +398,7 @@ export class ComposeRuntime implements RuntimeDriver {
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
-        await ctx.ports.pull(plan.image, sink);
+        for (const image of dbPlanImages(plan)) await ctx.ports.pull(image, sink);
         const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
         try {
             await composeUpRetryingLease(ctx, spec, sink, {

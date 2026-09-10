@@ -184,6 +184,15 @@ export interface DbDeployPlan {
      * `volumeName` above are then unused.
      */
     readonly nodes?: readonly DbNodePlan[];
+    /**
+     * The containers of a database laid out over several - a replica set's
+     * members, a sharded cluster's config servers, shards and router, a primary
+     * and its read replicas - in place of the one container the fields above
+     * describe. Each is its own service in the same project, on the same
+     * networks, with the same limits; `ref.name` is one of them. Absent is the
+     * one container.
+     */
+    readonly members?: readonly DbMemberPlan[];
 }
 
 /** One node of a clustered database. */
@@ -191,6 +200,24 @@ export interface DbNodePlan {
     readonly name: string;
     readonly command: readonly string[];
     readonly volumeName: string;
+}
+
+/** One container of a database laid out over several. */
+export interface DbMemberPlan {
+    /** Container name, which is also what the others reach it by. */
+    readonly name: string;
+    readonly env: Readonly<Record<string, string>>;
+    readonly command?: readonly string[];
+    /** Its own data volume, mounted at the plan's `dataPath`; absent for a
+     *  member that keeps nothing, like a sharded cluster's router. */
+    readonly volumeName?: string;
+    /** The image, where it is not the plan's: a member already moved to the
+     *  next version by a rolling upgrade while the others still run the old. */
+    readonly image?: string;
+    /** Published on the host. */
+    readonly exposePort?: number;
+    /** Other names it answers to on the database's networks. */
+    readonly aliases?: readonly string[];
 }
 
 export interface DeployResult {

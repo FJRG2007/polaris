@@ -89,7 +89,8 @@ export async function restoreDumpInto(
                 adminPassword: context.admin.password,
                 hosted: context.hosted,
                 file: inside,
-                ...(options.sourceDatabase ? { sourceDatabase: options.sourceDatabase } : {})
+                ...(options.sourceDatabase ? { sourceDatabase: options.sourceDatabase } : {}),
+                ...(context.mongoSeeds ? { seeds: context.mongoSeeds } : {})
             });
             for (const step of steps) {
                 await operation.step(step.describe);

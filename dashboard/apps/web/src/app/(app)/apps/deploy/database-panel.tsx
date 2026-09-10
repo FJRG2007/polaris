@@ -16,8 +16,8 @@ import * as actions from "./database-actions";
 import { useProjectCan } from "./access-context";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { useDisplayFormat } from "@/components/display-format";
-import { KeyRound, Link2, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
+import { KeyRound, Link2, Loader2, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -95,7 +95,7 @@ export function DatabaseManageDialog({
     const tabs: { value: Tab; label: string }[] = overview
         ? [
               ...(overview.upgrade ? [{ value: "versions" as const, label: "Version" }] : []),
-              ...(overview.redis || overview.mongo || overview.limits
+              ...(overview.redis || overview.mongo || overview.limits || overview.topology
                   ? [{ value: "settings" as const, label: "Settings" }]
                   : []),
               ...(overview.pitr ? [{ value: "pitr" as const, label: "Point in time" }] : []),
@@ -140,6 +140,7 @@ export function DatabaseManageDialog({
                                 {core.dbEngineLabel(overview.engine)} {overview.version}
                             </Badge>
                         ) : null}
+                        {overview?.topology ? <Badge>{overview.topology.label}</Badge> : null}
                     </DialogTitle>
                     {overview?.hosted ? (
                         <DialogDescription>
@@ -179,6 +180,7 @@ export function DatabaseManageDialog({
                             <VersionsSection overview={overview} manage={manage} ask={ask} onChanged={load} />
                         ) : current === "settings" ? (
                             <div className="flex flex-col gap-5">
+                                {overview.topology ? <ClusterSection overview={overview} /> : null}
                                 <LimitsSection overview={overview} manage={manage} ask={ask} />
                                 <SettingsSection overview={overview} manage={manage} ask={ask} />
                             </div>
@@ -279,10 +281,14 @@ function VersionsSection({
                   ? `Update to the newest ${version} release?`
                   : `Upgrade to ${label} ${version}?`,
             body: refresh
-                ? "The instance restarts on the newest release of the version it runs. Its data stays where it is."
-                : overview.storage
-                  ? `The store restarts on ${version} with the data it has. If it does not start, it goes back to ${overview.version}.`
-                  : `Its data is copied out, ${label} ${version} starts on a new volume, and the copy is loaded into it. It is unavailable while that runs. If any step fails it goes back to ${overview.version} on its old data, which is kept either way.${at ? ` Runs at ${format.dateTime(at)}.` : ""}`,
+                ? overview.topology
+                    ? "Every member restarts on the newest release of the version it runs, at the same time. Their data stays where it is."
+                    : "The instance restarts on the newest release of the version it runs. Its data stays where it is."
+                : overview.topology?.kind === "replicaSet"
+                  ? `Each member restarts on ${label} ${version} in turn, secondaries first, while the set keeps a primary. Then its feature compatibility version is raised, and from there it cannot go back to ${overview.version}. If a member does not come back before that, every member returns to ${overview.version}.${at ? ` Runs at ${format.dateTime(at)}.` : ""}`
+                  : overview.storage
+                    ? `The store restarts on ${version} with the data it has. If it does not start, it goes back to ${overview.version}.`
+                    : `Its data is copied out, ${label} ${version} starts on a new volume, and the copy is loaded into it. It is unavailable while that runs. If any step fails it goes back to ${overview.version} on its old data, which is kept either way.${at ? ` Runs at ${format.dateTime(at)}.` : ""}`,
             label: at ? "Schedule" : refresh ? "Update" : "Upgrade",
             run: () => actions.upgradeDatabaseAction({ databaseId: overview.id, version, ...(at ? { at } : {}) })
         });
@@ -401,6 +407,97 @@ function VersionsSection({
 // Settings
 // ---------------------------------------------------------------------------
 
+type MemberState = NonNullable<Awaited<ReturnType<typeof actions.databaseMembersAction>>["members"]>[number];
+
+const ROLE_LABELS: Readonly<Record<string, string>> = {
+    member: "Member",
+    config: "Config server",
+    shard: "Shard member",
+    router: "Router",
+    primary: "Primary",
+    replica: "Read replica"
+};
+
+/** What upkeep does for each layout, said where somebody looks for it. */
+const TOPOLOGY_NOTES: Readonly<Record<string, string>> = {
+    replicaSet:
+        "Backups are read from a secondary. A version change moves one member at a time while the set keeps a primary, then raises the feature compatibility version, after which the earlier version cannot be returned to.",
+    sharded: `${core.SHARDED_DUMP_REFUSAL} ${core.SHARDED_UPGRADE_REFUSAL}`,
+    replicas:
+        "Backups and copies go through the primary. A version change starts the replicas again, empty, beside the new primary, and they follow it from the start."
+};
+
+/**
+ * The members of a database laid out over several containers, each with what
+ * it is doing now - read from the members when the panel opens, and again on
+ * request. The names and roles are known up front, so they show at once and
+ * only the states wait.
+ */
+function ClusterSection({ overview }: { overview: Overview }) {
+    const topology = overview.topology!;
+    const [states, setStates] = useState<Map<string, MemberState> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const check = useCallback(() => {
+        startTransition(async () => {
+            const result = await actions.databaseMembersAction(overview.id);
+            if (result.members) {
+                setStates(new Map(result.members.map((member) => [member.name, member])));
+                setError(null);
+            } else setError(result.error ?? "Could not read the members");
+        });
+    }, [overview.id]);
+
+    useEffect(() => {
+        check();
+    }, [check]);
+
+    return (
+        <Section title={topology.label} hint={TOPOLOGY_NOTES[topology.kind]}>
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                    {topology.members.length} {topology.members.length === 1 ? "container" : "containers"}
+                </span>
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Check the members again"
+                    title="Check the members again"
+                    disabled={pending}
+                    onClick={check}
+                >
+                    {pending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                </Button>
+            </div>
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                {topology.members.map((member) => {
+                    const state = states?.get(member.name);
+                    return (
+                        <li key={member.name} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                            <span className="flex min-w-0 flex-col">
+                                <span className="truncate font-mono text-xs" title={member.name}>
+                                    {member.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {ROLE_LABELS[member.role] ?? member.role}
+                                    {member.set && member.role !== "member" ? ` - ${member.set}` : ""}
+                                </span>
+                            </span>
+                            {state ? (
+                                <span className={`text-xs ${state.healthy ? "text-success" : "text-warning"}`}>{state.state}</span>
+                            ) : error ? null : (
+                                <Skeleton className="h-4 w-20" />
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+        </Section>
+    );
+}
+
 /** The most CPU and memory the instance's container may use, applied by
  *  starting it again. Blank is no limit. */
 function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
@@ -415,7 +512,10 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
     const parsed = core.resourceLimitsSchema.safeParse(next);
     const changed = next.cpus !== limits.cpus || next.memoryMb !== limits.memoryMb;
     return (
-        <Section title="Resources" hint="Past its memory the database is stopped and started again; past its CPU it is slowed. Blank = no limit.">
+        <Section
+            title="Resources"
+            hint={`${overview.topology ? "Each member gets these limits. " : ""}Past its memory the database is stopped and started again; past its CPU it is slowed. Blank = no limit.`}
+        >
             <div className="flex flex-wrap gap-3">
                 <label className="flex flex-col gap-1">
                     <span className="text-xs text-muted-foreground">CPU (cores)</span>

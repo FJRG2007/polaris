@@ -295,6 +295,9 @@ export interface RestoreTarget {
     /** For MongoDB, the database the dump was taken from, when that is not the
      *  one it is being restored into - a copy between databases. */
     readonly sourceDatabase?: string;
+    /** For a MongoDB replica set of several members, its seed list: the load
+     *  goes to whichever member is primary, not to the container it runs in. */
+    readonly seeds?: string;
 }
 
 /**
@@ -431,6 +434,7 @@ export function restoreCommands(target: RestoreTarget): MaintenanceCommand[] {
         {
             argv: [
                 "mongorestore",
+                ...(target.seeds ? [`--host=${target.seeds}`] : []),
                 `--username=${target.adminUser}`,
                 `--password=${target.adminPassword}`,
                 "--authenticationDatabase=admin",
@@ -629,16 +633,20 @@ const MONGO_KEYFILE = "/data/db/.polaris-keyfile";
  * `mongodb` user with mode 400, as mongod requires) and then hands over to the
  * entrypoint unchanged; the entrypoint drops `--replSet` and `--keyFile` for
  * its own first-boot initialisation and keeps them for the real server.
+ *
+ * One line: a container's command reaches compose through the host daemon,
+ * which refuses any argument holding a control character, and through a YAML
+ * file on a remote server, where a line break inside a quoted value is folded
+ * into a space. A script written over several lines ran on neither.
  */
 export function mongoReplicaSetCommand(): string[] {
     const script = [
-        `if [ ! -s "${MONGO_KEYFILE}" ]; then`,
-        `  head -c 756 /dev/urandom | base64 > "${MONGO_KEYFILE}"`,
-        `  chmod 400 "${MONGO_KEYFILE}"`,
-        `  chown mongodb:mongodb "${MONGO_KEYFILE}"`,
+        `if [ ! -s "${MONGO_KEYFILE}" ]; then head -c 756 /dev/urandom | base64 > "${MONGO_KEYFILE}"`,
+        `chmod 400 "${MONGO_KEYFILE}"`,
+        `chown mongodb:mongodb "${MONGO_KEYFILE}"`,
         "fi",
         `exec docker-entrypoint.sh mongod --replSet ${MONGO_REPLICA_SET} --bind_ip_all --keyFile "${MONGO_KEYFILE}"`
-    ].join("\n");
+    ].join("; ");
     return ["sh", "-c", script];
 }
 
@@ -799,21 +807,22 @@ export function pitrCleanupCommands(oldestHistoryFile: string, removeBases: read
  * The recovered instance does not archive: its settings come from this
  * command, and nothing here repeats the original's archive settings, so it
  * never writes into the archive it is reading from.
+ *
+ * One line, for the reason `mongoReplicaSetCommand` gives.
  */
 export function pitrRecoveryCommand(baseLabel: string, target: Date): string[] {
     if (!/^[0-9TZ-]+$/.test(baseLabel)) throw new Error("A base backup label is a timestamp");
     const script = [
         "set -e",
-        'if [ ! -s "$PGDATA/PG_VERSION" ]; then',
-        '  mkdir -p "$PGDATA"',
-        '  tar -xzf "$1" -C "$PGDATA"',
-        '  touch "$PGDATA/recovery.signal"',
-        "  printf \"%s\\n\" \"restore_command = 'cp $3/wal/%f %p'\" \"recovery_target_time = '$2'\" \"recovery_target_action = 'promote'\" >> \"$PGDATA/postgresql.auto.conf\"",
-        '  chown -R postgres:postgres "$PGDATA"',
-        '  chmod 700 "$PGDATA"',
+        'if [ ! -s "$PGDATA/PG_VERSION" ]; then mkdir -p "$PGDATA"',
+        'tar -xzf "$1" -C "$PGDATA"',
+        'touch "$PGDATA/recovery.signal"',
+        "printf \"%s\\n\" \"restore_command = 'cp $3/wal/%f %p'\" \"recovery_target_time = '$2'\" \"recovery_target_action = 'promote'\" >> \"$PGDATA/postgresql.auto.conf\"",
+        'chown -R postgres:postgres "$PGDATA"',
+        'chmod 700 "$PGDATA"',
         "fi",
         "exec docker-entrypoint.sh postgres"
-    ].join("\n");
+    ].join("; ");
     return [
         "sh",
         "-c",

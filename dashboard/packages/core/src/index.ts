@@ -117,6 +117,7 @@ export * from "./schemas/database.js";
 export * from "./schemas/database-statements.js";
 export * from "./schemas/database-maintenance.js";
 export * from "./schemas/redis-cluster.js";
+export * from "./schemas/database-topology.js";
 export * from "./schemas/object-storage.js";
 export * from "./schemas/cdn.js";
 export * from "./data-sql.js";

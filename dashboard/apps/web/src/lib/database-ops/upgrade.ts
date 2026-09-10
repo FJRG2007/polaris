@@ -20,18 +20,32 @@
  *
  * An object store is upgraded in place, on its own volume: SeaweedFS reads the
  * data of the versions before it, and a store has no dump to move it by.
+ *
+ * A MongoDB replica set of several members is upgraded the way the manual does
+ * it instead: member by member on the data it has, secondaries first and the
+ * primary after stepping down, one major version at a time, with the feature
+ * compatibility version raised once every member runs the new one. It stays
+ * available throughout, and until that raise a failure puts every member back
+ * on the version before; after it there is no going back, which the screen says.
+ * A sharded cluster is refused (`SHARDED_UPGRADE_REFUSAL`). MySQL with read
+ * replicas takes the dump path: its replicas' volumes are named after the
+ * primary's, so they start empty on the new version beside it and follow it
+ * from its first transaction.
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { shortHash } from "@polaris/deploy";
 import { restoreDumpInto } from "./restore";
 import { ensureMongoReplicaSet } from "./provision";
 import { buildSelector } from "@/lib/backups/schemas";
+import { rollMembers, topologySetup, waitPrimary } from "./topology";
 import { dumpInContainer, isDumpableEngine } from "@/lib/backups/sources/databases";
 import { deployDatabaseAndWait, engineImage, provisionInInstance } from "@/lib/database-service";
 import {
     DatabaseOperationError,
     instanceContext,
+    lastLine,
     runStep,
     startOperation,
     waitReady,
@@ -39,15 +53,6 @@ import {
     type InstanceContext,
     type OperationHandle
 } from "./ops";
-import {
-    isInPlaceUpgrade,
-    listDatabasesCommand,
-    listRolesCommand,
-    unknownNames,
-    upgradeTargets,
-    MANAGED_ENGINE_INFO,
-    type ManagedEngine
-} from "@polaris/core";
 
 /** A dedicated instance the owner holds, that can be upgraded. */
 async function upgradable(databaseId: string, ownerId: string) {
@@ -71,14 +76,15 @@ async function upgradable(databaseId: string, ownerId: string) {
             "A recovered instance cannot be upgraded in place. Copy its data into a new instance of the version you want."
         );
     }
+    if (core.resolveTopology(row).kind === "sharded") throw new DatabaseOperationError(core.SHARDED_UPGRADE_REFUSAL);
     return row;
 }
 
 /** Check a requested version against what the engine offers. */
-function checkVersion(engine: ManagedEngine, current: string, version: string): void {
-    const offered = MANAGED_ENGINE_INFO[engine]?.versions ?? [];
+function checkVersion(engine: core.ManagedEngine, current: string, version: string): void {
+    const offered = core.MANAGED_ENGINE_INFO[engine]?.versions ?? [];
     if (!offered.includes(version)) throw new DatabaseOperationError(`Polaris does not offer version ${version}.`);
-    if (!isInPlaceUpgrade(current, version) && !upgradeTargets(engine, current).includes(version)) {
+    if (!core.isInPlaceUpgrade(current, version) && !core.upgradeTargets(engine, current).includes(version)) {
         throw new DatabaseOperationError("Only newer versions can be moved to - a dump from a newer version may not load into an older one.");
     }
 }
@@ -94,7 +100,7 @@ export async function upgradeDatabase(
     version: string
 ): Promise<{ operationId: string }> {
     const row = await upgradable(databaseId, ownerId);
-    const engine = row.engine as ManagedEngine;
+    const engine = row.engine as core.ManagedEngine;
     checkVersion(engine, row.version, version);
     const operation = await startOperation(databaseId, "upgrade", actorId);
     await prisma.managedDatabase.update({
@@ -116,10 +122,10 @@ async function runUpgrade(
     let switched = false;
     try {
         const row = await upgradable(databaseId, ownerId);
-        const engine = row.engine as ManagedEngine;
+        const engine = row.engine as core.ManagedEngine;
         const userId = actorId ?? (await projectOwnerUser(databaseId));
 
-        if (isInPlaceUpgrade(row.version, version)) {
+        if (core.isInPlaceUpgrade(row.version, version)) {
             // The same tag, pulled again. Nothing to go back to if it fails -
             // the tag is what it was - so what the instance was pointed at stays.
             await operation.step(`Pulling the newest ${version} release`);
@@ -149,6 +155,13 @@ async function runUpgrade(
             return;
         }
 
+        if (core.resolveTopology(row).kind === "replicaSet") {
+            await backupFirst(databaseId, userId, operation);
+            await rollReplicaSet(databaseId, ownerId, userId, version, operation);
+            await finish(databaseId, operation);
+            return;
+        }
+
         if (!isDumpableEngine(engine)) throw new DatabaseOperationError(`A ${engine} instance cannot be moved by a dump.`);
         const context = await instanceContext(databaseId, ownerId);
         const children = await prisma.managedDatabase.findMany({
@@ -159,19 +172,7 @@ async function runUpgrade(
 
         await operation.step("Checking what the instance holds");
         await refuseUnknown(context, childContexts);
-
-        const resource = await prisma.protectedResource.findFirst({
-            where: { selector: buildSelector("managed-database", [databaseId]) },
-            select: { id: true }
-        });
-        if (resource) {
-            await operation.step("Taking a backup first");
-            const { runBackup } = await import("@/lib/backups/service");
-            const copy = await runBackup(resource.id, { trigger: "pre-upgrade", actorUserId: userId });
-            if (copy.status === "failed") {
-                throw new DatabaseOperationError("The backup before the upgrade failed, so nothing was changed.");
-            }
-        }
+        await backupFirst(databaseId, userId, operation);
 
         const dumps: { context: InstanceContext; path: string }[] = [];
         for (const each of [context, ...childContexts]) {
@@ -241,6 +242,93 @@ async function runUpgrade(
             .catch(() => undefined);
     } finally {
         for (const artifact of staged) await artifact.cleanup().catch(() => undefined);
+    }
+}
+
+/** A backup through the ordinary engine first, when the instance is protected;
+ *  an upgrade whose backup failed changes nothing. */
+async function backupFirst(databaseId: string, userId: string, operation: OperationHandle): Promise<void> {
+    const resource = await prisma.protectedResource.findFirst({
+        where: { selector: buildSelector("managed-database", [databaseId]) },
+        select: { id: true }
+    });
+    if (!resource) return;
+    await operation.step("Taking a backup first");
+    const { runBackup } = await import("@/lib/backups/service");
+    const copy = await runBackup(resource.id, { trigger: "pre-upgrade", actorUserId: userId });
+    if (copy.status === "failed") {
+        throw new DatabaseOperationError("The backup before the upgrade failed, so nothing was changed.");
+    }
+}
+
+/**
+ * Move a MongoDB replica set of several members to `version` member by member,
+ * one major at a time (`rollingPath`).
+ *
+ * Each step first settles the feature compatibility version at the version the
+ * set runs - the manual's prerequisite, and what a step that stopped after its
+ * members moved but before the raise left behind - then moves the members with
+ * `rollMembers`, each by a deploy that gives that member the new image while the
+ * others keep theirs. Once all of them run it, the instance is recorded at the
+ * new version, its first member is waited on as primary, and the feature
+ * compatibility version is raised. Until that raise, a failure deploys every
+ * member on the version before again, which reads what the set wrote; the raise
+ * is the point with no way back, so the earlier version is not kept to return to.
+ */
+async function rollReplicaSet(
+    databaseId: string,
+    ownerId: string,
+    userId: string,
+    version: string,
+    operation: OperationHandle
+): Promise<void> {
+    const start = await upgradable(databaseId, ownerId);
+    const label = core.dbEngineLabel("mongo");
+    for (const next of core.rollingPath(core.MANAGED_ENGINE_INFO.mongo.versions, start.version, version)) {
+        const row = await upgradable(databaseId, ownerId);
+        const context = await instanceContext(databaseId, ownerId);
+        const setup = topologySetup(context);
+        const hosts = core.mongoSets(context.topology, context.container)[0]?.hosts ?? [];
+        const image = engineImage("mongo", next);
+        const secrets = [setup.admin.password];
+        let moved = false;
+        let committed = false;
+        try {
+            await withPorts(context, async (ports) => {
+                // The version is read and set on the primary, which the first
+                // member is whenever it is healthy.
+                await operation.step("Checking the feature compatibility version");
+                await waitPrimary(ports, context.container);
+                const fcv = lastLine(await runStep(ports, context.container, core.mongoReadFcvCommand(setup.admin), secrets));
+                if (fcv !== core.fcvOf(row.version)) {
+                    await runStep(ports, context.container, core.mongoSetFcvCommand(setup.admin, row.version), secrets);
+                }
+                const images: Record<string, string> = {};
+                await rollMembers(ports, hosts, setup.admin, async (member) => {
+                    await operation.step(`Moving ${member} to ${label} ${next}`);
+                    images[member] = image;
+                    moved = true;
+                    const failure = await deployDatabaseAndWait(databaseId, ownerId, userId, { memberImages: { ...images } });
+                    if (failure) throw new DatabaseOperationError(`${member} did not start on ${label} ${next}: ${failure}`);
+                });
+                await prisma.managedDatabase.update({
+                    where: { id: databaseId },
+                    data: { previousVersion: row.version, previousImage: row.image, previousVolumeName: null, version: next, image }
+                });
+                committed = true;
+                await operation.step(`Waiting for ${context.container} to be primary again`);
+                await waitPrimary(ports, context.container);
+                const raise = core.mongoSetFcvCommand(setup.admin, next);
+                await operation.step(raise.describe);
+                await runStep(ports, context.container, raise, secrets);
+            });
+        } catch (error) {
+            if (moved && !committed) {
+                await operation.step(`Putting every member back on ${label} ${row.version}`);
+                await deployDatabaseAndWait(databaseId, ownerId, userId).catch(() => null);
+            }
+            throw error;
+        }
     }
 }
 
@@ -325,20 +413,20 @@ async function refuseUnknown(context: InstanceContext, children: readonly Instan
         const listed = await runStep(
             ports,
             context.container,
-            listDatabasesCommand(engine, context.admin.username, context.admin.password),
+            core.listDatabasesCommand(engine, context.admin.username, context.admin.password),
             [context.admin.password]
         );
-        const strangers = unknownNames(engine, listed, known);
+        const strangers = core.unknownNames(engine, listed, known);
         if (strangers.length > 0) {
             throw new DatabaseOperationError(
                 `The instance also holds ${strangers.join(", ")}, which Polaris did not create and would not carry over. Move or drop ${strangers.length === 1 ? "it" : "them"} first.`
             );
         }
         if (engine === "postgres") {
-            const roles = await runStep(ports, context.container, listRolesCommand(context.admin.username, context.admin.password), [
+            const roles = await runStep(ports, context.container, core.listRolesCommand(context.admin.username, context.admin.password), [
                 context.admin.password
             ]);
-            const accounts = unknownNames("", roles, [context.own.username, ...children.map((child) => child.own.username)]);
+            const accounts = core.unknownNames("", roles, [context.own.username, ...children.map((child) => child.own.username)]);
             if (accounts.length > 0) {
                 throw new DatabaseOperationError(
                     `The instance also has the account${accounts.length === 1 ? "" : "s"} ${accounts.join(", ")}, which Polaris did not create and would not carry over. Drop ${accounts.length === 1 ? "it" : "them"} first.`
@@ -361,7 +449,7 @@ async function projectOwnerUser(databaseId: string): Promise<string> {
 /** Schedule an upgrade for a maintenance window. */
 export async function scheduleUpgrade(databaseId: string, ownerId: string, version: string, at: Date): Promise<void> {
     const row = await upgradable(databaseId, ownerId);
-    checkVersion(row.engine as ManagedEngine, row.version, version);
+    checkVersion(row.engine as core.ManagedEngine, row.version, version);
     if (at.getTime() < Date.now() + 60_000) throw new DatabaseOperationError("Pick a time at least a minute from now.");
     if (row.upgradeState === "running") throw new DatabaseOperationError("An upgrade is already running.");
     await prisma.managedDatabase.update({

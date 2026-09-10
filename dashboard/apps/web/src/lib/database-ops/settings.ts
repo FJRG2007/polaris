@@ -15,7 +15,16 @@ import { DatabaseOperationError, instanceContext, lastLine, runStep, waitReady, 
 async function dedicated(databaseId: string, ownerId: string, engine: string) {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        select: { id: true, engine: true, parentId: true, mode: true, maxMemoryMb: true, replicaSet: true, containerName: true }
+        select: {
+            id: true,
+            engine: true,
+            parentId: true,
+            mode: true,
+            maxMemoryMb: true,
+            replicaSet: true,
+            containerName: true,
+            topology: true
+        }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     if (row.engine !== engine) throw new DatabaseOperationError("That setting does not apply to this engine.");
@@ -124,6 +133,9 @@ export async function setMongoReplicaSet(
     enabled: boolean
 ): Promise<void> {
     const row = await dedicated(databaseId, ownerId, "mongo");
+    if (row.topology !== "single") {
+        throw new DatabaseOperationError("This database is already laid out over several members; that is chosen when it is created.");
+    }
     if (row.replicaSet === enabled) return;
     await prisma.managedDatabase.update({ where: { id: databaseId }, data: { replicaSet: enabled } });
     const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);

@@ -4218,6 +4218,13 @@ model ManagedDatabase {
     clusterMasters      Int?
     // MongoDB: run as a single-member replica set (change streams, transactions).
     replicaSet          Boolean  @default(false)
+    // How a dedicated instance is laid out: single | replicaSet | sharded (MongoDB)
+    // | replicas (MySQL with read replicas), with the replica set's members, the
+    // cluster's shards, or the primary's read replicas. Chosen at creation.
+    topology            String   @default("single")
+    members             Int      @default(1)
+    shards              Int      @default(0)
+    readReplicas        Int      @default(0)
     // PostgreSQL: archive every WAL segment and take daily base backups, so the
     // instance can be recovered to any moment inside the kept window.
     pitr                Boolean  @default(false)

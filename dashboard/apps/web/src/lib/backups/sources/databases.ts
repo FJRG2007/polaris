@@ -21,6 +21,7 @@ import { createWriteStream } from "node:fs";
 import { prisma, Prisma } from "@polaris/db";
 import { pipeline } from "node:stream/promises";
 import { getPorts } from "@/lib/deploy/runtime";
+import { SHARDED_DUMP_REFUSAL } from "@polaris/core";
 import { restoreDumpInto } from "@/lib/database-ops/restore";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
@@ -71,8 +72,16 @@ const DUMPERS = {
         extension: "archive.gz",
         // A dedicated instance's account is root, in `admin`; a database hosted on
         // an instance has its account created inside itself - see `authDatabase`.
-        argv: (db: string, user: string, password: string, authDb = "admin") => [
+        //
+        // A replica set of several members is read from a secondary, so a backup
+        // does not load the primary: the set is named by its seed list and reads
+        // prefer a secondary, falling back to the primary only when none answers.
+        // Without `--oplog`: that option needs a dump of the whole instance, and
+        // replaying one refuses any namespace filter, while a copy here is of one
+        // database and is restored into one.
+        argv: (db: string, user: string, password: string, authDb = "admin", seeds?: string) => [
             "mongodump",
+            ...(seeds ? [`--host=${seeds}`, "--readPreference=secondaryPreferred"] : []),
             `--db=${db}`,
             `--username=${user}`,
             `--password=${password}`,
@@ -158,12 +167,16 @@ export const managedDatabaseSource: BackupSource = {
                 id: true,
                 name: true,
                 engine: true,
+                topology: true,
+                parent: { select: { topology: true } },
                 environment: { select: { name: true, project: { select: { name: true } } } }
             },
             take: 500
         });
         return rows
-            .filter((row) => isEngine(row.engine))
+            // A sharded cluster cannot be copied consistently yet, so it is not
+            // offered; its Manage panel says so.
+            .filter((row) => isEngine(row.engine) && (row.parent ?? row).topology !== "sharded")
             .map((row) => ({
                 kind: "managed-database" as const,
                 selector: buildSelector("managed-database", [row.id]),
@@ -185,12 +198,22 @@ export const managedDatabaseSource: BackupSource = {
         if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
         const row = await prisma.managedDatabase.findUnique({
             where: { id },
-            select: { engine: true, containerName: true, targetId: true, parentId: true, name: true, clusterMasters: true }
+            select: {
+                engine: true,
+                containerName: true,
+                targetId: true,
+                parentId: true,
+                name: true,
+                topology: true,
+                clusterMasters: true,
+                parent: { select: { topology: true } }
+            }
         });
         if (!row) throw new SourceUnavailableError("That database no longer exists");
         if (!isEngine(row.engine)) {
             throw new SourceUnavailableError(`Polaris cannot dump a ${row.engine} database yet`);
         }
+        if ((row.parent ?? row).topology === "sharded") throw new SourceUnavailableError(SHARDED_DUMP_REFUSAL);
         const connection = await databaseConnection(id, resource.ownerId);
         const nodes = databaseClusterNodes(row);
         if (nodes && row.clusterMasters) {
@@ -219,7 +242,8 @@ export const managedDatabaseSource: BackupSource = {
             username: connection.username,
             password: connection.password,
             authDatabase: row.parentId ? connection.database : "admin",
-            label: resource.name || row.name
+            label: resource.name || row.name,
+            ...(connection.replicaSet && connection.hosts.length > 1 ? { mongoSeeds: seedsOf(connection) } : {})
         });
     },
 
@@ -300,6 +324,14 @@ export interface DumpRequest {
     /** MongoDB only: where the account signs in - `admin` for a dedicated
      *  instance's root account, the database itself for a hosted one. */
     readonly authDatabase?: string;
+    /** MongoDB only: a replica set of several members as a seed list, so the
+     *  dump is read from a secondary. */
+    readonly mongoSeeds?: string;
+}
+
+/** A replica set connection as the seed list the database tools' `--host` reads. */
+function seedsOf(connection: { hosts: readonly string[]; replicaSet: string | null; port: number }): string {
+    return `${connection.replicaSet}/${connection.hosts.map((host) => `${host}:${connection.port}`).join(",")}`;
 }
 
 /** The engines a dump can be taken of. */
@@ -334,7 +366,15 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
     try {
         const argv =
             request.engine === "mongo"
-                ? [...DUMPERS.mongo.argv(request.database, request.username, request.password, request.authDatabase)]
+                ? [
+                      ...DUMPERS.mongo.argv(
+                          request.database,
+                          request.username,
+                          request.password,
+                          request.authDatabase,
+                          request.mongoSeeds
+                      )
+                  ]
                 : [...dumper.argv(request.database, request.username, request.password)];
         // redis-cli exits 0 on an error reply, so the answer itself is checked:
         // a refused SAVE must not be followed by copying a stale snapshot.

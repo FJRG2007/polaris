@@ -68,6 +68,7 @@ export type {
     AppDeployPlan,
     DbDeployPlan,
     DbNodePlan,
+    DbMemberPlan,
     DeployResult,
     RuntimeStatus,
     HealthcheckSpec,
@@ -77,6 +78,7 @@ export type {
 export {
     appComposeSpec,
     dbComposeSpec,
+    dbPlanImages,
     defaultDbPort,
     expandReplicas,
     deployBlockLines,

@@ -7,7 +7,7 @@
  */
 
 import { traefikLabels } from "./traefik.js";
-import type { AppDeployPlan, DbDeployPlan, ResourceLimits } from "./runtime/driver.js";
+import type { AppDeployPlan, DbDeployPlan, DbMemberPlan, ResourceLimits } from "./runtime/driver.js";
 
 export interface ComposeSpecPort {
     readonly host: number;
@@ -138,8 +138,20 @@ function composeValues(values: Readonly<Record<string, string>>): Record<string,
  * session and a runner all build their own, and escaping in some of them is the bug
  * this exists to end. Everything else about the spec is names and numbers compose does
  * not interpolate.
+ *
+ * And refused, naming the service, when a command, an entrypoint or a healthcheck
+ * holds a control character. The host daemon rejects any such argument outright, and
+ * the remote renderer's YAML folds a line break inside a quoted value into a space,
+ * so a script written over several lines ran on neither - it failed on one in the
+ * daemon's words and silently became a different script on the other.
  */
 export function forCompose(spec: ComposeSpec): ComposeSpec {
+    for (const service of spec.services) {
+        const args = [...(service.command ?? []), ...(service.entrypoint ?? []), ...(service.healthcheck?.test ?? [])];
+        if (args.some((arg) => /[\x00-\x1f\x7f]/.test(arg))) {
+            throw new Error(`${service.name}'s command holds a line break or another control character, which a container cannot be started with.`);
+        }
+    }
     return {
         ...spec,
         services: spec.services.map((service) => ({
@@ -417,6 +429,7 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
             networks
         };
     }
+    if (plan.members && plan.members.length > 0) return dbMembersSpec(plan, plan.members, networks);
     return {
         project: plan.ref.project,
         services: [
@@ -444,6 +457,52 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
         ],
         networks
     };
+}
+
+/**
+ * The spec for a database laid out over several containers: one service per
+ * member, all in the database's one project - so it is started, stopped and
+ * removed as one database - on the same networks, where each reaches the others
+ * by its container name. Every member with data has a volume of its own.
+ *
+ * No `depends_on`: the members of a replica set start in any order and are
+ * joined once all of them answer, which is Polaris' step after the deploy, not
+ * compose's. The point-in-time archive mounts of `extraVolumes` are a
+ * PostgreSQL single instance's and are not carried here.
+ */
+function dbMembersSpec(plan: DbDeployPlan, members: readonly DbMemberPlan[], networks: string[]): ComposeSpec {
+    const names = new Set(members.map((member) => member.name));
+    if (names.size !== members.length) throw new Error("Two members of one database cannot share a name");
+    if (!names.has(plan.ref.name)) throw new Error("A database's own name must be one of its members");
+    return {
+        project: plan.ref.project,
+        services: members.map((member) => {
+            const image = member.image ?? plan.image;
+            return {
+                name: member.name,
+                image,
+                pullPolicy: "always",
+                env: { ...member.env },
+                command: member.command ? [...member.command] : undefined,
+                ports: member.exposePort !== undefined ? [{ host: member.exposePort, container: defaultDbPort(image) }] : [],
+                volumes: member.volumeName ? [{ source: member.volumeName, target: plan.dataPath, kind: "volume" }] : [],
+                labels: {},
+                networks,
+                ...(member.aliases && member.aliases.length > 0 ? { aliases: [...member.aliases] } : {}),
+                extraHosts: [HOST_GATEWAY],
+                restart: "unless-stopped",
+                ...limitFields(plan.limits)
+            };
+        }),
+        volumes: members.flatMap((member) => (member.volumeName ? [member.volumeName] : [])),
+        networks
+    };
+}
+
+/** Every image a database plan runs, once each: a rolling upgrade has members
+ *  on two at a time, and each has to be on the host before compose starts. */
+export function dbPlanImages(plan: DbDeployPlan): string[] {
+    return [...new Set([plan.image, ...(plan.members ?? []).map((member) => member.image ?? plan.image)].filter(Boolean))];
 }
 
 /** A plan's limits as spec fields, leaving out the ones it does not set. */
