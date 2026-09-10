@@ -55,8 +55,40 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             {
                 title: "Builds from the source",
                 description:
-                    "A Dockerfile is used when there is one; otherwise the stack is detected and built. Install, build and start commands can be set per service.",
+                    "A Dockerfile is used when there is one; otherwise the stack is detected - Node, Python, Go, Rust, PHP, Ruby, Java, Elixir or a static site - and built. Install, build and start commands and the runtime version can be set per service.",
                 where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Settings from the repository",
+                description:
+                    "A new service takes what railway.json, render.yaml, netlify.toml, vercel.json, a Procfile or app.json already set.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
+                title: "Build anywhere",
+                description:
+                    "Build on the service's own server, on this machine or on another server, and the image is carried to where it runs. The CLI can build on your own computer.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Deploy a folder",
+                description: "Drop a folder or a zip and it is built the way a repository would be.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
+                title: "Smart fixes",
+                description: "A failed deploy says what most likely went wrong and offers the change that fixes it, redeploying in one press.",
+                where: "Service > Deployments",
+                href: PROJECTS
+            },
+            {
+                title: "Updates noticed",
+                description: "Says when a newer image is published behind a service's tag, or how far it is behind its branch.",
+                where: "Service > Deployments",
                 href: PROJECTS
             },
             {
@@ -156,6 +188,18 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 title: "Copies and autoscaling",
                 description:
                     "Run up to ten copies, spread by the edge with sticky visitors and a health path, and let the count follow CPU.",
+                where: "Service > Settings > Scaling",
+                href: PROJECTS
+            },
+            {
+                title: "Resource limits",
+                description: "Cap the CPU and memory each copy of a service, or a database, may use.",
+                where: "Service > Settings > Scaling",
+                href: PROJECTS
+            },
+            {
+                title: "Sleep when idle",
+                description: "A service nobody visits sleeps after a set time and wakes on the next visit.",
                 where: "Service > Settings > Scaling",
                 href: PROJECTS
             }
@@ -275,6 +319,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 href: PROJECTS
             },
             {
+                title: "Templates",
+                description: "Grafana, n8n, Uptime Kuma, Vaultwarden and other well-known apps, with their volumes and secrets set.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
                 title: "Marketplace",
                 description: "Ready-made apps, installed in a click.",
                 where: "Marketplace",
@@ -319,7 +369,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Webhooks",
-                description: "Deploys and alerts reported to Discord, Slack or any endpoint.",
+                description: "Deploys and alerts reported to Discord, Slack, Microsoft Teams, Telegram or any endpoint.",
                 where: "Watch > Webhooks",
                 href: "/watch/webhooks"
             },
@@ -342,6 +392,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 description: "Backups on a schedule, and restores.",
                 where: "Backups",
                 href: "/apps/backups",
+                adminOnly: true
+            },
+            {
+                title: "Move to another machine",
+                description: "The whole instance in one file sealed with a passphrase, imported on a new install.",
+                where: "Management > Updates & settings",
+                href: "/admin/settings",
                 adminOnly: true
             },
             {
@@ -370,6 +427,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 description: "Secret variables are encrypted at rest and only revealed on request, and each reveal is recorded.",
                 where: "Service > Variables",
                 href: PROJECTS
+            },
+            {
+                title: "Encrypted backups",
+                description: "Every copy leaves encrypted, under a key you can keep elsewhere as a recovery key.",
+                where: "Backups > Encryption",
+                href: "/apps/backups",
+                adminOnly: true
             },
             {
                 title: "Project access",
