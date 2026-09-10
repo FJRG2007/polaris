@@ -44,6 +44,7 @@ import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
 import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
+import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
 import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
@@ -585,6 +586,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
         run: sweepEveryDisk
+    },
+    {
+        key: "private-networks",
+        // Ten minutes. An update recreates the edge without its attachments to the
+        // private networks, and until this runs a service with its port closed in
+        // an isolated environment is routed but not reached; the first pass after
+        // boot is the one that matters, and the rest catch anything since.
+        everyMs: Number(process.env.POLARIS_PRIVATE_NETWORKS_MS) || 10 * MINUTE,
+        // Unleased: attaching what is already attached and removing what is
+        // already gone are both no-ops, so a second runner changes nothing.
+        leaseMs: null,
+        run: reconcilePrivateNetworks
     },
     {
         key: "drive-transfers",

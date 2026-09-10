@@ -146,20 +146,24 @@ export function forCompose(spec: ComposeSpec): ComposeSpec {
 
 /** Build the structured spec for an application deployment. */
 export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
+    const joined = joinedNetworks(plan.networks, network);
     const labels = traefikLabels({
         serviceName: plan.ref.name,
-        network,
+        // The network the edge finds the container on: the proxy network whenever
+        // the service is on it, else the private one the edge was attached to.
+        network: joined[0] ?? network,
         domains: plan.domains,
         waf: plan.waf,
         edge: plan.edge,
         replicas: plan.replicas
     });
     const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
-    // The proxy network plus any extra networks the plan requests (deduped, proxy
-    // first so edge routing is unchanged). Both the daemon and the remote YAML
-    // renderer emit every top-level network as external, so each must already exist
-    // on the target. Traefik still routes via the proxy network (labels reference it).
-    const networks = [network, ...(plan.extraNetworks ?? []).filter((net) => net && net !== network)];
+    // The planned networks plus any extra networks the plan requests (deduped, in
+    // order, so the proxy network stays first where the service is on it). Both the
+    // daemon and the remote YAML renderer emit every top-level network as external,
+    // so each must already exist on the target: the shared ones are made when the
+    // target is set up, the private ones just before compose runs.
+    const networks = [...new Set([...joined, ...(plan.extraNetworks ?? [])].filter(Boolean))];
     return {
         project: plan.ref.project,
         services: [
@@ -314,6 +318,7 @@ export function serviceNetworkLines(service: Pick<ComposeSpecService, "networks"
 export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec {
     const ports: ComposeSpecPort[] =
         plan.exposePort !== undefined ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }] : [];
+    const networks = joinedNetworks(plan.networks, network);
     return {
         project: plan.ref.project,
         services: [
@@ -326,14 +331,20 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 ports,
                 volumes: [{ source: plan.volumeName, target: plan.dataPath, kind: "volume" }],
                 labels: {},
-                networks: [network],
+                networks,
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped"
             }
         ],
         volumes: [plan.volumeName],
-        networks: [network]
+        networks
     };
+}
+
+/** The networks a plan names, or the proxy network when it names none. */
+function joinedNetworks(planned: readonly string[] | undefined, proxy: string): string[] {
+    const named = [...new Set((planned ?? []).filter(Boolean))];
+    return named.length > 0 ? named : [proxy];
 }
 
 /** The in-container port a database engine listens on, inferred from its image. */

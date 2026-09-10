@@ -10,8 +10,9 @@
  */
 
 import { prisma } from "@polaris/db";
-import { loadEnv } from "@polaris/config";
-import { slugify } from "@polaris/deploy";
+import { getCapabilities, loadEnv } from "@polaris/config";
+import { linksOfLayout, slugify } from "@polaris/deploy";
+import { networkModeOf } from "@/lib/deploy/service-networks";
 import { createApiKey } from "@polaris/auth";
 import { contactLines } from "@/lib/privacy-service";
 import { readsOrgWhere } from "@/lib/orgs/org-service";
@@ -29,6 +30,7 @@ import {
     ALL_PROJECT_CAPABILITIES,
     PROJECT_PRINCIPAL_LABELS,
     TOKEN_LIFETIME_DAYS,
+    type EnvironmentNetworkMode,
     type ProjectAccessInput,
     type ProjectCapability,
     type ProjectFlags,
@@ -57,6 +59,10 @@ export interface ProjectEnvironmentView {
     pullRequest: number | null;
     /** "owner/repo" that pull request is on. */
     previewRepo: string | null;
+    /** How its services see each other: "shared", "environment" or "links". */
+    networkMode: EnvironmentNetworkMode;
+    /** How many links its canvas holds - in "links" mode, the connections made. */
+    linkCount: number;
 }
 
 export interface ProjectSettingsView {
@@ -71,6 +77,9 @@ export interface ProjectSettingsView {
     createdAt: string;
     environments: ProjectEnvironmentView[];
     serviceCount: number;
+    /** Whether this machine's daemon makes private networks. An older one keeps
+     *  every service here on the shared network until Polaris is updated. */
+    privateNetworksHere: boolean;
 }
 
 export async function getProjectSettings(projectId: string): Promise<ProjectSettingsView> {
@@ -89,6 +98,8 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
                     branch: true,
                     pullRequest: true,
                     previewRepo: true,
+                    networkMode: true,
+                    layout: true,
                     _count: { select: { applications: true, databases: true } }
                 }
             }
@@ -104,7 +115,9 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         createdAt: environment.createdAt.toISOString(),
         branch: environment.branch,
         pullRequest: environment.pullRequest,
-        previewRepo: environment.previewRepo
+        previewRepo: environment.previewRepo,
+        networkMode: networkModeOf(environment.networkMode),
+        linkCount: linksOfLayout(environment.layout).length
     }));
     return {
         id: project.id,
@@ -120,7 +133,8 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         serviceCount: environments.reduce(
             (total, environment) => total + environment.serviceCount,
             0
-        )
+        ),
+        privateNetworksHere: getCapabilities().privateNetworks
     };
 }
 

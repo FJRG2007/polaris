@@ -188,6 +188,23 @@ export class HostdClient {
         return parsed.exposedPorts.filter((port): port is number => typeof port === "number");
     }
 
+    /**
+     * Settle the private networks on this host against the set still wanted:
+     * Polaris's own containers are attached to each one kept (a recreated edge
+     * comes back without them), and any the set no longer names is removed.
+     */
+    public async reconcilePrivateNetworks(keep: readonly string[]): Promise<{ kept: number; removed: number }> {
+        const response = await this.call("POST", "/v1/deploy/networks/reconcile", JSON.stringify({ keep }));
+        if (response.status !== 200) {
+            throw new Error(`hostd network reconcile failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as { kept?: unknown; removed?: unknown };
+        return {
+            kept: typeof parsed.kept === "number" ? parsed.kept : 0,
+            removed: typeof parsed.removed === "number" ? parsed.removed : 0
+        };
+    }
+
     /** Authenticate to a private registry (`docker login`). Resolves on success and
      *  throws on failure; the password rides in the JSON body, never in argv. */
     public async deployLogin(registry: string, username: string, password: string): Promise<void> {

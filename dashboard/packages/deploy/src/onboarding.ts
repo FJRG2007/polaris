@@ -20,6 +20,7 @@
  */
 
 import { quoteArg } from "./shell.js";
+import { PRIVATE_NETWORK_LABEL, REMOTE_EDGE_CONTAINERS } from "./networks.js";
 
 export interface OnboardingOptions {
     /** Shared proxy network name (must match the target's proxyNetwork). */
@@ -145,6 +146,10 @@ export function onboardingScript(options: OnboardingOptions): string {
             "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
         ].join(" "),
         ...guardSteps,
+        // A recreated edge comes back on the proxy network only, and a service kept
+        // on its environment's own network is reached by name there - so the edge
+        // rejoins every private network already on this server.
+        `for n in $(docker network ls -q --filter label=${PRIVATE_NETWORK_LABEL}); do for c in ${REMOTE_EDGE_CONTAINERS.join(" ")}; do docker network connect "$n" "$c" >/dev/null 2>&1 || true; done; done`,
         'echo "== done =="'
     ].join("\n");
 }

@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import { randomBytes } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { getPorts, type TargetRow } from "./deploy/runtime";
+import { networksForService } from "./deploy/service-networks";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
 import { deployLogPath, enqueueOnTarget, executeDeployment } from "./deploy-service";
@@ -411,7 +412,17 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         command: spec.command?.(creds),
         volumeName,
         dataPath: spec.dataPath,
-        exposePort: db.exposePort ?? undefined
+        exposePort: db.exposePort ?? undefined,
+        // Nothing routes to a database, so in an isolated environment it leaves the
+        // proxy network entirely: the services beside it reach it on their own
+        // network, and the daemon attaches the dashboard there for the data browser.
+        networks: networksForService({
+            environment: db.environment,
+            serviceId: db.id,
+            target: db.target,
+            published: db.exposePort !== null,
+            routed: false
+        })
     };
 
     const deployment = await prisma.deployment.create({

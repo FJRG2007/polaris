@@ -35,6 +35,7 @@ import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { challengeActive, floodedServices } from "./deploy/edge-state";
+import { hasTunnel, networksForService } from "./deploy/service-networks";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
@@ -81,7 +82,8 @@ import {
     isTunnelHostname,
     isWildcardHostname,
     normalizeDeployHostname,
-    parseAppEdgeConfig
+    parseAppEdgeConfig,
+    type EnvironmentNetworkMode
 } from "@polaris/core";
 import {
     bucketHttpMetrics,
@@ -353,6 +355,26 @@ export async function renameEnvironment(
         where: { id: environmentId },
         data: { name, slug: taken ? undefined : slug }
     });
+}
+
+/**
+ * Choose how an environment's services see each other. Stored only: a running
+ * container keeps the networks it was started on, so the choice reaches each
+ * service on its next deploy - or all of them at once when the caller deploys the
+ * environment straight after, which is what the settings screen offers.
+ */
+export async function setEnvironmentNetworkMode(
+    environmentId: string,
+    ownerId: string,
+    networkMode: EnvironmentNetworkMode
+): Promise<{ previous: string }> {
+    const environment = await prisma.environment.findFirst({
+        where: { id: environmentId, project: { ownerId } },
+        select: { id: true, networkMode: true }
+    });
+    if (!environment) throw new Error("Environment not found");
+    await prisma.environment.update({ where: { id: environmentId }, data: { networkMode } });
+    return { previous: environment.networkMode };
 }
 
 /** Make one environment the project's default - the one a link with no
@@ -2381,6 +2403,17 @@ async function buildAppPlan(
         }),
         healthcheck
     };
+    // Which networks it joins: the proxy network alone in a shared environment,
+    // else its environment's own (or its links'), plus the proxy network only when
+    // the edge has to dial it there.
+    const networks = networksForService({
+        environment: app.environment,
+        serviceId: app.id,
+        target: app.target,
+        published: !plan.private,
+        routed: plan.domains.length > 0 || (await hasTunnel(app.id))
+    });
+    const planned: AppDeployPlan = { ...plan, networks };
     let gitSource: GitSource | undefined;
     if (typeof source.repoUrl === "string" && source.repoUrl) {
         gitSource = {
@@ -2429,7 +2462,7 @@ async function buildAppPlan(
               }
             : undefined;
     return {
-        plan,
+        plan: planned,
         target: app.target,
         gitSource,
         buildCommands,

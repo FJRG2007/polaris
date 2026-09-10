@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Environments: rename them, choose which one a bare link lands on, and remove
- * the ones that are finished with.
+ * Environments: rename them, choose which one a bare link lands on, choose which
+ * of their services can reach each other, and remove the ones that are finished
+ * with.
  *
  * The default environment cannot be deleted, because something has to answer
  * when a link names no environment - so the way to remove it is to promote
@@ -13,6 +14,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SettingsCard } from "../project-settings";
+import { NetworkingCard } from "./networking-card";
 import { deleteEnvironmentAction } from "../actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Input } from "@polaris/ui";
@@ -218,6 +220,8 @@ export function EnvironmentsSection({
                     </div>
                 )}
             </SettingsCard>
+
+            <NetworkingCard settings={settings} canManage={canManage} />
 
             <NewEnvironmentDialog
                 projectId={settings.id}

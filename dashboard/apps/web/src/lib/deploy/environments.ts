@@ -79,6 +79,9 @@ export async function cloneEnvironment(
             slug,
             isDefault: false,
             layout: source.layout,
+            // Its own network when the original has one: a preview of an isolated
+            // environment that could reach every other project would not be a copy.
+            networkMode: source.networkMode,
             branch: input.branch?.trim() || null,
             pullRequest: input.preview?.pullRequest ?? null,
             previewRepo: input.preview?.repo ?? null,

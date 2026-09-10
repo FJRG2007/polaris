@@ -17,6 +17,7 @@ import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
 import type { ComposeSpec } from "@polaris/deploy";
 import { connectorOrigin } from "../deploy-service";
+import { connectorNetworks } from "./service-networks";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
 
 const PROXY_NETWORK = "polaris-proxy";
@@ -54,7 +55,13 @@ async function requireLocalApp(appId: string, ownerId: string): Promise<void> {
 }
 
 /** The ngrok sidecar spec forwarding the edge to the app's published host port. */
-function tunnelSpec(project: string, service: string, origin: string, token: string): ComposeSpec {
+function tunnelSpec(
+    project: string,
+    service: string,
+    origin: string,
+    token: string,
+    networks: string[]
+): ComposeSpec {
     return {
         project,
         services: [
@@ -69,12 +76,12 @@ function tunnelSpec(project: string, service: string, origin: string, token: str
                 volumes: [],
                 labels: {},
                 command: ["http", origin, "--log", "stdout"],
-                networks: [PROXY_NETWORK],
+                networks,
                 restart: "unless-stopped"
             }
         ],
         volumes: [],
-        networks: [PROXY_NETWORK]
+        networks
     };
 }
 
@@ -118,7 +125,9 @@ export async function startNgrokTunnel(appId: string, ownerId: string): Promise<
     const ports = new HostdPorts();
     try {
         await ports.composeDown(project).catch(() => undefined);
-        await ports.composeUp(tunnelSpec(project, service, origin, token));
+        await ports.composeUp(
+            tunnelSpec(project, service, origin, token, await connectorNetworks(appId, PROXY_NETWORK))
+        );
 
         let url: string | null = null;
         for (let attempt = 0; attempt < 20 && !url; attempt += 1) {

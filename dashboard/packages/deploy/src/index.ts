@@ -85,6 +85,24 @@ export {
     type ComposeSpecVolume,
     type ComposeSpecHealth
 } from "./compose-spec.js";
+export {
+    NETWORK_MODES,
+    PRIVATE_NETWORK_LABEL,
+    PRIVATE_NETWORK_PREFIX,
+    REMOTE_EDGE_CONTAINERS,
+    ensurePrivateNetworksScript,
+    environmentNetwork,
+    fallbackSubnet,
+    isPrivateNetwork,
+    joinsProxy,
+    linksOfLayout,
+    privateNetworksOf,
+    serviceNetwork,
+    serviceNetworks,
+    type NetworkMode,
+    type NetworkPlanInput,
+    type ServiceLink
+} from "./networks.js";
 export { ComposeRuntime } from "./runtime/compose.js";
 export { mountFailureReason } from "./mount-failure.js";
 export { deployFailureReason, isOutOfSpace, parseReclaimedBytes } from "./deploy-failure.js";

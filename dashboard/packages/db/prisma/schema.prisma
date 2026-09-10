@@ -3931,6 +3931,10 @@ model Environment {
     previewRepo   String?
     previewOfId   String?  @db.Uuid
     previewSha    String?
+    // How its services see each other: "shared" (every service on the one proxy
+    // network, as every environment made before this was), "environment" (a
+    // private network of its own), or "links" (only services linked on the canvas).
+    networkMode   String   @default("shared")
     createdAt DateTime @default(now())
 
     project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)

@@ -10,7 +10,7 @@ import type { Client } from "ssh2";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
-import { forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { ensurePrivateNetworksScript, forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -64,6 +64,10 @@ export class SshPorts implements RuntimePorts {
             "set -e",
             `mkdir -p ${quoteArg(dir)} ${quoteArg(REMOTE_VOLUME_ROOT)}`,
             `printf %s ${quoteArg(b64)} | base64 -d > ${quoteArg(file)}`,
+            // Compose only joins a network that already exists; a private one is
+            // made here the first time a service names it (the daemon does the same
+            // on Polaris's own machine).
+            ...ensurePrivateNetworksScript(spec.networks, false),
             `docker compose -p ${quoteArg(spec.project)} -f ${quoteArg(file)} up -d --remove-orphans`
         ].join("; ");
         await this.run(command, onOutput);
@@ -86,6 +90,7 @@ export class SshPorts implements RuntimePorts {
             "set -e",
             `mkdir -p ${quoteArg(dir)} ${quoteArg(REMOTE_VOLUME_ROOT)}`,
             `printf %s ${quoteArg(b64)} | base64 -d > ${quoteArg(file)}`,
+            ...ensurePrivateNetworksScript(spec.networks, true),
             `docker stack deploy -c ${quoteArg(file)} --detach=true --with-registry-auth --prune ${quoteArg(spec.project)}`
         ].join("; ");
         await this.run(command, onOutput);

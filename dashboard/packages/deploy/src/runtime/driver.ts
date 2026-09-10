@@ -67,6 +67,10 @@ export interface AppDeployPlan {
     /** Runtime environment (already merged from EnvVars, secrets decrypted). */
     readonly env: Readonly<Record<string, string>>;
     readonly replicas: number;
+    /** The networks this service joins in place of the proxy network alone, from
+     *  `serviceNetworks`. Absent or empty means the proxy network, which is what
+     *  every service joined before an environment could keep its own. */
+    readonly networks?: readonly string[];
     /** External networks this service joins beyond the proxy network. The messaging
      *  hub uses it to join the control-plane's default network so it can reach the
      *  web's inbound ingest directly; empty for a normal app. Each must already
@@ -132,6 +136,9 @@ export interface DbDeployPlan {
     readonly volumeName: string;
     readonly dataPath: string;
     readonly exposePort?: number;
+    /** The networks the database joins in place of the proxy network, as for an
+     *  application. Absent or empty means the proxy network. */
+    readonly networks?: readonly string[];
 }
 
 export interface DeployResult {

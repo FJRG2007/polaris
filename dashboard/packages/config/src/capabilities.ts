@@ -17,6 +17,10 @@ export interface HostdCapabilityReport {
      *  Optional so an older daemon that predates it still parses; it then falls
      *  back to the docker flag. */
     readonly deploy?: boolean;
+    /** Whether the daemon creates the private networks a deploy names and
+     *  attaches Polaris's own containers to them. Absent on a daemon that
+     *  predates it, which means every service stays on the proxy network. */
+    readonly privateNetworks?: boolean;
     readonly kubernetes: boolean;
     readonly systemd: boolean;
     readonly autoUpdate: boolean;
@@ -35,6 +39,7 @@ export interface Capabilities {
     readonly nativeMounts: boolean;
     readonly docker: boolean;
     readonly deploy: boolean;
+    readonly privateNetworks: boolean;
     readonly kubernetes: boolean;
     readonly systemd: boolean;
     readonly autoUpdate: boolean;
@@ -48,6 +53,7 @@ export const LIMITED_CAPABILITIES: Capabilities = {
     nativeMounts: false,
     docker: false,
     deploy: false,
+    privateNetworks: false,
     kubernetes: false,
     systemd: false,
     autoUpdate: false
@@ -78,6 +84,7 @@ export function deriveCapabilities(
         docker: reported.docker,
         // Older daemons omit `deploy`; fall back to the docker flag they do send.
         deploy: reported.deploy ?? reported.docker,
+        privateNetworks: reported.privateNetworks ?? false,
         kubernetes: reported.kubernetes,
         systemd: reported.systemd,
         autoUpdate: reported.autoUpdate && autoUpdateAllowed

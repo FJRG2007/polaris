@@ -34,12 +34,14 @@ import {
 } from "@/lib/deploy-project-access";
 import {
     environmentNameSchema,
+    environmentNetworkModeSchema,
     projectAccessInputSchema,
     projectFlagsSchema,
     projectGeneralSchema,
     projectTokenInputSchema,
     projectVisibilitySchema,
     projectWebhookInputSchema,
+    type EnvironmentNetworkMode,
     type ProjectAccessInput,
     type ProjectCapability,
     type ProjectFlags,
@@ -198,6 +200,48 @@ export async function setDefaultEnvironmentAction(environmentId: string): Promis
         await deployService.setDefaultEnvironment(environmentId, access.ownerId);
         refresh(access.projectId);
         return {};
+    });
+}
+
+/**
+ * Choose how an environment's services see each other, and optionally deploy it
+ * at once so the choice takes effect now. Changing it needs the settings
+ * capability; deploying everything in it on top needs the deploy one too.
+ */
+export async function setEnvironmentNetworkModeAction(input: {
+    environmentId: string;
+    networkMode: EnvironmentNetworkMode;
+    apply?: boolean;
+}): Promise<Result<{ started: number; failed: string[] }>> {
+    return attempt("Could not change how the services connect", async () => {
+        const user = await requirePermission("deploy.manage");
+        const parsed = environmentNetworkModeSchema.safeParse(input);
+        if (!parsed.success) return { error: "Pick one of the offered options" };
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "project.settings"
+        );
+        if (parsed.data.apply && !accessCan(access, "deploy.run")) {
+            return { error: "You can change this setting, but not deploy the services in this environment." };
+        }
+        const { previous } = await deployService.setEnvironmentNetworkMode(
+            parsed.data.environmentId,
+            access.ownerId,
+            parsed.data.networkMode
+        );
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.env.network",
+            targetType: "environment",
+            targetId: parsed.data.environmentId,
+            metadata: { from: previous, to: parsed.data.networkMode, applied: parsed.data.apply }
+        });
+        refresh(access.projectId);
+        if (!parsed.data.apply) return {};
+        const { deployEnvironment } = await import("@/lib/deploy/environments");
+        const result = await deployEnvironment(parsed.data.environmentId, access.ownerId, user.id);
+        return { started: result.started, failed: result.failed };
     });
 }
 

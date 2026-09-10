@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::deploy::{self, DeploySpec};
 use crate::docker;
 use crate::http::{self, Request, Response};
+use crate::networks;
 use crate::security::{self, PathError};
 
 /// Body cap for control endpoints (JSON). `fs` PUT is streamed and not bound by
@@ -58,6 +59,10 @@ fn capabilities(config: &Config) -> serde_json::Value {
         "nativeMounts": true,
         "docker": config.docker_socket.exists(),
         "deploy": config.docker_socket.exists(),
+        // Creates the private networks a deploy spec names. Reported so a dashboard
+        // newer than this daemon keeps its services on the shared network rather
+        // than naming one this daemon would not create.
+        "privateNetworks": config.docker_socket.exists(),
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
@@ -202,6 +207,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
         ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
+        ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -329,6 +335,11 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
     if let Err(msg) = deploy::validate_spec(&spec, &state.config) {
         return Response::bad_request(&msg);
     }
+    // Private networks the spec names are created here, because compose refuses to
+    // join one another project created (see `networks`).
+    if let Err(msg) = networks::ensure(&spec.networks, false) {
+        return Response::text(502, "Bad Gateway", &msg);
+    }
     let yaml = deploy::render_compose(&spec, &state.config);
     match deploy::compose_up(&state.config, &spec.project, &yaml) {
         Ok(reader) => stream_response(reader),
@@ -337,6 +348,51 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
             Response::text(502, "Bad Gateway", "could not start docker compose")
         }
     }
+}
+
+/// The private networks the dashboard still has a use for.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NetworksReconcileRequest {
+    keep: Vec<String>,
+}
+
+/// The most names one reconcile may carry: one per environment and one per
+/// service, with room to spare, and a bound on what a request can make this walk.
+const MAX_KEPT_NETWORKS: usize = 20_000;
+
+/// Keep this machine's private networks in line with what the dashboard still
+/// uses: attach Polaris's own containers to each wanted one and remove the rest
+/// (see `networks::reconcile`). Every name is checked against the private shape,
+/// so nothing sent here can name any other network.
+fn deploy_networks_reconcile<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    if !state.config.docker_socket.exists() {
+        return Response::not_implemented("docker is not available on this host");
+    }
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: NetworksReconcileRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid reconcile request"),
+    };
+    if request.keep.len() > MAX_KEPT_NETWORKS {
+        return Response::bad_request("too many networks");
+    }
+    if request
+        .keep
+        .iter()
+        .any(|name| !networks::is_private_network(name))
+    {
+        return Response::bad_request("invalid network name");
+    }
+    let report = networks::reconcile(&request.keep);
+    Response::json(
+        200,
+        "OK",
+        &serde_json::json!({ "kept": report.kept, "removed": report.removed }),
+    )
 }
 
 /// Deploy a validated spec onto a swarm via `docker stack deploy`, streaming
@@ -352,6 +408,9 @@ fn deploy_stack_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Re
     };
     if let Err(msg) = deploy::validate_spec(&spec, &state.config) {
         return Response::bad_request(&msg);
+    }
+    if let Err(msg) = networks::ensure(&spec.networks, true) {
+        return Response::text(502, "Bad Gateway", &msg);
     }
     let yaml = deploy::render_compose(&spec, &state.config);
     match deploy::stack_up(&state.config, &spec.project, &yaml) {
@@ -1444,5 +1503,6 @@ mod tests {
         // Presence-based flags are booleans regardless of host.
         assert!(caps["docker"].is_boolean());
         assert!(caps["systemd"].is_boolean());
+        assert!(caps["privateNetworks"].is_boolean());
     }
 }

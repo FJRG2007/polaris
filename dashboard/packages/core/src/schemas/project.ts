@@ -213,6 +213,19 @@ export const environmentNameSchema = z.object({
     name: projectName
 });
 
+/** How an environment's services see each other - the modes `@polaris/deploy`
+ *  plans networks for. */
+export const ENVIRONMENT_NETWORK_MODES = ["shared", "environment", "links"] as const;
+export type EnvironmentNetworkMode = (typeof ENVIRONMENT_NETWORK_MODES)[number];
+
+export const environmentNetworkModeSchema = z.object({
+    environmentId: z.string().uuid(),
+    networkMode: z.enum(ENVIRONMENT_NETWORK_MODES),
+    /** Deploy every service in it straight away, so the choice takes effect now
+     *  rather than service by service as each is next deployed. */
+    apply: z.boolean().default(false)
+});
+
 /**
  * A git branch name, by the rules `git check-ref-format` holds it to: no spaces
  * or control characters, none of `~ ^ : ? * [ \`, no `..` or `@{`, no empty

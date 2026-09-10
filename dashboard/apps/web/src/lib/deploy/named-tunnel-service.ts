@@ -19,6 +19,7 @@ import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
 import type { ComposeSpec } from "@polaris/deploy";
 import { connectorOrigin } from "../deploy-service";
+import { connectorNetworks } from "./service-networks";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { requireCloudflareAccount } from "../integrations/cloudflare-account-service";
 import {
@@ -145,7 +146,7 @@ async function loadToken(appId: string): Promise<string | null> {
 /** The cloudflared sidecar spec running the named connector from its token. The
  *  token is passed via TUNNEL_TOKEN (env), and the ingress config is pulled from
  *  Cloudflare's edge, so no --url/origin is needed here. */
-function tunnelSpec(project: string, service: string, token: string): ComposeSpec {
+function tunnelSpec(project: string, service: string, token: string, networks: string[]): ComposeSpec {
     return {
         project,
         services: [
@@ -161,13 +162,19 @@ function tunnelSpec(project: string, service: string, token: string): ComposeSpe
                 volumes: [],
                 labels: {},
                 command: ["tunnel", "--no-autoupdate", "run"],
-                networks: [PROXY_NETWORK],
+                networks,
                 restart: "unless-stopped"
             }
         ],
         volumes: [],
-        networks: [PROXY_NETWORK]
+        networks
     };
+}
+
+/** The connector's spec for one application, on the networks its origin is on. */
+async function connectorSpec(appId: string, token: string): Promise<ComposeSpec> {
+    const { project, service } = names(appId);
+    return tunnelSpec(project, service, token, await connectorNetworks(appId, PROXY_NETWORK));
 }
 
 /**
@@ -192,11 +199,11 @@ export async function startNamedTunnel(
     await setSetting(managedKey(appId), null);
     await setSetting(enabledKey(appId), null);
 
-    const { project, service } = names(appId);
+    const { project } = names(appId);
     const ports = new HostdPorts();
     try {
         await ports.composeDown(project).catch(() => undefined);
-        await ports.composeUp(tunnelSpec(project, service, token));
+        await ports.composeUp(await connectorSpec(appId, token));
     } finally {
         await ports.dispose();
     }
@@ -244,11 +251,11 @@ export async function provisionNamedTunnel(
         JSON.stringify({ tunnelId: tunnel.id, zoneId: zone.id, dnsId, accountId } satisfies ManagedRefs)
     );
 
-    const { project, service } = names(appId);
+    const { project } = names(appId);
     const ports = new HostdPorts();
     try {
         await ports.composeDown(project).catch(() => undefined);
-        await ports.composeUp(tunnelSpec(project, service, connectorToken));
+        await ports.composeUp(await connectorSpec(appId, connectorToken));
     } finally {
         await ports.dispose();
     }
@@ -272,7 +279,7 @@ export async function setNamedTunnelEnabled(appId: string, ownerId: string, enab
     const [hostname, token, managed] = await Promise.all([getSetting(hostKey(appId)), loadToken(appId), loadManaged(appId)]);
     if (!token || !hostname) throw new Error("This app has no named tunnel configured");
 
-    const { project, service } = names(appId);
+    const { project } = names(appId);
     const ports = new HostdPorts();
     try {
         if (managed) {
@@ -285,9 +292,9 @@ export async function setNamedTunnelEnabled(appId: string, ownerId: string, enab
                 await putTunnelPlaceholder(account.token, account.accountId, managed.tunnelId, hostname);
             }
             // Keep the connector running either way so the hostname stays reserved.
-            await ports.composeUp(tunnelSpec(project, service, token));
+            await ports.composeUp(await connectorSpec(appId, token));
         } else if (enabled) {
-            await ports.composeUp(tunnelSpec(project, service, token));
+            await ports.composeUp(await connectorSpec(appId, token));
         } else {
             // No API access to repoint a manual tunnel's ingress; stop its connector.
             await ports.composeDown(project).catch(() => undefined);
