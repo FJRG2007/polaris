@@ -19,9 +19,9 @@
 import * as core from "@polaris/core";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { Button, Select, useToast } from "@polaris/ui";
-import { useState, useTransition, type ReactNode } from "react";
 import { useMailLayout } from "@/app/(app)/mail/use-mail-layout";
 import { setMailPreferencesAction } from "@/app/(app)/mail/actions";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 
 export function GeneralView({ preferences }: { preferences: core.MailPreferences }) {
     const toast = useToast();
@@ -128,6 +128,10 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
             </div>
 
             <div className="border-t border-border pt-5">
+                <MailtoHandler />
+            </div>
+
+            <div className="border-t border-border pt-5">
                 <Field
                     label="Reading layout"
                     hint="Remembered for this browser rather than for your account: a phone and a desk are not the same shape."
@@ -146,6 +150,58 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                 </Field>
             </div>
         </div>
+    );
+}
+
+/**
+ * Make Polaris the browser's handler for `mailto:` links.
+ *
+ * Remembered by the browser, not by Polaris, which is why it is a button on
+ * this device rather than a setting on the account: every browser asks for its
+ * own permission, and the answer lives in its settings. The address handed over
+ * is this page's own origin because a browser refuses any other - a handler must
+ * be on the site that registers it.
+ */
+function MailtoHandler() {
+    const toast = useToast();
+    const [supported, setSupported] = useState<boolean | null>(null);
+    useEffect(() => {
+        setSupported(typeof navigator !== "undefined" && "registerProtocolHandler" in navigator);
+    }, []);
+
+    return (
+        <Field
+            label="Email links"
+            hint="Opens every mailto link you click - an email us link on any site - as a new message here. Your browser asks you to confirm, and can undo it from its own settings."
+        >
+            {supported === false ? (
+                <p className="text-[13px] text-muted-foreground">
+                    This browser cannot hand email links to a website. Chrome, Edge and Firefox can.
+                </p>
+            ) : (
+                <Button
+                    variant="secondary"
+                    disabled={supported === null}
+                    onClick={() => {
+                        try {
+                            navigator.registerProtocolHandler(
+                                "mailto",
+                                `${window.location.origin}/mail/compose?url=%s`
+                            );
+                            toast.show({ title: "Confirm it in the bar your browser shows." });
+                        } catch {
+                            // Refused outright - most often because this page is
+                            // not served over https, which a handler requires.
+                            toast.show({
+                                title: "This browser refused. It only allows it on a page opened over https."
+                            });
+                        }
+                    }}
+                >
+                    Open email links in Polaris
+                </Button>
+            )}
+        </Field>
     );
 }
 

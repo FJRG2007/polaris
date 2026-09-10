@@ -122,8 +122,8 @@ export function Composer() {
         setIdentityId((identities[account] ?? []).find((one) => one.isDefault)?.id ?? "");
         setTo([...(composing.to ?? [])]);
         setCc([...(composing.cc ?? [])]);
-        setBcc([]);
-        setShowCopies((composing.cc ?? []).length > 0);
+        setBcc([...(composing.bcc ?? [])]);
+        setShowCopies((composing.cc ?? []).length + (composing.bcc ?? []).length > 0);
         setSubject(composing.subject ?? "");
         setBody(withSignature(composing, accounts, identities, account));
         setFiles([]);

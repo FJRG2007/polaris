@@ -18,16 +18,16 @@
 
 import Link from "next/link";
 import { cn } from "@polaris/ui";
-import { MailRail } from "./mail-rail";
 import { Composer } from "./composer";
-import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
+import { MailRail } from "./mail-rail";
 import { Menu, PenLine } from "lucide-react";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
-import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
+import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
 import {
     useRef,
     useMemo,
@@ -114,6 +114,8 @@ export interface ComposerSeed {
     readonly accountId?: string;
     readonly to?: readonly { name: string; address: string }[];
     readonly cc?: readonly { name: string; address: string }[];
+    /** Only ever from a `mailto:` link: nothing Polaris starts itself is blind. */
+    readonly bcc?: readonly { name: string; address: string }[];
     readonly subject?: string;
     readonly body?: string;
     readonly inReplyToId?: string | null;
