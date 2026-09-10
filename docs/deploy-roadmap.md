@@ -156,6 +156,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Notifications on deploy success/fail | done | P1 | |
 | Slack/Discord/Teams/Telegram/email/webhook | done | P1 | |
 | Team/RBAC on projects | done | P1 | capability sets, per-environment scope, expiry |
+| Compliance evidence (SOC 2 / ISO 27001) | done | P2 | Management > Evidence: controls in force, JSON + printable report, SHA-256 in the audit trail; see `docs/compliance.md` |
 | Usage per project | done | P2 | |
 | Usage/cost estimates | done | P2 | Management > Billing and Organization > Billing: monthly statement per project and owner, admin-set rates (vCPU-hour, GB-hour, GB-month, GB out), CSV/JSON export, org budgets alerted at 80%/100% (`billing-budgets` job) |
 | API + CLI | done | P1 | `/api/v1/deploy`, `dashboard/cli` |
