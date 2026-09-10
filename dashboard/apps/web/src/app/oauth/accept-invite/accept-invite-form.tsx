@@ -27,7 +27,8 @@ export function AcceptInviteForm({
     token,
     code,
     email,
-    needsPassword
+    needsPassword,
+    orgName = null
 }: {
     /** The invite arrived either as a link or as a code. */
     token?: string;
@@ -35,6 +36,8 @@ export function AcceptInviteForm({
     email: string;
     /** It also asks for a one-time password, handed over separately. */
     needsPassword: boolean;
+    /** The organization accepting it also joins, when it was sent from one. */
+    orgName?: string | null;
 }) {
     const router = useRouter();
     const form = useZodForm(acceptInviteSchema);
@@ -116,7 +119,15 @@ export function AcceptInviteForm({
                 </CardHeader>
                 <CardBody>
                     <p className="mb-3 text-sm text-muted-foreground">
-                        Joining as <span className="font-medium text-foreground">{email}</span>.
+                        Joining as <span className="font-medium text-foreground">{email}</span>
+                        {orgName ? (
+                            <>
+                                {" "}
+                                and becoming part of{" "}
+                                <span className="font-medium text-foreground">{orgName}</span>
+                            </>
+                        ) : null}
+                        .
                     </p>
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">

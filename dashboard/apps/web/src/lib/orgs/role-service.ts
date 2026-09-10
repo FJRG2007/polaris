@@ -7,9 +7,10 @@
  * lets you do. A membership stores the slug, which is why renaming a role leaves
  * every roster intact.
  *
- * Two are seeded and cannot be deleted - `admin`, which holds the wildcard and
- * cannot be edited either, and `member`, which is where somebody lands when the
- * role they had is removed. Everything else here is the organization's own.
+ * Three are seeded and cannot be deleted - `admin`, which holds the wildcard and
+ * cannot be edited either, `member`, which is where somebody lands when the role
+ * they had is removed, and `restricted`, which reaches nothing that was not
+ * granted to the person directly. Everything else here is the organization's own.
  *
  * Authorization is not decided in this file. It reads and writes the definitions;
  * `resolveOrgAccess` in org-service is what a request is judged against.
@@ -27,6 +28,8 @@ export interface OrgRoleView {
     readonly permissions: string[];
     /** Seeded by Polaris: it cannot be deleted, and `admin` cannot be edited. */
     readonly system: boolean;
+    /** Reaches nothing implicitly, not even the roster. */
+    readonly restricted: boolean;
     /** How many people hold it, so deleting one can say who it moves. */
     readonly memberCount: number;
 }
@@ -60,11 +63,28 @@ export async function ensureSystemRoles(orgId: string): Promise<void> {
                 name: role.name,
                 description: role.description,
                 permissions: JSON.stringify(role.permissions),
-                system: true
+                system: true,
+                restricted: role.restricted === true
             };
         }),
         skipDuplicates: true
     });
+}
+
+/**
+ * Whether holding this role reaches nothing implicitly.
+ *
+ * Read from the organization's own row, falling back to the seeded definition,
+ * the same way access is resolved - so the mirror written on a membership always
+ * agrees with what `resolveOrgAccess` will answer for it.
+ */
+export async function roleIsRestricted(orgId: string, slug: string): Promise<boolean> {
+    const role = await prisma.orgRole.findUnique({
+        where: { orgId_slug: { orgId, slug } },
+        select: { restricted: true }
+    });
+    if (role) return role.restricted;
+    return core.ORG_SYSTEM_ROLES[slug]?.restricted === true;
 }
 
 /** Every role this organization has, seeded ones first and then by name, with
@@ -85,6 +105,7 @@ export async function listOrgRoles(orgId: string): Promise<OrgRoleView[]> {
             description: role.description,
             permissions: parsePermissions(role.permissions),
             system: role.system,
+            restricted: role.restricted,
             memberCount: held.get(role.slug) ?? 0
         }))
         .sort((left, right) => Number(right.system) - Number(left.system) || left.name.localeCompare(right.name));
@@ -171,7 +192,10 @@ export async function deleteOrgRole(orgId: string, slug: string): Promise<void> 
     await prisma.$transaction([
         prisma.organizationMember.updateMany({
             where: { orgId, role: slug },
-            data: { role: core.DEFAULT_ORG_ROLE }
+            data: {
+                role: core.DEFAULT_ORG_ROLE,
+                restricted: await roleIsRestricted(orgId, core.DEFAULT_ORG_ROLE)
+            }
         }),
         prisma.orgRole.delete({ where: { id: role.id } })
     ]);

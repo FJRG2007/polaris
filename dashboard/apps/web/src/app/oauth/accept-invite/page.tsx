@@ -1,9 +1,9 @@
 import { INVITE_REFUSALS } from "@polaris/core";
-import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 import { clientIp } from "@/lib/request-context";
+import { InviteCodeForm } from "./invite-code-form";
 import { resolveInvite } from "@/lib/invite-service";
 import { AcceptInviteForm } from "./accept-invite-form";
-import { InviteCodeForm } from "./invite-code-form";
+import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -39,5 +39,12 @@ export default async function AcceptInvitePage({
         );
     }
 
-    return <AcceptInviteForm token={token} email={invite.email} needsPassword={invite.needsPassword} />;
+    return (
+        <AcceptInviteForm
+            token={token}
+            email={invite.email}
+            needsPassword={invite.needsPassword}
+            orgName={invite.orgName}
+        />
+    );
 }

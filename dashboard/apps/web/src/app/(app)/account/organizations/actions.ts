@@ -19,9 +19,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { proveStepUp } from "@/lib/step-up";
 import * as orgs from "@/lib/orgs/org-service";
-import { orgChatOffered } from "@/lib/chat/isolation";
 import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
+import { orgChatOffered } from "@/lib/chat/isolation";
 import { canCreateOrganization } from "@/lib/orgs/policy";
 import * as invitations from "@/lib/orgs/invitation-service";
 
@@ -229,18 +229,96 @@ export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ 
  */
 export async function inviteOrgMemberAction(
     orgId: string,
-    identifier: string,
-    role: string
+    identifier: unknown,
+    role: unknown
+): Promise<{ emailed?: boolean; url?: string; sendError?: string; error?: string }> {
+    const caller = await actor();
+    const parsed = core.orgInviteSchema.safeParse({ identifier, role });
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        const sent = await invitations.inviteToOrg(
+            orgId,
+            parsed.data.identifier,
+            parsed.data.role,
+            caller
+        );
+        // Named by the account it resolved to, or by the invite row for somebody
+        // with no account - never by the address, which the organization's
+        // history would otherwise publish to everybody who reads it.
+        await record(
+            caller.id,
+            orgId,
+            "org.member.invite",
+            sent.kind === "account"
+                ? { userId: sent.userId, role: parsed.data.role }
+                : { inviteId: sent.inviteId, role: parsed.data.role, via: "email" }
+        );
+        refresh();
+        if (sent.kind === "account") return {};
+        return { emailed: !sent.sendError, url: sent.url, sendError: sent.sendError };
+    } catch (caught) {
+        return failure(caught, "Could not invite that person");
+    }
+}
+
+/** Send an emailed invitation again, under a new link. */
+export async function resendOrgEmailInviteAction(
+    orgId: string,
+    inviteId: string
+): Promise<{ url?: string; sendError?: string; error?: string }> {
+    const caller = await actor();
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        const sent = await invitations.resendOrgEmailInvite(orgId, String(inviteId), caller);
+        await record(caller.id, orgId, "org.member.invite.resend", { inviteId });
+        refresh();
+        return sent;
+    } catch (caught) {
+        return failure(caught, "Could not send that invitation again");
+    }
+}
+
+/** Withdraw an emailed invitation. The link stops working at once. */
+export async function revokeOrgEmailInviteAction(
+    orgId: string,
+    inviteId: string
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await orgs.requireOrgPermission(caller, orgId, "people.manage");
-        const userId = await invitations.inviteToOrg(orgId, identifier, role, caller.id);
-        await record(caller.id, orgId, "org.member.invite", { userId, role });
+        await invitations.revokeOrgEmailInvite(orgId, String(inviteId));
+        await record(caller.id, orgId, "org.member.invite.revoke", { inviteId, via: "email" });
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not invite that person");
+        return failure(caught, "Could not withdraw that invitation");
+    }
+}
+
+/**
+ * The role an invitation offers unless whoever sends it picks another.
+ *
+ * Setting it to Restricted is how an organization makes least privilege the
+ * starting point: everybody invited from then on arrives holding nothing but what
+ * is granted to them. Nobody already on the roster is moved.
+ */
+export async function setOrgDefaultInviteRoleAction(
+    orgId: string,
+    role: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.orgRoleSlugField.safeParse(role);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Pick a role" };
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        await orgs.setOrgDefaultInviteRole(orgId, parsed.data);
+        await record(caller.id, orgId, "org.invite.default", { role: parsed.data });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not save that");
     }
 }
 
@@ -271,7 +349,7 @@ export async function revokeOrgInvitationAction(
 export async function respondToOrgInvitationAction(
     invitationId: string,
     accept: boolean
-): Promise<{ slug?: string; error?: string }> {
+): Promise<{ slug?: string; restricted?: boolean; error?: string }> {
     const caller = await actor();
     try {
         const answered = await invitations.respondToInvitation(
@@ -285,7 +363,7 @@ export async function respondToOrgInvitationAction(
             accept ? "org.member.invite.accept" : "org.member.invite.decline"
         );
         refresh();
-        return accept ? { slug: answered.orgSlug } : {};
+        return accept ? { slug: answered.orgSlug, restricted: answered.restricted } : {};
     } catch (caught) {
         return failure(caught, "Could not answer that invitation");
     }
@@ -308,6 +386,14 @@ export async function setOrgMemberRoleAction(
     }
 }
 
+/** Leave an organization. The same write as taking oneself off the roster,
+ *  named for the one screen that offers it on its own - the list, where a
+ *  restricted member sees the organization and nothing else. */
+export async function leaveOrgAction(orgId: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    return removeOrgMemberAction(orgId, caller.id);
+}
+
 export async function removeOrgMemberAction(
     orgId: string,
     userId: string
@@ -315,9 +401,14 @@ export async function removeOrgMemberAction(
     const caller = await actor();
     try {
         // Leaving is the one write anybody on the roster may make about
-        // themselves; taking somebody else off takes running the people here.
+        // themselves - a restricted member included, who holds no permission here
+        // at all and must still be able to go. Taking somebody else off takes
+        // running the people here.
         if (userId !== caller.id) await orgs.requireOrgPermission(caller, orgId, "people.manage");
-        else await orgs.requireOrgPermission(caller, orgId, "org.read");
+        else {
+            const access = await orgs.resolveOrgAccess(caller, orgId);
+            if (!access || access.role === "successor") throw new orgs.OrgAccessError();
+        }
         await orgs.removeOrgMember(orgId, userId);
         await record(
             caller.id,

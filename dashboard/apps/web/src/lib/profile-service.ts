@@ -31,12 +31,12 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getProfileStyle } from "@/lib/profile-style-service";
 import * as core from "@polaris/core";
-import { blockedBy, blockersOf } from "@/lib/blocks";
-import { areFriends } from "@/lib/friends-service";
-import { getSetting, setSetting } from "@/lib/setting-store";
 import { mutualsBetween } from "@/lib/mutuals";
+import { areFriends } from "@/lib/friends-service";
+import { blockedBy, blockersOf } from "@/lib/blocks";
+import { getSetting, setSetting } from "@/lib/setting-store";
+import { getProfileStyle } from "@/lib/profile-style-service";
 import { followCounts, followsPerson } from "@/lib/people-follow";
 import {
     allowedBy,
@@ -69,7 +69,6 @@ export interface ProfileCompany {
     readonly name: string;
     readonly slug: string;
 }
-
 
 /** What one reader may do about the person whose page they are on. */
 export interface ProfileStanding {
@@ -330,8 +329,9 @@ export async function orgProfile(slug: string, viewer: PrivacyViewer | null): Pr
     const manageable = viewer
         ? viewer.isAdmin ||
           org.ownerId === viewer.id ||
-          (await prisma.organizationMember.findUnique({
-              where: { orgId_userId: { orgId: org.id, userId: viewer.id } },
+          // A restricted member would open screens that hold nothing for them.
+          (await prisma.organizationMember.findFirst({
+              where: { orgId: org.id, userId: viewer.id, restricted: false },
               select: { id: true }
           })) !== null
         : false;

@@ -17,9 +17,10 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { OrgAvatar } from "@/components/avatar";
 import type { OrgSummary } from "@/lib/orgs/org-service";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Building2, Check, Plus, Users, X } from "lucide-react";
 import type { OrgInvitationView } from "@/lib/orgs/invitation-service";
-import { createOrgAction, respondToOrgInvitationAction } from "./actions";
+import { createOrgAction, leaveOrgAction, respondToOrgInvitationAction } from "./actions";
 import {
     Badge,
     Button,
@@ -61,8 +62,11 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
         );
         setBusy("");
         if (!result || result.error) return;
-        if (accept && result.slug) router.push(`/account/organizations/${result.slug}`);
-        else router.refresh();
+        // A restricted role opens none of the organization's screens, so there
+        // is nowhere to take them; the list is where they see it.
+        if (accept && result.slug && !result.restricted) {
+            router.push(`/account/organizations/${result.slug}`);
+        } else router.refresh();
     };
 
     return (
@@ -118,6 +122,59 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * An organization this account is on under a restricted role.
+ *
+ * Not a link: every screen of it is gated on seeing the organization, which is
+ * exactly what a restricted role withholds, so the row would open a page that
+ * does not exist for them. What they can do from here is recognise it, see why
+ * it opens nothing, and leave.
+ */
+function RestrictedOrgRow({ org }: { org: OrgSummary }) {
+    const router = useRouter();
+    const [confirm, confirmElement] = useConfirm();
+    const [error, setError] = useState("");
+
+    const leave = async () => {
+        const ok = await confirm({
+            title: `Leave ${org.name}?`,
+            description: "You lose whatever it granted you. Somebody there can invite you again.",
+            confirmLabel: "Leave",
+            danger: true
+        });
+        if (!ok) return;
+        setError("");
+        const result = await runAction(() => leaveOrgAction(org.id), setError);
+        if (result && !result.error) router.refresh();
+    };
+
+    return (
+        <div className="border-border flex flex-wrap items-center gap-3 rounded-lg border px-3 py-3">
+            <OrgAvatar org={org} size={36} />
+            <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium" title={org.name}>
+                        {org.name}
+                    </span>
+                    <Badge variant="neutral">{org.roleName}</Badge>
+                </span>
+                <span className="text-muted-foreground block truncate text-xs">
+                    You reach only what somebody there granted to you directly.
+                </span>
+            </span>
+            <Button size="xs" variant="ghost" onClick={() => void leave()}>
+                Leave
+            </Button>
+            {error ? (
+                <p role="alert" className="text-danger w-full text-xs">
+                    {error}
+                </p>
+            ) : null}
+            {confirmElement}
+        </div>
     );
 }
 
@@ -210,6 +267,9 @@ export function OrganizationsView({
                 <ul className="flex flex-col gap-2">
                     {orgs.map((org) => (
                         <li key={org.id}>
+                            {org.restricted ? (
+                                <RestrictedOrgRow org={org} />
+                            ) : (
                             <Link
                                 // A successor is not on the roster, so the
                                 // overview is not theirs to open; their row goes
@@ -249,6 +309,7 @@ export function OrganizationsView({
                                     </span>
                                 </span>
                             </Link>
+                            )}
                         </li>
                     ))}
                 </ul>

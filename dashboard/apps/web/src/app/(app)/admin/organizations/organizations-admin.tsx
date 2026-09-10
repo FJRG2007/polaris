@@ -47,6 +47,11 @@ const CREATION_OPTIONS = core.ORG_CREATION_MODES.map((mode) => ({
     label: core.ORG_CREATION_LABELS[mode]
 }));
 
+const NEW_PEOPLE_OPTIONS = core.ORG_NEW_PEOPLE_MODES.map((mode) => ({
+    value: mode,
+    label: core.ORG_NEW_PEOPLE_LABELS[mode]
+}));
+
 export function OrganizationsAdmin({
     initial,
     orgs,
@@ -199,17 +204,21 @@ function OrganizationPolicyForm({
     const [maxPerUser, setMaxPerUser] = useState(String(initial.maxPerUser));
     const [maxMembers, setMaxMembers] = useState(String(initial.maxMembers));
     const [maxTeams, setMaxTeams] = useState(String(initial.maxTeams));
+    const [newPeople, setNewPeople] = useState<core.OrgNewPeopleMode>(initial.newPeople);
+    const [invitesPerHour, setInvitesPerHour] = useState(String(initial.invitesPerHour));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [saved, setSaved] = useState(false);
 
-    const draft = { creation, maxPerUser, maxMembers, maxTeams };
+    const draft = { creation, maxPerUser, maxMembers, maxTeams, newPeople, invitesPerHour };
     const parsed = core.organizationPolicySchema.safeParse(draft);
     const changed =
         creation !== initial.creation ||
         Number(maxPerUser) !== initial.maxPerUser ||
         Number(maxMembers) !== initial.maxMembers ||
-        Number(maxTeams) !== initial.maxTeams;
+        Number(maxTeams) !== initial.maxTeams ||
+        newPeople !== initial.newPeople ||
+        Number(invitesPerHour) !== initial.invitesPerHour;
 
     const limitField = (
         label: string,
@@ -284,6 +293,27 @@ function OrganizationPolicyForm({
                             maxTeams,
                             setMaxTeams,
                             "Across the organization."
+                        )}
+                    </div>
+
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Who can invite somebody with no account
+                        <Select
+                            value={newPeople}
+                            options={NEW_PEOPLE_OPTIONS}
+                            className="h-9 w-72"
+                            aria-label="Who can invite somebody with no account"
+                            onValueChange={(next) => setNewPeople(next as core.OrgNewPeopleMode)}
+                        />
+                        <span>{core.ORG_NEW_PEOPLE_HINTS[newPeople]}</span>
+                    </label>
+
+                    <div className="flex flex-wrap gap-6">
+                        {limitField(
+                            "Invitations per person per hour",
+                            invitesPerHour,
+                            setInvitesPerHour,
+                            "From one organization, counted over the last hour."
                         )}
                     </div>
 

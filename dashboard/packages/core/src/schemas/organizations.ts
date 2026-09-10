@@ -159,7 +159,13 @@ export const ORG_PERMISSION_AREAS: readonly string[] = [
 export const ORG_SYSTEM_ROLES: Readonly<
     Record<
         string,
-        { name: string; description: string; permissions: readonly GrantedOrgPermission[] }
+        {
+            name: string;
+            description: string;
+            permissions: readonly GrantedOrgPermission[];
+            /** Holds nothing implicitly - not even `org.read`. See `OrgRole.restricted`. */
+            restricted?: boolean;
+        }
     >
 > = {
     admin: {
@@ -171,6 +177,15 @@ export const ORG_SYSTEM_ROLES: Readonly<
         name: "Member",
         description: "Sees the organization and reaches whatever their teams reach.",
         permissions: ["org.read"]
+    },
+    // Least privilege as a starting point. Somebody holding this is on the
+    // roster for whoever runs it and reaches exactly what is granted to them -
+    // a team, a project, a space - and nothing because of where they belong.
+    restricted: {
+        name: "Restricted",
+        description: "Reaches only what is granted to them. Does not see the roster, the files or internal work.",
+        permissions: [],
+        restricted: true
     }
 };
 
@@ -183,6 +198,11 @@ export const UNEDITABLE_ORG_ROLE = "admin";
 /** The role somebody falls to when the one they held is deleted, and what a new
  *  membership takes unless the person adding them says otherwise. */
 export const DEFAULT_ORG_ROLE = "member";
+
+/** The seeded role that holds nothing. Named so an organization's settings can
+ *  offer it as the default for invitations; what it means is read from the role
+ *  row's own `restricted`, never from this slug. */
+export const RESTRICTED_ORG_ROLE = "restricted";
 
 /** Role names are typed by hand and read back in a roster, a picker and an audit
  *  entry, so they stay short. */
@@ -276,6 +296,26 @@ export const teamSchema = z.object({
 
 export type TeamInput = z.infer<typeof teamSchema>;
 
+/**
+ * Asking somebody to join: an account's handle or email, or the email of
+ * somebody with no account yet, and the role they would take.
+ *
+ * The identifier is lowercased here so the lookup, the refusal and the invite
+ * that may be emailed all see the same address.
+ */
+export const orgInviteSchema = z.object({
+    identifier: z.string().trim().toLowerCase().min(1, "Enter an email or a username").max(254),
+    role: orgRoleSlugField
+});
+
+export type OrgInviteInput = z.infer<typeof orgInviteSchema>;
+
+/** Whether an identifier is written as an address rather than a handle. The
+ *  handle alphabet has no `@`, so the two cannot be mistaken for each other. */
+export function isEmailIdentifier(identifier: string): boolean {
+    return z.string().email().safeParse(identifier).success;
+}
+
 // ---------------------------------------------------------------------------
 // Instance policy
 // ---------------------------------------------------------------------------
@@ -308,6 +348,36 @@ export const ORG_CREATION_HINTS: Record<OrgCreationMode, string> = {
  *  input, and an empty one has to mean "unlimited" rather than "none allowed". */
 const limitField = z.coerce.number().int().min(0).max(100_000).default(0);
 
+/**
+ * Who may invite somebody with no account yet from an organization's People
+ * screen.
+ *
+ * Such an invitation makes an account on this Polaris, which is otherwise
+ * something only an administrator does - so it is theirs by default, and
+ * handing it to whoever runs an organization's people is a choice an
+ * administrator makes. Somebody who already has an account can always be
+ * invited; this is only about making new ones.
+ */
+export const ORG_NEW_PEOPLE_MODES = ["admins", "managers", "off"] as const;
+export type OrgNewPeopleMode = (typeof ORG_NEW_PEOPLE_MODES)[number];
+
+export const ORG_NEW_PEOPLE_LABELS: Record<OrgNewPeopleMode, string> = {
+    admins: "Administrators only",
+    managers: "Anyone who manages an organization's people",
+    off: "Nobody"
+};
+
+export const ORG_NEW_PEOPLE_HINTS: Record<OrgNewPeopleMode, string> = {
+    admins: "Administrators can invite by email from any organization. Everybody else invites people who already have an account.",
+    managers: "The invitation creates their account when they accept it, so this lets organizations bring in new people.",
+    off: "Organizations only invite people who already have an account."
+};
+
+/** How many invitations one person may send from one organization in an hour,
+ *  before it is turned down. Twenty is a busy onboarding afternoon and far short
+ *  of what somebody using an organization to send mail to strangers would want. */
+export const ORG_INVITES_PER_HOUR_DEFAULT = 20;
+
 export const organizationPolicySchema = z.object({
     creation: z.enum(ORG_CREATION_MODES).default("everyone"),
     /** How many organizations one account may own. Being a member of somebody
@@ -315,7 +385,15 @@ export const organizationPolicySchema = z.object({
     maxPerUser: limitField,
     /** Roster size, counting the owner. */
     maxMembers: limitField,
-    maxTeams: limitField
+    maxTeams: limitField,
+    newPeople: z.enum(ORG_NEW_PEOPLE_MODES).default("admins"),
+    /** Per person, per organization, per hour. Zero is no limit. */
+    invitesPerHour: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(10_000)
+        .default(ORG_INVITES_PER_HOUR_DEFAULT)
 });
 
 export type OrganizationPolicy = z.infer<typeof organizationPolicySchema>;

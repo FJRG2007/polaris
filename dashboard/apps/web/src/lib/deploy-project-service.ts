@@ -14,6 +14,7 @@ import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
 import { createApiKey } from "@polaris/auth";
 import { contactLines } from "@/lib/privacy-service";
+import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { sendWebhook } from "./notifications/webhook-sender";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
@@ -306,7 +307,8 @@ async function resolvePrincipal(
     input: ProjectAccessInput,
     granterId: string
 ): Promise<{ userId: string | null; teamId: string | null; orgId: string | null }> {
-    const onRoster = { OR: [{ ownerId: granterId }, { members: { some: { userId: granterId } } }] };
+    // A roster the granter reads: a restricted member is on it without seeing it.
+    const onRoster = readsOrgWhere(granterId);
     if (input.principal === "everyone") return { userId: null, teamId: null, orgId: null };
     if (input.principal === "team") {
         if (!input.principalId) throw new Error("Pick a team");
@@ -451,7 +453,7 @@ export async function listProjectAccessCandidates(
     userId: string
 ): Promise<ProjectAccessCandidates> {
     const orgs = await prisma.organization.findMany({
-        where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
+        where: readsOrgWhere(userId),
         orderBy: { name: "asc" },
         select: {
             id: true,

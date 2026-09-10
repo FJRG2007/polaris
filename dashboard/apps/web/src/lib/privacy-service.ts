@@ -22,8 +22,8 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { friendIds } from "@/lib/friends-service";
-import { getSetting, setSetting } from "@/lib/setting-store";
 import { memberOrgIds } from "@/lib/orgs/org-service";
+import { getSetting, setSetting } from "@/lib/setting-store";
 
 /**
  * What a new account's follower lists are visible to.
@@ -149,8 +149,10 @@ export async function colleaguesAmong(
     if (mine.length === 0) return new Set();
     const ids = [...candidateIds];
     const [members, owners] = await Promise.all([
+        // Restricted members are not colleagues to the rest of the roster, in
+        // either direction: `memberOrgIds` already leaves their own side out.
         prisma.organizationMember.findMany({
-            where: { orgId: { in: mine }, userId: { in: ids } },
+            where: { orgId: { in: mine }, userId: { in: ids }, restricted: false },
             select: { userId: true }
         }),
         prisma.organization.findMany({
