@@ -15,10 +15,13 @@
  * - `${{shared.KEY}}` - a variable set on the environment rather than a service.
  * - `${{service.KEY}}` - a variable of another service, by its name or slug.
  * - `${{database.URL}}` and friends - how to reach a managed database (below).
+ * - `${{files.S3_ENDPOINT}}` and friends - how to reach a managed object store.
  *
  * This module is the pure half: finding references and substituting them. What a
  * name resolves to is the caller's to answer, because that needs the database.
  */
+
+import { objectStorageReferenceKeys, OBJECT_STORAGE_REGION } from "./schemas/object-storage.js";
 
 /** One `${{ name.KEY }}`. Names are service slugs or `shared`; keys are what an
  *  environment variable may be called. */
@@ -138,6 +141,18 @@ export function databaseReferenceKeys(connection: {
         keys.MONGO_URL = connection.uri;
     } else if (connection.engine === "redis") {
         Object.assign(keys, { REDIS_URL: connection.uri, REDISHOST: connection.host, REDISPORT: port });
+    } else if (connection.engine === "seaweedfs") {
+        // An object store's account is an S3 key pair; it answers with the names
+        // S3 clients read, the AWS SDKs' own among them.
+        Object.assign(
+            keys,
+            objectStorageReferenceKeys({
+                endpoint: connection.uri,
+                accessKeyId: connection.username,
+                secretAccessKey: connection.password,
+                region: OBJECT_STORAGE_REGION
+            })
+        );
     }
     return keys;
 }

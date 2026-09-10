@@ -84,11 +84,71 @@ export const DB_ENGINE_INFO: Readonly<Record<DbEngine, DbEngineInfo>> = {
     }
 };
 
+/**
+ * Services Polaris runs beside its databases that are not databases: an
+ * S3-compatible object store. They share the database machinery - a container,
+ * a data volume, generated credentials held encrypted, the deploy queue, the
+ * canvas - and nothing that reads data out of a database, which is why they are
+ * a separate list rather than members of `DB_ENGINES`: the data browser and the
+ * saved connections are typed by `DbEngine`, and an object store in that list
+ * would be offered there as something to run SQL against.
+ *
+ * SeaweedFS rather than MinIO: MinIO stopped publishing community images in
+ * October 2025 and archived the community repository in April 2026. SeaweedFS
+ * is Apache-2.0, maintained, and has expiry rules, presigned URLs and a
+ * replication tool of its own (`filer.sync`). Garage (AGPL) has expiry and
+ * presigned URLs too, but no bucket replication.
+ */
+export const STORAGE_ENGINES = ["seaweedfs"] as const;
+export type StorageEngine = (typeof STORAGE_ENGINES)[number];
+
+/** Everything that can be created from the "new database" flow. */
+export const MANAGED_ENGINES = [...DB_ENGINES, ...STORAGE_ENGINES] as const;
+export type ManagedEngine = (typeof MANAGED_ENGINES)[number];
+
+export interface ManagedEngineInfo extends Omit<DbEngineInfo, "id"> {
+    readonly id: ManagedEngine;
+    /** True for an object store: no SQL, no named databases, a bucket API. */
+    readonly storage: boolean;
+}
+
+export const MANAGED_ENGINE_INFO: Readonly<Record<ManagedEngine, ManagedEngineInfo>> = {
+    ...(Object.fromEntries(
+        DB_ENGINES.map((engine) => [engine, { ...DB_ENGINE_INFO[engine], storage: false }])
+    ) as Record<DbEngine, ManagedEngineInfo>),
+    seaweedfs: {
+        id: "seaweedfs",
+        label: "Object storage",
+        // The S3 gateway's port. Pinned to one tested release rather than a
+        // moving tag, so a redeploy never changes what it runs by itself.
+        port: 8333,
+        versions: ["4.46"],
+        namedDatabases: false,
+        namedUsers: false,
+        storage: true
+    }
+};
+
+/** True for an engine this build can create. */
+export function isManagedEngine(value: unknown): value is ManagedEngine {
+    return typeof value === "string" && (MANAGED_ENGINES as readonly string[]).includes(value);
+}
+
+/** True for an engine whose data can be browsed and queried. */
+export function isDbEngine(value: unknown): value is DbEngine {
+    return typeof value === "string" && (DB_ENGINES as readonly string[]).includes(value);
+}
+
+/** True for an object store rather than a database. */
+export function isStorageEngine(engine: string): engine is StorageEngine {
+    return (STORAGE_ENGINES as readonly string[]).includes(engine);
+}
+
 /** The engine's own name for itself, for anywhere an engine id would otherwise
  *  be shown raw. Falls back to the stored value so a row written by a future
  *  version still renders as something. */
 export function dbEngineLabel(engine: string): string {
-    return DB_ENGINE_INFO[engine as DbEngine]?.label ?? engine;
+    return MANAGED_ENGINE_INFO[engine as ManagedEngine]?.label ?? engine;
 }
 
 /** True when an engine can host more databases beside the one it was created
@@ -128,7 +188,7 @@ export const databaseCreateSchema = z
         environmentId: z.string().uuid(),
         /** Display name. The slug derived from it identifies the service. */
         name: z.string().trim().min(1, "A database name is required").max(64),
-        engine: z.enum(DB_ENGINES),
+        engine: z.enum(MANAGED_ENGINES),
         /** "local" or a host id; resolved to a deploy target server-side. */
         serverId: z.string().trim().min(1).optional(),
         version: z
@@ -152,7 +212,7 @@ export const databaseCreateSchema = z
         privileges: z.enum(DB_PRIVILEGES).default("owner")
     })
     .superRefine((value, ctx) => {
-        const info = DB_ENGINE_INFO[value.engine];
+        const info = MANAGED_ENGINE_INFO[value.engine];
         if (value.version && !info.versions.includes(value.version)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -189,6 +249,13 @@ export const databaseCreateSchema = z
                 code: z.ZodIssueCode.custom,
                 path: ["username"],
                 message: `${info.label} has no named users or databases`
+            });
+        }
+        if (info.storage && value.password) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["password"],
+                message: "An object store's keys are always generated"
             });
         }
     });
