@@ -76,10 +76,12 @@ describe("the count reaching every badge in Polaris", () => {
         const chrome = await readFile(new URL("components/app-chrome.tsx", SRC), "utf8");
         expect(chrome).toContain("countAdminWaiting()");
         // And asked for nobody else: two queries per page load for a badge that
-        // cannot appear is two queries for nothing.
-        expect(chrome).toContain("user.isAdmin\n        ? await countAdminWaiting()");
-        expect(chrome).toContain(
-            "<AdminWaitingProvider initial={adminWaiting} enabled={user.isAdmin}>"
+        // cannot appear is two queries for nothing. Matched with the whitespace
+        // folded, so the formatter wrapping a line does not read as a change.
+        const flat = chrome.replace(/\s+/g, " ");
+        expect(flat).toContain("user.isAdmin ? await countAdminWaiting()");
+        expect(flat).toMatch(
+            /<AdminWaitingProvider initial=\{adminWaiting\} enabled=\{user\.isAdmin\} ?>/
         );
     });
 
