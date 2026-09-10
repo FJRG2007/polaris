@@ -12,6 +12,7 @@ const SCREENS = [
     // of their mailboxes - and the only one worth opening before there is a
     // mailbox at all.
     { label: "General", href: "/mail/settings/general" },
+    { label: "Shortcuts", href: "/mail/settings/shortcuts" },
     { label: "Mailboxes", href: "/mail/settings/accounts" },
     { label: "Send-as", href: "/mail/settings/identities" },
     { label: "Labels", href: "/mail/settings/labels" },

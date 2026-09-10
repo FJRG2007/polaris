@@ -22,6 +22,13 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
+import { refusalOf } from "./refusal";
+import { useMail } from "./mail-shell";
+import { MAIL_DRAG_TYPE } from "./mail-actions";
+import { useMailRailOpen } from "./use-mail-rail";
+import { useCallback, useMemo, useState } from "react";
+import { moveToFolderAction, setFolderColorAction } from "./actions";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     cn,
     ContextMenu,
@@ -31,17 +38,11 @@ import {
     ContextMenuTrigger,
     useToast
 } from "@polaris/ui";
-import { useCallback, useMemo, useState } from "react";
-import { useMail } from "./mail-shell";
-import { useMailRailOpen } from "./use-mail-rail";
-import { refusalOf } from "./refusal";
-import { moveToFolderAction, setFolderColorAction } from "./actions";
-import { MAIL_DRAG_TYPE } from "./mail-actions";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     Archive,
     AlertTriangle,
     BellOff,
+    Bookmark,
     Bug,
     ChevronDown,
     ChevronRight,
@@ -74,7 +75,7 @@ const FOLDER_ICONS: Record<core.FolderLook, LucideIcon> = {
     trash: Trash2,
     starred: Star,
     snoozed: Clock,
-    important: AlertTriangle,
+    important: Bookmark,
     notes: FileText,
     outbox: SendHorizontal,
     folder: Layers
@@ -103,6 +104,7 @@ const FOLDER_COLORS: readonly { hex: string; name: string }[] = [
 const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: string }[] = [
     { label: "Inbox", href: "/mail", icon: Inbox, role: "inbox" },
     { label: "Starred", href: "/mail/starred", icon: Star },
+    { label: "Important", href: "/mail/important", icon: Bookmark },
     { label: "Snoozed", href: "/mail/snoozed", icon: Clock },
     { label: "Drafts", href: "/mail/drafts", icon: FileText, role: "drafts" },
     { label: "Sent", href: "/mail/sent", icon: SendHorizontal, role: "sent" },

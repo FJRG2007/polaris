@@ -19,6 +19,7 @@
  */
 
 import { z } from "zod";
+import { cleanMailKeymap, mailKeymapSchema, type MailKeymap } from "./mail-keys.js";
 import { DEFAULT_MAIL_SORT, MAIL_SORTS, isMailSort, type MailSort } from "./mailbox-list.js";
 
 /**
@@ -86,6 +87,9 @@ export interface MailPreferences {
     readonly markRead: MailMarkRead;
     readonly afterFiling: MailAfterFiling;
     readonly undoSeconds: number;
+    /** The shortcuts somebody moved, by command. Empty is every default - see
+     *  `mail-keys`. */
+    readonly keys: MailKeymap;
 }
 
 /** What Mail does for somebody who has never opened this screen. */
@@ -93,7 +97,8 @@ export const MAIL_PREF_DEFAULTS: MailPreferences = {
     sort: DEFAULT_MAIL_SORT,
     markRead: "open",
     afterFiling: "list",
-    undoSeconds: DEFAULT_MAIL_UNDO_SECONDS
+    undoSeconds: DEFAULT_MAIL_UNDO_SECONDS,
+    keys: {}
 };
 
 function isMarkRead(value: unknown): value is MailMarkRead {
@@ -135,7 +140,8 @@ export function parseMailPreferences(raw: string | null | undefined): MailPrefer
             : MAIL_PREF_DEFAULTS.afterFiling,
         undoSeconds: isUndoSeconds(bag.undoSeconds)
             ? bag.undoSeconds
-            : MAIL_PREF_DEFAULTS.undoSeconds
+            : MAIL_PREF_DEFAULTS.undoSeconds,
+        keys: cleanMailKeymap(bag.keys)
     };
 }
 
@@ -158,7 +164,13 @@ export const mailPreferencesSchema = z.object({
         .int()
         .refine((value) => (MAIL_UNDO_SECONDS as readonly number[]).includes(value), {
             message: "That is not one of the waits on offer."
-        })
+        }),
+    /**
+     * Optional, because the reading form and the shortcuts screen are two
+     * screens: the reading form does not send the keyboard, and leaving it out
+     * means "keep what is there" - which the action decides, not the schema.
+     */
+    keys: mailKeymapSchema.optional()
 });
 
 /** The whole shape on the way out, so what is read back is what was chosen
@@ -168,6 +180,7 @@ export function stringifyMailPreferences(preferences: MailPreferences): string {
         sort: preferences.sort,
         markRead: preferences.markRead,
         afterFiling: preferences.afterFiling,
-        undoSeconds: preferences.undoSeconds
+        undoSeconds: preferences.undoSeconds,
+        keys: preferences.keys
     });
 }

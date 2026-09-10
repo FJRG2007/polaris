@@ -28,6 +28,7 @@ export interface MailPageNarrow {
     readonly unreadOnly: boolean;
     readonly readOnly: boolean;
     readonly starredOnly: boolean;
+    readonly importantOnly: boolean;
     readonly snoozedOnly: boolean;
     readonly withAttachments: boolean;
     readonly category: string;
@@ -42,6 +43,7 @@ const FLAGS = [
     "unreadOnly",
     "readOnly",
     "starredOnly",
+    "importantOnly",
     "snoozedOnly",
     "withAttachments"
 ] as const satisfies readonly (keyof MailPageNarrow)[];

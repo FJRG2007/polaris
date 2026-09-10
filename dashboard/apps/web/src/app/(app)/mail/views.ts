@@ -41,6 +41,16 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             permanentDelete: false
         }
     },
+    important: {
+        narrow: { importantOnly: true },
+        context: {
+            title: "Important",
+            emptyTitle: "Nothing marked important",
+            emptyBody: "Mark a message important to keep it here, across every mailbox.",
+            canArchive: true,
+            permanentDelete: false
+        }
+    },
     snoozed: {
         narrow: { snoozedOnly: true },
         context: {

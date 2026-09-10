@@ -21,6 +21,7 @@
  * at it means.
  */
 
+import * as core from "@polaris/core";
 import type { ReactNode } from "react";
 import { useMail } from "./mail-shell";
 import { useRouter } from "next/navigation";
@@ -28,9 +29,26 @@ import { useAppUrl } from "@/components/app-url";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { MailThreadView } from "@/lib/mailbox/views";
 import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
+    ContextMenuTrigger,
+    MenuShortcut,
+    useToast
+} from "@polaris/ui";
+import {
     Archive,
+    Bell,
+    BellOff,
+    Bookmark,
     Bug,
     Clock,
+    Pin,
+    PinOff,
     Copy,
     CornerUpLeft,
     CornerUpRight,
@@ -44,18 +62,6 @@ import {
     Tag,
     Trash2
 } from "lucide-react";
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuSeparator,
-    ContextMenuSub,
-    ContextMenuSubContent,
-    ContextMenuSubTrigger,
-    ContextMenuTrigger,
-    MenuShortcut,
-    useToast
-} from "@polaris/ui";
 
 export function ThreadContextMenu({
     thread,
@@ -66,10 +72,15 @@ export function ThreadContextMenu({
     onLabel,
     onAnswer,
     onBlock,
+    onConversation,
+    keymap,
     selection,
     children
 }: {
     thread: MailThreadView;
+    /** The keyboard this person set up, so the hint beside an item is the key
+     *  that actually does it rather than the default. */
+    keymap: core.MailKeymap;
     /** The conversations ticked, as message ids, when this row is one of them
      *  and there is more than one. Null for the ordinary case: a right-click on
      *  a row that is not part of a selection. */
@@ -85,6 +96,13 @@ export function ThreadContextMenu({
     onAnswer: (kind: "reply" | "reply-all" | "forward", messageId: string) => void;
     /** Refuse this sender from now on, and clear out what they have sent. */
     onBlock: (accountId: string, address: string) => void;
+    /** Pin the conversations to the top, or mute them - Polaris' own, so nothing
+     *  is asked of the mail server. */
+    onConversation: (
+        messageIds: readonly string[],
+        state: { pinned?: boolean; muted?: boolean },
+        announce: string
+    ) => void;
     children: ReactNode;
 }) {
     const { labels } = useMail();
@@ -102,6 +120,8 @@ export function ThreadContextMenu({
         many > 1 ? more(many) : one;
     const unread = thread.unreadCount > 0;
     const sender = thread.participants[0]?.address ?? "";
+    const keyFor = (command: core.MailKeyCommand): string =>
+        core.mailKeyLabel(core.mailKeyFor(command, keymap));
 
     async function copy(what: string, said: string): Promise<void> {
         try {
@@ -124,7 +144,7 @@ export function ThreadContextMenu({
                 >
                     <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
                     Reply
-                    <MenuShortcut keys="r" />
+                    <MenuShortcut keys={keyFor("reply")} />
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() => onAnswer("reply-all", thread.leadMessageId)}
@@ -132,7 +152,7 @@ export function ThreadContextMenu({
                 >
                     <CornerUpRight className="size-3.5 shrink-0" aria-hidden />
                     Reply to everybody
-                    <MenuShortcut keys="a" />
+                    <MenuShortcut keys={keyFor("replyAll")} />
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() => onAnswer("forward", thread.leadMessageId)}
@@ -140,7 +160,7 @@ export function ThreadContextMenu({
                 >
                     <Forward className="size-3.5 shrink-0" aria-hidden />
                     Forward
-                    <MenuShortcut keys="f" />
+                    <MenuShortcut keys={keyFor("forward")} />
                 </ContextMenuItem>
 
                 <ContextMenuSeparator />
@@ -158,7 +178,7 @@ export function ThreadContextMenu({
                     {unread
                         ? said("Mark as read", (n) => `Mark ${n} as read`)
                         : said("Mark as unread", (n) => `Mark ${n} as unread`)}
-                    <MenuShortcut keys="u" />
+                    <MenuShortcut keys={keyFor("markUnread")} />
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() =>
@@ -173,7 +193,62 @@ export function ThreadContextMenu({
                     {thread.starred
                         ? said("Unstar", (n) => `Unstar ${n}`)
                         : said("Star", (n) => `Star ${n}`)}
-                    <MenuShortcut keys="s" />
+                    <MenuShortcut keys={keyFor("star")} />
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() =>
+                        onAct(
+                            thread.important ? "unimportant" : "important",
+                            ids,
+                            thread.important ? "No longer important." : "Marked important."
+                        )
+                    }
+                >
+                    <Bookmark className="size-3.5 shrink-0" aria-hidden />
+                    {thread.important
+                        ? said("Mark not important", (n) => `Mark ${n} not important`)
+                        : said("Mark important", (n) => `Mark ${n} important`)}
+                    <MenuShortcut keys={keyFor("important")} />
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() =>
+                        onConversation(
+                            ids,
+                            { pinned: !thread.pinned },
+                            thread.pinned ? "Unpinned." : "Pinned to the top."
+                        )
+                    }
+                >
+                    {thread.pinned ? (
+                        <PinOff className="size-3.5 shrink-0" aria-hidden />
+                    ) : (
+                        <Pin className="size-3.5 shrink-0" aria-hidden />
+                    )}
+                    {thread.pinned
+                        ? said("Unpin", (n) => `Unpin ${n}`)
+                        : said("Pin to the top", (n) => `Pin ${n} to the top`)}
+                    <MenuShortcut keys={keyFor("pin")} />
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() =>
+                        onConversation(
+                            ids,
+                            { muted: !thread.muted },
+                            thread.muted
+                                ? "Unmuted."
+                                : "Muted. New messages in it will not be announced."
+                        )
+                    }
+                >
+                    {thread.muted ? (
+                        <Bell className="size-3.5 shrink-0" aria-hidden />
+                    ) : (
+                        <BellOff className="size-3.5 shrink-0" aria-hidden />
+                    )}
+                    {thread.muted
+                        ? said("Unmute", (n) => `Unmute ${n}`)
+                        : said("Mute", (n) => `Mute ${n}`)}
+                    <MenuShortcut keys={keyFor("mute")} />
                 </ContextMenuItem>
 
                 <ContextMenuSub>
@@ -217,7 +292,7 @@ export function ThreadContextMenu({
                     <ContextMenuItem onSelect={() => onAct("archive", ids, "Archived.")}>
                         <Archive className="size-3.5 shrink-0" aria-hidden />
                         {said("Archive", (n) => `Archive ${n}`)}
-                        <MenuShortcut keys="e" />
+                        <MenuShortcut keys={keyFor("archive")} />
                     </ContextMenuItem>
                 ) : null}
                 {/* The two that take mail away from somebody are drawn as what
@@ -226,7 +301,7 @@ export function ThreadContextMenu({
                 <ContextMenuItem variant="danger" onSelect={() => onAct("junk", ids, "Moved to spam.")}>
                     <Bug className="size-3.5 shrink-0" aria-hidden />
                     {said("Report as spam", (n) => `Report ${n} as spam`)}
-                    <MenuShortcut keys="!" />
+                    <MenuShortcut keys={keyFor("junk")} />
                 </ContextMenuItem>
                 <ContextMenuItem
                     variant="danger"

@@ -9693,6 +9693,12 @@ model MailFolder {
     // name match. Their answer outlives a resync: without this the next pass
     // would read the role off the server again and forget what they told us.
     roleLocked Boolean @default(false)
+    // Whether this folder is known to store keywords such as `$Important`:
+    // learned the first time a writable open accepts one or a message arrives
+    // carrying one. Until then the server's silence about a keyword is not an
+    // answer, because a folder opened read-only reports no permanent flags at
+    // all, and treating that as "no" would wipe a mark somebody made here.
+    keywords   Boolean @default(false)
 
     // What the server said the last time it was asked. A changed uidValidity
     // means every uid held here is meaningless and the folder is resynced.
@@ -9740,6 +9746,9 @@ model MailThread {
     // is fifty aggregates for one page.
     size           Int      @default(0)
     starred        Boolean  @default(false)
+    // Whether any message in it is marked important, rolled up the way starred
+    // is so the list can say so without reading its messages.
+    important      Boolean  @default(false)
     // Kept at the top of the list by its reader.
     pinned         Boolean  @default(false)
     // Nothing about this conversation is announced, however much it moves.
@@ -9804,6 +9813,10 @@ model MailMessage {
     answered Boolean @default(false)
     draft    Boolean @default(false)
     deleted  Boolean @default(false)
+    // The `$Important` keyword. Mirrored like the flags above where the folder
+    // stores keywords; where it does not, it is Polaris' own and a sync leaves
+    // it alone rather than reading the server's silence as "not important".
+    important Boolean @default(false)
 
     hasAttachments Boolean @default(false)
     // Whether this message asked to be told when it was read. Recorded so the

@@ -317,6 +317,24 @@ export async function actOnAction(input: unknown) {
     }
 }
 
+/** Pin a conversation to the top of every list, or mute it - or undo either.
+ *  Polaris' own: nothing is sent to the mail server. */
+export async function setConversationStateAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailConversationStateSchema.safeParse(input);
+    if (!parsed.success) return { error: "Nothing was selected." };
+    try {
+        const done = await messages.setConversationState(userId, parsed.data.messageIds, {
+            pinned: parsed.data.pinned,
+            muted: parsed.data.muted
+        });
+        refresh();
+        return { done };
+    } catch (caught) {
+        return failure(caught, "That could not be changed.");
+    }
+}
+
 export async function moveAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailMoveSchema.safeParse(input);
@@ -612,11 +630,44 @@ export async function setMailPreferencesAction(input: unknown) {
         };
     }
     try {
-        await prefs.saveMailPreferences(userId, parsed.data);
+        // The reading form does not carry the keyboard, and saving it must not
+        // quietly put every moved shortcut back where it started.
+        const current = await prefs.readMailPreferences(userId);
+        await prefs.saveMailPreferences(userId, {
+            ...parsed.data,
+            keys: parsed.data.keys ?? current.keys
+        });
         refresh();
         return { saved: true };
     } catch (caught) {
         return failure(caught, "That could not be saved.");
+    }
+}
+
+/**
+ * Move Mail's shortcuts.
+ *
+ * The whole keyboard at once, and refused whole when two commands would share a
+ * key - the message names both, so the screen can say which binding is in the
+ * way rather than storing one that would archive when somebody meant to mute.
+ */
+export async function setMailKeysAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailKeymapSchema.safeParse(input);
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return {
+            error: issue?.message ?? "Those shortcuts could not be saved.",
+            field: String(issue?.path[0] ?? "")
+        };
+    }
+    try {
+        const current = await prefs.readMailPreferences(userId);
+        await prefs.saveMailPreferences(userId, { ...current, keys: parsed.data });
+        refresh();
+        return { keys: parsed.data };
+    } catch (caught) {
+        return failure(caught, "Those shortcuts could not be saved.");
     }
 }
 

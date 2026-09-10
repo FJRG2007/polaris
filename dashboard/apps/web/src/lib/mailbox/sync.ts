@@ -212,7 +212,12 @@ type FolderRow = {
     uidValidity: bigint | null;
     uidNext: bigint | null;
     highestModseq: bigint | null;
+    /** Whether this folder is known to store keywords - see `importantFrom`. */
+    keywords: boolean;
 };
+
+const IMPORTANT = core.MAIL_IMPORTANT_KEYWORD;
+const importantFrom = core.importantAfterSync;
 
 /**
  * Bring one folder up to date on a connection somebody else already has open.
@@ -446,6 +451,10 @@ async function storeMessages(
                 flagged: message.flags.has("\\Flagged"),
                 answered: message.flags.has("\\Answered"),
                 deleted: message.flags.has("\\Deleted"),
+                // Only where the server's answer is one: see `importantFrom`.
+                ...(folder.keywords || message.flags.has(IMPORTANT)
+                    ? { important: message.flags.has(IMPORTANT) }
+                    : {}),
                 // Rewritten, not left as it was found. A row stored before the
                 // decoder existed holds an escape sequence everywhere somebody
                 // put an accent, and a resync is the one moment the good line
@@ -479,6 +488,7 @@ async function storeMessages(
                 answered: message.flags.has("\\Answered"),
                 draft: message.flags.has("\\Draft"),
                 deleted: message.flags.has("\\Deleted"),
+                important: message.flags.has(IMPORTANT),
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
@@ -543,6 +553,12 @@ async function storeMessages(
 
     // One connection for the whole page, after the loop rather than inside it.
     await fileJudgedJunk(account.userId, judged);
+
+    // A message arriving with the keyword on it is the server saying it keeps
+    // keywords in this folder, so its silence about one is an answer from now on.
+    if (!folder.keywords && fetched.some((message) => message.flags.has(IMPORTANT))) {
+        await learnKeywords(folder.id);
+    }
 
     await refreshThreads(account.id);
     publishMail({
@@ -732,6 +748,7 @@ export async function refreshThreads(accountId: string): Promise<void> {
             select: {
                 seen: true,
                 flagged: true,
+                important: true,
                 sentAt: true,
                 snippet: true,
                 subject: true,
@@ -763,6 +780,7 @@ export async function refreshThreads(accountId: string): Promise<void> {
                 messageCount: messages.length,
                 unreadCount: messages.filter((message) => !message.seen).length,
                 starred: messages.some((message) => message.flagged),
+                important: messages.some((message) => message.important),
                 hasAttachments: messages.some((message) => message.hasAttachments),
                 // What the server said each message weighs, added up. A message
                 // whose size the server never gave counts as nothing, which is
@@ -798,7 +816,14 @@ async function reconcileFlags(
 ): Promise<void> {
     const held = await prisma.mailMessage.findMany({
         where: { folderId: folder.id },
-        select: { id: true, uid: true, seen: true, flagged: true, answered: true },
+        select: {
+            id: true,
+            uid: true,
+            seen: true,
+            flagged: true,
+            answered: true,
+            important: true
+        },
         orderBy: { uid: "desc" },
         take: WINDOW
     });
@@ -825,18 +850,36 @@ async function reconcileFlags(
         return;
     }
 
+    // Seen on any message here, the keyword is the folder saying it keeps them.
+    const keywords =
+        folder.keywords || [...changed.values()].some((flags) => flags.has(IMPORTANT));
+    if (keywords && !folder.keywords) await learnKeywords(folder.id);
+
     for (const row of held) {
         const flags = changed.get(Number(row.uid));
         if (!flags) continue;
         const seen = flags.has("\\Seen");
         const flagged = flags.has("\\Flagged");
         const answered = flags.has("\\Answered");
-        if (seen === row.seen && flagged === row.flagged && answered === row.answered) continue;
+        const important = importantFrom(flags, keywords, row.important);
+        if (
+            seen === row.seen &&
+            flagged === row.flagged &&
+            answered === row.answered &&
+            important === row.important
+        ) {
+            continue;
+        }
         await prisma.mailMessage.update({
             where: { id: row.id },
-            data: { seen, flagged, answered }
+            data: { seen, flagged, answered, important }
         });
     }
+}
+
+/** Remember that a folder keeps keywords, so the next pass believes its silence. */
+async function learnKeywords(folderId: string): Promise<void> {
+    await prisma.mailFolder.update({ where: { id: folderId }, data: { keywords: true } });
 }
 
 /**

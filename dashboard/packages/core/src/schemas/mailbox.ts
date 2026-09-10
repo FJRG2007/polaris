@@ -333,6 +333,8 @@ export const mailMessageAction = z.enum([
     "unread",
     "star",
     "unstar",
+    "important",
+    "unimportant",
     "archive",
     "trash",
     "delete",
@@ -347,6 +349,25 @@ export const mailActionSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),
     action: mailMessageAction
 });
+
+/**
+ * Pinning a conversation to the top of every list, or muting it.
+ *
+ * Both are about the conversation rather than a message, and neither is
+ * something a mail server has a word for - so they are Polaris' own and nothing
+ * is sent anywhere. Named by the messages the screen is showing, the way every
+ * other action is, and resolved to their conversations on the server. At least
+ * one of the two has to be said, or the request asks for nothing.
+ */
+export const mailConversationStateSchema = z
+    .object({
+        messageIds: z.array(z.string().uuid()).min(1).max(500),
+        pinned: z.boolean().optional(),
+        muted: z.boolean().optional()
+    })
+    .refine((value) => value.pinned !== undefined || value.muted !== undefined, {
+        message: "Say whether to pin or mute."
+    });
 
 export const mailMoveSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),
@@ -512,6 +533,7 @@ export const mailPageSchema = z.object({
     unreadOnly: z.boolean().default(false),
     readOnly: z.boolean().default(false),
     starredOnly: z.boolean().default(false),
+    importantOnly: z.boolean().default(false),
     snoozedOnly: z.boolean().default(false),
     withAttachments: z.boolean().default(false),
     category: z.string().trim().max(32).default(""),

@@ -102,6 +102,35 @@ export function bareMessageId(raw: string): string {
  */
 export const SUBJECT_THREAD_WINDOW_MS = 28 * 24 * 60 * 60 * 1000;
 
+/**
+ * The keyword a message marked Important carries on the server.
+ *
+ * `$Important` is the name the clients that have the idea agree on, and the one
+ * Gmail's IMAP answers to. Here rather than beside the code that writes it,
+ * because the sync that reads it back and the action that sets it must never
+ * disagree about the spelling.
+ */
+export const MAIL_IMPORTANT_KEYWORD = "$Important";
+
+/**
+ * What a message's Important mark should be after a sync, given the flags the
+ * server sent for it.
+ *
+ * The server is believed when it says a message IS important, always. It is
+ * believed when it says nothing only once the folder is known to keep keywords
+ * (`keywords`): a folder opened read-only reports no permanent flags, and plenty
+ * of servers keep none, so until that is learned the silence is no answer and
+ * the mark somebody made here (`held`) stays.
+ */
+export function importantAfterSync(
+    flags: ReadonlySet<string>,
+    keywords: boolean,
+    held: boolean
+): boolean {
+    if (flags.has(MAIL_IMPORTANT_KEYWORD)) return true;
+    return keywords ? false : held;
+}
+
 /** The key a conversation is filed under when its headers name no ancestor.
  *  Never used on its own: it is only reached for after the id match failed. */
 export function subjectThreadKey(envelope: MailEnvelope): string | null {

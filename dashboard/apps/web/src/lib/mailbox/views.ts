@@ -100,6 +100,8 @@ export interface MailThreadView {
     readonly messageCount: number;
     readonly unreadCount: number;
     readonly starred: boolean;
+    /** Whether any message in it is marked important. */
+    readonly important: boolean;
     readonly pinned: boolean;
     readonly muted: boolean;
     readonly hasAttachments: boolean;
@@ -140,6 +142,8 @@ export interface MailListQuery {
      *  are. */
     readonly readOnly: boolean;
     readonly starredOnly: boolean;
+    /** Only what somebody marked important, across every mailbox. */
+    readonly importantOnly: boolean;
     /** The other side of the snooze filter: only what is still put off, which is
      *  the one screen that exists to show it. */
     readonly snoozedOnly: boolean;
@@ -165,6 +169,7 @@ export const EMPTY_QUERY: MailListQuery = {
     unreadOnly: false,
     readOnly: false,
     starredOnly: false,
+    importantOnly: false,
     snoozedOnly: false,
     withAttachments: false,
     category: "",
@@ -214,6 +219,7 @@ export async function listThreads(
         ...(query.role ? { folder: { role: query.role } } : {}),
         ...(query.unreadOnly ? { seen: false } : {}),
         ...(query.starredOnly ? { flagged: true } : {}),
+        ...(query.importantOnly ? { important: true } : {}),
         ...(query.withAttachments ? { hasAttachments: true } : {}),
         ...(query.category ? { category: query.category } : {}),
         ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
@@ -263,6 +269,7 @@ export async function listThreads(
             messageCount: true,
             unreadCount: true,
             starred: true,
+            important: true,
             pinned: true,
             muted: true,
             hasAttachments: true,
@@ -295,6 +302,7 @@ export async function listThreads(
             messageCount: thread.messageCount,
             unreadCount: thread.unreadCount,
             starred: thread.starred,
+            important: thread.important,
             pinned: thread.pinned,
             muted: thread.muted,
             hasAttachments: thread.hasAttachments,
@@ -365,6 +373,7 @@ async function matchingThreads(
             ...(terms.hasAttachment || query.withAttachments ? { hasAttachments: true } : {}),
             ...(query.unreadOnly ? { seen: false } : {}),
             ...(query.starredOnly ? { flagged: true } : {}),
+            ...(query.importantOnly ? { important: true } : {}),
             ...(terms.unread === null ? {} : { seen: !terms.unread }),
             ...(terms.starred === null ? {} : { flagged: terms.starred }),
             ...(terms.after || terms.before
@@ -458,6 +467,7 @@ export interface MailMessageView {
     readonly sentAt: string;
     readonly seen: boolean;
     readonly flagged: boolean;
+    readonly important: boolean;
     readonly answered: boolean;
     readonly wantsReceipt: boolean;
     readonly listId: string;
@@ -495,6 +505,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
             sentAt: true,
             seen: true,
             flagged: true,
+            important: true,
             answered: true,
             wantsReceipt: true,
             listId: true,
@@ -529,6 +540,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         sentAt: message.sentAt.toISOString(),
         seen: message.seen,
         flagged: message.flagged,
+        important: message.important,
         answered: message.answered,
         wantsReceipt: message.wantsReceipt,
         listId: message.listId,
@@ -564,6 +576,13 @@ export async function readThreadView(
 ): Promise<{ thread: MailThreadView | null; messages: MailMessageView[] }> {
     const messages = await readThread(userId, threadId);
     if (messages.length === 0) return { thread: null, messages: [] };
+    // Pinned and muted are the conversation's own and nothing on a message says
+    // them, so they are read off its row - narrowed by the reader like the rest.
+    // Hardcoded off, a pinned conversation opened from a link offered to pin it.
+    const state = await prisma.mailThread.findFirst({
+        where: { id: threadId, account: { userId } },
+        select: { pinned: true, muted: true }
+    });
 
     const first = messages[0]!;
     const newest = messages.at(-1)!;
@@ -577,8 +596,9 @@ export async function readThreadView(
             messageCount: messages.length,
             unreadCount: messages.filter((message) => !message.seen).length,
             starred: messages.some((message) => message.flagged),
-            pinned: false,
-            muted: false,
+            important: messages.some((message) => message.important),
+            pinned: state?.pinned ?? false,
+            muted: state?.muted ?? false,
             hasAttachments: messages.some((message) => message.attachments.length > 0),
             // Not read: this one is built from its own messages rather than from
             // a list, and their sizes are not part of that shape. It is only ever

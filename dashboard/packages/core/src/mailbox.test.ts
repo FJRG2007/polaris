@@ -227,6 +227,26 @@ describe("folders", () => {
     });
 });
 
+describe("important, after a sync", () => {
+    const flags = (...values: string[]) => new Set(values);
+
+    it("believes a server that says a message is important, always", () => {
+        expect(mailbox.importantAfterSync(flags("$Important"), false, false)).toBe(true);
+        expect(mailbox.importantAfterSync(flags("$Important"), true, false)).toBe(true);
+    });
+
+    it("keeps a mark made here on a folder not known to keep keywords", () => {
+        // A read-only open reports no permanent flags and plenty of servers keep
+        // none, so the server's silence is not an answer yet.
+        expect(mailbox.importantAfterSync(flags("\\Seen"), false, true)).toBe(true);
+    });
+
+    it("clears it once the folder is known to keep keywords and it has none", () => {
+        // Unmarked on a phone: the folder keeps keywords, so silence is a no.
+        expect(mailbox.importantAfterSync(flags("\\Seen"), true, true)).toBe(false);
+    });
+});
+
 describe("rules", () => {
     const message: MailRuleSubject = {
         from: [{ name: "Billing", address: "invoices@acme.com" }],
