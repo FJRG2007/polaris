@@ -7,6 +7,7 @@
  */
 
 import { Button, cn } from "@polaris/ui";
+import { LikelyCause } from "./likely-cause";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { deployFreshnessAction } from "./glance-actions";
 import { useEffect, useState, type ReactNode } from "react";
@@ -97,7 +98,10 @@ export function DeployCallouts({
     canDeploy,
     busy,
     onDeploy,
-    onViewLog
+    onViewLog,
+    canConfigure = false,
+    canSetVariables = false,
+    onFixed
 }: {
     applicationId: string;
     /** The service's deployments, newest first. */
@@ -106,6 +110,12 @@ export function DeployCallouts({
     busy: boolean;
     onDeploy: () => void;
     onViewLog: (deploymentId: string) => void;
+    /** Allowed to change the service and deploy it, for a failed deploy's fix. */
+    canConfigure?: boolean;
+    /** Allowed to change its variables and deploy it. */
+    canSetVariables?: boolean;
+    /** A fix was applied and a new deploy started. */
+    onFixed?: () => void;
 }) {
     const latest = items[0] ?? null;
     const active = items.find((item) => item.isCurrent) ?? null;
@@ -149,6 +159,14 @@ export function DeployCallouts({
                     </Button>
                     {deployButton("Redeploy")}
                 </Callout>
+            )}
+            {failed && (
+                <LikelyCause
+                    deploymentId={failed.id}
+                    canConfigure={canConfigure && canDeploy}
+                    canSetVariables={canSetVariables && canDeploy}
+                    onFixed={onFixed ?? (() => undefined)}
+                />
             )}
             {behind && (
                 <Callout

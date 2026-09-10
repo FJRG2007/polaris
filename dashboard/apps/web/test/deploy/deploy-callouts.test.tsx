@@ -13,6 +13,12 @@ vi.mock("@/app/(app)/apps/deploy/glance-actions", () => ({
     deployFreshnessAction: async () => null,
     projectGlanceAction: async () => null
 }));
+// The likely cause under a failed deploy asks the server once it mounts, which a
+// static render never does.
+vi.mock("@/app/(app)/apps/deploy/fix-actions", () => ({
+    deploymentDiagnosisAction: async () => ({ diagnosis: null }),
+    applyDeployFixAction: async () => ({})
+}));
 vi.mock("@/components/relative-time", () => ({
     RelativeTime: ({ iso }: { iso: string }) => `relative:${iso}`
 }));

@@ -40,8 +40,8 @@ import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
-import { isTunnelHostname, runtimeVersionSchema, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { isTunnelHostname, runtimeVersionSchema, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import {
     CONSUMPTION_METRICS,
     MetricsHistory,
@@ -746,6 +746,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                         busy={busy}
                         onDeploy={deploy}
                         onViewLog={setLogsFor}
+                        canConfigure={can("service.configure")}
+                        canSetVariables={can("variables.write")}
+                        onFixed={() => {
+                            reload();
+                            onChanged();
+                        }}
                     />
                     {active && (
                         <div className="overflow-hidden rounded-xl border border-success-edge bg-success/[0.06]">
