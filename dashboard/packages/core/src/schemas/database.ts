@@ -183,6 +183,20 @@ const dbPassword = z
  *  the ports the host's own services claim, and a database is not one of them. */
 const hostPort = z.number().int().min(1024).max(65535);
 
+/**
+ * The masters a new Redis can be run as a Redis Cluster with, each given one
+ * replica, so the cluster runs twice as many nodes. Three is the smallest
+ * cluster Redis documents as working; odd counts keep a majority of masters
+ * possible when one is lost.
+ */
+export const REDIS_CLUSTER_MASTERS = [3, 5, 7] as const;
+export type RedisClusterMasters = (typeof REDIS_CLUSTER_MASTERS)[number];
+
+/** True for a master count a cluster can be created with. */
+export function isRedisClusterMasters(value: unknown): value is RedisClusterMasters {
+    return typeof value === "number" && (REDIS_CLUSTER_MASTERS as readonly number[]).includes(value);
+}
+
 export const databaseCreateSchema = z
     .object({
         environmentId: z.string().uuid(),
@@ -209,7 +223,14 @@ export const databaseCreateSchema = z
         username: sqlIdentifier.optional(),
         /** Left off, a strong password is generated and stored encrypted. */
         password: dbPassword.optional(),
-        privileges: z.enum(DB_PRIVILEGES).default("owner")
+        privileges: z.enum(DB_PRIVILEGES).default("owner"),
+        /** Redis only: run as a cluster of this many masters, each with one
+         *  replica. Omitted is a single instance. */
+        clusterMasters: z
+            .number()
+            .int()
+            .refine(isRedisClusterMasters, "A cluster has 3, 5 or 7 masters")
+            .optional()
     })
     .superRefine((value, ctx) => {
         const info = MANAGED_ENGINE_INFO[value.engine];
@@ -256,6 +277,23 @@ export const databaseCreateSchema = z
                 code: z.ZodIssueCode.custom,
                 path: ["password"],
                 message: "An object store's keys are always generated"
+            });
+        }
+        if (value.clusterMasters !== undefined && value.engine !== "redis") {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["clusterMasters"],
+                message: `${info.label} does not run as a Redis Cluster`
+            });
+        }
+        // A cluster answers a client with the addresses of its nodes, which only
+        // the services on its network can reach; one published port leads a
+        // client outside to one node and then to addresses it cannot open.
+        if (value.clusterMasters !== undefined && value.exposePort !== undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["exposePort"],
+                message: "A cluster is reached by the services in its environment and cannot be published on one port"
             });
         }
     });

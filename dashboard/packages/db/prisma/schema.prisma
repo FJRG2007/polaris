@@ -4213,6 +4213,9 @@ model ManagedDatabase {
     // memory ceiling in megabytes a cache evicts to stay under.
     mode                String   @default("default")
     maxMemoryMb         Int?
+    // Redis: the masters of a Redis Cluster - 3, 5 or 7, each with one replica,
+    // all on this instance's server. Null is a single instance. Fixed at create.
+    clusterMasters      Int?
     // MongoDB: run as a single-member replica set (change streams, transactions).
     replicaSet          Boolean  @default(false)
     // PostgreSQL: archive every WAL segment and take daily base backups, so the

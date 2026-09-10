@@ -262,9 +262,23 @@ const MAX_NAME = 63;
  * the logs and the status - which all ask for that name - keep answering.
  */
 export function replicaNames(name: string, count: number): string[] {
+    return numberedNames(name, count, "r");
+}
+
+/**
+ * The names a clustered database's nodes run under, and their volumes: the
+ * database's own first, then `-n2`, `-n3`... cut to fit. Node, not replica: which
+ * node is a master is the cluster's to decide, and changes when one fails over.
+ */
+export function clusterNodeNames(name: string, count: number): string[] {
+    return numberedNames(name, count, "n");
+}
+
+/** `name`, then `name-<tag>2`, `name-<tag>3`... each cut to fit a DNS label. */
+function numberedNames(name: string, count: number, tag: string): string[] {
     return Array.from({ length: Math.max(1, count) }, (_, index) => {
         if (index === 0) return name;
-        const suffix = `-r${index + 1}`;
+        const suffix = `-${tag}${index + 1}`;
         return `${name.slice(0, MAX_NAME - suffix.length)}${suffix}`;
     });
 }
@@ -379,6 +393,30 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
     const ports: ComposeSpecPort[] =
         plan.exposePort !== undefined ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }] : [];
     const networks = joinedNetworks(plan.networks, network);
+    // A cluster is one project of equal nodes, reaching each other by name on
+    // the networks they share. Nothing is published: a client is redirected
+    // between nodes by name, which only the network can resolve.
+    if (plan.nodes && plan.nodes.length > 0) {
+        return {
+            project: plan.ref.project,
+            services: plan.nodes.map((node) => ({
+                name: node.name,
+                image: plan.image,
+                pullPolicy: "always" as const,
+                env: { ...plan.env },
+                command: [...node.command],
+                ports: [],
+                volumes: [{ source: node.volumeName, target: plan.dataPath, kind: "volume" as const }],
+                labels: {},
+                networks,
+                extraHosts: [HOST_GATEWAY],
+                restart: "unless-stopped",
+                ...limitFields(plan.limits)
+            })),
+            volumes: plan.nodes.map((node) => node.volumeName),
+            networks
+        };
+    }
     return {
         project: plan.ref.project,
         services: [

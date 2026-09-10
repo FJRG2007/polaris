@@ -126,6 +126,9 @@ export function databaseReferenceKeys(connection: {
     readonly username: string;
     readonly password: string;
     readonly uri: string;
+    /** A Redis Cluster's nodes as `host:port`, the seeds a cluster client takes.
+     *  Absent for anything that is not a cluster. */
+    readonly clusterNodes?: readonly string[] | null;
 }): Record<string, string> {
     const port = String(connection.port);
     const keys: Record<string, string> = {
@@ -161,6 +164,8 @@ export function databaseReferenceKeys(connection: {
         keys.MONGO_URL = connection.uri;
     } else if (connection.engine === "redis") {
         Object.assign(keys, { REDIS_URL: connection.uri, REDISHOST: connection.host, REDISPORT: port });
+        // A cluster's URL names one node; a cluster client wants every one.
+        if (connection.clusterNodes?.length) keys.REDIS_CLUSTER_NODES = connection.clusterNodes.join(",");
     } else if (connection.engine === "seaweedfs") {
         // An object store's account is an S3 key pair; it answers with the names
         // S3 clients read, the AWS SDKs' own among them.

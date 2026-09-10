@@ -176,6 +176,21 @@ export interface DbDeployPlan {
     /** The most CPU (cores) and memory (MB) the container may use. Absent is no
      *  limit. */
     readonly limits?: ResourceLimits;
+    /**
+     * A Redis Cluster: one container per node in place of the single one, each
+     * with its own command and data volume, on the same networks, and none
+     * published on the host. The first node carries `ref.name`, so everything
+     * that asks for the database's container finds one. `command` and
+     * `volumeName` above are then unused.
+     */
+    readonly nodes?: readonly DbNodePlan[];
+}
+
+/** One node of a clustered database. */
+export interface DbNodePlan {
+    readonly name: string;
+    readonly command: readonly string[];
+    readonly volumeName: string;
 }
 
 export interface DeployResult {
