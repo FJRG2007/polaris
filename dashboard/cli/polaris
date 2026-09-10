@@ -179,24 +179,440 @@ print_setup_link() {
     echo "  http://polaris.local/oauth/setup?token=$token"
 }
 
+# ---------------------------------------------------------------------------
+# Deploy, from anywhere
+#
+# Everything below talks to a Polaris over its Deploy API with an API key, so it
+# works from a laptop or a CI job as well as on the host. `polaris login` stores
+# the instance address and the key in the user's config directory, readable by
+# nobody else; POLARIS_URL and POLARIS_TOKEN override it for a CI job that should
+# not write a file.
+#
+# A service is named the way the dashboard shows it: project/service for the
+# project's default environment, or project/environment/service. An argument
+# with a slash in it, or an id, is a Deploy service; anything else keeps meaning
+# what it always meant here - so `polaris logs web` is still this stack's web
+# container, and `polaris logs shop/api` is the shop's API.
+# ---------------------------------------------------------------------------
+
+CONFIG_DIR="${POLARIS_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/polaris}"
+CONFIG_FILE="$CONFIG_DIR/cli"
+
+die() {
+    echo "polaris: $*" >&2
+    exit 1
+}
+
+# Whether an argument names a Deploy service rather than a container of this stack.
+is_ref() {
+    case "$1" in
+        */*) return 0 ;;
+    esac
+    printf '%s' "$1" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+}
+
+conf() {
+    [ -f "$CONFIG_FILE" ] && sed -n "s#^$1=##p" "$CONFIG_FILE" | head -n1
+}
+
+load_credentials() {
+    command -v curl >/dev/null 2>&1 || die "curl is required for this command"
+    API_URL="${POLARIS_URL:-$(conf url)}"
+    API_TOKEN="${POLARIS_TOKEN:-$(conf token)}"
+    API_INSECURE="${POLARIS_INSECURE:-$(conf insecure)}"
+    API_URL="${API_URL%/}"
+    [ -n "$API_URL" ] && [ -n "$API_TOKEN" ] || die "not signed in to a Polaris - run 'polaris login'"
+}
+
+# curl with the key and, when asked for at login, without certificate checks.
+# The key goes in a header read from stdin, so it never appears in the process
+# list the way an argument would.
+curl_api() {
+    if [ "$API_INSECURE" = "1" ]; then
+        printf 'header = "Authorization: Bearer %s"\n' "$API_TOKEN" | curl -sS -k -K - "$@"
+    else
+        printf 'header = "Authorization: Bearer %s"\n' "$API_TOKEN" | curl -sS -K - "$@"
+    fi
+}
+
+# Call the API and print the body; on a refusal print the reason and stop. The
+# status code rides on the last line so the body can be told apart from it.
+api() {
+    method=$1
+    path=$2
+    shift 2
+    out=$(curl_api -X "$method" -w '\n%{http_code}' "$@" "$API_URL$path") || die "could not reach $API_URL"
+    code=$(printf '%s' "$out" | tail -n1)
+    body=$(printf '%s' "$out" | sed '$d')
+    case "$code" in
+        # The body loses its last newline on the way through `$( )`, so it is put
+        # back - a caller capturing the output strips it again, a terminal needs it.
+        2??) if [ -n "$body" ]; then printf '%s\n' "$body"; fi ;;
+        401) die "the key was refused - it may be revoked or expired; run 'polaris login'" ;;
+        *)
+            reason=$(printf '%s' "$body" | sed -n 's/.*"error":"\([^"]*\)".*/\1/p')
+            die "${reason:-the request failed with HTTP $code}"
+            ;;
+    esac
+}
+
+# Send a JSON body. It goes through a private temporary file rather than an
+# argument: an argument is visible to every user of the machine in the process
+# list, and this body can be a secret's value. `api` is run in a subshell so a
+# refusal cannot exit before the file is removed.
+api_json() {
+    tmp=$(umask 077 && mktemp) || die "cannot create a temporary file"
+    printf '%s' "$3" >"$tmp"
+    rc=0
+    (api "$1" "$2" -H "content-type: application/json" --data-binary "@$tmp") || rc=$?
+    rm -f "$tmp"
+    return "$rc"
+}
+
+# Standard input as the inside of a JSON string: backslashes and quotes escaped,
+# tabs and line breaks written as escapes, carriage returns dropped.
+json_escape() {
+    tab=$(printf '\t')
+    tr -d '\r' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e "s/$tab/\\\\t/g" |
+        awk 'BEGIN { ORS = "" } NR > 1 { printf "\\n" } { print }'
+}
+
+# The id of the service a reference names, asked of the instance so a name is
+# matched exactly the way the dashboard and the API match it.
+service_id() {
+    [ -n "$1" ] || die "name a service: project/service, project/environment/service or its id"
+    api GET "/api/v1/deploy/services" -G --data-urlencode "ref=$1" --data-urlencode "format=text"
+}
+
+# A deploy target named on the command line, or the one POLARIS_SERVICE names
+# for a repository that always deploys the same service.
+pick_service() {
+    ref="${1:-${POLARIS_SERVICE:-}}"
+    [ -n "$ref" ] || die "name a service, or set POLARIS_SERVICE"
+    service_id "$ref"
+}
+
+deploy_login() {
+    command -v curl >/dev/null 2>&1 || die "curl is required for this command"
+    insecure=0
+    url=""
+    for arg in "$@"; do
+        case "$arg" in
+            --insecure) insecure=1 ;;
+            *) url=$arg ;;
+        esac
+    done
+    if [ -z "$url" ]; then
+        printf 'Polaris address (https://...): '
+        read -r url
+    fi
+    url="${url%/}"
+    case "$url" in
+        http://* | https://*) ;;
+        *) die "the address must start with https:// (or http:// on a trusted network)" ;;
+    esac
+    if [ -n "${POLARIS_TOKEN:-}" ]; then
+        token=$POLARIS_TOKEN
+    else
+        printf 'API key (Account > API keys; input hidden): '
+        if [ -t 0 ]; then stty -echo; fi
+        read -r token
+        if [ -t 0 ]; then stty echo; fi
+        printf '\n'
+    fi
+    [ -n "$token" ] || die "no key was given"
+    if [ "$insecure" = "1" ]; then
+        echo "polaris: certificate checks are OFF for $url - only do this for an address you control" >&2
+    fi
+
+    API_URL=$url
+    API_TOKEN=$token
+    API_INSECURE=$insecure
+    me=$(api GET "/api/v1/me")
+    name=$(printf '%s' "$me" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')
+
+    umask 077
+    mkdir -p "$CONFIG_DIR"
+    printf 'url=%s\ntoken=%s\ninsecure=%s\n' "$url" "$token" "$insecure" >"$CONFIG_FILE"
+    chmod 600 "$CONFIG_FILE"
+    echo "Signed in to $url${name:+ as $name}."
+}
+
+deploy_logout() {
+    rm -f "$CONFIG_FILE"
+    echo "Signed out. The key itself still works until it is revoked in Polaris."
+}
+
+deploy_projects() {
+    load_credentials
+    if [ "${1:-}" = "--quiet" ]; then
+        api GET "/api/v1/deploy/projects?format=text" | sed '1d' | cut -f1
+    else
+        api GET "/api/v1/deploy/projects?format=text"
+    fi
+}
+
+# Stream a deployment's build log until it finishes.
+follow_build() {
+    api GET "/api/v1/deploy/deployments/$1?tail=1&format=text" >/dev/null
+    if [ "$API_INSECURE" = "1" ]; then k=-k; else k=; fi
+    printf 'header = "Authorization: Bearer %s"\n' "$API_TOKEN" |
+        curl -sS $k -N -K - "$API_URL/api/v1/deploy/deployments/$1?follow=1"
+}
+
+deploy_now() {
+    load_credentials
+    follow=0
+    ref=""
+    for arg in "$@"; do
+        case "$arg" in
+            --follow | -f) follow=1 ;;
+            *) ref=$arg ;;
+        esac
+    done
+    id=$(pick_service "$ref")
+    deployment=$(api POST "/api/v1/deploy/services/$id/deploy?format=text")
+    echo "Deployment $deployment started."
+    if [ "$follow" = "1" ]; then follow_build "$deployment"; fi
+}
+
+deploy_deployments() {
+    load_credentials
+    id=$(pick_service "${1:-}")
+    api GET "/api/v1/deploy/services/$id/deployments?format=text"
+}
+
+deploy_build_log() {
+    load_credentials
+    [ -n "${1:-}" ] || die "name a deployment id (see 'polaris deployments <service>')"
+    if [ "${2:-}" = "--follow" ] || [ "${2:-}" = "-f" ]; then
+        follow_build "$1"
+    else
+        api GET "/api/v1/deploy/deployments/$1?tail=${POLARIS_TAIL:-200}&format=text"
+    fi
+}
+
+deploy_rollback() {
+    load_credentials
+    [ -n "${1:-}" ] || die "name the deployment to roll back to (see 'polaris deployments <service>')"
+    deployment=$(api POST "/api/v1/deploy/deployments/$1/rollback?format=text")
+    echo "Rolling back as deployment $deployment."
+    if [ "${2:-}" = "--follow" ] || [ "${2:-}" = "-f" ]; then follow_build "$deployment"; fi
+}
+
+# A service's runtime logs. With --follow, poll for the lines after the last one
+# printed - each line carries Docker's timestamp, which is what `since` compares.
+deploy_logs() {
+    load_credentials
+    follow=0
+    tail=200
+    ref=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --follow | -f) follow=1 ;;
+            --tail)
+                shift
+                tail=${1:-200}
+                ;;
+            *) ref=$1 ;;
+        esac
+        shift
+    done
+    id=$(service_id "$ref")
+    chunk=$(api GET "/api/v1/deploy/services/$id/logs?tail=$tail&format=text")
+    [ -n "$chunk" ] && printf '%s\n' "$chunk"
+    [ "$follow" = "1" ] || return 0
+    last=$(printf '%s\n' "$chunk" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' | tail -n1 | cut -d' ' -f1)
+    while :; do
+        sleep 2
+        if [ -n "$last" ]; then
+            chunk=$(api GET "/api/v1/deploy/services/$id/logs" -G --data-urlencode "tail=1000" \
+                --data-urlencode "since=$last" --data-urlencode "format=text")
+        else
+            chunk=$(api GET "/api/v1/deploy/services/$id/logs?tail=$tail&format=text")
+        fi
+        [ -n "$chunk" ] || continue
+        printf '%s\n' "$chunk"
+        stamp=$(printf '%s\n' "$chunk" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' | tail -n1 | cut -d' ' -f1)
+        [ -n "$stamp" ] && last=$stamp
+    done
+}
+
+deploy_status() {
+    load_credentials
+    id=$(service_id "$1")
+    api GET "/api/v1/deploy/services/$id?format=text"
+}
+
+deploy_power() {
+    load_credentials
+    id=$(service_id "$2")
+    api POST "/api/v1/deploy/services/$id/$1?format=text"
+}
+
+deploy_env() {
+    load_credentials
+    sub=${1:-list}
+    [ "$#" -gt 0 ] && shift
+    id=$(pick_service "${1:-}")
+    [ "$#" -gt 0 ] && shift
+    secret=true
+    case "$sub" in
+        list) api GET "/api/v1/deploy/services/$id/variables?format=text" ;;
+        set)
+            [ "$#" -gt 0 ] || die "usage: polaris env set <service> KEY=VALUE [--plain]"
+            pair=$1
+            [ "${2:-}" = "--plain" ] && secret=false
+            key=${pair%%=*}
+            value=${pair#*=}
+            [ "$key" != "$pair" ] || die "write the variable as KEY=VALUE"
+            escaped=$(printf '%s' "$value" | json_escape)
+            api_json POST "/api/v1/deploy/services/$id/variables?format=text" \
+                "{\"key\":\"$(printf '%s' "$key" | json_escape)\",\"value\":\"$escaped\",\"secret\":$secret}"
+            ;;
+        unset)
+            [ "$#" -gt 0 ] || die "usage: polaris env unset <service> KEY"
+            var=$(api GET "/api/v1/deploy/services/$id/variables?format=text" | awk -F '\t' -v key="$1" 'NR>1 && $1==key {print $3}')
+            [ -n "$var" ] || die "$1 is not set on that service"
+            api DELETE "/api/v1/deploy/variables/$var?format=text"
+            ;;
+        import)
+            [ "$#" -gt 0 ] || die "usage: polaris env import <service> <file|-> [--plain]"
+            file=$1
+            [ "${2:-}" = "--plain" ] && secret=false
+            if [ "$file" = "-" ]; then text=$(cat); else text=$(cat "$file") || die "cannot read $file"; fi
+            escaped=$(printf '%s' "$text" | json_escape)
+            api_json POST "/api/v1/deploy/services/$id/variables/import?format=text" \
+                "{\"text\":\"$escaped\",\"secret\":$secret}"
+            ;;
+        *) die "unknown 'env' command '$sub' - list, set, unset or import" ;;
+    esac
+}
+
+deploy_domains() {
+    load_credentials
+    sub=${1:-list}
+    [ "$#" -gt 0 ] && shift
+    id=$(pick_service "${1:-}")
+    [ "$#" -gt 0 ] && shift
+    case "$sub" in
+        list) api GET "/api/v1/deploy/services/$id/domains?format=text" ;;
+        add)
+            host=""
+            port=""
+            cert=""
+            while [ "$#" -gt 0 ]; do
+                case "$1" in
+                    --port)
+                        shift
+                        port=${1:-}
+                        ;;
+                    --cert)
+                        shift
+                        cert=${1:-}
+                        ;;
+                    *) host=$1 ;;
+                esac
+                shift
+            done
+            case "$port" in
+                "" | *[!0-9]*) [ -z "$port" ] || die "--port takes a number" ;;
+            esac
+            body="{"
+            [ -n "$host" ] && body="$body\"hostname\":\"$(printf '%s' "$host" | json_escape)\","
+            [ -n "$port" ] && body="$body\"targetPort\":$port,"
+            [ -n "$cert" ] && body="$body\"certificate\":\"$(printf '%s' "$cert" | json_escape)\","
+            body="${body%,}}"
+            api_json POST "/api/v1/deploy/services/$id/domains?format=text" "$body"
+            ;;
+        remove)
+            [ "$#" -gt 0 ] || die "usage: polaris domains remove <service> <hostname|id>"
+            domain=$(api GET "/api/v1/deploy/services/$id/domains?format=text" | awk -F '\t' -v want="$1" 'NR>1 && ($1==want || $6==want) {print $6}')
+            [ -n "$domain" ] || die "$1 is not attached to that service"
+            api DELETE "/api/v1/deploy/domains/$domain?format=text"
+            ;;
+        *) die "unknown 'domains' command '$sub' - list, add or remove" ;;
+    esac
+}
+
+# Tab completion for bash: `eval "$(polaris completion bash)"` in ~/.bashrc.
+# Service names are asked of the instance, so they complete only when signed in.
+completion_bash() {
+    cat <<'COMPLETION'
+_polaris() {
+    local cur=${COMP_WORDS[COMP_CWORD]}
+    local prev=${COMP_WORDS[COMP_CWORD-1]}
+    local commands="setup token status ps doctor logs start stop restart update login logout whoami projects deploy deployments build-log rollback env domains completion help"
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+        return
+    fi
+    case "${COMP_WORDS[1]}" in
+        env)
+            if [ "$COMP_CWORD" -eq 2 ]; then COMPREPLY=($(compgen -W "list set unset import" -- "$cur")); return; fi ;;
+        domains)
+            if [ "$COMP_CWORD" -eq 2 ]; then COMPREPLY=($(compgen -W "list add remove" -- "$cur")); return; fi ;;
+        completion)
+            COMPREPLY=($(compgen -W "bash" -- "$cur")); return ;;
+    esac
+    case "$prev" in
+        --cert) COMPREPLY=($(compgen -W "le internal none" -- "$cur")); return ;;
+    esac
+    case "${COMP_WORDS[1]}" in
+        deploy | deployments | logs | status | restart | stop | start | env | domains)
+            COMPREPLY=($(compgen -W "$(polaris projects --quiet 2>/dev/null)" -- "$cur")) ;;
+    esac
+}
+complete -F _polaris polaris plr
+COMPLETION
+}
+
 cmd="${1:-help}"
 [ "$#" -gt 0 ] && shift
 
 case "$cmd" in
     setup) print_setup_link ;;
     token) val POLARIS_SETUP_TOKEN && echo ;;
-    status) pretty_status ;;
+    status)
+        if [ "$#" -gt 0 ] && is_ref "$1"; then deploy_status "$1"; else pretty_status; fi
+        ;;
     ps) compose ps ;;
     doctor) doctor ;;
-    logs) compose logs "$@" ;;
-    start | up) compose up -d ;;
-    stop) compose stop ;;
-    restart) compose restart "$@" ;;
+    logs)
+        if [ "$#" -gt 0 ] && is_ref "$1"; then deploy_logs "$@"; else compose logs "$@"; fi
+        ;;
+    start | up)
+        if [ "$#" -gt 0 ] && is_ref "$1"; then deploy_power start "$1"; else compose up -d; fi
+        ;;
+    stop)
+        if [ "$#" -gt 0 ] && is_ref "$1"; then deploy_power stop "$1"; else compose stop; fi
+        ;;
+    restart)
+        if [ "$#" -gt 0 ] && is_ref "$1"; then deploy_power restart "$1"; else compose restart "$@"; fi
+        ;;
     update) sh "$INSTALL_DIR/dashboard/scripts/install.sh" "$@" ;;
+    login) deploy_login "$@" ;;
+    logout) deploy_logout ;;
+    whoami)
+        load_credentials
+        api GET "/api/v1/me"
+        ;;
+    projects) deploy_projects "$@" ;;
+    deploy) deploy_now "$@" ;;
+    deployments) deploy_deployments "$@" ;;
+    build-log) deploy_build_log "$@" ;;
+    rollback) deploy_rollback "$@" ;;
+    env) deploy_env "$@" ;;
+    domains) deploy_domains "$@" ;;
+    completion)
+        [ "${1:-bash}" = "bash" ] || die "only bash completion is available"
+        completion_bash
+        ;;
     help | --help | -h)
         cat <<'USAGE'
-polaris - manage a Polaris deployment
+polaris - manage a Polaris deployment, and deploy to one
 
+This stack (on the host):
   polaris setup        Print the link to create the administrator
   polaris token        Print the current setup token
   polaris status       Show a clean, colored view of every service
@@ -207,6 +623,28 @@ polaris - manage a Polaris deployment
   polaris stop         Stop the stack
   polaris restart [s]  Restart the stack (or one service)
   polaris update       Pull the latest and redeploy
+
+Deploy (from anywhere, with an API key):
+  polaris login [url] [--insecure]     Sign in with an API key
+  polaris logout                       Forget the stored key
+  polaris whoami                       Who the key acts as
+  polaris projects                     Every service you can reach
+  polaris deploy <service> [--follow]  Deploy, and watch the build
+  polaris deployments <service>        Recent deployments
+  polaris build-log <id> [--follow]    A deployment's build log
+  polaris rollback <id> [--follow]     Put an earlier deployment back
+  polaris logs <service> [--follow] [--tail N]
+  polaris status <service>             Status, source and domains
+  polaris restart|stop|start <service>
+  polaris env list|set|unset|import <service> ...
+                  set KEY=VALUE [--plain]   unset KEY   import <file|-> [--plain]
+  polaris domains list|add|remove <service> ...
+                  add [hostname] [--port N] [--cert le|internal|none]   remove <hostname|id>
+  polaris completion bash              Tab completion (eval it in ~/.bashrc)
+
+A service is project/service (default environment), project/environment/service
+or its id. POLARIS_URL and POLARIS_TOKEN override the stored sign-in, and
+POLARIS_SERVICE names the service for commands where it is left out.
 USAGE
         ;;
     *)
