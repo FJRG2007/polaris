@@ -1,0 +1,198 @@
+name: Desktop
+
+# The Polaris desktop app (desktop/): typecheck and test it on any change there,
+# and on a `desktop-v*` tag - or by hand - build the installers on Windows, macOS
+# and Linux and attach them to the tag's GitHub release.
+#
+# Its own npm project with its own lockfile: nothing here installs the
+# dashboard's dependencies, and nothing in the dashboard's CI installs these.
+#
+# Unsigned unless the signing secrets exist (see desktop/README.md for their
+# names). Secrets are handed only to the step that signs, never to `npm ci`,
+# which runs third-party install scripts.
+#
+# Node 22 on purpose: the packager's zip extractor stops silently, reporting
+# success, on newer Node, and the installers come out empty.
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+    branches:
+      - main
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      # What ships is only the bundled app and its runtime dependencies; the build
+      # tooling's advisories are reviewed in desktop/README.md.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  build:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: macos-latest
+            arch: arm64
+          - os: macos-latest
+            arch: x64
+          - os: ubuntu-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: The tag names this version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          expected="desktop-v$(node -p "require('./package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot dpkg squashfs-tools
+
+      # The AppImage runtime from a fixed release, checked against its published
+      # digest, instead of the maker's default of the moving "continuous" build.
+      - name: AppImage runtime
+        if: runner.os == 'Linux'
+        run: |
+          runtime="$RUNNER_TEMP/runtime-x86_64"
+          curl -fsSL -o "$runtime" https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64
+          echo "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d  $runtime" | sha256sum -c -
+          echo "APPIMAGE_RUNTIME=$runtime" >> "$GITHUB_ENV"
+
+      - name: Which signing secrets exist
+        id: signing
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+        run: |
+          echo "windows=$([ -n "$WINDOWS_CERTIFICATE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "apple=$([ -n "$APPLE_CERTIFICATE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Windows code-signing certificate
+        if: runner.os == 'Windows' && steps.signing.outputs.windows == 'true'
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+        run: |
+          certificate="$RUNNER_TEMP/windows-signing.pfx"
+          printf '%s' "$WINDOWS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          echo "WINDOWS_CERTIFICATE_FILE=$certificate" >> "$GITHUB_ENV"
+
+      - name: Apple signing identity
+        if: runner.os == 'macOS' && steps.signing.outputs.apple == 'true'
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          certificate="$RUNNER_TEMP/apple-signing.p12"
+          printf '%s' "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$certificate" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$certificate"
+
+      - name: Build the installers
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          npm run build
+          npx electron-forge make --arch=${{ matrix.arch }}
+
+      - name: Remove the signing material
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/windows-signing.pfx"
+          if [ "$RUNNER_OS" = "macOS" ] && [ -f "$RUNNER_TEMP/signing.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/signing.keychain-db"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polaris-desktop-${{ runner.os }}-${{ matrix.arch }}
+          path: desktop/out/make/**
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: polaris-desktop-*
+          path: installers
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Polaris desktop ${{ github.ref_name }}
+          # The repository releases the dashboard too; the desktop app is not
+          # made its "latest release".
+          make_latest: "false"
+          files: |
+            installers/**/*.exe
+            installers/**/*.nupkg
+            installers/**/RELEASES
+            installers/**/*.dmg
+            installers/**/*.zip
+            installers/**/*.deb
+            installers/**/*.AppImage

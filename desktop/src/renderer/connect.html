@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+        />
+        <title>Polaris</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <img class="mark" src="mark.svg" alt="" />
+        <h1>Open your Polaris</h1>
+        <p class="lead">The address you open Polaris at in the browser. This app opens it in a window of its own.</p>
+        <form id="form" novalidate>
+            <p id="failure" class="banner bad" role="alert" hidden></p>
+            <label>
+                Address *
+                <input
+                    id="address"
+                    name="address"
+                    type="url"
+                    inputmode="url"
+                    autocomplete="url"
+                    spellcheck="false"
+                    placeholder="https://polaris.example.com"
+                    aria-describedby="address-note"
+                    autofocus
+                />
+                <span id="address-note" class="hint">https://, or http:// for an address on your own network.</span>
+            </label>
+            <div class="row end">
+                <button id="submit" class="primary" type="submit" aria-disabled="true">Open</button>
+            </div>
+        </form>
+        <script src="connect.js"></script>
+    </body>
+</html>

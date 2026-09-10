@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+        />
+        <title>API key - Polaris</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <h1>An API key for pushing</h1>
+        <p class="lead">
+            Pushing from this computer calls <span id="server">your Polaris</span> with an API key that may manage
+            deploys. You paste it once.
+        </p>
+        <form id="form" novalidate>
+            <label>
+                API key *
+                <span class="field">
+                    <input
+                        id="key"
+                        name="key"
+                        type="password"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="plk_..."
+                        aria-describedby="key-note"
+                        autofocus
+                    />
+                    <button id="reveal" class="reveal" type="button" aria-controls="key">Show</button>
+                </span>
+                <span id="key-note" class="hint">Kept encrypted by this computer's password store.</span>
+            </label>
+            <p id="failure" class="error" role="alert" hidden></p>
+            <p class="hint">
+                No key yet? <button id="open-keys" class="link" type="button">Create one in Account &gt; API keys</button>
+            </p>
+            <div class="row end">
+                <button id="cancel" type="button">Cancel</button>
+                <button id="submit" class="primary" type="submit" aria-disabled="true">Save key</button>
+            </div>
+        </form>
+        <script src="api-key.js"></script>
+    </body>
+</html>

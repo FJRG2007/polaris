@@ -1,0 +1,41 @@
+{
+    "name": "polaris-desktop",
+    "productName": "Polaris",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Polaris for Windows, macOS and Linux: an instance in its own window, local pushes and native notifications.",
+    "author": "FJRG2007 <fjrg2007@tpeoficial.com>",
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/FJRG2007/polaris",
+    "repository": "https://github.com/FJRG2007/polaris",
+    "main": "dist/main/index.js",
+    "engines": {
+        "node": ">=22.12.0"
+    },
+    "scripts": {
+        "build": "node build/bundle.mjs",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "start": "npm run build && electron-forge start",
+        "package": "npm run build && electron-forge package",
+        "make": "npm run build && electron-forge make",
+        "icons": "electron build/icons.cjs"
+    },
+    "devDependencies": {
+        "@electron-forge/cli": "7.11.2",
+        "@electron-forge/maker-deb": "7.11.2",
+        "@electron-forge/maker-dmg": "7.11.2",
+        "@electron-forge/maker-squirrel": "7.11.2",
+        "@electron-forge/maker-zip": "7.11.2",
+        "@reforged/maker-appimage": "5.3.1",
+        "@types/node": "24.13.4",
+        "electron": "44.3.0",
+        "esbuild": "0.28.2",
+        "typescript": "5.9.3",
+        "vitest": "4.1.11"
+    },
+    "dependencies": {
+        "fflate": "0.8.3",
+        "zod": "4.6.1"
+    }
+}

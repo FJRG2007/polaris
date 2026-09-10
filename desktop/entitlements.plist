@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Hardened-runtime entitlements, used only when the app is signed (see
+    forge.config.js). Notarization requires the hardened runtime.
+
+    - allow-jit / allow-unsigned-executable-memory: V8 compiles JavaScript at
+      run time; without these the app is killed on its first JIT write.
+    - device.audio-input / device.camera: calls in Chat. The hardened runtime
+      withholds both unless they are declared here, whatever the person allows.
+  -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+  <key>com.apple.security.device.camera</key>
+  <true/>
+</dict>
+</plist>
