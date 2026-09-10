@@ -11,6 +11,7 @@ import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
+import { tailIntoLog, waitUntilServing } from "./readiness.js";
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
@@ -317,6 +318,16 @@ export class ComposeRuntime implements RuntimeDriver {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
         started();
+        // Not a success until it is serving: a container that exists and then
+        // exits, crash-loops or reports itself unhealthy must not be promoted.
+        const waited = step("Waiting for it to come up");
+        const ready = await waitUntilServing(ctx, plan.ref.name, plan);
+        if (!ready.ok) {
+            waited("it did not");
+            await tailIntoLog(ctx, plan.ref.name);
+            return fail(ctx, ready.reason);
+        }
+        waited();
         // The release landed, so whatever it replaced is unreferenced from this
         // moment. Handed back now rather than at a threshold: waiting means
         // carrying every superseded image until the machine is nearly full,

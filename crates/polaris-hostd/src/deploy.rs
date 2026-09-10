@@ -75,6 +75,11 @@ pub struct ServiceSpec {
     /// Replica count for swarm deploys (rendered as `deploy.replicas`). Ignored by
     /// plain compose.
     pub replicas: Option<u32>,
+    /// Swarm only: replace start-first and roll back by itself if the new task
+    /// fails within the monitor window. The dashboard never sets it for a service
+    /// with a volume, where two tasks at once would share its files.
+    #[serde(default)]
+    pub rolling_update: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -239,6 +244,27 @@ fn validate_volume(volume: &VolumeSpec, config: &Config) -> Result<(), String> {
     }
 }
 
+/// The `deploy:` block of a swarm service: the replica count when it is more than
+/// one, and a start-first update that rolls itself back when asked for. Empty when
+/// neither applies, which is what plain compose deploys have always rendered. The
+/// same shape as the dashboard's own renderer for remote servers.
+fn swarm_deploy_block(replicas: Option<u32>, rolling_update: bool) -> String {
+    let replicated = replicas.is_some_and(|count| count > 1);
+    if !replicated && !rolling_update {
+        return String::new();
+    }
+    let mut out = format!(
+        "    deploy:\n      mode: replicated\n      replicas: {}\n",
+        if replicated { replicas.unwrap_or(1) } else { 1 }
+    );
+    if rolling_update {
+        out.push_str(
+            "      update_config:\n        order: start-first\n        failure_action: rollback\n        monitor: 30s\n      rollback_config:\n        order: start-first\n",
+        );
+    }
+    out
+}
+
 /// Render a validated spec into a compose file. Every string is emitted as a
 /// double-quoted YAML scalar, so a value can never break out of its field. Only
 /// call after `validate_spec` has succeeded.
@@ -349,12 +375,10 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
                 out.push_str(&format!("      start_period: {start}s\n"));
             }
         }
-        if let Some(replicas) = service.replicas {
-            // Swarm scaling: `docker stack deploy` reads this; plain compose ignores it.
-            out.push_str(&format!(
-                "    deploy:\n      mode: replicated\n      replicas: {replicas}\n"
-            ));
-        }
+        out.push_str(&swarm_deploy_block(
+            service.replicas,
+            service.rolling_update,
+        ));
     }
     if !spec.networks.is_empty() {
         out.push_str("networks:\n");
@@ -1080,6 +1104,24 @@ mod tests {
         let rendered = render_compose(&s, &config);
         assert!(rendered.contains("\"19132:19132/udp\""));
         assert!(rendered.contains("\"25565:25565\""));
+    }
+
+    #[test]
+    fn a_rolling_update_starts_the_new_task_first_and_rolls_itself_back() {
+        // Accepted under the name the dashboard sends, and rendered so swarm keeps
+        // the old task serving until the new one is healthy. Absent, nothing is
+        // rendered - which is what every plain compose deploy has always had.
+        let config = test_config();
+        let rolling = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","rollingUpdate":true}]}"#,
+        );
+        let rendered = render_compose(&rolling, &config);
+        assert!(rendered.contains("order: start-first"));
+        assert!(rendered.contains("failure_action: rollback"));
+        assert!(rendered.contains("replicas: 1"));
+
+        let plain = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx"}]}"#);
+        assert!(!render_compose(&plain, &config).contains("deploy:"));
     }
 
     #[test]

@@ -82,6 +82,13 @@ export interface ComposeSpecService {
     readonly healthcheck?: ComposeSpecHealth;
     /** Replica count for swarm deploys; ignored by plain compose. */
     readonly replicas?: number;
+    /**
+     * Swarm only: replace a running service start-first - the new task comes up,
+     * passes its healthcheck, and only then does the old one stop - and roll back
+     * by itself when the new one fails within the monitor window. Never set for a
+     * service with a volume, where two tasks at once would share its files.
+     */
+    readonly rollingUpdate?: boolean;
 }
 
 export interface ComposeSpec {
@@ -209,12 +216,37 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
  * the manager at deploy time, so a moved tag is picked up regardless - and warns
  * ("Ignoring unsupported options: pull_policy") on every deploy, which reads like
  * something went wrong in a log an operator is watching for exactly that.
+ *
+ * And with the replacement made start-first wherever it is safe: a stateless
+ * service is updated with no gap and rolled back by the engine if the new version
+ * does not come up. A service with a volume keeps swarm's stop-first default,
+ * because two tasks writing one volume is how data gets corrupted.
  */
 export function forSwarm(spec: ComposeSpec): ComposeSpec {
     return {
         ...spec,
-        services: spec.services.map(({ pullPolicy: _dropped, ...service }) => service)
+        services: spec.services.map(({ pullPolicy: _dropped, ...service }) =>
+            service.volumes.length === 0 ? { ...service, rollingUpdate: true } : service
+        )
     };
+}
+
+/** The `deploy:` block of a swarm service, or none when it needs nothing there. */
+export function swarmDeployLines(service: Pick<ComposeSpecService, "replicas" | "rollingUpdate">): string[] {
+    const replicated = service.replicas !== undefined && service.replicas > 1;
+    if (!replicated && !service.rollingUpdate) return [];
+    const lines = ["    deploy:", "      mode: replicated", `      replicas: ${replicated ? service.replicas : 1}`];
+    if (service.rollingUpdate) {
+        lines.push(
+            "      update_config:",
+            "        order: start-first",
+            "        failure_action: rollback",
+            "        monitor: 30s",
+            "      rollback_config:",
+            "        order: start-first"
+        );
+    }
+    return lines;
 }
 
 /** Build the structured spec for a managed-database deployment. */
@@ -316,9 +348,7 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
             if (service.healthcheck.retries) lines.push(`      retries: ${service.healthcheck.retries}`);
             if (service.healthcheck.startPeriod) lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
         }
-        if (service.replicas && service.replicas > 1) {
-            lines.push(`    deploy:\n      mode: replicated\n      replicas: ${service.replicas}`);
-        }
+        lines.push(...swarmDeployLines(service));
     }
     if (spec.networks.length > 0) {
         lines.push("networks:");
