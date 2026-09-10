@@ -2487,7 +2487,14 @@ async function buildAppPlan(
                 kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
             return { mountPath: volume.mountPath, source, kind };
         }),
-        healthcheck
+        healthcheck,
+        // The image's command replaced, for a one-click service whose image does
+        // nothing without its arguments (MinIO's `server /data`).
+        ...(Array.isArray(source.command) &&
+        source.command.length > 0 &&
+        source.command.every((part): part is string => typeof part === "string")
+            ? { command: source.command }
+            : {})
     };
     // Which networks it joins: the proxy network alone in a shared environment,
     // else its environment's own (or its links'), plus the proxy network only when
@@ -3190,6 +3197,12 @@ export async function deployAndWait(
     } catch (caught) {
         return caught instanceof Error ? caught.message : "the deploy could not be started";
     }
+    return awaitDeployment(deploymentId);
+}
+
+/** Wait for a deploy already started to finish: null when it is up, or why it
+ *  is not. */
+export async function awaitDeployment(deploymentId: string): Promise<string | null> {
     const deadline = Date.now() + DEPLOY_WAIT_TIMEOUT_MS;
     while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, DEPLOY_WAIT_POLL_MS));

@@ -8,7 +8,6 @@
 
 import { z } from "zod";
 import { headers } from "next/headers";
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
@@ -23,6 +22,7 @@ import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
 import * as environments from "@/lib/deploy/environments";
 import { guardSupportsChallenge } from "@/lib/deploy/router";
+import * as templateSetup from "@/lib/deploy/template-setup";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
@@ -33,8 +33,8 @@ import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { applyImportedAfterCreate, importedCreate } from "@/lib/deploy/repo-import";
-import { serviceTemplate, serviceTemplateIdSchema, templateVariables } from "@polaris/core";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
+import { serviceTemplate, serviceTemplateIdSchema, templateNeedsSetup } from "@polaris/core";
 import { inspectGithubRepo, readGithubRepoSetup, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import {
     getDomainZones,
@@ -47,20 +47,19 @@ import {
     type CloudflareAccountStatus
 } from "@/lib/integrations/cloudflare-account-service";
 import {
+    envVarScope,
+    listEnvVars,
+    revealEnvVar,
+    type EnvScope,
+    type EnvVarView
+} from "@/lib/env-var-service";
+import {
     listVolumes,
     createVolume,
     updateVolume,
     deleteVolume,
     type VolumeView
 } from "@/lib/deploy-volume-service";
-import {
-    envVarScope,
-    listEnvVars,
-    revealEnvVar,
-    setEnvVars,
-    type EnvScope,
-    type EnvVarView
-} from "@/lib/env-var-service";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -398,7 +397,9 @@ export async function createApplicationAction(input: {
     } else {
         const imageRef = input.imageRef?.trim();
         if (!imageRef) return { error: "An image reference is required (e.g. nginx:latest)" };
-        sourceConfig = { imageRef, ...(port !== undefined ? { port } : {}) };
+        sourceConfig = template
+            ? templateSetup.templateSource(template, template.id)
+            : { imageRef, ...(port !== undefined ? { port } : {}) };
     }
     try {
         const access = await requireEnvironmentAccess(
@@ -406,6 +407,10 @@ export async function createApplicationAction(input: {
             user.id,
             "service.create"
         );
+        // A template with a database creates one, which is a grant of its own.
+        if (template?.database) {
+            await requireEnvironmentAccess(input.environmentId, user.id, "databases.manage");
+        }
         const owner = access.ownerId;
         // Resolve the chosen server: the local host by default, or a connected SSH
         // host adopted as a deploy target on first use.
@@ -467,23 +472,16 @@ export async function createApplicationAction(input: {
             targetType: "application",
             targetId: app.id
         });
-        // A template's volumes and variables go on before the first deploy reads them.
-        if (template) {
-            for (const volume of template.volumes) {
-                await createVolume(owner, {
-                    applicationId: app.id,
-                    name: `${template.id}-${volume.name}`,
-                    mountPath: volume.mountPath,
-                    kind: "volume"
-                });
-            }
-            await setEnvVars(
-                "application",
-                app.id,
-                owner,
-                templateVariables(template, app.slug, () => randomBytes(32).toString("hex"))
-            );
-        }
+        // A template's volumes, variables, database and companion go on before the
+        // first deploy reads them.
+        const parts = template
+            ? await templateSetup.addTemplateParts({
+                  template,
+                  service: { id: app.id, slug: app.slug, environmentId: input.environmentId, targetId: target.id },
+                  ownerId: owner,
+                  keepReleases: flags.keepReleasesByDefault
+              })
+            : null;
         // Give it a free testing subdomain and kick off the first deploy right away,
         // like Railway/Dokploy. Auto-detect the server IP (Caddy's X-Server-Ip) so the
         // free sslip.io subdomain works with no setup even on a LAN.
@@ -499,6 +497,20 @@ export async function createApplicationAction(input: {
         }
         let deploymentId: string | undefined;
         if (isUpload) {
+            revalidatePath(DEPLOY_PATH);
+            return { applicationId: app.id };
+        }
+        // A database to wait for, a companion to bring up first, or setup to run
+        // once it serves: minutes of work, so it goes on after this answers and
+        // reports on the service.
+        if (template && parts && templateNeedsSetup(template)) {
+            void templateSetup.firstTemplateDeploy({
+                template,
+                applicationId: app.id,
+                parts,
+                ownerId: owner,
+                userId: user.id
+            });
             revalidatePath(DEPLOY_PATH);
             return { applicationId: app.id };
         }
@@ -630,6 +642,27 @@ export async function serviceHistoryAction(
         return await deployService.serviceHistory(applicationId, access.ownerId);
     } catch {
         return [];
+    }
+}
+
+/** Run a one-click service's setup commands again, after they failed. Answers
+ *  once they are started; how they went lands in the service's activity. */
+export async function rerunServiceSetupAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const id = z.string().uuid().safeParse(applicationId);
+    if (!id.success) return { error: "That service is not there any more" };
+    try {
+        const access = await requireApplicationAccess(id.data, user.id, "service.configure");
+        await templateSetup.rerunTemplateSetup(id.data, access.ownerId);
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.app.setup",
+            targetType: "application",
+            targetId: id.data
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not run the setup" };
     }
 }
 

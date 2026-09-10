@@ -28,7 +28,6 @@ import { useParams, useRouter } from "next/navigation";
 import { UploadedSourceSection } from "./upload-source";
 import { RuntimeLogs } from "@/components/runtime-logs";
 import { deploySteps } from "@/lib/deploy/deploy-steps";
-import { describeServiceEvent } from "./service-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
@@ -40,6 +39,7 @@ import { TabAttentionDot, tabAttention } from "./attention-dot";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
+import { describeServiceEvent, unresolvedSetupFailure } from "./service-history";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
@@ -1031,9 +1031,11 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
     // Nothing yet means nothing to open, and a heading over an empty box is a
     // control that does nothing.
     if (lines !== null && lines.length === 0) return null;
+    const failure = lines ? unresolvedSetupFailure(lines) : null;
 
     return (
         <div className="flex flex-col gap-2">
+            {failure ? <SetupFailure applicationId={applicationId} failure={failure} /> : null}
             <button
                 type="button"
                 onClick={() => setOpen((value) => !value)}
@@ -1051,6 +1053,53 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
                     <ActivityFeed lines={lines} describe={describeServiceEvent} />
                 )
             ) : null}
+        </div>
+    );
+}
+
+/**
+ * A one-click service whose setup did not finish, said where its deploys are
+ * rather than only inside the folded activity. A failed setup command can be run
+ * again from here; a deploy that never started is fixed by deploying.
+ */
+function SetupFailure({ applicationId, failure }: { applicationId: string; failure: ActivityLine }) {
+    const can = useProjectCan();
+    const [started, setStarted] = useState(false);
+    const [error, setError] = useState("");
+    const [pending, startTransition] = useTransition();
+    const rerunnable = failure.action === "setup-failed" && can("service.configure");
+    const hint = started
+        ? "Setup is running again. How it went appears under Activity."
+        : failure.action === "setup-failed"
+          ? null
+          : "Once that is fixed, deploy this service.";
+
+    function rerun() {
+        setError("");
+        startTransition(async () => {
+            const result = await deployActions.rerunServiceSetupAction(applicationId);
+            if (result.error) setError(result.error);
+            else setStarted(true);
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-danger-edge bg-danger-soft p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                        {failure.action === "setup-failed" ? "Setup did not finish" : "Not deployed"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">{describeServiceEvent(failure)}</span>
+                    {hint ? <span className="block text-xs text-muted-foreground">{hint}</span> : null}
+                </span>
+                {rerunnable && !started ? (
+                    <Button variant="secondary" size="sm" onClick={rerun} disabled={pending}>
+                        {pending && <Loader2 className="size-4 animate-spin" />} Run setup again
+                    </Button>
+                ) : null}
+            </div>
+            {error && <p className="text-xs text-danger">{error}</p>}
         </div>
     );
 }

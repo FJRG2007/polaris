@@ -55,7 +55,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Custom root directory (monorepo) | done | P1 | |
 | Settings from railway/render/netlify/vercel/Procfile/app.json | done | P2 | read when a service is created from GitHub |
 | Deploy an uploaded folder | done | P1 | folder or zip, built like a repository |
-| One-click templates | done | P1 | 13 single-image apps; templates that need a command after start are left out |
+| One-click templates | done | P1 | 19 apps: plain images, plus a managed database (Ghost, Umami), a companion service (Kafka) or setup run inside once serving (Gitea, FreshRSS, MinIO); ClickHouse, Convex, PostHog and Supabase are left out |
 | Pre-deploy / release command (migrations) | todo | P1 | |
 
 ## 3. Networking, domains & proxy

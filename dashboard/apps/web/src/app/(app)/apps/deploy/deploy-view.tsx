@@ -1006,6 +1006,13 @@ function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDon
     );
 }
 
+/** What a template creates besides its own service, in the picker's words. */
+function templateExtra(template: ServiceTemplate): string | null {
+    if (template.database) return dbEngineLabel(template.database.engine);
+    if (template.companion) return `a ${template.companion.label}`;
+    return null;
+}
+
 /** A one-click service: pick a template, name it, and it deploys with its
  *  volumes and variables already set. */
 function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
@@ -1044,7 +1051,14 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                         className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
                     >
                         <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium text-foreground">{template.name}</span>
+                            <span className="block text-sm font-medium text-foreground">
+                                {template.name}
+                                {templateExtra(template) && (
+                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                        with {templateExtra(template)}
+                                    </span>
+                                )}
+                            </span>
                             <span className="block truncate text-xs text-muted-foreground" title={template.description}>{template.description}</span>
                         </span>
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
@@ -1063,9 +1077,24 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                 <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={picked.name} />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
+            {picked.database && (
+                <p className="text-xs text-muted-foreground">
+                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named after the
+                    service. Its variables point at the database, so no password is copied.
+                </p>
+            )}
+            {picked.companion && (
+                <p className="text-xs text-muted-foreground">
+                    Creates a second service beside it for the {picked.companion.label}, reachable only from
+                    this environment.
+                </p>
+            )}
             <p className="text-xs text-muted-foreground">
                 {picked.firstRun}
                 {picked.secrets.length > 0 && " Generated secrets are in the service's Variables."}
+                {picked.prepare?.length
+                    ? " Setup runs inside it once it is up, and the service says how it went."
+                    : ""}
             </p>
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-between gap-2">

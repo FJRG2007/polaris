@@ -320,7 +320,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Templates",
-                description: "Grafana, n8n, Uptime Kuma, Vaultwarden and other well-known apps, with their volumes and secrets set.",
+                description: "Ghost, Gitea, Grafana, n8n, Umami, Vaultwarden and other well-known apps, with their volumes, secrets, database and first setup done.",
                 where: "Project > New service",
                 href: PROJECTS
             },
