@@ -72,6 +72,10 @@ export async function backfillCategories(): Promise<number> {
     });
     if (rows.length === 0) return 0;
 
+    const repaired = await repairEmptySnippets(
+        rows.filter((row) => !row.snippet).map((row) => row.id)
+    );
+
     // Grouped by the answer rather than written one at a time: five statements
     // for five hundred messages instead of five hundred.
     const byCategory = new Map<core.MailCategory, string[]>();
@@ -79,7 +83,7 @@ export async function backfillCategories(): Promise<number> {
         const from = addressesFrom(row.fromJson)[0];
         const category = core.categoriseMail({
             subject: row.subject,
-            snippet: row.snippet,
+            snippet: repaired.get(row.id) ?? row.snippet,
             fromAddress: from?.address ?? "",
             fromName: from?.name ?? "",
             headers: (row.headers as Record<string, string> | null) ?? null
@@ -96,6 +100,48 @@ export async function backfillCategories(): Promise<number> {
         });
     }
     return rows.length;
+}
+
+/**
+ * Give a preview back to messages stored without one, from the body kept when
+ * somebody opened them.
+ *
+ * An HTML-only message whose `<head>` outgrew the slice sync used to read for
+ * its preview was stored with an empty line under its subject - and the
+ * categoriser, which reads nothing else, had only the subject to decide from.
+ * Sync now reads further, which helps the mail still to come; this is the
+ * repair for the mail already here. Only a message that has been opened has a
+ * body on its row, so an unopened one stays as it is until it is next synced.
+ *
+ * Run from inside the pass above rather than on its own, so it is bounded by
+ * the same batch and happens once per rule version: a body that yields nothing
+ * (a picture-only newsletter) is not read again every minute.
+ *
+ * The conversation's own line is written too when this message is its newest,
+ * because that line is what the list draws.
+ */
+async function repairEmptySnippets(ids: readonly string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (ids.length === 0) return out;
+    const rows = await prisma.mailMessage.findMany({
+        where: {
+            id: { in: [...ids] },
+            OR: [{ bodyText: { not: null } }, { bodyHtml: { not: null } }]
+        },
+        select: { id: true, threadId: true, sentAt: true, bodyText: true, bodyHtml: true }
+    });
+    for (const row of rows) {
+        const snippet =
+            core.snippetFrom(row.bodyText ?? "") || core.snippetFrom(row.bodyHtml ?? "");
+        if (!snippet) continue;
+        await prisma.mailMessage.update({ where: { id: row.id }, data: { snippet } });
+        await prisma.mailThread.updateMany({
+            where: { id: row.threadId, snippet: "", lastMessageAt: row.sentAt },
+            data: { snippet }
+        });
+        out.set(row.id, snippet);
+    }
+    return out;
 }
 
 /**

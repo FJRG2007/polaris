@@ -476,3 +476,75 @@ describe("a lender's payment confirmation", () => {
         ).toBe("billing");
     });
 });
+
+describe("credit being arranged", () => {
+    const lender = (subject: string, snippet = "") =>
+        categoriseMail(message({ subject, snippet, fromAddress: "noreply@cetelem.es" }));
+
+    it("files the lender's mail from a real inbox, with the empty preview it arrived with", () => {
+        // Every one of these sat under Primary: no List-Unsubscribe, an HTML body
+        // whose preview came out empty, and none of the billing words in the
+        // subject. An approved application is the first of a schedule of payments.
+        for (const subject of [
+            "Enhorabuena JAVIER, tu solicitud de financiación ha sido aprobada",
+            "JAVIER, estás a un paso de obtener tu financiación",
+            "Información previa a tu solicitud de financiación",
+            "Información precontractual de Banco Cetelem enviada mediante Logalty (003001-0001-000000010786389.par)",
+            "Certificado Logalty, Documentación pre-contractual transacción: 003001-0001-000000010786389.par."
+        ]) {
+            expect(lender(subject), subject).toBe("billing");
+        }
+    });
+
+    it("files a decision in every language a lender writes in", () => {
+        for (const subject of [
+            "Your loan application has been approved",
+            "Your mortgage offer is ready to sign",
+            "Tu préstamo ha sido concedido",
+            "Seu empréstimo foi aprovado",
+            "Votre demande de prêt a été acceptée",
+            "Ihr Kreditantrag wurde genehmigt",
+            "La tua richiesta di finanziamento è stata approvata"
+        ]) {
+            expect(lender(subject), subject).toBe("billing");
+        }
+    });
+
+    it("counts a refusal too, the way a refused payment counts", () => {
+        expect(lender("Tu solicitud de préstamo ha sido denegada")).toBe("billing");
+    });
+
+    it("leaves a lender's advert with the adverts", () => {
+        // The nouns on their own are what lenders sell with. Only the reader's
+        // own credit, or one applied for or decided on, is money about to move.
+        expect(
+            categoriseMail(
+                message({
+                    subject: "Financiación al 0% en todos los portátiles",
+                    snippet: "Oferta válida hasta el domingo",
+                    fromAddress: "news@shop.example",
+                    headers: { "list-unsubscribe": "<https://shop.example/out>" }
+                })
+            )
+        ).toBe("promotions");
+    });
+
+    it("does not read a name in capitals as a code", () => {
+        // "JAVIER" is six upper-case letters standing on their own, which is the
+        // shape of a code. With a sign-in phrase in the preview it put a lender's
+        // approval under Security - the one tab that can be cleared up on its own.
+        const approval = message({
+            subject: "Enhorabuena JAVIER, tu solicitud de financiación ha sido aprobada",
+            snippet: "Inicia sesión en tu área de cliente para firmar el contrato",
+            fromAddress: "noreply@cetelem.es"
+        });
+        expect(categoriseMail(approval)).toBe("billing");
+        expect(isDisposableSecurityMail(approval)).toBe(false);
+        // A code with a digit in it is still a code.
+        expect(
+            categoriseMail(
+                message({ subject: "Your code: A7K2Q9", snippet: "Use it to sign in to Polaris" })
+            )
+        ).toBe("security");
+    });
+});

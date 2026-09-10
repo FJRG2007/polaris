@@ -24,22 +24,22 @@
  * because a mailbox is mostly messages nobody will ever open again.
  */
 
-import { MailUnreachableError, withImap } from "./imap";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
-import { fileJudgedJunk, judgeArrival } from "./spam";
 import * as core from "@polaris/core";
-import { readShape } from "./structure";
 import { decodePart } from "./decode";
-import { addressesFrom, asJson } from "./json";
+import { readShape } from "./structure";
+import { replyIfAway } from "./vacation";
 import { ACCOUNT_COLUMNS } from "./access";
 import { rememberContacts } from "./contacts";
-import { recordSubscription } from "./subscriptions";
-import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
-import { replyIfAway } from "./vacation";
 import { applyRulesToMessage } from "./rules";
 import { MailAuthError } from "./credentials";
+import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
+import { recordSubscription } from "./subscriptions";
+import { fileJudgedJunk, judgeArrival } from "./spam";
+import { MailUnreachableError, withImap } from "./imap";
+import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
 
 /** How many messages of a folder are held. Four hundred is roughly two years of
@@ -553,6 +553,21 @@ async function storeMessages(
     });
 }
 
+/** How much of a plain part is read for its preview. A plain part starts with
+ *  its words, so the first few kilobytes are always enough. */
+const TEXT_PREVIEW_BYTES = 4096;
+
+/**
+ * How much of an HTML part is read when the plain one said nothing.
+ *
+ * An HTML part does not start with its words: it starts with a `<head>`, and a
+ * marketing template's head is a stylesheet. One lender's approval notice has
+ * 13.6 KB of it before `<body>`, so the 4 KB slice a plain part gets was all
+ * CSS, the preview came out empty, and with no preview the categoriser had only
+ * the subject to go on. Only messages whose plain part was silent pay for this.
+ */
+const HTML_PREVIEW_BYTES = 65536;
+
 /** The first few kilobytes of each message's text part, for the line under the
  *  subject. A message with no text part gets none, which is what a picture-only
  *  newsletter is. */
@@ -561,7 +576,7 @@ async function fetchSnippets(
     fetched: readonly Fetched[]
 ): Promise<Map<number, string>> {
     const out = new Map<number, string>();
-    await readParts(client, fetched, out, "text");
+    await readParts(client, fetched, out, "text", TEXT_PREVIEW_BYTES);
     // A plain part with nothing in it is not a message with nothing in it.
     //
     // Plenty of senders put their words in the HTML half and leave the plain one
@@ -572,7 +587,7 @@ async function fetchSnippets(
     const silent = fetched.filter(
         (message) => !core.snippetFrom(out.get(message.uid) ?? "") && message.structure.htmlPart
     );
-    if (silent.length > 0) await readParts(client, silent, out, "html");
+    if (silent.length > 0) await readParts(client, silent, out, "html", HTML_PREVIEW_BYTES);
     return out;
 }
 
@@ -587,7 +602,8 @@ async function readParts(
     client: ImapFlow,
     fetched: readonly Fetched[],
     out: Map<number, string>,
-    half: "text" | "html"
+    half: "text" | "html",
+    maxLength: number
 ): Promise<void> {
     const byPart = new Map<string, number[]>();
     for (const message of fetched) {
@@ -605,7 +621,7 @@ async function readParts(
         try {
             for await (const message of client.fetch(
                 uids,
-                { uid: true, bodyParts: [{ key, maxLength: 4096 }] },
+                { uid: true, bodyParts: [{ key, maxLength }] },
                 { uid: true }
             )) {
                 const bytes =
