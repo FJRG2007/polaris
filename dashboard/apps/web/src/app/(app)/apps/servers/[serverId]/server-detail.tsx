@@ -16,22 +16,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { EdgePanel } from "../edge-panel";
 import { ServerUsage } from "../server-usage";
 import { ServerStorage } from "../server-storage";
 import { ServerWorkload } from "./server-workload";
-import { ServerNotesPanel } from "../server-notes-panel";
 import { ENVIRONMENT_META } from "../environment-meta";
 import type { ServerMetrics } from "@/lib/server-probe";
+import { ServerNotesPanel } from "../server-notes-panel";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "../types";
-import { Connect, LocalNote, LocalPathPanel, Reachability, RenameForm } from "../server-panels";
-import { EdgePanel } from "../edge-panel";
 import { EnvironmentDialog, type EnvironmentTarget } from "../environment-dialog";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { ArrowLeft, Boxes, FolderOpen, MapPin, SquareTerminal, Trash2 } from "lucide-react";
+import { Connect, LocalNote, LocalPathPanel, Reachability, RenameForm } from "../server-panels";
 import {
     Badge,
     Button,
@@ -238,6 +238,7 @@ export function ServerDetail({
                         <h2 className="text-sm font-medium">Load</h2>
                         <MetricsHistory
                             endpoint={`/api/watch/hosts/${encodeURIComponent(metricsId)}/metrics/history`}
+                            live={`/api/watch/hosts/${encodeURIComponent(metricsId)}/metrics/stream`}
                             metrics={CONSUMPTION_METRICS}
                         />
                         <p className="text-xs text-muted-foreground">

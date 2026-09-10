@@ -31,8 +31,9 @@ export async function deleteMetricsForSubject(subjectType: MetricSubjectType, su
     await prisma.metricRollup.deleteMany({ where: { subjectType, subjectId } });
 }
 
-/** Confirm the subject exists and belongs to the owner before returning its data. */
-async function subjectBelongsToOwner(
+/** Confirm the subject exists and belongs to the owner before returning its data.
+ *  Exported for the live streams, which answer for the same subjects. */
+export async function subjectBelongsToOwner(
     subjectType: MetricSubjectType,
     subjectId: string,
     ownerId: string

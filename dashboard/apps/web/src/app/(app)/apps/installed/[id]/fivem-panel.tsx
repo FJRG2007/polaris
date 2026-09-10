@@ -58,14 +58,6 @@ import {
     type FivemPlayerEntry
 } from "@/lib/apps/fivem/roster";
 import {
-    generateConsolePassword,
-    isBanReason,
-    isConsolePassword,
-    CONSOLE_PASSWORD_HINT,
-    DEFAULT_BAN_REASON,
-    REASON_HINT
-} from "@/lib/apps/fivem/access";
-import {
     playerAction,
     playerConfirm,
     playerFilters,
@@ -73,6 +65,14 @@ import {
     playerPresence,
     playerStanding
 } from "@/lib/apps/player-vocabulary";
+import {
+    generateConsolePassword,
+    isBanReason,
+    isConsolePassword,
+    CONSOLE_PASSWORD_HINT,
+    DEFAULT_BAN_REASON,
+    REASON_HINT
+} from "@/lib/apps/fivem/access";
 import {
     AlertTriangle,
     Ban,
@@ -352,6 +352,7 @@ export function FivemPanel({
                         />
                         <MetricsHistory
                             endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                            live={`/api/deploy/apps/${applicationId}/metrics/stream`}
                             metrics={CONSUMPTION_METRICS}
                         />
                     </div>

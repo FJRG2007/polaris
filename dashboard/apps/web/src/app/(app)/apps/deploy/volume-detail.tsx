@@ -366,6 +366,7 @@ function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
                 <h3 className="mb-1 text-sm font-medium">History</h3>
                 <MetricsHistory
                     endpoint={`/api/deploy/volumes/${volume.id}/metrics/history`}
+                    live={`/api/deploy/volumes/${volume.id}/metrics/stream`}
                     metrics={VOLUME_METRICS}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">

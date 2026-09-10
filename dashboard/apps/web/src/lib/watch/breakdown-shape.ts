@@ -26,7 +26,8 @@
  * a daemon, or a machine that answers.
  */
 
-/** The four cards, by the key `CONSUMPTION_METRICS` gives each one. Declared as
+/** The cards that open onto a breakdown, by the key `CONSUMPTION_METRICS` gives
+ *  each one ("net" is bandwidth out; bandwidth in has none). Declared as
  *  a tuple so the schema that accepts one and the panel that draws one are the
  *  same list rather than two lists that agree today. */
 export const BREAKDOWN_METRICS = ["cpu", "mem", "disk", "net"] as const;

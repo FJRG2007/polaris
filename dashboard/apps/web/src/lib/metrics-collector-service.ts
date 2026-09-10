@@ -13,6 +13,7 @@
 
 import { PERSONAL_KIND } from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
+import { publishMetricTick } from "./metrics-live";
 import type { DockerDriver } from "@polaris/docker";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
@@ -448,6 +449,8 @@ export async function collectMetricsOnce(opts: { storage: boolean }): Promise<nu
     // composite PK never collides - no skipDuplicates needed (unsupported on the
     // SQLite-portable target anyway).
     await prisma.metricSample.createMany({ data: rows });
+    // Open charts re-read now rather than on their next poll.
+    publishMetricTick(rows);
     return rows.length;
 }
 

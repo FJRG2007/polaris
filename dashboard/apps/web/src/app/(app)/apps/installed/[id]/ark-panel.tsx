@@ -33,12 +33,12 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { ArkProfile } from "@/lib/apps/ark/profile";
-import { presenceLine, seenFor } from "@/lib/apps/games-activity";
 import { RelativeTime } from "@/components/relative-time";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
+import type { PlayerSeen } from "@/lib/apps/games-activity";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import { useGamePresence } from "@/components/use-game-presence";
-import type { PlayerSeen } from "@/lib/apps/games-activity";
+import { presenceLine, seenFor } from "@/lib/apps/games-activity";
 import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
@@ -413,6 +413,7 @@ export function ArkPanel({
                         />
                         <MetricsHistory
                             endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                            live={`/api/deploy/apps/${applicationId}/metrics/stream`}
                             metrics={CONSUMPTION_METRICS}
                         />
                     </div>

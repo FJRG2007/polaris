@@ -202,6 +202,7 @@ function ServicePanel({
                         </h3>
                         <MetricsHistory
                             endpoint={`/api/deploy/apps/${service.id}/metrics/history`}
+                            live={`/api/deploy/apps/${service.id}/metrics/stream`}
                             metrics={CONSUMPTION_METRICS}
                         />
                     </div>

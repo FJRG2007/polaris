@@ -63,6 +63,9 @@ export function WatchSubjectDetail({
     // reuses the endpoint the Deploy panel already reads.
     const endpoint =
         kind === "server" ? `/api/watch/hosts/${id}/metrics/history` : `/api/deploy/apps/${id}/metrics/history`;
+    // The collector's word that there is something new to draw.
+    const live =
+        kind === "server" ? `/api/watch/hosts/${id}/metrics/stream` : `/api/deploy/apps/${id}/metrics/stream`;
 
     // The same four charts every consumption screen draws, with a way in under
     // the ones that have something behind them. The window comes from the chart
@@ -131,7 +134,7 @@ export function WatchSubjectDetail({
 
             {tab === "metrics" && (
                 <div className="flex flex-col gap-2">
-                    <MetricsHistory endpoint={endpoint} metrics={metrics} />
+                    <MetricsHistory endpoint={endpoint} live={live} metrics={metrics} />
                     <p className="text-xs text-muted-foreground">
                         {kind === "server"
                             ? "Measured from the containers running on this server, against what the machine has."

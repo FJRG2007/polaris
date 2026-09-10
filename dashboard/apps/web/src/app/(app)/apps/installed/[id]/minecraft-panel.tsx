@@ -33,6 +33,7 @@ import { isConfigCrash } from "@/lib/apps/crash-loop";
 import { CopyButton } from "@/components/copy-button";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
+import type { PlayerSeen } from "@/lib/apps/games-activity";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { ServerPresence } from "@/lib/apps/games-service";
@@ -41,16 +42,15 @@ import { useGamePresence } from "@/components/use-game-presence";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
-import type { PlayerSeen } from "@/lib/apps/games-activity";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, CardBody, cn, ScrollRow, Skeleton } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { findBlueprint, hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
+import { Badge, Button, Card, CardBody, cn, ScrollRow, Skeleton } from "@polaris/ui";
 import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
@@ -408,6 +408,7 @@ export function MinecraftPanel({
                         />
                         <MetricsHistory
                             endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                            live={`/api/deploy/apps/${applicationId}/metrics/stream`}
                             metrics={CONSUMPTION_METRICS}
                         />
                     </div>

@@ -1990,6 +1990,7 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
                 <h3 className="mb-1 text-sm font-medium">History</h3>
                 <MetricsHistory
                     endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                    live={`/api/deploy/apps/${applicationId}/metrics/stream`}
                     metrics={CONSUMPTION_METRICS}
                 />
             </div>
