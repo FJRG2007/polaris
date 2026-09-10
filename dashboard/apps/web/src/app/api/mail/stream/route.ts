@@ -32,8 +32,8 @@ export const dynamic = "force-dynamic";
  *  files a page of messages should be one redraw. */
 const COALESCE_MS = 400;
 
-/** How long the set of the reader's own mailboxes is trusted. It only changes
- *  when they add or remove one, which they did in this same tab. */
+/** How long a mailbox found to be somebody else's is left unasked about. A
+ *  mailbox never seen before is always asked about at once. */
 const SCOPE_TTL_MS = 30_000;
 
 /** Idle keep-alive. Proxies drop a stream that says nothing for long enough, and
@@ -62,14 +62,14 @@ export async function GET(request: Request): Promise<Response> {
     let sequence = 0;
 
     let mine = new Set<string>();
-    let resolvedAt = 0;
+    /** Mailboxes found to be somebody else's, and when that was last checked. */
+    const notMine = new Map<string, number>();
     let resolving: Promise<void> | null = null;
     /** Which mailboxes moved since the last wake, so one frame names them all. */
     let moved = new Set<string>();
 
     async function resolveMine(): Promise<void> {
         mine = new Set(await everyAccountId(readerId));
-        resolvedAt = Date.now();
     }
 
     function refreshMine(): Promise<void> {
@@ -146,12 +146,23 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
                 // A mailbox this reader does not know about is usually somebody
-                // else's. Re-ask once the TTL is up, in case it is one they have
-                // just added.
-                if (Date.now() - resolvedAt < SCOPE_TTL_MS) return;
+                // else's - or one they have just added, whose first sync is
+                // happening right now. So a mailbox never seen before is asked
+                // about at once; one already found to be somebody else's is not
+                // asked about again until the TTL is up. Gating the first ask on
+                // the TTL is what dropped a new mailbox's whole first sync and
+                // left its mail invisible until a reload.
                 const accountId = change.accountId;
+                const checkedAt = notMine.get(accountId);
+                if (checkedAt !== undefined && Date.now() - checkedAt < SCOPE_TTL_MS) return;
                 void refreshMine().then(() => {
-                    if (!closed && mine.has(accountId)) wake(accountId);
+                    if (closed) return;
+                    if (mine.has(accountId)) {
+                        notMine.delete(accountId);
+                        wake(accountId);
+                        return;
+                    }
+                    notMine.set(accountId, Date.now());
                 });
             });
 
