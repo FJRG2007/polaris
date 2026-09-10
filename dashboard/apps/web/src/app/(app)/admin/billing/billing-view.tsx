@@ -132,7 +132,9 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
     const href = parts.ownerHref(owner);
     const label = (
         <>
-            <span className="truncate">{owner.name}</span>
+            <span className="truncate" title={owner.name}>
+                {owner.name}
+            </span>
             <span className="text-muted-foreground shrink-0 text-xs">
                 {owner.kind === "org" ? "Organization" : "Personal"}
             </span>
@@ -140,7 +142,7 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
     );
     if (!href) return <span className="flex min-w-0 items-center gap-2">{label}</span>;
     return (
-        <Link href={href} className="hover:text-foreground flex min-w-0 items-center gap-2 font-medium" title={owner.name}>
+        <Link href={href} className="hover:text-foreground flex min-w-0 items-center gap-2 font-medium">
             {label}
         </Link>
     );
