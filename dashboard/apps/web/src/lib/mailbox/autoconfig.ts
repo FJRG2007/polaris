@@ -35,6 +35,7 @@
 import * as net from "node:net";
 import * as tls from "node:tls";
 import * as core from "@polaris/core";
+import { prisma } from "@polaris/db";
 import { resolveMx, resolveSrv } from "node:dns/promises";
 import { follow, readAtMost, reachable, safeUrl } from "@/lib/safe-fetch";
 
@@ -57,7 +58,7 @@ export interface MailDiscovery {
     readonly passwordUrl: string;
     /** Which of the five questions answered, so the form can say how sure it is
      *  and a support conversation has somewhere to start. */
-    readonly source: "catalogue" | "domain" | "directory" | "exchangers" | "probe" | "none";
+    readonly source: "catalogue" | "polaris" | "domain" | "directory" | "exchangers" | "probe" | "none";
 }
 
 /** How long any one lookup may take. Five of them run in sequence and somebody
@@ -95,6 +96,20 @@ export async function discoverMailbox(address: string): Promise<MailDiscovery> {
     const known = core.serviceForAddress(address);
     if (known) return fromService(address, known, "catalogue");
     if (!domain) return unknown(address, "");
+
+    // A mail server this Polaris runs: its settings are known without asking
+    // anybody, and before its DNS is published nothing else would find them.
+    const ours = await prisma.mailServer
+        .findFirst({ where: { primaryDomain: domain, status: { in: ["ready", "down"] } }, select: { hostname: true } })
+        .catch(() => null);
+    if (ours) {
+        return {
+            ...unknown(address, domain),
+            imap: { host: ours.hostname, port: 993, security: "tls" },
+            smtp: { host: ours.hostname, port: 465, security: "tls" },
+            source: "polaris"
+        };
+    }
 
     const published = await domainAutoconfig(domain, address).catch(() => null);
     if (published) return { ...published, address, source: "domain" };

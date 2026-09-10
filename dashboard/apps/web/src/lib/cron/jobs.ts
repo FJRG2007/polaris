@@ -24,6 +24,7 @@ import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
+import { sweepMailServers } from "@/lib/mail-server/health";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { expireTransfers } from "@/lib/drive-transfer-service";
@@ -35,6 +36,7 @@ import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
+import { collectAllReports } from "@/lib/mail-server/dmarc-report";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
@@ -331,6 +333,20 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // per account, which is how a client gets rate limited by Gmail.
         leaseMs: 10 * MINUTE,
         run: syncMailboxes
+    },
+    {
+        key: "mail-server",
+        // The mail servers Polaris runs: whether each still answers, and the
+        // DMARC reports that arrived in its report mailbox since the last pass.
+        // Receivers send those daily, so a quarter of an hour is prompt enough.
+        everyMs: 15 * MINUTE,
+        // Leased: two passes would read the same report mailbox at once.
+        leaseMs: 20 * MINUTE,
+        run: async () => {
+            const health = await sweepMailServers();
+            const reports = await collectAllReports();
+            return { ...health, filed: reports.filed };
+        }
     },
     {
         key: "mail-categories",

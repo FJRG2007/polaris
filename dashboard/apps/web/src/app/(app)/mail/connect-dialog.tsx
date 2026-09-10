@@ -545,6 +545,8 @@ function lookupSentence(
     switch (discovery.source) {
         case "catalogue":
             return `${discovery.serviceName}. Nothing else to fill in.`;
+        case "polaris":
+            return "A mail server this Polaris runs. Nothing else to fill in.";
         case "domain":
             return `${address.split("@")[1]} publishes its own settings, and these are them.`;
         case "directory":

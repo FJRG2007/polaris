@@ -24,16 +24,31 @@ export const PROBE_TIMEOUT_MS = 4000;
  * which is the forward working. A refusal or a timeout is reported as false and
  * means nothing on its own.
  */
-export function probeTcpPort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
+export async function probeTcpPort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
+    return (await probeTcpOutcome(host, port, timeoutMs)) === "open";
+}
+
+/**
+ * The same knock, saying how it ended. A refusal is somebody answering that
+ * nothing listens; a timeout is nobody answering at all - which for some ports
+ * is a verdict and for others (an outbound 25 most networks drop) is not.
+ */
+export function probeTcpOutcome(
+    host: string,
+    port: number,
+    timeoutMs = PROBE_TIMEOUT_MS
+): Promise<"open" | "refused" | "timeout" | "error"> {
     return new Promise((resolve) => {
         const socket = connect({ host, port, timeout: timeoutMs });
-        const settle = (reached: boolean): void => {
+        const settle = (outcome: "open" | "refused" | "timeout" | "error"): void => {
             socket.destroy();
-            resolve(reached);
+            resolve(outcome);
         };
-        socket.once("connect", () => settle(true));
-        socket.once("timeout", () => settle(false));
-        socket.once("error", () => settle(false));
+        socket.once("connect", () => settle("open"));
+        socket.once("timeout", () => settle("timeout"));
+        socket.once("error", (error: NodeJS.ErrnoException) =>
+            settle(error.code === "ECONNREFUSED" ? "refused" : error.code === "ETIMEDOUT" ? "timeout" : "error")
+        );
     });
 }
 

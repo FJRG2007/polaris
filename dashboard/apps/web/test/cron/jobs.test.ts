@@ -89,6 +89,8 @@ describe("the work Polaris runs on a schedule", () => {
             // same batch of messages twice.
             "mail-categories",
             "mail-send",
+            // Two passes would read the same DMARC report mailbox at once.
+            "mail-server",
             "mail-sync",
             // A capture stores the lines after the newest one it has; two at once
             // would both read the same newest line and store what follows twice.

@@ -290,6 +290,106 @@ export function findTxtRecords(token: string, zoneId: string, name: string): Pro
     return findDnsRecords(token, zoneId, "TXT", name);
 }
 
+/** One record as a mail server's DNS needs to read it: an MX has a priority,
+ *  an SRV has its fields in `data`. */
+export interface CfZoneRecord {
+    readonly id: string;
+    readonly type: string;
+    readonly name: string;
+    readonly content: string;
+    readonly priority: number | null;
+}
+
+/**
+ * A TXT record's value as one string. Cloudflare may hand the content back as
+ * the quoted character-strings it is stored as (`"v=spf1 " "mx -all"`); read
+ * that way, an SPF record would not be recognised as one, and a second would be
+ * published beside it - which invalidates both.
+ */
+export function unquoteTxt(content: string): string {
+    const trimmed = content.trim();
+    if (!trimmed.startsWith('"')) return trimmed;
+    const parts = [...trimmed.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) => (match[1] ?? "").replace(/\\(.)/g, "$1"));
+    return parts.length > 0 ? parts.join("") : trimmed;
+}
+
+/** Every record of one type at one name, with the fields a comparison needs. */
+export async function listZoneRecords(
+    token: string,
+    zoneId: string,
+    type: string,
+    name: string
+): Promise<CfZoneRecord[]> {
+    const rows = await cf<Array<Record<string, unknown>>>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?type=${encodeURIComponent(type)}&name=${encodeURIComponent(name)}`
+    );
+    if (!Array.isArray(rows)) return [];
+    return rows.flatMap((row) => {
+        if (typeof row.id !== "string") return [];
+        const data = (row.data ?? {}) as Record<string, unknown>;
+        const raw = typeof row.content === "string" ? row.content : "";
+        const content =
+            type === "SRV"
+                ? `${String(data.priority ?? 0)} ${String(data.weight ?? 0)} ${String(data.port ?? 0)} ${String(data.target ?? "")}`
+                : type === "TXT"
+                  ? unquoteTxt(raw)
+                  : raw;
+        return [
+            {
+                id: row.id,
+                type,
+                name: typeof row.name === "string" ? row.name : name,
+                content,
+                priority: typeof row.priority === "number" ? row.priority : null
+            }
+        ];
+    });
+}
+
+/** The body Cloudflare takes for a mail record: MX carries a priority, SRV its
+ *  fields in `data`, everything else a content string. Never proxied - a mail
+ *  record is read by resolvers and mail servers, not browsers. */
+function zoneRecordBody(record: { type: string; name: string; value: string; priority: number | null }): Record<string, unknown> {
+    if (record.type === "SRV") {
+        const [priority, weight, port, target] = record.value.split(" ");
+        return {
+            type: "SRV",
+            name: record.name,
+            ttl: 3600,
+            data: { priority: Number(priority), weight: Number(weight), port: Number(port), target }
+        };
+    }
+    return {
+        type: record.type,
+        name: record.name,
+        content: record.value,
+        ttl: 3600,
+        proxied: false,
+        ...(record.type === "MX" ? { priority: record.priority ?? 10 } : {})
+    };
+}
+
+export async function createZoneRecord(
+    token: string,
+    zoneId: string,
+    record: { type: string; name: string; value: string; priority: number | null }
+): Promise<string> {
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, zoneRecordBody(record));
+    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
+export async function updateZoneRecord(
+    token: string,
+    zoneId: string,
+    recordId: string,
+    record: { type: string; name: string; value: string; priority: number | null }
+): Promise<void> {
+    await cf(token, "PUT", `/zones/${zoneId}/dns_records/${recordId}`, zoneRecordBody(record));
+}
+
 /** Best-effort deletion of a DNS record (teardown never blocks on it). */
 export async function deleteDnsRecord(token: string, zoneId: string, recordId: string): Promise<void> {
     await cf(token, "DELETE", `/zones/${zoneId}/dns_records/${recordId}`);
