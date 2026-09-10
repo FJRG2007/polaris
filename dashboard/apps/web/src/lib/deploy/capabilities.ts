@@ -1,0 +1,392 @@
+/**
+ * What Polaris does for the things you deploy, in seven groups, each entry
+ * pointing at the screen that does it.
+ *
+ * Only what exists: every entry names where it is, and the test beside this
+ * checks that every link lands on a route that is really there. A capability
+ * written here before its screen is an advertisement for a 404.
+ *
+ * Screens inside a project or a service cannot be linked to without one, so
+ * those entries link to the projects and say where to go from there.
+ */
+
+import type { Permission } from "@polaris/core";
+
+export interface Capability {
+    title: string;
+    description: string;
+    /** Where it is, in the words the screens use. */
+    where: string;
+    href: string;
+    /** The permission the linked screen asks for, beyond reaching Deploy. */
+    needs?: Permission;
+    /** The linked screen is for administrators. */
+    adminOnly?: boolean;
+}
+
+export interface CapabilityGroup {
+    id: string;
+    title: string;
+    summary: string;
+    items: Capability[];
+}
+
+const PROJECTS = "/apps/deploy";
+
+export const CAPABILITY_GROUPS: CapabilityGroup[] = [
+    {
+        id: "deploy",
+        title: "Deploy",
+        summary: "From a repository or an image to a running service.",
+        items: [
+            {
+                title: "Push to deploy",
+                description:
+                    "A push to the tracked branch deploys the services built from it. A commit filter and watch paths decide which pushes count.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Preview environments",
+                description: "An environment for each open pull request, built from its branch and removed when it closes.",
+                where: "Project > Settings > Feature flags",
+                href: PROJECTS
+            },
+            {
+                title: "Builds from the source",
+                description:
+                    "A Dockerfile is used when there is one; otherwise the stack is detected and built. Install, build and start commands can be set per service.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Monorepos",
+                description: "Several services from one repository, each with its own root directory, Dockerfile and watch paths.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Images from a registry",
+                description: "Deploy any image, public or behind a registry login.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
+                title: "Instant rollbacks",
+                description: "Recent releases keep their image, so putting one back live needs no rebuild. Pin a release to keep it longer.",
+                where: "Service > Deployments",
+                href: PROJECTS
+            },
+            {
+                title: "Deploy progress",
+                description: "Each deploy shows its steps as it runs, with the build log under them and what failed if it did.",
+                where: "Service > Deployments",
+                href: PROJECTS
+            },
+            {
+                title: "Staged removals",
+                description: "Removing a service or a database is staged and reviewed with the rest before anything is torn down.",
+                where: "Project > changes banner",
+                href: PROJECTS
+            }
+        ]
+    },
+    {
+        id: "run",
+        title: "Run",
+        summary: "Keep services up and see what they are doing.",
+        items: [
+            {
+                title: "Service metrics",
+                description: "CPU, memory, network and disk for each service, with history.",
+                where: "Service > Metrics",
+                href: PROJECTS
+            },
+            {
+                title: "Observability",
+                description: "Metrics for every service in an environment on one screen.",
+                where: "Project > Observability",
+                href: PROJECTS
+            },
+            {
+                title: "Logs",
+                description: "Every service's output in one stream.",
+                where: "Project > Logs",
+                href: PROJECTS
+            },
+            {
+                title: "Scheduled jobs",
+                description: "Commands run inside a service on a schedule, with retries, timeouts and each run's output.",
+                where: "Service > Cron",
+                href: PROJECTS
+            },
+            {
+                title: "Console and files",
+                description: "A terminal inside the container, and a file browser over it.",
+                where: "Service > Console, Files",
+                href: PROJECTS
+            },
+            {
+                title: "Volumes",
+                description: "Persistent storage on the machine or on a connected storage share.",
+                where: "Service > Volumes",
+                href: PROJECTS
+            },
+            {
+                title: "Your own servers",
+                description: "Run services on this machine or any enrolled server, and move them between servers.",
+                where: "Servers",
+                href: "/apps/servers",
+                needs: "system.manage"
+            },
+            {
+                title: "Health checks",
+                description: "Every address is checked, and one that stops answering is flagged on the service.",
+                where: "Service > Settings",
+                href: PROJECTS
+            }
+        ]
+    },
+    {
+        id: "connect",
+        title: "Connect",
+        summary: "Addresses, certificates and the way in.",
+        items: [
+            {
+                title: "Free subdomains",
+                description: "Each service gets a hostname under the instance's domain, with a certificate.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Custom domains",
+                description: "Any hostname, with an automatic Let's Encrypt certificate or one you supply.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "DNS written for you",
+                description: "With a Cloudflare account connected, Polaris creates the records itself; without one it shows each record to add.",
+                where: "Management > Domains",
+                href: "/admin/domains",
+                adminOnly: true
+            },
+            {
+                title: "Tunnels",
+                description: "Cloudflare and ngrok tunnels for a machine with no open ports.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Domains you own",
+                description: "An account or organization proves a domain and deploys under it.",
+                where: "My account > Domains",
+                href: "/account/domains"
+            },
+            {
+                title: "Private networking",
+                description: "Services reach each other by a private name, handed to them as a variable.",
+                where: "Service > Variables",
+                href: PROJECTS
+            }
+        ]
+    },
+    {
+        id: "services",
+        title: "Services",
+        summary: "Databases and the rest of the stack.",
+        items: [
+            {
+                title: "Managed databases",
+                description: "PostgreSQL, MySQL, MariaDB, MongoDB and Redis, provisioned beside your services.",
+                where: "Project > New service",
+                href: PROJECTS
+            },
+            {
+                title: "Database client",
+                description: "Browse tables and run queries against any database here.",
+                where: "Databases",
+                href: "/apps/databases"
+            },
+            {
+                title: "Reference variables",
+                description: "${{postgres.DATABASE_URL}} points at another service's value, and follows it into a copied environment.",
+                where: "Service > Variables",
+                href: PROJECTS
+            },
+            {
+                title: "Shared variables",
+                description: "Set once per environment and delivered to every service in it.",
+                where: "Project > Settings > Shared variables",
+                href: PROJECTS
+            },
+            {
+                title: "Marketplace",
+                description: "Ready-made apps, installed in a click.",
+                where: "Marketplace",
+                href: "/apps/marketplace"
+            },
+            {
+                title: "Vercel and Railway",
+                description: "What a project runs on Vercel or Railway, on the same board.",
+                where: "Project > Elsewhere",
+                href: PROJECTS
+            }
+        ]
+    },
+    {
+        id: "manage",
+        title: "Manage",
+        summary: "Projects, environments, and what they report.",
+        items: [
+            {
+                title: "Projects and environments",
+                description: "Services grouped into projects, each with as many environments as it needs, each on its own branch.",
+                where: "Deploy",
+                href: PROJECTS
+            },
+            {
+                title: "Usage",
+                description: "What a project is consuming.",
+                where: "Project > Settings > Usage",
+                href: PROJECTS
+            },
+            {
+                title: "Alarms",
+                description: "Alerts on health, spikes and outages.",
+                where: "Watch > Alarms",
+                href: "/watch/alarms"
+            },
+            {
+                title: "Webhooks",
+                description: "Deploys and alerts reported to Discord, Slack or any endpoint.",
+                where: "Watch > Webhooks",
+                href: "/watch/webhooks"
+            },
+            {
+                title: "Error tracking",
+                description: "What your applications report when they break. Every service is handed a Sentry address.",
+                where: "Telemetry",
+                href: "/apps/telemetry",
+                needs: "deploy.manage"
+            },
+            {
+                title: "Analytics",
+                description: "Visitors and traffic on your services, without cookies.",
+                where: "Analytics",
+                href: "/apps/analytics",
+                needs: "deploy.manage"
+            },
+            {
+                title: "Backups",
+                description: "Backups on a schedule, and restores.",
+                where: "Backups",
+                href: "/apps/backups",
+                adminOnly: true
+            },
+            {
+                title: "CI runners",
+                description: "Self-hosted GitHub Actions runners on your own machines.",
+                where: "Runners",
+                href: "/apps/runners",
+                needs: "system.manage"
+            }
+        ]
+    },
+    {
+        id: "secure",
+        title: "Secure",
+        summary: "Who gets in, and what they can do.",
+        items: [
+            {
+                title: "Firewall",
+                description: "Rules, bans and injection protection in front of every service.",
+                where: "Firewall",
+                href: "/apps/firewall",
+                needs: "deploy.manage"
+            },
+            {
+                title: "Encrypted secrets",
+                description: "Secret variables are encrypted at rest and only revealed on request, and each reveal is recorded.",
+                where: "Service > Variables",
+                href: PROJECTS
+            },
+            {
+                title: "Project access",
+                description: "Give people a set of capabilities on a project, for some environments only, until a date.",
+                where: "Project > Settings > Access",
+                href: PROJECTS
+            },
+            {
+                title: "Project tokens",
+                description: "API tokens that reach one project and nothing else.",
+                where: "Project > Settings > Tokens",
+                href: PROJECTS
+            },
+            {
+                title: "Audit trail",
+                description: "Who changed what, including every secret revealed.",
+                where: "Management > Activity",
+                href: "/admin/activity",
+                adminOnly: true
+            },
+            {
+                title: "Two-factor sign-in",
+                description: "Passkeys, authenticator apps and trusted devices.",
+                where: "My account > Security",
+                href: "/account/security"
+            }
+        ]
+    },
+    {
+        id: "collaborate",
+        title: "Collaborate",
+        summary: "Working on it with other people.",
+        items: [
+            {
+                title: "Organizations and teams",
+                description: "Projects owned by an organization, reached through its teams.",
+                where: "My account > Organizations",
+                href: "/account/organizations"
+            },
+            {
+                title: "Notes on services",
+                description: "What people write down about a service - why it was restarted, what not to touch.",
+                where: "Service > Notes",
+                href: PROJECTS
+            },
+            {
+                title: "Service history",
+                description: "What happened to a service: deploys, restarts, variables changed, and by whom.",
+                where: "Service > Deployments",
+                href: PROJECTS
+            },
+            {
+                title: "Following",
+                description: "Hear about the deploys and outages of a service you care about.",
+                where: "Service > bell",
+                href: PROJECTS
+            },
+            {
+                title: "Deploys on GitHub",
+                description: "Each deploy is reported on its commit, so a pull request shows where it went live.",
+                where: "Your repository",
+                href: PROJECTS
+            },
+            {
+                title: "Code review queue",
+                description: "Pull requests and issues waiting on you, across your repositories.",
+                where: "Code",
+                href: "/apps/code",
+                needs: "agents.read"
+            },
+            {
+                title: "Coding agents",
+                description: "An agent in your repositories that reviews pull requests, answers issues and fixes failing checks.",
+                where: "Agents",
+                href: "/apps/agents",
+                needs: "agents.read"
+            }
+        ]
+    }
+];
