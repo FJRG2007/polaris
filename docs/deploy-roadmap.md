@@ -104,7 +104,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Compose runtime | done | P0 | |
 | Swarm runtime | done | P1 | |
 | Copies (replicas) UI | done | P1 | up to ten |
-| Autoscaling | done | P2 | follows CPU between a minimum and maximum |
+| Autoscaling | done | P2 | follows CPU, and optionally requests per copy, between a minimum and maximum; ten idle minutes drop it straight to the fewest |
 | Resource limits (CPU/mem) UI | done | P1 | services and databases |
 | Sleep when idle | done | P2 | wakes on the next visit; one local copy only |
 | Restart policies UI | todo | P2 | |

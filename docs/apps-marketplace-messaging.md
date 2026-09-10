@@ -114,12 +114,17 @@ without a monolith:
 - `id`, `name`, `category`, `icon`, `summary`, `description`, `docsUrl`
 - `installMethod`: `compose-template` | `builtin` | `integration`
 - `capabilities`: e.g. `messaging-channel`, `ai-assistant`, `game-server`,
-  `tool` - drive derived nav and which adapted dashboard to mount
+  `mail-server`, `tool` - drive derived nav and which adapted dashboard to mount
 - `configSchema`: a Zod schema for the app's config form
 - `dashboard`: `builtin-component` (a lazy-loaded panel keyed by manifest) |
   `generic` (reuse Deploy panels) | `iframe`
 - for `compose-template`: the template ref + declared volumes/env so the install
   wizard can render the target + storage picker
+- `singleton`: only one install of this app exists; the wizard opens the
+  existing one instead of offering a second
+- `instanceWide` (`singleton` only): one install turns the feature on for
+  everybody, not just the installer - the mail server, Places, Tools - because
+  what it gates is read instance-wide (`lib/apps/install-presence.ts`)
 
 The catalog is code (`lib/apps/catalog.ts`); a DB row (`InstalledApp`) records
 each install (target, config, status, secret). Nav pillars/rails are partly
