@@ -9,18 +9,25 @@
  */
 
 import * as core from "@polaris/core";
-import { useMail } from "../mail-shell";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { CONNECT_MAILBOX_HREF, useMail } from "../mail-shell";
 
 export function OpenFromLink({ seed }: { seed: core.MailtoSeed | null }) {
-    const { openComposer } = useMail();
+    const { openComposer, accounts } = useMail();
     const router = useRouter();
     const done = useRef(false);
+    const hasMailbox = accounts.length > 0;
 
     useEffect(() => {
         if (done.current) return;
         done.current = true;
+        // Nothing to send it from: connecting a mailbox comes first, and the
+        // inbox would only be a second hop on the way there.
+        if (!hasMailbox) {
+            router.replace(CONNECT_MAILBOX_HREF, { scroll: false });
+            return;
+        }
         if (seed) {
             const people = (addresses: readonly string[]) =>
                 addresses.map((address) => ({ name: "", address }));
@@ -34,7 +41,7 @@ export function OpenFromLink({ seed }: { seed: core.MailtoSeed | null }) {
             });
         }
         router.replace("/mail", { scroll: false });
-    }, [openComposer, router, seed]);
+    }, [hasMailbox, openComposer, router, seed]);
 
     return null;
 }

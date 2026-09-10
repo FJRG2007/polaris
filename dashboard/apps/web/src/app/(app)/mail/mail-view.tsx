@@ -215,7 +215,8 @@ export function MailView({
         openComposer,
         refresh,
         reloadLists,
-        revision
+        revision,
+        shelf
     } = useMail();
 
     /**
@@ -274,7 +275,7 @@ export function MailView({
      * mailbox never opened in this tab is the only case that waits, and it waits
      * behind rows shaped like rows rather than behind nothing.
      */
-    const list = useMailList(page, revision);
+    const list = useMailList(page, revision, shelf);
     const firstPage = list.threads;
     const firstCursor = list.cursor;
     const opened = useMailThread(openThreadId, revision);

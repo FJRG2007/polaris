@@ -46,7 +46,8 @@ export function AccountsView({
     canSetDomain,
     microsoftReady,
     outcome,
-    outcomeProvider
+    outcomeProvider,
+    connectNow = false
 }: {
     accounts: MailAccountView[];
     links: LinkedAccount[];
@@ -56,8 +57,10 @@ export function AccountsView({
     microsoftReady: boolean;
     outcome: string;
     outcomeProvider: string;
+    /** Open the connect dialog straight away. */
+    connectNow?: boolean;
 }) {
-    const [adding, setAdding] = useState(false);
+    const [adding, setAdding] = useState(connectNow);
 
     return (
         <div className="space-y-4">

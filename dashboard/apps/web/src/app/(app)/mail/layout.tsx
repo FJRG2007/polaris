@@ -16,11 +16,11 @@
  */
 
 import { MailShell } from "./mail-shell";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission } from "@/lib/session";
-import { listIdentities, listLabels } from "@/lib/mailbox/labels";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
+import { listIdentities, listLabels } from "@/lib/mailbox/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
             identities={identities}
             unread={unread}
             viewerName={user.name}
+            shelf={shelfOrgId ?? "personal"}
         >
             {children}
         </MailShell>

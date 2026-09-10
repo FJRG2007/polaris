@@ -9,8 +9,8 @@
 
 import { AccountsView } from "./accounts-view";
 import { requirePermission } from "@/lib/session";
-import { listAccountViews } from "@/lib/mailbox/accounts";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { listAccountViews } from "@/lib/mailbox/accounts";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function MailAccountsPage({
     searchParams
 }: {
-    searchParams: Promise<{ connection?: string; provider?: string }>;
+    searchParams: Promise<{ connection?: string; provider?: string; connect?: string }>;
 }) {
     const user = await requirePermission("mail.use");
     const params = await searchParams;
@@ -37,6 +37,9 @@ export default async function MailAccountsPage({
             canSetDomain={user.isAdmin}
             outcome={params.connection ?? ""}
             outcomeProvider={params.provider ?? ""}
+            // Sent here by a Write with nothing to write from: the dialog is
+            // what they came for, so it is already open.
+            connectNow={params.connect === "1"}
         />
     );
 }

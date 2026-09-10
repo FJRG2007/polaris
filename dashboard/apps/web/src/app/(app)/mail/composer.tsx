@@ -36,7 +36,7 @@ import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRef, useMemo, useState, useEffect, useCallback, useTransition } from "react";
 import {
     ChevronDown,
     Clock,
@@ -116,8 +116,19 @@ export function Composer() {
     // Opening the composer seeds it. Keyed on the seed object, which is replaced
     // whenever something asks for a new one, so pressing Reply on two different
     // conversations does not keep the first one's recipients.
+    //
+    // Only a NEW seed seeds. The mailboxes and their identities come from the
+    // server and are fresh objects after every live refresh - which the draft's
+    // own autosave causes, and any arriving message too - so running on them
+    // wiped the recipients and the subject a few seconds into typing.
+    const seeded = useRef<ComposerSeed | null>(null);
     useEffect(() => {
-        if (!composing) return;
+        if (!composing) {
+            seeded.current = null;
+            return;
+        }
+        if (seeded.current === composing) return;
+        seeded.current = composing;
         const account = composing.accountId ?? accounts[0]?.id ?? "";
         setAccountId(account);
         setIdentityId((identities[account] ?? []).find((one) => one.isDefault)?.id ?? "");
@@ -371,7 +382,10 @@ export function Composer() {
     /** What this message would sign with, for the Insert button. */
     const signature = (identity?.signature || account?.signature || "").trim();
 
-    if (!composing) return null;
+    // A message with nowhere to leave from is not a message: the shell sends a
+    // Write with no mailbox to connecting one, and a mailbox removed while a
+    // draft was open takes the composer with it.
+    if (!composing || accounts.length === 0) return null;
 
     const from = account
         ? core.formatAddress({

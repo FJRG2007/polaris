@@ -58,7 +58,11 @@ async function readJson<T>(url: string, signal: AbortSignal): Promise<T> {
  */
 export function useMailList(
     page: MailPageNarrow,
-    revision: number
+    revision: number,
+    /** The shelf on screen. The same view on two shelves is two lists, so it is
+     *  part of the cache key - otherwise switching shelf drew the one left
+     *  behind from the cache. */
+    shelf: string
 ): {
     threads: MailThreadView[];
     cursor: string;
@@ -76,10 +80,10 @@ export function useMailList(
         // last answer is out of date. A new identity here is what sends this
         // again, and it is the only thing that does.
         (signal: AbortSignal) => readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal),
-        [params, revision]
+        [params, revision, shelf]
     );
 
-    const read = useLiveRead<MailListAnswer>({ load, cacheKey: `mail.list.${params}` });
+    const read = useLiveRead<MailListAnswer>({ load, cacheKey: `mail.list.${shelf}.${params}` });
     const answer = read.data ?? NOTHING;
     return {
         threads: answer.threads,
