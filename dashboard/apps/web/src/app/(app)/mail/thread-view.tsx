@@ -263,7 +263,12 @@ export function ThreadView({
     const account = accounts.find((one) => one.id === newest.accountId);
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
+        // `min-w-0` is the width twin of the panes' `min-h-0`. This is a flex item
+        // in a row, and a flex item's floor is its content: one subject that does
+        // not wrap - the `truncate` heading - made the whole conversation as wide
+        // as that line, thousands of pixels, with the Reply buttons and the
+        // pane's scrollbar pushed off the right-hand edge of the screen.
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <header className="flex shrink-0 items-start gap-2 border-b border-border px-4 py-3">
                 {onBack ? (
                     <Button

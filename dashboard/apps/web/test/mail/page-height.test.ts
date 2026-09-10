@@ -39,6 +39,21 @@ describe("what the shell's class list actually resolves to", () => {
     });
 });
 
+describe("the window under a screen like this", () => {
+    it("never scrolls, whatever else lands on the page", async () => {
+        // Measured in Chrome with the real chrome and CSS: anything that adds
+        // height outside the screen (a banner, a notice) let one wheel move the
+        // window and every pane on it together. The marker survives the merge,
+        // and the root rule stops the window scrolling while it is on the page.
+        expect(cn(PAGE_BLEED, "flex min-h-0 overflow-hidden").split(" ")).toContain("page-bleed");
+        const tokens = await readFile(
+            fileURLToPath(new URL("../../../../packages/ui/src/styles/tokens.css", import.meta.url)),
+            "utf8"
+        );
+        expect(tokens).toMatch(/html:has\(\.page-bleed\) \{\s*overflow: hidden;/);
+    });
+});
+
 describe("the shell itself", () => {
     it("does not set a height beside PAGE_BLEED", async () => {
         const source = await readFile(SHELL, "utf8");

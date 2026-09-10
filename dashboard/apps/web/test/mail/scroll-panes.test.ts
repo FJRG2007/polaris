@@ -45,6 +45,14 @@ describe("the list and the message own their own scrollbars", () => {
         expect(reading).toContain("min-h-0");
     });
 
+    it("keeps the conversation as wide as its pane, not as its longest line", async () => {
+        // The width twin of `min-h-0`: the conversation is a flex item in a row,
+        // so without `min-w-0` one subject that does not wrap made it thousands
+        // of pixels wide, with Reply and its scrollbar off the edge of the screen.
+        const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
+        expect(thread).toContain('<div className="flex min-h-0 min-w-0 flex-1 flex-col">');
+    });
+
     it("keeps a scrolling region inside each of them", async () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
