@@ -165,7 +165,8 @@ export default async function DeployProjectPage({
                             // Whether one was supplied, never the material itself: the
                             // panel only needs to say which certificate is in use.
                             hasCertificate: domain.certPem !== null,
-                            servedBy: domain.servedBy
+                            servedBy: domain.servedBy,
+                            cdn: domain.cdn
                         })),
                     tunnelDomains.get(app.id) ?? []
                 ),

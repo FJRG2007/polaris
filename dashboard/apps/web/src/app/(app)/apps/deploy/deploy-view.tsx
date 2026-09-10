@@ -13,6 +13,7 @@ import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { LogViewer } from "@/components/log-viewer";
+import { DatabaseManageDialog } from "./database-panel";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
@@ -24,10 +25,10 @@ import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode
 import {
     databaseCreateSchema,
     dbEngineLabel,
-    DB_ENGINES,
-    DB_ENGINE_INFO,
+    MANAGED_ENGINES,
+    MANAGED_ENGINE_INFO,
     type DatabaseCreateInput,
-    type DbEngine
+    type ManagedEngine
 } from "@polaris/core";
 import {
     Badge,
@@ -59,13 +60,14 @@ import {
     Plug,
     Plus,
     Rocket,
+    Settings2,
     TerminalSquare,
     Trash2
 } from "lucide-react";
 
-const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
+const ENGINE_OPTIONS: SelectOption[] = MANAGED_ENGINES.map((engine) => ({
     value: engine,
-    label: DB_ENGINE_INFO[engine].label,
+    label: MANAGED_ENGINE_INFO[engine].label,
     icon: <DbEngineIcon engine={engine} className="size-5" />
 }));
 
@@ -138,6 +140,9 @@ export interface ProjectSummary {
                 /** Who answers it: "server" - the machine the service runs on - or
                  *  "polaris" - this instance, dialling that machine. */
                 servedBy?: string;
+                /** Served through Cloudflare's proxy. Absent on a tunnel's name,
+                 *  which has no domain row of its own to change. */
+                cdn?: boolean;
             }[];
             volumes: {
                 id: string;
@@ -497,6 +502,7 @@ function DatabaseCard({
     const [pending, startTransition] = useTransition();
     const [confirming, setConfirming] = useState(false);
     const [connecting, setConnecting] = useState(false);
+    const [managing, setManaging] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function remove() {
@@ -579,6 +585,15 @@ function DatabaseCard({
                     <Button
                         variant="ghost"
                         size="icon"
+                        title="Manage"
+                        aria-label="Manage"
+                        onClick={() => setManaging(true)}
+                    >
+                        <Settings2 className="size-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         title={staged ? "Removal pending" : "Delete database"}
                         aria-label="Delete database"
                         disabled={staged}
@@ -594,6 +609,9 @@ function DatabaseCard({
                 open={connecting}
                 onOpenChange={setConnecting}
             />
+            {managing ? (
+                <DatabaseManageDialog database={database} open onOpenChange={setManaging} />
+            ) : null}
 
             <ConfirmDeleteDialog
                 open={confirming}
@@ -731,7 +749,7 @@ function DatabaseConnectionDialog({
 }
 
 /** A read-only value with a copy button, for anything meant to be pasted. */
-function CopyRow({
+export function CopyRow({
     value,
     secret,
     copyValue
@@ -1273,7 +1291,7 @@ const PRIVILEGE_OPTIONS: SelectOption[] = [
 
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
-    const [engine, setEngine] = useState<DbEngine>("postgres");
+    const [engine, setEngine] = useState<ManagedEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -1290,7 +1308,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [password, setPassword] = useState("");
     const [privileges, setPrivileges] = useState("owner");
 
-    const info = DB_ENGINE_INFO[engine];
+    const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
 
     // Which instances this engine could be placed on. Reloaded when the engine
@@ -1323,7 +1341,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             exposePort: !hosted && exposePort.trim() ? Number(exposePort) : undefined,
             databaseName: databaseName.trim() || undefined,
             username: username.trim() || undefined,
-            password: password || undefined,
+            password: info.storage ? undefined : password || undefined,
             privileges: privileges as "owner" | "readwrite" | "readonly"
         };
     }
@@ -1355,7 +1373,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             <Field label="Engine">
                 <Select
                     value={engine}
-                    onValueChange={(value) => setEngine(value as DbEngine)}
+                    onValueChange={(value) => setEngine(value as ManagedEngine)}
                     options={ENGINE_OPTIONS}
                 />
             </Field>
@@ -1459,17 +1477,20 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                         </>
                     )}
 
-                    <Field
-                        label="Password"
-                        hint="Blank generates a strong one and stores it encrypted."
-                    >
-                        <Input
-                            type="password"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="Generated"
-                        />
-                    </Field>
+                    {/* An object store's account is an S3 key pair, always generated. */}
+                    {!info.storage && (
+                        <Field
+                            label="Password"
+                            hint="Blank generates a strong one and stores it encrypted."
+                        >
+                            <Input
+                                type="password"
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
+                                placeholder="Generated"
+                            />
+                        </Field>
+                    )}
                 </div>
             )}
 

@@ -13,6 +13,7 @@ import { ScalingSection } from "./scaling-section";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
+import { DomainCdnButton } from "./domain-cdn";
 import { EdgeSettings } from "./edge-settings";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
@@ -2881,6 +2882,14 @@ function SettingsTab({
                                         supplied={domain.hasCertificate === true}
                                         onChanged={onChanged}
                                     />
+                                    {domain.cdn !== undefined && domain.kind !== "lan" && !domain.hostname.endsWith(".plr.local") && (
+                                        <DomainCdnButton
+                                            domainId={domain.id}
+                                            hostname={domain.hostname}
+                                            enabled={domain.cdn}
+                                            onChanged={onChanged}
+                                        />
+                                    )}
                                     <Switch
                                         checked={domain.enabled}
                                         onChange={(next) =>

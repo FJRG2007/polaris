@@ -13,6 +13,7 @@ import { primaryDomain } from "./domain-rank";
 import { dbEngineLabel } from "@polaris/core";
 import { NewVolumeDialog } from "./volume-form";
 import { useStagedChanges } from "./staged-changes";
+import { DatabaseManageDialog } from "./database-panel";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { VolumeDetailDialog, type VolumeTab } from "./volume-detail";
 import { duplicateApplicationAction, saveLayoutAction } from "./actions";
@@ -259,6 +260,7 @@ export function DeployCanvas({
         hostedCount?: number;
     } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [managing, setManaging] = useState<{ id: string; name: string; engine: string } | null>(null);
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
         open: false,
@@ -454,10 +456,13 @@ export function DeployCanvas({
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             setDragId(null);
-            // A click (no meaningful drag) opens the service detail for app nodes.
+            // A click (no meaningful drag) opens the service detail for app nodes,
+            // and a database's Manage panel for database nodes.
             if (!moved) {
                 const app = environment.applications.find((item) => item.id === id);
                 if (app && onOpenService) onOpenService(app);
+                const database = environment.databases.find((item) => item.id === id);
+                if (database) setManaging(database);
                 return;
             }
             if (canManage) persist(posRef.current, links);
@@ -826,6 +831,19 @@ export function DeployCanvas({
                                                             </ContextMenuItem>
                                                         </>
                                                     )}
+                                                    {!app && (
+                                                        <ContextMenuItem
+                                                            onSelect={() =>
+                                                                setManaging({
+                                                                    id: node.id,
+                                                                    name: node.name,
+                                                                    engine: node.engine ?? ""
+                                                                })
+                                                            }
+                                                        >
+                                                            <Settings2 className="size-4" /> Manage
+                                                        </ContextMenuItem>
+                                                    )}
                                                     <ContextMenuSeparator />
                                                     <ContextMenuItem
                                                         variant="danger"
@@ -995,6 +1013,18 @@ export function DeployCanvas({
                 onOpenChange={(open) => !open && setOpenVolume(null)}
                 onChanged={() => router.refresh()}
             />
+            {managing ? (
+                <DatabaseManageDialog
+                    database={managing}
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setManaging(null);
+                            router.refresh();
+                        }
+                    }}
+                />
+            ) : null}
             {dialog}
         </div>
     );
