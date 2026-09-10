@@ -23,6 +23,7 @@ import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { useParams, useRouter } from "next/navigation";
 import { RuntimeLogs } from "@/components/runtime-logs";
+import { deploySteps } from "@/lib/deploy/deploy-steps";
 import { describeServiceEvent } from "./service-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
@@ -34,6 +35,7 @@ import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
 import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import {
@@ -803,6 +805,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate text-xs text-muted-foreground">
                                                         {deploySubtitle(deployment, app, format)}
                                                     </p>
+                                                    {!isSettled(deployment) && (
+                                                        <InFlightSteps deploymentId={deployment.id} />
+                                                    )}
                                                 </div>
                                                 <KeptChip deployment={deployment} />
                                                 <ReleaseLink deployment={deployment} />
@@ -1180,6 +1185,16 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
     );
 }
 
+/** A deploy that is still moving, drawn as its steps under its row. */
+function InFlightSteps({ deploymentId }: { deploymentId: string }) {
+    const steps = useDeploySteps(deploymentId, true);
+    return steps ? (
+        <div className="mt-1">
+            <DeployStepSegments steps={steps} />
+        </div>
+    ) : null;
+}
+
 /** Small pulsing "Live" badge shown above a log stream that is actively polling. */
 function LivePill() {
     return (
@@ -1191,6 +1206,7 @@ function LivePill() {
 
 function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
     const [log, setLog] = useState("");
+    const [status, setStatus] = useState("queued");
     const [live, setLive] = useState(true);
     const onDoneRef = useRef(onDone);
     onDoneRef.current = onDone;
@@ -1208,6 +1224,7 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
                 setLog(data.log);
+                setStatus(data.status);
                 // The build stream is terminal once the deployment leaves the build phase
                 // (running) or ends in failure; stop polling and drop the live indicator.
                 if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
@@ -1230,6 +1247,9 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
 
     return (
         <div className="flex flex-col gap-2">
+            <div className="rounded-lg border border-border bg-card px-3 pt-3">
+                <DeployStepper steps={deploySteps(status, log)} />
+            </div>
             {live && <LivePill />}
             <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />
         </div>
