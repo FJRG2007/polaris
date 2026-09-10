@@ -928,6 +928,22 @@ function MessageCard({
                                                 </a>
                                             </li>
                                         ))}
+                                    {/* All of them at once, for the message with
+                                        eleven scans on it. Only offered when there
+                                        is more than one: an archive of one file is
+                                        a file with an extra step. */}
+                                    {message.attachments.filter((file) => !file.inline).length > 1 ? (
+                                        <li className="flex items-center">
+                                            <a
+                                                href={`/api/mail/zip/${message.id}`}
+                                                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
+                                                download
+                                            >
+                                                <Download className="size-3.5 shrink-0" aria-hidden />
+                                                Save all as a .zip
+                                            </a>
+                                        </li>
+                                    ) : null}
                                 </ul>
                             ) : null}
                             {/* The message itself, as its server holds it.
