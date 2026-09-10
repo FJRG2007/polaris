@@ -9,6 +9,7 @@
  */
 
 import { FilesPanel } from "./files-panel";
+import { NewFolderForm } from "./upload-source";
 import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
@@ -55,6 +56,7 @@ import {
     Eye,
     EyeOff,
     FolderOpen,
+    FolderUp,
     GitBranch,
     Globe,
     Loader2,
@@ -801,14 +803,16 @@ export function CopyRow({
 export const SERVICE_TYPES = [
     { id: "github", label: "GitHub Repository", icon: <GitHubMark className="size-5" /> },
     { id: "docker", label: "Docker Image", icon: <DockerMark className="size-5" /> },
+    { id: "folder", label: "Upload a folder", icon: <FolderUp className="size-5" /> },
     { id: "database", label: "Database", icon: <Database className="size-5" /> }
 ] as const;
 
-export type ServiceView = "list" | "github" | "docker" | "database";
+export type ServiceView = "list" | "github" | "docker" | "folder" | "database";
 
 const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
     github: "GitHub Repository",
     docker: "Docker Image",
+    folder: "Upload a folder",
     database: "Database"
 };
 
@@ -858,6 +862,8 @@ export function NewServiceDialog({
                     <NewDatabaseForm environmentId={environmentId} onDone={done} />
                 ) : view === "github" ? (
                     <NewGithubForm environmentId={environmentId} onDone={done} />
+                ) : view === "folder" ? (
+                    <NewUploadForm environmentId={environmentId} onDone={done} />
                 ) : (
                     <NewImageForm environmentId={environmentId} onDone={done} />
                 )}
@@ -976,6 +982,19 @@ function ServerField({
                 aria-label="Server"
             />
         </Field>
+    );
+}
+
+/** A new service from an uploaded folder, on the server picked here. */
+function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
+    return (
+        <NewFolderForm
+            environmentId={environmentId}
+            serverId={serverId}
+            serverField={<ServerField servers={servers} value={serverId} onChange={setServerId} />}
+            onDone={onDone}
+        />
     );
 }
 

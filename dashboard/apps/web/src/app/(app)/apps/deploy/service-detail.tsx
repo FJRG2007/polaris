@@ -25,6 +25,7 @@ import { VariablesEditor } from "./variables-editor";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { useParams, useRouter } from "next/navigation";
+import { UploadedSourceSection } from "./upload-source";
 import { RuntimeLogs } from "@/components/runtime-logs";
 import { deploySteps } from "@/lib/deploy/deploy-steps";
 import { describeServiceEvent } from "./service-history";
@@ -33,6 +34,7 @@ import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
+import { BuildMachineSection } from "./build-machine-section";
 import { useDisplayFormat } from "@/components/display-format";
 import { TabAttentionDot, tabAttention } from "./attention-dot";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
@@ -367,6 +369,8 @@ function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: Display
             ? " - restarted with new settings, not rebuilt"
             : deployment.trigger === "scale"
               ? " - scaled, not rebuilt"
+              : deployment.trigger === "upload"
+              ? " - uploaded"
               : deployment.trigger === "preview"
               ? ` - pull request preview via ${sourceLabel(app)}`
               : deployment.trigger === "push"
@@ -3388,6 +3392,10 @@ function SettingsTab({
                     </Button>
                 </div>
             )}
+
+            {can("service.configure") && <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />}
+
+            {can("service.configure") && <BuildMachineSection applicationId={app.id} />}
 
             {can("service.configure") && <ScalingSection applicationId={app.id} onChanged={onChanged} />}
 

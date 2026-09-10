@@ -347,7 +347,7 @@ export async function createApplicationAction(input: {
     /** Take the settings the repository's own deploy files set (railway.json,
      *  render.yaml, netlify.toml, vercel.json, Procfile, app.json). */
     useRepoConfig?: boolean;
-}): Promise<{ error?: string; deploymentId?: string; needs?: string[] }> {
+}): Promise<{ error?: string; deploymentId?: string; applicationId?: string; needs?: string[] }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
     if (!name) return { error: "An application name is required" };
@@ -357,9 +357,15 @@ export async function createApplicationAction(input: {
     // can otherwise default it to the image's own exposed port (see buildAppPlan) -
     // storing a guess here would suppress that detection.
     const port = Number.isInteger(input.port) ? Number(input.port) : undefined;
+    // A folder to be uploaded next: built from source, detected, with nothing to
+    // clone. Nothing is deployed until the upload arrives.
+    const isUpload = input.sourceType === "upload";
     let sourceType = "image";
     let sourceConfig: Record<string, unknown>;
-    if (isGit) {
+    if (isUpload) {
+        sourceType = "nixpacks";
+        sourceConfig = port !== undefined ? { port } : {};
+    } else if (isGit) {
         const repoUrl = input.repoUrl?.trim();
         if (!repoUrl) return { error: "A git repository URL is required" };
         // "nixpacks" auto-builds from source (no Dockerfile); "dockerfile" uses one.
@@ -453,7 +459,7 @@ export async function createApplicationAction(input: {
         // free sslip.io subdomain works with no setup even on a LAN.
         const requestHeaders = await headers();
         await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
-        const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
+        const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit || isUpload ? 3000 : 80;
         if (flags.autoSubdomain) {
             try {
                 await deployService.addApplicationDomain(app.id, owner, { targetPort });
@@ -462,6 +468,10 @@ export async function createApplicationAction(input: {
             }
         }
         let deploymentId: string | undefined;
+        if (isUpload) {
+            revalidatePath(DEPLOY_PATH);
+            return { applicationId: app.id };
+        }
         try {
             deploymentId = await deployService.deployApplication(app.id, owner, user.id);
             await recordDeployAudit({
@@ -474,7 +484,7 @@ export async function createApplicationAction(input: {
             // Surfaced on the app's next manual deploy; creation still succeeds.
         }
         revalidatePath(DEPLOY_PATH);
-        return { deploymentId, ...(needs.length > 0 ? { needs } : {}) };
+        return { deploymentId, applicationId: app.id, ...(needs.length > 0 ? { needs } : {}) };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not create the application"
