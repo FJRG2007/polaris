@@ -10,9 +10,13 @@
  * somebody looks for it, instead of in a bar the browser draws when it likes.
  * Browsers without the event (Safari, Firefox) install from their own menu, and
  * the card says where.
+ *
+ * The same card offers the native desktop app (`desktop/` in the repository) for
+ * download, and inside that app says so instead of offering to install anything.
  */
 
 import { Download } from "lucide-react";
+import { useDesktopBridge } from "@/components/desktop-app";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
@@ -58,12 +62,13 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export function InstallAppCard() {
+export function InstallAppCard({ downloadUrl }: { downloadUrl: string | null }) {
     const prompt = useSyncExternalStore(
         subscribe,
         () => held,
         () => null
     );
+    const desktop = useDesktopBridge();
     const [installed, setInstalled] = useState(false);
     useEffect(() => setInstalled(runningInstalled()), [prompt]);
 
@@ -83,23 +88,47 @@ export function InstallAppCard() {
                 <CardTitle>Desktop app</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
-                    Install Polaris to open it in its own window, with its own icon in the dock, taskbar or
-                    home screen. It updates with Polaris itself.
-                </p>
-                {installed ? (
-                    <p className="text-sm">You are using the installed app.</p>
-                ) : prompt ? (
-                    <div>
-                        <Button onClick={() => void install()}>
-                            <Download className="size-4" /> Install Polaris
-                        </Button>
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground">
-                        Your browser installs it from its own menu: Install Polaris in Chrome and Edge, Add to
-                        Dock in Safari, Add to Home Screen on a phone. It needs Polaris to be open over https.
+                {desktop ? (
+                    <p className="text-sm">
+                        You are using the Polaris desktop app{desktop.version ? `, version ${desktop.version}` : ""}.
                     </p>
+                ) : (
+                    <>
+                        <p className="text-sm text-muted-foreground">
+                            Install Polaris to open it in its own window, with its own icon in the dock, taskbar
+                            or home screen. It updates with Polaris itself.
+                        </p>
+                        {installed ? (
+                            <p className="text-sm">You are using the installed app.</p>
+                        ) : prompt ? (
+                            <div>
+                                <Button onClick={() => void install()}>
+                                    <Download className="size-4" /> Install Polaris
+                                </Button>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                Your browser installs it from its own menu: Install Polaris in Chrome and Edge, Add
+                                to Dock in Safari, Add to Home Screen on a phone. It needs Polaris to be open over
+                                https.
+                            </p>
+                        )}
+                        {downloadUrl && (
+                            <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
+                                <p className="text-sm text-muted-foreground">
+                                    The desktop app for Windows, macOS and Linux also pushes a build from your own
+                                    computer and follows a service&apos;s logs in a window of its own.
+                                </p>
+                                <div>
+                                    <Button asChild variant="secondary">
+                                        <a href={downloadUrl} target="_blank" rel="noreferrer">
+                                            <Download className="size-4" /> Download the desktop app
+                                        </a>
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </CardBody>
         </Card>

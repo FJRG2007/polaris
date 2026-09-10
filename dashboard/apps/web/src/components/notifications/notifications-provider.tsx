@@ -14,9 +14,11 @@
  * an alert read in one as read in the other straight away.
  */
 
+import { claimForDevice } from "@/lib/device-once";
+import { notifyDesktop } from "@/lib/desktop-notify";
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
-import { claimForDevice } from "@/lib/device-once";
+import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
 import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -99,6 +101,23 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                 try {
                     const payload = JSON.parse(data) as { items?: NotificationView[] };
                     if (!Array.isArray(payload.items)) return;
+                    // Inside the desktop app a finished deploy is also a notice
+                    // from the system, as the app's own pushes are: a build is
+                    // exactly what somebody switches away from while it runs.
+                    // Taken before the rows below are marked as seen.
+                    if (desktopBridge()) {
+                        for (const row of arrivedDeployResults(seen.current, payload.items)) {
+                            void claimForDevice(`${scope}:deploy-notice:${row.id}`, 60_000).then((mine) => {
+                                if (!mine || document.hasFocus()) return;
+                                void notifyDesktop({
+                                    title: row.title,
+                                    body: row.body ?? undefined,
+                                    tag: `notification:${row.id}`,
+                                    href: row.href ?? undefined
+                                });
+                            });
+                        }
+                    }
                     // Every tab records what it has seen, so the one that ends up
                     // holding the connection later does not chime for a backlog it
                     // was already showing.

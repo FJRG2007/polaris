@@ -4,8 +4,9 @@
  * Installed from the browser, Polaris opens in its own window with its own icon
  * in the dock, the taskbar or the home screen - on Windows, macOS, Linux,
  * ChromeOS and Android alike - and stays whatever version the instance is
- * running, because it is the instance. That is the desktop app: nothing to
- * download, sign or keep updated separately.
+ * running, because it is the instance. Nothing to download, sign or keep
+ * updated separately; the native app in `desktop/` is the download for what a
+ * browser window cannot do.
  *
  * The colours are the dark theme's background (`--background` in the design
  * tokens), the one a window opens on before the page has painted.

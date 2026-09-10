@@ -8,6 +8,10 @@
  * `node_modules` and `.git` are left out on the way: the build installs what the
  * project needs, and neither belongs in what is sent. The same two are skipped on
  * the server too, so a zip made elsewhere is treated the same.
+ *
+ * Inside the Polaris desktop app, "Choose folder" hands the folder to the app,
+ * which zips it from the disk with the same exclusions and limits - they are
+ * copied in `desktop/src/main/zip-rules.ts`, and a change here belongs there too.
  */
 
 import * as deployActions from "./actions";
@@ -15,6 +19,7 @@ import { formatBytes } from "@polaris/core";
 import { Button, Input, cn } from "@polaris/ui";
 import { FolderUp, Loader2 } from "lucide-react";
 import { uploadedSourceAction } from "./source-actions";
+import { useDesktopBridge } from "@/components/desktop-app";
 import type { UploadedSource } from "@/lib/deploy/source-upload";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
 
@@ -107,16 +112,18 @@ export function SourceDropZone({
     const zipInput = useRef<HTMLInputElement>(null);
     const [over, setOver] = useState(false);
     const [reading, setReading] = useState(false);
+    const desktop = useDesktopBridge();
 
     useEffect(() => {
         // Not in React's typings: the attribute that makes a file input pick a folder.
         folderInput.current?.setAttribute("webkitdirectory", "");
     }, []);
 
-    async function take(work: () => Promise<PickedSource>) {
+    async function take(work: () => Promise<PickedSource | null>) {
         setReading(true);
         try {
-            onPicked(await work());
+            const next = await work();
+            if (next) onPicked(next);
         } catch (caught) {
             onPicked(null, caught instanceof Error ? caught.message : "Could not read that");
         } finally {
@@ -146,6 +153,21 @@ export function SourceDropZone({
             }
             for (const entry of entries) await walk(entry, "", files);
             return zipped(files, "upload");
+        });
+    }
+
+    /** Inside the desktop app the folder is picked with the system's dialog and
+     *  zipped from the disk, skipping node_modules without reading it. */
+    function chooseFolder() {
+        if (!desktop) {
+            folderInput.current?.click();
+            return;
+        }
+        void take(async () => {
+            const picked = await desktop.pickFolder();
+            if (!picked) return null;
+            if (!picked.ok) throw new Error(picked.error);
+            return { blob: new Blob([picked.zip], { type: "application/zip" }), name: picked.name, files: picked.files };
         });
     }
 
@@ -196,7 +218,7 @@ export function SourceDropZone({
                     size="sm"
                     variant="secondary"
                     disabled={disabled || reading}
-                    onClick={() => folderInput.current?.click()}
+                    onClick={chooseFolder}
                 >
                     Choose folder
                 </Button>

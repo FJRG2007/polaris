@@ -11,9 +11,9 @@ import { useRouter } from "next/navigation";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
 import { useStagedChanges } from "./staged-changes";
-import { ProjectAccessProvider } from "./access-context";
 import type { ProjectCapability } from "@polaris/core";
 import { isInFlightStatus } from "@/lib/deploy/status";
+import { ProjectAccessProvider } from "./access-context";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
 import {
@@ -183,6 +183,7 @@ export function ProjectDetail({
                 {detailApp && (
                     <ServiceDetail
                         app={detailApp}
+                        project={{ id: project.id, name: project.name }}
                         staged={stagedIds.has(detailApp.id)}
                         onChanged={refresh}
                         onClose={() => showService(null)}

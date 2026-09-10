@@ -20,11 +20,17 @@
  * It is also only ever raised by the tab holding the live connection - see
  * `shared-stream` - so a device with five tabs open makes one sound and draws
  * one notice.
+ *
+ * Inside the Polaris desktop app the notice is the app's own instead: drawn by
+ * the operating system through its bridge, with no permission prompt, and a
+ * press on it brings the app's window forward on the page it names.
  */
+
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 /** Whether this browser can do it at all. */
 export function canNotify(): boolean {
-    return typeof window !== "undefined" && "Notification" in window;
+    return desktopBridge() !== null || (typeof window !== "undefined" && "Notification" in window);
 }
 
 /** Whether the person is looking at this tab right now. */
@@ -39,6 +45,7 @@ export function tabIsWatched(): boolean {
  * everything after the first answer returns without prompting.
  */
 export async function mayNotify(): Promise<boolean> {
+    if (desktopBridge()) return true;
     if (!canNotify()) return false;
     if (Notification.permission === "granted") return true;
     if (Notification.permission === "denied") return false;
@@ -67,6 +74,11 @@ export async function notifyDesktop(input: {
     /** Whether it stays until it is dealt with. True for a call. */
     insistent?: boolean;
 }): Promise<{ close: () => void } | null> {
+    const app = desktopBridge();
+    if (app) {
+        const shown = await app.notify(input).catch(() => false);
+        return shown ? { close: () => void app.closeNotice(input.tag).catch(() => undefined) } : null;
+    }
     if (!(await mayNotify())) return null;
 
     try {

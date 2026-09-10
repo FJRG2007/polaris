@@ -366,7 +366,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Desktop app",
-                description: "Polaris installed as an app with its own window and icon, on any computer or phone.",
+                description:
+                    "Polaris in a window of its own: installed from the browser on any computer or phone, or the native app for Windows, macOS and Linux, which also pushes a build made with your computer's Docker and follows a service's logs in a window with system notifications.",
                 where: "Account > Preferences",
                 href: "/account/preferences"
             },

@@ -36,6 +36,7 @@ import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
 import { useDisplayFormat } from "@/components/display-format";
 import { TabAttentionDot, tabAttention } from "./attention-dot";
+import { DesktopServiceActions } from "@/components/desktop-app";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
@@ -166,11 +167,14 @@ const LINKED_TABS = [
 
 export function ServiceDetail({
     app,
+    project,
     staged,
     onChanged,
     onClose
 }: {
     app: ProjectApp;
+    /** The project the service is in, for what the desktop app opens and names. */
+    project: { id: string; name: string };
     /** Queued for removal in the changeset. The panel keeps working - the service
      *  is still up - but says so, and stops offering a second delete. */
     staged?: boolean;
@@ -211,6 +215,14 @@ export function ServiceDetail({
                         </span>
                     )}
                     <div className="ml-auto mr-8 flex shrink-0 items-center gap-1">
+                        <DesktopServiceActions
+                            projectId={project.id}
+                            projectName={project.name}
+                            serviceId={app.id}
+                            serviceName={app.name}
+                            canReadLogs={can("logs.read")}
+                            canDeploy={can("deploy.run")}
+                        />
                         <FollowToggle applicationId={app.id} />
                         <button
                             type="button"

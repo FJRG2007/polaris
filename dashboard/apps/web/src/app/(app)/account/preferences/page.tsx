@@ -10,13 +10,15 @@
  * somebody is reading on, not about the person.
  */
 
+import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
-import { saveDisplayPreferencesAction, saveTextSizeAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
-import { AccessibilityForm } from "@/components/accessibility-form";
-import { DeviceCacheCard } from "@/components/device-cache-card";
+import { desktopReleasesUrl } from "@/lib/desktop-release";
 import { InstallAppCard } from "@/components/installed-app";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
+import { DeviceCacheCard } from "@/components/device-cache-card";
+import { AccessibilityForm } from "@/components/accessibility-form";
+import { saveDisplayPreferencesAction, saveTextSizeAction } from "./actions";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import {
     getPlatformDisplayPreferences,
@@ -61,7 +63,7 @@ export default async function PreferencesPage() {
                 save={saveTextSizeAction}
             />
             <SpoilersCard />
-            <InstallAppCard />
+            <InstallAppCard downloadUrl={desktopReleasesUrl(loadEnv().POLARIS_REPO)} />
             <DeviceCacheCard />
         </div>
     );
