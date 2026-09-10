@@ -45,6 +45,7 @@ import {
     type MetricSpec
 } from "@/components/metrics-history";
 import {
+    Badge,
     Button,
     Checkbox,
     cn,
@@ -285,13 +286,27 @@ export function ServiceDetail({
 
 type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
 
-function depBadge(deployment: DepSummary): { label: string; cls: string } {
-    if (deployment.isCurrent) return { label: "ACTIVE", cls: "bg-success-soft text-success-ink" };
+/** A deployment's state as one chip. Every chip on a row is a Badge, so the
+ *  state, the rollback marks and the kept-image mark share one shape. */
+function depBadge(deployment: DepSummary): {
+    label: string;
+    variant: "success" | "danger" | "warning" | "neutral";
+} {
+    if (deployment.isCurrent) return { label: "Active", variant: "success" };
     if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
-        return { label: "FAILED", cls: "bg-danger-soft text-danger-ink" };
+        return { label: deployment.status === "cancelled" ? "Cancelled" : "Failed", variant: "danger" };
     if (["queued", "deploying"].includes(deployment.status))
-        return { label: deployment.status.toUpperCase(), cls: "bg-warning-soft text-warning-ink" };
-    return { label: "REMOVED", cls: "bg-muted text-muted-foreground" };
+        return { label: deployment.status === "queued" ? "Queued" : "Deploying", variant: "warning" };
+    return { label: "Removed", variant: "neutral" };
+}
+
+function StateBadge({ deployment }: { deployment: DepSummary }) {
+    const badge = depBadge(deployment);
+    return (
+        <Badge variant={badge.variant} className="shrink-0 uppercase tracking-wide">
+            {badge.label}
+        </Badge>
+    );
 }
 
 /** Whether a deployment has stopped moving. Everything else is still queued or
@@ -365,18 +380,27 @@ function duration(ms: number): string {
  *  past the window. Only for versions that are not live: the live one is the
  *  one everything else would be rolled back from. */
 function KeptChip({ deployment }: { deployment: DepSummary }) {
-    if (deployment.isCurrent || !deployment.imageKept) return null;
     return (
-        <span
-            title={
-                deployment.pinned
-                    ? "Kept until you stop keeping it - roll back to it at any time"
-                    : "Its image is still on the server - roll back to it instantly"
-            }
-            className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[0.6875rem] font-medium text-primary"
-        >
-            {deployment.pinned ? "Pinned" : "Instant rollback"}
-        </span>
+        <>
+            {deployment.rollbackOfId && (
+                <Badge variant="neutral" className="shrink-0" title="Put back from a kept image">
+                    Rollback
+                </Badge>
+            )}
+            {!deployment.isCurrent && deployment.imageKept && (
+                <Badge
+                    variant="primary"
+                    className="shrink-0"
+                    title={
+                        deployment.pinned
+                            ? "Kept until you stop keeping it - roll back to it at any time"
+                            : "Its image is still on the server - roll back to it instantly"
+                    }
+                >
+                    {deployment.pinned ? "Pinned" : "Instant rollback"}
+                </Badge>
+            )}
+        </>
     );
 }
 
@@ -691,9 +715,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     {active && (
                         <div className="overflow-hidden rounded-xl border border-success-edge bg-success/[0.06]">
                             <div className="flex items-center gap-3 p-3">
-                                <span className="shrink-0 rounded bg-success-soft px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-success-ink">
-                                    ACTIVE
-                                </span>
+                                <StateBadge deployment={active} />
                                 <DeployAvatar app={app} deployment={active} />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium text-foreground">
@@ -703,6 +725,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                         {deploySubtitle(active, app, format)}
                                     </p>
                                 </div>
+                                {active.commitSha && (
+                                    <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                                        <CommitRef deployment={active} />
+                                    </span>
+                                )}
+                                <KeptChip deployment={active} />
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -772,7 +800,6 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             {historyOpen && (
                                 <ul className="flex flex-col gap-2">
                                     {history.map((deployment) => {
-                                        const badge = depBadge(deployment);
                                         const failed = [
                                             "failed",
                                             "cancelled",
@@ -789,14 +816,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                         : "border-border/60"
                                                 )}
                                             >
-                                                <span
-                                                    className={cn(
-                                                        "shrink-0 rounded px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide",
-                                                        badge.cls
-                                                    )}
-                                                >
-                                                    {badge.label}
-                                                </span>
+                                                <StateBadge deployment={deployment} />
                                                 <DeployAvatar app={app} deployment={deployment} />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate font-medium text-foreground">
@@ -809,6 +829,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                         <InFlightSteps deploymentId={deployment.id} />
                                                     )}
                                                 </div>
+                                                {deployment.commitSha && (
+                                                    <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                                                        <CommitRef deployment={deployment} />
+                                                    </span>
+                                                )}
                                                 <KeptChip deployment={deployment} />
                                                 <ReleaseLink deployment={deployment} />
                                                 {/* A deploy still in flight is listed
@@ -1017,7 +1042,6 @@ function DeploymentLogsView({
     const [chosen, setChosen] = useState<(typeof CATS)[number] | null>(null);
     const building = !deployment || !isSettled(deployment);
     const cat = chosen ?? (building ? "Build Logs" : "Deploy Logs");
-    const badge = deployment ? depBadge(deployment) : null;
 
     return (
         <div className="flex flex-col gap-2 py-2">
@@ -1043,13 +1067,7 @@ function DeploymentLogsView({
                         </span>
                     </>
                 )}
-                {badge && (
-                    <span
-                        className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}
-                    >
-                        {badge.label}
-                    </span>
-                )}
+                {deployment && <StateBadge deployment={deployment} />}
                 {deployment && (
                     <span className="ml-auto text-xs text-muted-foreground">
                         {format.dateTime(deployment.createdAt)}
