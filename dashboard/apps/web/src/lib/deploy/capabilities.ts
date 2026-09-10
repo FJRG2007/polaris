@@ -266,6 +266,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
                 description: "A domain served through Cloudflare, with its cache emptied after every deploy.",
                 where: "Service > Settings",
                 href: PROJECTS
+            },
+            {
+                title: "Global edge",
+                description:
+                    "A domain served through Cloudflare's proxy is answered from their network worldwide, on their anycast addresses, and reaches your server only for what the cache cannot answer.",
+                where: "Service > Settings",
+                href: PROJECTS
             }
         ]
     },
@@ -417,10 +424,25 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         items: [
             {
                 title: "Firewall",
-                description: "Rules, bans and injection protection in front of every service.",
+                description:
+                    "Rules, bans and injection protection in front of every service. A new service publishes no port on the machine; it is reached through the edge only.",
                 where: "Firewall",
                 href: "/apps/firewall",
                 needs: "deploy.manage"
+            },
+            {
+                title: "DDoS protection",
+                description:
+                    "A browser challenge, connection caps and a flood watch on every server's edge, and Cloudflare's network in front of any domain served through its proxy.",
+                where: "Service > Settings",
+                href: PROJECTS
+            },
+            {
+                title: "Security headers",
+                description:
+                    "HSTS, CSP, COOP and COEP as presets or one by one. A new service starts on the preset any app survives.",
+                where: "Service > Settings",
+                href: PROJECTS
             },
             {
                 title: "Encrypted secrets",
