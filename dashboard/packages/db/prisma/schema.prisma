@@ -3949,9 +3949,74 @@ model Application {
     target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
     domains     Domain[]
     volumes     Volume[]
+    crons       ServiceCron[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
+}
+
+// A command a service runs on a schedule, inside its own running container, the
+// way a crontab line runs on a server: the service's code, its variables and its
+// network, with nothing new to deploy. Runs are kept with their output so a job
+// that failed at three in the morning can say why at nine.
+model ServiceCron {
+    id                String    @id @default(uuid(7)) @db.Uuid
+    applicationId     String    @db.Uuid
+    name              String
+    // Five-field cron expression or a shorthand (@daily), in `timezone`.
+    schedule          String
+    timezone          String    @default("UTC")
+    // Run with `sh -c` inside the service's container.
+    command           String
+    // Stopped after this long; the run is recorded as timed out.
+    timeoutSeconds    Int       @default(900)
+    // Tries in all, counting the first. A failed try waits `retryDelaySeconds`
+    // times the attempt number before the next.
+    maxAttempts       Int       @default(1)
+    retryDelaySeconds Int       @default(60)
+    enabled           Boolean   @default(true)
+    // When the schedule next fires, and when a retry of the last run is due -
+    // the one the scheduler reads, so it is one indexed column rather than a
+    // computation per job per minute.
+    nextRunAt         DateTime?
+    retryAt           DateTime?
+    retryAttempt      Int       @default(0)
+    lastRunAt         DateTime?
+    // succeeded | failed | timed_out, of the last finished run.
+    lastStatus        String?
+    createdById       String?   @db.Uuid
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+
+    application Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    runs        ServiceCronRun[]
+
+    @@index([applicationId])
+    @@index([enabled, nextRunAt])
+    @@index([retryAt])
+}
+
+// One run of a scheduled command, and what it printed.
+model ServiceCronRun {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    cronId     String    @db.Uuid
+    // schedule | manual | retry
+    trigger    String
+    attempt    Int       @default(1)
+    // running | succeeded | failed | timed_out | skipped (the previous run was
+    // still going when this one was due)
+    status     String    @default("running")
+    exitCode   Int?
+    // The last 64 KB of stdout and stderr together - the end of a log is where
+    // the reason is.
+    output     String    @default("")
+    error      String?
+    startedAt  DateTime  @default(now())
+    finishedAt DateTime?
+
+    cron ServiceCron @relation(fields: [cronId], references: [id], onDelete: Cascade)
+
+    @@index([cronId, startedAt])
 }
 
 // A service this project runs somewhere that is not Polaris.

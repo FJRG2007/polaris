@@ -16,22 +16,22 @@
 
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
+import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepExpiredSends } from "@/lib/vault/sends";
+import { sweepDueSends } from "@/lib/mailbox/compose";
+import { pruneTelemetry } from "@/lib/telemetry/store";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
-import { pruneTelemetry } from "@/lib/telemetry/store";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
+import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
+import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { expireTransfers } from "@/lib/drive-transfer-service";
-import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
-import { wakeSnoozed } from "@/lib/mailbox/messages";
-import { sweepDueSends } from "@/lib/mailbox/compose";
-import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
-import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
+import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
@@ -39,6 +39,7 @@ import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
+import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
@@ -345,6 +346,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepOrphanUploads
+    },
+    {
+        key: "service-crons",
+        // Every minute, because a cron's finest grain is the minute. Not leased:
+        // each firing is claimed by a compare-and-swap on the job's own row, so
+        // two processes cannot both start the same one, and a lease here would
+        // hold every job hostage to the slowest.
+        everyMs: MINUTE,
+        leaseMs: null,
+        run: tickServiceCrons
     },
     {
         key: "chat-scheduled",

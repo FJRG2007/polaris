@@ -31,6 +31,7 @@ export * from "./profile-style.js";
 export * from "./connection-providers.js";
 export * from "./mailbox-category.js";
 export * from "./deploy-references.js";
+export * from "./cron.js";
 export * from "./mailbox-folder-look.js";
 export * from "./mailbox-list.js";
 export * from "./mail-prefs.js";

@@ -8,6 +8,7 @@
  */
 
 import Link from "next/link";
+import { CronPanel } from "./cron-panel";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
@@ -109,6 +110,7 @@ const TABS = [
     "Console",
     "Files",
     "Volumes",
+    "Cron",
     "Notes",
     "Settings"
 ] as const;
@@ -127,6 +129,9 @@ const TAB_CAPABILITY: Record<Tab, readonly ProjectCapability[]> = {
     Console: ["console.use"],
     Files: ["files.read"],
     Volumes: ["project.read"],
+    // Seeing jobs and their output is reading logs; changing or running one is
+    // gated again inside, on the console.
+    Cron: ["logs.read"],
     Notes: ["project.read"],
     // Settings holds three separate jobs - how the service is built, where it
     // answers, and removing it - so any one of them is enough to open it, and the
@@ -257,6 +262,7 @@ export function ServiceDetail({
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
                     {tab === "Volumes" && <VolumesTab app={app} />}
+                    {tab === "Cron" && <CronPanel applicationId={app.id} />}
                     {tab === "Notes" && <NotesTab applicationId={app.id} />}
                     {tab === "Settings" && (
                         <SettingsTab

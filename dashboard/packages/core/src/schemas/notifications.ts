@@ -97,6 +97,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: false, email: false }
     },
     {
+        id: "cron.failed",
+        group: "deploy",
+        label: "A scheduled job failed",
+        description: "A service's scheduled command failed on its last try, or ran out of time.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "domain.down",
         group: "deploy",
         label: "A domain stopped serving",
