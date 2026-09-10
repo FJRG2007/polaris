@@ -280,6 +280,13 @@ export function replicaNames(name: string, count: number): string[] {
  * by name is spread over all of them. They carry the same labels, which the edge
  * merges into one service it balances over. Swarm scales natively and never comes
  * through here.
+ *
+ * A release that stands beside the one it replaces runs under names of its own and
+ * answers to the service's names by alias. Each of its copies also answers to the
+ * matching copy name of every alias - its second copy to the service's own second
+ * copy name - so the edge, which dials the service's copies by those names, finds
+ * the new copies beside the old ones and only the new ones once the old are gone,
+ * with no route rewritten in between.
  */
 export function expandReplicas(spec: ComposeSpec): ComposeSpec {
     return {
@@ -287,8 +294,23 @@ export function expandReplicas(spec: ComposeSpec): ComposeSpec {
         services: spec.services.flatMap(({ replicas, ...service }) => {
             if (!replicas || replicas <= 1) return [service];
             const [, ...copies] = replicaNames(service.name, replicas);
-            const aliases = [...(service.aliases ?? []), service.name];
-            return [service, ...copies.map((name) => ({ ...service, name, ports: [], aliases }))];
+            const shared = service.aliases ?? [];
+            const numbered = shared.map((alias) => replicaNames(alias, replicas));
+            return [
+                service,
+                ...copies.map((name, index) => ({
+                    ...service,
+                    name,
+                    ports: [],
+                    aliases: [
+                        ...new Set([
+                            ...shared,
+                            service.name,
+                            ...numbered.map((names) => names[index + 1]!)
+                        ])
+                    ]
+                }))
+            ];
         })
     };
 }

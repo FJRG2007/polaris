@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseAppEdgeConfig } from "@polaris/core";
 import { traefikLabels } from "../src/traefik.js";
-import { expandReplicas, replicaNames, type ComposeSpec } from "../src/compose-spec.js";
+import { parseAppEdgeConfig } from "@polaris/core";
+import { expandReplicas, renderComposeYaml, replicaNames, type ComposeSpec } from "../src/compose-spec.js";
 
 describe("a service with more than one copy", () => {
     const spec: ComposeSpec = {
@@ -42,6 +42,33 @@ describe("a service with more than one copy", () => {
     it("leaves a single copy exactly as it was", () => {
         const single = { ...spec, services: [{ ...spec.services[0]!, replicas: undefined }] };
         expect(expandReplicas(single)).toEqual(single);
+    });
+
+    it("gives each copy of a release beside the running one the service's name for that copy", () => {
+        const release: ComposeSpec = {
+            ...spec,
+            project: "p-abc1234",
+            services: [{ ...spec.services[0]!, name: "web-abc1234", ports: [], aliases: ["web"] }]
+        };
+        const expanded = expandReplicas(release);
+        expect(expanded.services.map((service) => service.name)).toEqual([
+            "web-abc1234",
+            "web-abc1234-r2",
+            "web-abc1234-r3"
+        ]);
+        // The first answers to the service's own name, as a single copy does; every
+        // other copy to that name, its release's first name, and its own copy name -
+        // which is what the edge dials, so the new copies take over those names as the
+        // old ones go.
+        expect(expanded.services[0]?.aliases).toEqual(["web"]);
+        expect(expanded.services[1]?.aliases).toEqual(["web", "web-abc1234", "web-r2"]);
+        expect(expanded.services[2]?.aliases).toEqual(["web", "web-abc1234", "web-r3"]);
+        // Labelled alike, so an edge that reads the labels merges them into one.
+        expect(new Set(expanded.services.map((service) => JSON.stringify(service.labels))).size).toBe(1);
+        // Every name the copies answer to is on every network they join.
+        const yaml = renderComposeYaml(expanded, "/v", "/m");
+        expect(yaml).toContain("  web-abc1234-r2:\n");
+        expect(yaml).toContain('      polaris-proxy:\n        aliases:\n          - "web"\n          - "web-abc1234"\n          - "web-r2"');
     });
 
     it("keeps every copy's name a DNS label", () => {
