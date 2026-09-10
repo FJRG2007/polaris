@@ -176,7 +176,8 @@ export async function deployEnvironment(
     environmentId: string,
     ownerId: string,
     userId: string,
-    commit?: { sha: string; message?: string; authorName?: string | null; authorAvatarUrl?: string | null }
+    commit?: { sha: string; message?: string; authorName?: string | null; authorAvatarUrl?: string | null },
+    trigger: "manual" | "preview" = "manual"
 ): Promise<{ started: number; failed: string[] }> {
     const [databases, applications] = await Promise.all([
         prisma.managedDatabase.findMany({
@@ -216,9 +217,10 @@ export async function deployEnvironment(
                           commitSha: commit.sha,
                           commitMessage: commit.message,
                           authorName: commit.authorName ?? undefined,
-                          authorAvatarUrl: commit.authorAvatarUrl ?? undefined
+                          authorAvatarUrl: commit.authorAvatarUrl ?? undefined,
+                          trigger
                       }
-                    : undefined
+                    : { trigger }
             );
             if (repositoryBuilt && commit) {
                 // The poller would otherwise see a new head and deploy it again.
@@ -314,12 +316,18 @@ export async function ensurePullRequestPreview(pull: {
                 preview: { pullRequest: pull.number, repo: pull.repo.toLowerCase() }
             });
             await prisma.environment.update({ where: { id: environment.id }, data: { previewSha: pull.headSha } });
-            const result = await deployEnvironment(environment.id, project.ownerId, project.ownerId, {
-                sha: pull.headSha,
-                message: pull.title,
-                authorName: pull.authorName,
-                authorAvatarUrl: pull.authorAvatarUrl
-            });
+            const result = await deployEnvironment(
+                environment.id,
+                project.ownerId,
+                project.ownerId,
+                {
+                    sha: pull.headSha,
+                    message: pull.title,
+                    authorName: pull.authorName,
+                    authorAvatarUrl: pull.authorAvatarUrl
+                },
+                "preview"
+            );
             if (result.failed.length > 0) {
                 console.warn(`polaris: preview for ${pull.repo}#${pull.number}: ${result.failed.join("; ")}`);
             }

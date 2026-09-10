@@ -83,7 +83,8 @@ export async function pollAutoDeploys(): Promise<void> {
                 commitMessage: latest.message,
                 commitSha: latest.sha,
                 authorName: latest.authorName ?? undefined,
-                authorAvatarUrl: latest.authorAvatarUrl ?? undefined
+                authorAvatarUrl: latest.authorAvatarUrl ?? undefined,
+                trigger: "push"
             });
             await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
         } catch {

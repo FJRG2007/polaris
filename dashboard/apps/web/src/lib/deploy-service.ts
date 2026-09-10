@@ -1105,7 +1105,9 @@ export async function setApplicationPublishPort(
     await syncAppRoutes();
     if (view.local) await repointConnectors(applicationId, ownerId);
     if (!app.currentDeploymentId) return { redeployed: false };
-    await deployApplication(applicationId, ownerId, ownerId);
+    // The port only changes when the container is recreated, and recreated is
+    // all it needs: the live release is started again rather than rebuilt.
+    await restartFromKeptImage(applicationId, ownerId, ownerId, "settings");
     return { redeployed: true };
 }
 
@@ -1881,10 +1883,11 @@ export async function setApplicationRunning(
     ownerId: string,
     running: boolean
 ): Promise<void> {
-    // Starting recreates from the current spec so it comes up with the latest env;
+    // Starting recreates from the current spec so it comes up with the latest env -
+    // from the live release's kept image, not a fresh build of today's source;
     // stopping just halts the container while keeping the deployment record.
     if (running) {
-        await deployApplication(applicationId, ownerId, ownerId);
+        await restartFromKeptImage(applicationId, ownerId, ownerId, "settings");
         await prisma.application.update({
             where: { id: applicationId },
             data: { desiredState: "running" }
@@ -2415,11 +2418,12 @@ function stringOrNull(value: unknown): string | null {
 /** Merge environment-scoped and application-scoped env vars (app wins), decrypting
  *  any secret values. */
 /**
- * Redeploy the currently-deployed app(s) a variable change affects, so new values
+ * Put a variable change into every running service it affects, so new values
  * take effect without a manual redeploy (Vercel-style). Application scope hits the
  * one service; environment scope hits every deployed service that shares it.
- * Best-effort and only for already-deployed apps - a change on an undeployed app
- * simply applies on its first deploy.
+ * Each is started again from its live release's kept image rather than rebuilt
+ * (see `restartFromKeptImage`). Best-effort and only for already-deployed apps -
+ * a change on an undeployed app simply applies on its first deploy.
  */
 export async function redeployForEnvScope(
     scope: "application" | "environment",
@@ -2440,7 +2444,7 @@ export async function redeployForEnvScope(
               };
     const apps = await prisma.application.findMany({ where, select: { id: true } });
     for (const app of apps) {
-        await deployApplication(app.id, ownerId, ownerId).catch(() => undefined);
+        await restartFromKeptImage(app.id, ownerId, ownerId, "variables").catch(() => undefined);
     }
 }
 
@@ -2593,8 +2597,11 @@ export async function deployApplication(
         commitSha?: string;
         authorName?: string;
         authorAvatarUrl?: string;
+        /** What started it, for the history. Manual when nobody says. */
+        trigger?: DeploymentTrigger;
     },
-    /** A rollback: run this earlier release's kept image instead of building. */
+    /** Run a kept release image instead of building: a rollback, or the live
+     *  release started again with changed variables. */
     rollback?: RollbackSource
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
@@ -2664,7 +2671,11 @@ export async function deployApplication(
             authorName,
             authorAvatarUrl,
             isolated: keepsHistory,
-            rollbackOfId: rollback?.deploymentId ?? null
+            // Only a rollback points back at the release it restored; a variable
+            // change re-runs the live one and is not a step back.
+            rollbackOfId:
+                rollback && (rollback.kind ?? "rollback") === "rollback" ? rollback.deploymentId : null,
+            trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
         }
     });
     // Put it in the commit's deployment box before anything else happens, so a
@@ -2714,7 +2725,11 @@ export async function deployApplication(
     return deployment.id;
 }
 
-/** What a rollback carries over from the release it goes back to. */
+/** What started a deployment, as the history names it. `settings` is the live
+ *  release started again because something about how it runs changed. */
+export type DeploymentTrigger = "manual" | "push" | "preview" | "rollback" | "variables" | "settings";
+
+/** What a run of a kept image carries over from the release it runs. */
 export interface RollbackSource {
     readonly deploymentId: string;
     readonly imageTag: string;
@@ -2722,6 +2737,65 @@ export interface RollbackSource {
     readonly commitMessage: string | null;
     readonly authorName: string | null;
     readonly authorAvatarUrl: string | null;
+    /** A rollback to an earlier release, or the live one again with changed
+     *  variables or settings. Rollback when absent. */
+    readonly kind?: "rollback" | "variables" | "settings";
+}
+
+/**
+ * Put changed variables into a running service without building it again.
+ *
+ * A container reads its environment when it starts, so a changed variable only
+ * reaches the service when its container is recreated - but recreated is all it
+ * needs. The live release's image is kept on the server, so it is started again
+ * from that image with today's variables: no clone, no build, seconds instead
+ * of minutes, and the same code that was running. It goes through the ordinary
+ * pipeline, so it has a row in the history (marked as a variable change), a log,
+ * and the old container stays up until the new one is.
+ *
+ * A service whose live release predates kept images has nothing to start again
+ * from; it is rebuilt, as every variable change used to be.
+ *
+ * The same holds for anything else that only needs the container recreated - a
+ * stopped service started again, a port opened or closed - which is `settings`.
+ */
+export async function restartFromKeptImage(
+    applicationId: string,
+    ownerId: string,
+    userId: string,
+    reason: "variables" | "settings" = "variables"
+): Promise<string> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { currentDeploymentId: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const live = app.currentDeploymentId
+        ? await prisma.deployment.findUnique({
+              where: { id: app.currentDeploymentId },
+              select: {
+                  id: true,
+                  imageTag: true,
+                  imageKept: true,
+                  commitSha: true,
+                  commitMessage: true,
+                  authorName: true,
+                  authorAvatarUrl: true
+              }
+          })
+        : null;
+    if (!live?.imageKept || !isReleaseImage(live.imageTag)) {
+        return deployApplication(applicationId, ownerId, userId, { trigger: reason });
+    }
+    return deployApplication(applicationId, ownerId, userId, undefined, {
+        deploymentId: live.id,
+        imageTag: live.imageTag,
+        commitSha: live.commitSha,
+        commitMessage: live.commitMessage,
+        authorName: live.authorName,
+        authorAvatarUrl: live.authorAvatarUrl,
+        kind: reason
+    });
 }
 
 /**
@@ -2910,6 +2984,8 @@ export interface DeploymentSummary {
     pinned: boolean;
     /** The release this one rolled back to, when it was a rollback. */
     rollbackOfId: string | null;
+    /** What started it; null for deployments made before this was recorded. */
+    trigger: DeploymentTrigger | null;
     /** How long it took from starting to finishing, when it has finished. */
     durationMs: number | null;
 }
@@ -3042,6 +3118,7 @@ export async function listDeployments(
             imageKept: true,
             pinned: true,
             rollbackOfId: true,
+            trigger: true,
             startedAt: true,
             finishedAt: true
         }
@@ -3077,6 +3154,7 @@ export async function listDeployments(
         imageKept: row.imageKept,
         pinned: row.pinned,
         rollbackOfId: row.rollbackOfId,
+        trigger: (row.trigger as DeploymentTrigger | null) ?? null,
         durationMs:
             row.startedAt && row.finishedAt
                 ? row.finishedAt.getTime() - row.startedAt.getTime()
@@ -3434,7 +3512,8 @@ export async function triggerAutoDeploysForPush(input: {
         try {
             await deployApplication(app.id, ownerId, ownerId, {
                 commitMessage: input.commitMessage,
-                commitSha: input.commitSha
+                commitSha: input.commitSha,
+                trigger: "push"
             });
             await prisma.application.update({
                 where: { id: app.id },

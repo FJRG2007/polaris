@@ -4210,6 +4210,9 @@ model Deployment {
     // The deployment this one rolled back to, when it was a rollback rather
     // than a build. Its image is that deployment's image.
     rollbackOfId   String?   @db.Uuid
+    // What started it: manual | push | preview | rollback | variables. Null on
+    // every deployment made before this was recorded.
+    trigger        String?
     triggeredById  String?   @db.Uuid
     startedAt      DateTime?
     finishedAt     DateTime?

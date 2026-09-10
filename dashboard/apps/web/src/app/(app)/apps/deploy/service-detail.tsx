@@ -327,12 +327,22 @@ function DeployAvatar({ app, deployment }: { app: ProjectApp; deployment?: DepSu
     );
 }
 
-/** Deployment subtitle: relative time, optional author, the source, and how long
- *  it took once it has finished. A rollback says so instead of naming a source,
- *  since nothing was fetched from one. */
+/** Deployment subtitle: relative time, optional author, what started it, and how
+ *  long it took once it has finished. A rollback or a restart with changed
+ *  variables says so instead of naming a source, since nothing was built. */
 function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: DisplayFormat): string {
     const by = deployment.authorName ? ` by ${deployment.authorName}` : "";
-    const via = deployment.rollbackOfId ? " - rolled back" : ` via ${sourceLabel(app)}`;
+    const via = deployment.rollbackOfId
+        ? " - rolled back"
+        : deployment.trigger === "variables"
+          ? " - variables changed, not rebuilt"
+          : deployment.trigger === "settings"
+            ? " - restarted with new settings, not rebuilt"
+            : deployment.trigger === "preview"
+              ? ` - pull request preview via ${sourceLabel(app)}`
+              : deployment.trigger === "push"
+                ? ` - pushed to ${sourceLabel(app)}`
+                : ` via ${sourceLabel(app)}`;
     const took = deployment.durationMs !== null ? ` - took ${duration(deployment.durationMs)}` : "";
     return `${relativeTime(deployment.createdAt, format)}${by}${via}${took}`;
 }
