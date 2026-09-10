@@ -3976,6 +3976,11 @@ model Application {
     // limit. Applied the next time it is started.
     cpuLimit            Float?
     memoryLimitMb       Int?
+    // Stop the service after this many minutes with no request at the edge, and
+    // start it again on the next one. Null keeps it running.
+    sleepAfterMinutes   Int?
+    // When it was put to sleep; null while it is awake.
+    asleepSince         DateTime?
     // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
     currentDeploymentId String?   @db.Uuid
     // Auto-deploy on git push (Vercel-style): redeploy when a matching commit lands.

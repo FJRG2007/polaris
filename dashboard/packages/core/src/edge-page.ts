@@ -66,6 +66,9 @@ export interface EdgePageInput {
     /** A script the page runs, allowed by the nonce in the response's own CSP. Only
      *  the challenge page has one; every other edge page is inert markup. */
     readonly script?: { readonly nonce: string; readonly source: string };
+    /** Reload the page by itself after this many seconds - for a page that is only
+     *  there while something the visitor is waiting for gets ready. */
+    readonly refreshSeconds?: number;
 }
 
 /** Render one edge page. */
@@ -82,7 +85,8 @@ export function edgePage(input: EdgePageInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
+<meta name="robots" content="noindex, nofollow">${input.refreshSeconds ? `
+<meta http-equiv="refresh" content="${Math.round(input.refreshSeconds)}">` : ""}
 <title>${input.title}</title>
 <style>
 :root {

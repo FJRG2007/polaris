@@ -26,6 +26,8 @@ interface Draft {
     healthPath: string;
     cpus: string;
     memoryMb: string;
+    sleeps: boolean;
+    sleepAfter: string;
 }
 
 function draftOf(view: ServiceScalingView): Draft {
@@ -38,7 +40,9 @@ function draftOf(view: ServiceScalingView): Draft {
         sticky: view.balancing.sticky,
         healthPath: view.balancing.healthPath ?? "",
         cpus: view.limits.cpus === null ? "" : String(view.limits.cpus),
-        memoryMb: view.limits.memoryMb === null ? "" : String(view.limits.memoryMb)
+        memoryMb: view.limits.memoryMb === null ? "" : String(view.limits.memoryMb),
+        sleeps: view.sleepAfterMinutes !== null,
+        sleepAfter: String(view.sleepAfterMinutes ?? 30)
     };
 }
 
@@ -54,10 +58,15 @@ function parse(draft: Draft) {
         limits: {
             cpus: draft.cpus.trim() ? Number(draft.cpus) : null,
             memoryMb: draft.memoryMb.trim() ? Number(draft.memoryMb) : null
-        }
+        },
+        sleepAfterMinutes: draft.sleeps ? Number(draft.sleepAfter) : null
     };
     const parsed = core.serviceScalingSchema
-        .extend({ balancing: core.edgeBalancingSchema, limits: core.resourceLimitsSchema })
+        .extend({
+            balancing: core.edgeBalancingSchema,
+            limits: core.resourceLimitsSchema,
+            sleepAfterMinutes: core.serviceSleepSchema
+        })
         .safeParse(input);
     return parsed.success
         ? { input: parsed.data, problem: null }
@@ -187,6 +196,37 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                                 />
                             </label>
                         </div>
+                    )}
+
+                    <div className="flex items-start justify-between gap-3">
+                        <span>
+                            <span className="font-medium">Sleep when nobody visits</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Stop the service after a stretch with no visits, and start it on the next one. The
+                                first visitor sees a page saying it is waking up for the few seconds that takes.
+                                {view.asleep && " It is asleep now."}
+                                {view.sleepBlocked && ` ${view.sleepBlocked}`}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={draft.sleeps}
+                            onChange={(value) => set({ sleeps: value })}
+                            disabled={view.sleepBlocked !== null && !draft.sleeps}
+                            aria-label="Sleep when nobody visits"
+                        />
+                    </div>
+                    {draft.sleeps && (
+                        <label className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">After (minutes without a visit)</span>
+                            <Input
+                                type="number"
+                                min={core.SLEEP_AFTER_MIN_MINUTES}
+                                max={core.SLEEP_AFTER_MAX_MINUTES}
+                                value={draft.sleepAfter}
+                                onChange={(event) => set({ sleepAfter: event.target.value })}
+                                className="w-28"
+                            />
+                        </label>
                     )}
 
                     <div className="flex flex-col gap-1">

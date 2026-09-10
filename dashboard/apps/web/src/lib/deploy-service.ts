@@ -1201,6 +1201,7 @@ export async function syncAppRoutes(): Promise<void> {
                     sourceType: true,
                     sourceConfig: true,
                     replicas: true,
+                    asleepSince: true,
                     target: { select: { kind: true, hostId: true, runtime: true } },
                     environment: {
                         select: { project: { select: { slug: true, ownerId: true } } }
@@ -1311,6 +1312,7 @@ export async function syncAppRoutes(): Promise<void> {
                           id: true,
                           slug: true,
                           publishPort: true,
+                          asleepSince: true,
                           currentDeploymentId: true,
                           sourceType: true,
                           sourceConfig: true,
@@ -1409,6 +1411,7 @@ export async function syncAppRoutes(): Promise<void> {
                     own ? domain.application.currentDeploymentId : null,
                     localIp
                 ),
+                asleep: domain.application.asleepSince !== null,
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 presets: rule.presets,
@@ -1441,6 +1444,7 @@ export async function syncAppRoutes(): Promise<void> {
                     ? serviceName(app.environment.project.slug, app.slug, app.id)
                     : localIp,
                 dialPort: privately ? containerPortOf(app) : hostPortForApp(app.id),
+                asleep: app.asleepSince !== null,
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 presets: rule.presets,
@@ -1990,7 +1994,7 @@ export async function setApplicationRunning(
     // not leave the app claiming it should be up, or the next reconcile undoes it.
     await prisma.application.update({
         where: { id: applicationId },
-        data: { desiredState: "stopped" }
+        data: { desiredState: "stopped", asleepSince: null }
     });
     const ports = await getPorts(target, ownerId);
     try {
@@ -2004,6 +2008,28 @@ export async function setApplicationRunning(
             data: { status: "stopped" }
         });
     }
+}
+
+/**
+ * Stop a service for being idle, or start it again for a visit.
+ *
+ * Not a stop the operator asked for: `desiredState` stays "running", so every
+ * screen and the boot reconcile still treat it as a service that should be up, and
+ * `asleepSince` is what says why it is not. The container is stopped and started
+ * as it is, so it wakes in seconds with the same release and variables.
+ */
+export async function setApplicationAsleep(applicationId: string, ownerId: string, asleep: boolean): Promise<void> {
+    const { container, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    try {
+        await ports.container(container, asleep ? "stop" : "start");
+    } finally {
+        await ports.dispose();
+    }
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { asleepSince: asleep ? new Date() : null }
+    });
 }
 
 /**
@@ -4229,7 +4255,8 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
     }
     await prisma.application.update({
         where: { id: dep.deployableId },
-        data: { currentDeploymentId: deploymentId }
+        // A release that just came up is awake, whatever its service was before.
+        data: { currentDeploymentId: deploymentId, asleepSince: null }
     });
     await retireOldReleases(dep.deployableId).catch((error) => {
         console.error("polaris: could not retire superseded releases:", error);

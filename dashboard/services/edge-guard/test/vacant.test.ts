@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { sendVacant } from "../src/vacant.js";
 import type { ServerResponse } from "node:http";
-import { VACANT_DOWN_PATH, VACANT_HEADER, VACANT_HEADER_VALUE, VACANT_PATH } from "@polaris/core";
+import { VACANT_ASLEEP_PATH, VACANT_DOWN_PATH, VACANT_HEADER, VACANT_HEADER_VALUE, VACANT_PATH } from "@polaris/core";
 
 /** A ServerResponse stand-in that records what was written to it. */
 function capture() {
@@ -46,6 +46,16 @@ describe("sendVacant", () => {
 
         expect(written.status).toBe(502);
         expect(written.body).toContain("This app is not running");
+    });
+
+    it("answers an app waking up as a 503 that says when to ask again", () => {
+        const { res, written } = capture();
+
+        sendVacant(res, { accept: HTML, host: "app.plr.example.com", path: VACANT_ASLEEP_PATH });
+
+        expect(written.status).toBe(503);
+        expect(written.headers["retry-after"]).toBe("5");
+        expect(written.body).toContain("This app is waking up");
     });
 
     it("answers anything that is not a browser with text", () => {

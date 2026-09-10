@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    VACANT_ASLEEP_PATH,
     VACANT_DOWN_PATH,
     VACANT_PATH,
     vacantCode,
@@ -75,5 +76,21 @@ describe("the state a request is answered in", () => {
         expect(vacantStateForPath(`${VACANT_PATH}?state=down`)).toBe("missing");
         expect(vacantStateForPath(`${VACANT_PATH}?status=502`)).toBe("missing");
         expect(vacantStateForPath(`${VACANT_PATH}/../down`)).toBe("missing");
+    });
+});
+
+describe("an app that is asleep", () => {
+    it("answers 503 with a page that reloads itself while the app starts", () => {
+        expect(vacantStateForPath(VACANT_ASLEEP_PATH)).toBe("asleep");
+        expect(vacantStatus("asleep")).toBe(503);
+        expect(vacantCode("asleep")).toBe("SERVICE_WAKING_UP");
+        const page = vacantPage({ reference: REFERENCE, host: "shop.example.com", state: "asleep" });
+        expect(page).toContain("This app is waking up");
+        expect(page).toContain('<meta http-equiv="refresh" content="5">');
+        expect(page).toContain("shop.example.com");
+    });
+
+    it("never reloads a page that is not waiting on anything", () => {
+        expect(vacantPage({ reference: REFERENCE, host: "x.example.com", state: "down" })).not.toContain("http-equiv");
     });
 });

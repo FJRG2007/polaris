@@ -101,6 +101,8 @@ describe("the work Polaris runs on a schedule", () => {
             "runtime-logs",
             // Two passes would both see the same streak and both add a copy.
             "service-autoscale",
+            // Two passes would both stop, or both start, the same container.
+            "service-sleep",
             "task-reminders",
             "task-trackers"
         ]);

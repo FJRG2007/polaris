@@ -21,13 +21,14 @@ import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { pruneTelemetry } from "@/lib/telemetry/store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
-import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepMailServers } from "@/lib/mail-server/health";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
+import { scanServiceUpdates } from "@/lib/deploy/update-scan";
+import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -410,6 +411,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: MINUTE,
         leaseMs: 5 * MINUTE,
         run: () => runAutoscale()
+    },
+    {
+        key: "service-sleep",
+        // Every fifteen seconds: this is also what wakes a sleeping service, and the
+        // visitor is looking at the waking page for as long as it takes. A pass with
+        // no service that sleeps reads nothing.
+        everyMs: 15_000,
+        // Leased, so two processes never both stop or start the same container.
+        leaseMs: 2 * MINUTE,
+        run: () => runSleepPass()
     },
     {
         key: "update-scan",

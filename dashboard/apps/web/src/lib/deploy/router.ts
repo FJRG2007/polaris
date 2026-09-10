@@ -25,6 +25,7 @@ import {
     isWildcardHostname,
     normalizeDeployHostname,
     securityHeaderMap,
+    VACANT_ASLEEP_PATH,
     VACANT_DOWN_PATH,
     VACANT_HEADER,
     VACANT_HEADER_VALUE,
@@ -58,6 +59,9 @@ export interface AppRoute {
     /** Every copy's name, when the service runs more than one: each is dialled on
      *  `dialPort` and the edge balances between them. Absent for a single copy. */
     readonly dialHosts?: readonly string[];
+    /** Stopped for being idle: a request is answered with the page saying it is
+     *  waking up, and is what wakes it. */
+    readonly asleep?: boolean;
     /** Keep each visitor on the copy that answered them first. */
     readonly sticky?: boolean;
     /** Asked of every copy every few seconds; one that stops answering it is left
@@ -516,6 +520,8 @@ function edgeChain(route: AppRoute, name: string, defs: Map<string, string>): Ed
  *  by every app route's error page, which are the same service reached two ways. */
 const VACANT = "polaris-vacant";
 const VACANT_ERRORS = `${VACANT}-errors`;
+/** The same error page for an app that is asleep: it says the app is waking up. */
+const VACANT_ASLEEP_ERRORS = `${VACANT}-asleep`;
 const VACANT_REWRITE = `${VACANT}-rewrite`;
 const VACANT_CTX = `${VACANT}-waf-ctx`;
 
@@ -637,6 +643,14 @@ export function renderDynamicConfig(
         services.push(
             `    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${guardProxyUrl()}"`
         );
+        // An asleep app is routed as it always is, to a container that is stopped: the
+        // refusal is what brings this page up, saying it is waking rather than down.
+        if (routes.some((route) => route.asleep === true)) {
+            defs.set(
+                VACANT_ASLEEP_ERRORS,
+                `    ${VACANT_ASLEEP_ERRORS}:\n      errors:\n        status: ["502", "504"]\n        service: ${VACANT}\n        query: "${VACANT_ASLEEP_PATH}"`
+            );
+        }
     }
     for (const route of routes) {
         // A stored name that is not a hostname, or a path that is not a path, is left
@@ -651,7 +665,7 @@ export function renderDynamicConfig(
         // only ever fires on a status the app never returned, so nothing else in the
         // chain is affected by sitting inside it.
         const appMw = [
-            ...(vacant ? [VACANT_ERRORS] : []),
+            ...(vacant ? [route.asleep === true ? VACANT_ASLEEP_ERRORS : VACANT_ERRORS] : []),
             ...routeMiddlewares(route, name, defs, options, edge)
         ];
         const appMwLine = appMw.length > 0 ? `\n      middlewares: [${appMw.join(", ")}]` : "";
@@ -686,6 +700,7 @@ export function renderDynamicConfig(
                     (m) =>
                         m !== "polaris-waf-guard" &&
                         m !== VACANT_ERRORS &&
+                        m !== VACANT_ASLEEP_ERRORS &&
                         !m.endsWith("-waf-ctx") &&
                         !edge.late.includes(m)
                 ),

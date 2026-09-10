@@ -18,7 +18,8 @@ const DEPLOY_PATH = "/apps/deploy";
 
 const scalingInputSchema = core.serviceScalingSchema.extend({
     balancing: core.edgeBalancingSchema,
-    limits: core.resourceLimitsSchema
+    limits: core.resourceLimitsSchema,
+    sleepAfterMinutes: core.serviceSleepSchema
 });
 
 function failure(caught: unknown, fallback: string): { error: string } {
@@ -58,7 +59,8 @@ export async function saveServiceScalingAction(
                 sticky: parsed.data.balancing.sticky,
                 healthPath: parsed.data.balancing.healthPath,
                 cpus: parsed.data.limits.cpus,
-                memoryMb: parsed.data.limits.memoryMb
+                memoryMb: parsed.data.limits.memoryMb,
+                sleepAfterMinutes: parsed.data.sleepAfterMinutes
             }
         });
         revalidatePath(DEPLOY_PATH);

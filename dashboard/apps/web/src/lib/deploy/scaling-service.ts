@@ -14,6 +14,7 @@ import { restartFromKeptImage, syncAppRoutes } from "@/lib/deploy-service";
 import {
     parseAppEdgeConfig,
     parseAutoscale,
+    sleepRefusal,
     type Autoscale,
     type EdgeBalancing,
     type ResourceLimitsInput,
@@ -26,6 +27,12 @@ export interface ServiceScalingView {
     readonly balancing: EdgeBalancing;
     /** The most CPU and memory each copy may use. */
     readonly limits: ResourceLimitsInput;
+    /** Minutes without a visit before it sleeps; null is never. */
+    readonly sleepAfterMinutes: number | null;
+    /** Whether it is asleep right now. */
+    readonly asleep: boolean;
+    /** Why it cannot sleep as it is set now, when it cannot. */
+    readonly sleepBlocked: string | null;
     /** Why this service runs one copy whatever is asked, when it has to. */
     readonly single: string | null;
     readonly engine: "compose" | "swarm";
@@ -36,11 +43,13 @@ type ScalableApp = {
     autoscale: string | null;
     cpuLimit: number | null;
     memoryLimitMb: number | null;
+    sleepAfterMinutes: number | null;
+    asleepSince: Date | null;
     edgeConfig: string | null;
     keepReleases: boolean;
     sourceType: string;
     currentDeploymentId: string | null;
-    target: { runtime: string };
+    target: { runtime: string; kind: string };
     _count: { volumes: number };
 };
 
@@ -49,11 +58,13 @@ const SCALABLE_SELECT = {
     autoscale: true,
     cpuLimit: true,
     memoryLimitMb: true,
+    sleepAfterMinutes: true,
+    asleepSince: true,
     edgeConfig: true,
     keepReleases: true,
     sourceType: true,
     currentDeploymentId: true,
-    target: { select: { runtime: true } },
+    target: { select: { runtime: true, kind: true } },
     _count: { select: { volumes: true } }
 } as const;
 
@@ -85,6 +96,9 @@ export async function getServiceScaling(applicationId: string, ownerId: string):
         autoscale: parseAutoscale(app.autoscale),
         balancing: parseAppEdgeConfig(app.edgeConfig).balancing,
         limits: { cpus: app.cpuLimit, memoryMb: app.memoryLimitMb },
+        sleepAfterMinutes: app.sleepAfterMinutes,
+        asleep: app.asleepSince !== null,
+        sleepBlocked: sleepRefusal(app),
         single: singleCopyReason(app),
         engine: app.target.runtime === "swarm" ? "swarm" : "compose"
     };
@@ -101,7 +115,7 @@ export async function setServiceScaling(
     applicationId: string,
     ownerId: string,
     userId: string,
-    input: ServiceScaling & { balancing: EdgeBalancing; limits: ResourceLimitsInput }
+    input: ServiceScaling & { balancing: EdgeBalancing; limits: ResourceLimitsInput; sleepAfterMinutes: number | null }
 ): Promise<{ redeployed: boolean }> {
     const app = await loadApp(applicationId, ownerId);
     const single = singleCopyReason(app);
@@ -111,6 +125,9 @@ export async function setServiceScaling(
     const replicas = input.autoscale
         ? Math.min(input.autoscale.max, Math.max(input.autoscale.min, input.replicas))
         : input.replicas;
+    // Sleeping is for one copy on this machine, judged as the service will be set.
+    const sleepBlocked = input.sleepAfterMinutes === null ? null : sleepRefusal({ ...app, replicas, autoscale: input.autoscale ? "on" : null });
+    if (sleepBlocked) throw new Error(sleepBlocked);
     const edge = parseAppEdgeConfig(app.edgeConfig);
     await prisma.application.update({
         where: { id: applicationId },
@@ -119,6 +136,7 @@ export async function setServiceScaling(
             autoscale: input.autoscale ? JSON.stringify(input.autoscale) : null,
             cpuLimit: input.limits.cpus,
             memoryLimitMb: input.limits.memoryMb,
+            sleepAfterMinutes: input.sleepAfterMinutes,
             edgeConfig: JSON.stringify({ ...edge, balancing: input.balancing })
         }
     });

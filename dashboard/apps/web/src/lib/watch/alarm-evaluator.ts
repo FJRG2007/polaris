@@ -76,11 +76,15 @@ async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise
     if (alarm.metric === "service") {
         const app = await prisma.application.findFirst({
             where: { id: alarm.targetId },
-            select: { desiredState: true }
+            select: { desiredState: true, asleepSince: true }
         });
         if (!app) return { breach: false, value: null, detail: "App not found", insufficient: true };
         if (app.desiredState !== "running") {
             return { breach: false, value: null, detail: "stopped (not expected up)", insufficient: false };
+        }
+        // Asleep for being idle is stopped on purpose, and wakes on the next visit.
+        if (app.asleepSince) {
+            return { breach: false, value: null, detail: "asleep (wakes on the next visit)", insufficient: false };
         }
         const sample = await prisma.metricSample.findFirst({
             where: { subjectType: "app", subjectId: alarm.targetId },
