@@ -123,9 +123,21 @@ function textFrom(markdown: string): string {
     return markdown;
 }
 
-/** Build the MIME bytes once. */
-export async function composeMime(message: OutgoingMessage): Promise<Buffer> {
+/**
+ * Build the MIME bytes once.
+ *
+ * `messageId` names the message where the caller must be able to find it again -
+ * a draft's copy on the server - and is otherwise left to the composer to make
+ * up. `keepBcc` is for that same copy: a draft somebody picks up in another
+ * client must still have its blind copies, and it is in their own mailbox, so
+ * nobody else reads the header. Anything sent never keeps it.
+ */
+export async function composeMime(
+    message: OutgoingMessage,
+    extra: { messageId?: string; keepBcc?: boolean } = {}
+): Promise<Buffer> {
     const options: Mail.Options = {
+        ...(extra.messageId ? { messageId: extra.messageId } : {}),
         from: core.formatAddress(message.from),
         to: message.to.map(core.formatAddress),
         ...(message.cc.length > 0 ? { cc: message.cc.map(core.formatAddress) } : {}),
@@ -153,7 +165,9 @@ export async function composeMime(message: OutgoingMessage): Promise<Buffer> {
               }
             : {})
     };
-    return new MailComposer(options).compile().build();
+    const node = new MailComposer(options).compile();
+    if (extra.keepBcc) node.keepBcc = true;
+    return node.build();
 }
 
 /**

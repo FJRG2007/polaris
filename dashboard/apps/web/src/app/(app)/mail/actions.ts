@@ -540,6 +540,19 @@ export async function sendAction(input: unknown) {
     }
 }
 
+/**
+ * Leave a copy of an unsent draft in the mail server's Drafts folder, so it can
+ * be finished in another client. Called when the composer closes. Never refuses
+ * anybody: the draft is safe here whether or not the copy could be written.
+ */
+export async function fileDraftOnServerAction(draftId: string) {
+    const userId = await actorId();
+    const parsed = core.mailDraftIdSchema.safeParse(draftId);
+    if (!parsed.success) return {};
+    await compose.fileDraftOnServer(userId, parsed.data);
+    return {};
+}
+
 /** Take a message back out of the queue. Only works while it is still in it. */
 export async function undoSendAction(draftId: string) {
     const userId = await actorId();

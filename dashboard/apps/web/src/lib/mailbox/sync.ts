@@ -430,6 +430,12 @@ async function storeMessages(
             sentAt
         } satisfies core.MailEnvelope;
 
+        // Polaris' own copy of an unsent draft, left in Drafts for other clients.
+        // The draft itself is already here, in the Drafts screen; filed as a
+        // message it would join the conversation it answers and show up there
+        // as if it had been sent.
+        if (core.isPolarisDraftMessageId(shape.messageId)) continue;
+
         const threadId = await threadFor(account.id, shape);
         const snippet = core.snippetFrom(snippets.get(message.uid) ?? "");
         // Which tab it sits under. Decided from what is already on the row - no

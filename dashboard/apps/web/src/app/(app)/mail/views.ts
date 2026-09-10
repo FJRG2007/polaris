@@ -14,10 +14,10 @@ import type { ListRoute } from "./list-page";
  * `drafts` is deliberately not here.
  *
  * Polaris' drafts and the Drafts folder on the mail server are not the same
- * thing: the composer saves as somebody types and nothing is ever appended to
- * the server's folder, so listing that folder meant the screen was permanently
- * empty while every draft anybody wrote sat in the database with no way back to
- * it. `/mail/drafts` is a screen of its own.
+ * thing: the composer saves as somebody types, and the server's folder only gets
+ * a copy when the composer closes - one sync leaves out - so listing that folder
+ * would show nothing of what was written here. `/mail/drafts` is a screen of its
+ * own.
  */
 export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
     inbox: {

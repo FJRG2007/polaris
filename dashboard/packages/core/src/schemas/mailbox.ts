@@ -616,6 +616,9 @@ export const mailTemplateSchema = z.object({
 
 export type MailTemplateInput = z.infer<typeof mailTemplateSchema>;
 
+/** A draft named from the screen. Whose it is, is decided in the query. */
+export const mailDraftIdSchema = z.string().uuid();
+
 /** Carrying the files of a message being forwarded onto the forward. Whose the
  *  message is, is decided on the server inside the query that finds it. */
 export const mailAttachFromMessageSchema = z.object({

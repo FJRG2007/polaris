@@ -113,6 +113,27 @@ export const SUBJECT_THREAD_WINDOW_MS = 28 * 24 * 60 * 60 * 1000;
 export const MAIL_IMPORTANT_KEYWORD = "$Important";
 
 /**
+ * The Message-Id a draft's copy on the mail server carries.
+ *
+ * Polaris keeps a copy of each unsent draft in the server's Drafts folder so
+ * other clients can see it, and has to find that copy again to replace or
+ * remove it. A uid is not a safe way back - a folder whose uid validity moved
+ * would hand the uid to somebody else's message - so the copy is found by this
+ * header instead, which names the draft and nothing else. `.invalid` is the
+ * domain reserved for names that must never resolve, which is right for a
+ * message that is never sent under this id.
+ */
+export function polarisDraftMessageId(draftId: string): string {
+    return `polaris-draft.${draftId}@polaris.invalid`;
+}
+
+/** Whether a Message-Id is one of those copies, so sync leaves it out rather
+ *  than filing Polaris' own draft into a conversation as a message. */
+export function isPolarisDraftMessageId(messageId: string): boolean {
+    return /^polaris-draft\.[0-9a-f-]{36}@polaris\.invalid$/i.test(bareMessageId(messageId));
+}
+
+/**
  * What a message's Important mark should be after a sync, given the flags the
  * server sent for it.
  *

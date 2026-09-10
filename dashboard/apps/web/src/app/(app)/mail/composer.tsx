@@ -54,6 +54,7 @@ import {
     attachFromAddressAction,
     attachFromDriveAction,
     attachFromMessageAction,
+    fileDraftOnServerAction,
     listTemplatesAction,
     saveDraftAction,
     sendAction,
@@ -316,6 +317,54 @@ export function Composer() {
         [accountId, identityId, to, cc, bcc, subject, body, files, composing, draftId, refresh]
     );
 
+    /**
+     * Close, keeping what was written.
+     *
+     * The draft is saved a few seconds after typing stops, so the last words
+     * typed before closing were not saved yet - they are now. Then the draft's
+     * copy goes to the server's Drafts folder, so it can be finished on another
+     * device. A message waiting to go is left to the queue.
+     */
+    const close = useCallback(() => {
+        openComposer(null);
+        if (queued || !accountId) return;
+        const pending = { dirty, draftId };
+        const current = {
+            id: draftId,
+            accountId,
+            identityId: identityId || null,
+            to,
+            cc,
+            bcc,
+            subject,
+            body,
+            attachmentIds: files.map((file) => file.id)
+        };
+        void (async () => {
+            let id = pending.draftId;
+            if (pending.dirty) {
+                const outcome = await saveDraftAction(current);
+                if ("draftId" in outcome && outcome.draftId) id = outcome.draftId;
+            }
+            if (id) await fileDraftOnServerAction(id);
+            refresh();
+        })();
+    }, [
+        openComposer,
+        queued,
+        accountId,
+        dirty,
+        draftId,
+        identityId,
+        to,
+        cc,
+        bcc,
+        subject,
+        body,
+        files,
+        refresh
+    ]);
+
     const account = accounts.find((one) => one.id === accountId);
     const own = useMemo(() => identities[accountId] ?? [], [identities, accountId]);
     const identity = own.find((one) => one.id === identityId);
@@ -387,7 +436,7 @@ export function Composer() {
                     size="icon"
                     aria-label="Close the composer"
                     title="Close the composer"
-                    onClick={() => openComposer(null)}
+                    onClick={close}
                 >
                     <X className="size-4 shrink-0" aria-hidden />
                 </Button>

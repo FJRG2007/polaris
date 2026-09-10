@@ -18,6 +18,8 @@ import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { refreshThreads } from "./sync";
+import type { ImapFlow } from "imapflow";
+import type { Prisma } from "@polaris/db";
 import { readMailPreferences } from "./prefs";
 import { rememberContacts } from "./contacts";
 import { MailAuthError } from "./credentials";
@@ -212,84 +214,55 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
 
     const draft = await prisma.mailDraft.findUnique({
         where: { id: draftId },
-        select: {
-            id: true,
-            accountId: true,
-            subject: true,
-            body: true,
-            replyTo: true,
-            toJson: true,
-            ccJson: true,
-            bccJson: true,
-            inReplyToHeader: true,
-            references: true,
-            requestReceipt: true,
-            identity: { select: { address: true, displayName: true, signature: true } },
-            attachments: { select: { id: true } }
-        }
+        select: DRAFT_COLUMNS
     });
     if (!draft) return false;
 
     const account = await prisma.mailAccount.findUnique({
         where: { id: draft.accountId },
-        select: { ...ACCOUNT_COLUMNS, user: { select: { name: true } } }
+        select: SENDER_COLUMNS
     });
     if (!account) return false;
 
+    /**
+     * Whether the outgoing server has taken the message.
+     *
+     * Past that point the message is somebody else's, and nothing that goes
+     * wrong afterwards - filing a copy, noting a contact, tidying the draft -
+     * may put it back in the queue: a draft marked failed after it went is a
+     * draft the sweep sends a second time, to the same people.
+     */
+    let gone = false;
     try {
-        const attachments = [];
-        for (const file of draft.attachments) {
-            const held = await readUpload(account.userId, file.id);
-            if (!held) continue;
-            attachments.push({
-                filename: held.name,
-                contentType: held.contentType,
-                content: held.bytes,
-                ...(held.inline && held.contentId ? { cid: held.contentId } : {})
-            });
-        }
-
-        const from: core.MailAddress = {
-            name: draft.identity?.displayName || account.displayName || account.user.name,
-            address: draft.identity?.address || account.address
-        };
-        const signature = draft.identity?.signature || account.signature;
-        const message: OutgoingMessage = {
-            from,
-            to: addressesFrom(draft.toJson),
-            cc: addressesFrom(draft.ccJson),
-            bcc: addressesFrom(draft.bccJson),
-            replyTo: draft.replyTo,
-            subject: draft.subject,
-            body: withSignature(draft.body, signature, {
-                above: account.signatureAboveQuote,
-                auto: account.signatureAuto,
-                answering: Boolean(draft.inReplyToHeader)
-            }),
-            attachments,
-            inReplyTo: draft.inReplyToHeader,
-            references: stringsFrom(draft.references),
-            requestReceipt: draft.requestReceipt
-        };
-
+        const message = await outgoingFromDraft(draft, account, { signature: true });
         const mime = await composeMime(message);
         await sendMime(account, message, mime);
+        gone = true;
         await fileInSent(account, mime);
         await rememberContacts(account.id, "sent", {
-            from: [from],
+            from: [message.from],
             to: message.to,
             cc: message.cc
         });
 
         // Gone means gone: the row is the queue entry, not a record of what was
         // sent. What was sent is in the Sent folder, which is where somebody
-        // looks for it.
+        // looks for it - and so is its copy in Drafts, which goes with it.
         await prisma.mailDraft.delete({ where: { id: draft.id } });
+        await removeDraftFromServer(account, draft.id);
         if (draft.inReplyToHeader) await markAnswered(account.id, draft.inReplyToHeader);
         await refreshThreads(account.id);
         publishMail({ accountId: account.id, kind: "sending", actorId: account.userId });
         return true;
     } catch (caught) {
+        if (gone) {
+            // Sent. Whatever failed after it is logged and the queue entry goes,
+            // so the sweep never finds it again.
+            console.warn("polaris: a message went, and tidying up after it failed:", caught);
+            await prisma.mailDraft.deleteMany({ where: { id: draft.id } }).catch(() => undefined);
+            publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
+            return true;
+        }
         const auth = caught instanceof MailAuthError;
         await prisma.mailDraft.update({
             where: { id: draft.id },
@@ -305,6 +278,80 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
         publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
         return false;
     }
+}
+
+/** What a draft is read as, for sending it or for filing its copy. */
+export const DRAFT_COLUMNS = {
+    id: true,
+    accountId: true,
+    subject: true,
+    body: true,
+    replyTo: true,
+    toJson: true,
+    ccJson: true,
+    bccJson: true,
+    inReplyToHeader: true,
+    references: true,
+    requestReceipt: true,
+    identity: { select: { address: true, displayName: true, signature: true } },
+    attachments: { select: { id: true } }
+} as const;
+
+/** The mailbox a draft goes from, with what building its From line needs. */
+export const SENDER_COLUMNS = { ...ACCOUNT_COLUMNS, user: { select: { name: true } } } as const;
+
+type DraftRow = Prisma.MailDraftGetPayload<{ select: typeof DRAFT_COLUMNS }>;
+type SenderRow = Prisma.MailAccountGetPayload<{ select: typeof SENDER_COLUMNS }>;
+
+/**
+ * A draft, as the message it is.
+ *
+ * One builder for the two things a draft becomes - the message that is sent,
+ * and the copy left in the server's Drafts folder - so the copy another client
+ * opens is the message Polaris would have sent. The signature backstop is only
+ * for sending: a draft's copy is what was written, and a signature added there
+ * would be added again when somebody finishes it somewhere else.
+ */
+export async function outgoingFromDraft(
+    draft: DraftRow,
+    account: SenderRow,
+    how: { signature: boolean }
+): Promise<OutgoingMessage> {
+    const attachments = [];
+    for (const file of draft.attachments) {
+        const held = await readUpload(account.userId, file.id);
+        if (!held) continue;
+        attachments.push({
+            filename: held.name,
+            contentType: held.contentType,
+            content: held.bytes,
+            ...(held.inline && held.contentId ? { cid: held.contentId } : {})
+        });
+    }
+    const from: core.MailAddress = {
+        name: draft.identity?.displayName || account.displayName || account.user.name,
+        address: draft.identity?.address || account.address
+    };
+    const signature = draft.identity?.signature || account.signature;
+    return {
+        from,
+        to: addressesFrom(draft.toJson),
+        cc: addressesFrom(draft.ccJson),
+        bcc: addressesFrom(draft.bccJson),
+        replyTo: draft.replyTo,
+        subject: draft.subject,
+        body: how.signature
+            ? withSignature(draft.body, signature, {
+                  above: account.signatureAboveQuote,
+                  auto: account.signatureAuto,
+                  answering: Boolean(draft.inReplyToHeader)
+              })
+            : draft.body,
+        attachments,
+        inReplyTo: draft.inReplyToHeader,
+        references: stringsFrom(draft.references),
+        requestReceipt: draft.requestReceipt
+    };
 }
 
 /**
@@ -331,6 +378,100 @@ async function fileInSent(
         });
     } catch {
         /* the message is sent; the copy is a convenience */
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The copy in the server's Drafts folder                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Leave a copy of an unsent draft in the mail server's Drafts folder, replacing
+ * the one left last time.
+ *
+ * So a message started here can be finished on a phone. Written when the
+ * composer closes rather than as somebody types - appending on every keystroke
+ * would leave a trail of half-written messages in the folder, which is what the
+ * clients that do it are complained about for.
+ *
+ * The copy is found again by its Message-Id (`polarisDraftMessageId`), never by
+ * the uid it was given: a folder whose uid validity moved hands that uid to
+ * somebody else's message, and deleting by it would delete the wrong mail. A
+ * mailbox with no Drafts folder is left alone - making a folder in somebody's
+ * mailbox is not a default here - and nothing about the copy is ever allowed
+ * to fail the draft itself, which is safe in Polaris either way.
+ */
+export async function fileDraftOnServer(userId: string, draftId: string): Promise<void> {
+    const draft = await prisma.mailDraft.findFirst({
+        where: { id: draftId, account: { userId }, state: "draft" },
+        select: DRAFT_COLUMNS
+    });
+    if (!draft) return;
+    const [account, folder] = await Promise.all([
+        prisma.mailAccount.findUnique({ where: { id: draft.accountId }, select: SENDER_COLUMNS }),
+        prisma.mailFolder.findFirst({
+            where: { accountId: draft.accountId, role: "drafts" },
+            select: { path: true }
+        })
+    ]);
+    if (!account || !folder) return;
+
+    try {
+        const message = await outgoingFromDraft(draft, account, { signature: false });
+        const mime = await composeMime(message, {
+            messageId: `<${core.polarisDraftMessageId(draft.id)}>`,
+            keepBcc: true
+        });
+        const uid = await withImap(account, async (client) => {
+            await deleteCopies(client, folder.path, draft.id);
+            const appended = await client.append(folder.path, mime, ["\\Draft", "\\Seen"]);
+            return appended && typeof appended === "object" && appended.uid ? appended.uid : null;
+        });
+        await prisma.mailDraft.update({
+            where: { id: draft.id },
+            data: { serverUid: uid === null ? null : BigInt(uid) }
+        });
+    } catch (caught) {
+        // The server's own words name hosts and paths: logged, not shown.
+        console.warn("polaris: a draft could not be copied to the mail server:", caught);
+    }
+}
+
+/**
+ * Take a draft's copy out of the server's Drafts folder: it was sent, or thrown
+ * away. Best-effort for the same reason the copy is - the draft's fate here has
+ * already been decided, and a copy that lingers is tidied the next time.
+ */
+export async function removeDraftFromServer(
+    account: MailConnectionSource & { id: string },
+    draftId: string
+): Promise<void> {
+    // The whole of it, the lookup included, never throws: this runs after a
+    // message has been sent, where an error would put it back in the queue.
+    try {
+        const folder = await prisma.mailFolder.findFirst({
+            where: { accountId: account.id, role: "drafts" },
+            select: { path: true }
+        });
+        if (!folder) return;
+        await withImap(account, (client) => deleteCopies(client, folder.path, draftId));
+    } catch (caught) {
+        console.warn("polaris: a draft's copy could not be removed from the mail server:", caught);
+    }
+}
+
+/** Delete every copy of one draft in a folder, found by its Message-Id. */
+async function deleteCopies(client: ImapFlow, path: string, draftId: string): Promise<void> {
+    const lock = await client.getMailboxLock(path);
+    try {
+        const found = await client.search(
+            { header: { "message-id": core.polarisDraftMessageId(draftId) } },
+            { uid: true }
+        );
+        const uids = Array.isArray(found) ? found : [];
+        if (uids.length > 0) await client.messageDelete(uids, { uid: true });
+    } finally {
+        lock.release();
     }
 }
 
@@ -442,9 +583,9 @@ export interface MailDraftView {
  *
  * Polaris' own drafts rather than the Drafts folder on the mail server. They are
  * not the same thing and conflating them is what left this screen permanently
- * empty: the composer saves here as somebody types, and nothing has ever been
- * appended to the server's folder - so a draft was saved, was real, and could
- * not be reached from anywhere.
+ * empty: the composer saves here as somebody types, and the server's folder only
+ * gets a copy when the composer closes (`fileDraftOnServer`) - which sync then
+ * leaves out, so a draft is listed here once rather than twice.
  */
 export async function listDrafts(userId: string): Promise<MailDraftView[]> {
     const rows = await prisma.mailDraft.findMany({
@@ -468,7 +609,14 @@ export async function listDrafts(userId: string): Promise<MailDraftView[]> {
     }));
 }
 
-/** Throw one away. Nothing was ever sent, so there is nothing to take back. */
+/** Throw one away. Nothing was ever sent, so there is nothing to take back -
+ *  except its copy in the server's Drafts folder, which goes with it. */
 export async function discardDraft(userId: string, draftId: string): Promise<void> {
-    await prisma.mailDraft.deleteMany({ where: { id: draftId, account: { userId } } });
+    const draft = await prisma.mailDraft.findFirst({
+        where: { id: draftId, account: { userId } },
+        select: { id: true, account: { select: ACCOUNT_COLUMNS } }
+    });
+    if (!draft) return;
+    await prisma.mailDraft.delete({ where: { id: draft.id } });
+    await removeDraftFromServer(draft.account, draft.id);
 }
