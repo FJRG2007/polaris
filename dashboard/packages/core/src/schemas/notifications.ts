@@ -27,13 +27,64 @@ export const NOTIFICATION_DESTINATION_KINDS = ["webhook", "sms"] as const;
 export type NotificationDestinationKind = (typeof NOTIFICATION_DESTINATION_KINDS)[number];
 
 /**
- * How a webhook body is shaped. Discord and Slack each want their own JSON;
- * `generic` posts the raw event, which is what a script or a bridge of your own
- * wants. `auto` picks by hostname when the destination is added.
+ * How a webhook body is shaped. Discord, Slack and Microsoft Teams each want their
+ * own JSON; Telegram is its Bot API's `sendMessage`, addressed by a URL that carries
+ * the bot token and the chat. `generic` posts the raw event, which is what a script
+ * or a bridge of your own wants. `auto` picks by hostname when the destination is
+ * added.
  */
-export const WEBHOOK_FORMATS = ["discord", "slack", "generic"] as const;
+export const WEBHOOK_FORMATS = ["discord", "slack", "teams", "telegram", "generic"] as const;
 
 export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
+
+export const WEBHOOK_FORMAT_LABEL: Record<WebhookFormat, string> = {
+    discord: "Discord",
+    slack: "Slack",
+    teams: "Microsoft Teams",
+    telegram: "Telegram",
+    generic: "Raw JSON"
+};
+
+/** Telegram's Bot API host. */
+const TELEGRAM_HOST = "api.telegram.org";
+
+/**
+ * A Telegram destination read out of the URL it was given as:
+ * `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>`. Null when the
+ * URL is not that shape. `endpoint` is the method URL without the query, which is
+ * where the message is posted, with the chat in the body.
+ */
+export function telegramTarget(url: string): { endpoint: string; chatId: string } | null {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return null;
+    }
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== TELEGRAM_HOST) return null;
+    if (!/^\/bot\d+:[A-Za-z0-9_-]+\/sendMessage$/.test(parsed.pathname)) return null;
+    const chatId = parsed.searchParams.get("chat_id")?.trim() ?? "";
+    if (!/^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(chatId)) return null;
+    return { endpoint: `https://${TELEGRAM_HOST}${parsed.pathname}`, chatId };
+}
+
+/** True when a URL points at Telegram at all, whatever its shape. */
+function isTelegram(url: string): boolean {
+    try {
+        return new URL(url).hostname.toLowerCase() === TELEGRAM_HOST;
+    } catch {
+        return false;
+    }
+}
+
+/** The sentence for a Telegram URL that is not the one shape it can be. */
+export const TELEGRAM_URL_HINT =
+    "For Telegram, paste https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>";
+
+/** A Telegram URL must name the bot and the chat; any other URL passes. */
+export function webhookUrlProblem(url: string): string | null {
+    return isTelegram(url) && !telegramTarget(url) ? TELEGRAM_URL_HINT : null;
+}
 
 /** The groups the settings page renders events under. */
 export const NOTIFICATION_GROUPS = [
@@ -570,7 +621,8 @@ export const webhookDestinationSchema = z.object({
         .trim()
         .url("Enter the full URL the platform gave you")
         .max(2048)
-        .refine((value) => value.startsWith("https://"), "The URL has to be https"),
+        .refine((value) => value.startsWith("https://"), "The URL has to be https")
+        .refine((value) => webhookUrlProblem(value) === null, TELEGRAM_URL_HINT),
     format: z.enum([...WEBHOOK_FORMATS, "auto"]).default("auto")
 });
 
@@ -591,9 +643,10 @@ export const destinationInputSchema = z.discriminatedUnion("kind", [
 export type DestinationInput = z.infer<typeof destinationInputSchema>;
 
 /**
- * The body shape a webhook URL wants, guessed from its host. Only Discord and
- * Slack are guessable; everything else gets the raw event, which is the only
- * safe assumption about somebody else's endpoint.
+ * The body shape a webhook URL wants, guessed from its host. Discord, Slack,
+ * Teams (a connector on webhook.office.com, or a Workflows trigger on Logic Apps
+ * or Power Platform) and Telegram are guessable; everything else gets the raw
+ * event, which is the only safe assumption about somebody else's endpoint.
  */
 export function detectWebhookFormat(url: string): WebhookFormat {
     let host: string;
@@ -605,6 +658,13 @@ export function detectWebhookFormat(url: string): WebhookFormat {
     if (host === "discord.com" || host.endsWith(".discord.com") || host.endsWith("discordapp.com"))
         return "discord";
     if (host === "slack.com" || host.endsWith(".slack.com")) return "slack";
+    if (
+        host.endsWith(".webhook.office.com") ||
+        host.endsWith(".logic.azure.com") ||
+        host.endsWith(".api.powerplatform.com")
+    )
+        return "teams";
+    if (host === TELEGRAM_HOST) return "telegram";
     return "generic";
 }
 
@@ -614,6 +674,9 @@ export function detectWebhookFormat(url: string): WebhookFormat {
  * rendered back.
  */
 export function maskWebhookUrl(url: string): string {
+    // The bot token is the path's first segment, so the usual stub would print it.
+    const telegram = telegramTarget(url);
+    if (telegram) return `${TELEGRAM_HOST} - chat ${telegram.chatId}`;
     try {
         const parsed = new URL(url);
         const tail = parsed.pathname

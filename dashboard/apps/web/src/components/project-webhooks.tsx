@@ -18,7 +18,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ProjectWebhookView } from "@/lib/deploy-project-service";
 import { Button, Checkbox, Input, Select, Switch, ConfirmDeleteDialog } from "@polaris/ui";
-import { PROJECT_WEBHOOK_EVENTS, WEBHOOK_FORMATS, type WebhookFormat } from "@polaris/core";
+import { PROJECT_WEBHOOK_EVENTS, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS, type WebhookFormat } from "@polaris/core";
 import { CheckCircle2, CircleAlert, Loader2, Plus, Send, Trash2, Webhook } from "lucide-react";
 import {
     createProjectWebhookAction,
@@ -27,12 +27,6 @@ import {
     setProjectWebhookEnabledAction,
     testProjectWebhookAction
 } from "@/app/(app)/apps/deploy/project-actions";
-
-const FORMAT_LABELS: Record<WebhookFormat, string> = {
-    generic: "Generic JSON",
-    discord: "Discord",
-    slack: "Slack"
-};
 
 export function ProjectWebhooks({
     projectId,
@@ -127,7 +121,7 @@ export function ProjectWebhooks({
                                 <p className="flex items-center gap-2 truncate text-sm font-medium">
                                     {hook.name}
                                     <span className="rounded border border-border/60 px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
-                                        {FORMAT_LABELS[hook.format]}
+                                        {WEBHOOK_FORMAT_LABEL[hook.format]}
                                     </span>
                                     {hook.status === "ok" && <CheckCircle2 className="size-3.5 shrink-0 text-success" />}
                                     {hook.status === "error" && <CircleAlert className="size-3.5 shrink-0 text-danger" />}
@@ -278,7 +272,7 @@ function AddWebhookForm({
                         onValueChange={(value) => setFormat(value as WebhookFormat | "auto")}
                         options={[
                             { value: "auto", label: "Detect from the URL" },
-                            ...WEBHOOK_FORMATS.map((value) => ({ value, label: FORMAT_LABELS[value] }))
+                            ...WEBHOOK_FORMATS.map((value) => ({ value, label: WEBHOOK_FORMAT_LABEL[value] }))
                         ]}
                         aria-label="Format"
                     />

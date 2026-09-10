@@ -12,8 +12,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
-import { destinationInputSchema, WEBHOOK_FORMATS } from "@polaris/core";
 import type { DestinationView } from "@/lib/notifications/destinations";
+import { destinationInputSchema, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS } from "@polaris/core";
 import {
     createDestinationAction,
     deleteDestinationAction,
@@ -257,6 +257,8 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                     placeholder="https://discord.com/api/webhooks/..."
                                 />
                                 <span className="text-xs text-muted-foreground">
+                                    Discord, Slack, Teams, or a Telegram bot as
+                                    https://api.telegram.org/bot&lt;token&gt;/sendMessage?chat_id=&lt;chat id&gt;.
                                     Anyone with this URL can post to the channel, so it is stored encrypted and
                                     never shown again.
                                 </span>
@@ -270,7 +272,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                         { value: "auto", label: "Detect from the URL" },
                                         ...WEBHOOK_FORMATS.map((entry) => ({
                                             value: entry,
-                                            label: entry === "generic" ? "Raw JSON" : entry
+                                            label: WEBHOOK_FORMAT_LABEL[entry]
                                         }))
                                     ]}
                                 />

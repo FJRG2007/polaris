@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { WEBHOOK_FORMATS } from "./notifications.js";
+import { TELEGRAM_URL_HINT, WEBHOOK_FORMATS, webhookUrlProblem } from "./notifications.js";
 
 // ---------------------------------------------------------------------------
 // Visibility and membership
@@ -292,7 +292,8 @@ export const projectWebhookInputSchema = z.object({
         .refine(
             (value) => value.startsWith("https://") || value.startsWith("http://"),
             "Only http(s) endpoints"
-        ),
+        )
+        .refine((value) => webhookUrlProblem(value) === null, TELEGRAM_URL_HINT),
     format: z.enum(WEBHOOK_FORMATS).optional(),
     events: z
         .array(z.enum(PROJECT_WEBHOOK_EVENT_IDS))

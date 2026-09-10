@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import * as notifications from "../src/schemas/notifications.js";
 import { parseSmsConfig } from "../src/schemas/sms.js";
+import * as notifications from "../src/schemas/notifications.js";
 
 const {
     defaultRule,
@@ -94,6 +94,35 @@ describe("webhook targets", () => {
         expect(detectWebhookFormat("https://hooks.slack.com/services/T/B/x")).toBe("slack");
         expect(detectWebhookFormat("https://example.com/hook")).toBe("generic");
         expect(detectWebhookFormat("not a url")).toBe("generic");
+    });
+
+    it("recognises Teams connectors and workflows, and Telegram's Bot API", () => {
+        expect(detectWebhookFormat("https://contoso.webhook.office.com/webhookb2/a/IncomingWebhook/b/c")).toBe("teams");
+        expect(detectWebhookFormat("https://prod-01.westus.logic.azure.com/workflows/x/triggers/manual/paths/invoke")).toBe(
+            "teams"
+        );
+        expect(detectWebhookFormat("https://api.telegram.org/bot123:abc/sendMessage?chat_id=42")).toBe("telegram");
+    });
+
+    it("reads a Telegram URL as its method and chat, and never prints the bot token", () => {
+        const url = "https://api.telegram.org/bot123456:SECRET-token_x/sendMessage?chat_id=-1001234";
+        expect(notifications.telegramTarget(url)).toEqual({
+            endpoint: "https://api.telegram.org/bot123456:SECRET-token_x/sendMessage",
+            chatId: "-1001234"
+        });
+        expect(maskWebhookUrl(url)).not.toContain("SECRET");
+        expect(maskWebhookUrl(url)).toBe("api.telegram.org - chat -1001234");
+    });
+
+    it("refuses a Telegram URL that does not name the chat", () => {
+        const result = destinationInputSchema.safeParse({
+            kind: "webhook",
+            label: "Ops",
+            url: "https://api.telegram.org/bot123:abc/sendMessage",
+            format: "auto"
+        });
+        expect(result.success).toBe(false);
+        expect(notifications.telegramTarget("https://api.telegram.org/bot123:abc/getUpdates?chat_id=1")).toBeNull();
     });
 
     it("masks the part of the URL that is the credential", () => {
