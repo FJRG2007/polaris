@@ -186,7 +186,11 @@ export async function cloneEnvironment(
                 // without a branch deploys the way its original does.
                 autoDeploy: Boolean(branch) && repositoryBuilt ? true : application.autoDeploy,
                 deployBranch: branch ? null : application.deployBranch,
-                keepReleases: false
+                keepReleases: false,
+                // As open or as closed as the one it copies: a clone of a service
+                // reached only through the edge must not come up on the machine's
+                // own address.
+                publishPort: application.publishPort
             });
             ids.set(application.id, created.id);
             await prisma.application.update({

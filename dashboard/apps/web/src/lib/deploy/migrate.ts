@@ -32,8 +32,8 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { decryptSecret } from "@polaris/storage";
 import { setEnvVars } from "@/lib/env-var-service";
-import { carriable, isPublicKey, repoFromSourceConfig } from "@/lib/deploy/migrate-rules";
 import { readCredential } from "@/lib/connections/store";
+import { carriable, isPublicKey, repoFromSourceConfig } from "@/lib/deploy/migrate-rules";
 import { createApplication, deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import {
     ProviderError,
@@ -435,7 +435,9 @@ export async function moveHome(
         // What a provider does by default, and what somebody moving off one
         // expects to keep: a push builds it. The branch is the one being built.
         autoDeploy: true,
-        deployBranch: input.branch.trim() || null
+        deployBranch: input.branch.trim() || null,
+        // Reached through its domains, as it was on the provider it came from.
+        publishPort: false
     });
 
     const entries = Object.entries(values).map(([key, value]) => ({

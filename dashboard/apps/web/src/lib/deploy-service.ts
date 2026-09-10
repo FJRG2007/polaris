@@ -558,12 +558,13 @@ export interface CreateApplicationInput {
     /** Keep earlier builds running beside the current one, Railway-style. Comes
      *  from the project's flags, so a project can set the house style once. */
     keepReleases?: boolean;
-    /** Publish the container port on the host's interfaces. Absent keeps the
-     *  historical behaviour (published), which every caller that reaches a service by
-     *  its host port - a catalog install, a game server - relies on; the Deploy
-     *  screen passes false, so what somebody deploys there is reached through the
-     *  edge and nothing else. */
-    publishPort?: boolean;
+    /** Publish the container port on the host's interfaces. Required, with no
+     *  default, so every way a service is made says which it is: closed is what a
+     *  firewall should start from, and only a caller that reaches the service by
+     *  its host port - a catalog install, a game server, the mail server Polaris
+     *  manages over it - opens it. A default of "open" is how a cloned or migrated
+     *  service came up exposed when the one it copied was not. */
+    publishPort: boolean;
     /** How it builds: commands and settings picked up from the repository. */
     buildConfig?: Record<string, unknown>;
     /** How many copies run, from a config file that said. */
@@ -591,7 +592,7 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             autoDeploy: input.autoDeploy ?? false,
             deployBranch: input.deployBranch ?? null,
             keepReleases: input.keepReleases ?? false,
-            publishPort: input.publishPort ?? true,
+            publishPort: input.publishPort,
             ...(input.buildConfig ? { buildConfig: JSON.stringify(input.buildConfig) } : {}),
             ...(input.replicas ? { replicas: input.replicas } : {})
         }

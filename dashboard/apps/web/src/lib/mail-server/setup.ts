@@ -286,7 +286,9 @@ const service: StepRunner = async (server) => {
             extraPorts: core.MAIL_SERVER_PORTS.map((entry) => ({ host: entry.port, container: entry.port }))
         },
         autoDeploy: false,
-        keepReleases: false
+        keepReleases: false,
+        // Polaris manages the engine over its host port (see `transport.ts`).
+        publishPort: true
     });
     await prisma.mailServer.update({ where: { id: server.id }, data: { applicationId: app.id } });
 

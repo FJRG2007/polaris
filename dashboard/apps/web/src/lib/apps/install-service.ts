@@ -177,7 +177,10 @@ export async function installApp(
             ...(containerPort ? { port: containerPort } : {}),
             ...(hostPort ? { hostPort, hostProtocol: protocol } : {}),
             ...(extraPorts && extraPorts.length > 0 ? { extraPorts } : {})
-        }
+        },
+        // A catalog app is reached on the machine's own address - a game server
+        // by the port its clients type - so its port is published.
+        publishPort: true
     });
 
     // Env: manifest defaults overlaid with the operator's values, preserving each
