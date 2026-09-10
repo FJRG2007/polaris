@@ -182,6 +182,35 @@ export const mailAccountEditSchema = z.object({
     signatureAuto: mailSignatureAuto.default("new")
 });
 
+/**
+ * A change to a mailbox's settings, of only the fields a screen actually sent.
+ *
+ * The full schema above defaults every missing field, and the screens send one
+ * switch at a time - so saving "In the shared inbox" used to write "new" over
+ * whatever somebody had chosen for when their signature goes in, because that
+ * switch did not send it and the default filled it in. Every field here is
+ * optional with no default: absent means "leave it as it is".
+ */
+export const mailAccountPatchSchema = z.object({
+    displayName: mailDisplayName.optional(),
+    label: z.string().transform(normalizeMailName).pipe(z.string().max(60)).optional(),
+    color: z
+        .string()
+        .trim()
+        .regex(/^#[0-9a-fA-F]{6}$/, "That is not a color")
+        .nullable()
+        .optional(),
+    notify: z.boolean().optional(),
+    pollSeconds: z.number().int().min(60).max(3600).optional(),
+    unified: z.boolean().optional(),
+    appendToSent: z.boolean().optional(),
+    signature: z.string().max(20000).optional(),
+    signatureAboveQuote: z.boolean().optional(),
+    signatureAuto: mailSignatureAuto.optional()
+});
+
+export type MailAccountPatch = z.infer<typeof mailAccountPatchSchema>;
+
 /** The out-of-office reply. Off means the fields are kept and nothing is sent. */
 export const mailVacationSchema = z
     .object({

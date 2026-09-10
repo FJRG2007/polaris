@@ -25,18 +25,18 @@
  */
 
 import Link from "next/link";
-import { refusalOf } from "@/app/(app)/mail/refusal";
-import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
+import { Button, ConfirmDeleteDialog, Switch, cn, useToast } from "@polaris/ui";
 import { AlertTriangle, CheckCircle2, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import {
     editAccountAction,
     removeAccountAction,
     syncAccountAction
 } from "@/app/(app)/mail/actions";
-import { Button, ConfirmDeleteDialog, Switch, cn, useToast } from "@polaris/ui";
 
 export function AccountsView({
     accounts,
@@ -141,6 +141,7 @@ function AccountRow({ account }: { account: MailAccountView }) {
     const [busy, startBusy] = useTransition();
     const [removing, setRemoving] = useState(false);
     const [unified, setUnified] = useState(account.unified);
+    const [notify, setNotify] = useState(account.notify);
 
     const broken = account.state === "auth" || account.state === "unreachable";
 
@@ -190,16 +191,10 @@ function AccountRow({ account }: { account: MailAccountView }) {
                         onChange={(next) => {
                             setUnified(next);
                             startBusy(async () => {
+                                // Only this switch. The edit is a patch, so the
+                                // rest of the mailbox's settings are left alone.
                                 const answer = await editAccountAction(account.id, {
-                                    displayName: account.displayName,
-                                    label: account.label,
-                                    color: account.color,
-                                    notify: account.notify,
-                                    pollSeconds: account.pollSeconds,
-                                    unified: next,
-                                    appendToSent: account.appendToSent,
-                                    signature: account.signature,
-                                    signatureAboveQuote: account.signatureAboveQuote
+                                    unified: next
                                 });
                                 const said = refusalOf(answer);
                                 if (said) {
@@ -213,6 +208,30 @@ function AccountRow({ account }: { account: MailAccountView }) {
                         aria-label="Include this mailbox in the shared inbox"
                     />
                     In the shared inbox
+                </label>
+
+                <label
+                    className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
+                    title="A notice from your system when new mail arrives here while Polaris is in another tab or window"
+                >
+                    <Switch
+                        checked={notify}
+                        onChange={(next) => {
+                            setNotify(next);
+                            startBusy(async () => {
+                                const answer = await editAccountAction(account.id, { notify: next });
+                                const said = refusalOf(answer);
+                                if (said) {
+                                    setNotify(!next);
+                                    toast.show({ title: said });
+                                    return;
+                                }
+                                router.refresh();
+                            });
+                        }}
+                        aria-label="Tell me when new mail arrives in this mailbox"
+                    />
+                    Notify me
                 </label>
 
                 <Button

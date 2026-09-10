@@ -220,7 +220,9 @@ export async function forgetSpamAction(accountId: string) {
 
 export async function editAccountAction(accountId: string, input: unknown) {
     const userId = await actorId();
-    const parsed = core.mailAccountEditSchema.safeParse(input);
+    // A patch: only what the screen sent is written, so one switch never puts
+    // every other setting back to its default.
+    const parsed = core.mailAccountPatchSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details." };
     try {
         const account = await accounts.editAccount(userId, accountId, parsed.data);
