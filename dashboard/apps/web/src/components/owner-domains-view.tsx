@@ -19,9 +19,23 @@ import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
+import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, DnsRecordCard, Input } from "@polaris/ui";
-import { AlertTriangle, CheckCircle2, Clock, Globe, KeyRound, Loader2, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ChevronDown,
+    ChevronRight,
+    Clock,
+    Globe,
+    KeyRound,
+    Loader2,
+    Plus,
+    RefreshCw,
+    ShieldCheck,
+    Trash2
+} from "lucide-react";
 import {
     addOwnerDomainAction,
     checkOwnerDomainAction,
@@ -205,6 +219,7 @@ function DomainCard({
 }) {
     const format = useDisplayFormat();
     const [busy, setBusy] = useState(false);
+    const [recordsOpen, setRecordsOpen] = useState(false);
 
     const ready = domain.verified && domain.wildcardOk;
 
@@ -301,6 +316,27 @@ function DomainCard({
 
                 {domain.verified && (
                     <CertificatePanel owner={owner} domain={domain} onChanged={onChecked} onError={onError} />
+                )}
+
+                {/* Editing records takes the domain's own token: this Polaris's
+                    token may reach the zone, but it was never handed over for this. */}
+                {domain.verified && domain.hasDnsToken && (
+                    <div className="flex flex-col gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setRecordsOpen((open) => !open)}
+                            aria-expanded={recordsOpen}
+                            className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs"
+                        >
+                            {recordsOpen ? (
+                                <ChevronDown className="size-3.5 shrink-0" />
+                            ) : (
+                                <ChevronRight className="size-3.5 shrink-0" />
+                            )}
+                            DNS records
+                        </button>
+                        {recordsOpen && <DnsZoneEditor scope={{ kind: "owner", ref: owner, domainId: domain.id }} />}
+                    </div>
                 )}
 
                 <p className="text-muted-foreground text-xs" aria-live="polite">

@@ -25,6 +25,7 @@ import { readJson } from "@/lib/read-json";
 import { CallPortsCard } from "./call-ports-card";
 import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
+import { DnsRecordsCard } from "./dns-records-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import type { DomainConfig } from "@/lib/domain-service";
@@ -195,6 +196,8 @@ export function DomainsView() {
             )}
 
             <LocalCertificate />
+
+            <DnsRecordsCard />
 
             <div className="flex flex-col gap-4">
                 <button

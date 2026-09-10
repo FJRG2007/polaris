@@ -17,6 +17,15 @@ interface CfEnvelope<T> {
     result: T;
 }
 
+/** What Cloudflare said when it refused a request, or that it could not be
+ *  reached - sentences about the request, safe to show whoever made it. */
+export class CloudflareApiError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "CloudflareApiError";
+    }
+}
+
 /** Call the Cloudflare API and return `result`, throwing the API's own error text. */
 async function cf<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
@@ -31,12 +40,14 @@ async function cf<T>(token: string, method: string, path: string, body?: unknown
             body: body === undefined ? undefined : JSON.stringify(body)
         });
     } catch (caught) {
-        throw new Error(caught instanceof Error ? `Cloudflare unreachable: ${caught.message}` : "Cloudflare unreachable");
+        throw new CloudflareApiError(
+            caught instanceof Error ? `Cloudflare unreachable: ${caught.message}` : "Cloudflare unreachable"
+        );
     }
     const payload = (await res.json().catch(() => null)) as CfEnvelope<T> | null;
     if (!payload || typeof payload !== "object" || !payload.success) {
         const detail = payload?.errors?.map((error) => error.message).filter(Boolean).join("; ");
-        throw new Error(detail || `Cloudflare API error (HTTP ${res.status})`);
+        throw new CloudflareApiError(detail || `Cloudflare API error (HTTP ${res.status})`);
     }
     return payload.result;
 }
@@ -84,7 +95,9 @@ export async function resolveZoneForHostname(token: string, hostname: string): P
         .filter((zone) => hostname === zone.name || hostname.endsWith(`.${zone.name}`))
         .sort((a, b) => b.name.length - a.name.length)[0];
     if (!match) {
-        throw new Error(`${hostname} is not on a domain in this Cloudflare account. Add the domain to Cloudflare first.`);
+        throw new CloudflareApiError(
+            `${hostname} is not on a domain in this Cloudflare account. Add the domain to Cloudflare first.`
+        );
     }
     return match;
 }
@@ -380,6 +393,62 @@ export async function createZoneRecord(
     return created.id;
 }
 
+/** One record as the zone holds it, for the record editor. */
+export interface CfDnsRecord {
+    id: string;
+    type: string;
+    name: string;
+    /** The value as Cloudflare writes it out - for SRV and CAA, their fields in one line. */
+    content: string;
+    ttl: number;
+    proxied: boolean;
+    proxiable: boolean;
+    priority: number | null;
+    /** The separate fields of an SRV or CAA record. */
+    data: Record<string, unknown> | null;
+}
+
+/** How many records are read per request, and the most pages read for one zone. */
+const RECORDS_PER_PAGE = 100;
+const MAX_RECORD_PAGES = 50;
+
+/** Every record in a zone, page by page, in the order Cloudflare keeps them. */
+export async function listDnsRecords(token: string, zoneId: string): Promise<CfDnsRecord[]> {
+    const records: CfDnsRecord[] = [];
+    for (let page = 1; page <= MAX_RECORD_PAGES; page += 1) {
+        const batch = await cf<unknown[]>(
+            token,
+            "GET",
+            `/zones/${zoneId}/dns_records?per_page=${RECORDS_PER_PAGE}&page=${page}`
+        );
+        if (!Array.isArray(batch)) throw new Error("Unexpected DNS records response from Cloudflare");
+        for (const entry of batch) {
+            const row = entry as Record<string, unknown>;
+            if (typeof row.id !== "string" || typeof row.type !== "string" || typeof row.name !== "string") continue;
+            records.push({
+                id: row.id,
+                type: row.type,
+                name: row.name,
+                content: typeof row.content === "string" ? row.content : "",
+                ttl: typeof row.ttl === "number" ? row.ttl : 1,
+                proxied: row.proxied === true,
+                proxiable: row.proxiable === true,
+                priority: typeof row.priority === "number" ? row.priority : null,
+                data: row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null
+            });
+        }
+        if (batch.length < RECORDS_PER_PAGE) break;
+    }
+    return records;
+}
+
+/** Add a record, returning its id. `record` is the API's own shape. */
+export async function createDnsRecord(token: string, zoneId: string, record: object): Promise<string> {
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, record);
+    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
 export async function updateZoneRecord(
     token: string,
     zoneId: string,
@@ -387,6 +456,31 @@ export async function updateZoneRecord(
     record: { type: string; name: string; value: string; priority: number | null }
 ): Promise<void> {
     await cf(token, "PUT", `/zones/${zoneId}/dns_records/${recordId}`, zoneRecordBody(record));
+}
+
+/** Replace a record's every field with these. */
+export async function updateDnsRecord(token: string, zoneId: string, recordId: string, record: object): Promise<void> {
+    await cf(token, "PUT", `/zones/${zoneId}/dns_records/${recordId}`, record);
+}
+
+/** One record, or null when the zone has no record by that id. */
+export async function getDnsRecord(
+    token: string,
+    zoneId: string,
+    recordId: string
+): Promise<{ id: string; type: string; name: string } | null> {
+    try {
+        const row = await cf<{ id?: unknown; type?: unknown; name?: unknown }>(
+            token,
+            "GET",
+            `/zones/${zoneId}/dns_records/${recordId}`
+        );
+        return typeof row?.id === "string" && typeof row.type === "string" && typeof row.name === "string"
+            ? { id: row.id, type: row.type, name: row.name }
+            : null;
+    } catch {
+        return null;
+    }
 }
 
 /** Best-effort deletion of a DNS record (teardown never blocks on it). */

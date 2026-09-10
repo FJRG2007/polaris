@@ -16,9 +16,8 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { requireOrgPermission } from "@/lib/orgs/org-service";
+import { domainCallerFor as callerFor, type DomainOwnerRef } from "@/lib/owner-domain-caller";
 import {
     addOwnerDomain,
     checkOwnerDomain,
@@ -27,34 +26,10 @@ import {
     removeOwnerDomain,
     retryOwnerDomainCertificateFor,
     setOwnerDomainDnsToken,
-    type DomainOwner,
     type OwnerDomainView
 } from "@/lib/owner-domains";
 
-/** Which shelf the caller says the domain is on. An organization id is a claim
- *  and is checked; nothing else is accepted. */
-export type DomainOwnerRef = { kind: "user" } | { kind: "org"; orgId: string };
-
-interface Caller {
-    readonly owner: DomainOwner;
-    readonly userId: string;
-    readonly isAdmin: boolean;
-    readonly orgId: string | null;
-}
-
-/**
- * Resolve who is being written for, refusing anything the caller has no standing
- * on. An organization takes its `domains.manage` permission; the personal shelf
- * is always the session's own account and never an id from the request.
- */
-async function callerFor(ref: DomainOwnerRef): Promise<Caller> {
-    const user = await requireUser();
-    if (ref.kind === "user") {
-        return { owner: { kind: "user", id: user.id }, userId: user.id, isAdmin: user.isAdmin, orgId: null };
-    }
-    await requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, ref.orgId, "domains.manage");
-    return { owner: { kind: "org", id: ref.orgId }, userId: user.id, isAdmin: user.isAdmin, orgId: ref.orgId };
-}
+export type { DomainOwnerRef } from "@/lib/owner-domain-caller";
 
 function failure(caught: unknown, fallback: string): { error: string } {
     if (caught instanceof OwnerDomainError) return { error: caught.message };
