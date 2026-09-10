@@ -67,14 +67,14 @@ installers as workflow artifacts.
 Builds are unsigned unless these repository secrets exist. They are only used on
 a `desktop-v*` tag or on `main`; a run by hand from another branch is unsigned.
 
-| Secret                                                     | Used for                                                          |
-| ---------------------------------------------------------- | ----------------------------------------------------------------- |
-| `WINDOWS_CERTIFICATE_BASE64`                               | The code-signing certificate (`.pfx`), base64-encoded             |
-| `WINDOWS_CERTIFICATE_PASSWORD`                             | Its password                                                      |
-| `APPLE_CERTIFICATE_BASE64`                                 | The Developer ID Application certificate (`.p12`), base64-encoded |
-| `APPLE_CERTIFICATE_PASSWORD`                               | Its password                                                      |
-| `APPLE_SIGNING_IDENTITY`                                   | The identity to sign with, as `security find-identity` prints it  |
-| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Notarization; skipped unless all three are set                    |
+| Secret | Used for |
+| --- | --- |
+| `WINDOWS_CERTIFICATE_BASE64` | The code-signing certificate (`.pfx`), base64-encoded |
+| `WINDOWS_CERTIFICATE_PASSWORD` | Its password |
+| `APPLE_CERTIFICATE_BASE64` | The Developer ID Application certificate (`.p12`), base64-encoded |
+| `APPLE_CERTIFICATE_PASSWORD` | Its password |
+| `APPLE_SIGNING_IDENTITY` | The identity to sign with, as `security find-identity` prints it |
+| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Notarization; skipped unless all three are set |
 
 An unsigned macOS app has to be opened with right-click > Open the first time,
 and Windows SmartScreen warns about an unsigned installer.

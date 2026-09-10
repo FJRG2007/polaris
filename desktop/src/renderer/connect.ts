@@ -22,8 +22,7 @@ let busy = false;
 function check(): string | null {
     const text = input.value;
     const parsed = serverAddressSchema.safeParse(text);
-    const problem =
-        text.trim() && !parsed.success ? (parsed.error.issues[0]?.message ?? null) : null;
+    const problem = text.trim() && !parsed.success ? (parsed.error.issues[0]?.message ?? null) : null;
     input.setAttribute("aria-invalid", String(Boolean(problem)));
     note.textContent = problem ?? (parsed.success ? `Opens ${parsed.data}` : hint);
     note.className = problem ? "error" : "hint";

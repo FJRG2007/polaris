@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { newerRelease, parseVersion, releaseSource, TAG_PREFIX } from "@/main/releases";
 
-const release = (tag: string, extra: { draft?: boolean; prerelease?: boolean } = {}) => ({
+const release = (tag: string, extra: { draft?: boolean; prerelease?: boolean; } = {}) => ({
     tag_name: tag,
     draft: extra.draft ?? false,
     prerelease: extra.prerelease ?? false,
@@ -40,9 +40,7 @@ describe("newerRelease", () => {
     });
 
     it("answers null when the running version is the newest, or is not a version", () => {
-        expect(
-            newerRelease([release("desktop-v0.1.0"), release("desktop-v0.0.9")], "0.1.0")
-        ).toBeNull();
+        expect(newerRelease([release("desktop-v0.1.0"), release("desktop-v0.0.9")], "0.1.0")).toBeNull();
         expect(newerRelease([release("desktop-v0.2.0")], "dev")).toBeNull();
     });
 
@@ -55,21 +53,12 @@ describe("newerRelease", () => {
 
 describe("releaseSource", () => {
     it("reads the repository from package.json and matches the workflow's tag prefix", () => {
-        const manifest = JSON.parse(
-            readFileSync(join(__dirname, "../../package.json"), "utf8")
-        ) as { repository: string };
+        const manifest = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf8")) as { repository: string; };
         const source = releaseSource(manifest.repository);
-        expect(source?.api).toMatch(
-            /^https:\/\/api\.github\.com\/repos\/[\w.-]+\/[\w.-]+\/releases\?per_page=100$/
-        );
-        expect(source?.page(`${TAG_PREFIX}1.2.3`)).toMatch(
-            /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/desktop-v1\.2\.3$/
-        );
+        expect(source?.api).toMatch(/^https:\/\/api\.github\.com\/repos\/[\w.-]+\/[\w.-]+\/releases\?per_page=100$/);
+        expect(source?.page(`${TAG_PREFIX}1.2.3`)).toMatch(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/desktop-v1\.2\.3$/);
 
-        const workflow = readFileSync(
-            join(__dirname, "../../../.github/workflows/desktop.yml"),
-            "utf8"
-        );
+        const workflow = readFileSync(join(__dirname, "../../../.github/workflows/desktop.yml"), "utf8");
         expect(workflow).toContain(`- "${TAG_PREFIX}*"`);
     });
 

@@ -17,14 +17,9 @@ export async function GET(): Promise<Response> {
     const user = await apiAdmin();
     if (user instanceof Response) return user;
     try {
-        return NextResponse.json(await readEvidence(), {
-            headers: { "cache-control": "private, no-store" }
-        });
+        return NextResponse.json(await readEvidence(), { headers: { "cache-control": "private, no-store" } });
     } catch (caught) {
         console.error("polaris: the compliance evidence could not be read:", caught);
-        return NextResponse.json(
-            { error: "The evidence could not be read just now. Try again in a minute." },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "The evidence could not be read just now. Try again in a minute." }, { status: 500 });
     }
 }

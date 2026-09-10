@@ -98,13 +98,11 @@ async function probe(origin: string): Promise<string | null> {
         // window may only ever be on the address kept, so the one it lands on is
         // the one to type.
         const landed = new URL(response.url || origin).origin;
-        if (landed !== origin)
-            return `${host} sends visitors on to ${landed}. Use that address instead.`;
+        if (landed !== origin) return `${host} sends visitors on to ${landed}. Use that address instead.`;
         const body = await response.json().catch(() => null);
         return describeProbe(classifyHealth(response.status, body), host);
     } catch (caught) {
-        if ((caught as Error).name === "TimeoutError")
-            return describeNetError("ERR_TIMED_OUT", host);
+        if ((caught as Error).name === "TimeoutError") return describeNetError("ERR_TIMED_OUT", host);
         return describeNetError(netErrorCode(String(caught)), host);
     }
 }
@@ -122,8 +120,7 @@ function goBack(): void {
 
 async function connectSubmit(raw: unknown): Promise<Outcome> {
     const parsed = serverAddressSchema.safeParse(typeof raw === "string" ? raw : "");
-    if (!parsed.success)
-        return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an address." };
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an address." };
     const origin = parsed.data;
     const problem = await probe(origin);
     if (problem) return { ok: false, error: problem };
@@ -151,17 +148,13 @@ function start(): void {
     });
 
     app.whenReady().then(() => {
-        if (process.platform === "win32" && !app.isPackaged)
-            app.setAppUserModelId(process.execPath);
+        if (process.platform === "win32" && !app.isPackaged) app.setAppUserModelId(process.execPath);
 
-        session.defaultSession.setPermissionRequestHandler(
-            (_contents, permission, callback, details) => {
-                callback(allowPermission(permission, details.requestingUrl, current));
-            }
-        );
-        session.defaultSession.setPermissionCheckHandler(
-            (_contents, permission, requestingOrigin) =>
-                allowPermission(permission, requestingOrigin, current)
+        session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
+            callback(allowPermission(permission, details.requestingUrl, current));
+        });
+        session.defaultSession.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
+            allowPermission(permission, requestingOrigin, current)
         );
 
         registerIpc({

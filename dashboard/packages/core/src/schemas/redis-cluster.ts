@@ -51,8 +51,7 @@ export function redisClusterServerCommand(
     maxMemoryMb: number | undefined,
     hostname: string
 ): string[] {
-    if (!NODE_NAME.test(hostname))
-        throw new Error(`${hostname} cannot be announced as a cluster node's hostname`);
+    if (!NODE_NAME.test(hostname)) throw new Error(`${hostname} cannot be announced as a cluster node's hostname`);
     return [
         ...redisServerCommand(password, mode, maxMemoryMb),
         "--masterauth",
@@ -83,11 +82,11 @@ const EVERY_NODE_ANSWERS = `for n in "$@"; do [ "$(redis-cli --no-auth-warning -
 const CREATE_OR_INTRODUCE = [
     'first="$1"',
     'addrs=""',
-    'for n in "$@"; do ip=$(getent hosts "$n" | awk \'$1 ~ /^[0-9.]+$/ { print $1; exit }\'); if [ -z "$ip" ]; then echo "$n has no address on this network"; exit 1; fi; addrs="$addrs $ip"; done',
+    "for n in \"$@\"; do ip=$(getent hosts \"$n\" | awk '$1 ~ /^[0-9.]+$/ { print $1; exit }'); if [ -z \"$ip\" ]; then echo \"$n has no address on this network\"; exit 1; fi; addrs=\"$addrs $ip\"; done",
     `known=$(redis-cli --no-auth-warning -h "$first" -p ${REDIS_CLUSTER_PORT} CLUSTER INFO | sed -n 's/^cluster_known_nodes:\\([0-9]*\\).*$/\\1/p')`,
     `if [ "\${known:-0}" -gt 1 ]; then for ip in $addrs; do [ "$(redis-cli --no-auth-warning -h "$first" -p ${REDIS_CLUSTER_PORT} CLUSTER MEET "$ip" ${REDIS_CLUSTER_PORT})" = OK ] || { echo "The node at $ip could not be introduced"; exit 1; }; done; echo "The cluster already exists; every node was introduced again at its current address."; exit 0; fi`,
     `set --; for ip in $addrs; do set -- "$@" "$ip:${REDIS_CLUSTER_PORT}"; done`,
-    'exec redis-cli --no-auth-warning --cluster create "$@" --cluster-replicas 1 --cluster-yes'
+    "exec redis-cli --no-auth-warning --cluster create \"$@\" --cluster-replicas 1 --cluster-yes"
 ].join("; ");
 
 /**
@@ -122,11 +121,7 @@ export function redisClusterSetupSteps(masters: number): TemplatePrepareStep[] {
         {
             title: "Checking the cluster",
             command: `redis-cli --no-auth-warning -h "$1" -p ${REDIS_CLUSTER_PORT} CLUSTER INFO | grep '^cluster_'`,
-            readiness: {
-                test: clusterSettled(redisClusterNodeCount(masters)),
-                intervalMs: 2000,
-                retries: 60
-            }
+            readiness: { test: clusterSettled(redisClusterNodeCount(masters)), intervalMs: 2000, retries: 60 }
         }
     ];
 }
@@ -136,11 +131,7 @@ export function redisClusterSetupSteps(masters: number): TemplatePrepareStep[] {
  * arguments, and the password in the environment variable redis-cli reads, so
  * it is never part of the script.
  */
-export function redisClusterExec(
-    password: string,
-    script: string,
-    nodes: readonly string[]
-): string[] {
+export function redisClusterExec(password: string, script: string, nodes: readonly string[]): string[] {
     for (const node of nodes) {
         if (!NODE_NAME.test(node)) throw new Error(`${node} is not a cluster node's name`);
     }

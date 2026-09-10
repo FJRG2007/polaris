@@ -258,10 +258,7 @@ const sqlIdentifier = z
     .trim()
     .min(1)
     .max(63)
-    .regex(
-        /^[A-Za-z][A-Za-z0-9_]*$/,
-        "Use letters, digits and underscores, starting with a letter"
-    );
+    .regex(/^[A-Za-z][A-Za-z0-9_]*$/, "Use letters, digits and underscores, starting with a letter");
 
 /**
  * A password we are willing to put in a statement. Quotes and backslashes are
@@ -274,10 +271,7 @@ const dbPassword = z
     .min(12, "Use at least 12 characters")
     .max(128)
     .regex(/^[\x21-\x7e]+$/u, "Use printable characters with no spaces")
-    .refine(
-        (value) => !/["'`\\]/.test(value),
-        "Quotes and backslashes are not allowed in a database password"
-    );
+    .refine((value) => !/["'`\\]/.test(value), "Quotes and backslashes are not allowed in a database password");
 
 /** A host port a database may be published on. Below 1024 is refused: those are
  *  the ports the host's own services claim, and a database is not one of them. */
@@ -294,9 +288,7 @@ export type RedisClusterMasters = (typeof REDIS_CLUSTER_MASTERS)[number];
 
 /** True for a master count a cluster can be created with. */
 export function isRedisClusterMasters(value: unknown): value is RedisClusterMasters {
-    return (
-        typeof value === "number" && (REDIS_CLUSTER_MASTERS as readonly number[]).includes(value)
-    );
+    return typeof value === "number" && (REDIS_CLUSTER_MASTERS as readonly number[]).includes(value);
 }
 
 export const databaseCreateSchema = z
@@ -344,57 +336,25 @@ export const databaseCreateSchema = z
     })
     .superRefine((value, ctx) => {
         const info = MANAGED_ENGINE_INFO[value.engine];
-        const issue = (path: string, message: string) =>
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+        const issue = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
         if (value.topology !== "single") {
             const engine = TOPOLOGY_ENGINE[value.topology];
             if (value.engine !== engine) {
-                issue(
-                    "topology",
-                    `${topologyLabel(topologyOf(value))} is offered for ${DB_ENGINE_INFO[engine].label} only`
-                );
+                issue("topology", `${topologyLabel(topologyOf(value))} is offered for ${DB_ENGINE_INFO[engine].label} only`);
             }
-            if (value.instanceId)
-                issue(
-                    "topology",
-                    "A database on an existing instance runs the way that instance does"
-                );
+            if (value.instanceId) issue("topology", "A database on an existing instance runs the way that instance does");
         }
-        if (
-            value.members !== undefined &&
-            (value.topology !== "replicaSet" ||
-                !(MONGO_SET_SIZES as readonly number[]).includes(value.members))
-        ) {
-            issue(
-                "members",
-                value.topology === "replicaSet"
-                    ? "A replica set has 3 or 5 members"
-                    : "Only a replica set has members to count"
-            );
+        if (value.members !== undefined && (value.topology !== "replicaSet" || !(MONGO_SET_SIZES as readonly number[]).includes(value.members))) {
+            issue("members", value.topology === "replicaSet" ? "A replica set has 3 or 5 members" : "Only a replica set has members to count");
         }
-        if (
-            value.shards !== undefined &&
-            (value.topology !== "sharded" ||
-                !(MONGO_SHARD_COUNTS as readonly number[]).includes(value.shards))
-        ) {
-            issue(
-                "shards",
-                value.topology === "sharded"
-                    ? "A sharded cluster starts with 2, 3 or 4 shards"
-                    : "Only a sharded cluster has shards"
-            );
+        if (value.shards !== undefined && (value.topology !== "sharded" || !(MONGO_SHARD_COUNTS as readonly number[]).includes(value.shards))) {
+            issue("shards", value.topology === "sharded" ? "A sharded cluster starts with 2, 3 or 4 shards" : "Only a sharded cluster has shards");
         }
         if (
             value.readReplicas !== undefined &&
-            (value.topology !== "replicas" ||
-                !(MYSQL_REPLICA_COUNTS as readonly number[]).includes(value.readReplicas))
+            (value.topology !== "replicas" || !(MYSQL_REPLICA_COUNTS as readonly number[]).includes(value.readReplicas))
         ) {
-            issue(
-                "readReplicas",
-                value.topology === "replicas"
-                    ? "Add 1 or 2 read replicas"
-                    : "Only a primary with replicas has read replicas"
-            );
+            issue("readReplicas", value.topology === "replicas" ? "Add 1 or 2 read replicas" : "Only a primary with replicas has read replicas");
         }
         // A replica set's members know each other by names only the environment
         // resolves, and a client that connects as a replica set follows those
@@ -426,8 +386,7 @@ export const databaseCreateSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["exposePort"],
-                message:
-                    "A database on an existing instance is reached through that instance's port"
+                message: "A database on an existing instance is reached through that instance's port"
             });
         }
         if (value.instanceId && value.version) {
@@ -465,8 +424,7 @@ export const databaseCreateSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["exposePort"],
-                message:
-                    "A cluster is reached by the services in its environment and cannot be published on one port"
+                message: "A cluster is reached by the services in its environment and cannot be published on one port"
             });
         }
     });
@@ -491,9 +449,10 @@ export function topologyOf(input: {
 
 /** The create-request fields that ask for a stored layout again - a copy of an
  *  environment gets the layout its original had. */
-export function topologyRequest(
-    topology: DbTopology
-): Pick<DatabaseCreateInput, "topology" | "members" | "shards" | "readReplicas"> {
+export function topologyRequest(topology: DbTopology): Pick<
+    DatabaseCreateInput,
+    "topology" | "members" | "shards" | "readReplicas"
+> {
     switch (topology.kind) {
         case "replicaSet":
             return { topology: "replicaSet", members: topology.members };

@@ -148,30 +148,22 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
     const credential = await readCredential(account.connectionId);
     const refreshToken = credential?.refreshToken;
     if (!refreshToken) {
-        throw new MailAuthError(
-            "The account that authorized this mailbox needs authorizing again."
-        );
+        throw new MailAuthError("The account that authorized this mailbox needs authorizing again.");
     }
 
     const provider = oauthProviderFor(account.service);
     try {
         if (provider === "google") {
             const client = await getGoogleOAuthClient();
-            if (!client)
-                throw new MailAuthError("Google is not connected on this Polaris any more.");
+            if (!client) throw new MailAuthError("Google is not connected on this Polaris any more.");
             // Google mints one token per refresh token regardless of what was
             // asked for; the scopes it carries are the ones the link was granted,
             // which is what `grantsMailAccess` checked before this account existed.
             void GOOGLE_MAIL_SCOPES;
-            return {
-                kind: "oauth",
-                user,
-                accessToken: await googleAccessToken(client, refreshToken)
-            };
+            return { kind: "oauth", user, accessToken: await googleAccessToken(client, refreshToken) };
         }
         const client = await getMicrosoftOAuthClient();
-        if (!client)
-            throw new MailAuthError("Microsoft is not connected on this Polaris any more.");
+        if (!client) throw new MailAuthError("Microsoft is not connected on this Polaris any more.");
         return {
             kind: "oauth",
             user,
@@ -182,10 +174,7 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
         // A grant the provider refused is the same answer to the person holding
         // the mailbox: authorize it again. The provider's own words are kept off
         // the screen deliberately - they name endpoints and scopes.
-        if (
-            caught instanceof GoogleAuthExpiredError ||
-            caught instanceof MicrosoftAuthExpiredError
-        ) {
+        if (caught instanceof GoogleAuthExpiredError || caught instanceof MicrosoftAuthExpiredError) {
             throw new MailAuthError("This mailbox needs authorizing again.");
         }
         console.warn(`polaris: ${provider} did not answer a mail token request:`, caught);

@@ -47,9 +47,7 @@ describe("the window under a screen like this", () => {
         // and the root rule stops the window scrolling while it is on the page.
         expect(cn(PAGE_BLEED, "flex min-h-0 overflow-hidden").split(" ")).toContain("page-bleed");
         const tokens = await readFile(
-            fileURLToPath(
-                new URL("../../../../packages/ui/src/styles/tokens.css", import.meta.url)
-            ),
+            fileURLToPath(new URL("../../../../packages/ui/src/styles/tokens.css", import.meta.url)),
             "utf8"
         );
         expect(tokens).toMatch(/html:has\(\.page-bleed\) \{\s*overflow: hidden;/);

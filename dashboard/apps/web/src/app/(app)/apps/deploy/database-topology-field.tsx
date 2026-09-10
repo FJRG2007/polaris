@@ -15,10 +15,7 @@ import * as core from "@polaris/core";
 import type { ReactNode } from "react";
 import { SegmentedControl, Select } from "@polaris/ui";
 
-export type TopologyValue = Pick<
-    core.DatabaseCreateInput,
-    "topology" | "members" | "shards" | "readReplicas"
->;
+export type TopologyValue = Pick<core.DatabaseCreateInput, "topology" | "members" | "shards" | "readReplicas">;
 
 export const SINGLE_TOPOLOGY: TopologyValue = { topology: "single" };
 
@@ -53,18 +50,11 @@ export function DatabaseTopologyField({
                     aria-label="Read replicas"
                     value={String(replicas)}
                     onValueChange={(next) =>
-                        onChange(
-                            next === "0"
-                                ? SINGLE_TOPOLOGY
-                                : { topology: "replicas", readReplicas: Number(next) }
-                        )
+                        onChange(next === "0" ? SINGLE_TOPOLOGY : { topology: "replicas", readReplicas: Number(next) })
                     }
                     options={[
                         { value: "0", label: "None" },
-                        ...core.MYSQL_REPLICA_COUNTS.map((count) => ({
-                            value: String(count),
-                            label: String(count)
-                        }))
+                        ...core.MYSQL_REPLICA_COUNTS.map((count) => ({ value: String(count), label: String(count) }))
                     ]}
                 />
             </Group>
@@ -112,26 +102,16 @@ export function DatabaseTopologyField({
                     aria-label="Members"
                     size="sm"
                     value={String(topology.members)}
-                    onValueChange={(next) =>
-                        onChange({ topology: "replicaSet", members: Number(next) })
-                    }
-                    options={core.MONGO_SET_SIZES.map((count) => ({
-                        value: String(count),
-                        label: `${count} members`
-                    }))}
+                    onValueChange={(next) => onChange({ topology: "replicaSet", members: Number(next) })}
+                    options={core.MONGO_SET_SIZES.map((count) => ({ value: String(count), label: `${count} members` }))}
                 />
             ) : null}
             {topology.kind === "sharded" ? (
                 <div className="w-40">
                     <Select
                         value={String(topology.shards)}
-                        onValueChange={(next) =>
-                            onChange({ topology: "sharded", shards: Number(next) })
-                        }
-                        options={core.MONGO_SHARD_COUNTS.map((count) => ({
-                            value: String(count),
-                            label: `${count} shards`
-                        }))}
+                        onValueChange={(next) => onChange({ topology: "sharded", shards: Number(next) })}
+                        options={core.MONGO_SHARD_COUNTS.map((count) => ({ value: String(count), label: `${count} shards` }))}
                     />
                 </div>
             ) : null}

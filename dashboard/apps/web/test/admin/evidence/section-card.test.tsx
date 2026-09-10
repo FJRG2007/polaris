@@ -60,8 +60,6 @@ describe("an evidence area", () => {
     });
 
     it("says when the trail holds no change for it", () => {
-        expect(render(area("firewall"))).toContain(
-            "No change to this is recorded in the audit trail."
-        );
+        expect(render(area("firewall"))).toContain("No change to this is recorded in the audit trail.");
     });
 });

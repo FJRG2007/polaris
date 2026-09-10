@@ -15,11 +15,7 @@ import { requireOrgPage } from "@/lib/orgs/page-access";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrganizationBillingPage({
-    params
-}: {
-    params: Promise<{ slug: string }>;
-}) {
+export default async function OrganizationBillingPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
     const { org, user } = await requireOrgPage(slug, "settings.manage");
     const [rates, budget] = await Promise.all([getBillingRates(), getOrgBudget(org.id)]);
@@ -29,8 +25,8 @@ export default async function OrganizationBillingPage({
             <div>
                 <h2 className="text-base font-semibold">Billing</h2>
                 <p className="text-muted-foreground text-sm">
-                    What {org.name}&apos;s projects used each month, priced at this Polaris&apos;s
-                    rates, and the budget it is measured against.
+                    What {org.name}&apos;s projects used each month, priced at this Polaris&apos;s rates, and the budget
+                    it is measured against.
                 </p>
             </div>
             <BillingView

@@ -30,10 +30,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
     const topology = resolveTopology(row);
     const members = hosted ? [] : topologyMembers(topology, row.containerName || row.slug);
     const recoveredFrom = row.recoveredFromId
-        ? await prisma.managedDatabase.findUnique({
-              where: { id: row.recoveredFromId },
-              select: { name: true }
-          })
+        ? await prisma.managedDatabase.findUnique({ where: { id: row.recoveredFromId }, select: { name: true } })
         : null;
     return {
         id: row.id,
@@ -48,30 +45,22 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
         // A sharded cluster's version is not changed here yet, and a Redis
         // Cluster cannot take the dump and reload an upgrade is; each says so
         // in its own section instead of offering a button that would refuse.
-        upgrade:
-            upgradable && topology.kind !== "sharded"
-                ? {
-                      versions: upgradeTargets(engine, row.version),
-                      state: row.upgradeState,
-                      to: row.upgradeTo,
-                      at: row.upgradeAt?.toISOString() ?? null,
-                      error: row.upgradeError,
-                      previousVersion: row.previousVolumeName ? row.previousVersion : null,
-                      previousVolume: row.previousVolumeName
-                  }
-                : null,
+        upgrade: upgradable && topology.kind !== "sharded"
+            ? {
+                  versions: upgradeTargets(engine, row.version),
+                  state: row.upgradeState,
+                  to: row.upgradeTo,
+                  at: row.upgradeAt?.toISOString() ?? null,
+                  error: row.upgradeError,
+                  previousVersion: row.previousVolumeName ? row.previousVersion : null,
+                  previousVolume: row.previousVolumeName
+              }
+            : null,
         redis:
             engine === "redis" && !hosted
-                ? {
-                      mode: row.mode,
-                      maxMemoryMb: row.maxMemoryMb,
-                      clusterMasters: row.clusterMasters
-                  }
+                ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb, clusterMasters: row.clusterMasters }
                 : null,
-        mongo:
-            engine === "mongo" && !hosted && topology.kind === "single"
-                ? { replicaSet: row.replicaSet }
-                : null,
+        mongo: engine === "mongo" && !hosted && topology.kind === "single" ? { replicaSet: row.replicaSet } : null,
         // Laid out over several containers: what it is, and each member by name
         // and role. How each is doing is read on demand (`databaseMembers`).
         topology:
@@ -79,11 +68,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
                 ? {
                       kind: topology.kind,
                       label: topologyLabel(topology),
-                      members: members.map((member) => ({
-                          name: member.name,
-                          role: member.role,
-                          set: member.set
-                      }))
+                      members: members.map((member) => ({ name: member.name, role: member.role, set: member.set }))
                   }
                 : null,
         // A hosted database runs in its parent's container, so the parent's limits are its own.
@@ -106,8 +91,7 @@ export async function copySources(databaseId: string, ownerId: string) {
         select: { engine: true, environment: { select: { projectId: true } } }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    const engines =
-        row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
+    const engines = row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
     // The same project: access was checked for it, and for nothing wider.
     const rows = await prisma.managedDatabase.findMany({
         where: {

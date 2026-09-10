@@ -60,22 +60,14 @@ async function resolve(input: unknown): Promise<Resolved> {
     const ref = parsed.data;
     if (ref.kind === "instance") {
         const user = await requireUser();
-        if (!user.isAdmin)
-            throw new DnsEditError("Only an administrator can edit this Polaris's DNS zones");
+        if (!user.isAdmin) throw new DnsEditError("Only an administrator can edit this Polaris's DNS zones");
         return { scope: { kind: "instance", zoneId: ref.zoneId }, userId: user.id, orgId: null };
     }
     const caller = await domainCallerFor(ref.ref);
-    return {
-        scope: { kind: "owner", owner: caller.owner, domainId: ref.domainId },
-        userId: caller.userId,
-        orgId: caller.orgId
-    };
+    return { scope: { kind: "owner", owner: caller.owner, domainId: ref.domainId }, userId: caller.userId, orgId: caller.orgId };
 }
 
-function failure(
-    caught: unknown,
-    fallback: string
-): { error: string; problems?: Record<string, string> } {
+function failure(caught: unknown, fallback: string): { error: string; problems?: Record<string, string> } {
     if (caught instanceof DnsEditError) return { error: caught.message, problems: caught.problems };
     // Cloudflare's own refusal is worth showing: it names the field it disliked.
     if (caught instanceof CloudflareApiError) return { error: caught.message.slice(0, 300) };
@@ -85,23 +77,17 @@ function failure(
 }
 
 /** The zones an administrator can pick from. */
-export async function listDnsZonesAction(): Promise<{
-    zones?: { id: string; name: string }[];
-    error?: string;
-}> {
+export async function listDnsZonesAction(): Promise<{ zones?: { id: string; name: string }[]; error?: string }> {
     try {
         const user = await requireUser();
-        if (!user.isAdmin)
-            return { error: "Only an administrator can edit this Polaris's DNS zones" };
+        if (!user.isAdmin) return { error: "Only an administrator can edit this Polaris's DNS zones" };
         return { zones: await editableZones() };
     } catch (caught) {
         return failure(caught, "Could not read the zones");
     }
 }
 
-export async function zoneRecordsAction(
-    scope: DnsScopeRef
-): Promise<{ zone?: ZoneRecords; error?: string }> {
+export async function zoneRecordsAction(scope: DnsScopeRef): Promise<{ zone?: ZoneRecords; error?: string }> {
     try {
         const resolved = await resolve(scope);
         return { zone: await zoneRecords(resolved.scope) };
@@ -119,8 +105,7 @@ export async function saveDnsRecordAction(
         const resolved = await resolve(scope);
         const parsed = dnsRecordDraftSchema.safeParse(draft);
         if (!parsed.success) return { error: "That record could not be read" };
-        if (recordId !== null && typeof recordId !== "string")
-            return { error: "That record could not be read" };
+        if (recordId !== null && typeof recordId !== "string") return { error: "That record could not be read" };
         // The same schema the form checked with, run again here against the zone
         // as it is now - see `saveZoneRecord`.
         const record = await saveZoneRecord(resolved.scope, recordId, parsed.data);
@@ -138,10 +123,7 @@ export async function saveDnsRecordAction(
     }
 }
 
-export async function deleteDnsRecordAction(
-    scope: DnsScopeRef,
-    recordId: string
-): Promise<{ error?: string }> {
+export async function deleteDnsRecordAction(scope: DnsScopeRef, recordId: string): Promise<{ error?: string }> {
     try {
         const resolved = await resolve(scope);
         await deleteZoneRecord(resolved.scope, String(recordId));

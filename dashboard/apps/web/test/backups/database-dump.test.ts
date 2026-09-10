@@ -10,10 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const ports = vi.hoisted(() => ({
     runIn: vi.fn(async (_container: string, _argv: readonly string[]) => ({ code: 0, output: "" })),
-    readFile: vi.fn(
-        async () =>
-            Readable.toWeb(Readable.from([Buffer.from("-- dump")])) as ReadableStream<Uint8Array>
-    ),
+    readFile: vi.fn(async () => Readable.toWeb(Readable.from([Buffer.from("-- dump")])) as ReadableStream<Uint8Array>),
     dispose: vi.fn(async () => undefined)
 }));
 
@@ -22,10 +19,7 @@ vi.mock("@polaris/db", () => ({
     Prisma: { dmmf: { datamodel: { models: [] } } }
 }));
 vi.mock("@/lib/deploy/runtime", () => ({ getPorts: async () => ports }));
-vi.mock("@/lib/database-service", () => ({
-    databaseClusterNodes: vi.fn(),
-    databaseConnection: vi.fn()
-}));
+vi.mock("@/lib/database-service", () => ({ databaseClusterNodes: vi.fn(), databaseConnection: vi.fn() }));
 vi.mock("@/lib/database-ops/restore", () => ({ restoreDumpInto: vi.fn() }));
 vi.mock("@/lib/database-ops/ops", () => ({ instanceContext: vi.fn(), startOperation: vi.fn() }));
 
@@ -50,9 +44,7 @@ async function dumpScript(engine: "mysql" | "mariadb"): Promise<string> {
 
 describe("dumping a MySQL-family database", () => {
     it("tells mysqldump to leave the GTID statements out", async () => {
-        expect(await dumpScript("mysql")).toContain(
-            "'mysqldump' '--single-transaction' '--set-gtid-purged=OFF'"
-        );
+        expect(await dumpScript("mysql")).toContain("'mysqldump' '--single-transaction' '--set-gtid-purged=OFF'");
     });
 
     it("gives mariadb-dump no option it does not have", async () => {

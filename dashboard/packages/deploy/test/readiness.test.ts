@@ -34,10 +34,7 @@ function fakeClock(start = Date.parse("2026-09-10T10:00:00Z")) {
     return { now: () => now, sleep: async (ms: number) => void (now += ms) };
 }
 
-const container = (state: Record<string, unknown>, restarts = 0) => ({
-    RestartCount: restarts,
-    State: state
-});
+const container = (state: Record<string, unknown>, restarts = 0) => ({ RestartCount: restarts, State: state });
 
 describe("waiting for a release to come up", () => {
     it("fails a container that exits, naming its exit code", async () => {
@@ -88,9 +85,7 @@ describe("waiting for a release to come up", () => {
     it("passes a container with no healthcheck once it has stayed up", async () => {
         const clock = fakeClock();
         const result = await waitUntilServing(
-            context([
-                container({ Status: "running", StartedAt: new Date(clock.now()).toISOString() })
-            ]),
+            context([container({ Status: "running", StartedAt: new Date(clock.now()).toISOString() })]),
             "web",
             {},
             clock
@@ -105,14 +100,7 @@ describe("waiting for a release to come up", () => {
     it("bounds the wait by the healthcheck's own worst case", () => {
         expect(readinessDeadlineMs({})).toBe(45_000);
         expect(
-            readinessDeadlineMs({
-                healthcheck: {
-                    test: ["CMD", "true"],
-                    intervalSeconds: 10,
-                    retries: 3,
-                    startPeriodSeconds: 20
-                }
-            })
+            readinessDeadlineMs({ healthcheck: { test: ["CMD", "true"], intervalSeconds: 10, retries: 3, startPeriodSeconds: 20 } })
         ).toBe(20_000 + 40_000 + 15_000);
     });
 });
@@ -120,9 +108,7 @@ describe("waiting for a release to come up", () => {
 describe("a swarm update", () => {
     const spec = (volumes: ComposeSpec["services"][number]["volumes"]): ComposeSpec => ({
         project: "p",
-        services: [
-            { name: "web", image: "nginx", env: {}, ports: [], volumes, labels: {}, networks: [] }
-        ],
+        services: [{ name: "web", image: "nginx", env: {}, ports: [], volumes, labels: {}, networks: [] }],
         volumes: [],
         networks: []
     });
@@ -134,11 +120,7 @@ describe("a swarm update", () => {
     });
 
     it("keeps stop-first for a service with a volume, so two tasks never share its files", () => {
-        const yaml = renderComposeYaml(
-            forSwarm(spec([{ source: "data", target: "/data", kind: "volume" }])),
-            "/v",
-            "/m"
-        );
+        const yaml = renderComposeYaml(forSwarm(spec([{ source: "data", target: "/data", kind: "volume" }])), "/v", "/m");
         expect(yaml).not.toContain("start-first");
     });
 });
@@ -164,9 +146,7 @@ describe("a release beside the one it replaces", () => {
 
     it("answers to the service's own name on every network it joins", () => {
         const yaml = renderComposeYaml(service(["web"]), "/v", "/m");
-        expect(yaml).toContain(
-            '      polaris-proxy:\n        aliases:\n          - "web"\n      hub:\n        aliases:\n          - "web"'
-        );
+        expect(yaml).toContain('      polaris-proxy:\n        aliases:\n          - "web"\n      hub:\n        aliases:\n          - "web"');
     });
 
     it("keeps the plain network list when it carries no alias", () => {

@@ -83,12 +83,7 @@ export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
                             >
                                 <Server className="size-4 text-foreground-subtle" />
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <span
-                                        className="truncate text-[0.8125rem] font-medium text-foreground"
-                                        title={server.hostname}
-                                    >
-                                        {server.hostname}
-                                    </span>
+                                    <span className="truncate text-[0.8125rem] font-medium text-foreground" title={server.hostname}>{server.hostname}</span>
                                     <span className="truncate text-xs text-muted-foreground">
                                         {server.primaryDomain} on {server.placementName}
                                         {server.error ? ` - ${server.error}` : ""}
@@ -174,10 +169,7 @@ function UninstallDialog({
                                     className="flex items-center gap-2 px-3 py-2 text-[0.8125rem] transition-colors hover:bg-muted"
                                 >
                                     <Server className="size-4 text-foreground-subtle" />
-                                    <span
-                                        className="min-w-0 flex-1 truncate"
-                                        title={server.hostname}
-                                    >
+                                    <span className="min-w-0 flex-1 truncate" title={server.hostname}>
                                         {server.hostname}
                                     </span>
                                     <span className="text-xs text-muted-foreground">Open</span>
@@ -196,12 +188,7 @@ function UninstallDialog({
                         {blocked ? "Close" : "Cancel"}
                     </Button>
                     {blocked ? null : (
-                        <Button
-                            type="button"
-                            variant="danger"
-                            onClick={uninstall}
-                            disabled={pending}
-                        >
+                        <Button type="button" variant="danger" onClick={uninstall} disabled={pending}>
                             {pending ? <Loader2 className="animate-spin" /> : null}
                             {pending ? "Uninstalling" : "Uninstall"}
                         </Button>
@@ -212,13 +199,7 @@ function UninstallDialog({
     );
 }
 
-function SetupDialog({
-    open,
-    onOpenChange
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-}) {
+function SetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const router = useRouter();
     const [placements, setPlacements] = useState<{ id: string; name: string }[]>([]);
     const [serverId, setServerId] = useState("local");
@@ -235,8 +216,7 @@ function SetupDialog({
     }, [open]);
 
     // Suggest the name from the domain the way almost everybody names it.
-    const suggested =
-        domain.trim() && !hostname.trim() ? `mail.${domain.trim().toLowerCase()}` : "";
+    const suggested = domain.trim() && !hostname.trim() ? `mail.${domain.trim().toLowerCase()}` : "";
     const input = { serverId, hostname: hostname.trim() || suggested, domain };
     const parsed = mailServerSetupSchema.safeParse(input);
     const fieldError = (path: string): string | null => {
@@ -268,8 +248,7 @@ function SetupDialog({
                 <DialogHeader>
                     <DialogTitle>Set up a mail server</DialogTitle>
                     <DialogDescription>
-                        It runs as a service in Deploy, with ports 25, 465, 587, 993 and 4190
-                        published on the machine you choose.
+                        It runs as a service in Deploy, with ports 25, 465, 587, 993 and 4190 published on the machine you choose.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -279,37 +258,19 @@ function SetupDialog({
                         void submit();
                     }}
                 >
-                    <Field
-                        label="Runs on"
-                        required
-                        hint="A server that deploys through a swarm cannot run one."
-                    >
+                    <Field label="Runs on" required hint="A server that deploys through a swarm cannot run one.">
                         {(id) => (
                             <Select
                                 id={id}
                                 value={serverId}
                                 onValueChange={setServerId}
-                                options={placements.map((placement) => ({
-                                    value: placement.id,
-                                    label: placement.name
-                                }))}
+                                options={placements.map((placement) => ({ value: placement.id, label: placement.name }))}
                             />
                         )}
                     </Field>
-                    <Field
-                        label="First domain"
-                        required
-                        error={fieldError("domain")}
-                        hint="The domain mail is received for, like example.com."
-                    >
+                    <Field label="First domain" required error={fieldError("domain")} hint="The domain mail is received for, like example.com.">
                         {(id) => (
-                            <Input
-                                id={id}
-                                value={domain}
-                                onChange={(event) => setDomain(event.target.value)}
-                                placeholder="example.com"
-                                autoComplete="off"
-                            />
+                            <Input id={id} value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="example.com" autoComplete="off" />
                         )}
                     </Field>
                     <Field
@@ -333,11 +294,7 @@ function SetupDialog({
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button
-                            type="submit"
-                            disabled={!parsed.success || pending}
-                            aria-disabled={!parsed.success || pending}
-                        >
+                        <Button type="submit" disabled={!parsed.success || pending} aria-disabled={!parsed.success || pending}>
                             {pending ? "Starting..." : "Set it up"}
                         </Button>
                     </DialogFooter>

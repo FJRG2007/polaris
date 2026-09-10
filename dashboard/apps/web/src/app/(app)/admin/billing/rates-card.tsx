@@ -42,19 +42,10 @@ function draftOf(rates: BillingRates | null): Draft {
 
 function sameRates(left: BillingRates | null, right: BillingRates | null): boolean {
     if (left === null || right === null) return left === right;
-    return (
-        left.currency === right.currency &&
-        BILLING_RATE_KEYS.every((key) => left[key] === right[key])
-    );
+    return left.currency === right.currency && BILLING_RATE_KEYS.every((key) => left[key] === right[key]);
 }
 
-export function RatesCard({
-    rates,
-    onChange
-}: {
-    rates: BillingRates | null;
-    onChange: () => void;
-}) {
+export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onChange: () => void }) {
     const [saved, setSaved] = useState<BillingRates | null>(rates);
     const [draft, setDraft] = useState<Draft>(() => draftOf(rates));
     const [busy, setBusy] = useState(false);
@@ -94,8 +85,7 @@ export function RatesCard({
     const clear = async () => {
         const ok = await confirm({
             title: "Remove the prices?",
-            description:
-                "Every statement goes back to showing usage without money, and budgets stop being measured.",
+            description: "Every statement goes back to showing usage without money, and budgets stop being measured.",
             confirmLabel: "Remove prices",
             danger: true
         });
@@ -161,9 +151,7 @@ export function RatesCard({
                                     value={draft[key]}
                                     aria-invalid={message ? true : undefined}
                                     aria-describedby={message ? `${id}-error` : undefined}
-                                    onChange={(event) =>
-                                        setDraft({ ...draft, [key]: event.target.value })
-                                    }
+                                    onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}
                                 />
                                 {message ? (
                                     <p id={`${id}-error`} className="text-danger text-xs">
@@ -188,20 +176,13 @@ export function RatesCard({
                         Save prices
                     </Button>
                     {saved ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => void clear()}
-                            disabled={busy}
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => void clear()} disabled={busy}>
                             <Trash2 className="size-4" aria-hidden />
                             Remove prices
                         </Button>
                     ) : null}
                     {blank ? (
-                        <p className="text-muted-foreground text-xs">
-                            Set at least one price to save.
-                        </p>
+                        <p className="text-muted-foreground text-xs">Set at least one price to save.</p>
                     ) : null}
                 </div>
             </CardBody>

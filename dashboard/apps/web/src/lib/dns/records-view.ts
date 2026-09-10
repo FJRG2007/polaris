@@ -32,10 +32,7 @@ function compare(a: string, b: string): number {
 }
 
 /** The records that match the filters, by type, then name, then value. */
-export function listedRecords(
-    records: readonly DnsRecordView[],
-    filters: RecordFilters
-): DnsRecordView[] {
+export function listedRecords(records: readonly DnsRecordView[], filters: RecordFilters): DnsRecordView[] {
     const needle = filters.search.trim().toLowerCase();
     return records
         .filter((record) => filters.type === ALL_TYPES || record.type === filters.type)
@@ -48,9 +45,7 @@ export function listedRecords(
         )
         .sort(
             (a, b) =>
-                compare(a.type, b.type) ||
-                compare(a.relative, b.relative) ||
-                compare(a.content, b.content)
+                compare(a.type, b.type) || compare(a.relative, b.relative) || compare(a.content, b.content)
         );
 }
 
@@ -59,12 +54,7 @@ export function recordTypesIn(records: readonly DnsRecordView[]): string[] {
     return [...new Set(records.map((record) => record.type))].sort(compare);
 }
 
-const TTL_LABELS: Record<number, string> = {
-    60: "1 min",
-    300: "5 min",
-    3600: "1 hour",
-    86400: "1 day"
-};
+const TTL_LABELS: Record<number, string> = { 60: "1 min", 300: "5 min", 3600: "1 hour", 86400: "1 day" };
 
 /** A TTL as the table and the form say it. */
 export function ttlLabel(ttl: number): string {
@@ -89,12 +79,7 @@ function contentOf(fields: DnsRecordFields): string {
  * checked record. Replaced by the row the server answers with, or taken away if
  * the write is refused.
  */
-export function pendingView(
-    id: string,
-    fields: DnsRecordFields,
-    draft: DnsRecordDraft,
-    zone: string
-): DnsRecordView {
+export function pendingView(id: string, fields: DnsRecordFields, draft: DnsRecordDraft, zone: string): DnsRecordView {
     const proxiable = PROXIABLE_TYPES.includes(fields.type);
     const proxied = "proxied" in fields && fields.proxied;
     return {

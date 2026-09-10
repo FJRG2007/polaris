@@ -41,9 +41,7 @@ function draftOf(view: ServiceScalingView): Draft {
         min: String(view.autoscale?.min ?? 1),
         max: String(view.autoscale?.max ?? Math.max(2, view.replicas)),
         cpuPercent: String(view.autoscale?.cpuPercent ?? 50),
-        requestsPerCopy: view.autoscale?.requestsPerCopy
-            ? String(view.autoscale.requestsPerCopy)
-            : "",
+        requestsPerCopy: view.autoscale?.requestsPerCopy ? String(view.autoscale.requestsPerCopy) : "",
         sticky: view.balancing.sticky,
         healthPath: view.balancing.healthPath ?? "",
         cpus: view.limits.cpus === null ? "" : String(view.limits.cpus),
@@ -62,9 +60,7 @@ function parse(draft: Draft) {
                   min: Number(draft.min),
                   max: Number(draft.max),
                   cpuPercent: Number(draft.cpuPercent),
-                  requestsPerCopy: draft.requestsPerCopy.trim()
-                      ? Number(draft.requestsPerCopy)
-                      : null
+                  requestsPerCopy: draft.requestsPerCopy.trim() ? Number(draft.requestsPerCopy) : null
               }
             : null,
         balancing: { sticky: draft.sticky, healthPath: draft.healthPath.trim() || null },
@@ -87,13 +83,7 @@ function parse(draft: Draft) {
         : { input: null, problem: parsed.error.issues[0]?.message ?? "Check these settings" };
 }
 
-export function ScalingSection({
-    applicationId,
-    onChanged
-}: {
-    applicationId: string;
-    onChanged: () => void;
-}) {
+export function ScalingSection({ applicationId, onChanged }: { applicationId: string; onChanged: () => void }) {
     const [view, setView] = useState<ServiceScalingView | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -115,8 +105,7 @@ export function ScalingSection({
     }, [applicationId]);
 
     const checked = useMemo(() => (draft ? parse(draft) : null), [draft]);
-    const set = (patch: Partial<Draft>) =>
-        setDraft((current) => (current ? { ...current, ...patch } : current));
+    const set = (patch: Partial<Draft>) => setDraft((current) => (current ? { ...current, ...patch } : current));
     const copies = Number(draft?.autoscale ? draft.max : draft?.replicas) || 1;
 
     function save() {
@@ -130,11 +119,7 @@ export function ScalingSection({
                 setError(result.error);
                 return;
             }
-            setNote(
-                result.redeployed
-                    ? "Saved. The service is being started again with the new settings."
-                    : "Saved."
-            );
+            setNote(result.redeployed ? "Saved. The service is being started again with the new settings." : "Saved.");
             onChanged();
         });
     }
@@ -163,8 +148,8 @@ export function ScalingSection({
                             className="w-28"
                         />
                         <span className="text-xs text-muted-foreground">
-                            How many copies of the service run at once, up to {core.REPLICAS_MAX}.
-                            The edge spreads requests over them.
+                            How many copies of the service run at once, up to {core.REPLICAS_MAX}. The edge
+                            spreads requests over them.
                         </span>
                     </label>
 
@@ -173,13 +158,11 @@ export function ScalingSection({
                             <span className="font-medium">Scale by itself</span>
                             <span className="block text-xs text-muted-foreground">
                                 Add a copy when CPU or requests per copy stay above their target for
-                                three minutes, and take one away after ten minutes with both low.
-                                With a requests target, {core.AUTOSCALE_IDLE_AFTER} minutes with no
-                                requests at all drops straight to the fewest. CPU is each
-                                copy&apos;s share of the machine, the same figure the Metrics tab
-                                shows.
-                                {view.engine === "swarm" &&
-                                    " Not on a swarm machine, which keeps its own count."}
+                                three minutes, and take one away after ten minutes with both low. With a
+                                requests target, {core.AUTOSCALE_IDLE_AFTER} minutes with no requests at all
+                                drops straight to the fewest. CPU is each copy&apos;s share of the machine,
+                                the same figure the Metrics tab shows.
+                                {view.engine === "swarm" && " Not on a swarm machine, which keeps its own count."}
                             </span>
                         </span>
                         <Switch
@@ -214,9 +197,7 @@ export function ScalingSection({
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">
-                                    CPU target (%)
-                                </span>
+                                <span className="text-xs text-muted-foreground">CPU target (%)</span>
                                 <Input
                                     type="number"
                                     min={5}
@@ -227,22 +208,15 @@ export function ScalingSection({
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">
-                                    Requests per copy (a minute)
-                                </span>
+                                <span className="text-xs text-muted-foreground">Requests per copy (a minute)</span>
                                 <Input
                                     type="number"
                                     min={1}
                                     max={core.REQUESTS_PER_COPY_MAX}
                                     value={draft.requestsPerCopy}
                                     // A stored target can still be cleared where it cannot be read.
-                                    disabled={
-                                        view.trafficBlocked !== null &&
-                                        !draft.requestsPerCopy.trim()
-                                    }
-                                    onChange={(event) =>
-                                        set({ requestsPerCopy: event.target.value })
-                                    }
+                                    disabled={view.trafficBlocked !== null && !draft.requestsPerCopy.trim()}
+                                    onChange={(event) => set({ requestsPerCopy: event.target.value })}
                                     placeholder="CPU only"
                                     className="w-44"
                                 />
@@ -265,9 +239,8 @@ export function ScalingSection({
                         <span>
                             <span className="font-medium">Sleep when nobody visits</span>
                             <span className="block text-xs text-muted-foreground">
-                                Stop the service after a stretch with no visits, and start it on the
-                                next one. The first visitor sees a page saying it is waking up for
-                                the few seconds that takes.
+                                Stop the service after a stretch with no visits, and start it on the next one. The
+                                first visitor sees a page saying it is waking up for the few seconds that takes.
                                 {view.asleep && " It is asleep now."}
                                 {view.sleepBlocked && ` ${view.sleepBlocked}`}
                             </span>
@@ -281,9 +254,7 @@ export function ScalingSection({
                     </div>
                     {draft.sleeps && (
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
-                                After (minutes without a visit)
-                            </span>
+                            <span className="text-xs text-muted-foreground">After (minutes without a visit)</span>
                             <Input
                                 type="number"
                                 min={core.SLEEP_AFTER_MIN_MINUTES}
@@ -324,8 +295,8 @@ export function ScalingSection({
                             </label>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                            A copy past its memory is stopped and started again; one past its CPU is
-                            slowed. Blank = no limit.
+                            A copy past its memory is stopped and started again; one past its CPU is slowed.
+                            Blank = no limit.
                         </span>
                     </div>
 
@@ -333,8 +304,8 @@ export function ScalingSection({
                         <span>
                             <span className="font-medium">Keep each visitor on one copy</span>
                             <span className="block text-xs text-muted-foreground">
-                                For WebSockets and sessions kept in memory. A cookie pins the
-                                visitor to the copy that answered them first.
+                                For WebSockets and sessions kept in memory. A cookie pins the visitor to
+                                the copy that answered them first.
                             </span>
                         </span>
                         <Switch
@@ -355,14 +326,14 @@ export function ScalingSection({
                             className="max-w-xs"
                         />
                         <span className="text-xs text-muted-foreground">
-                            Asked of every copy every 10 seconds. One that stops answering is left
-                            out until it answers again. Blank = no check.
+                            Asked of every copy every 10 seconds. One that stops answering is left out until
+                            it answers again. Blank = no check.
                         </span>
                     </label>
                     {copies > 1 && (
                         <p className="text-xs text-muted-foreground">
-                            With more than one copy the edge balances between them itself, so email
-                            addresses in its pages are not hidden from scrapers.
+                            With more than one copy the edge balances between them itself, so email addresses
+                            in its pages are not hidden from scrapers.
                         </p>
                     )}
 

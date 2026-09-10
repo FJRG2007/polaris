@@ -42,9 +42,7 @@ export function LogsView({
     initialService?: string | null;
 }) {
     const [selected, setSelected] = useState<string>(() =>
-        initialService && services.some((service) => service.id === initialService)
-            ? initialService
-            : ALL
+        initialService && services.some((service) => service.id === initialService) ? initialService : ALL
     );
 
     const watched = useMemo(() => {
@@ -90,9 +88,7 @@ export function LogsView({
             {services.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 px-4 py-16 text-center">
                     <ScrollText className="size-5 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                        No services in this environment to log.
-                    </p>
+                    <p className="text-sm text-muted-foreground">No services in this environment to log.</p>
                 </div>
             ) : (
                 <RuntimeLogs

@@ -50,10 +50,7 @@ function view(id: string, type: "A" | "TXT", relative: string, content: string):
 const zone: ZoneRecords = {
     zone: { id: ZONE_ID, name: "example.test" },
     within: null,
-    records: [
-        view("r1", "A", "www", "203.0.113.10"),
-        view("r2", "TXT", "_dmarc", "v=DMARC1; p=none")
-    ]
+    records: [view("r1", "A", "www", "203.0.113.10"), view("r2", "TXT", "_dmarc", "v=DMARC1; p=none")]
 };
 
 /** A promise the test settles by hand, so the frame between a click and its answer can be looked at. */
@@ -123,17 +120,13 @@ describe("deleting a record", () => {
         await mount();
 
         fireEvent.click(screen.getByRole("button", { name: "Delete the A record www" }));
-        fireEvent.click(
-            within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete record" })
-        );
+        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete record" }));
 
         expect(actions.deleteDnsRecordAction).toHaveBeenCalledWith(scope, "r1");
         expect(screen.queryByText("203.0.113.10")).toBeNull();
 
         // Stored: the zone is read again, and what it answers is what stays.
-        actions.zoneRecordsAction.mockResolvedValue({
-            zone: { ...zone, records: [zone.records[1]] }
-        });
+        actions.zoneRecordsAction.mockResolvedValue({ zone: { ...zone, records: [zone.records[1]] } });
         await act(async () => answer.resolve({}));
         expect(actions.zoneRecordsAction).toHaveBeenCalledTimes(2);
         expect(screen.queryByText("203.0.113.10")).toBeNull();
@@ -145,9 +138,7 @@ describe("deleting a record", () => {
         await mount();
 
         fireEvent.click(screen.getByRole("button", { name: "Delete the A record www" }));
-        fireEvent.click(
-            within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete record" })
-        );
+        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete record" }));
 
         expect(await screen.findByText("Cloudflare refused the change")).toBeTruthy();
         expect(screen.getByText("203.0.113.10")).toBeTruthy();
@@ -173,12 +164,7 @@ describe("adding a record", () => {
         const row = screen.getByText("203.0.113.20").closest("tr");
         expect(row?.getAttribute("aria-busy")).toBe("true");
 
-        await act(async () =>
-            answer.resolve({
-                error: "Check the highlighted fields",
-                problems: { content: "Already taken" }
-            })
-        );
+        await act(async () => answer.resolve({ error: "Check the highlighted fields", problems: { content: "Already taken" } }));
         expect(screen.queryByText("203.0.113.20", { selector: "code" })).toBeNull();
         const reopened = await screen.findByRole("dialog");
         expect(within(reopened).getByText("Already taken")).toBeTruthy();
@@ -228,39 +214,24 @@ describe("changing a record", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Edit the A record www" }));
         const first = await screen.findByRole("dialog");
-        fireEvent.change(within(first).getAllByRole("textbox")[1]!, {
-            target: { value: "203.0.113.11" }
-        });
+        fireEvent.change(within(first).getAllByRole("textbox")[1]!, { target: { value: "203.0.113.11" } });
         fireEvent.click(within(first).getByRole("button", { name: "Save" }));
-        expect(actions.saveDnsRecordAction).toHaveBeenLastCalledWith(
-            scope,
-            "r1",
-            expect.objectContaining({ content: "203.0.113.11" })
-        );
+        expect(actions.saveDnsRecordAction).toHaveBeenLastCalledWith(scope, "r1", expect.objectContaining({ content: "203.0.113.11" }));
 
         // Another record is opened while the first is still being sent.
         fireEvent.click(screen.getByRole("button", { name: "Edit the TXT record _dmarc" }));
         const second = await screen.findByRole("dialog");
-        await act(async () =>
-            answer.resolve({
-                error: "Check the highlighted fields",
-                problems: { content: "Refused by Cloudflare" }
-            })
-        );
+        await act(async () => answer.resolve({ error: "Check the highlighted fields", problems: { content: "Refused by Cloudflare" } }));
 
         // The open form is still the TXT record's, with its own value.
         const open = screen.getByRole("dialog");
         expect(open).toBe(second);
         expect(within(open).getByDisplayValue("v=DMARC1; p=none")).toBeTruthy();
         expect(within(open).queryByDisplayValue("203.0.113.11")).toBeNull();
-        expect(
-            screen.getByText("The A record www was not saved: Refused by Cloudflare")
-        ).toBeTruthy();
+        expect(screen.getByText("The A record www was not saved: Refused by Cloudflare")).toBeTruthy();
 
         // Saving it writes the TXT record, never over the refused A record.
-        fireEvent.change(within(open).getAllByRole("textbox")[1]!, {
-            target: { value: "v=DMARC1; p=reject" }
-        });
+        fireEvent.change(within(open).getAllByRole("textbox")[1]!, { target: { value: "v=DMARC1; p=reject" } });
         fireEvent.click(within(open).getByRole("button", { name: "Save" }));
         expect(actions.saveDnsRecordAction).toHaveBeenLastCalledWith(
             scope,

@@ -37,10 +37,7 @@ const states = new Map<string, AutoscaleState>();
 
 /** Average CPU over the copies that answered, or null when none did. */
 async function averageCpu(
-    app: {
-        target: { kind: string; hostId: string | null };
-        environment: { project: { ownerId: string } };
-    },
+    app: { target: { kind: string; hostId: string | null }; environment: { project: { ownerId: string } } },
     names: readonly string[]
 ): Promise<number | null> {
     const driver =
@@ -53,9 +50,7 @@ async function averageCpu(
             const stats = samples.get(name);
             return stats ? [stats.cpuPercent] : [];
         });
-        return readings.length > 0
-            ? readings.reduce((sum, value) => sum + value, 0) / readings.length
-            : null;
+        return readings.length > 0 ? readings.reduce((sum, value) => sum + value, 0) / readings.length : null;
     } finally {
         await driver.dispose().catch(() => undefined);
     }
@@ -67,29 +62,19 @@ async function averageCpu(
  * moves before the release carrying it is serving, and stays moved when that
  * release never comes up.
  */
-async function servingCopies(
-    apps: readonly { currentDeploymentId: string | null }[]
-): Promise<Map<string, number>> {
-    const ids = apps
-        .map((app) => app.currentDeploymentId)
-        .filter((id): id is string => id !== null);
+async function servingCopies(apps: readonly { currentDeploymentId: string | null }[]): Promise<Map<string, number>> {
+    const ids = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
     if (ids.length === 0) return new Map();
     const rows = await prisma.deployment.findMany({
         where: { id: { in: ids } },
         select: { id: true, replicas: true }
     });
-    return new Map(
-        rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : []))
-    );
+    return new Map(rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : [])));
 }
 
 export async function runAutoscale(now = Date.now()): Promise<{ checked: number; scaled: number }> {
     const apps = await prisma.application.findMany({
-        where: {
-            autoscale: { not: null },
-            currentDeploymentId: { not: null },
-            desiredState: "running"
-        },
+        where: { autoscale: { not: null }, currentDeploymentId: { not: null }, desiredState: "running" },
         include: {
             environment: { include: { project: true } },
             target: true,
@@ -124,11 +109,7 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
             : null;
         let requests: number | null = null;
         if (config.requestsPerCopy !== null && trafficRefusal(app) === null) {
-            log ??= readEdgeVisits().catch(() => ({
-                visits: [],
-                windowStart: null,
-                truncated: false
-            }));
+            log ??= readEdgeVisits().catch(() => ({ visits: [], windowStart: null, truncated: false }));
             const visits = await log;
             requests = requestRate(
                 visitTimes(visits, serviceHostnames(app)),

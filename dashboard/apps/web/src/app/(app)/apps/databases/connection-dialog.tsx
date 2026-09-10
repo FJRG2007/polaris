@@ -108,9 +108,7 @@ export function ConnectionDialog({
                 actions.saveConnectionAction({
                     id: connection?.id ?? null,
                     name: name.trim(),
-                    engine: (kind === "managed"
-                        ? (chosenManaged?.engine ?? engine)
-                        : engine) as never,
+                    engine: (kind === "managed" ? (chosenManaged?.engine ?? engine) : engine) as never,
                     managedDatabaseId: kind === "managed" ? managedId : null,
                     host: kind === "manual" ? host.trim() : null,
                     port: kind === "manual" ? Number(port) : null,
@@ -187,9 +185,9 @@ export function ConnectionDialog({
                                     chosenManaged &&
                                     !chosenManaged.reachable && (
                                         <p className="text-xs text-warning">
-                                            This one runs on another server and is not published on
-                                            a port, so Polaris cannot reach it from here. Publish it
-                                            on a port from the database&apos;s own screen first.
+                                            This one runs on another server and is not published on a
+                                            port, so Polaris cannot reach it from here. Publish it on a
+                                            port from the database&apos;s own screen first.
                                         </p>
                                     )
                                 )}
@@ -266,10 +264,7 @@ export function ConnectionDialog({
                     />
 
                     {error && (
-                        <p
-                            role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                        >
+                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                             {error}
                         </p>
                     )}

@@ -28,10 +28,7 @@ export function BillingView({
     canSetPrices: boolean;
 }) {
     const base = `/api/orgs/${encodeURIComponent(slug)}/billing`;
-    const { data, error, stale, refreshing, refresh, month, months } = parts.useStatement(
-        base,
-        `org.billing:${slug}`
-    );
+    const { data, error, stale, refreshing, refresh, month, months } = parts.useStatement(base, `org.billing:${slug}`);
 
     return (
         <div className="flex flex-col gap-4">
@@ -53,16 +50,11 @@ export function BillingView({
                     aria-label="Refresh"
                     title="Refresh"
                 >
-                    <RefreshCw
-                        className={refreshing ? "size-4 animate-spin" : "size-4"}
-                        aria-hidden
-                    />
+                    <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
                 </Button>
             </parts.StatementToolbar>
             {error ? <p className="text-danger text-sm">{error}</p> : null}
-            {stale ? (
-                <p className="text-warning-ink text-sm">Showing the last statement read. {stale}</p>
-            ) : null}
+            {stale ? <p className="text-warning-ink text-sm">Showing the last statement read. {stale}</p> : null}
             <parts.StatementTotals view={data} />
             <parts.StatementTable
                 view={data}

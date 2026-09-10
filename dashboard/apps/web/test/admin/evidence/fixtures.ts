@@ -12,11 +12,7 @@ export function readings(overrides: Partial<EvidenceReadings> = {}): EvidenceRea
         now: NOW,
         instance: { url: "https://polaris.example.com", build: "abc123def456" },
         authentication: {
-            policy: {
-                requireSecondFactor: true,
-                acceptedFactors: ["totp", "email"],
-                challengeConnectionSignIn: false
-            },
+            policy: { requireSecondFactor: true, acceptedFactors: ["totp", "email"], challengeConnectionSignIn: false },
             mailReady: true,
             accounts: 12,
             withSecondFactor: 12,
@@ -43,12 +39,7 @@ export function readings(overrides: Partial<EvidenceReadings> = {}): EvidenceRea
             sealed: 5000,
             pending: 0,
             head: { seq: "5000", hash: "f".repeat(64) },
-            lastVerification: {
-                at: "2026-09-10T03:00:00.000Z",
-                ok: true,
-                checked: 5000,
-                broken: null
-            }
+            lastVerification: { at: "2026-09-10T03:00:00.000Z", ok: true, checked: 5000, broken: null }
         },
         backups: {
             total: 1,
@@ -78,12 +69,7 @@ export function readings(overrides: Partial<EvidenceReadings> = {}): EvidenceRea
             internalCa: 2,
             plainHttp: 0,
             uploaded: 1,
-            managed: {
-                issued: 2,
-                pending: 0,
-                failed: 0,
-                expiries: ["2026-12-01T00:00:00.000Z", "2026-11-20T00:00:00.000Z"]
-            }
+            managed: { issued: 2, pending: 0, failed: 0, expiries: ["2026-12-01T00:00:00.000Z", "2026-11-20T00:00:00.000Z"] }
         },
         firewall: {
             instancePacks: 6,

@@ -15,11 +15,7 @@
 import { txtText } from "./record-schema";
 
 export const RESOLVERS = [
-    {
-        id: "cloudflare",
-        label: "Cloudflare (1.1.1.1)",
-        url: "https://cloudflare-dns.com/dns-query"
-    },
+    { id: "cloudflare", label: "Cloudflare (1.1.1.1)", url: "https://cloudflare-dns.com/dns-query" },
     { id: "google", label: "Google (8.8.8.8)", url: "https://dns.google/dns-query" },
     { id: "quad9", label: "Quad9 (9.9.9.9)", url: "https://dns.quad9.net/dns-query" }
 ] as const;
@@ -27,16 +23,7 @@ export const RESOLVERS = [
 export type ResolverId = (typeof RESOLVERS)[number]["id"];
 
 /** The record types this reads, with their numbers on the wire. */
-export const QUERY_TYPES = {
-    A: 1,
-    NS: 2,
-    CNAME: 5,
-    MX: 15,
-    TXT: 16,
-    AAAA: 28,
-    SRV: 33,
-    CAA: 257
-} as const;
+export const QUERY_TYPES = { A: 1, NS: 2, CNAME: 5, MX: 15, TXT: 16, AAAA: 28, SRV: 33, CAA: 257 } as const;
 export type QueryType = keyof typeof QUERY_TYPES;
 
 const TIMEOUT_MS = 5_000;
@@ -58,34 +45,12 @@ export function encodeQuery(name: string, type: QueryType): Uint8Array {
     question.push(0);
     const code = QUERY_TYPES[type];
     // Header: id 0, flags 0x0100 (recursion desired), one question, no answers.
-    return new Uint8Array([
-        0,
-        0,
-        1,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        ...question,
-        code >> 8,
-        code & 0xff,
-        0,
-        1
-    ]);
+    return new Uint8Array([0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, ...question, code >> 8, code & 0xff, 0, 1]);
 }
 
 /** Base64url with no padding, the form RFC 8484 puts a query in a URL as. */
 export function base64Url(bytes: Uint8Array): string {
-    return Buffer.from(bytes)
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+    return Buffer.from(bytes).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /** Read a possibly compressed name starting at `offset`, answering it and where
@@ -117,8 +82,7 @@ function readName(message: Uint8Array, offset: number): { name: string; next: nu
 
 function ipv6(bytes: Uint8Array): string {
     const groups: number[] = [];
-    for (let index = 0; index < 16; index += 2)
-        groups.push((bytes[index]! << 8) | bytes[index + 1]!);
+    for (let index = 0; index < 16; index += 2) groups.push((bytes[index]! << 8) | bytes[index + 1]!);
     // The longest run of zero groups becomes "::", as addresses are written.
     let bestStart = -1;
     let bestLength = 0;
@@ -153,12 +117,7 @@ function characterStrings(bytes: Uint8Array): string[] {
 }
 
 /** One answer's data in the form a zone file writes it. */
-function presentation(
-    message: Uint8Array,
-    type: number,
-    start: number,
-    length: number
-): string | null {
+function presentation(message: Uint8Array, type: number, start: number, length: number): string | null {
     const data = message.subarray(start, start + length);
     switch (type) {
         case QUERY_TYPES.A:
@@ -206,8 +165,7 @@ export function decodeResponse(message: Uint8Array, type: QueryType): DecodedAns
     const questions = (message[4]! << 8) | message[5]!;
     const answers = (message[6]! << 8) | message[7]!;
     let position = 12;
-    for (let index = 0; index < questions; index += 1)
-        position = readName(message, position).next + 4;
+    for (let index = 0; index < questions; index += 1) position = readName(message, position).next + 4;
     const values: string[] = [];
     for (let index = 0; index < answers; index += 1) {
         position = readName(message, position).next;
@@ -266,12 +224,7 @@ function sameSet(a: readonly string[], b: readonly string[], type: QueryType): b
     return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-async function ask(
-    url: string,
-    name: string,
-    type: QueryType,
-    fetcher: typeof fetch
-): Promise<DecodedAnswer> {
+async function ask(url: string, name: string, type: QueryType, fetcher: typeof fetch): Promise<DecodedAnswer> {
     const response = await fetcher(`${url}?dns=${base64Url(encodeQuery(name, type))}`, {
         headers: { accept: "application/dns-message" },
         cache: "no-store",
@@ -299,8 +252,7 @@ export async function checkPropagation(
             try {
                 const answer = await ask(resolver.url, name, type, fetcher);
                 if (answer.rcode === 3) return { resolver, status: "missing" as const, values: [] };
-                if (answer.rcode !== 0)
-                    return { resolver, status: "unreachable" as const, values: [] };
+                if (answer.rcode !== 0) return { resolver, status: "unreachable" as const, values: [] };
                 return { resolver, status: "answered" as const, values: answer.values };
             } catch {
                 return { resolver, status: "unreachable" as const, values: [] };
@@ -324,10 +276,7 @@ export async function checkPropagation(
         label: entry.resolver.label,
         status: entry.status,
         values: entry.values,
-        agrees:
-            entry.status === "unreachable" || reference === null
-                ? null
-                : sameSet(entry.values, reference, type)
+        agrees: entry.status === "unreachable" || reference === null ? null : sameSet(entry.values, reference, type)
     }));
     const answered = resolvers.filter((entry) => entry.agrees !== null);
     return {

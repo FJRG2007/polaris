@@ -31,18 +31,11 @@ function feed(
     state: scaling.AutoscaleState = AUTOSCALE_IDLE,
     setting: scaling.Autoscale = config
 ) {
-    const each =
-        typeof reading === "number" ? { cpuPercent: reading, requestsPerMinute: null } : reading;
+    const each = typeof reading === "number" ? { cpuPercent: reading, requestsPerMinute: null } : reading;
     let current: ReturnType<typeof autoscaleStep> = { replicas, state, signal: null };
     const signals: scaling.AutoscaleSignal[] = [];
     for (let tick = 0; tick < times; tick++) {
-        current = autoscaleStep(
-            setting,
-            current.replicas,
-            each,
-            current.state,
-            NOW + tick * 60_000
-        );
+        current = autoscaleStep(setting, current.replicas, each, current.state, NOW + tick * 60_000);
         if (current.signal) signals.push(current.signal);
     }
     return { ...current, signals };
@@ -90,13 +83,8 @@ describe("autoscaleStep on CPU", () => {
     });
 
     it("brings a count outside the range back into it at once", () => {
-        expect(autoscaleStep(config, 7, cpu(10), AUTOSCALE_IDLE, NOW)).toMatchObject({
-            replicas: 4,
-            signal: "range"
-        });
-        expect(autoscaleStep({ ...config, min: 2 }, 1, cpu(10), AUTOSCALE_IDLE, NOW).replicas).toBe(
-            2
-        );
+        expect(autoscaleStep(config, 7, cpu(10), AUTOSCALE_IDLE, NOW)).toMatchObject({ replicas: 4, signal: "range" });
+        expect(autoscaleStep({ ...config, min: 2 }, 1, cpu(10), AUTOSCALE_IDLE, NOW).replicas).toBe(2);
     });
 
     it("decides nothing on a missing reading, and starts the streak over", () => {
@@ -116,10 +104,7 @@ describe("autoscaleStep on CPU", () => {
 describe("autoscaleStep on traffic", () => {
     it("adds copies on traffic alone, as many as the requests need", () => {
         // 450 a minute on one copy is 4.5 times a target of 100: five copies, at most four.
-        expect(feedTraffic(1, 5, 450, AUTOSCALE_UP_AFTER)).toMatchObject({
-            replicas: 4,
-            signals: ["traffic"]
-        });
+        expect(feedTraffic(1, 5, 450, AUTOSCALE_UP_AFTER)).toMatchObject({ replicas: 4, signals: ["traffic"] });
         expect(feedTraffic(1, 5, 250, AUTOSCALE_UP_AFTER).replicas).toBe(3);
     });
 
@@ -129,17 +114,11 @@ describe("autoscaleStep on traffic", () => {
     });
 
     it("says both signals moved it when both were over", () => {
-        expect(feedTraffic(1, 80, 150, AUTOSCALE_UP_AFTER)).toMatchObject({
-            replicas: 2,
-            signals: ["both"]
-        });
+        expect(feedTraffic(1, 80, 150, AUTOSCALE_UP_AFTER)).toMatchObject({ replicas: 2, signals: ["both"] });
     });
 
     it("scales up when either signal is over, whatever the other says", () => {
-        expect(feedTraffic(1, 80, 0, AUTOSCALE_UP_AFTER)).toMatchObject({
-            replicas: 2,
-            signals: ["cpu"]
-        });
+        expect(feedTraffic(1, 80, 0, AUTOSCALE_UP_AFTER)).toMatchObject({ replicas: 2, signals: ["cpu"] });
     });
 
     it("takes a copy away only when both signals are low", () => {
@@ -147,10 +126,7 @@ describe("autoscaleStep on traffic", () => {
         expect(feedTraffic(3, 5, 180, AUTOSCALE_DOWN_AFTER * 2).replicas).toBe(3);
         // Traffic is quiet but CPU sits between half its target and the target.
         expect(feedTraffic(3, 40, 30, AUTOSCALE_DOWN_AFTER * 2).replicas).toBe(3);
-        expect(feedTraffic(3, 5, 30, AUTOSCALE_DOWN_AFTER)).toMatchObject({
-            replicas: 2,
-            signals: ["both"]
-        });
+        expect(feedTraffic(3, 5, 30, AUTOSCALE_DOWN_AFTER)).toMatchObject({ replicas: 2, signals: ["both"] });
     });
 
     it("keeps the hysteresis: a reading between half and the target counts toward neither", () => {
@@ -161,26 +137,14 @@ describe("autoscaleStep on traffic", () => {
 
     it("starts the rising streak over when the traffic dips", () => {
         const primed = feedTraffic(1, 5, 500, AUTOSCALE_UP_AFTER - 1);
-        const dip = autoscaleStep(
-            withTraffic,
-            1,
-            { cpuPercent: 5, requestsPerMinute: 80 },
-            primed.state,
-            NOW
-        );
+        const dip = autoscaleStep(withTraffic, 1, { cpuPercent: 5, requestsPerMinute: 80 }, primed.state, NOW);
         expect(dip.state.above).toBe(0);
         expect(feedTraffic(1, 5, 500, AUTOSCALE_UP_AFTER - 1, dip.state).replicas).toBe(1);
     });
 
     it("goes straight to the fewest after a stretch with no request at all", () => {
-        expect(feedTraffic(4, 3, 0, AUTOSCALE_IDLE_AFTER)).toMatchObject({
-            replicas: 1,
-            signals: ["idle"]
-        });
-        const floor = feedTraffic(4, 3, 0, AUTOSCALE_IDLE_AFTER, AUTOSCALE_IDLE, {
-            ...withTraffic,
-            min: 2
-        });
+        expect(feedTraffic(4, 3, 0, AUTOSCALE_IDLE_AFTER)).toMatchObject({ replicas: 1, signals: ["idle"] });
+        const floor = feedTraffic(4, 3, 0, AUTOSCALE_IDLE_AFTER, AUTOSCALE_IDLE, { ...withTraffic, min: 2 });
         expect(floor.replicas).toBe(2);
     });
 
@@ -191,13 +155,7 @@ describe("autoscaleStep on traffic", () => {
     it("steps down one copy, not to the fewest, when a single request broke the idle stretch", () => {
         const almost = feedTraffic(4, 3, 0, AUTOSCALE_IDLE_AFTER - 1);
         expect(almost.state.quiet).toBe(AUTOSCALE_IDLE_AFTER - 1);
-        const one = autoscaleStep(
-            withTraffic,
-            4,
-            { cpuPercent: 3, requestsPerMinute: 1 },
-            almost.state,
-            NOW
-        );
+        const one = autoscaleStep(withTraffic, 4, { cpuPercent: 3, requestsPerMinute: 1 }, almost.state, NOW);
         expect(one).toMatchObject({ replicas: 3, signal: "both" });
     });
 
@@ -211,31 +169,19 @@ describe("autoscaleStep on traffic", () => {
         const idle = { cpuPercent: 3, requestsPerMinute: 0 };
         const cooling = autoscaleStep(withTraffic, 4, idle, primed, NOW);
         expect(cooling.replicas).toBe(4);
-        const later = autoscaleStep(
-            withTraffic,
-            4,
-            idle,
-            cooling.state,
-            NOW - 60_000 + AUTOSCALE_COOLDOWN_MS
-        );
+        const later = autoscaleStep(withTraffic, 4, idle, cooling.state, NOW - 60_000 + AUTOSCALE_COOLDOWN_MS);
         expect(later).toMatchObject({ replicas: 1, signal: "idle" });
     });
 
     it("decides on CPU alone when the requests cannot be counted", () => {
-        expect(feedTraffic(1, 80, null, AUTOSCALE_UP_AFTER)).toMatchObject({
-            replicas: 2,
-            signals: ["cpu"]
-        });
+        expect(feedTraffic(1, 80, null, AUTOSCALE_UP_AFTER)).toMatchObject({ replicas: 2, signals: ["cpu"] });
         const down = feedTraffic(3, 5, null, AUTOSCALE_DOWN_AFTER);
         expect(down).toMatchObject({ replicas: 2, signals: ["cpu"] });
         expect(down.state.quiet).toBe(0);
     });
 
     it("decides on traffic alone when no copy reports its CPU", () => {
-        expect(feedTraffic(1, null, 250, AUTOSCALE_UP_AFTER)).toMatchObject({
-            replicas: 3,
-            signals: ["traffic"]
-        });
+        expect(feedTraffic(1, null, 250, AUTOSCALE_UP_AFTER)).toMatchObject({ replicas: 3, signals: ["traffic"] });
     });
 });
 
@@ -251,10 +197,7 @@ describe("a setting from before traffic", () => {
     });
 
     it("ignores traffic entirely, however busy or idle", () => {
-        expect(
-            feedTraffic(1, 40, 1_000_000, AUTOSCALE_UP_AFTER * 3, AUTOSCALE_IDLE, setting())
-                .replicas
-        ).toBe(1);
+        expect(feedTraffic(1, 40, 1_000_000, AUTOSCALE_UP_AFTER * 3, AUTOSCALE_IDLE, setting()).replicas).toBe(1);
         const silent = feedTraffic(4, 40, 0, AUTOSCALE_IDLE_AFTER * 3, AUTOSCALE_IDLE, setting());
         expect(silent.replicas).toBe(4);
         expect(silent.state.quiet).toBe(0);
@@ -309,9 +252,7 @@ describe("the autoscale setting", () => {
 
     it("takes a traffic target, and none", () => {
         expect(autoscaleSchema.parse({ ...range, requestsPerCopy: 600 }).requestsPerCopy).toBe(600);
-        expect(
-            autoscaleSchema.parse({ ...range, requestsPerCopy: null }).requestsPerCopy
-        ).toBeNull();
+        expect(autoscaleSchema.parse({ ...range, requestsPerCopy: null }).requestsPerCopy).toBeNull();
     });
 
     it("refuses a traffic target that is not a whole number of requests", () => {

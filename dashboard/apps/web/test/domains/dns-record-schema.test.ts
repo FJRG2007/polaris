@@ -18,57 +18,33 @@ function draft(overrides: Partial<dns.DnsRecordDraft>): dns.DnsRecordDraft {
 }
 
 /** The sentence a field is refused with, or undefined when it is not. */
-function problem(
-    value: dns.DnsRecordDraft,
-    field: keyof dns.DnsRecordDraft,
-    checks?: dns.RecordChecks
-) {
+function problem(value: dns.DnsRecordDraft, field: keyof dns.DnsRecordDraft, checks?: dns.RecordChecks) {
     const checked = dns.recordFields(value, zone, checks);
     return checked.ok ? undefined : checked.problems[field];
 }
 
 /** A record the zone already holds, in the shape the editor reads it. */
-function existing(
-    id: string,
-    type: dns.DnsRecordType,
-    name: string,
-    overrides: Partial<dns.DnsRecordDraft>
-): dns.ExistingRecord {
+function existing(id: string, type: dns.DnsRecordType, name: string, overrides: Partial<dns.DnsRecordDraft>): dns.ExistingRecord {
     const record = { ...dns.emptyDraft(type), name: dns.relativeName(name, zone), ...overrides };
     return { id, type, name, content: record.content, draft: record };
 }
 
 describe("normalizing before checking", () => {
     it("trims, lower-cases names and hostnames, and drops a final dot", () => {
-        expect(
-            dns.normalizeDraft(
-                draft({
-                    type: "CNAME",
-                    name: "  WWW.Example.Test. ",
-                    content: " Edge.Example.NET. "
-                })
-            )
-        ).toMatchObject({
+        expect(dns.normalizeDraft(draft({ type: "CNAME", name: "  WWW.Example.Test. ", content: " Edge.Example.NET. " }))).toMatchObject({
             name: "www.example.test",
             content: "edge.example.net"
         });
         // TXT text is the one value whose case is its own.
-        expect(
-            dns.normalizeDraft(draft({ type: "TXT", content: "  v=DKIM1; p=AbC  " })).content
-        ).toBe("v=DKIM1; p=AbC");
-        expect(
-            dns.normalizeDraft(
-                draft({ type: "SRV", target: " MC.Example.Test. ", port: " 25565 " })
-            )
-        ).toMatchObject({
+        expect(dns.normalizeDraft(draft({ type: "TXT", content: "  v=DKIM1; p=AbC  " })).content).toBe("v=DKIM1; p=AbC");
+        expect(dns.normalizeDraft(draft({ type: "SRV", target: " MC.Example.Test. ", port: " 25565 " }))).toMatchObject({
             target: "mc.example.test",
             port: "25565"
         });
     });
 
     it("stores a name relative to the zone, whichever way it was typed", () => {
-        const record = (name: string) =>
-            dns.recordFields(draft({ name, content: "203.0.113.10" }), zone);
+        const record = (name: string) => dns.recordFields(draft({ name, content: "203.0.113.10" }), zone);
         for (const typed of ["api", "API.", "api.example.test", " Api.Example.Test. "]) {
             expect(record(typed)).toMatchObject({ ok: true, record: { name: "api.example.test" } });
         }
@@ -86,142 +62,68 @@ describe("each type's own rules", () => {
     it("A takes an IPv4 address and nothing else", () => {
         expect(problem(draft({ content: "203.0.113.10" }), "content")).toBeUndefined();
         for (const wrong of ["300.1.1.1", "203.0.113", "2001:db8::1", "example.test"]) {
-            expect(problem(draft({ content: wrong }), "content")).toBe(
-                "An IPv4 address, like 203.0.113.10"
-            );
+            expect(problem(draft({ content: wrong }), "content")).toBe("An IPv4 address, like 203.0.113.10");
         }
     });
 
     it("AAAA takes an IPv6 address and nothing else", () => {
-        expect(
-            problem(draft({ type: "AAAA", content: "2001:DB8::10" }), "content")
-        ).toBeUndefined();
+        expect(problem(draft({ type: "AAAA", content: "2001:DB8::10" }), "content")).toBeUndefined();
         for (const wrong of ["203.0.113.10", "2001:db8::zz", "fe80::1%eth0"]) {
             expect(problem(draft({ type: "AAAA", content: wrong }), "content")).toMatch(/IPv6/);
         }
     });
 
     it("CNAME, MX and NS point at a hostname", () => {
-        expect(
-            problem(draft({ type: "CNAME", content: "edge.example.net" }), "content")
-        ).toBeUndefined();
-        expect(problem(draft({ type: "CNAME", content: "203.0.113.10:80" }), "content")).toMatch(
-            /hostname/
-        );
-        expect(problem(draft({ type: "CNAME", content: "www.example.test" }), "content")).toBe(
-            "A name cannot point at itself"
-        );
-        expect(
-            problem(draft({ type: "MX", name: "@", content: "mx_1.example.test" }), "content")
-        ).toMatch(/mail server/);
-        expect(
-            problem(draft({ type: "NS", name: "lab", content: "ns1.example.net" }), "content")
-        ).toBeUndefined();
-        expect(
-            problem(draft({ type: "NS", name: "lab", content: "*.example.net" }), "content")
-        ).toMatch(/nameserver/);
+        expect(problem(draft({ type: "CNAME", content: "edge.example.net" }), "content")).toBeUndefined();
+        expect(problem(draft({ type: "CNAME", content: "203.0.113.10:80" }), "content")).toMatch(/hostname/);
+        expect(problem(draft({ type: "CNAME", content: "www.example.test" }), "content")).toBe("A name cannot point at itself");
+        expect(problem(draft({ type: "MX", name: "@", content: "mx_1.example.test" }), "content")).toMatch(/mail server/);
+        expect(problem(draft({ type: "NS", name: "lab", content: "ns1.example.net" }), "content")).toBeUndefined();
+        expect(problem(draft({ type: "NS", name: "lab", content: "*.example.net" }), "content")).toMatch(/nameserver/);
     });
 
     it("lets a CNAME point at a name with underscore labels, and nothing else does", () => {
-        for (const target of [
-            "selector1-contoso-com._domainkey.contoso.onmicrosoft.com",
-            "_x1.acm-validations.aws"
-        ]) {
-            expect(
-                problem(
-                    draft({ type: "CNAME", name: "selector1._domainkey", content: target }),
-                    "content"
-                )
-            ).toBeUndefined();
+        for (const target of ["selector1-contoso-com._domainkey.contoso.onmicrosoft.com", "_x1.acm-validations.aws"]) {
+            expect(problem(draft({ type: "CNAME", name: "selector1._domainkey", content: target }), "content")).toBeUndefined();
         }
-        expect(problem(draft({ type: "CNAME", content: "*.example.net" }), "content")).toMatch(
-            /hostname/
-        );
+        expect(problem(draft({ type: "CNAME", content: "*.example.net" }), "content")).toMatch(/hostname/);
         expect(problem(draft({ type: "CNAME", content: "_" }), "content")).toMatch(/hostname/);
-        expect(
-            problem(draft({ type: "NS", name: "lab", content: "_ns.example.net" }), "content")
-        ).toMatch(/nameserver/);
+        expect(problem(draft({ type: "NS", name: "lab", content: "_ns.example.net" }), "content")).toMatch(/nameserver/);
     });
 
     it("takes . as an MX that accepts no mail and an SRV service that is not offered", () => {
         expect(dns.normalizeDraft(draft({ type: "MX", content: " . " })).content).toBe(".");
-        expect(
-            dns.recordFields(draft({ type: "MX", name: "@", content: ".", priority: "0" }), zone)
-        ).toMatchObject({
+        expect(dns.recordFields(draft({ type: "MX", name: "@", content: ".", priority: "0" }), zone)).toMatchObject({
             ok: true,
             record: { type: "MX", content: ".", priority: 0 }
         });
-        const srv = draft({
-            type: "SRV",
-            name: "_imap._tcp",
-            target: ".",
-            priority: "0",
-            weight: "0",
-            port: "0"
-        });
-        expect(dns.recordFields(srv, zone)).toMatchObject({
-            ok: true,
-            record: { data: { target: "." } }
-        });
+        const srv = draft({ type: "SRV", name: "_imap._tcp", target: ".", priority: "0", weight: "0", port: "0" });
+        expect(dns.recordFields(srv, zone)).toMatchObject({ ok: true, record: { data: { target: "." } } });
         expect(problem(draft({ type: "CNAME", content: "." }), "content")).toMatch(/hostname/);
     });
 
     it("keeps the domain's own nameservers Cloudflare's", () => {
-        expect(
-            problem(draft({ type: "NS", name: "@", content: "ns1.example.net" }), "name")
-        ).toMatch(/set by Cloudflare/);
+        expect(problem(draft({ type: "NS", name: "@", content: "ns1.example.net" }), "name")).toMatch(/set by Cloudflare/);
     });
 
     it("MX priority is 0 to 65535", () => {
-        expect(
-            problem(
-                draft({ type: "MX", name: "@", content: "mx.example.test", priority: "0" }),
-                "priority"
-            )
-        ).toBeUndefined();
-        expect(
-            problem(
-                draft({ type: "MX", name: "@", content: "mx.example.test", priority: "65536" }),
-                "priority"
-            )
-        ).toBe("0 to 65535");
-        expect(
-            problem(
-                draft({ type: "MX", name: "@", content: "mx.example.test", priority: "-1" }),
-                "priority"
-            )
-        ).toBe("0 to 65535");
+        expect(problem(draft({ type: "MX", name: "@", content: "mx.example.test", priority: "0" }), "priority")).toBeUndefined();
+        expect(problem(draft({ type: "MX", name: "@", content: "mx.example.test", priority: "65536" }), "priority")).toBe("0 to 65535");
+        expect(problem(draft({ type: "MX", name: "@", content: "mx.example.test", priority: "-1" }), "priority")).toBe("0 to 65535");
     });
 
     it("TXT holds one line of up to Cloudflare's limit", () => {
-        expect(
-            problem(draft({ type: "TXT", content: "a".repeat(dns.TXT_MAX) }), "content")
-        ).toBeUndefined();
-        expect(
-            problem(draft({ type: "TXT", content: "a".repeat(dns.TXT_MAX + 1) }), "content")
-        ).toBe(`At most ${dns.TXT_MAX} characters`);
-        expect(problem(draft({ type: "TXT", content: "v=spf1\n-all" }), "content")).toMatch(
-            /line breaks/
-        );
+        expect(problem(draft({ type: "TXT", content: "a".repeat(dns.TXT_MAX) }), "content")).toBeUndefined();
+        expect(problem(draft({ type: "TXT", content: "a".repeat(dns.TXT_MAX + 1) }), "content")).toBe(`At most ${dns.TXT_MAX} characters`);
+        expect(problem(draft({ type: "TXT", content: "v=spf1\n-all" }), "content")).toMatch(/line breaks/);
     });
 
     it("SRV is named for a service and a protocol, with a target and three numbers", () => {
         const srv = (overrides: Partial<dns.DnsRecordDraft>) =>
-            draft({
-                type: "SRV",
-                name: "_minecraft._tcp",
-                target: "mc.example.test",
-                priority: "0",
-                weight: "5",
-                port: "25565",
-                ...overrides
-            });
+            draft({ type: "SRV", name: "_minecraft._tcp", target: "mc.example.test", priority: "0", weight: "5", port: "25565", ...overrides });
         expect(dns.recordFields(srv({}), zone)).toMatchObject({
             ok: true,
-            record: {
-                type: "SRV",
-                data: { priority: 0, weight: 5, port: 25565, target: "mc.example.test" }
-            }
+            record: { type: "SRV", data: { priority: 0, weight: 5, port: 25565, target: "mc.example.test" } }
         });
         expect(problem(srv({ name: "minecraft" }), "name")).toMatch(/_service\._protocol/);
         expect(problem(srv({ port: "70000" }), "port")).toBe("0 to 65535");
@@ -229,33 +131,21 @@ describe("each type's own rules", () => {
     });
 
     it("CAA names an authority, or ; to allow none, or an address to report to", () => {
-        const caa = (overrides: Partial<dns.DnsRecordDraft>) =>
-            draft({ type: "CAA", name: "@", ...overrides });
+        const caa = (overrides: Partial<dns.DnsRecordDraft>) => draft({ type: "CAA", name: "@", ...overrides });
         expect(problem(caa({ value: "letsencrypt.org" }), "value")).toBeUndefined();
         expect(problem(caa({ value: ";" }), "value")).toBeUndefined();
-        expect(
-            problem(caa({ value: "letsencrypt.org; validationmethods=dns-01" }), "value")
-        ).toBeUndefined();
+        expect(problem(caa({ value: "letsencrypt.org; validationmethods=dns-01" }), "value")).toBeUndefined();
         expect(problem(caa({ value: "lets encrypt" }), "value")).toMatch(/A domain/);
-        expect(
-            problem(caa({ tag: "iodef", value: "mailto:security@example.test" }), "value")
-        ).toBeUndefined();
-        expect(problem(caa({ tag: "iodef", value: "security@example.test" }), "value")).toMatch(
-            /mailto:/
-        );
+        expect(problem(caa({ tag: "iodef", value: "mailto:security@example.test" }), "value")).toBeUndefined();
+        expect(problem(caa({ tag: "iodef", value: "security@example.test" }), "value")).toMatch(/mailto:/);
         expect(problem(caa({ value: "letsencrypt.org", flags: "256" }), "flags")).toBe("0 to 255");
     });
 
     it("takes Auto or a TTL in range, and Auto whenever the proxy is on", () => {
         expect(problem(draft({ content: "203.0.113.10", ttl: "300" }), "ttl")).toBeUndefined();
-        expect(problem(draft({ content: "203.0.113.10", ttl: "30" }), "ttl")).toMatch(
-            /Auto, or 60 to 86400/
-        );
+        expect(problem(draft({ content: "203.0.113.10", ttl: "30" }), "ttl")).toMatch(/Auto, or 60 to 86400/);
         expect(problem(draft({ content: "203.0.113.10", ttl: "90000" }), "ttl")).toMatch(/Auto/);
-        const proxied = dns.recordFields(
-            draft({ content: "203.0.113.10", ttl: "30", proxied: true }),
-            zone
-        );
+        const proxied = dns.recordFields(draft({ content: "203.0.113.10", ttl: "30", proxied: true }), zone);
         expect(proxied).toMatchObject({ ok: true, record: { ttl: dns.TTL_AUTO, proxied: true } });
     });
 
@@ -266,12 +156,8 @@ describe("each type's own rules", () => {
 
     it("keeps an owner's records at or under the domain they proved", () => {
         const within = { within: "shop.example.test" };
-        expect(
-            problem(draft({ name: "api.shop", content: "203.0.113.10" }), "name", within)
-        ).toBeUndefined();
-        expect(problem(draft({ name: "www", content: "203.0.113.10" }), "name", within)).toBe(
-            "Must be at or under shop.example.test"
-        );
+        expect(problem(draft({ name: "api.shop", content: "203.0.113.10" }), "name", within)).toBeUndefined();
+        expect(problem(draft({ name: "www", content: "203.0.113.10" }), "name", within)).toBe("Must be at or under shop.example.test");
     });
 });
 
@@ -285,30 +171,19 @@ describe("checked against the zone", () => {
     const checks = { existing: zoneRecords };
 
     it("refuses a second copy of a record, however it was typed", () => {
-        expect(problem(draft({ name: "WWW.", content: " 203.0.113.10 " }), "content", checks)).toBe(
-            "This A record is already in the zone"
-        );
+        expect(problem(draft({ name: "WWW.", content: " 203.0.113.10 " }), "content", checks)).toBe("This A record is already in the zone");
         // A different address at the same name is a second record, not a copy.
         expect(problem(draft({ content: "203.0.113.11" }), "content", checks)).toBeUndefined();
         // Cloudflare writes TXT values quoted; the text inside is what is compared.
-        expect(
-            problem(draft({ type: "TXT", name: "@", content: "v=spf1 -all" }), "content", checks)
-        ).toMatch(/already in the zone/);
+        expect(problem(draft({ type: "TXT", name: "@", content: "v=spf1 -all" }), "content", checks)).toMatch(/already in the zone/);
         // A priority is a setting of the one record, not a second one.
-        expect(
-            problem(
-                draft({ type: "MX", name: "@", content: "mx.example.test", priority: "20" }),
-                "content",
-                checks
-            )
-        ).toMatch(/already in the zone/);
+        expect(problem(draft({ type: "MX", name: "@", content: "mx.example.test", priority: "20" }), "content", checks)).toMatch(
+            /already in the zone/
+        );
     });
 
     it("lets a record be saved over itself", () => {
-        const edit = dns.recordFields(draft({ content: "203.0.113.10", ttl: "300" }), zone, {
-            ...checks,
-            editingId: "a1"
-        });
+        const edit = dns.recordFields(draft({ content: "203.0.113.10", ttl: "300" }), zone, { ...checks, editingId: "a1" });
         expect(edit.ok).toBe(true);
     });
 
@@ -319,29 +194,15 @@ describe("checked against the zone", () => {
         expect(problem(draft({ name: "blog", content: "203.0.113.10" }), "name", checks)).toBe(
             "blog is a CNAME, which cannot share its name with other records"
         );
-        expect(
-            problem(
-                draft({ type: "CNAME", name: "blog", content: "other.example.net" }),
-                "name",
-                checks
-            )
-        ).toMatch(/CNAME/);
+        expect(problem(draft({ type: "CNAME", name: "blog", content: "other.example.net" }), "name", checks)).toMatch(/CNAME/);
         // Changing the CNAME itself is not a conflict with itself.
-        expect(
-            problem(draft({ type: "CNAME", name: "blog", content: "other.example.net" }), "name", {
-                ...checks,
-                editingId: "c1"
-            })
-        ).toBeUndefined();
+        expect(problem(draft({ type: "CNAME", name: "blog", content: "other.example.net" }), "name", { ...checks, editingId: "c1" })).toBeUndefined();
     });
 
     it("counts every TXT record at a name against Cloudflare's total", () => {
-        const long = (id: string) =>
-            existing(id, "TXT", "big.example.test", { content: "a".repeat(dns.TXT_MAX) });
+        const long = (id: string) => existing(id, "TXT", "big.example.test", { content: "a".repeat(dns.TXT_MAX) });
         const full = { existing: [long("t1"), long("t2"), long("t3"), long("t4")] };
-        expect(problem(draft({ type: "TXT", name: "big", content: "b" }), "content", full)).toMatch(
-            /add up to more than 8192/
-        );
+        expect(problem(draft({ type: "TXT", name: "big", content: "b" }), "content", full)).toMatch(/add up to more than 8192/);
     });
 
     it("compares only a record that is right on its own", () => {
@@ -352,15 +213,8 @@ describe("checked against the zone", () => {
 
 describe("the server's shape check", () => {
     it("refuses what a form could not have sent", () => {
-        expect(
-            dns.dnsRecordDraftSchema.safeParse({ ...dns.emptyDraft("A"), type: "PTR" }).success
-        ).toBe(false);
-        expect(
-            dns.dnsRecordDraftSchema.safeParse({ ...dns.emptyDraft("A"), name: "a".repeat(300) })
-                .success
-        ).toBe(false);
-        expect(
-            dns.dnsRecordDraftSchema.safeParse({ ...dns.emptyDraft("A"), proxied: "yes" }).success
-        ).toBe(false);
+        expect(dns.dnsRecordDraftSchema.safeParse({ ...dns.emptyDraft("A"), type: "PTR" }).success).toBe(false);
+        expect(dns.dnsRecordDraftSchema.safeParse({ ...dns.emptyDraft("A"), name: "a".repeat(300) }).success).toBe(false);
+        expect(dns.dnsRecordDraftSchema.safeParse({ ...dns.emptyDraft("A"), proxied: "yes" }).success).toBe(false);
     });
 });

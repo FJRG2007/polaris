@@ -20,21 +20,8 @@ import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
-import {
-    hasNewArrival,
-    notificationSoundEnabled,
-    playNotificationSound
-} from "@/lib/notification-sound";
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type ReactNode
-} from "react";
+import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
     applyFeedMutation,
     FEED_CHANNEL,
@@ -75,13 +62,7 @@ export function useNotificationFeed(): NotificationFeed {
     return feed;
 }
 
-export function NotificationsProvider({
-    initial,
-    children
-}: {
-    initial: NotificationView[];
-    children: ReactNode;
-}) {
+export function NotificationsProvider({ initial, children }: { initial: NotificationView[]; children: ReactNode }) {
     const scope = useSessionScope();
     const [items, setItems] = useState(initial);
     // A snapshot the server took before an in-flight mutation landed would undo
@@ -126,17 +107,15 @@ export function NotificationsProvider({
                     // Taken before the rows below are marked as seen.
                     if (desktopBridge()) {
                         for (const row of arrivedDeployResults(seen.current, payload.items)) {
-                            void claimForDevice(`${scope}:deploy-notice:${row.id}`, 60_000).then(
-                                (mine) => {
-                                    if (!mine || document.hasFocus()) return;
-                                    void notifyDesktop({
-                                        title: row.title,
-                                        body: row.body ?? undefined,
-                                        tag: `notification:${row.id}`,
-                                        href: row.href ?? undefined
-                                    });
-                                }
-                            );
+                            void claimForDevice(`${scope}:deploy-notice:${row.id}`, 60_000).then((mine) => {
+                                if (!mine || document.hasFocus()) return;
+                                void notifyDesktop({
+                                    title: row.title,
+                                    body: row.body ?? undefined,
+                                    tag: `notification:${row.id}`,
+                                    href: row.href ?? undefined
+                                });
+                            });
                         }
                     }
                     // Every tab records what it has seen, so the one that ends up
@@ -204,9 +183,7 @@ export function NotificationsProvider({
                 // Only the ones that would actually change: marking twenty rows
                 // of which two are unread is two rows of work, and a write that
                 // changes nothing still costs a round trip and a rollback path.
-                const unreadIds = items
-                    .filter((row) => !row.read && ids.includes(row.id))
-                    .map((row) => row.id);
+                const unreadIds = items.filter((row) => !row.read && ids.includes(row.id)).map((row) => row.id);
                 if (unreadIds.length === 0) return;
                 apply({ kind: "readMany", ids: unreadIds }, () =>
                     markNotificationsReadAction({ ids: unreadIds })

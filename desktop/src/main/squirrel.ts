@@ -22,9 +22,7 @@ export function handledSquirrelEvent(): boolean {
     const exe = basename(process.execPath);
     const updateThenQuit = (args: string[]) => {
         try {
-            spawn(updater, args, { detached: true, windowsHide: true }).on("close", () =>
-                app.quit()
-            );
+            spawn(updater, args, { detached: true, windowsHide: true }).on("close", () => app.quit());
         } catch {
             app.quit();
         }

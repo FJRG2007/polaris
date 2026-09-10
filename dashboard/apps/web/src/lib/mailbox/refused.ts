@@ -94,9 +94,7 @@ export async function settleRefusalNotices(userId: string, accountId: string): P
             },
             select: { id: true, metadata: true }
         });
-        const about = open
-            .filter((row) => noticeIsAbout(row.metadata, accountId))
-            .map((row) => row.id);
+        const about = open.filter((row) => noticeIsAbout(row.metadata, accountId)).map((row) => row.id);
         if (about.length === 0) return;
         await prisma.notification.updateMany({
             where: { id: { in: about } },

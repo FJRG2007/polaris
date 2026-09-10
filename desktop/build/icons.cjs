@@ -40,11 +40,7 @@ function render(size, inset) {
     const html = `<html><body style="margin:0;background:transparent;overflow:hidden"><img style="position:absolute;left:${inset}px;top:${inset}px;width:${body}px;height:${body}px" src="data:image/svg+xml;base64,${MARK.toString("base64")}"></body></html>`;
     return window
         .loadURL(`data:text/html;base64,${Buffer.from(html).toString("base64")}`)
-        .then(() =>
-            window.webContents.executeJavaScript(
-                "document.querySelector('img').decode().then(() => true)"
-            )
-        )
+        .then(() => window.webContents.executeJavaScript("document.querySelector('img').decode().then(() => true)"))
         .then(
             () =>
                 new Promise((resolve) => {
@@ -94,8 +90,7 @@ function icns(entries) {
 app.whenReady().then(async () => {
     const full = await render(1024, 0);
     const mac = await render(1024, 100);
-    const at = (image, size) =>
-        image.resize({ width: size, height: size, quality: "best" }).toPNG();
+    const at = (image, size) => image.resize({ width: size, height: size, quality: "best" }).toPNG();
 
     writeFileSync(join(ROOT, "assets/icon.png"), at(full, 512));
     writeFileSync(

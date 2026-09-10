@@ -15,9 +15,5 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
     const user = await apiAdmin();
     if (user instanceof Response) return user;
-    return statementExportResponse(
-        request,
-        { kind: "all" },
-        { label: "polaris", actorId: user.id }
-    );
+    return statementExportResponse(request, { kind: "all" }, { label: "polaris", actorId: user.id });
 }

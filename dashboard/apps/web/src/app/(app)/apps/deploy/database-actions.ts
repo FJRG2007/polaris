@@ -40,11 +40,7 @@ function invalid(error: z.ZodError): { error: string } {
 /** An error's words for the screen. Refusals are written for it; anything else
  *  is logged and replaced, since it may name internals. */
 function failure(caught: unknown, fallback: string): { error: string } {
-    if (
-        caught instanceof Error &&
-        !(caught instanceof TypeError) &&
-        !caught.name.startsWith("Prisma")
-    ) {
+    if (caught instanceof Error && !(caught instanceof TypeError) && !caught.name.startsWith("Prisma")) {
         return { error: caught.message };
     }
     console.error(`deploy: ${fallback}:`, caught);
@@ -58,28 +54,15 @@ async function manage(databaseId: string) {
     return { userId: user.id, ownerId: access.ownerId };
 }
 
-async function audit(
-    actorId: string,
-    action: string,
-    databaseId: string,
-    metadata?: Record<string, unknown>
-) {
-    await recordDeployAudit({
-        actorId,
-        action,
-        targetType: "database",
-        targetId: databaseId,
-        ...(metadata ? { metadata } : {})
-    });
+async function audit(actorId: string, action: string, databaseId: string, metadata?: Record<string, unknown>) {
+    await recordDeployAudit({ actorId, action, targetType: "database", targetId: databaseId, ...(metadata ? { metadata } : {}) });
 }
 
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 
-export async function databaseOverviewAction(
-    databaseId: string
-): Promise<Result<{ overview: DatabaseOverview }>> {
+export async function databaseOverviewAction(databaseId: string): Promise<Result<{ overview: DatabaseOverview }>> {
     const parsed = z.string().uuid().safeParse(databaseId);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -125,34 +108,20 @@ export async function copySourcesAction(
 // ---------------------------------------------------------------------------
 
 /** Upgrade now, or schedule it for a maintenance window when `at` is given. */
-export async function upgradeDatabaseAction(
-    input: z.input<typeof core.databaseUpgradeSchema>
-): Promise<Result> {
+export async function upgradeDatabaseAction(input: z.input<typeof core.databaseUpgradeSchema>): Promise<Result> {
     const parsed = core.databaseUpgradeSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.databaseId);
         if (parsed.data.at) {
-            await upgrade.scheduleUpgrade(
-                parsed.data.databaseId,
-                ownerId,
-                parsed.data.version,
-                new Date(parsed.data.at)
-            );
+            await upgrade.scheduleUpgrade(parsed.data.databaseId, ownerId, parsed.data.version, new Date(parsed.data.at));
             await audit(userId, "deploy.db.upgrade.schedule", parsed.data.databaseId, {
                 version: parsed.data.version,
                 at: parsed.data.at
             });
         } else {
-            await upgrade.upgradeDatabase(
-                parsed.data.databaseId,
-                ownerId,
-                userId,
-                parsed.data.version
-            );
-            await audit(userId, "deploy.db.upgrade", parsed.data.databaseId, {
-                version: parsed.data.version
-            });
+            await upgrade.upgradeDatabase(parsed.data.databaseId, ownerId, userId, parsed.data.version);
+            await audit(userId, "deploy.db.upgrade", parsed.data.databaseId, { version: parsed.data.version });
         }
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -192,9 +161,7 @@ export async function revertUpgradeAction(databaseId: string): Promise<Result> {
 // Engine settings
 // ---------------------------------------------------------------------------
 
-export async function setRedisModeAction(
-    input: z.input<typeof core.redisModeSchema>
-): Promise<Result> {
+export async function setRedisModeAction(input: z.input<typeof core.redisModeSchema>): Promise<Result> {
     const parsed = core.redisModeSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -211,22 +178,13 @@ export async function setRedisModeAction(
     }
 }
 
-export async function setMongoReplicaSetAction(
-    input: z.input<typeof core.mongoReplicaSetSchema>
-): Promise<Result> {
+export async function setMongoReplicaSetAction(input: z.input<typeof core.mongoReplicaSetSchema>): Promise<Result> {
     const parsed = core.mongoReplicaSetSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.databaseId);
-        await settings.setMongoReplicaSet(
-            parsed.data.databaseId,
-            ownerId,
-            userId,
-            parsed.data.enabled
-        );
-        await audit(userId, "deploy.db.replica-set", parsed.data.databaseId, {
-            enabled: parsed.data.enabled
-        });
+        await settings.setMongoReplicaSet(parsed.data.databaseId, ownerId, userId, parsed.data.enabled);
+        await audit(userId, "deploy.db.replica-set", parsed.data.databaseId, { enabled: parsed.data.enabled });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -236,9 +194,7 @@ export async function setMongoReplicaSetAction(
 
 const databaseLimitsSchema = core.resourceLimitsSchema.extend({ databaseId: z.string().uuid() });
 
-export async function setDatabaseLimitsAction(
-    input: z.input<typeof databaseLimitsSchema>
-): Promise<Result> {
+export async function setDatabaseLimitsAction(input: z.input<typeof databaseLimitsSchema>): Promise<Result> {
     const parsed = databaseLimitsSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -257,9 +213,7 @@ export async function setDatabaseLimitsAction(
 // Point-in-time recovery
 // ---------------------------------------------------------------------------
 
-export async function setPitrAction(
-    input: z.input<typeof core.pitrSettingsSchema>
-): Promise<Result> {
+export async function setPitrAction(input: z.input<typeof core.pitrSettingsSchema>): Promise<Result> {
     const parsed = core.pitrSettingsSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -302,22 +256,17 @@ export async function recoverDatabaseAction(
 // Copying data in
 // ---------------------------------------------------------------------------
 
-export async function copyIntoDatabaseAction(
-    input: z.input<typeof core.databaseCopySchema>
-): Promise<Result> {
+export async function copyIntoDatabaseAction(input: z.input<typeof core.databaseCopySchema>): Promise<Result> {
     const parsed = core.databaseCopySchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.databaseId);
-        if (parsed.data.fromDatabaseId)
-            await requireDatabaseAccess(parsed.data.fromDatabaseId, userId, "databases.manage");
+        if (parsed.data.fromDatabaseId) await requireDatabaseAccess(parsed.data.fromDatabaseId, userId, "databases.manage");
         await copyInto(
             parsed.data.databaseId,
             ownerId,
             userId,
-            parsed.data.fromDatabaseId
-                ? { fromDatabaseId: parsed.data.fromDatabaseId }
-                : { fromUrl: parsed.data.fromUrl ?? "" }
+            parsed.data.fromDatabaseId ? { fromDatabaseId: parsed.data.fromDatabaseId } : { fromUrl: parsed.data.fromUrl ?? "" }
         );
         // The connection string carries a password: only where the copy came
         // from is recorded, never the string itself.
@@ -353,17 +302,13 @@ export async function listBucketsAction(
     }
 }
 
-export async function createBucketAction(
-    input: z.input<typeof core.bucketCreateSchema>
-): Promise<Result> {
+export async function createBucketAction(input: z.input<typeof core.bucketCreateSchema>): Promise<Result> {
     const parsed = core.bucketCreateSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.storeId);
         await store.createBucket(parsed.data.storeId, ownerId, parsed.data.name);
-        await audit(userId, "deploy.bucket.create", parsed.data.storeId, {
-            bucket: parsed.data.name
-        });
+        await audit(userId, "deploy.bucket.create", parsed.data.storeId, { bucket: parsed.data.name });
         return {};
     } catch (caught) {
         return failure(caught, "Could not create the bucket");
@@ -402,13 +347,8 @@ export async function createBucketKeyAction(
     }
 }
 
-export async function deleteBucketKeyAction(input: {
-    bucketId: string;
-    keyId: string;
-}): Promise<Result> {
-    const parsed = z
-        .object({ bucketId: z.string().uuid(), keyId: z.string().uuid() })
-        .safeParse(input);
+export async function deleteBucketKeyAction(input: { bucketId: string; keyId: string }): Promise<Result> {
+    const parsed = z.object({ bucketId: z.string().uuid(), keyId: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId, storeId } = await manageBucket(parsed.data.bucketId);
@@ -420,9 +360,7 @@ export async function deleteBucketKeyAction(input: {
     }
 }
 
-export async function setLifecycleRuleAction(
-    input: z.input<typeof core.lifecycleRuleSchema>
-): Promise<Result> {
+export async function setLifecycleRuleAction(input: z.input<typeof core.lifecycleRuleSchema>): Promise<Result> {
     const parsed = core.lifecycleRuleSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -435,15 +373,9 @@ export async function setLifecycleRuleAction(
     }
 }
 
-export async function removeLifecycleRuleAction(input: {
-    bucketId: string;
-    prefix: string;
-}): Promise<Result> {
+export async function removeLifecycleRuleAction(input: { bucketId: string; prefix: string }): Promise<Result> {
     const parsed = z
-        .object({
-            bucketId: z.string().uuid(),
-            prefix: z.string().refine(core.isObjectPrefix, "That is not a prefix")
-        })
+        .object({ bucketId: z.string().uuid(), prefix: z.string().refine(core.isObjectPrefix, "That is not a prefix") })
         .safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -494,9 +426,7 @@ export async function replicationCandidatesAction(
     }
 }
 
-export async function setBucketReplicationAction(
-    input: z.input<typeof core.bucketReplicationSchema>
-): Promise<Result> {
+export async function setBucketReplicationAction(input: z.input<typeof core.bucketReplicationSchema>): Promise<Result> {
     const parsed = core.bucketReplicationSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -515,9 +445,7 @@ export async function setBucketReplicationAction(
 // Cloudflare CDN
 // ---------------------------------------------------------------------------
 
-export async function setDomainCdnAction(
-    input: z.input<typeof core.domainCdnSchema>
-): Promise<Result> {
+export async function setDomainCdnAction(input: z.input<typeof core.domainCdnSchema>): Promise<Result> {
     const parsed = core.domainCdnSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -525,12 +453,7 @@ export async function setDomainCdnAction(
         const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
         await cdn.setDomainCdn(
             parsed.data.domainId,
-            {
-                ownerId: access.ownerId,
-                orgId: access.orgId,
-                actorId: user.id,
-                isAdmin: user.isAdmin
-            },
+            { ownerId: access.ownerId, orgId: access.orgId, actorId: user.id, isAdmin: user.isAdmin },
             parsed.data.enabled
         );
         await recordDeployAudit({
@@ -546,9 +469,7 @@ export async function setDomainCdnAction(
     }
 }
 
-export async function purgeDomainCacheAction(
-    input: z.input<typeof core.cachePurgeSchema>
-): Promise<Result> {
+export async function purgeDomainCacheAction(input: z.input<typeof core.cachePurgeSchema>): Promise<Result> {
     const parsed = core.cachePurgeSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -556,12 +477,7 @@ export async function purgeDomainCacheAction(
         const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
         await cdn.purgeDomainCache(
             parsed.data.domainId,
-            {
-                ownerId: access.ownerId,
-                orgId: access.orgId,
-                actorId: user.id,
-                isAdmin: user.isAdmin
-            },
+            { ownerId: access.ownerId, orgId: access.orgId, actorId: user.id, isAdmin: user.isAdmin },
             parsed.data.prefix || undefined
         );
         await recordDeployAudit({

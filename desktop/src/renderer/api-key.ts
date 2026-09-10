@@ -17,8 +17,7 @@ let busy = false;
 
 function check(): boolean {
     const parsed = apiKeySchema.safeParse(input.value);
-    const problem =
-        input.value.trim() && !parsed.success ? (parsed.error.issues[0]?.message ?? null) : null;
+    const problem = input.value.trim() && !parsed.success ? (parsed.error.issues[0]?.message ?? null) : null;
     input.setAttribute("aria-invalid", String(Boolean(problem)));
     say(failure, problem);
     available(submit, parsed.success && !busy);
@@ -52,14 +51,8 @@ form.addEventListener("submit", (event) => {
         });
 });
 
-byId<HTMLButtonElement>("cancel").addEventListener(
-    "click",
-    () => void window.polarisLocal.apiKey.cancel()
-);
-byId<HTMLButtonElement>("open-keys").addEventListener(
-    "click",
-    () => void window.polarisLocal.apiKey.openKeys()
-);
+byId<HTMLButtonElement>("cancel").addEventListener("click", () => void window.polarisLocal.apiKey.cancel());
+byId<HTMLButtonElement>("open-keys").addEventListener("click", () => void window.polarisLocal.apiKey.openKeys());
 
 void window.polarisLocal.apiKey.state().then((state) => {
     if (!state) return;

@@ -25,11 +25,7 @@ import { instanceWideInstallIds, listInstalledApps } from "@/lib/apps/install-se
 
 export const dynamic = "force-dynamic";
 
-export default async function MarketplacePage({
-    searchParams
-}: {
-    searchParams: Promise<{ app?: string | string[] }>;
-}) {
+export default async function MarketplacePage({ searchParams }: { searchParams: Promise<{ app?: string | string[] }> }) {
     const user = await requirePermission("deploy.read");
     // An instance built when each game was its own app is folded into the one that
     // replaced them, here as well as on the Game servers page - this is the other

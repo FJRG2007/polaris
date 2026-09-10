@@ -4,11 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    normalizeServerInput,
-    readServerAddress,
-    serverAddressSchema
-} from "@/shared/server-address";
+import { normalizeServerInput, readServerAddress, serverAddressSchema } from "@/shared/server-address";
 
 function refusal(input: string): string | undefined {
     const parsed = serverAddressSchema.safeParse(input);
@@ -23,9 +19,7 @@ describe("normalizeServerInput", () => {
 
     it("keeps a scheme that was typed", () => {
         expect(normalizeServerInput("http://polaris.local")).toBe("http://polaris.local");
-        expect(normalizeServerInput("HTTPS://Polaris.Example.com")).toBe(
-            "HTTPS://Polaris.Example.com"
-        );
+        expect(normalizeServerInput("HTTPS://Polaris.Example.com")).toBe("HTTPS://Polaris.Example.com");
     });
 
     it("leaves an empty field empty", () => {
@@ -35,19 +29,11 @@ describe("normalizeServerInput", () => {
 
 describe("serverAddressSchema", () => {
     it("stores the origin: lowercase, no trailing slash, no default port", () => {
-        expect(serverAddressSchema.parse("https://Polaris.Example.COM/")).toBe(
-            "https://polaris.example.com"
-        );
-        expect(serverAddressSchema.parse("https://polaris.example.com:443")).toBe(
-            "https://polaris.example.com"
-        );
+        expect(serverAddressSchema.parse("https://Polaris.Example.COM/")).toBe("https://polaris.example.com");
+        expect(serverAddressSchema.parse("https://polaris.example.com:443")).toBe("https://polaris.example.com");
         expect(serverAddressSchema.parse("http://polaris.local:80")).toBe("http://polaris.local");
-        expect(serverAddressSchema.parse("polaris.example.com:8443")).toBe(
-            "https://polaris.example.com:8443"
-        );
-        expect(serverAddressSchema.parse("http://192.168.1.20:3000")).toBe(
-            "http://192.168.1.20:3000"
-        );
+        expect(serverAddressSchema.parse("polaris.example.com:8443")).toBe("https://polaris.example.com:8443");
+        expect(serverAddressSchema.parse("http://192.168.1.20:3000")).toBe("http://192.168.1.20:3000");
     });
 
     it("asks for an address when there is none", () => {
@@ -101,9 +87,7 @@ describe("serverAddressSchema", () => {
                 "An address on the internet needs https://. http:// works only on your own network."
             );
         }
-        expect(serverAddressSchema.parse("https://polaris.example.com")).toBe(
-            "https://polaris.example.com"
-        );
+        expect(serverAddressSchema.parse("https://polaris.example.com")).toBe("https://polaris.example.com");
     });
 
     it("refuses what is not an address", () => {
@@ -112,9 +96,7 @@ describe("serverAddressSchema", () => {
     });
 
     it("refuses credentials in the address", () => {
-        expect(refusal("https://admin:secret@polaris.example.com")).toMatch(
-            /user name and password/
-        );
+        expect(refusal("https://admin:secret@polaris.example.com")).toMatch(/user name and password/);
     });
 
     it("refuses a path, a query or a fragment, and says which address to use", () => {
@@ -128,9 +110,7 @@ describe("serverAddressSchema", () => {
 
 describe("readServerAddress", () => {
     it("reads back a stored origin, and nothing else", () => {
-        expect(readServerAddress("https://polaris.example.com")).toBe(
-            "https://polaris.example.com"
-        );
+        expect(readServerAddress("https://polaris.example.com")).toBe("https://polaris.example.com");
         expect(readServerAddress("https://polaris.example.com/home")).toBeNull();
         expect(readServerAddress("http://polaris.example.com")).toBeNull();
         expect(readServerAddress(42)).toBeNull();

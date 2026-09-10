@@ -14,13 +14,10 @@ import { recordAudit } from "@/lib/audit-service";
 import { getBillingRates, setBillingRates } from "@/lib/billing/rates";
 import { billingRatesInputSchema, type BillingRates } from "@polaris/core";
 
-export async function saveBillingRatesAction(
-    input: unknown
-): Promise<{ rates?: BillingRates; error?: string }> {
+export async function saveBillingRatesAction(input: unknown): Promise<{ rates?: BillingRates; error?: string }> {
     const admin = await requireAdmin();
     const parsed = billingRatesInputSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the prices and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the prices and try again" };
 
     try {
         const before = await getBillingRates();
@@ -44,11 +41,7 @@ export async function clearBillingRatesAction(): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     try {
         await setBillingRates(null);
-        await recordAudit({
-            actorId: admin.id,
-            action: "billing.rates.clear",
-            targetType: "instance"
-        });
+        await recordAudit({ actorId: admin.id, action: "billing.rates.clear", targetType: "instance" });
         revalidatePath("/admin/billing");
         return {};
     } catch (caught) {

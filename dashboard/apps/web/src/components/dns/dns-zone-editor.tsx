@@ -31,12 +31,7 @@ import type { DnsRecordView, ZoneRecords } from "@/lib/dns/zone-records";
 import { Button, ConfirmDeleteDialog, Input, Select } from "@polaris/ui";
 import { DnsRecordDialog, type RecordEditing } from "./dns-record-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-    emptyDraft,
-    normalizeDraft,
-    type DnsRecordDraft,
-    type DnsRecordFields
-} from "@/lib/dns/record-schema";
+import { emptyDraft, normalizeDraft, type DnsRecordDraft, type DnsRecordFields } from "@/lib/dns/record-schema";
 import {
     deleteDnsRecordAction,
     saveDnsRecordAction,
@@ -73,11 +68,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
         // The scope is read through the ref; its key is what makes it a new subject.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]);
-    const live = useLiveRead<ZoneRecords>({
-        load,
-        cacheKey: `dns.records.${key}`,
-        enabled: scope !== null
-    });
+    const live = useLiveRead<ZoneRecords>({ load, cacheKey: `dns.records.${key}`, enabled: scope !== null });
 
     // The kept copy is painted from the first effect rather than the first render:
     // this is rendered on the server too, where the tab's copy does not exist, and
@@ -89,9 +80,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
     const [filters, setFilters] = useState<view.RecordFilters>(view.NO_RECORD_FILTERS);
     const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
     const [editing, setEditing] = useState<EditorSession | null>(null);
-    const [refused, setRefused] = useState<{ editing: RecordEditing; message: string } | null>(
-        null
-    );
+    const [refused, setRefused] = useState<{ editing: RecordEditing; message: string } | null>(null);
     const [deleting, setDeleting] = useState<DnsRecordView | null>(null);
     const [checking, setChecking] = useState<string | null>(null);
     const [error, setError] = useState("");
@@ -128,11 +117,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
 
     function openEditor(record: DnsRecordView | null) {
         const draft = record?.draft ?? emptyDraft("A");
-        openForm({
-            id: record?.id ?? null,
-            draft,
-            original: JSON.stringify(normalizeDraft(draft))
-        });
+        openForm({ id: record?.id ?? null, draft, original: JSON.stringify(normalizeDraft(draft)) });
     }
 
     function reopenRefused() {
@@ -158,19 +143,12 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
         }));
         mark(id, true);
         void saveDnsRecordAction(scope, opened.id, draft)
-            .catch(() => ({
-                record: undefined,
-                error: "Could not save the record",
-                problems: undefined
-            }))
+            .catch(() => ({ record: undefined, error: "Could not save the record", problems: undefined }))
             .then((result) => {
                 mark(id, false);
                 const saved = result.record;
                 if (saved) {
-                    update((zone) => ({
-                        ...zone,
-                        records: zone.records.map((record) => (record.id === id ? saved : record))
-                    }));
+                    update((zone) => ({ ...zone, records: zone.records.map((record) => (record.id === id ? saved : record)) }));
                     live.refresh();
                     return;
                 }
@@ -205,10 +183,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
         if (!scope) return;
         setError("");
         if (checking === record.id) setChecking(null);
-        update((zone) => ({
-            ...zone,
-            records: zone.records.filter((entry) => entry.id !== record.id)
-        }));
+        update((zone) => ({ ...zone, records: zone.records.filter((entry) => entry.id !== record.id) }));
         void deleteDnsRecordAction(scope, record.id)
             .catch(() => ({ error: "Could not delete the record" }))
             .then((result) => {
@@ -234,9 +209,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                     <Input
                         className="pl-9"
                         value={filters.search}
-                        onChange={(event) =>
-                            setFilters((current) => ({ ...current, search: event.target.value }))
-                        }
+                        onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                         placeholder="Search by name or content"
                         aria-label="Search records"
                         autoComplete="off"
@@ -263,21 +236,14 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                     >
                         <RefreshCw className={live.refreshing ? "size-4 animate-spin" : "size-4"} />
                     </Button>
-                    <Button
-                        onClick={() => openEditor(null)}
-                        disabled={!zone}
-                        className="flex-1 sm:flex-none"
-                    >
+                    <Button onClick={() => openEditor(null)} disabled={!zone} className="flex-1 sm:flex-none">
                         <Plus className="size-4" /> Add record
                     </Button>
                 </div>
             </div>
 
             {problem ? (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {problem}
                 </p>
             ) : null}
@@ -309,31 +275,21 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                     : narrowed
                       ? `Showing ${shown.length} of ${zone.records.length} records`
                       : `${zone.records.length} record${zone.records.length === 1 ? "" : "s"}`}
-                {zone?.within
-                    ? ` at and under ${zone.within}, in the ${zone.zone.name} zone.`
-                    : null}
+                {zone?.within ? ` at and under ${zone.within}, in the ${zone.zone.name} zone.` : null}
             </p>
 
             <DnsRecordsTable
                 records={shown ?? (live.error ? [] : null)}
                 pending={pending}
                 checking={checking}
-                expanded={
-                    checking && scope ? (
-                        <PropagationPanel scope={scope} recordId={checking} />
-                    ) : null
-                }
+                expanded={checking && scope ? <PropagationPanel scope={scope} recordId={checking} /> : null}
                 empty={
                     !zone ? (
                         "The records could not be read."
                     ) : narrowed ? (
                         <span className="flex flex-col items-center gap-2">
                             No record matches that.
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setFilters(view.NO_RECORD_FILTERS)}
-                            >
+                            <Button size="sm" variant="ghost" onClick={() => setFilters(view.NO_RECORD_FILTERS)}>
                                 Clear filters
                             </Button>
                         </span>
@@ -346,9 +302,7 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                         </span>
                     )
                 }
-                onCheck={(record) =>
-                    setChecking((current) => (current === record.id ? null : record.id))
-                }
+                onCheck={(record) => setChecking((current) => (current === record.id ? null : record.id))}
                 onEdit={openEditor}
                 onDelete={setDeleting}
             />
@@ -373,17 +327,13 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef | null }) {
                 question={
                     deleting ? (
                         <>
-                            Delete the{" "}
-                            <span className="font-medium text-foreground">{deleting.type}</span>{" "}
-                            record{" "}
+                            Delete the <span className="font-medium text-foreground">{deleting.type}</span> record{" "}
                             <span className="font-medium text-foreground">{deleting.name}</span>
                             {deleting.content ? (
                                 <>
                                     {" "}
                                     with content{" "}
-                                    <code className="break-all font-mono text-xs text-foreground">
-                                        {deleting.content}
-                                    </code>
+                                    <code className="break-all font-mono text-xs text-foreground">{deleting.content}</code>
                                 </>
                             ) : null}
                             ?

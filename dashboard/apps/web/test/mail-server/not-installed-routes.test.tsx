@@ -33,9 +33,7 @@ vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
     uninstallMailServerAppAction: async () => ({})
 }));
 vi.mock("@/app/(app)/apps/mail-server/mail-servers-view", () => ({
-    MailServersView: ({ canUninstall }: { canUninstall: boolean }) => (
-        <div data-list={String(canUninstall)} />
-    )
+    MailServersView: ({ canUninstall }: { canUninstall: boolean }) => <div data-list={String(canUninstall)} />
 }));
 vi.mock("@/app/(app)/apps/mail-server/[id]/server-view", () => ({
     ServerView: ({ hostname }: { hostname: string }) => <div data-server={hostname} />
@@ -100,8 +98,6 @@ describe("once it is installed", () => {
     });
 
     it("still refuses a malformed link", async () => {
-        await expect(DetailPage({ params: Promise.resolve({ id: "not-an-id" }) })).rejects.toThrow(
-            "NEXT_NOT_FOUND"
-        );
+        await expect(DetailPage({ params: Promise.resolve({ id: "not-an-id" }) })).rejects.toThrow("NEXT_NOT_FOUND");
     });
 });

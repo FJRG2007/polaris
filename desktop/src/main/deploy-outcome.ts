@@ -26,11 +26,7 @@ export function firstLine(error: string | null | undefined): string {
     return line.length > 300 ? `${line.slice(0, 297)}...` : line;
 }
 
-export function deployOutcome(
-    service: string,
-    status: string,
-    error: string | null | undefined
-): Outcome {
+export function deployOutcome(service: string, status: string, error: string | null | undefined): Outcome {
     return SERVING.has(status)
         ? { ok: true, title: `Deployed ${service}`, body: `${service} is serving the new release.` }
         : { ok: false, title: `Deploy failed: ${service}`, body: firstLine(error) };

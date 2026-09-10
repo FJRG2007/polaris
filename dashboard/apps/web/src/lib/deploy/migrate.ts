@@ -120,10 +120,7 @@ async function localVariables(
     });
     // The environment's first, so the service's own value wins where both name
     // the same variable - which is the order the pipeline resolves them in.
-    rows.sort(
-        (left, right) =>
-            Number(left.scopeType === "application") - Number(right.scopeType === "application")
-    );
+    rows.sort((left, right) => Number(left.scopeType === "application") - Number(right.scopeType === "application"));
 
     const masterKey = loadEnv().POLARIS_MASTER_KEY;
     const values: Record<string, string> = {};
@@ -213,20 +210,14 @@ export async function moveOut(
         select: { id: true, provider: true }
     });
     if (!link) throw new ProviderError("That account is not connected to your profile", "refused");
-    if (!isProvider(link.provider))
-        throw new ProviderError("Polaris cannot move a service there", "refused");
+    if (!isProvider(link.provider)) throw new ProviderError("Polaris cannot move a service there", "refused");
 
     let copied = 0;
     if (input.copyVariables) {
         const values = await localVariables(app.environmentId, app.id);
         if (Object.keys(values).length > 0) {
             const driver = driverOf(link.provider);
-            await driver.putVariables(
-                await tokenOf(link.id, link.provider),
-                input.externalId,
-                input.ref,
-                values
-            );
+            await driver.putVariables(await tokenOf(link.id, link.provider), input.externalId, input.ref, values);
             copied = Object.keys(values).length;
         }
     }
@@ -309,9 +300,7 @@ async function ownService(projectId: string, serviceId: string) {
     try {
         const parsed = JSON.parse(held.ref) as Record<string, unknown>;
         ref = Object.fromEntries(
-            Object.entries(parsed).filter(
-                (entry): entry is [string, string] => typeof entry[1] === "string"
-            )
+            Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string")
         );
     } catch {
         ref = {};
@@ -434,8 +423,7 @@ export async function moveHome(
             // Recorded rather than thrown. The service is worth creating either
             // way, and a screen that says which variables are missing is what
             // somebody needs; a move that refused would leave them with nothing.
-            variablesError =
-                caught instanceof Error ? caught.message : "The variables could not be read";
+            variablesError = caught instanceof Error ? caught.message : "The variables could not be read";
         }
     }
 
@@ -463,8 +451,7 @@ export async function moveHome(
         value,
         isSecret: !isPublicKey(key)
     }));
-    const copied =
-        entries.length > 0 ? await setEnvVars("application", application.id, owner, entries) : 0;
+    const copied = entries.length > 0 ? await setEnvVars("application", application.id, owner, entries) : 0;
 
     await ensureApplicationDomain(application.id, owner).catch(() => undefined);
 

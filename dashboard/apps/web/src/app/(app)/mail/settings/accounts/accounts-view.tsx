@@ -118,9 +118,7 @@ export function AccountsView({
     useEffect(() => setPending({}), [accounts]);
 
     const shown = accounts.map((account) => ({ ...account, ...pending[account.id] }));
-    const editedAccount = editing
-        ? accounts.find((account) => account.id === editing.id)
-        : undefined;
+    const editedAccount = editing ? accounts.find((account) => account.id === editing.id) : undefined;
 
     function closeEditor(): void {
         setEditing(null);
@@ -185,9 +183,7 @@ export function AccountsView({
                         <AccountRow
                             key={account.id}
                             account={account}
-                            onEdit={(focusPassword) =>
-                                setEditing({ id: account.id, focusPassword })
-                            }
+                            onEdit={(focusPassword) => setEditing({ id: account.id, focusPassword })}
                         />
                     ))}
                 </ul>
@@ -342,9 +338,7 @@ function AccountRow({
                         onChange={(next) => {
                             setNotify(next);
                             startBusy(async () => {
-                                const answer = await editAccountAction(account.id, {
-                                    notify: next
-                                });
+                                const answer = await editAccountAction(account.id, { notify: next });
                                 const said = refusalOf(answer);
                                 if (said) {
                                     setNotify(!next);

@@ -46,18 +46,12 @@ export function evidenceFilename(generatedAt: string, extension: "json" | "md"):
 /** A value made safe for one Markdown table cell: no pipe ends the cell early and
  *  no line break ends the row. */
 function cell(value: string): string {
-    return value
-        .replace(/\\/g, "\\\\")
-        .replace(/\|/g, "\\|")
-        .replace(/\s*\n\s*/g, " ");
+    return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
 }
 
 function sectionMarkdown(section: EvidenceSection): string[] {
     const lines = [`## ${section.title}`, ""];
-    lines.push(
-        `Configured in: ${section.where.map((where) => `${where.label} (\`${where.href}\`)`).join("; ")}`,
-        ""
-    );
+    lines.push(`Configured in: ${section.where.map((where) => `${where.label} (\`${where.href}\`)`).join("; ")}`, "");
     lines.push("| Control | Value |", "| --- | --- |");
     for (const fact of section.facts) {
         const flag = fact.attention ? " (attention)" : "";
@@ -139,9 +133,6 @@ export function evidenceExport(report: EvidenceReport): EvidenceExport {
         generatedAt: report.generatedAt,
         sha256,
         json: { name: evidenceFilename(report.generatedAt, "json"), body: json },
-        markdown: {
-            name: evidenceFilename(report.generatedAt, "md"),
-            body: evidenceMarkdown(report, sha256)
-        }
+        markdown: { name: evidenceFilename(report.generatedAt, "md"), body: evidenceMarkdown(report, sha256) }
     };
 }

@@ -14,9 +14,7 @@ import type { DnsRecordView } from "@/lib/dns/zone-records";
 import { emptyDraft, recordFields } from "@/lib/dns/record-schema";
 import { DnsRecordsTable } from "@/components/dns/dns-records-table";
 
-function record(
-    overrides: Partial<DnsRecordView> & Pick<DnsRecordView, "id" | "type" | "relative">
-): DnsRecordView {
+function record(overrides: Partial<DnsRecordView> & Pick<DnsRecordView, "id" | "type" | "relative">): DnsRecordView {
     const name = overrides.relative === "@" ? "example.test" : `${overrides.relative}.example.test`;
     return {
         name,
@@ -56,25 +54,13 @@ function render(rows: readonly DnsRecordView[] | null, pending: string[] = []): 
 
 describe("the order and the filters", () => {
     it("lists by type, then by name", () => {
-        expect(
-            view.listedRecords(records, view.NO_RECORD_FILTERS).map((entry) => entry.id)
-        ).toEqual(["a1", "a2", "x", "m", "t"]);
+        expect(view.listedRecords(records, view.NO_RECORD_FILTERS).map((entry) => entry.id)).toEqual(["a1", "a2", "x", "m", "t"]);
     });
 
     it("narrows by type and by a search over the name and the content", () => {
-        expect(
-            view.listedRecords(records, { type: "A", search: "" }).map((entry) => entry.id)
-        ).toEqual(["a1", "a2"]);
-        expect(
-            view
-                .listedRecords(records, { type: view.ALL_TYPES, search: "DOMAINKEY" })
-                .map((entry) => entry.id)
-        ).toEqual(["t"]);
-        expect(
-            view
-                .listedRecords(records, { type: view.ALL_TYPES, search: "mx.example" })
-                .map((entry) => entry.id)
-        ).toEqual(["m"]);
+        expect(view.listedRecords(records, { type: "A", search: "" }).map((entry) => entry.id)).toEqual(["a1", "a2"]);
+        expect(view.listedRecords(records, { type: view.ALL_TYPES, search: "DOMAINKEY" }).map((entry) => entry.id)).toEqual(["t"]);
+        expect(view.listedRecords(records, { type: view.ALL_TYPES, search: "mx.example" }).map((entry) => entry.id)).toEqual(["m"]);
         expect(view.listedRecords(records, { type: "TXT", search: "www" })).toEqual([]);
     });
 
@@ -83,12 +69,7 @@ describe("the order and the filters", () => {
     });
 
     it("builds the row a write shows before Cloudflare answers", () => {
-        const draft = {
-            ...emptyDraft("MX"),
-            name: "@",
-            content: "MX2.Example.Test.",
-            priority: "20"
-        };
+        const draft = { ...emptyDraft("MX"), name: "@", content: "MX2.Example.Test.", priority: "20" };
         const checked = recordFields(draft, "example.test");
         if (!checked.ok) throw new Error("the draft should be valid");
         expect(view.pendingView("pending-1", checked.record, draft, "example.test")).toMatchObject({
@@ -131,9 +112,7 @@ describe("the records table", () => {
         const markup = render(records);
         expect(markup).toContain('aria-label="Delete the A record www"');
         expect(markup).toContain('aria-label="Edit the MX record @"');
-        expect(markup).toContain(
-            'aria-label="Check where the TXT record mail._domainkey has reached"'
-        );
+        expect(markup).toContain('aria-label="Check where the TXT record mail._domainkey has reached"');
         // A type the editor does not write can be deleted, not edited.
         expect(markup).toContain('aria-label="Delete the HTTPS record @"');
         expect(markup).not.toContain('aria-label="Edit the HTTPS record @"');

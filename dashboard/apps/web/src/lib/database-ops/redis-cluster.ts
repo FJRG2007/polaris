@@ -31,20 +31,12 @@ export async function ensureRedisCluster(
     const password = context.admin.password;
     const outcomes = await core.runPrepareSteps(
         core.redisClusterSetupSteps(nodes.length / 2),
-        (script) =>
-            runWithin(
-                ports,
-                context.container,
-                core.redisClusterExec(password, script, nodes),
-                STEP_LIMIT_MS
-            ),
+        (script) => runWithin(ports, context.container, core.redisClusterExec(password, script, nodes), STEP_LIMIT_MS),
         sleep
     );
     const failed = outcomes.find((outcome) => !outcome.ok);
     if (failed && !failed.ok) {
         const said = lastLine(failed.output, [password]);
-        throw new DatabaseOperationError(
-            `${failed.title} failed: ${[failed.reason, said].filter(Boolean).join(" ")}`
-        );
+        throw new DatabaseOperationError(`${failed.title} failed: ${[failed.reason, said].filter(Boolean).join(" ")}`);
     }
 }

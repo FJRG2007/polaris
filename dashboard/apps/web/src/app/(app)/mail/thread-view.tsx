@@ -538,9 +538,7 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { muted: !thread.muted },
-                            thread.muted
-                                ? "Unmuted."
-                                : "Muted. New messages in it will not be announced."
+                            thread.muted ? "Unmuted." : "Muted. New messages in it will not be announced."
                         )
                     }
                 >
@@ -552,7 +550,9 @@ function ConversationMenu({
                     {thread.muted ? "Unmute" : "Mute"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                    onSelect={() => window.open(`/mail/print/${thread.id}`, "_blank", "noopener")}
+                    onSelect={() =>
+                        window.open(`/mail/print/${thread.id}`, "_blank", "noopener")
+                    }
                 >
                     <Printer className="size-3.5 shrink-0" aria-hidden />
                     Print
@@ -937,18 +937,14 @@ function MessageCard({
                                         eleven scans on it. Only offered when there
                                         is more than one: an archive of one file is
                                         a file with an extra step. */}
-                                    {message.attachments.filter((file) => !file.inline).length >
-                                    1 ? (
+                                    {message.attachments.filter((file) => !file.inline).length > 1 ? (
                                         <li className="flex items-center">
                                             <a
                                                 href={`/api/mail/zip/${message.id}`}
                                                 className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
                                                 download
                                             >
-                                                <Download
-                                                    className="size-3.5 shrink-0"
-                                                    aria-hidden
-                                                />
+                                                <Download className="size-3.5 shrink-0" aria-hidden />
                                                 Save all as a .zip
                                             </a>
                                         </li>

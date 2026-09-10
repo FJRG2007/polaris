@@ -45,9 +45,9 @@ function smtpRefusal(responseCode: number, response: string) {
 
 describe("what counts as a refused credential", () => {
     it("reads imapflow's refusal, whose message says nothing", () => {
-        expect(
-            isCredentialRefusal(imapRefusal("AUTHENTICATIONFAILED", "Invalid credentials"))
-        ).toBe(true);
+        expect(isCredentialRefusal(imapRefusal("AUTHENTICATIONFAILED", "Invalid credentials"))).toBe(
+            true
+        );
         // No bracketed code, only the status: still a refusal.
         const bare = Object.assign(new Error("Command failed"), {
             responseStatus: "NO",
@@ -62,18 +62,12 @@ describe("what counts as a refused credential", () => {
     });
 
     it("reads a reply whose code is not a refusal's by what it says", () => {
-        expect(
-            isCredentialRefusal(
-                imapRefusal("ALERT", "Too many simultaneous connections. (Failure)")
-            )
-        ).toBe(false);
-        expect(isCredentialRefusal(imapRefusal("ALERT", "Invalid credentials (Failure)"))).toBe(
-            true
+        expect(isCredentialRefusal(imapRefusal("ALERT", "Too many simultaneous connections. (Failure)"))).toBe(
+            false
         );
+        expect(isCredentialRefusal(imapRefusal("ALERT", "Invalid credentials (Failure)"))).toBe(true);
         expect(
-            isCredentialRefusal(
-                imapRefusal("ALERT", "Please log in via your web browser (Failure)")
-            )
+            isCredentialRefusal(imapRefusal("ALERT", "Please log in via your web browser (Failure)"))
         ).toBe(true);
     });
 
@@ -85,46 +79,32 @@ describe("what counts as a refused credential", () => {
         });
         expect(isCredentialRefusal(dropped)).toBe(false);
         expect(
-            isCredentialRefusal(
-                Object.assign(new Error("Already logged out"), { authenticationFailed: true })
-            )
+            isCredentialRefusal(Object.assign(new Error("Already logged out"), { authenticationFailed: true }))
         ).toBe(false);
     });
 
     it("reads an SMTP refusal and leaves a temporary one alone", () => {
-        expect(
-            isCredentialRefusal(smtpRefusal(535, "535 5.7.8 Username and Password not accepted"))
-        ).toBe(true);
-        expect(
-            isCredentialRefusal(
-                smtpRefusal(534, "534 5.7.9 Application-specific password required")
-            )
-        ).toBe(true);
-        expect(
-            isCredentialRefusal(smtpRefusal(454, "454 4.7.0 Temporary authentication failure"))
-        ).toBe(false);
+        expect(isCredentialRefusal(smtpRefusal(535, "535 5.7.8 Username and Password not accepted"))).toBe(
+            true
+        );
+        expect(isCredentialRefusal(smtpRefusal(534, "534 5.7.9 Application-specific password required"))).toBe(
+            true
+        );
+        expect(isCredentialRefusal(smtpRefusal(454, "454 4.7.0 Temporary authentication failure"))).toBe(
+            false
+        );
     });
 
     it("leaves the network, the DNS and a timeout as a retry", () => {
-        expect(
-            isCredentialRefusal(
-                Object.assign(new Error("getaddrinfo ENOTFOUND imap.example.com"), {
-                    code: "ENOTFOUND"
-                })
-            )
-        ).toBe(false);
-        expect(
-            isCredentialRefusal(Object.assign(new Error("Socket timeout"), { code: "ETIMEOUT" }))
-        ).toBe(false);
+        expect(isCredentialRefusal(Object.assign(new Error("getaddrinfo ENOTFOUND imap.example.com"), { code: "ENOTFOUND" }))).toBe(false);
+        expect(isCredentialRefusal(Object.assign(new Error("Socket timeout"), { code: "ETIMEOUT" }))).toBe(false);
         expect(isCredentialRefusal(null)).toBe(false);
         expect(isCredentialRefusal("connect ECONNREFUSED")).toBe(false);
     });
 
     it("still reads a server that only says no in a sentence", () => {
         expect(isCredentialRefusal(new Error("AUTHENTICATE failed."))).toBe(true);
-        expect(isCredentialRefusal("[AUTHENTICATIONFAILED] Invalid credentials (Failure)")).toBe(
-            true
-        );
+        expect(isCredentialRefusal("[AUTHENTICATIONFAILED] Invalid credentials (Failure)")).toBe(true);
     });
 });
 

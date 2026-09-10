@@ -156,33 +156,21 @@ function RecordRow({
     return (
         <tr
             aria-busy={pending ? true : undefined}
-            className={cn(
-                "border-t border-border align-top hover:bg-card-hover",
-                pending && "opacity-60"
-            )}
+            className={cn("border-t border-border align-top hover:bg-card-hover", pending && "opacity-60")}
         >
-            <td className="whitespace-nowrap px-3 py-2 font-mono text-xs font-semibold">
-                {record.type}
-            </td>
+            <td className="whitespace-nowrap px-3 py-2 font-mono text-xs font-semibold">{record.type}</td>
             <td className="px-3 py-2">
                 <span className="flex items-center gap-1.5">
                     <span className="block max-w-[16rem] truncate font-medium" title={record.name}>
                         {record.relative}
                     </span>
-                    <CopyButton
-                        value={record.name}
-                        label={`name ${record.name}`}
-                        className="shrink-0"
-                    />
+                    <CopyButton value={record.name} label={`name ${record.name}`} className="shrink-0" />
                 </span>
             </td>
             <td className="max-w-0 px-3 py-2">
                 <span className="flex min-w-0 items-center gap-1.5">
                     {record.type === "MX" && record.priority !== null ? (
-                        <span
-                            className="shrink-0 font-mono text-xs text-foreground-subtle"
-                            title="Priority"
-                        >
+                        <span className="shrink-0 font-mono text-xs text-foreground-subtle" title="Priority">
                             {record.priority}
                         </span>
                     ) : null}
@@ -190,11 +178,7 @@ function RecordRow({
                         {record.content || "-"}
                     </code>
                     {record.content ? (
-                        <CopyButton
-                            value={record.content}
-                            label={`content ${record.content}`}
-                            className="shrink-0"
-                        />
+                        <CopyButton value={record.content} label={`content ${record.content}`} className="shrink-0" />
                     ) : null}
                 </span>
             </td>

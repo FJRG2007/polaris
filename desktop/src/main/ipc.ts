@@ -20,7 +20,7 @@ import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from "electro
 
 export interface IpcHost extends PushHost {
     /** The address form's state: the address in use and why it failed to open. */
-    readonly connectState: () => { address: string | null; error: string | null };
+    readonly connectState: () => { address: string | null; error: string | null; };
     readonly connectSubmit: (raw: unknown) => Promise<Outcome>;
 }
 
@@ -56,8 +56,7 @@ export function registerIpc(host: IpcHost): void {
                 isServerUrl(frame.url, origin)
         );
     };
-    const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean =>
-        kindOf(event.sender) === kind;
+    const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean => kindOf(event.sender) === kind;
 
     ipcMain.handle(CHANNELS.notify, (event, raw: unknown): boolean => {
         if (!fromPolaris(event)) return false;
@@ -98,14 +97,8 @@ export function registerIpc(host: IpcHost): void {
         if (!fromPolaris(event)) return { ok: false, error: REFUSAL };
         const window = BrowserWindow.fromWebContents(event.sender);
         const picked = window
-            ? await dialog.showOpenDialog(window, {
-                  title: "Choose the folder to upload",
-                  properties: ["openDirectory"]
-              })
-            : await dialog.showOpenDialog({
-                  title: "Choose the folder to upload",
-                  properties: ["openDirectory"]
-              });
+            ? await dialog.showOpenDialog(window, { title: "Choose the folder to upload", properties: ["openDirectory"] })
+            : await dialog.showOpenDialog({ title: "Choose the folder to upload", properties: ["openDirectory"] });
         const folder = picked.canceled ? undefined : picked.filePaths[0];
         if (!folder) return null;
         try {
@@ -114,10 +107,7 @@ export function registerIpc(host: IpcHost): void {
         } catch (caught) {
             if (caught instanceof FolderRefusal) return { ok: false, error: caught.message };
             console.error("[folder]", caught);
-            return {
-                ok: false,
-                error: "Could not read that folder. Check that this app may open it."
-            };
+            return { ok: false, error: "Could not read that folder. Check that this app may open it." };
         }
     });
 
@@ -134,35 +124,26 @@ export function registerIpc(host: IpcHost): void {
         const input = windowSchema.safeParse(raw);
         const origin = host.server();
         const url = input.success && origin ? serverPath(input.data.path, origin) : null;
-        if (!input.success || !url)
-            return { ok: false, error: "That is not a page of this Polaris." };
+        if (!input.success || !url) return { ok: false, error: "That is not a page of this Polaris." };
         const open = opened.get(url);
         if (open && !open.isDestroyed()) {
             open.show();
             open.focus();
             return { ok: true };
         }
-        const window = openPolarisWindow(url, host.server, {
-            title: input.data.title,
-            width: 1100,
-            height: 720
-        });
+        const window = openPolarisWindow(url, host.server, { title: input.data.title, width: 1100, height: 720 });
         opened.set(url, window);
         window.on("closed", () => opened.delete(url));
         return { ok: true };
     });
 
-    ipcMain.handle(CHANNELS.connectState, (event) =>
-        from(event, "connect") ? host.connectState() : null
-    );
+    ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));
     ipcMain.handle(CHANNELS.connectSubmit, (event, raw: unknown) =>
         from(event, "connect") ? host.connectSubmit(raw) : REFUSED
     );
 
     ipcMain.handle(CHANNELS.keyState, (event) => (from(event, "api-key") ? keyFormState() : null));
-    ipcMain.handle(CHANNELS.keySubmit, (event, raw: unknown) =>
-        from(event, "api-key") ? submitApiKey(raw) : REFUSED
-    );
+    ipcMain.handle(CHANNELS.keySubmit, (event, raw: unknown) => (from(event, "api-key") ? submitApiKey(raw) : REFUSED));
     ipcMain.handle(CHANNELS.keyCancel, (event) => {
         if (from(event, "api-key")) cancelApiKey();
     });

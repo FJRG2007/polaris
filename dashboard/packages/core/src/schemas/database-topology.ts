@@ -167,17 +167,12 @@ function shardSetName(index: number): string {
 /** The replica sets of a MongoDB layout, config servers first. */
 export function mongoSets(topology: DbTopology, name: string): MongoSet[] {
     const members = topologyMembers(topology, name);
-    const hostsOf = (set: string) =>
-        members.filter((member) => member.set === set).map((member) => member.name);
-    if (topology.kind === "replicaSet")
-        return [{ name: MONGO_REPLICA_SET, hosts: hostsOf(MONGO_REPLICA_SET) }];
+    const hostsOf = (set: string) => members.filter((member) => member.set === set).map((member) => member.name);
+    if (topology.kind === "replicaSet") return [{ name: MONGO_REPLICA_SET, hosts: hostsOf(MONGO_REPLICA_SET) }];
     if (topology.kind !== "sharded") return [];
     return [
         { name: MONGO_CONFIG_SET, hosts: hostsOf(MONGO_CONFIG_SET), configsvr: true },
-        ...Array.from({ length: topology.shards }, (_, index) => ({
-            name: shardSetName(index),
-            hosts: hostsOf(shardSetName(index))
-        }))
+        ...Array.from({ length: topology.shards }, (_, index) => ({ name: shardSetName(index), hosts: hostsOf(shardSetName(index)) }))
     ];
 }
 
@@ -199,14 +194,9 @@ export function topologyAddress(
     name: string
 ): { hosts: string[]; replicaSet: string | null; readHost: string | null } {
     if (topology.kind === "replicaSet") {
-        return {
-            hosts: topologyMembers(topology, name).map((member) => member.name),
-            replicaSet: MONGO_REPLICA_SET,
-            readHost: null
-        };
+        return { hosts: topologyMembers(topology, name).map((member) => member.name), replicaSet: MONGO_REPLICA_SET, readHost: null };
     }
-    if (topology.kind === "replicas")
-        return { hosts: [name], replicaSet: null, readHost: readHostName(name) };
+    if (topology.kind === "replicas") return { hosts: [name], replicaSet: null, readHost: readHostName(name) };
     // A sharded cluster is reached through its router alone, like one server.
     return { hosts: [name], replicaSet: null, readHost: null };
 }
@@ -244,45 +234,16 @@ export function readHostName(name: string): string {
  *
  * One line, for the reason `mongoReplicaSetCommand` gives.
  */
-export function mongoMemberCommand(
-    member: TopologyMember,
-    topology: DbTopology,
-    name: string
-): string[] {
+export function mongoMemberCommand(member: TopologyMember, topology: DbTopology, name: string): string[] {
     let program: string[];
     if (member.role === "router") {
         const config = mongoSets(topology, name).find((set) => set.configsvr);
         if (!config) throw new Error("A router needs a config server replica set");
-        program = [
-            "mongos",
-            "--configdb",
-            seedList(config),
-            "--port",
-            String(MONGO_PORT),
-            "--bind_ip_all"
-        ];
+        program = ["mongos", "--configdb", seedList(config), "--port", String(MONGO_PORT), "--bind_ip_all"];
     } else if (member.role === "config") {
-        program = [
-            "mongod",
-            "--configsvr",
-            "--replSet",
-            setOf(member),
-            "--port",
-            String(MONGO_PORT),
-            "--dbpath",
-            "/data/db",
-            "--bind_ip_all"
-        ];
+        program = ["mongod", "--configsvr", "--replSet", setOf(member), "--port", String(MONGO_PORT), "--dbpath", "/data/db", "--bind_ip_all"];
     } else if (member.role === "shard") {
-        program = [
-            "mongod",
-            "--shardsvr",
-            "--replSet",
-            setOf(member),
-            "--port",
-            String(MONGO_PORT),
-            "--bind_ip_all"
-        ];
+        program = ["mongod", "--shardsvr", "--replSet", setOf(member), "--port", String(MONGO_PORT), "--bind_ip_all"];
     } else if (member.role === "member") {
         program = ["mongod", "--replSet", setOf(member), "--bind_ip_all"];
     } else {
@@ -300,8 +261,7 @@ export function mongoMemberCommand(
 }
 
 function setOf(member: TopologyMember): string {
-    if (!member.set || !/^[A-Za-z0-9_-]+$/.test(member.set))
-        throw new Error("A member belongs to a named replica set");
+    if (!member.set || !/^[A-Za-z0-9_-]+$/.test(member.set)) throw new Error("A member belongs to a named replica set");
     return member.set;
 }
 
@@ -331,9 +291,7 @@ function mongosh(auth: MongoAuth | null, script: string): string[] {
     return [
         "mongosh",
         "--quiet",
-        ...(auth
-            ? ["-u", auth.username, "-p", auth.password, "--authenticationDatabase", "admin"]
-            : []),
+        ...(auth ? ["-u", auth.username, "-p", auth.password, "--authenticationDatabase", "admin"] : []),
         "--eval",
         script
     ];
@@ -342,29 +300,20 @@ function mongosh(auth: MongoAuth | null, script: string): string[] {
 /** Whether a member answers at all. `ping` needs no account, so it answers on a
  *  member no user has been created on yet as well as on one that has. */
 export function mongoPingCommand(): MaintenanceCommand {
-    return {
-        argv: mongosh(null, "db.adminCommand({ ping: 1 }).ok"),
-        describe: "Waiting for the member"
-    };
+    return { argv: mongosh(null, "db.adminCommand({ ping: 1 }).ok"), describe: "Waiting for the member" };
 }
 
 /** Whether an account signs in on a member - false while the member still has
  *  no users, which is when the localhost exception applies instead. */
 export function mongoSignInCommand(auth: MongoAuth): MaintenanceCommand {
-    return {
-        argv: mongosh(auth, "db.runCommand({ connectionStatus: 1 }).ok"),
-        describe: "Signing in"
-    };
+    return { argv: mongosh(auth, "db.runCommand({ connectionStatus: 1 }).ok"), describe: "Signing in" };
 }
 
 /** What a member is in its set right now, as one word on the last line:
  *  `primary`, `secondary` or `other`. `hello` needs no account. */
 export function mongoRoleCommand(): MaintenanceCommand {
     return {
-        argv: mongosh(
-            null,
-            'const h = db.hello(); h.isWritablePrimary ? "primary" : h.secondary ? "secondary" : "other"'
-        ),
+        argv: mongosh(null, 'const h = db.hello(); h.isWritablePrimary ? "primary" : h.secondary ? "secondary" : "other"'),
         describe: "Checking the member"
     };
 }
@@ -391,10 +340,7 @@ export function mongoSetInitiateCommand(auth: MongoAuth | null, set: MongoSet): 
     for (const host of set.hosts) checkHost(host);
     if (!/^[A-Za-z0-9_-]+$/.test(set.name)) throw new Error("A replica set name is a plain word");
     const members = set.hosts
-        .map(
-            (host, index) =>
-                `{ _id: ${index}, host: ${JSON.stringify(`${host}:${MONGO_PORT}`)}, priority: ${index === 0 ? 2 : 1} }`
-        )
+        .map((host, index) => `{ _id: ${index}, host: ${JSON.stringify(`${host}:${MONGO_PORT}`)}, priority: ${index === 0 ? 2 : 1} }`)
         .join(", ");
     const config = `{ _id: ${JSON.stringify(set.name)}${set.configsvr ? ", configsvr: true" : ""}, members: [${members}] }`;
     const script = `try { rs.status().ok } catch (error) { try { rs.initiate(${config}).ok } catch (again) { if (again.codeName !== "AlreadyInitialized") throw again; 1 } }`;
@@ -421,10 +367,7 @@ export function mongoCreateRootCommand(auth: MongoAuth, where: string): Maintena
  * `listShards`, whose `host` is `<set>/<members>`, so a shard added on an
  * earlier run - or by a run that stopped half way - is not added twice.
  */
-export function mongoAddShardsCommand(
-    auth: MongoAuth,
-    shards: readonly MongoSet[]
-): MaintenanceCommand {
+export function mongoAddShardsCommand(auth: MongoAuth, shards: readonly MongoSet[]): MaintenanceCommand {
     const seeds = JSON.stringify(shards.map(seedList));
     const script = [
         'const listed = db.adminCommand({ listShards: 1 }).shards.map((shard) => shard.host.split("/")[0])',
@@ -443,10 +386,7 @@ export function mongoStepDownCommand(auth: MongoAuth): MaintenanceCommand {
 /** The feature compatibility version a set runs at, as MongoDB prints it: `7.0`. */
 export function mongoReadFcvCommand(auth: MongoAuth): MaintenanceCommand {
     return {
-        argv: mongosh(
-            auth,
-            "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version"
-        ),
+        argv: mongosh(auth, "db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 }).featureCompatibilityVersion.version"),
         describe: "Reading the feature compatibility version"
     };
 }
@@ -454,8 +394,7 @@ export function mongoReadFcvCommand(auth: MongoAuth): MaintenanceCommand {
 /** A major version's feature compatibility version: `8` is `8.0`. */
 export function fcvOf(version: string): string {
     const major = Number.parseInt(version, 10);
-    if (!Number.isInteger(major) || major < 1)
-        throw new Error("A version starts with its major number");
+    if (!Number.isInteger(major) || major < 1) throw new Error("A version starts with its major number");
     return `${major}.0`;
 }
 
@@ -467,10 +406,7 @@ export function mongoSetFcvCommand(auth: MongoAuth, version: string): Maintenanc
     const fcv = fcvOf(version);
     const confirm = Number.parseInt(fcv, 10) >= 7 ? ", confirm: true" : "";
     return {
-        argv: mongosh(
-            auth,
-            `db.adminCommand({ setFeatureCompatibilityVersion: ${JSON.stringify(fcv)}${confirm} }).ok`
-        ),
+        argv: mongosh(auth, `db.adminCommand({ setFeatureCompatibilityVersion: ${JSON.stringify(fcv)}${confirm} }).ok`),
         describe: `Setting the feature compatibility version to ${fcv}`
     };
 }
@@ -491,23 +427,18 @@ export function rollingPath(offered: readonly string[], current: string, target:
 /** Each member of a set as `rs.status()` sees it. */
 export function mongoSetStatusCommand(auth: MongoAuth | null): MaintenanceCommand {
     return {
-        argv: mongosh(
-            auth,
-            "JSON.stringify(rs.status().members.map((m) => ({ name: m.name, state: m.stateStr, health: m.health })))"
-        ),
+        argv: mongosh(auth, "JSON.stringify(rs.status().members.map((m) => ({ name: m.name, state: m.stateStr, health: m.health })))"),
         describe: "Reading the replica set's state"
     };
 }
 
-const memberStatusSchema = z
-    .array(z.object({ name: z.string().max(300), state: z.string().max(40), health: z.number() }))
-    .max(64);
+const memberStatusSchema = z.array(
+    z.object({ name: z.string().max(300), state: z.string().max(40), health: z.number() })
+).max(64);
 
 /** The members `mongoSetStatusCommand` printed, or null for anything else - it
  *  is a container's output, so it is parsed as untrusted. */
-export function parseSetStatus(
-    output: string
-): { name: string; state: string; healthy: boolean }[] | null {
+export function parseSetStatus(output: string): { name: string; state: string; healthy: boolean }[] | null {
     const line = output.trim().split(/\r?\n/).at(-1) ?? "";
     let raw: unknown;
     try {
@@ -539,16 +470,14 @@ export function parseSetStatus(
  * primary - see `mysqlFollowCommands`.
  */
 export function mysqlMemberCommand(serverId: number): string[] {
-    if (!Number.isInteger(serverId) || serverId < 1 || serverId > 4_294_967_295)
-        throw new Error("A server id is a positive integer");
+    if (!Number.isInteger(serverId) || serverId < 1 || serverId > 4_294_967_295) throw new Error("A server id is a positive integer");
     return ["mysqld", `--server-id=${serverId}`, "--gtid-mode=ON", "--enforce-gtid-consistency=ON"];
 }
 
 /** A SQL string literal for a value that has already been checked to hold no
  *  quote or backslash. */
 function sqlLiteral(value: string): string {
-    if (/['\\]/.test(value))
-        throw new Error("A value with a quote or a backslash cannot be written into a statement");
+    if (/['\\]/.test(value)) throw new Error("A value with a quote or a backslash cannot be written into a statement");
     return `'${value}'`;
 }
 
@@ -557,10 +486,7 @@ function sqlLiteral(value: string): string {
  * stored password, with the one privilege a replica needs. The statements are
  * written to the primary's binary log, so the replicas get the account too.
  */
-export function mysqlReplicationUserCommand(
-    rootPassword: string,
-    replicationPassword: string
-): MaintenanceCommand {
+export function mysqlReplicationUserCommand(rootPassword: string, replicationPassword: string): MaintenanceCommand {
     const account = `${sqlLiteral(MYSQL_REPLICATION_USER)}@'%'`;
     const secret = sqlLiteral(replicationPassword);
     return {

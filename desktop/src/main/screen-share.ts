@@ -32,10 +32,7 @@ function label(source: DesktopCapturerSource): string {
 
 /** The source the person picked, or null when they picked none. */
 async function choose(frame: WebFrameMain | null): Promise<DesktopCapturerSource | null> {
-    const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 0, height: 0 }
-    });
+    const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } });
     if (sources.length === 0) return null;
     if (process.platform === "linux" && sources.length === 1) return sources[0] ?? null;
 
@@ -53,9 +50,7 @@ async function choose(frame: WebFrameMain | null): Promise<DesktopCapturerSource
         defaultId: 0,
         noLink: false
     };
-    const { response } = parent
-        ? await dialog.showMessageBox(parent, options)
-        : await dialog.showMessageBox(options);
+    const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
     return offered[response] ?? null;
 }
 
@@ -63,10 +58,7 @@ export function installScreenShare(server: () => string | null): void {
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
             const refuse = () => (callback as (streams: Streams | null) => void)(null);
-            if (
-                !request.videoRequested ||
-                !allowPermission("display-capture", request.securityOrigin, server())
-            ) {
+            if (!request.videoRequested || !allowPermission("display-capture", request.securityOrigin, server())) {
                 refuse();
                 return;
             }

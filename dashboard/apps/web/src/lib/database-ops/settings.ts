@@ -10,14 +10,7 @@ import { ensureMongoReplicaSet } from "./provision";
 import type { RuntimePorts } from "@polaris/deploy";
 import type { RedisMode, ResourceLimitsInput } from "@polaris/core";
 import { deployDatabase, deployDatabaseAndWait } from "@/lib/database-service";
-import {
-    DatabaseOperationError,
-    instanceContext,
-    lastLine,
-    runStep,
-    waitReady,
-    withPorts
-} from "./ops";
+import { DatabaseOperationError, instanceContext, lastLine, runStep, waitReady, withPorts } from "./ops";
 
 async function dedicated(databaseId: string, ownerId: string, engine: string) {
     const row = await prisma.managedDatabase.findFirst({
@@ -34,12 +27,8 @@ async function dedicated(databaseId: string, ownerId: string, engine: string) {
         }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    if (row.engine !== engine)
-        throw new DatabaseOperationError("That setting does not apply to this engine.");
-    if (row.parentId)
-        throw new DatabaseOperationError(
-            "This database lives inside another instance; change the instance."
-        );
+    if (row.engine !== engine) throw new DatabaseOperationError("That setting does not apply to this engine.");
+    if (row.parentId) throw new DatabaseOperationError("This database lives inside another instance; change the instance.");
     return row;
 }
 
@@ -78,10 +67,7 @@ export async function setRedisMode(
     }
     await prisma.managedDatabase.update({
         where: { id: databaseId },
-        data: {
-            mode: input.mode,
-            maxMemoryMb: input.mode === "cache" ? (input.maxMemoryMb ?? 256) : row.maxMemoryMb
-        }
+        data: { mode: input.mode, maxMemoryMb: input.mode === "cache" ? (input.maxMemoryMb ?? 256) : row.maxMemoryMb }
     });
     return { deploymentId: await deployDatabase(databaseId, ownerId, userId) };
 }
@@ -121,21 +107,13 @@ async function prepareRedisMode(
                 ?.slice(name.length + 1)
                 .trim();
         if (field("aof_last_bgrewrite_status") === "err") {
-            throw new DatabaseOperationError(
-                "Redis could not write its append-only log; nothing was changed."
-            );
+            throw new DatabaseOperationError("Redis could not write its append-only log; nothing was changed.");
         }
-        if (
-            field("aof_enabled") === "1" &&
-            field("aof_rewrite_in_progress") === "0" &&
-            field("aof_rewrite_scheduled") === "0"
-        ) {
+        if (field("aof_enabled") === "1" && field("aof_rewrite_in_progress") === "0" && field("aof_rewrite_scheduled") === "0") {
             return;
         }
         if (Date.now() > deadline) {
-            throw new DatabaseOperationError(
-                "Redis did not finish writing its append-only log in ten minutes."
-            );
+            throw new DatabaseOperationError("Redis did not finish writing its append-only log in ten minutes.");
         }
     }
 }
@@ -156,25 +134,15 @@ export async function setMongoReplicaSet(
 ): Promise<void> {
     const row = await dedicated(databaseId, ownerId, "mongo");
     if (row.topology !== "single") {
-        throw new DatabaseOperationError(
-            "This database is already laid out over several members; that is chosen when it is created."
-        );
+        throw new DatabaseOperationError("This database is already laid out over several members; that is chosen when it is created.");
     }
     if (row.replicaSet === enabled) return;
-    await prisma.managedDatabase.update({
-        where: { id: databaseId },
-        data: { replicaSet: enabled }
-    });
+    await prisma.managedDatabase.update({ where: { id: databaseId }, data: { replicaSet: enabled } });
     const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);
     if (failure) {
-        await prisma.managedDatabase.update({
-            where: { id: databaseId },
-            data: { replicaSet: row.replicaSet }
-        });
+        await prisma.managedDatabase.update({ where: { id: databaseId }, data: { replicaSet: row.replicaSet } });
         await deployDatabaseAndWait(databaseId, ownerId, userId);
-        throw new DatabaseOperationError(
-            `The instance did not start that way, so it was put back: ${failure}`
-        );
+        throw new DatabaseOperationError(`The instance did not start that way, so it was put back: ${failure}`);
     }
     if (enabled) {
         const context = await instanceContext(databaseId, ownerId);
@@ -197,12 +165,8 @@ export async function setDatabaseLimits(
         select: { parentId: true, containerName: true, cpuLimit: true, memoryLimitMb: true }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    if (row.parentId)
-        throw new DatabaseOperationError(
-            "This database lives inside another instance; change the instance."
-        );
-    if (row.cpuLimit === limits.cpus && row.memoryLimitMb === limits.memoryMb)
-        return { deploymentId: null };
+    if (row.parentId) throw new DatabaseOperationError("This database lives inside another instance; change the instance.");
+    if (row.cpuLimit === limits.cpus && row.memoryLimitMb === limits.memoryMb) return { deploymentId: null };
     await prisma.managedDatabase.update({
         where: { id: databaseId },
         data: { cpuLimit: limits.cpus, memoryLimitMb: limits.memoryMb }

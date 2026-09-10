@@ -14,9 +14,7 @@ import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 
-const { LINUX_LAUNCHER } = createRequire(import.meta.url)("../../build/linux-launcher.cjs") as {
-    LINUX_LAUNCHER: string;
-};
+const { LINUX_LAUNCHER } = createRequire(import.meta.url)("../../build/linux-launcher.cjs") as { LINUX_LAUNCHER: string; };
 
 const SWITCHES = {
     restrict: "/proc/sys/kernel/apparmor_restrict_unprivileged_userns",
@@ -36,10 +34,7 @@ describe.runIf(posix)("the Linux launcher", () => {
     });
 
     /** An installed app whose launcher reads its switches from `values`. */
-    function install(values: Partial<Record<keyof typeof SWITCHES, string>>): {
-        app: string;
-        launcher: string;
-    } {
+    function install(values: Partial<Record<keyof typeof SWITCHES, string>>): { app: string; launcher: string; } {
         root = mkdtempSync(join(tmpdir(), "polaris-launcher-"));
         const app = join(root, "lib", "polaris-desktop");
         mkdirSync(app, { recursive: true });
@@ -52,18 +47,13 @@ describe.runIf(posix)("the Linux launcher", () => {
         }
         const launcher = join(app, "polaris");
         writeFileSync(launcher, script, { mode: 0o755 });
-        writeFileSync(join(app, "polaris.bin"), '#!/bin/sh\nprintf "%s\\n" "$@"\n', {
-            mode: 0o755
-        });
+        writeFileSync(join(app, "polaris.bin"), '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
         return { app, launcher };
     }
 
     function run(launcher: string, env: NodeJS.ProcessEnv = {}): string[] {
         const { APPIMAGE: _ignored, ...base } = process.env;
-        return execFileSync(launcher, ["--flag", "a b"], {
-            env: { ...base, ...env },
-            encoding: "utf8"
-        })
+        return execFileSync(launcher, ["--flag", "a b"], { env: { ...base, ...env }, encoding: "utf8" })
             .split("\n")
             .filter(Boolean);
     }

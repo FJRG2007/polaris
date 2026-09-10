@@ -34,12 +34,8 @@ function compare(a: Version, b: Version): number {
 
 /** Where the app's releases are listed and shown, from package.json's
  *  `repository`. Null when that is not a GitHub repository. */
-export function releaseSource(
-    repository: string
-): { readonly api: string; readonly page: (tag: string) => string } | null {
-    const match = /^(?:git\+)?https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(
-        repository
-    );
+export function releaseSource(repository: string): { readonly api: string; readonly page: (tag: string) => string; } | null {
+    const match = /^(?:git\+)?https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(repository);
     if (!match) return null;
     const [, owner, repo] = match;
     return {
@@ -59,15 +55,13 @@ export function newerRelease(body: unknown, current: string): Release | null {
     const running = parseVersion(current);
     const releases = releasesSchema.safeParse(body);
     if (!running || !releases.success) return null;
-    let newest: { release: Release; version: Version } | null = null;
+    let newest: { release: Release; version: Version; } | null = null;
     for (const release of releases.data) {
-        if (release.draft || release.prerelease || !release.tag_name.startsWith(TAG_PREFIX))
-            continue;
+        if (release.draft || release.prerelease || !release.tag_name.startsWith(TAG_PREFIX)) continue;
         const text = release.tag_name.slice(TAG_PREFIX.length);
         const version = parseVersion(text);
         if (!version || compare(version, running) <= 0) continue;
-        if (!newest || compare(version, newest.version) > 0)
-            newest = { release: { version: text, tag: release.tag_name }, version };
+        if (!newest || compare(version, newest.version) > 0) newest = { release: { version: text, tag: release.tag_name }, version };
     }
     return newest?.release ?? null;
 }

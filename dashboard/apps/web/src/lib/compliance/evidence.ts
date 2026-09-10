@@ -56,11 +56,7 @@ export type EvidenceArea = (typeof EVIDENCE_AREAS)[number];
  */
 export const EVIDENCE_CHANGE_ACTIONS: Readonly<Record<EvidenceArea, readonly string[]>> = {
     // The mail channel decides whether an accepted email code can be armed at all.
-    authentication: [
-        "instance.security.updated",
-        "auth-mail.channel.set",
-        "auth-mail.channel.cleared"
-    ],
+    authentication: ["instance.security.updated", "auth-mail.channel.set", "auth-mail.channel.cleared"],
     sessions: [
         "account.session-limits.updated",
         "account.session-binding.updated",
@@ -153,11 +149,7 @@ export interface EvidenceSection {
     /** Where each part of it is set, in the words the screens use. */
     readonly where: readonly { readonly label: string; readonly href: string }[];
     readonly facts: readonly EvidenceFact[];
-    readonly rows?: {
-        readonly title: string;
-        readonly total: number;
-        readonly items: readonly EvidenceRow[];
-    };
+    readonly rows?: { readonly title: string; readonly total: number; readonly items: readonly EvidenceRow[] };
     readonly notes: readonly string[];
     readonly lastChange: EvidenceChange | null;
 }
@@ -217,11 +209,7 @@ export interface EvidenceReadings {
         readonly loginApproval: number;
         readonly open: number;
     };
-    readonly administrators: readonly {
-        readonly id: string;
-        readonly name: string;
-        readonly secondFactor: boolean;
-    }[];
+    readonly administrators: readonly { readonly id: string; readonly name: string; readonly secondFactor: boolean }[];
     readonly audit: {
         readonly retention: core.RetentionPolicy;
         readonly sealed: number;

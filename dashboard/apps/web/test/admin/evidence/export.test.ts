@@ -73,9 +73,7 @@ describe("the printable report", () => {
 
     it("keeps a value with a pipe or a line break inside its own cell", () => {
         const odd = buildEvidence(
-            readings({
-                administrators: [{ id: "a1", name: "Pipe | Name\nTwo", secondFactor: true }]
-            })
+            readings({ administrators: [{ id: "a1", name: "Pipe | Name\nTwo", secondFactor: true }] })
         );
         const text = files.evidenceMarkdown(odd, "b".repeat(64));
         expect(text).toContain("| Pipe \\| Name Two | Yes |");

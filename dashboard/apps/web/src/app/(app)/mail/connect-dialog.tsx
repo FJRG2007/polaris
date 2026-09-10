@@ -38,7 +38,11 @@ import type { MailDiscovery } from "@/lib/mailbox/autoconfig";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { addressState } from "@/app/(app)/mail/address-state";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { addAccountAction, discoverAction, updateAccountAction } from "@/app/(app)/mail/actions";
+import {
+    addAccountAction,
+    discoverAction,
+    updateAccountAction
+} from "@/app/(app)/mail/actions";
 import {
     Button,
     Dialog,
@@ -613,9 +617,7 @@ export function ConnectMailboxDialog({
                                         autoComplete="off"
                                         autoFocus={focusPassword}
                                         placeholder={
-                                            keepsPassword
-                                                ? "Leave blank to keep the current one"
-                                                : undefined
+                                            keepsPassword ? "Leave blank to keep the current one" : undefined
                                         }
                                         aria-invalid={field === "password" ? true : undefined}
                                         aria-describedby={
@@ -633,8 +635,7 @@ export function ConnectMailboxDialog({
                                             id="mailbox-password-kept"
                                             className="mt-1 block text-[12px] text-foreground-subtle"
                                         >
-                                            The servers or login changed, so enter the password
-                                            again.
+                                            The servers or login changed, so enter the password again.
                                         </span>
                                     ) : keepsPassword ? (
                                         <span
@@ -730,8 +731,7 @@ export function ConnectMailboxDialog({
                                                     onClick={() => setColor(swatch.hex)}
                                                     className={cn(
                                                         "size-6 shrink-0 rounded-full ring-offset-2 ring-offset-background",
-                                                        color === swatch.hex &&
-                                                            "ring-2 ring-foreground"
+                                                        color === swatch.hex && "ring-2 ring-foreground"
                                                     )}
                                                     style={{ backgroundColor: swatch.hex }}
                                                 />
@@ -909,8 +909,7 @@ function lookupSentence(
  */
 export function serverProblem(host: string, port: string): string | null {
     const hostCheck = mailHost.safeParse(host);
-    if (!hostCheck.success)
-        return hostCheck.error.issues[0]?.message ?? "That is not a server name";
+    if (!hostCheck.success) return hostCheck.error.issues[0]?.message ?? "That is not a server name";
     if (!mailPort.safeParse(port).success) return "The port is a number from 1 to 65535";
     return null;
 }

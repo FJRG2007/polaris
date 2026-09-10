@@ -179,9 +179,7 @@ const SERVICE_NAME = /^_[a-z0-9-]+\._(?:tcp|udp|tls)\./;
 
 /** Whether text holds a line break or another control character. */
 function hasControl(value: string): boolean {
-    return [...value].some(
-        (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
-    );
+    return [...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
 }
 
 function integer(value: string, min: number, max: number): number | null {
@@ -195,9 +193,7 @@ function integer(value: string, min: number, max: number): number | null {
 function isCaaIssuer(value: string): boolean {
     if (value === ";") return true;
     const [domain = "", ...parameters] = value.split(";");
-    return (
-        isTargetHostname(normalizeHostname(domain)) && parameters.every((part) => !hasControl(part))
-    );
+    return isTargetHostname(normalizeHostname(domain)) && parameters.every((part) => !hasControl(part));
 }
 
 /** A record in the shape Cloudflare's API takes it. */
@@ -211,12 +207,7 @@ export type DnsRecordFields =
           ttl: number;
           data: { priority: number; weight: number; port: number; target: string };
       }
-    | {
-          type: "CAA";
-          name: string;
-          ttl: number;
-          data: { flags: number; tag: string; value: string };
-      };
+    | { type: "CAA"; name: string; ttl: number; data: { flags: number; tag: string; value: string } };
 
 /** Every field that is wrong, keyed by the field, with the sentence to show. */
 export type DraftProblems = Partial<Record<keyof DnsRecordDraft, string>>;
@@ -301,34 +292,21 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
             const need = (field: keyof DnsRecordDraft): boolean => {
                 if (draft[field] !== "") return true;
                 clean = false;
-                context.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    path: [field],
-                    message: "Required",
-                    params: { missing: true }
-                });
+                context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: "Required", params: { missing: true } });
                 return false;
             };
             const port = (field: "priority" | "weight" | "port") => {
-                if (need(field) && integer(draft[field], 0, 65535) === null)
-                    fail(field, "0 to 65535");
+                if (need(field) && integer(draft[field], 0, 65535) === null) fail(field, "0 to 65535");
             };
 
             const apex = normalizeHostname(zone);
             const name = absoluteName(draft.name, zone);
             const root = normalizeHostname(checks.within ?? zone);
             if (need("name")) {
-                if (!isRecordName(name))
-                    fail(
-                        "name",
-                        "Letters, digits and hyphens, like www, or @ for the domain itself"
-                    );
+                if (!isRecordName(name)) fail("name", "Letters, digits and hyphens, like www, or @ for the domain itself");
                 else if (!isWithin(name, root)) fail("name", `Must be at or under ${root}`);
                 else if (draft.type === "SRV" && !SERVICE_NAME.test(name)) {
-                    fail(
-                        "name",
-                        "A service record is named _service._protocol, like _minecraft._tcp"
-                    );
+                    fail("name", "A service record is named _service._protocol, like _minecraft._tcp");
                 } else if (draft.type === "NS" && name === apex) {
                     fail("name", "The domain's own nameservers are set by Cloudflare");
                 }
@@ -336,65 +314,40 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
 
             const proxied = PROXIABLE_TYPES.includes(draft.type) && draft.proxied;
             // A proxied record's TTL is Cloudflare's to set; it is written as Auto.
-            if (
-                !proxied &&
-                draft.ttl !== String(TTL_AUTO) &&
-                integer(draft.ttl, TTL_MIN, TTL_MAX) === null
-            ) {
+            if (!proxied && draft.ttl !== String(TTL_AUTO) && integer(draft.ttl, TTL_MIN, TTL_MAX) === null) {
                 fail("ttl", `Auto, or ${TTL_MIN} to ${TTL_MAX} seconds`);
             }
 
             switch (draft.type) {
                 case "A":
-                    if (need("content") && !IPV4.test(draft.content))
-                        fail("content", "An IPv4 address, like 203.0.113.10");
+                    if (need("content") && !IPV4.test(draft.content)) fail("content", "An IPv4 address, like 203.0.113.10");
                     break;
                 case "AAAA":
-                    if (
-                        need("content") &&
-                        !(
-                            draft.content.includes(":") &&
-                            !draft.content.includes("%") &&
-                            isIpAddress(draft.content)
-                        )
-                    ) {
+                    if (need("content") && !(draft.content.includes(":") && !draft.content.includes("%") && isIpAddress(draft.content))) {
                         fail("content", "An IPv6 address, like 2001:db8::10");
                     }
                     break;
                 case "CNAME":
                     if (!need("content")) break;
-                    if (!isAliasTarget(draft.content))
-                        fail("content", "A hostname, like app.example.com");
-                    else if (draft.content === name)
-                        fail("content", "A name cannot point at itself");
+                    if (!isAliasTarget(draft.content)) fail("content", "A hostname, like app.example.com");
+                    else if (draft.content === name) fail("content", "A name cannot point at itself");
                     break;
                 case "NS":
-                    if (need("content") && !isTargetHostname(draft.content))
-                        fail("content", "A nameserver's hostname, like ns1.example.com");
+                    if (need("content") && !isTargetHostname(draft.content)) fail("content", "A nameserver's hostname, like ns1.example.com");
                     break;
                 case "TXT":
                     if (!need("content")) break;
-                    if (hasControl(draft.content))
-                        fail("content", "No line breaks or control characters");
-                    else if (draft.content.length > TXT_MAX)
-                        fail("content", `At most ${TXT_MAX} characters`);
+                    if (hasControl(draft.content)) fail("content", "No line breaks or control characters");
+                    else if (draft.content.length > TXT_MAX) fail("content", `At most ${TXT_MAX} characters`);
                     break;
                 case "MX":
-                    if (
-                        need("content") &&
-                        draft.content !== NO_TARGET &&
-                        !isTargetHostname(draft.content)
-                    ) {
+                    if (need("content") && draft.content !== NO_TARGET && !isTargetHostname(draft.content)) {
                         fail("content", "The mail server's hostname, like mx.example.com");
                     }
                     port("priority");
                     break;
                 case "SRV":
-                    if (
-                        need("target") &&
-                        draft.target !== NO_TARGET &&
-                        !isTargetHostname(draft.target)
-                    ) {
+                    if (need("target") && draft.target !== NO_TARGET && !isTargetHostname(draft.target)) {
                         fail("target", "The hostname the service runs on");
                     }
                     port("priority");
@@ -403,13 +356,9 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
                     break;
                 case "CAA":
                     if (integer(draft.flags, 0, 255) === null) fail("flags", "0 to 255");
-                    if (!(CAA_TAGS as readonly string[]).includes(draft.tag))
-                        fail("tag", "Pick one of the offered tags");
+                    if (!(CAA_TAGS as readonly string[]).includes(draft.tag)) fail("tag", "Pick one of the offered tags");
                     else if (need("value")) {
-                        if (
-                            draft.tag === "iodef" &&
-                            !/^(?:mailto:[^\s@]+@[^\s@]+|https?:\/\/\S+)$/.test(draft.value)
-                        ) {
+                        if (draft.tag === "iodef" && !/^(?:mailto:[^\s@]+@[^\s@]+|https?:\/\/\S+)$/.test(draft.value)) {
                             fail("value", "An address like mailto:security@example.com");
                         } else if (draft.tag !== "iodef" && !isCaaIssuer(draft.value)) {
                             fail("value", "A domain, like letsencrypt.org, or ; to allow none");
@@ -422,8 +371,7 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
             // half-typed value matching nothing says nothing.
             if (!clean) return;
             const others = (checks.existing ?? []).filter(
-                (record) =>
-                    record.id !== checks.editingId && normalizeHostname(record.name) === name
+                (record) => record.id !== checks.editingId && normalizeHostname(record.name) === name
             );
             const label = relativeName(name, zone);
             const alias = others.find((record) => record.type === "CNAME");
@@ -431,10 +379,7 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
                 const other = others[0]!.type;
                 // Read letter by letter: "an A record", "an MX record", "a CNAME record".
                 const article = /^[AEFHILMNORSX]/.test(other) ? "an" : "a";
-                fail(
-                    "name",
-                    `${label} already has ${article} ${other} record, and a CNAME cannot share its name`
-                );
+                fail("name", `${label} already has ${article} ${other} record, and a CNAME cannot share its name`);
                 return;
             }
             if (draft.type !== "CNAME" && alias) {
@@ -448,15 +393,8 @@ export function dnsRecordSchema(zone: string, checks: RecordChecks = {}) {
                 return;
             }
             if (draft.type === "TXT") {
-                const total = sameType.reduce(
-                    (sum, record) => sum + existingIdentity(record).length,
-                    identity.length
-                );
-                if (total > TXT_NAME_MAX)
-                    fail(
-                        "content",
-                        `The TXT records at ${label} add up to more than ${TXT_NAME_MAX} characters`
-                    );
+                const total = sameType.reduce((sum, record) => sum + existingIdentity(record).length, identity.length);
+                if (total > TXT_NAME_MAX) fail("content", `The TXT records at ${label} add up to more than ${TXT_NAME_MAX} characters`);
             }
         })
         .transform((draft): DnsRecordFields => toFields(draft, zone));
@@ -476,13 +414,7 @@ function toFields(draft: DnsRecordDraft, zone: string): DnsRecordFields {
         case "NS":
             return { type: draft.type, name, content: draft.content, ttl };
         case "MX":
-            return {
-                type: "MX",
-                name,
-                content: draft.content,
-                priority: Number(draft.priority),
-                ttl
-            };
+            return { type: "MX", name, content: draft.content, priority: Number(draft.priority), ttl };
         case "SRV":
             return {
                 type: "SRV",
@@ -514,9 +446,7 @@ export function recordFields(
     draft: DnsRecordDraft,
     zone: string,
     checks: RecordChecks = {}
-):
-    | { ok: true; record: DnsRecordFields }
-    | { ok: false; problems: DraftProblems; missing: (keyof DnsRecordDraft)[] } {
+): { ok: true; record: DnsRecordFields } | { ok: false; problems: DraftProblems; missing: (keyof DnsRecordDraft)[] } {
     const parsed = dnsRecordSchema(zone, checks).safeParse(normalizeDraft(draft));
     if (parsed.success) return { ok: true, record: parsed.data };
     const problems: DraftProblems = {};

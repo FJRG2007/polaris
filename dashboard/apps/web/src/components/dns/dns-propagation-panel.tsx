@@ -10,14 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { PropagationReport } from "@/lib/dns/propagation";
 import { dnsPropagationAction, type DnsScopeRef } from "@/app/(app)/account/domains/dns-actions";
-import {
-    AlertTriangle,
-    CheckCircle2,
-    CircleSlash,
-    Loader2,
-    RefreshCw,
-    XCircle
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleSlash, Loader2, RefreshCw, XCircle } from "lucide-react";
 
 /** How long a record that has not settled waits between checks, and how many
  *  checks it gets before it stops asking on its own. */
@@ -92,35 +85,21 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
                             ? `Checked ${format.time(report.checkedAt)}.`
                             : ""}
                 </span>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="ml-auto"
-                    disabled={busy}
-                    onClick={() => void check()}
-                >
-                    {busy ? (
-                        <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="size-4" />
-                    )}{" "}
-                    Check now
+                <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void check()}>
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Check now
                 </Button>
             </div>
             {error && <p className="text-danger text-xs">{error}</p>}
             {report && report.expected === null && (
                 <p className="text-muted-foreground text-xs">
-                    Proxied through Cloudflare, so resolvers answer with Cloudflare&rsquo;s
-                    addresses rather than the value here. Compared with each other instead.
+                    Proxied through Cloudflare, so resolvers answer with Cloudflare&rsquo;s addresses rather than the
+                    value here. Compared with each other instead.
                 </p>
             )}
             {report && (
                 <ul className="flex flex-col gap-1">
                     {report.resolvers.map((resolver) => (
-                        <li
-                            key={resolver.resolver}
-                            className="flex flex-wrap items-start gap-2 text-xs"
-                        >
+                        <li key={resolver.resolver} className="flex flex-wrap items-start gap-2 text-xs">
                             {resolver.agrees === true ? (
                                 <CheckCircle2 className="text-success mt-px size-3.5 shrink-0" />
                             ) : resolver.agrees === false ? (
@@ -145,8 +124,8 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
             {!busy && report && !report.settled && attempts >= PROPAGATION_ATTEMPTS && (
                 <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
                     <AlertTriangle className="mt-px size-3.5 shrink-0" />
-                    Stopped checking on its own. A resolver keeps an old answer until its cached
-                    copy expires, which can take as long as the old record&rsquo;s TTL.
+                    Stopped checking on its own. A resolver keeps an old answer until its cached copy expires, which
+                    can take as long as the old record&rsquo;s TTL.
                 </p>
             )}
         </div>

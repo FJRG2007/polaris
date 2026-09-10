@@ -36,11 +36,7 @@ function isPrivateIpv4(host: string): boolean {
 
 function isPrivateIpv6(host: string): boolean {
     const address = host.replace(/^\[|\]$/g, "");
-    return (
-        address === "::1" ||
-        /^f[cd][0-9a-f]{2}:/.test(address) ||
-        /^fe[89ab][0-9a-f]:/.test(address)
-    );
+    return address === "::1" || /^f[cd][0-9a-f]{2}:/.test(address) || /^fe[89ab][0-9a-f]:/.test(address);
 }
 
 /**
@@ -79,46 +75,30 @@ export const serverAddressSchema = z
         try {
             url = new URL(text);
         } catch {
-            ctx.addIssue({
-                code: "custom",
-                message: "That is not an address. It looks like https://polaris.example.com."
-            });
+            ctx.addIssue({ code: "custom", message: "That is not an address. It looks like https://polaris.example.com." });
             return z.NEVER;
         }
         if (url.protocol !== "https:" && url.protocol !== "http:") {
-            ctx.addIssue({
-                code: "custom",
-                message: "The address starts with https:// (or http:// on your own network)."
-            });
+            ctx.addIssue({ code: "custom", message: "The address starts with https:// (or http:// on your own network)." });
             return z.NEVER;
         }
         if (!url.hostname || /\s/.test(text)) {
-            ctx.addIssue({
-                code: "custom",
-                message: "That is not an address. It looks like https://polaris.example.com."
-            });
+            ctx.addIssue({ code: "custom", message: "That is not an address. It looks like https://polaris.example.com." });
             return z.NEVER;
         }
         if (url.protocol === "http:" && !isOwnNetworkHost(url.hostname)) {
             ctx.addIssue({
                 code: "custom",
-                message:
-                    "An address on the internet needs https://. http:// works only on your own network."
+                message: "An address on the internet needs https://. http:// works only on your own network."
             });
             return z.NEVER;
         }
         if (url.username || url.password) {
-            ctx.addIssue({
-                code: "custom",
-                message: "Leave the user name and password out of the address."
-            });
+            ctx.addIssue({ code: "custom", message: "Leave the user name and password out of the address." });
             return z.NEVER;
         }
         if (url.pathname !== "/" || url.search || url.hash) {
-            ctx.addIssue({
-                code: "custom",
-                message: `Only the address, without a path: ${url.origin}`
-            });
+            ctx.addIssue({ code: "custom", message: `Only the address, without a path: ${url.origin}` });
             return z.NEVER;
         }
         return url.origin;

@@ -28,9 +28,7 @@ describe("the port a new service publishes", () => {
     });
 
     it("follows the original in a cloned environment", async () => {
-        expect(await read("lib/deploy/environments.ts")).toContain(
-            "publishPort: application.publishPort"
-        );
+        expect(await read("lib/deploy/environments.ts")).toContain("publishPort: application.publishPort");
     });
 
     it("starts what somebody deploys with the headers any app survives", async () => {
@@ -38,12 +36,8 @@ describe("the port a new service publishes", () => {
         // same-site framing. Existing services keep theirs; catalog apps and the
         // templates that another page may embed start with none.
         const service = await read("lib/deploy-service.ts");
-        expect(service).toContain(
-            'edgeConfig: JSON.stringify({ headers: { preset: "recommended" } })'
-        );
-        expect(await read("app/(app)/apps/deploy/actions.ts")).toContain(
-            "safeHeaders: !template?.embedded"
-        );
+        expect(service).toContain('edgeConfig: JSON.stringify({ headers: { preset: "recommended" } })');
+        expect(await read("app/(app)/apps/deploy/actions.ts")).toContain("safeHeaders: !template?.embedded");
         expect(await read("lib/deploy/template-setup.ts")).toContain("safeHeaders: true");
         expect(await read("lib/deploy/migrate.ts")).toContain("safeHeaders: true");
     });

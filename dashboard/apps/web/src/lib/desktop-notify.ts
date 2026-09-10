@@ -77,9 +77,7 @@ export async function notifyDesktop(input: {
     const app = desktopBridge();
     if (app) {
         const shown = await app.notify(input).catch(() => false);
-        return shown
-            ? { close: () => void app.closeNotice(input.tag).catch(() => undefined) }
-            : null;
+        return shown ? { close: () => void app.closeNotice(input.tag).catch(() => undefined) } : null;
     }
     if (!(await mayNotify())) return null;
 

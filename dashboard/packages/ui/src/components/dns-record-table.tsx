@@ -33,10 +33,7 @@ export interface DnsRecordRow {
     readonly note?: ReactNode;
 }
 
-const STATUS: Record<
-    DnsRecordStatus,
-    { label: string; variant: "success" | "neutral" | "warning" }
-> = {
+const STATUS: Record<DnsRecordStatus, { label: string; variant: "success" | "neutral" | "warning" }> = {
     done: { label: "In place", variant: "success" },
     waiting: { label: "Not seen yet", variant: "neutral" },
     conflict: { label: "Points elsewhere", variant: "warning" }
@@ -48,21 +45,10 @@ function StatusIcon({ status }: { status: DnsRecordStatus }) {
     return <Clock className="size-3" aria-hidden />;
 }
 
-export function DnsRecordTable({
-    records,
-    className
-}: {
-    records: readonly DnsRecordRow[];
-    className?: string;
-}) {
+export function DnsRecordTable({ records, className }: { records: readonly DnsRecordRow[]; className?: string }) {
     const withStatus = records.some((record) => record.status);
     return (
-        <div
-            className={cn(
-                "min-w-0 overflow-x-auto rounded-lg border border-border bg-card",
-                className
-            )}
-        >
+        <div className={cn("min-w-0 overflow-x-auto rounded-lg border border-border bg-card", className)}>
             <table className="w-full min-w-[32rem] text-sm">
                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                     <tr>
@@ -84,10 +70,7 @@ export function DnsRecordTable({
                 </thead>
                 <tbody>
                     {records.map((record) => (
-                        <tr
-                            key={`${record.type} ${record.name}`}
-                            className="border-t border-border align-top"
-                        >
+                        <tr key={`${record.type} ${record.name}`} className="border-t border-border align-top">
                             <td className="whitespace-nowrap px-3 py-2 font-mono text-xs font-semibold">
                                 {record.type}
                             </td>
@@ -96,16 +79,10 @@ export function DnsRecordTable({
                                     <code className="min-w-0 break-all font-mono text-xs text-foreground">
                                         {record.name}
                                     </code>
-                                    <CopyButton
-                                        value={record.name}
-                                        label={`name ${record.name}`}
-                                        className="mt-px shrink-0"
-                                    />
+                                    <CopyButton value={record.name} label={`name ${record.name}`} className="mt-px shrink-0" />
                                 </span>
                                 {record.note ? (
-                                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                                        {record.note}
-                                    </span>
+                                    <span className="mt-0.5 block text-xs text-muted-foreground">{record.note}</span>
                                 ) : null}
                             </td>
                             <td className="px-3 py-2">

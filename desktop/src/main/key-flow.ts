@@ -17,14 +17,10 @@ import { canKeepApiKey, forgetApiKey, keepApiKey, readApiKey } from "./api-key-s
 
 const REFUSED = "Polaris refused that key - it may have been revoked or have expired.";
 
-let remembered: { server: string; key: string } | null = null;
+let remembered: { server: string; key: string; } | null = null;
 
 /** The open key form, and every push waiting on it. */
-let asking: {
-    server: string;
-    window: BrowserWindow;
-    waiting: Array<(key: string | null) => void>;
-} | null = null;
+let asking: { server: string; window: BrowserWindow; waiting: Array<(key: string | null) => void>; } | null = null;
 
 function settle(key: string | null): void {
     const current = asking;
@@ -35,11 +31,7 @@ function settle(key: string | null): void {
 /** The key for this Polaris, asking for it when there is none. Null when the
  *  person closed the form, or when `signal` aborted while it was open - the
  *  form then closes unless another push is still waiting on it. */
-export function apiKeyFor(
-    server: string,
-    parent?: BrowserWindow,
-    signal?: AbortSignal
-): Promise<string | null> {
+export function apiKeyFor(server: string, parent?: BrowserWindow, signal?: AbortSignal): Promise<string | null> {
     if (signal?.aborted) return Promise.resolve(null);
     if (remembered?.server === server) return Promise.resolve(remembered.key);
     const kept = readApiKey(server);
@@ -66,12 +58,7 @@ export function apiKeyFor(
         const replaced = asking;
         settle(null);
         replaced?.window.close();
-        const window = openLocalWindow("api-key", {
-            title: "API key - Polaris",
-            width: 520,
-            height: 470,
-            parent
-        });
+        const window = openLocalWindow("api-key", { title: "API key - Polaris", width: 520, height: 470, parent });
         asking = { server, window, waiting: [give] };
         window.on("closed", () => {
             if (asking?.window === window) settle(null);
@@ -85,7 +72,7 @@ export function dropApiKey(): void {
     forgetApiKey();
 }
 
-export function keyFormState(): { server: string; canKeep: boolean } {
+export function keyFormState(): { server: string; canKeep: boolean; } {
     return { server: asking?.server ?? "", canKeep: canKeepApiKey() };
 }
 
@@ -94,17 +81,14 @@ export async function submitApiKey(raw: unknown): Promise<Outcome> {
     const current = asking;
     if (!current) return { ok: false, error: "Nothing is waiting for a key. Close this window." };
     const parsed = apiKeySchema.safeParse(raw);
-    if (!parsed.success)
-        return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an API key." };
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an API key." };
     try {
         await callJson({ server: current.server, key: parsed.data }, "/api/v1/me", meSchema);
     } catch (caught) {
-        if (caught instanceof ApiFailure)
-            return { ok: false, error: caught.status === 401 ? REFUSED : caught.message };
+        if (caught instanceof ApiFailure) return { ok: false, error: caught.status === 401 ? REFUSED : caught.message };
         return { ok: false, error: "Could not check the key with Polaris. Try again." };
     }
-    if (asking !== current)
-        return { ok: false, error: "This form was replaced. Close this window." };
+    if (asking !== current) return { ok: false, error: "This form was replaced. Close this window." };
     remembered = { server: current.server, key: parsed.data };
     keepApiKey(current.server, parsed.data);
     settle(parsed.data);

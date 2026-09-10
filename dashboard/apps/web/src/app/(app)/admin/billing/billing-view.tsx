@@ -36,10 +36,7 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
                         aria-label="Refresh"
                         title="Refresh"
                     >
-                        <RefreshCw
-                            className={refreshing ? "size-4 animate-spin" : "size-4"}
-                            aria-hidden
-                        />
+                        <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
                     </Button>
                 }
             />
@@ -47,26 +44,14 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
             <RatesCard rates={rates} onChange={refresh} />
 
             <section className="flex flex-col gap-4">
-                <parts.StatementToolbar
-                    month={month}
-                    months={months}
-                    exportEndpoint="/api/admin/billing/export"
-                />
+                <parts.StatementToolbar month={month} months={months} exportEndpoint="/api/admin/billing/export" />
                 {error ? <p className="text-danger text-sm">{error}</p> : null}
-                {stale ? (
-                    <p className="text-warning-ink text-sm">
-                        Showing the last statement read. {stale}
-                    </p>
-                ) : null}
+                {stale ? <p className="text-warning-ink text-sm">Showing the last statement read. {stale}</p> : null}
                 <parts.StatementTotals view={data} />
                 <OwnersTable view={data} />
                 <div className="flex flex-col gap-2">
                     <h2 className="text-sm font-medium">Projects</h2>
-                    <parts.StatementTable
-                        view={data}
-                        showOwner
-                        emptyLabel="There are no projects on this Polaris yet."
-                    />
+                    <parts.StatementTable view={data} showOwner emptyLabel="There are no projects on this Polaris yet." />
                 </div>
                 <parts.StatementNotes view={data} />
             </section>
@@ -105,12 +90,9 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                               ))
                             : statement.owners.map((entry) => {
                                   const budget =
-                                      entry.owner.kind === "org"
-                                          ? (view?.budgets?.[entry.owner.id] ?? null)
-                                          : null;
+                                      entry.owner.kind === "org" ? (view?.budgets?.[entry.owner.id] ?? null) : null;
                                   const spent = entry.cost?.total ?? 0;
-                                  const level =
-                                      budget === null ? 0 : core.budgetLevel(spent, budget);
+                                  const level = budget === null ? 0 : core.budgetLevel(spent, budget);
                                   return (
                                       <tr
                                           key={`${entry.owner.kind}:${entry.owner.id}`}
@@ -119,9 +101,7 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                                           <td className="w-full max-w-0 px-2 py-2">
                                               <OwnerName owner={entry.owner} />
                                           </td>
-                                          <td className="px-2 py-2 text-right tabular-nums">
-                                              {entry.projects}
-                                          </td>
+                                          <td className="px-2 py-2 text-right tabular-nums">{entry.projects}</td>
                                           <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
                                               {parts.quantity(entry.usage.cpuHours)} vCPU-h
                                           </td>
@@ -130,11 +110,7 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                                           </td>
                                           <td
                                               className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${
-                                                  level >= 100
-                                                      ? "text-danger"
-                                                      : level >= 80
-                                                        ? "text-warning-ink"
-                                                        : "text-muted-foreground"
+                                                  level >= 100 ? "text-danger" : level >= 80 ? "text-warning-ink" : "text-muted-foreground"
                                               }`}
                                           >
                                               {budget === null
@@ -166,10 +142,7 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
     );
     if (!href) return <span className="flex min-w-0 items-center gap-2">{label}</span>;
     return (
-        <Link
-            href={href}
-            className="hover:text-foreground flex min-w-0 items-center gap-2 font-medium"
-        >
+        <Link href={href} className="hover:text-foreground flex min-w-0 items-center gap-2 font-medium">
             {label}
         </Link>
     );

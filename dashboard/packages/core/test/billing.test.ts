@@ -37,9 +37,7 @@ describe("months", () => {
     });
 
     it("crosses a year", () => {
-        expect(billing.billingMonthRange("2026-12")?.to.toISOString()).toBe(
-            "2027-01-01T00:00:00.000Z"
-        );
+        expect(billing.billingMonthRange("2026-12")?.to.toISOString()).toBe("2027-01-01T00:00:00.000Z");
         expect(billing.billingMonthOf(new Date("2026-12-31T23:59:59Z"))).toBe("2026-12");
     });
 
@@ -57,12 +55,7 @@ describe("months", () => {
         const now = new Date("2026-09-10T12:00:00Z");
         const ninetyDays = 90 * 24 * 3_600_000;
         // The oldest kept hour is 2026-06-12, so June still has some and May none.
-        expect(billing.billingMonthsOffered(now, ninetyDays)).toEqual([
-            "2026-09",
-            "2026-08",
-            "2026-07",
-            "2026-06"
-        ]);
+        expect(billing.billingMonthsOffered(now, ninetyDays)).toEqual(["2026-09", "2026-08", "2026-07", "2026-06"]);
         expect(billing.billingMonthsOffered(now, 0)).toEqual(["2026-09"]);
     });
 });
@@ -98,11 +91,7 @@ describe("metering an hour", () => {
     });
 
     it("takes network out as the bytes the hour sent", () => {
-        const usage = billing.meterHour(
-            appHour({ netTxBytesSum: 3 * GB, samples: 10 }),
-            2,
-            CADENCE
-        );
+        const usage = billing.meterHour(appHour({ netTxBytesSum: 3 * GB, samples: 10 }), 2, CADENCE);
         expect(usage.egressGb).toBeCloseTo(3);
     });
 
@@ -115,11 +104,7 @@ describe("metering an hour", () => {
     });
 
     it("ignores a reading that is not a real amount", () => {
-        const usage = billing.meterHour(
-            appHour({ cpuPercentAvg: -5, memUsedBytesAvg: Number.NaN }),
-            4,
-            CADENCE
-        );
+        const usage = billing.meterHour(appHour({ cpuPercentAvg: -5, memUsedBytesAvg: Number.NaN }), 4, CADENCE);
         expect(usage).toEqual(billing.EMPTY_USAGE);
     });
 });
@@ -171,33 +156,16 @@ describe("a statement", () => {
     const org: billing.BillingOwner = { kind: "org", id: "o1", name: "Acme", handle: "acme" };
     const person: billing.BillingOwner = { kind: "user", id: "u1", name: "Ana", handle: "ana" };
     const projects: billing.MeteredProject[] = [
-        {
-            projectId: "p1",
-            projectName: "Site",
-            owner: org,
-            usage: { ...billing.EMPTY_USAGE, cpuHours: 50 }
-        },
-        {
-            projectId: "p2",
-            projectName: "Api",
-            owner: org,
-            usage: { ...billing.EMPTY_USAGE, cpuHours: 150 }
-        },
-        {
-            projectId: "p3",
-            projectName: "Blog",
-            owner: person,
-            usage: { ...billing.EMPTY_USAGE, cpuHours: 25 }
-        }
+        { projectId: "p1", projectName: "Site", owner: org, usage: { ...billing.EMPTY_USAGE, cpuHours: 50 } },
+        { projectId: "p2", projectName: "Api", owner: org, usage: { ...billing.EMPTY_USAGE, cpuHours: 150 } },
+        { projectId: "p3", projectName: "Blog", owner: person, usage: { ...billing.EMPTY_USAGE, cpuHours: 25 } }
     ];
 
     it("prices each project, heaviest first, and totals them per owner and overall", () => {
         const statement = billing.buildStatement("2026-09", projects, RATES);
         expect(statement.lines.map((line) => line.projectId)).toEqual(["p2", "p1", "p3"]);
         expect(statement.lines[0]?.cost?.total).toBe(3);
-        expect(
-            statement.owners.map((entry) => [entry.owner.name, entry.projects, entry.cost?.total])
-        ).toEqual([
+        expect(statement.owners.map((entry) => [entry.owner.name, entry.projects, entry.cost?.total])).toEqual([
             ["Acme", 2, 4],
             ["Ana", 1, 0.5]
         ]);
@@ -231,78 +199,28 @@ describe("budgets", () => {
 
     it("announces each threshold once a month", () => {
         const month = "2026-09";
+        expect(billing.budgetAlertDue({ spent: 85, budget: 100, month, alertedMonth: null, alertedLevel: 0 })).toBe(80);
+        expect(billing.budgetAlertDue({ spent: 90, budget: 100, month, alertedMonth: month, alertedLevel: 80 })).toBeNull();
+        expect(billing.budgetAlertDue({ spent: 101, budget: 100, month, alertedMonth: month, alertedLevel: 80 })).toBe(100);
         expect(
-            billing.budgetAlertDue({
-                spent: 85,
-                budget: 100,
-                month,
-                alertedMonth: null,
-                alertedLevel: 0
-            })
-        ).toBe(80);
-        expect(
-            billing.budgetAlertDue({
-                spent: 90,
-                budget: 100,
-                month,
-                alertedMonth: month,
-                alertedLevel: 80
-            })
-        ).toBeNull();
-        expect(
-            billing.budgetAlertDue({
-                spent: 101,
-                budget: 100,
-                month,
-                alertedMonth: month,
-                alertedLevel: 80
-            })
-        ).toBe(100);
-        expect(
-            billing.budgetAlertDue({
-                spent: 150,
-                budget: 100,
-                month,
-                alertedMonth: month,
-                alertedLevel: 100
-            })
+            billing.budgetAlertDue({ spent: 150, budget: 100, month, alertedMonth: month, alertedLevel: 100 })
         ).toBeNull();
     });
 
     it("tells a spend that jumps past both only the higher one", () => {
-        expect(
-            billing.budgetAlertDue({
-                spent: 120,
-                budget: 100,
-                month: "2026-09",
-                alertedMonth: null,
-                alertedLevel: 0
-            })
-        ).toBe(100);
+        expect(billing.budgetAlertDue({ spent: 120, budget: 100, month: "2026-09", alertedMonth: null, alertedLevel: 0 })).toBe(
+            100
+        );
     });
 
     it("starts every month with nothing announced", () => {
         expect(
-            billing.budgetAlertDue({
-                spent: 85,
-                budget: 100,
-                month: "2026-10",
-                alertedMonth: "2026-09",
-                alertedLevel: 100
-            })
+            billing.budgetAlertDue({ spent: 85, budget: 100, month: "2026-10", alertedMonth: "2026-09", alertedLevel: 100 })
         ).toBe(80);
     });
 
     it("says nothing below the first threshold", () => {
-        expect(
-            billing.budgetAlertDue({
-                spent: 10,
-                budget: 100,
-                month: "2026-09",
-                alertedMonth: null,
-                alertedLevel: 0
-            })
-        ).toBeNull();
+        expect(billing.budgetAlertDue({ spent: 10, budget: 100, month: "2026-09", alertedMonth: null, alertedLevel: 0 })).toBeNull();
     });
 });
 
@@ -317,9 +235,7 @@ describe("what people type", () => {
     it("leaves a comma after the point as typed, so the amount is refused", () => {
         expect(schemas.normalizeAmount("1.250,00")).toBe("1.250,00");
         expect(schemas.orgBudgetInputSchema.safeParse({ amount: "1.250,00" }).success).toBe(false);
-        expect(schemas.orgBudgetInputSchema.parse({ amount: "1,250.00" })).toEqual({
-            amount: 1250
-        });
+        expect(schemas.orgBudgetInputSchema.parse({ amount: "1,250.00" })).toEqual({ amount: 1250 });
     });
 
     it("takes a price card with blanks for what is not charged", () => {
@@ -330,40 +246,19 @@ describe("what people type", () => {
             storageGbMonth: "0.1",
             egressGb: "  "
         });
-        expect(parsed).toEqual({
-            currency: "USD",
-            cpuHour: 0.02,
-            memoryGbHour: null,
-            storageGbMonth: 0.1,
-            egressGb: null
-        });
+        expect(parsed).toEqual({ currency: "USD", cpuHour: 0.02, memoryGbHour: null, storageGbMonth: 0.1, egressGb: null });
     });
 
     it("refuses a card that charges for nothing, a currency off the list, and a word", () => {
-        const blank = {
-            currency: "EUR",
-            cpuHour: "",
-            memoryGbHour: "",
-            storageGbMonth: "",
-            egressGb: ""
-        };
+        const blank = { currency: "EUR", cpuHour: "", memoryGbHour: "", storageGbMonth: "", egressGb: "" };
         expect(schemas.billingRatesInputSchema.safeParse(blank).success).toBe(false);
-        expect(
-            schemas.billingRatesInputSchema.safeParse({ ...blank, currency: "XYZ", cpuHour: "1" })
-                .success
-        ).toBe(false);
-        expect(
-            schemas.billingRatesInputSchema.safeParse({ ...blank, cpuHour: "cheap" }).success
-        ).toBe(false);
-        expect(schemas.billingRatesInputSchema.safeParse({ ...blank, cpuHour: "-1" }).success).toBe(
-            false
-        );
+        expect(schemas.billingRatesInputSchema.safeParse({ ...blank, currency: "XYZ", cpuHour: "1" }).success).toBe(false);
+        expect(schemas.billingRatesInputSchema.safeParse({ ...blank, cpuHour: "cheap" }).success).toBe(false);
+        expect(schemas.billingRatesInputSchema.safeParse({ ...blank, cpuHour: "-1" }).success).toBe(false);
     });
 
     it("takes a budget above zero and nothing else", () => {
-        expect(schemas.orgBudgetInputSchema.parse({ amount: "1500,5" })).toEqual({
-            amount: 1500.5
-        });
+        expect(schemas.orgBudgetInputSchema.parse({ amount: "1500,5" })).toEqual({ amount: 1500.5 });
         expect(schemas.orgBudgetInputSchema.safeParse({ amount: "0" }).success).toBe(false);
         expect(schemas.orgBudgetInputSchema.safeParse({ amount: "" }).success).toBe(false);
         expect(schemas.orgBudgetInputSchema.safeParse({ amount: "2e9" }).success).toBe(false);
@@ -373,30 +268,17 @@ describe("what people type", () => {
         expect(schemas.storedBillingRates(JSON.stringify(RATES))).toEqual(RATES);
         expect(schemas.storedBillingRates(null)).toBeNull();
         expect(schemas.storedBillingRates("{not json")).toBeNull();
-        expect(
-            schemas.storedBillingRates(JSON.stringify({ ...RATES, currency: "XYZ" }))
-        ).toBeNull();
+        expect(schemas.storedBillingRates(JSON.stringify({ ...RATES, currency: "XYZ" }))).toBeNull();
         expect(
             schemas.storedBillingRates(
-                JSON.stringify({
-                    currency: "EUR",
-                    cpuHour: null,
-                    memoryGbHour: null,
-                    storageGbMonth: null,
-                    egressGb: null
-                })
+                JSON.stringify({ currency: "EUR", cpuHour: null, memoryGbHour: null, storageGbMonth: null, egressGb: null })
             )
         ).toBeNull();
     });
 
     it("reads a month and an export format from a query", () => {
-        expect(schemas.billingExportQuerySchema.parse({ month: "2026-09" })).toEqual({
-            month: "2026-09",
-            format: "csv"
-        });
-        expect(
-            schemas.billingExportQuerySchema.safeParse({ month: "2026-9", format: "csv" }).success
-        ).toBe(false);
+        expect(schemas.billingExportQuerySchema.parse({ month: "2026-09" })).toEqual({ month: "2026-09", format: "csv" });
+        expect(schemas.billingExportQuerySchema.safeParse({ month: "2026-9", format: "csv" }).success).toBe(false);
         expect(schemas.billingExportQuerySchema.safeParse({ format: "xlsx" }).success).toBe(false);
     });
 });

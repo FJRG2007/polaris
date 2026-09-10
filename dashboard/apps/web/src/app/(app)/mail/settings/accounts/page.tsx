@@ -23,10 +23,7 @@ const EDIT_PARAM = z.string().uuid();
 
 /** The shelf a named mailbox is on, when it is this person's. Anybody else's,
  *  or one that does not exist, is nothing - the same answer either way. */
-async function shelfOf(
-    userId: string,
-    accountId: string
-): Promise<{ orgId: string | null } | null> {
+async function shelfOf(userId: string, accountId: string): Promise<{ orgId: string | null } | null> {
     try {
         const account = await ownedAccount(userId, accountId);
         return { orgId: account.orgId };

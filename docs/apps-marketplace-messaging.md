@@ -40,9 +40,8 @@ document is the source of truth; keep it current as phases land.
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
 (scan a QR); Discord bot token; Slack bot token + MESSAGING_SLACK_SIGNING_SECRET
-
-- Events webhook. All channels also need the bridge running (MESSAGING_BRIDGE_URL/
-  TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
++ Events webhook. All channels also need the bridge running (MESSAGING_BRIDGE_URL/
+TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
 
 ## Known follow-ups (deferred, not silently dropped)
 
@@ -81,12 +80,12 @@ phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
 - **All four platforms**, built on a capability-based adapter. WhatsApp ships
   with **two selectable provider backends**; the operator picks per channel,
   told the trade-offs:
-    - `whatsapp-web` - free, unofficial (whatsapp-web.js + Puppeteer). No native
-      buttons (deprecated by WhatsApp) -> rendered as a native Poll or a numbered
-      menu. Ban risk. Heavy (one Chromium per number).
-    - `whatsapp-cloud` - official WhatsApp Business Cloud API (Meta). Paid/tiered.
-      Native interactive buttons + list messages + templates, webhook-based, no
-      browser, no ban risk within ToS.
+  - `whatsapp-web` - free, unofficial (whatsapp-web.js + Puppeteer). No native
+    buttons (deprecated by WhatsApp) -> rendered as a native Poll or a numbered
+    menu. Ban risk. Heavy (one Chromium per number).
+  - `whatsapp-cloud` - official WhatsApp Business Cloud API (Meta). Paid/tiered.
+    Native interactive buttons + list messages + templates, webhook-based, no
+    browser, no ban risk within ToS.
 - **Install reuses Deploy.** Installing an app is a Deploy of a curated compose
   template onto a chosen `DeployTarget` (local hostd or remote SSH host), with
   the same storage/volume picker (server-local volume vs NAS mount). No new
@@ -94,16 +93,16 @@ phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
 
 ## Reuse map (do not reinvent)
 
-| Need                           | Reuse                                                                                                                         |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| Install/run an app             | Deploy: compose templates on `DeployTarget` -> `RuntimePorts` (`lib/deploy/runtime.ts`), engine driver from `@polaris/deploy` |
-| Server + storage picker        | Deploy target picker + `Volume`/NAS `StorageMount` (`deploy-volume-service.ts`)                                               |
-| Store channel/provider secrets | `Integration` envelope-encryption pattern (AES-256-GCM, `encryptedSecret`/`secretNonce`/`secretKeyId`)                        |
-| Catalog-as-code                | `lib/integrations/registry.ts` shape (static typed array + DB row for install state)                                          |
-| Live inbox transport           | Ticket-authed WebSocket sidecar (`ws-server.mjs` + `DeployTicket` + subprotocol token)                                        |
-| Generic app dashboard          | Deploy panels: logs, metrics, terminal, files                                                                                 |
-| Auth on routes/actions         | `requirePermission()` from `lib/session.ts`                                                                                   |
-| Input validation               | Zod schemas in `packages/core/src/schemas/`, shared client+server                                                             |
+| Need | Reuse |
+| --- | --- |
+| Install/run an app | Deploy: compose templates on `DeployTarget` -> `RuntimePorts` (`lib/deploy/runtime.ts`), engine driver from `@polaris/deploy` |
+| Server + storage picker | Deploy target picker + `Volume`/NAS `StorageMount` (`deploy-volume-service.ts`) |
+| Store channel/provider secrets | `Integration` envelope-encryption pattern (AES-256-GCM, `encryptedSecret`/`secretNonce`/`secretKeyId`) |
+| Catalog-as-code | `lib/integrations/registry.ts` shape (static typed array + DB row for install state) |
+| Live inbox transport | Ticket-authed WebSocket sidecar (`ws-server.mjs` + `DeployTicket` + subprotocol token) |
+| Generic app dashboard | Deploy panels: logs, metrics, terminal, files |
+| Auth on routes/actions | `requirePermission()` from `lib/session.ts` |
+| Input validation | Zod schemas in `packages/core/src/schemas/`, shared client+server |
 
 ## Architecture
 
@@ -170,15 +169,15 @@ bridge service (`services/messaging-bridge/src/adapters/`):
 
 Capability matrix:
 
-| Platform / provider       | Native buttons        | Native selects    | Poll | Runtime        | Cost          |
-| ------------------------- | --------------------- | ----------------- | ---- | -------------- | ------------- |
-| Telegram (Bot API)        | yes                   | yes               | yes  | no browser     | free          |
-| Discord (bot)             | yes                   | yes               | n/a  | gateway        | free          |
-| Discord `discord-webhook` | no (-> numbered text) | no                | n/a  | send-only HTTP | free          |
-| Slack (Block Kit)         | yes                   | yes               | n/a  | Events API     | free          |
-| Slack `slack-webhook`     | no (-> numbered text) | no                | n/a  | send-only HTTP | free          |
-| WhatsApp `whatsapp-web`   | no (-> Poll/menu)     | no (-> Poll/menu) | yes  | Puppeteer      | free + number |
-| WhatsApp `whatsapp-cloud` | yes                   | yes (list)        | n/a  | webhook        | paid + number |
+| Platform / provider | Native buttons | Native selects | Poll | Runtime | Cost |
+| --- | --- | --- | --- | --- | --- |
+| Telegram (Bot API) | yes | yes | yes | no browser | free |
+| Discord (bot) | yes | yes | n/a | gateway | free |
+| Discord `discord-webhook` | no (-> numbered text) | no | n/a | send-only HTTP | free |
+| Slack (Block Kit) | yes | yes | n/a | Events API | free |
+| Slack `slack-webhook` | no (-> numbered text) | no | n/a | send-only HTTP | free |
+| WhatsApp `whatsapp-web` | no (-> Poll/menu) | no (-> Poll/menu) | yes | Puppeteer | free + number |
+| WhatsApp `whatsapp-cloud` | yes | yes (list) | n/a | webhook | paid + number |
 
 The `discord-webhook` and `slack-webhook` providers are send-only incoming-webhook
 adapters (no bot, no gateway/socket, so no receive) for one-way alerts to a channel

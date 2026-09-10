@@ -32,13 +32,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { buildArgs, dockerEnv, dockerReady, run } from "./docker";
 import { dialog, type BrowserWindow, type WebContents } from "electron";
 import { PUSH_PLATFORMS, pushChoice, rememberPushChoice, type PushPlatform } from "./settings";
-import {
-    CHANNELS,
-    type Outcome,
-    type PushEvent,
-    type PushPhase,
-    type PushState
-} from "@/shared/bridge";
+import { CHANNELS, type Outcome, type PushEvent, type PushPhase, type PushState } from "@/shared/bridge";
 import {
     ApiFailure,
     call,
@@ -91,11 +85,7 @@ class Push {
         const choice = pushChoice(target.serviceId);
         this.folder = choice?.folder ?? "";
         this.platform = choice?.platform ?? "";
-        this.window = openLocalWindow("push", {
-            title: `Push ${target.name} - Polaris`,
-            width: 760,
-            height: 620
-        });
+        this.window = openLocalWindow("push", { title: `Push ${target.name} - Polaris`, width: 760, height: 620 });
         this.window.on("closed", () => {
             this.abort?.abort();
             pushes.delete(target.serviceId);
@@ -131,11 +121,7 @@ class Push {
         this.send({ kind: "state", state: this.state() });
     }
 
-    private finish(
-        ok: boolean,
-        message: string,
-        phase: PushPhase = ok ? "done" : "failed"
-    ): Outcome {
+    private finish(ok: boolean, message: string, phase: PushPhase = ok ? "done" : "failed"): Outcome {
         this.abort = null;
         this.enter(phase);
         this.send({ kind: "result", ok, message });
@@ -187,8 +173,7 @@ class Push {
 
             const key = await apiKeyFor(server, this.window, abort.signal);
             if (abort.signal.aborted) return this.finish(false, "Cancelled.", "cancelled");
-            if (!key)
-                return this.finish(false, "Pushing needs an API key. Nothing was built.", "ready");
+            if (!key) return this.finish(false, "Pushing needs an API key. Nothing was built.", "ready");
             const caller: Caller = { server, key };
             const { repository } = await callJson(
                 caller,
@@ -204,8 +189,7 @@ class Push {
                 signal: abort.signal,
                 onLine: (text) => this.line(text)
             });
-            if (built.code !== 0)
-                return this.finish(false, "The build failed. The lines above say why.");
+            if (built.code !== 0) return this.finish(false, "The build failed. The lines above say why.");
 
             this.enter("saving");
             scratch = await mkdtemp(join(tmpdir(), "polaris-push-"));
@@ -221,11 +205,7 @@ class Push {
             this.line(`Deployment ${deploymentId} started.`);
             const final = await this.follow(caller, deploymentId, abort.signal);
             if (!final) {
-                return this.finish(
-                    true,
-                    "Still deploying after hours of following. It carries on in Polaris.",
-                    "cancelled"
-                );
+                return this.finish(true, "Still deploying after hours of following. It carries on in Polaris.", "cancelled");
             }
             const outcome = deployOutcome(this.target.name, final.status, final.error);
             showNotice({
@@ -235,18 +215,11 @@ class Push {
                 once: true,
                 onClick: () => this.host.showPolaris(this.target.href)
             });
-            return this.finish(
-                outcome.ok,
-                outcome.ok ? outcome.body : `${outcome.title}. ${outcome.body}`
-            );
+            return this.finish(outcome.ok, outcome.ok ? outcome.body : `${outcome.title}. ${outcome.body}`);
         } catch (caught) {
             if (abort.signal.aborted) {
                 return this.phase === "deploying"
-                    ? this.finish(
-                          true,
-                          "Stopped following. The deployment carries on in Polaris.",
-                          "cancelled"
-                      )
+                    ? this.finish(true, "Stopped following. The deployment carries on in Polaris.", "cancelled")
                     : this.finish(false, "Cancelled.", "cancelled");
             }
             if (caught instanceof ApiFailure) {
@@ -261,12 +234,7 @@ class Push {
     }
 
     /** Send the archive, answering the deployment it started. */
-    private async upload(
-        caller: Caller,
-        archive: string,
-        meta: CommitMeta | null,
-        signal: AbortSignal
-    ): Promise<string> {
+    private async upload(caller: Caller, archive: string, meta: CommitMeta | null, signal: AbortSignal): Promise<string> {
         const total = (await stat(archive)).size;
         let sent = 0;
         let reported = 0;
@@ -285,19 +253,9 @@ class Push {
             headers["x-polaris-message"] = encodeURIComponent(meta.message);
         }
         this.line(`Sending ${formatBytes(total)}...`);
-        const answer = await sendFile(
-            caller,
-            `/api/v1/deploy/services/${this.target.serviceId}/image`,
-            file,
-            headers,
-            signal
-        );
+        const answer = await sendFile(caller, `/api/v1/deploy/services/${this.target.serviceId}/image`, file, headers, signal);
         const parsed = startedSchema.safeParse(answer);
-        if (!parsed.success)
-            throw new ApiFailure(
-                202,
-                "Polaris took the image but did not say which deployment it started."
-            );
+        if (!parsed.success) throw new ApiFailure(202, "Polaris took the image but did not say which deployment it started.");
         return parsed.data.deploymentId;
     }
 
@@ -307,22 +265,14 @@ class Push {
      * follow this window allows. Polaris ends one follow after half an hour; the
      * next picks up at the byte the last one reached.
      */
-    private async follow(
-        caller: Caller,
-        deploymentId: string,
-        signal: AbortSignal
-    ): Promise<DeploymentState | null> {
+    private async follow(caller: Caller, deploymentId: string, signal: AbortSignal): Promise<DeploymentState | null> {
         let offset = 0;
         let pending = "";
         const decoder = new TextDecoder();
         for (let round = 0; round < MAX_FOLLOWS; round += 1) {
-            const response = await call(
-                caller,
-                `/api/v1/deploy/deployments/${deploymentId}?follow=1&offset=${offset}`,
-                {
-                    signal
-                }
-            );
+            const response = await call(caller, `/api/v1/deploy/deployments/${deploymentId}?follow=1&offset=${offset}`, {
+                signal
+            });
             const reader = response.body?.getReader();
             while (reader) {
                 const { done, value } = await reader.read();
@@ -332,14 +282,9 @@ class Push {
                 pending = lines.pop() ?? "";
                 for (const text of lines) this.line(text);
             }
-            const state = await callJson(
-                caller,
-                `/api/v1/deploy/deployments/${deploymentId}?tail=1`,
-                deploymentSchema,
-                {
-                    signal
-                }
-            );
+            const state = await callJson(caller, `/api/v1/deploy/deployments/${deploymentId}?tail=1`, deploymentSchema, {
+                signal
+            });
             if (state.done) {
                 if (pending) this.line(pending);
                 return state;
@@ -362,10 +307,7 @@ async function commitOf(folder: string): Promise<CommitMeta | null> {
         const message = await run("git", ["-C", folder, "log", "-1", "--pretty=%s"]);
         const head = sha.tail.at(-1)?.trim() ?? "";
         if (sha.code !== 0 || !/^[0-9a-f]{40,64}$/.test(head)) return null;
-        return {
-            sha: head,
-            message: (message.code === 0 ? (message.tail.at(-1) ?? "") : "").slice(0, 400)
-        };
+        return { sha: head, message: (message.code === 0 ? (message.tail.at(-1) ?? "") : "").slice(0, 400) };
     } catch {
         return null;
     }
@@ -389,12 +331,7 @@ async function saveImage(image: string, archive: string, signal: AbortSignal): P
     });
     const [code] = await Promise.all([
         exited,
-        pipeline(
-            child.stdout,
-            createGzip({ level: 1 }),
-            createWriteStream(archive, { mode: 0o600 }),
-            { signal }
-        )
+        pipeline(child.stdout, createGzip({ level: 1 }), createWriteStream(archive, { mode: 0o600 }), { signal })
     ]);
     if (code !== 0) {
         throw new Error(`docker save exited with ${code}: ${said.trim().split("\n").at(-1) ?? ""}`);
@@ -422,7 +359,5 @@ export function pushOf(sender: WebContents): Push | null {
 
 /** Whether any push is building or sending, so quitting can ask first. */
 export function pushRunning(): boolean {
-    return [...pushes.values()].some((push) =>
-        ["checking", "building", "saving", "sending"].includes(push.phase)
-    );
+    return [...pushes.values()].some((push) => ["checking", "building", "saving", "sending"].includes(push.phase));
 }
