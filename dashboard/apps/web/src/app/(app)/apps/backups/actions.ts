@@ -78,6 +78,13 @@ export async function setPlanAction(resourceId: string, planId: string | null): 
     const user = await requireAdmin();
     try {
         await manage.setResourcePlan(user.id, resourceId, planId);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.plan.assign",
+            targetType: "backup",
+            targetId: resourceId,
+            metadata: { planId }
+        });
         revalidatePath("/apps/backups");
         return {};
     } catch (error) {
@@ -89,6 +96,12 @@ export async function setPausedAction(resourceId: string, paused: boolean): Prom
     const user = await requireAdmin();
     try {
         await manage.setResourcePaused(user.id, resourceId, paused);
+        await recordAudit({
+            actorId: user.id,
+            action: paused ? "backup.pause" : "backup.resume",
+            targetType: "backup",
+            targetId: resourceId
+        });
         revalidatePath("/apps/backups");
         return {};
     } catch (error) {
@@ -136,6 +149,13 @@ export async function savePlanAction(input: unknown, planId?: string): Promise<R
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those plan details are not valid" };
     try {
         const saved = await manage.savePlan(user.id, parsed.data, planId);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.plan.save",
+            targetType: "backup-plan",
+            targetId: saved.id,
+            metadata: { every: parsed.data.every, keepLast: parsed.data.keepLast, keepDays: parsed.data.keepDays }
+        });
         revalidatePath("/apps/backups");
         return saved;
     } catch (error) {
@@ -147,6 +167,7 @@ export async function deletePlanAction(planId: string): Promise<Result> {
     const user = await requireAdmin();
     try {
         await manage.deletePlan(user.id, planId);
+        await recordAudit({ actorId: user.id, action: "backup.plan.delete", targetType: "backup-plan", targetId: planId });
         revalidatePath("/apps/backups");
         return {};
     } catch (error) {
@@ -162,6 +183,13 @@ export async function createDestinationAction(input: unknown): Promise<Result<{ 
     }
     try {
         const created = await manage.createDestination(user.id, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.create",
+            targetType: "backup-destination",
+            targetId: created.id,
+            metadata: { kind: parsed.data.kind }
+        });
         revalidatePath("/apps/backups");
         return created;
     } catch (error) {
@@ -173,6 +201,12 @@ export async function deleteDestinationAction(destinationId: string): Promise<Re
     const user = await requireAdmin();
     try {
         await manage.deleteDestination(user.id, destinationId);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.delete",
+            targetType: "backup-destination",
+            targetId: destinationId
+        });
         revalidatePath("/apps/backups");
         return {};
     } catch (error) {
