@@ -18,6 +18,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ProjectWebhooks } from "@/components/project-webhooks";
 import type { BreakdownMetric } from "@/lib/watch/breakdown-shape";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
+import { alarmUnit, describeThreshold, METRIC_LABEL, type AlarmMetric } from "@/lib/watch/alarm-metrics";
 import {
     BREAKDOWN_LABELS,
     MetricBreakdownDialog,
@@ -162,10 +163,14 @@ export function WatchSubjectDetail({
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-medium">{alarm.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {alarm.metric}
-                                            {alarm.threshold != null
-                                                ? ` ${alarm.operator === "lt" ? "<" : ">"} ${alarm.threshold}%`
-                                                : ""}
+                                            {alarm.threshold != null && alarmUnit(alarm.metric, alarm.targetType)
+                                                ? describeThreshold(
+                                                      alarm.metric,
+                                                      alarm.targetType,
+                                                      alarm.operator,
+                                                      alarm.threshold
+                                                  )
+                                                : (METRIC_LABEL[alarm.metric as AlarmMetric] ?? alarm.metric)}
                                             {alarm.lastEvaluatedAt
                                                 ? ` - checked ${display.dateTime(alarm.lastEvaluatedAt)}`
                                                 : " - not evaluated yet"}

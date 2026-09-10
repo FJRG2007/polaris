@@ -87,6 +87,20 @@ export function counterAdvance(values: (bigint | null)[]): bigint | null {
     return total;
 }
 
+/**
+ * A counter turned into a rate, against the gap it was measured over.
+ *
+ * Null rather than zero wherever it cannot be worked out: the first reading in a
+ * window has nothing before it, and a gap with no time in it has no rate. A fall
+ * means the container restarted and began counting again, so the reading itself
+ * is what it has moved since - which is the honest floor, and never negative.
+ */
+export function counterRate(previous: bigint | null, current: bigint | null, elapsedMs: number): number | null {
+    if (current == null || previous == null || elapsedMs <= 0) return null;
+    const moved = current >= previous ? current - previous : current;
+    return Math.round(Number(moved) / (elapsedMs / 1000));
+}
+
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 

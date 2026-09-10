@@ -4662,11 +4662,13 @@ model Alarm {
     // application | domain | host
     targetType      String
     targetId        String    @db.Uuid
-    // cpu | memory | http | service - http/service are reachability (no threshold).
+    // cpu | memory | disk | network_in | network_out | http | service -
+    // http/service are reachability (no threshold). See lib/watch/alarm-metrics.
     metric          String
     // gt | lt, for threshold metrics.
     operator        String    @default("gt")
-    // Threshold as a percent for cpu/memory; null for reachability alarms.
+    // Threshold in the metric's unit: a percent for cpu/memory and a server's
+    // disk, GB for a service's disk, MB/s for network; null for reachability.
     threshold       Float?
     // Consecutive breaching evaluations before firing, to ride out blips.
     forPeriods      Int       @default(2)

@@ -16,6 +16,7 @@
 
 import { prisma } from "@polaris/db";
 import {
+    counterRate,
     LOCAL_HOST_SUBJECT,
     MAX_POINTS,
     RAW_MAX_SPAN_MS,
@@ -110,20 +111,6 @@ function roundInt(value: number | null): number | null {
 }
 
 /**
- * A counter turned into a rate, against the gap it was measured over.
- *
- * Null rather than zero wherever it cannot be worked out: the first reading in a
- * window has nothing before it, and a gap with no time in it has no rate. A fall
- * means the container restarted and began counting again, so the reading itself
- * is what it has moved since - which is the honest floor, and never negative.
- */
-function ratePerSecond(previous: bigint | null, current: bigint | null, elapsedMs: number): number | null {
-    if (current == null || previous == null || elapsedMs <= 0) return null;
-    const moved = current >= previous ? current - previous : current;
-    return Math.round(Number(moved) / (elapsedMs / 1000));
-}
-
-/**
  * The downsampled series for a subject over [from, to]. Returns null when the
  * subject does not belong to the owner (so the route answers 404, not 200-empty).
  */
@@ -167,8 +154,8 @@ async function rawSeries(input: {
             memTotalBytes: num(row.memTotalBytes),
             diskUsedBytes: num(row.diskUsedBytes),
             diskTotalBytes: num(row.diskTotalBytes),
-            netRxBytesPerSecond: ratePerSecond(before?.netRxBytes ?? null, row.netRxBytes, elapsed),
-            netTxBytesPerSecond: ratePerSecond(before?.netTxBytes ?? null, row.netTxBytes, elapsed)
+            netRxBytesPerSecond: counterRate(before?.netRxBytes ?? null, row.netRxBytes, elapsed),
+            netTxBytesPerSecond: counterRate(before?.netTxBytes ?? null, row.netTxBytes, elapsed)
         };
     });
     return downsample(points, MAX_POINTS);

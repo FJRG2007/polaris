@@ -1,7 +1,8 @@
 /**
  * Watch alarm evaluator. On an interval, evaluates each enabled alarm against
- * recent metrics (CPU/memory from MetricSample) or reachability (domain health,
- * app running state), tracks a breach streak so a blip does not fire, and on a
+ * recent metrics (CPU, memory, disk and network from MetricSample, for a service
+ * or a server) or reachability (domain health, app running state), tracks a
+ * breach streak so a blip does not fire, and on a
  * state transition (ok <-> alarm) records an AlarmEvent, raises the alert through
  * the account's notification rules, and optionally messages a channel. Same
  * poller shape as auto-deploy-poller: idempotent start, unref'd interval,
@@ -11,10 +12,24 @@
 import { prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
+import { COLLECT_TICK_MS, LOCAL_HOST_SUBJECT, STORAGE_EVERY_TICKS } from "@/lib/metrics-shared";
+import { isLocalMachine, localMachineIdentity, type LocalMachineIdentity } from "@/lib/local-machine";
+import {
+    alarmUnit,
+    breaches,
+    formatAlarmValue,
+    formatThreshold,
+    METRIC_LABEL,
+    sampleValue,
+    volumeDiskGb
+} from "./alarm-metrics";
 
 const INTERVAL_MS = Number(process.env.POLARIS_ALARM_POLL_MS) || 60_000;
 const FIRST_PASS_MS = 25_000;
 const RECENT_SAMPLE_MS = 3 * 60_000;
+/** Volumes are measured on the slower storage cadence; three of those missed in a
+ *  row is a volume nothing can read, rather than one between measurements. */
+const RECENT_VOLUME_MS = 3 * STORAGE_EVERY_TICKS * COLLECT_TICK_MS;
 
 let started = false;
 
@@ -42,7 +57,7 @@ interface Evaluation {
     insufficient: boolean;
 }
 
-async function evaluateCondition(alarm: AlarmRow): Promise<Evaluation> {
+async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise<Evaluation> {
     // Domain reachability (or an app's http metric pointed at a domain id).
     if (alarm.targetType === "domain" || alarm.metric === "http") {
         const domain = await prisma.domain.findFirst({
@@ -76,32 +91,90 @@ async function evaluateCondition(alarm: AlarmRow): Promise<Evaluation> {
         return { breach: !recent, value: null, detail: recent ? "running" : "no recent metrics (down?)", insufficient: false };
     }
 
-    // CPU / memory threshold from the latest sample.
-    const sample = await prisma.metricSample.findFirst({
-        where: { subjectType: "app", subjectId: alarm.targetId },
-        orderBy: { ts: "desc" },
-        select: { ts: true, cpuPercent: true, memUsedBytes: true, memTotalBytes: true }
-    });
-    if (sample === null || Date.now() - sample.ts.getTime() >= RECENT_SAMPLE_MS) {
-        return { breach: false, value: null, detail: "no recent metrics", insufficient: true };
-    }
-    let value: number | null;
-    if (alarm.metric === "cpu") {
-        value = sample.cpuPercent ?? null;
-    } else {
-        const used = sample.memUsedBytes;
-        const total = sample.memTotalBytes;
-        value = used !== null && total !== null && total > 0n ? (Number(used) / Number(total)) * 100 : null;
-    }
-    if (value === null) return { breach: false, value: null, detail: "metric unavailable", insufficient: true };
+    const unit = alarmUnit(alarm.metric, alarm.targetType);
+    if (unit === null) return { breach: false, value: null, detail: "unknown metric", insufficient: true };
+
+    // A service's disk is what its volumes hold, measured as subjects of their own.
+    const value =
+        alarm.metric === "disk" && alarm.targetType === "application"
+            ? await serviceDiskGb(alarm.targetId)
+            : await subjectValue(alarm, context);
+    if (typeof value === "string") return { breach: false, value: null, detail: value, insufficient: true };
+
     const threshold = alarm.threshold ?? 0;
-    const breach = alarm.operator === "lt" ? value < threshold : value > threshold;
+    const label = METRIC_LABEL[alarm.metric as keyof typeof METRIC_LABEL] ?? alarm.metric;
     return {
-        breach,
+        breach: breaches(value, alarm.operator, threshold),
         value,
-        detail: `${alarm.metric} ${value.toFixed(1)}% (threshold ${alarm.operator} ${threshold})`,
+        detail: `${label} ${formatAlarmValue(value, unit)} (threshold ${formatThreshold(alarm.operator, threshold, unit)})`,
         insufficient: false
     };
+}
+
+/** What one pass knows once rather than per alarm. */
+interface PassContext {
+    identity: LocalMachineIdentity | null;
+}
+
+/**
+ * The metric subject an alarm reads: the service itself, or the server - where
+ * the machine Polaris runs on is filed under its reserved subject whichever way
+ * the alarm names it, since that is where its samples are.
+ */
+async function subjectOf(alarm: AlarmRow, context: PassContext): Promise<{ type: "app" | "host"; id: string }> {
+    if (alarm.targetType !== "host") return { type: "app", id: alarm.targetId };
+    if (alarm.targetId === LOCAL_HOST_SUBJECT) return { type: "host", id: LOCAL_HOST_SUBJECT };
+    const host = await prisma.host.findFirst({
+        where: { id: alarm.targetId },
+        select: { id: true, dockerId: true, address: true }
+    });
+    context.identity ??= await localMachineIdentity().catch(() => null);
+    const local = host && context.identity ? isLocalMachine(host, context.identity) : false;
+    return { type: "host", id: local ? LOCAL_HOST_SUBJECT : alarm.targetId };
+}
+
+/** The alarm's metric from its subject's latest sample, or why there is none. */
+async function subjectValue(alarm: AlarmRow, context: PassContext): Promise<number | string> {
+    const subject = await subjectOf(alarm, context);
+    // The newest two: a rate is worked out between them.
+    const [latest, previous] = await prisma.metricSample.findMany({
+        where: { subjectType: subject.type, subjectId: subject.id },
+        orderBy: { ts: "desc" },
+        take: 2,
+        select: {
+            ts: true,
+            cpuPercent: true,
+            memUsedBytes: true,
+            memTotalBytes: true,
+            diskUsedBytes: true,
+            diskTotalBytes: true,
+            netRxBytes: true,
+            netTxBytes: true
+        }
+    });
+    if (!latest || Date.now() - latest.ts.getTime() >= RECENT_SAMPLE_MS) return "no recent metrics";
+    const value = sampleValue(alarm.metric, latest, previous ?? null);
+    if (value !== null) return value;
+    if (alarm.metric === "disk") return "this server's disk is not measured";
+    return "metric unavailable";
+}
+
+/** What a service's volumes hold, from each one's latest measurement. */
+async function serviceDiskGb(applicationId: string): Promise<number | string> {
+    const volumes = await prisma.volume.findMany({ where: { applicationId }, select: { id: true } });
+    if (volumes.length === 0) return "the service has no volumes";
+    const since = new Date(Date.now() - RECENT_VOLUME_MS);
+    const readings = await Promise.all(
+        volumes.map((volume) =>
+            prisma.metricSample.findFirst({
+                where: { subjectType: "volume", subjectId: volume.id, ts: { gte: since } },
+                orderBy: { ts: "desc" },
+                select: { diskUsedBytes: true }
+            })
+        )
+    );
+    const value = volumeDiskGb(readings.filter((reading) => reading !== null));
+    return value === null ? "no recent volume measurement" : value;
 }
 
 async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved", detail: string): Promise<void> {
@@ -127,8 +200,8 @@ async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved",
     }
 }
 
-async function evaluateOne(alarm: AlarmRow): Promise<void> {
-    const result = await evaluateCondition(alarm);
+async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<void> {
+    const result = await evaluateCondition(alarm, context);
     let state = alarm.state;
     let streak = alarm.breachStreak;
     let transition: "triggered" | "resolved" | null = null;
@@ -164,9 +237,10 @@ async function evaluateOne(alarm: AlarmRow): Promise<void> {
 
 export async function evaluateAlarms(): Promise<void> {
     const alarms = await prisma.alarm.findMany({ where: { enabled: true } });
+    const context: PassContext = { identity: null };
     for (const alarm of alarms) {
         try {
-            await evaluateOne(alarm);
+            await evaluateOne(alarm, context);
         } catch (error) {
             console.error("polaris: alarm evaluation failed:", error);
         }
