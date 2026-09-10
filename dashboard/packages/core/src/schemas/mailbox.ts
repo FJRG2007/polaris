@@ -35,6 +35,19 @@ export function normalizeMailName(value: string): string {
         .trim();
 }
 
+/**
+ * The shape of an address, for every validator in Polaris that reads one.
+ *
+ * One @, a local part of the characters an unquoted mailbox may use, and a
+ * domain made of host labels with a dot in it. Letters in any script are
+ * allowed on both sides, since internationalized mailboxes are real. What it
+ * refuses is what no mailbox can have unquoted - a comma, a semicolon,
+ * brackets, a space - which is exactly what a slip of the finger leaves
+ * behind: `ana@example.com,` is a typo, not an address.
+ */
+export const MAIL_ADDRESS_PATTERN =
+    /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~.-]+@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}-]{2,}$/u;
+
 export const mailAddress = z
     .string()
     .transform(normalizeMailAddress)
@@ -43,10 +56,7 @@ export const mailAddress = z
             .string()
             .min(3, "That is not an email address")
             .max(320)
-            // One @ with something either side, no spaces, and a dot in the
-            // domain. Everything a mailbox must have and nothing a real one
-            // would be refused for.
-            .regex(/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/, "That is not an email address")
+            .regex(MAIL_ADDRESS_PATTERN, "That is not an email address")
     );
 
 export const mailDisplayName = z.string().transform(normalizeMailName).pipe(z.string().max(120));

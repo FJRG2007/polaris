@@ -23,12 +23,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { mailHost, mailPort } from "@polaris/core";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailDiscovery } from "@/lib/mailbox/autoconfig";
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
-import { addAccountAction, discoverAction } from "@/app/(app)/mail/actions";
 import { addressState } from "@/app/(app)/mail/address-state";
+import { addAccountAction, discoverAction } from "@/app/(app)/mail/actions";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     Button,
     Dialog,
@@ -253,10 +254,24 @@ export function ConnectMailboxDialog({
         });
     }
 
+    // Checked as they are typed, with the server's own rules: a guessed or
+    // edited server that would be refused keeps the button off and says why,
+    // rather than the refusal arriving after the password.
+    const serversProblem = authorizable
+        ? null
+        : (serverProblem(servers.imapHost, servers.imapPort) ??
+          serverProblem(servers.smtpHost, servers.smtpPort));
+    // A server that would be refused is shown, so the disabled button has its
+    // reason on screen rather than behind a closed disclosure.
+    const serversBroken = Boolean(discovery) && serversProblem !== null;
+    useEffect(() => {
+        if (serversBroken) setShowServers(true);
+    }, [serversBroken]);
     const ready =
         valid &&
         !already &&
         Boolean(discovery) &&
+        serversProblem === null &&
         (authorizable ? Boolean(chosenConnection) : password.length > 0);
 
     return (
@@ -560,6 +575,17 @@ function lookupSentence(
     }
 }
 
+/**
+ * What is wrong with one server's host and port, read with the schemas the
+ * server will read them with. Null when both would be accepted.
+ */
+export function serverProblem(host: string, port: string): string | null {
+    const hostCheck = mailHost.safeParse(host);
+    if (!hostCheck.success) return hostCheck.error.issues[0]?.message ?? "That is not a server name";
+    if (!mailPort.safeParse(port).success) return "The port is a number from 1 to 65535";
+    return null;
+}
+
 function ServerFields({
     legend,
     host,
@@ -577,6 +603,9 @@ function ServerFields({
     names: { host: string; port: string; security: string };
     onChange: (next: Record<string, string>) => void;
 }) {
+    const problem = serverProblem(host, port);
+    const hostBad = invalid || (problem !== null && !mailHost.safeParse(host).success);
+    const portBad = problem !== null && !hostBad;
     return (
         <fieldset className="space-y-2 rounded-md border border-border p-2">
             <legend className="px-1 text-[12px] text-muted-foreground">{legend}</legend>
@@ -585,7 +614,7 @@ function ServerFields({
                     className="flex-1"
                     value={host}
                     aria-label={`${legend} server`}
-                    aria-invalid={invalid ? true : undefined}
+                    aria-invalid={hostBad ? true : undefined}
                     onChange={(event) => onChange({ [names.host]: event.target.value })}
                 />
                 <Input
@@ -593,9 +622,11 @@ function ServerFields({
                     value={port}
                     inputMode="numeric"
                     aria-label={`${legend} port`}
+                    aria-invalid={portBad ? true : undefined}
                     onChange={(event) => onChange({ [names.port]: event.target.value })}
                 />
             </div>
+            {problem ? <p className="text-[12px] text-danger">{problem}</p> : null}
             <Select
                 value={security}
                 onValueChange={(next) => onChange({ [names.security]: next })}

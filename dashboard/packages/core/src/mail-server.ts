@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { normalizeDeployHostname } from "./edge-config.js";
+import { MAIL_ADDRESS_PATTERN } from "./schemas/mailbox.js";
 
 /** A plain host or domain name: what the edge accepts, with no wildcard. */
 function isHostname(value: string): boolean {
@@ -212,7 +213,7 @@ const address = z
     .trim()
     .toLowerCase()
     .max(320)
-    .regex(/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/, "That is not an email address");
+    .regex(MAIL_ADDRESS_PATTERN, "That is not an email address");
 
 /** Why a mailbox password that is its own address is refused, in the words the
  *  dialog and the server both use (see `passwordMatchesIdentity`). */

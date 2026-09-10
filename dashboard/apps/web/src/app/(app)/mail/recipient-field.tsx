@@ -215,9 +215,8 @@ export function RecipientField({
     );
 }
 
-/** The same shape the schema enforces on the server: one @ with something either
- *  side, no spaces, and a dot in the domain. Deliberately not a strict RFC
- *  parser - real mailboxes exist that one refuses. */
+/** Whether the server will take it: the shared address schema itself, so a chip
+ *  the field accepts is never one the send refuses. */
 function looksLikeAddress(value: string): boolean {
-    return /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(value.trim());
+    return core.mailAddress.safeParse(value).success;
 }

@@ -17,7 +17,8 @@ import {
     isReservedUsername,
     usernameChangeRefusal,
     RESERVED_USERNAME_MESSAGE,
-    USERNAME_COOLDOWN_DAYS
+    USERNAME_COOLDOWN_DAYS,
+    MAIL_ADDRESS_PATTERN
 } from "@polaris/core";
 
 /** Read the credential password hash for a user, or null if they have none. */
@@ -181,7 +182,7 @@ function normalizeEmail(value: string): string {
 }
 
 function isEmail(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    return MAIL_ADDRESS_PATTERN.test(value);
 }
 
 /**
