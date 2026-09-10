@@ -90,25 +90,35 @@ async function fill(handle: FileHandle, buffer: Buffer, from: number): Promise<n
  * written yet. A caller cannot act on the difference.
  */
 export async function readEdgeLogTail(bytes = EDGE_LOG_WINDOW_BYTES): Promise<string> {
+    return (await readEdgeLogWindow(bytes)).text;
+}
+
+/**
+ * `readEdgeLogTail`, and whether the log holds more than was read: a window cut
+ * at `bytes` covers less time because the log is busy, not because it is new.
+ */
+export async function readEdgeLogWindow(
+    bytes = EDGE_LOG_WINDOW_BYTES
+): Promise<{ readonly text: string; readonly truncated: boolean }> {
     let handle: FileHandle | null = null;
     try {
         handle = await open(accessLog(), "r");
         const { size } = await handle.stat();
         const want = Math.min(bytes, size);
-        if (want <= 0) return "";
+        if (want <= 0) return { text: "", truncated: false };
         const from = size - want;
         const buffer = Buffer.alloc(want);
         const filled = await fill(handle, buffer, from);
-        if (filled <= 0) return "";
+        if (filled <= 0) return { text: "", truncated: false };
         const text = buffer.toString("utf8", 0, filled);
-        if (from === 0) return text;
+        if (from === 0) return { text, truncated: false };
         // A read that started mid-file started mid-line, and half a JSON object
         // is not something to hand a parser. A window with no newline in it at
         // all is one line's middle and nothing else, so it is all dropped.
         const newline = text.indexOf("\n");
-        return newline < 0 ? "" : text.slice(newline + 1);
+        return { text: newline < 0 ? "" : text.slice(newline + 1), truncated: true };
     } catch {
-        return "";
+        return { text: "", truncated: false };
     } finally {
         await handle?.close().catch(() => undefined);
     }

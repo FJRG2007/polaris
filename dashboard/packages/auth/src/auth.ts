@@ -61,9 +61,13 @@ function requestOrigin(headers: Headers | undefined): DeviceOrigin {
     };
 }
 
-/** Session lifetime: 7 days, refreshed at most once per day. */
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
-const SESSION_UPDATE_AGE = 60 * 60 * 24;
+/** Session lifetime: 7 days, refreshed at most once per day. Exported so the
+ *  compliance evidence reports the lifetime this instance actually runs. */
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+export const SESSION_UPDATE_AGE = 60 * 60 * 24;
+
+/** The shortest password an account may set, reported by the same evidence. */
+export const MIN_PASSWORD_LENGTH = 10;
 
 /** How long an emailed sign-in link stays good. Short: it is a bearer credential
  *  sitting in an inbox, and the user is asking to sign in right now. */
@@ -125,9 +129,12 @@ function passkeyPlugin(address: string): BetterAuthPlugin | null {
  */
 async function assertPasskeyNameFree(userId: string, supplied: unknown): Promise<void> {
     const name = typeof supplied === "string" ? supplied.trim() : "";
-    if (!name) throw new APIError("BAD_REQUEST", { message: "Name this passkey before adding it." });
+    if (!name)
+        throw new APIError("BAD_REQUEST", { message: "Name this passkey before adding it." });
     if (name.length > PASSKEY_NAME_MAX) {
-        throw new APIError("BAD_REQUEST", { message: `Keep the name under ${PASSKEY_NAME_MAX} characters.` });
+        throw new APIError("BAD_REQUEST", {
+            message: `Keep the name under ${PASSKEY_NAME_MAX} characters.`
+        });
     }
     // Compared in the application rather than by the database: an account holds a
     // handful of these, and a case-insensitive match is one of the few things the
@@ -135,7 +142,9 @@ async function assertPasskeyNameFree(userId: string, supplied: unknown): Promise
     const existing = await prisma.passkey.findMany({ where: { userId }, select: { name: true } });
     const key = passkeyNameKey(name);
     if (existing.some((row) => row.name && passkeyNameKey(row.name) === key)) {
-        throw new APIError("BAD_REQUEST", { message: "One of your passkeys is already called that." });
+        throw new APIError("BAD_REQUEST", {
+            message: "One of your passkeys is already called that."
+        });
     }
 }
 
@@ -295,7 +304,11 @@ function describeTrustedDevices(plugin: BetterAuthPlugin): BetterAuthPlugin {
                             // The only thing that mints a pass. Anything else on
                             // these paths is somebody proving themselves without
                             // asking to be remembered.
-                            if ((ctx.body as { trustDevice?: unknown } | undefined)?.trustDevice !== true) return;
+                            if (
+                                (ctx.body as { trustDevice?: unknown } | undefined)?.trustDevice !==
+                                true
+                            )
+                                return;
                             await recordTrustedDevice(user.id, origin);
                             return;
                         }
@@ -303,7 +316,8 @@ function describeTrustedDevices(plugin: BetterAuthPlugin): BetterAuthPlugin {
                         // A rotation only happens for an account that has the
                         // challenge armed; for any other, a cookie left over from
                         // before is not a pass and better-auth ignored it.
-                        if ((user as { twoFactorEnabled?: unknown }).twoFactorEnabled !== true) return;
+                        if ((user as { twoFactorEnabled?: unknown }).twoFactorEnabled !== true)
+                            return;
                         const cookie = ctx.context.createAuthCookie(TRUST_DEVICE_COOKIE);
                         // False is a cookie whose signature did not check out,
                         // which better-auth treats as no cookie at all.
@@ -433,7 +447,9 @@ function gateOtherSignIns(plugin: BetterAuthPlugin): BetterAuthPlugin {
     const hooks = plugin.hooks?.after ?? [];
     const signIn = hooks.find((hook) => hook.matcher({ path: "/sign-in/email" } as never));
     if (!signIn) {
-        throw new Error("better-auth's two-factor plugin no longer gates sign-in where Polaris expects it");
+        throw new Error(
+            "better-auth's two-factor plugin no longer gates sign-in where Polaris expects it"
+        );
     }
     const matches = signIn.matcher;
     return {
@@ -499,7 +515,8 @@ const recordSignInMethod = createAuthMiddleware(async (ctx) => {
     const user = ctx.context.newSession?.user;
     if (!user) return;
 
-    const method = SIGN_IN_METHOD_BY_PATH.get(ctx.path) ?? connectionSignInMethod(ctx.path, ctx.body);
+    const method =
+        SIGN_IN_METHOD_BY_PATH.get(ctx.path) ?? connectionSignInMethod(ctx.path, ctx.body);
     if (method) {
         const armed = (user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true;
         // A passkey, a scanned code and a connected account this deployment does
@@ -648,7 +665,9 @@ function fixedHosts(): string[] {
  * trusted origins are - a domain saved in the panel has to work without a restart.
  */
 async function allowedHosts(options: AuthOptions): Promise<Set<string>> {
-    const configured = options.configuredHosts ? await options.configuredHosts().catch(() => []) : [];
+    const configured = options.configuredHosts
+        ? await options.configuredHosts().catch(() => [])
+        : [];
     return new Set([...fixedHosts(), ...configured]);
 }
 
@@ -696,7 +715,7 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             // user server-side (see provisionUser). Sign-in stays open.
             disableSignUp: true,
             requireEmailVerification: false,
-            minPasswordLength: 10
+            minPasswordLength: MIN_PASSWORD_LENGTH
         },
         session: {
             expiresIn: SESSION_MAX_AGE,
@@ -862,7 +881,10 @@ function refused(message: string, code: string): Response {
  * better-auth refuses those itself, and answering them here would only invent a
  * second opinion about who is signed in.
  */
-export async function refuseProtectedEndpoint(auth: Auth, request: Request): Promise<Response | null> {
+export async function refuseProtectedEndpoint(
+    auth: Auth,
+    request: Request
+): Promise<Response | null> {
     const path = new URL(request.url).pathname;
     const endpoint = [...PROTECTED_ENDPOINTS].find((known) => path.endsWith(known));
     if (!endpoint) return null;
@@ -889,7 +911,10 @@ export async function refuseProtectedEndpoint(auth: Auth, request: Request): Pro
     if (!standing.settled) {
         return refused(newDeviceWaitMessage(standing), "NEW_DEVICE_WAITING");
     }
-    if (NEEDS_PASSWORD.has(endpoint) && !(await passwordConfirmed(session.user.id, session.session.id))) {
+    if (
+        NEEDS_PASSWORD.has(endpoint) &&
+        !(await passwordConfirmed(session.user.id, session.session.id))
+    ) {
         return refused("Confirm your password before adding a passkey.", "PASSWORD_NOT_CONFIRMED");
     }
     return null;
@@ -944,7 +969,10 @@ export async function recordPasskeyOrigin(
 ): Promise<Response> {
     if (response.status !== 200) return response;
     if (!new URL(request.url).pathname.endsWith("/passkey/verify-registration")) return response;
-    const created: unknown = await response.clone().json().catch(() => null);
+    const created: unknown = await response
+        .clone()
+        .json()
+        .catch(() => null);
     const id = (created as { id?: unknown } | null)?.id;
     if (typeof id !== "string") return response;
     const name = (created as { name?: unknown }).name;

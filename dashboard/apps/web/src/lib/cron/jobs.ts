@@ -26,19 +26,18 @@ import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
-import { sweepMailServers } from "@/lib/mail-server/health";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
+import { runMailServerPass } from "@/lib/mail-server/scheduled";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
-import { collectAllReports } from "@/lib/mail-server/dmarc-report";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
@@ -344,13 +343,10 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // DMARC reports that arrived in its report mailbox since the last pass.
         // Receivers send those daily, so a quarter of an hour is prompt enough.
         everyMs: 15 * MINUTE,
-        // Leased: two passes would read the same report mailbox at once.
+        // Leased: two passes would read the same report mailbox at once. Does
+        // nothing on a Polaris that has not installed the Mail server app.
         leaseMs: 20 * MINUTE,
-        run: async () => {
-            const health = await sweepMailServers();
-            const reports = await collectAllReports();
-            return { ...health, filed: reports.filed };
-        }
+        run: runMailServerPass
     },
     {
         key: "mail-categories",
@@ -675,6 +671,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // and two runners would take two.
         leaseMs: 3 * HOUR,
         run: async () => (await import("@/lib/database-ops/pitr")).sweepArchives()
+    },
+    {
+        key: "billing-budgets",
+        // Hourly: the figures a budget is measured against are folded by the
+        // hour, so a pass more often would read the same spend again.
+        everyMs: HOUR,
+        // Leased, because the pass tells people something: two runners would
+        // each find the same threshold crossed and each tell everybody.
+        leaseMs: 2 * HOUR,
+        run: async () => (await import("@/lib/billing/budgets")).sweepBudgets()
     },
     {
         key: "object-replication",

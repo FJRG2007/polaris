@@ -558,12 +558,19 @@ export interface CreateApplicationInput {
     /** Keep earlier builds running beside the current one, Railway-style. Comes
      *  from the project's flags, so a project can set the house style once. */
     keepReleases?: boolean;
-    /** Publish the container port on the host's interfaces. Absent keeps the
-     *  historical behaviour (published), which every caller that reaches a service by
-     *  its host port - a catalog install, a game server - relies on; the Deploy
-     *  screen passes false, so what somebody deploys there is reached through the
-     *  edge and nothing else. */
-    publishPort?: boolean;
+    /** Publish the container port on the host's interfaces. Required, with no
+     *  default, so every way a service is made says which it is: closed is what a
+     *  firewall should start from, and only a caller that reaches the service by
+     *  its host port - a catalog install, a game server, the mail server Polaris
+     *  manages over it - opens it. A default of "open" is how a cloned or migrated
+     *  service came up exposed when the one it copied was not. */
+    publishPort: boolean;
+    /** Start with the security headers that go in front of any app without
+     *  breaking it (HSTS, no sniffing, a sane referrer, same-site framing - see
+     *  `recommended` in core's edge config). For what somebody deploys; a catalog
+     *  app or a template another page may embed starts with none, as every
+     *  service made before this did. */
+    safeHeaders?: boolean;
     /** How it builds: commands and settings picked up from the repository. */
     buildConfig?: Record<string, unknown>;
     /** How many copies run, from a config file that said. */
@@ -591,7 +598,10 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             autoDeploy: input.autoDeploy ?? false,
             deployBranch: input.deployBranch ?? null,
             keepReleases: input.keepReleases ?? false,
-            publishPort: input.publishPort ?? true,
+            publishPort: input.publishPort,
+            ...(input.safeHeaders
+                ? { edgeConfig: JSON.stringify({ headers: { preset: "recommended" } }) }
+                : {}),
             ...(input.buildConfig ? { buildConfig: JSON.stringify(input.buildConfig) } : {}),
             ...(input.replicas ? { replicas: input.replicas } : {})
         }
@@ -1099,7 +1109,11 @@ export async function setApplicationEdgeConfig(
     // How traffic is spread over copies and releases is set from Scaling and from
     // the deployments, not from this screen, so what those saved is kept.
     const stored = parseAppEdgeConfig(app.edgeConfig);
-    const next = { ...appEdgeConfigSchema.parse(config), balancing: stored.balancing, canary: stored.canary };
+    const next = {
+        ...appEdgeConfigSchema.parse(config),
+        balancing: stored.balancing,
+        canary: stored.canary
+    };
     await prisma.application.update({
         where: { id: app.id },
         data: { edgeConfig: JSON.stringify(next) }
@@ -1225,36 +1239,45 @@ export async function syncAppRoutes(): Promise<void> {
                 .map((other) => normalizeDeployHostname(other.hostname) ?? other.hostname)
         });
     }
-    // Which of the serving releases run in a project of their own, and so publish on
-    // a port of their own. One query for the whole edge rather than one per domain.
-    const isolated = new Set(
+    // The serving releases, one query for the whole edge rather than one per domain:
+    // which run in a project of their own, and so publish on a port of their own, and
+    // how many copies each was started with.
+    const serving = new Map(
         (
             await prisma.deployment.findMany({
                 where: {
-                    isolated: true,
-                    // A change-over release answers to the service's own name, so it is
-                    // reached the way the service always was.
-                    cutover: false,
                     id: {
                         in: domains
                             .map((domain) => domain.application.currentDeploymentId)
                             .filter((id) => id !== null)
                     }
                 },
-                select: { id: true }
+                select: { id: true, isolated: true, cutover: true, replicas: true }
             })
-        ).map((deployment) => deployment.id)
+        ).map((deployment) => [deployment.id, deployment])
+    );
+    // A change-over release answers to the service's own names, so it is reached the
+    // way the service always was.
+    const isolated = new Set(
+        [...serving.values()].filter((row) => row.isolated && !row.cutover).map((row) => row.id)
     );
     // The kept releases a share of traffic is sent to, and only while each is a
     // kept release still running: a canary that was retired, promoted or taken down
     // routes nothing, whatever the setting still says.
-    const canaryIds = [...edgeOf.values()].flatMap((fields) => (fields.edge?.canary ? [fields.edge.canary.deploymentId] : []));
+    const canaryIds = [...edgeOf.values()].flatMap((fields) =>
+        fields.edge?.canary ? [fields.edge.canary.deploymentId] : []
+    );
     const liveCanaries = new Set(
         canaryIds.length === 0
             ? []
             : (
                   await prisma.deployment.findMany({
-                      where: { id: { in: canaryIds }, status: "running", isolated: true, cutover: false },
+                      where: {
+                          id: { in: canaryIds },
+                          status: "running",
+                          isolated: true,
+                          cutover: false
+                      },
                       select: { id: true }
                   })
               ).map((row) => row.id)
@@ -1386,7 +1409,13 @@ export async function syncAppRoutes(): Promise<void> {
                 !isolated.has(domain.application.currentDeploymentId ?? "");
             // Several copies are each reached by name, published or not: only the
             // first holds the host port.
-            const copies = own ? copiesOf(domain.application, ownName) : undefined;
+            const copies = own
+                ? copiesOf(
+                      domain.application,
+                      ownName,
+                      serving.get(domain.application.currentDeploymentId ?? "")
+                  )
+                : undefined;
             const privately = own && (!domain.application.publishPort || copies !== undefined);
             const dialHost = privately
                 ? ownName
@@ -1465,7 +1494,7 @@ export async function syncAppRoutes(): Promise<void> {
     // is asleep, moved or refusing a connection is a server whose own edge goes on
     // serving whatever it was already serving, and no reason for the routes on this
     // machine to be left unwritten.
-    await pushRemoteRoutes(remoteDomains, edgeOf);
+    await pushRemoteRoutes(remoteDomains, edgeOf, serving);
 }
 
 /**
@@ -1480,9 +1509,13 @@ function canaryRoute(
     current: string | null,
     localIp: string
 ): Pick<AppRoute, "canary"> {
-    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId)) return {};
+    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId))
+        return {};
     return {
-        canary: { upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`, percent: canary.percent }
+        canary: {
+            upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`,
+            percent: canary.percent
+        }
     };
 }
 
@@ -1530,7 +1563,8 @@ type RoutableDomain = {
  */
 async function pushRemoteRoutes(
     domains: readonly RoutableDomain[],
-    edgeOf: ReadonlyMap<string, EdgeRouteFields>
+    edgeOf: ReadonlyMap<string, EdgeRouteFields>,
+    serving: ReadonlyMap<string, { readonly replicas: number | null }>
 ): Promise<void> {
     const pushable = domains.filter(
         (domain) => !domain.deploymentId && !domain.application.keepReleases
@@ -1576,11 +1610,18 @@ async function pushRemoteRoutes(
                         // it and that server's edge are on - which is what the
                         // labels resolve to as well. Never a published host port:
                         // the edge is a container, and the host is not a name it
-                        // can be relied on to have.
+                        // can be relied on to have. The service's own names, which
+                        // a change-over release answers to as well: ranked above
+                        // both releases' labels, this is what carries that server's
+                        // edge from the old copies to the new ones by name.
                         dialHost: name,
                         dialPort: domain.targetPort,
                         ...balancedOver(
-                            copiesOf(domain.application, name),
+                            copiesOf(
+                                domain.application,
+                                name,
+                                serving.get(domain.application.currentDeploymentId ?? "")
+                            ),
                             edgeOf.get(domain.applicationId)?.edge
                         ),
                         allowLists: rule?.allowLists ?? [],
@@ -2018,7 +2059,11 @@ export async function setApplicationRunning(
  * `asleepSince` is what says why it is not. The container is stopped and started
  * as it is, so it wakes in seconds with the same release and variables.
  */
-export async function setApplicationAsleep(applicationId: string, ownerId: string, asleep: boolean): Promise<void> {
+export async function setApplicationAsleep(
+    applicationId: string,
+    ownerId: string,
+    asleep: boolean
+): Promise<void> {
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
@@ -2240,11 +2285,15 @@ export function hostPortForApp(id: string): number {
  * before it keeps running. The service's own domains are deliberately left off it:
  * they follow whichever release is current, and the edge re-points them the moment
  * this one is promoted.
+ *
+ * Whether the release changes over beside the running one is decided by the plan
+ * built without a release, and carried into the one built with it (`cutover`), so
+ * the two plans cannot disagree and another server's edge is asked about once.
  */
 async function buildAppPlan(
     applicationId: string,
     ownerId: string,
-    release?: { id: string; commitSha: string | null }
+    release?: { id: string; commitSha: string | null; cutover: boolean }
 ): Promise<{
     plan: AppDeployPlan;
     target: TargetRow & { name: string };
@@ -2276,7 +2325,7 @@ async function buildAppPlan(
     const kept = release !== undefined && keepsReleases(app);
     // Beside the running release only for the change-over, answering to the
     // service's own name as well (see `runsCutover`).
-    const cutover = release !== undefined && !kept && runsCutover(app);
+    const cutover = release !== undefined && !kept && release.cutover;
     const ref =
         release && kept
             ? releaseRef(base, markerOf(release))
@@ -2414,6 +2463,14 @@ async function buildAppPlan(
         )
     ).filter((mount): mount is NonNullable<typeof mount> => mount !== null);
 
+    const replaced =
+        cutover && app.currentDeploymentId && app.currentDeploymentId !== release.id
+            ? await prisma.deployment.findUnique({
+                  where: { id: app.currentDeploymentId },
+                  select: { replicas: true }
+              })
+            : null;
+
     const plan: AppDeployPlan = {
         ref,
         mounts,
@@ -2430,6 +2487,7 @@ async function buildAppPlan(
         // of how the release beside the current one stays reachable.
         private: !app.publishPort && !kept,
         ...(cutover ? { alias: base.name } : {}),
+        ...(replaced?.replicas ? { aliasCopies: replaced.replicas } : {}),
         edge,
         ...(extraPorts.length > 0 ? { extraPorts } : {}),
         // When the user has not pinned a container port, the value above is a guess
@@ -2560,7 +2618,8 @@ async function buildAppPlan(
                   // Set on every service created since the other languages were
                   // detected, and on one that names its own runtime version. A
                   // service the builder already deploys stays on the builder.
-                  languages: build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
+                  languages:
+                      build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
               }
             : undefined;
     return {
@@ -2571,13 +2630,35 @@ async function buildAppPlan(
         buildConfig: app.buildConfig,
         buildCommands,
         keepsHistory: keepsReleases(app),
-        cutover: runsCutover(app),
+        cutover: release ? cutover : await changesOver(app, ownerId),
         unresolved: references.unresolved
     };
 }
 
+/**
+ * `runsCutover`, with the one fact about the edge it cannot know by itself. This
+ * host's edge is routed from the files Polaris writes. Another server's is asked -
+ * one connection - and only once nothing else has ruled the change-over out; a
+ * server that cannot be asked is taken as the older kind, and recreated in place.
+ */
+async function changesOver(
+    app: Parameters<typeof runsCutover>[0] & { target: { kind: string; hostId: string | null } },
+    ownerId: string
+): Promise<boolean> {
+    const hostId = app.target.kind === "local" ? null : app.target.hostId;
+    if (!runsCutover(app, { followsPushedRoutes: true })) return false;
+    if (!hostId) return true;
+    const { readServerEdge } = await import("./deploy/server-edge");
+    return runsCutover(app, {
+        followsPushedRoutes: (await readServerEdge(hostId, ownerId)).pushable
+    });
+}
+
 /** A service's or database's stored ceilings as a plan carries them. */
-export function limitsOf(row: { cpuLimit: number | null; memoryLimitMb: number | null }): AppDeployPlan["limits"] {
+export function limitsOf(row: {
+    cpuLimit: number | null;
+    memoryLimitMb: number | null;
+}): AppDeployPlan["limits"] {
     if (row.cpuLimit === null && row.memoryLimitMb === null) return undefined;
     return {
         ...(row.cpuLimit !== null ? { cpus: row.cpuLimit } : {}),
@@ -2784,7 +2865,15 @@ export async function deployApplication(
     rollback?: RollbackSource
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
-    const { plan, target, buildCommands, keepsHistory, cutover } = built;
+    const { plan, target, buildCommands, keepsHistory } = built;
+    const scaled =
+        rollback?.kind === "scale"
+            ? await prisma.deployment.findUnique({
+                  where: { id: rollback.deploymentId },
+                  select: { id: true, commitSha: true, cutover: true }
+              })
+            : null;
+    const cutover = built.cutover && !scaled;
     // A service started with `${{postgres.DATABASE_URL}}` as its literal
     // connection string fails in words that name nothing Polaris could have told
     // it, so the deploy is refused here instead, naming the reference.
@@ -2800,7 +2889,9 @@ export async function deployApplication(
     const uploadArchive = rollback || prebuilt ? undefined : built.uploadArchive;
     const fromSource = plan.build.method === "dockerfile" || plan.build.method === "nixpacks";
     if (fromSource && !rollback && !prebuilt && !gitSource && !uploadArchive) {
-        throw new Error("This service has no source yet. Upload a folder or connect a repository first.");
+        throw new Error(
+            "This service has no source yet. Upload a folder or connect a repository first."
+        );
     }
     // Where a build from source runs, when that is not where the service does.
     const builder =
@@ -2862,10 +2953,14 @@ export async function deployApplication(
             authorAvatarUrl,
             isolated: keepsHistory || cutover,
             cutover,
+            // What the edge dials once this is serving (see `copiesOf`).
+            replicas: plan.replicas,
             // Only a rollback points back at the release it restored; a variable
             // change re-runs the live one and is not a step back.
             rollbackOfId:
-                rollback && (rollback.kind ?? "rollback") === "rollback" ? rollback.deploymentId : null,
+                rollback && (rollback.kind ?? "rollback") === "rollback"
+                    ? rollback.deploymentId
+                    : null,
             trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
         }
     });
@@ -2880,7 +2975,7 @@ export async function deployApplication(
     // also the hostname it will answer on. Only those cases pay for the second plan.
     let planned = plan;
     if (keepsHistory || cutover) {
-        const release = { id: deployment.id, commitSha };
+        const release = { id: deployment.id, commitSha, cutover };
         if (keepsHistory) {
             await ensureReleaseDomain(applicationId, release).catch((error) => {
                 console.error("polaris: could not name this release:", error);
@@ -2888,6 +2983,8 @@ export async function deployApplication(
             });
         }
         planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
+    } else if (scaled?.cutover) {
+        planned = (await buildAppPlan(applicationId, ownerId, scaled)).plan;
     }
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
@@ -2922,7 +3019,8 @@ export async function deployApplication(
             ownerId,
             pinnedSource ?? (uploadArchive ? { archive: uploadArchive } : undefined),
             buildCommands,
-            builder ?? undefined
+            builder ?? undefined,
+            scaled ? { releaseId: scaled.id, inPlace: scaled.cutover } : undefined
         )
     );
     return deployment.id;
@@ -3062,7 +3160,11 @@ export async function rollbackToDeployment(
         authorName: source.authorName,
         authorAvatarUrl: source.authorAvatarUrl
     });
-    return { deploymentId: started, applicationId: source.deployableId, commitSha: source.commitSha };
+    return {
+        deploymentId: started,
+        applicationId: source.deployableId,
+        commitSha: source.commitSha
+    };
 }
 
 /** Keep a release's image past the window, or let the window have it again. */
@@ -3110,16 +3212,22 @@ export async function setDeploymentCanary(
         if (edge.canary?.deploymentId !== deploymentId) return;
         edge.canary = null;
     } else {
-        if (deploymentId === app.currentDeploymentId) throw new Error("That is the release already serving everybody.");
+        if (deploymentId === app.currentDeploymentId)
+            throw new Error("That is the release already serving everybody.");
         if (deployment.status !== "running" || !deployment.isolated || deployment.cutover) {
-            throw new Error("Only a previous deployment that is kept running can take a share of the traffic.");
+            throw new Error(
+                "Only a previous deployment that is kept running can take a share of the traffic."
+            );
         }
         if (!Number.isInteger(percent) || percent < 1 || percent > 50) {
             throw new Error("A share of the traffic is between 1 and 50 percent.");
         }
         edge.canary = { deploymentId, percent };
     }
-    await prisma.application.update({ where: { id: app.id }, data: { edgeConfig: JSON.stringify(edge) } });
+    await prisma.application.update({
+        where: { id: app.id },
+        data: { edgeConfig: JSON.stringify(edge) }
+    });
     await syncAppRoutes();
 }
 
@@ -3144,7 +3252,11 @@ export const ROLLBACK_WINDOW = 5;
 async function pruneReleaseImages(applicationId: string): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
-        select: { currentDeploymentId: true, target: true, environment: { select: { project: { select: { ownerId: true } } } } }
+        select: {
+            currentDeploymentId: true,
+            target: true,
+            environment: { select: { project: { select: { ownerId: true } } } }
+        }
     });
     if (!app) return;
     const rows = await prisma.deployment.findMany({
@@ -3165,7 +3277,11 @@ async function pruneReleaseImages(applicationId: string): Promise<void> {
                 continue;
             }
             await prisma.deployment.updateMany({
-                where: { deployableType: "application", deployableId: applicationId, imageTag: image },
+                where: {
+                    deployableType: "application",
+                    deployableId: applicationId,
+                    imageTag: image
+                },
                 data: { imageKept: false, pinned: false }
             });
         }
@@ -3424,7 +3540,10 @@ export async function listDeployments(
                 ? row.finishedAt.getTime() - row.startedAt.getTime()
                 : null,
         canTakeTraffic:
-            row.status === "running" && row.isolated && !row.cutover && row.id !== app.currentDeploymentId,
+            row.status === "running" &&
+            row.isolated &&
+            !row.cutover &&
+            row.id !== app.currentDeploymentId,
         trafficPercent: canary?.deploymentId === row.id ? canary.percent : null
     }));
 }
@@ -3556,13 +3675,19 @@ export async function setApplicationSourcePaths(
     // this service is built, not where it is. Cleared back to undefined when blank,
     // which is what hands the phase back to detection.
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
-    for (const key of ["installCommand", "buildCommand", "startCommand", "runtimeVersion"] as const) {
+    for (const key of [
+        "installCommand",
+        "buildCommand",
+        "startCommand",
+        "runtimeVersion"
+    ] as const) {
         const value = paths[key];
         if (value !== undefined) build[key] = value?.trim() || undefined;
     }
     // Relative to the service's directory, like the root directory is to the
     // repository's, so it goes through the same normalizer.
-    if (paths.outputDirectory !== undefined) build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
+    if (paths.outputDirectory !== undefined)
+        build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
 
     await prisma.application.update({
         where: { id: app.id },
@@ -3806,7 +3931,10 @@ function runDeployment(
     ownerId: string,
     source?: BuildSource,
     buildCommands?: BuildCommands,
-    builder?: BuildMachine
+    builder?: BuildMachine,
+    /** The release a scale step adds or removes copies of, and whether that happens
+     *  in its own project, where it stays the release serving. */
+    scaling?: { readonly releaseId: string; readonly inPlace: boolean }
 ): Promise<void> {
     // Only an image source pulls a registry image that may need a login.
     const pullImages =
@@ -3815,21 +3943,75 @@ function runDeployment(
         deploymentId,
         target,
         ownerId,
-        (ctx, driver) =>
-            driver.deployApplication(plan, ctx).then(async (result) => {
-                if (result.ok && result.detectedPort) {
-                    await rememberDetectedPort(deploymentId, result.detectedPort);
-                }
-                return result;
-            }),
+        async (ctx, driver) => {
+            const refused = scaling ? await prepareScale(scaling.releaseId, plan.replicas) : null;
+            if (refused) {
+                ctx.log(Buffer.from(`==> Failed: ${refused}\n`));
+                return { ok: false, error: refused };
+            }
+            const result = await driver.deployApplication(plan, ctx);
+            if (result.ok && result.detectedPort) {
+                await rememberDetectedPort(deploymentId, result.detectedPort);
+            }
+            return result;
+        },
         source,
         pullImages,
         buildCommands,
-        builder
+        builder,
+        scaling?.inPlace ? scaling.releaseId : undefined
     ).finally(async () => {
         // An uploaded release is loaded onto its machine by now, or never will be.
-        if (plan.build.prebuilt) await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
+        if (plan.build.prebuilt)
+            await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
     });
+}
+
+/**
+ * Ready a scale step, or say why it cannot run.
+ *
+ * Refused when the release it was planned against is no longer the one serving:
+ * a deploy ahead of it in the queue replaced that release, and running the step
+ * would bring the old one back. Otherwise, when it goes down to fewer copies, the
+ * edge is pointed at that many first, so the copies it removes are no longer
+ * dialled by the time they go.
+ */
+async function prepareScale(releaseId: string, replicas: number): Promise<string | null> {
+    const serving = await prisma.application.count({ where: { currentDeploymentId: releaseId } });
+    if (serving === 0) {
+        return "The release this was to scale was replaced by a deploy that ran first. Scaling again applies the count to the one serving now.";
+    }
+    const release = await prisma.deployment.findUnique({
+        where: { id: releaseId },
+        select: { replicas: true }
+    });
+    if (release?.replicas && replicas < release.replicas) {
+        await prisma.deployment.update({ where: { id: releaseId }, data: { replicas } });
+        await syncAppRoutes().catch(() => undefined);
+    }
+    return null;
+}
+
+/**
+ * Finish a scale step that added or removed copies of the release serving its
+ * service, in that release's own project. That release stays the one serving,
+ * now with the step's count, which the edge dials from here on; the step's row
+ * is the record of it and never serves anything itself.
+ */
+async function settleScaleInPlace(deploymentId: string, releaseId: string): Promise<void> {
+    const step = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { replicas: true }
+    });
+    await prisma.deployment.update({
+        where: { id: releaseId },
+        data: { replicas: step?.replicas ?? null }
+    });
+    await prisma.deployment.update({
+        where: { id: deploymentId },
+        data: { status: "removed", imageKept: false }
+    });
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /** Where a build from source comes from: a repository, or an uploaded folder's
@@ -4045,7 +4227,10 @@ export async function executeDeployment(
     pullImages: string[] = [],
     buildCommands?: BuildCommands,
     /** The machine a build from source runs on, when it is not this target. */
-    builder?: BuildMachine
+    builder?: BuildMachine,
+    /** The release a scale step changed in its own project, which stays current
+     *  rather than giving way to this deployment (see `settleScaleInPlace`). */
+    scaledRelease?: string
 ): Promise<void> {
     // Cancelled while it waited its turn on the target's queue. Nothing has started,
     // so there is nothing to unwind - and starting now would ignore the operator.
@@ -4146,7 +4331,8 @@ export async function executeDeployment(
             error: result.error,
             finishedAt: new Date()
         });
-        if (result.ok) await promoteDeployment(deploymentId);
+        if (result.ok && scaledRelease) await settleScaleInPlace(deploymentId, scaledRelease);
+        else if (result.ok) await promoteDeployment(deploymentId);
         else await abandonRelease(deploymentId, ports).catch(() => undefined);
         await notifyDeployFinished({ deploymentId, ownerId, ok: result.ok });
     } catch (error) {
@@ -4307,7 +4493,12 @@ const CUTOVER_DRAIN_MS = 5_000;
  */
 async function retireReplaced(
     applicationId: string,
-    replaced: readonly { id: string; commitSha: string | null; isolated: boolean; cutover: boolean }[]
+    replaced: readonly {
+        id: string;
+        commitSha: string | null;
+        isolated: boolean;
+        cutover: boolean;
+    }[]
 ): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
@@ -4337,7 +4528,10 @@ async function retireReplaced(
         await ports.dispose().catch(() => undefined);
     }
     await prisma.deployment.updateMany({
-        where: { id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) }, status: "running" },
+        where: {
+            id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) },
+            status: "running"
+        },
         data: { status: "removed", finishedAt: new Date() }
     });
 }
@@ -4360,9 +4554,13 @@ async function abandonRelease(deploymentId: string, open?: RuntimePorts): Promis
         include: { environment: { include: { project: true } }, target: true }
     });
     if (!app) return;
-    const project = releaseRef(serviceRef(app.environment.project.slug, app.slug, app.id), markerOf(row)).project;
+    const project = releaseRef(
+        serviceRef(app.environment.project.slug, app.slug, app.id),
+        markerOf(row)
+    ).project;
     if (project === (await currentReleaseRef(app)).project) return;
-    const ports = open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
+    const ports =
+        open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
     try {
         await ports.composeDown(project).catch(() => undefined);
     } finally {

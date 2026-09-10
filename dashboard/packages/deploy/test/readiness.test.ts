@@ -9,8 +9,9 @@
  * standing beside the one it replaces answers to the service's own name.
  */
 
-import { describe, expect, it } from "vitest";
-import type { RuntimeContext } from "../src/runtime/driver.js";
+import { describe, expect, it, vi } from "vitest";
+import { ComposeRuntime } from "../src/runtime/compose.js";
+import type { AppDeployPlan, RuntimeContext } from "../src/runtime/driver.js";
 import { readinessDeadlineMs, waitUntilServing } from "../src/runtime/readiness.js";
 import { forSwarm, renderComposeYaml, type ComposeSpec } from "../src/compose-spec.js";
 
@@ -33,7 +34,10 @@ function fakeClock(start = Date.parse("2026-09-10T10:00:00Z")) {
     return { now: () => now, sleep: async (ms: number) => void (now += ms) };
 }
 
-const container = (state: Record<string, unknown>, restarts = 0) => ({ RestartCount: restarts, State: state });
+const container = (state: Record<string, unknown>, restarts = 0) => ({
+    RestartCount: restarts,
+    State: state
+});
 
 describe("waiting for a release to come up", () => {
     it("fails a container that exits, naming its exit code", async () => {
@@ -84,7 +88,9 @@ describe("waiting for a release to come up", () => {
     it("passes a container with no healthcheck once it has stayed up", async () => {
         const clock = fakeClock();
         const result = await waitUntilServing(
-            context([container({ Status: "running", StartedAt: new Date(clock.now()).toISOString() })]),
+            context([
+                container({ Status: "running", StartedAt: new Date(clock.now()).toISOString() })
+            ]),
             "web",
             {},
             clock
@@ -99,7 +105,14 @@ describe("waiting for a release to come up", () => {
     it("bounds the wait by the healthcheck's own worst case", () => {
         expect(readinessDeadlineMs({})).toBe(45_000);
         expect(
-            readinessDeadlineMs({ healthcheck: { test: ["CMD", "true"], intervalSeconds: 10, retries: 3, startPeriodSeconds: 20 } })
+            readinessDeadlineMs({
+                healthcheck: {
+                    test: ["CMD", "true"],
+                    intervalSeconds: 10,
+                    retries: 3,
+                    startPeriodSeconds: 20
+                }
+            })
         ).toBe(20_000 + 40_000 + 15_000);
     });
 });
@@ -107,7 +120,9 @@ describe("waiting for a release to come up", () => {
 describe("a swarm update", () => {
     const spec = (volumes: ComposeSpec["services"][number]["volumes"]): ComposeSpec => ({
         project: "p",
-        services: [{ name: "web", image: "nginx", env: {}, ports: [], volumes, labels: {}, networks: [] }],
+        services: [
+            { name: "web", image: "nginx", env: {}, ports: [], volumes, labels: {}, networks: [] }
+        ],
         volumes: [],
         networks: []
     });
@@ -119,7 +134,11 @@ describe("a swarm update", () => {
     });
 
     it("keeps stop-first for a service with a volume, so two tasks never share its files", () => {
-        const yaml = renderComposeYaml(forSwarm(spec([{ source: "data", target: "/data", kind: "volume" }])), "/v", "/m");
+        const yaml = renderComposeYaml(
+            forSwarm(spec([{ source: "data", target: "/data", kind: "volume" }])),
+            "/v",
+            "/m"
+        );
         expect(yaml).not.toContain("start-first");
     });
 });
@@ -145,11 +164,69 @@ describe("a release beside the one it replaces", () => {
 
     it("answers to the service's own name on every network it joins", () => {
         const yaml = renderComposeYaml(service(["web"]), "/v", "/m");
-        expect(yaml).toContain('      polaris-proxy:\n        aliases:\n          - "web"\n      hub:\n        aliases:\n          - "web"');
+        expect(yaml).toContain(
+            '      polaris-proxy:\n        aliases:\n          - "web"\n      hub:\n        aliases:\n          - "web"'
+        );
     });
 
     it("keeps the plain network list when it carries no alias", () => {
         const yaml = renderComposeYaml(service(), "/v", "/m");
         expect(yaml).toContain("    networks:\n      - polaris-proxy\n      - hub");
+    });
+});
+
+describe("a release of several copies beside the one it replaces", () => {
+    const plan = {
+        ref: { name: "web-abc1234", project: "p-abc1234" },
+        alias: "web",
+        build: { method: "image", name: "web", contextPath: ".", imageRef: "nginx:1" },
+        env: {},
+        replicas: 3,
+        private: true,
+        domains: [],
+        volumes: []
+    } as unknown as AppDeployPlan;
+
+    /** A machine where every copy has been running a while, except the ones named. */
+    function machine(exited: readonly string[] = []) {
+        const asked: string[] = [];
+        const ports = {
+            pull: vi.fn(async () => undefined),
+            composeUp: vi.fn(async () => undefined),
+            inspectImage: vi.fn(async () => [] as number[]),
+            logs: vi.fn(async () => undefined),
+            inspect: vi.fn(async (name: string) => {
+                asked.push(name);
+                return exited.includes(name)
+                    ? container({ Status: "exited", ExitCode: 1 })
+                    : container({ Status: "running", StartedAt: "2026-09-10T09:00:00Z" });
+            })
+        };
+        const ctx = {
+            ports,
+            target: { id: "t1", kind: "host", engine: "compose", proxyNetwork: "polaris-proxy" },
+            log: () => undefined
+        } as unknown as RuntimeContext;
+        return { ctx, ports, asked };
+    }
+
+    it("starts every copy under the release's names and waits for each before it counts", async () => {
+        const { ctx, ports, asked } = machine();
+        const result = await new ComposeRuntime().deployApplication(plan, ctx);
+        expect(result.ok).toBe(true);
+        const spec = ports.composeUp.mock.calls[0]?.[0] as unknown as ComposeSpec;
+        expect(spec.project).toBe("p-abc1234");
+        expect(spec.services.map((service) => service.aliases)).toEqual([
+            ["web"],
+            ["web", "web-abc1234", "web-r2"],
+            ["web", "web-abc1234", "web-r3"]
+        ]);
+        expect([...new Set(asked)]).toEqual(["web-abc1234", "web-abc1234-r2", "web-abc1234-r3"]);
+    });
+
+    it("fails the whole release when one copy does not come up, so the old one keeps serving", async () => {
+        const { ctx } = machine(["web-abc1234-r3"]);
+        const result = await new ComposeRuntime().deployApplication(plan, ctx);
+        expect(result).toEqual({ ok: false, error: expect.stringContaining("exit code 1") });
     });
 });

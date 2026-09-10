@@ -6,10 +6,49 @@
  */
 
 import type { ActivityLine } from "@/lib/activity/activity";
+import { AUTOSCALE_IDLE_AFTER, AUTOSCALE_SIGNALS, AUTOSCALED_ACTION_PREFIX } from "@polaris/core";
+
+/**
+ * Why the autoscaler moved the count, from the signal in the action's name. A
+ * line written by a later release with a signal this one does not know still
+ * says what happened, without the why.
+ */
+function autoscaleReason(action: string, up: boolean): string {
+    const signal = AUTOSCALE_SIGNALS.find(
+        (known) => action === `${AUTOSCALED_ACTION_PREFIX}${known}`
+    );
+    switch (signal) {
+        case undefined:
+            return "";
+        case "range":
+            return " to fit its range";
+        case "idle":
+            return ` after ${AUTOSCALE_IDLE_AFTER} minutes with no requests`;
+        case "cpu":
+            return up ? ": CPU was over its target" : ": CPU stayed low";
+        case "traffic":
+            return up ? ": requests were over their target" : ": requests stayed low";
+        case "both":
+            return up
+                ? ": CPU and requests were over their targets"
+                : ": CPU and requests stayed low";
+    }
+}
+
+function describeAutoscale(line: ActivityLine, who: string): string {
+    const from = Number(line.fromValue);
+    const to = Number(line.toValue);
+    if (!line.fromValue || !line.toValue || !Number.isInteger(from) || !Number.isInteger(to)) {
+        return `${who} scaled it by itself`;
+    }
+    const reason = autoscaleReason(line.action, to > from);
+    return `${who} scaled it from ${from} to ${to} ${to === 1 ? "copy" : "copies"}${reason}`;
+}
 
 /** One line of a service's history, as a sentence. */
 export function describeServiceEvent(line: ActivityLine): string {
     const who = line.authorName ?? "Polaris";
+    if (line.action.startsWith(AUTOSCALED_ACTION_PREFIX)) return describeAutoscale(line, who);
     switch (line.action) {
         case "deployed":
             return `${who} deployed it`;
@@ -26,7 +65,9 @@ export function describeServiceEvent(line: ActivityLine): string {
         case "variable":
             // The name, never the value: a feed anybody with the service open can
             // read is not where a secret goes.
-            return line.toValue ? `${who} changed the ${line.toValue} variable` : `${who} changed a variable`;
+            return line.toValue
+                ? `${who} changed the ${line.toValue} variable`
+                : `${who} changed a variable`;
         case "variables-imported":
             return `${who} imported ${line.toValue ?? "some"} variables`;
         case "variable-removed":

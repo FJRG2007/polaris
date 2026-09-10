@@ -296,6 +296,36 @@ export async function orgIdsWhere(
     return [...new Set([...owned.map((org) => org.id), ...granted])];
 }
 
+/**
+ * Everybody who holds one permission in one organization: its owner, and each
+ * member whose role carries it.
+ *
+ * The other direction from `orgIdsWhere`, and for the same kind of caller - an
+ * alert that has to reach whoever runs something, rather than a check on who is
+ * asking. Each role is resolved once however many people hold it, and exactly as
+ * access is resolved, so the people told are the people who could act on it.
+ */
+export async function orgPeopleHolding(
+    orgId: string,
+    permission: core.OrgPermission
+): Promise<string[]> {
+    const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { ownerId: true, members: { select: { userId: true, role: true } } }
+    });
+    if (!org) return [];
+    const allowed = new Map<string, boolean>();
+    const people = [org.ownerId];
+    for (const member of org.members) {
+        if (!allowed.has(member.role)) {
+            const role = await roleFor(orgId, member.role);
+            allowed.set(member.role, core.hasOrgPermission(role.permissions, permission));
+        }
+        if (allowed.get(member.role)) people.push(member.userId);
+    }
+    return [...new Set(people)];
+}
+
 /** Every organization whose work this account administers. What a space asks when
  *  it needs to know whether its organization opens it to the reader. */
 export async function administeredOrgIds(actor: OrgActor): Promise<string[]> {

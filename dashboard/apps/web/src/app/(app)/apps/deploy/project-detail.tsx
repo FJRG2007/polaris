@@ -11,9 +11,9 @@ import { useRouter } from "next/navigation";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
 import { useStagedChanges } from "./staged-changes";
-import { ProjectAccessProvider } from "./access-context";
 import type { ProjectCapability } from "@polaris/core";
 import { isInFlightStatus } from "@/lib/deploy/status";
+import { ProjectAccessProvider } from "./access-context";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
 import {
@@ -183,6 +183,7 @@ export function ProjectDetail({
                 {detailApp && (
                     <ServiceDetail
                         app={detailApp}
+                        project={{ id: project.id, name: project.name }}
                         staged={stagedIds.has(detailApp.id)}
                         onChanged={refresh}
                         onClose={() => showService(null)}
@@ -233,7 +234,8 @@ function EnvSummary({ environment }: { environment: ProjectSummary["environments
             : partial
               ? "border-warning-edge bg-warning-soft text-warning-ink"
               : "border-success-edge bg-success-soft text-success-ink";
-    const dot = total === 0 ? "bg-muted-foreground" : partial ? "bg-warning-solid" : "bg-success-solid";
+    const dot =
+        total === 0 ? "bg-muted-foreground" : partial ? "bg-warning-solid" : "bg-success-solid";
     return (
         <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}

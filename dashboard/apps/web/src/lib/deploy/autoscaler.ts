@@ -2,9 +2,14 @@
  * The loop that moves a service's replica count by itself.
  *
  * Once a minute, for every running service with a range set: read the CPU of each
- * of its copies, average it, and ask `autoscaleStep` what the count should be. The
- * streaks the decision needs live in memory - a restart forgets them, which costs
- * a few minutes' patience before the next change and nothing else.
+ * of its copies and average it, count the requests the edge logged for its
+ * addresses in the last minute when it has a traffic target, and ask
+ * `autoscaleStep` what the count should be. The streaks the decision needs live
+ * in memory - a restart forgets them, which costs a few minutes' patience before
+ * the next change and nothing else.
+ *
+ * The edge's log is read once per pass, and only when some service has a traffic
+ * target on this machine - the same reader sleep mode wakes services with.
  *
  * Plain compose only. Swarm's replicas are tasks with names of their own that the
  * machine chooses, so there is nothing here to read them by.
@@ -13,16 +18,29 @@
 import { prisma } from "@polaris/db";
 import { replicaNames } from "@polaris/deploy";
 import { servingContainerNames } from "./releases";
+import * as activity from "@/lib/activity/activity";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import { scaleService, singleCopyReason } from "./scaling-service";
 import { hostDockerDriver, localDockerDriver } from "@/lib/docker-service";
-import { AUTOSCALE_IDLE, autoscaleStep, parseAutoscale, type AutoscaleState } from "@polaris/core";
+import { readEdgeVisits, serviceHostnames, visitTimes, type EdgeVisits } from "./edge-visits";
+import {
+    AUTOSCALE_IDLE,
+    AUTOSCALED_ACTION_PREFIX,
+    autoscaleStep,
+    parseAutoscale,
+    requestRate,
+    trafficRefusal,
+    type AutoscaleState
+} from "@polaris/core";
 
 const states = new Map<string, AutoscaleState>();
 
 /** Average CPU over the copies that answered, or null when none did. */
 async function averageCpu(
-    app: { target: { kind: string; hostId: string | null }; environment: { project: { ownerId: string } } },
+    app: {
+        target: { kind: string; hostId: string | null };
+        environment: { project: { ownerId: string } };
+    },
     names: readonly string[]
 ): Promise<number | null> {
     const driver =
@@ -35,24 +53,56 @@ async function averageCpu(
             const stats = samples.get(name);
             return stats ? [stats.cpuPercent] : [];
         });
-        return readings.length > 0 ? readings.reduce((sum, value) => sum + value, 0) / readings.length : null;
+        return readings.length > 0
+            ? readings.reduce((sum, value) => sum + value, 0) / readings.length
+            : null;
     } finally {
         await driver.dispose().catch(() => undefined);
     }
 }
 
+/**
+ * How many copies the release serving each service runs, by that release's id:
+ * what it was started with, where that was recorded. The count a service is set to
+ * moves before the release carrying it is serving, and stays moved when that
+ * release never comes up.
+ */
+async function servingCopies(
+    apps: readonly { currentDeploymentId: string | null }[]
+): Promise<Map<string, number>> {
+    const ids = apps
+        .map((app) => app.currentDeploymentId)
+        .filter((id): id is string => id !== null);
+    if (ids.length === 0) return new Map();
+    const rows = await prisma.deployment.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, replicas: true }
+    });
+    return new Map(
+        rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : []))
+    );
+}
+
 export async function runAutoscale(now = Date.now()): Promise<{ checked: number; scaled: number }> {
     const apps = await prisma.application.findMany({
-        where: { autoscale: { not: null }, currentDeploymentId: { not: null }, desiredState: "running" },
+        where: {
+            autoscale: { not: null },
+            currentDeploymentId: { not: null },
+            desiredState: "running"
+        },
         include: {
             environment: { include: { project: true } },
             target: true,
+            domains: { where: { enabled: true }, select: { hostname: true } },
             _count: { select: { volumes: true } }
         }
     });
     let checked = 0;
     let scaled = 0;
     const names = await servingContainerNames(apps);
+    const copies = await servingCopies(apps);
+    // Read on the first service that needs it, and not at all when none does.
+    let log: Promise<EdgeVisits> | null = null;
     for (const app of apps) {
         const config = parseAutoscale(app.autoscale);
         if (!config || app.target.runtime === "swarm" || singleCopyReason(app)) continue;
@@ -67,13 +117,35 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
         });
         if (inFlight > 0) continue;
         checked += 1;
+        const running = copies.get(app.currentDeploymentId ?? "") ?? app.replicas;
         const primary = names.get(app.id);
         const cpu = primary
-            ? await averageCpu(app, replicaNames(primary, app.replicas)).catch(() => null)
+            ? await averageCpu(app, replicaNames(primary, running)).catch(() => null)
             : null;
-        const step = autoscaleStep(config, app.replicas, cpu, states.get(app.id) ?? AUTOSCALE_IDLE, now);
+        let requests: number | null = null;
+        if (config.requestsPerCopy !== null && trafficRefusal(app) === null) {
+            log ??= readEdgeVisits().catch(() => ({
+                visits: [],
+                windowStart: null,
+                truncated: false
+            }));
+            const visits = await log;
+            requests = requestRate(
+                visitTimes(visits, serviceHostnames(app)),
+                visits.windowStart,
+                now,
+                visits.truncated
+            );
+        }
+        const step = autoscaleStep(
+            config,
+            running,
+            { cpuPercent: cpu, requestsPerMinute: requests },
+            states.get(app.id) ?? AUTOSCALE_IDLE,
+            now
+        );
         states.set(app.id, step.state);
-        if (step.replicas === app.replicas) continue;
+        if (step.replicas === running || step.signal === null) continue;
         try {
             await scaleService(app.id, app.environment.project.ownerId, step.replicas);
             scaled += 1;
@@ -83,8 +155,26 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
                 action: "deploy.app.autoscale",
                 targetType: "application",
                 targetId: app.id,
-                metadata: { from: app.replicas, to: step.replicas, cpuPercent: cpu }
+                metadata: {
+                    from: running,
+                    to: step.replicas,
+                    signal: step.signal,
+                    cpuPercent: cpu,
+                    requestsPerMinute: requests
+                }
             });
+            // And in the service's own history, where its owner reads what
+            // happened to it - with what moved it in the action's name.
+            await activity
+                .record({
+                    subjectType: "app",
+                    subjectId: app.id,
+                    userId: null,
+                    action: `${AUTOSCALED_ACTION_PREFIX}${step.signal}`,
+                    fromValue: String(running),
+                    toValue: String(step.replicas)
+                })
+                .catch(() => undefined);
         } catch (error) {
             console.error(`polaris: could not scale ${app.id}:`, error);
         }

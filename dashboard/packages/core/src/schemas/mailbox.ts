@@ -221,6 +221,45 @@ export const mailAccountPatchSchema = z.object({
 
 export type MailAccountPatch = z.infer<typeof mailAccountPatchSchema>;
 
+/**
+ * Changing how an existing mailbox connects: what it is called, its servers, its
+ * login and - only when one is typed - its password.
+ *
+ * The address is not in it. It is what the mailbox is: every message, folder,
+ * rule and send-as address held for it hangs off that one mailbox, and a
+ * different address is a different mailbox whose mail would land in this one's
+ * copy. Somebody whose sign-in name changed changes the login instead; a new
+ * address is added as a new mailbox.
+ *
+ * A blank password keeps the one already stored, for the servers and login it
+ * was entered for - a change to any of them needs it typed again. Whether there
+ * is one to keep is the server's question, because only it knows what is stored.
+ */
+export const mailAccountUpdateSchema = z
+    .object({
+        displayName: mailAccountEditSchema.shape.displayName,
+        label: mailAccountEditSchema.shape.label,
+        color: mailAccountEditSchema.shape.color,
+        auth: mailAuthKind,
+        connectionId: z.string().uuid().nullable().default(null),
+        /** Blank keeps the stored one. Never returned by any read. */
+        password: z.string().max(1024).default(""),
+        username: z.string().trim().max(320).default(""),
+        imap: serverSettings,
+        smtp: serverSettings
+    })
+    .superRefine((value, context) => {
+        if (value.auth === "oauth" && !value.connectionId) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["connectionId"],
+                message: "Choose the authorized account this mailbox belongs to"
+            });
+        }
+    });
+
+export type MailAccountUpdate = z.infer<typeof mailAccountUpdateSchema>;
+
 /** The out-of-office reply. Off means the fields are kept and nothing is sent. */
 export const mailVacationSchema = z
     .object({

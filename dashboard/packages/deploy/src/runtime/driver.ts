@@ -97,7 +97,11 @@ export interface AppDeployPlan {
     /** Host port to publish so the app is reachable directly over the host's IP
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
-    readonly expose?: { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" };
+    readonly expose?: {
+        readonly host: number;
+        readonly container: number;
+        readonly protocol?: "tcp" | "udp";
+    };
     /**
      * Keep the service off every interface of the host: its port is not published at
      * all, and the edge reaches it by name on the proxy network instead. `expose` still
@@ -112,13 +116,22 @@ export interface AppDeployPlan {
      * on reaching it while the container behind it changes.
      */
     readonly alias?: string;
+    /** How many copies the release it replaces runs, when that is more than this
+     *  one does: the route goes on naming that many of the alias's copies until
+     *  the edge takes a new file, so this release answers to all of them (see
+     *  `expandReplicas`). */
+    readonly aliasCopies?: number;
     /** Rate limits, concurrency, security headers, redirects and rewrites, written into
      *  the edge labels beside the WAF so a remote server's own edge applies them. */
     readonly edge?: AppEdgeConfig;
     /** Further ports to publish beside the main one. A Java Minecraft server that
      *  Bedrock clients can also join answers on a second, UDP port - one service,
      *  two doors, so it cannot be modelled as the single exposed port. */
-    readonly extraPorts?: readonly { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" }[];
+    readonly extraPorts?: readonly {
+        readonly host: number;
+        readonly container: number;
+        readonly protocol?: "tcp" | "udp";
+    }[];
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */
     readonly autoContainerPort?: boolean;
@@ -176,6 +189,55 @@ export interface DbDeployPlan {
     /** The most CPU (cores) and memory (MB) the container may use. Absent is no
      *  limit. */
     readonly limits?: ResourceLimits;
+    /**
+     * A Redis Cluster: one container per node in place of the single one, each
+     * with its own command and data volume, on the same networks, and none
+     * published on the host. The first node carries `ref.name`, so everything
+     * that asks for the database's container finds one. `command` and
+     * `volumeName` above are then unused.
+     */
+    readonly nodes?: readonly DbNodePlan[];
+    /**
+     * The containers of a database laid out over several - a replica set's
+     * members, a sharded cluster's config servers, shards and router, a primary
+     * and its read replicas - in place of the one container the fields above
+     * describe. Each is its own service in the same project, on the same
+     * networks, with the same limits; `ref.name` is one of them. Absent is the
+     * one container.
+     */
+    readonly members?: readonly DbMemberPlan[];
+    /**
+     * Run the images already on the host rather than fetching them again: a
+     * rolling upgrade's step, which must recreate only the member it moves.
+     * Compose recreates every container whose tag now names another image, so a
+     * fresh pull of the tag the other members run would restart all of them.
+     */
+    readonly keepImages?: boolean;
+}
+
+/** One node of a clustered database. */
+export interface DbNodePlan {
+    readonly name: string;
+    readonly command: readonly string[];
+    readonly volumeName: string;
+}
+
+/** One container of a database laid out over several. */
+export interface DbMemberPlan {
+    /** Container name, which is also what the others reach it by. */
+    readonly name: string;
+    readonly env: Readonly<Record<string, string>>;
+    readonly command?: readonly string[];
+    /** Its own data volume, mounted at the plan's `dataPath`; absent for a
+     *  member that keeps nothing, like a sharded cluster's router. */
+    readonly volumeName?: string;
+    /** The image, where it is not the plan's: a member already moved to the
+     *  next version by a rolling upgrade while the others still run the old. */
+    readonly image?: string;
+    /** Published on the host. */
+    readonly exposePort?: number;
+    /** Other names it answers to on the database's networks. */
+    readonly aliases?: readonly string[];
 }
 
 export interface DeployResult {

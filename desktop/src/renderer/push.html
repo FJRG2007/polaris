@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+        />
+        <title>Push - Polaris</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="stack">
+            <div>
+                <h1 id="title">Push from this computer</h1>
+                <p id="subtitle" class="hint">Built here with Docker, then deployed as the next release.</p>
+            </div>
+
+            <div class="row">
+                <div class="spread">
+                    <span class="hint">Folder to build</span>
+                    <p id="folder" class="path">None chosen</p>
+                </div>
+                <button id="choose" type="button">Choose folder</button>
+            </div>
+
+            <label>
+                Build for
+                <select id="platform">
+                    <option value="">This computer's platform</option>
+                    <option value="linux/amd64">linux/amd64 - most servers</option>
+                    <option value="linux/arm64">linux/arm64 - Raspberry Pi and other ARM servers</option>
+                </select>
+                <span class="hint">The platform of the server the service runs on. An image built for another one does not start.</span>
+            </label>
+
+            <ol id="steps" class="steps" aria-label="Progress">
+                <li data-phase="checking">Docker</li>
+                <li data-phase="building">Build</li>
+                <li data-phase="saving">Save</li>
+                <li data-phase="sending">Send</li>
+                <li data-phase="deploying">Deploy</li>
+            </ol>
+            <progress id="progress" max="1" value="0" hidden></progress>
+
+            <p id="result" class="banner" role="status" hidden></p>
+
+            <pre id="log" class="log" aria-label="Output" tabindex="0"></pre>
+
+            <div class="row end">
+                <button id="open" type="button" hidden>Open in Polaris</button>
+                <button id="cancel" type="button" hidden>Cancel</button>
+                <button id="start" class="primary" type="button" aria-disabled="true">Build and deploy</button>
+            </div>
+        </div>
+        <script src="push.js"></script>
+    </body>
+</html>

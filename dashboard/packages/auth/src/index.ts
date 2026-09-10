@@ -8,6 +8,9 @@
 export {
     createAuth,
     createRequestAuth,
+    MIN_PASSWORD_LENGTH,
+    SESSION_MAX_AGE,
+    SESSION_UPDATE_AGE,
     TRUST_DEVICE_COOKIE_NAMES,
     type Auth,
     type RequestAuth

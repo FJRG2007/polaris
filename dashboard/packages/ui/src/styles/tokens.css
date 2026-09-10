@@ -413,6 +413,15 @@ thead th {
     overscroll-behavior-x: contain;
 }
 
+/* A screen that is an application inside the application - Mail, Chat, a document
+   (see PAGE_BLEED in shell/app-shell.tsx) - owns every scrollbar on it: its list,
+   its conversation, its pages each scroll inside themselves. The window must not
+   scroll as well, whatever else lands on the page, or one wheel moves the whole
+   screen and its panes together. */
+html:has(.page-bleed) {
+    overflow: hidden;
+}
+
 /* One focus ring for the whole application, on the token that names it, drawn
    outside the element so it never changes the layout of the row it is in.
    Keyboard only: a mouse press already tells the user what it hit. */

@@ -20,13 +20,23 @@ import type { AppInstallInput } from "@/lib/apps/install-schema";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
-import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
+import {
+    createApplication,
+    createProject,
+    deleteApplication,
+    deployApplication
+} from "@/lib/deploy-service";
+import {
+    MAIL_SERVER_APP,
+    uninstallRefusal as mailServerUninstallRefusal
+} from "@/lib/mail-server/app-install";
 import {
     appHasCapability,
     findApp,
     isAllowedEnvValue,
     isInstallable,
     normalizeEnvValue,
+    POLARIS_APP_CATALOG,
     tunableEnvVars
 } from "@/lib/apps/catalog";
 
@@ -53,7 +63,9 @@ async function availableInstanceName(environmentId: string, wanted: string): Pro
     // Compared as slugs, because that is what the database holds unique - two
     // names that read differently can still be the same service.
     const taken = new Set(
-        (await prisma.application.findMany({ where: { environmentId }, select: { slug: true } })).map((row) => row.slug)
+        (
+            await prisma.application.findMany({ where: { environmentId }, select: { slug: true } })
+        ).map((row) => row.slug)
     );
     if (!taken.has(slugify(wanted))) return wanted;
     for (let suffix = 2; suffix < 100; suffix += 1) {
@@ -106,8 +118,14 @@ export async function installApp(
     if (!isInstallable(app)) throw new Error("This app cannot be installed yet");
 
     if (app.singleton) {
+        // An instance-wide app is installed once for everybody, so the question
+        // is whether anybody has, not whether this owner has.
         const existing = await prisma.installedApp.findFirst({
-            where: { ownerId, catalogId: app.id, status: { not: "removed" } }
+            where: {
+                ...(app.instanceWide ? {} : { ownerId }),
+                catalogId: app.id,
+                status: { not: "removed" }
+            }
         });
         if (existing) throw new Error("This app is already installed");
     }
@@ -148,7 +166,9 @@ export async function installApp(
         input.serverId === "local"
             ? await getOrCreateLocalTarget(ownerId)
             : await (async () => {
-                  const host = (await listHosts(ownerId)).find((item) => item.id === input.serverId);
+                  const host = (await listHosts(ownerId)).find(
+                      (item) => item.id === input.serverId
+                  );
                   if (!host) throw new Error("The selected server was not found");
                   return getOrCreateHostTarget(host.id, ownerId, host.name);
               })();
@@ -165,7 +185,11 @@ export async function installApp(
     // An app that declares the host port it wants is one people reach by typing an
     // address (a game server): publish it there, on the transport its clients speak.
     // A caller that allocated the port itself has already done that arithmetic.
-    const hostPort = pinned ? pinned.host : declared?.host ? await availableHostPort(declared.host, protocol) : undefined;
+    const hostPort = pinned
+        ? pinned.host
+        : declared?.host
+          ? await availableHostPort(declared.host, protocol)
+          : undefined;
     const extraPorts = ports?.extra;
     const application = await createApplication(ownerId, {
         environmentId,
@@ -177,7 +201,10 @@ export async function installApp(
             ...(containerPort ? { port: containerPort } : {}),
             ...(hostPort ? { hostPort, hostProtocol: protocol } : {}),
             ...(extraPorts && extraPorts.length > 0 ? { extraPorts } : {})
-        }
+        },
+        // A catalog app is reached on the machine's own address - a game server
+        // by the port its clients type - so its port is published.
+        publishPort: true
     });
 
     // Env: manifest defaults overlaid with the operator's values, preserving each
@@ -185,7 +212,10 @@ export async function installApp(
     const envByKey = new Map<string, { value: string; isSecret: boolean }>();
     for (const declared of template.env ?? []) {
         if (declared.default !== undefined) {
-            envByKey.set(declared.key, { value: declared.default, isSecret: Boolean(declared.secret) });
+            envByKey.set(declared.key, {
+                value: declared.default,
+                isSecret: Boolean(declared.secret)
+            });
         }
     }
     for (const entry of input.env) {
@@ -216,10 +246,17 @@ export async function installApp(
         const bridgePort = template.ports?.[0]?.container ?? 8787;
         envByKey.set("BRIDGE_TOKEN", { value: bridgeToken, isSecret: true });
         envByKey.set("WEB_INGEST_KEY", { value: ingestKey, isSecret: true });
-        envByKey.set("WEB_INGEST_URL", { value: `${await appBaseUrl()}/api/inbox/ingest`, isSecret: false });
+        envByKey.set("WEB_INGEST_URL", {
+            value: `${await appBaseUrl()}/api/inbox/ingest`,
+            isSecret: false
+        });
         envByKey.set("BRIDGE_PORT", { value: String(bridgePort), isSecret: false });
     }
-    const vars = [...envByKey.entries()].map(([key, meta]) => ({ key, value: meta.value, isSecret: meta.isSecret }));
+    const vars = [...envByKey.entries()].map(([key, meta]) => ({
+        key,
+        value: meta.value,
+        isSecret: meta.isSecret
+    }));
     if (vars.length > 0) await setEnvVars("application", application.id, ownerId, vars);
 
     // Volumes: each template volume gets a server-local docker volume or a NAS
@@ -240,7 +277,10 @@ export async function installApp(
     // resolve the bridge's bearer + ingest key when it dials it later.
     const secretBlob =
         isHub && bridgeToken && ingestKey
-            ? encryptSecret(JSON.stringify({ token: bridgeToken, ingestKey }), loadEnv().POLARIS_MASTER_KEY)
+            ? encryptSecret(
+                  JSON.stringify({ token: bridgeToken, ingestKey }),
+                  loadEnv().POLARIS_MASTER_KEY
+              )
             : null;
 
     const installed = await prisma.installedApp.create({
@@ -268,12 +308,18 @@ export async function installApp(
     // recorded on the install, but installation itself still succeeds.
     try {
         await deployApplication(application.id, ownerId, actorId);
-        await prisma.installedApp.update({ where: { id: installed.id }, data: { status: "running" } });
+        await prisma.installedApp.update({
+            where: { id: installed.id },
+            data: { status: "running" }
+        });
         // The inbox resolves the bridge from installs; drop the cache so it appears
         // configured immediately after this hub install rather than after the TTL.
         if (isHub) invalidateBridgeCache();
     } catch {
-        await prisma.installedApp.update({ where: { id: installed.id }, data: { status: "failed" } });
+        await prisma.installedApp.update({
+            where: { id: installed.id },
+            data: { status: "failed" }
+        });
     }
 
     return { installedAppId: installed.id, applicationId: application.id };
@@ -293,7 +339,10 @@ export async function listInstalledApps(
 ): Promise<InstalledAppView[]> {
     const mine = { ownerId, status: { not: "removed" } };
     const rows = await prisma.installedApp.findMany({
-        where: alsoIds.length > 0 ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] } : mine,
+        where:
+            alsoIds.length > 0
+                ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] }
+                : mine,
         orderBy: { createdAt: "desc" }
     });
     return rows.map((row) => ({
@@ -306,6 +355,23 @@ export async function listInstalledApps(
         createdAt: row.createdAt.toISOString(),
         ownerId: row.ownerId
     }));
+}
+
+/**
+ * The installs of instance-wide apps, whoever made them.
+ *
+ * For the marketplace, which lists what its reader installed: an app that is on
+ * for the whole Polaris is installed as far as every reader is concerned, and
+ * offering a second administrator Install on it would be offering a copy the
+ * install would refuse.
+ */
+export async function instanceWideInstallIds(): Promise<string[]> {
+    const catalogIds = POLARIS_APP_CATALOG.filter((app) => app.instanceWide).map((app) => app.id);
+    const rows = await prisma.installedApp.findMany({
+        where: { catalogId: { in: catalogIds }, status: { not: "removed" } },
+        select: { id: true }
+    });
+    return rows.map((row) => row.id);
 }
 
 /** An installed app that is backed by a deployed service, named as the app. */
@@ -353,15 +419,24 @@ export interface InstalledAppDetail extends InstalledAppView {
 
 /** One installed app with its backing application state, or null if not the
  *  owner's. Application/target are looked up by id (no FK, per the model). */
-export async function getInstalledApp(ownerId: string, id: string): Promise<InstalledAppDetail | null> {
+export async function getInstalledApp(
+    ownerId: string,
+    id: string
+): Promise<InstalledAppDetail | null> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) return null;
     const manifest = findApp(row.catalogId);
     const application = row.applicationId
-        ? await prisma.application.findFirst({ where: { id: row.applicationId }, select: { desiredState: true } })
+        ? await prisma.application.findFirst({
+              where: { id: row.applicationId },
+              select: { desiredState: true }
+          })
         : null;
     const target = row.targetId
-        ? await prisma.deployTarget.findFirst({ where: { id: row.targetId }, select: { name: true } })
+        ? await prisma.deployTarget.findFirst({
+              where: { id: row.targetId },
+              select: { name: true }
+          })
         : null;
     return {
         id: row.id,
@@ -396,7 +471,10 @@ export interface InstalledAppSetting {
  * variable that was never set - which is what the app is running on either way,
  * since the image applies the same default.
  */
-export async function getInstalledAppSettings(ownerId: string, id: string): Promise<InstalledAppSetting[]> {
+export async function getInstalledAppSettings(
+    ownerId: string,
+    id: string
+): Promise<InstalledAppSetting[]> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) return [];
     const manifest = findApp(row.catalogId);
@@ -408,10 +486,9 @@ export async function getInstalledAppSettings(ownerId: string, id: string): Prom
     // operator opens to get rid of exactly such an install, and a throw takes the
     // page - Uninstall included - down with it.
     const stored = new Map(
-        (await listEnvVars("application", row.applicationId, ownerId).catch(() => [])).map((item) => [
-            item.key,
-            item.value
-        ])
+        (await listEnvVars("application", row.applicationId, ownerId).catch(() => [])).map(
+            (item) => [item.key, item.value]
+        )
     );
     return fields.map((field) => ({
         key: field.key,
@@ -424,10 +501,14 @@ export async function getInstalledAppSettings(ownerId: string, id: string): Prom
 }
 
 /** Remove an installed app: tear down its Deploy application (best effort, it may
- *  already be gone) and mark the install removed so it drops out of the lists. */
+ *  already be gone) and mark the install removed so it drops out of the lists.
+ *  An instance-wide app is one install for everybody, so every copy of it goes. */
 export async function uninstallApp(ownerId: string, id: string): Promise<void> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) throw new Error("Installed app not found");
+    // The mail server's rule holds whichever door the uninstall came through.
+    const refusal = row.catalogId === MAIL_SERVER_APP ? await mailServerUninstallRefusal() : null;
+    if (refusal) throw new Error(refusal);
     if (row.applicationId) {
         try {
             await deleteApplication(row.applicationId, ownerId);
@@ -436,6 +517,13 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
         }
     }
     await prisma.installedApp.update({ where: { id: row.id }, data: { status: "removed" } });
+    const app = findApp(row.catalogId);
+    if (app?.singleton && app.instanceWide) {
+        await prisma.installedApp.updateMany({
+            where: { catalogId: row.catalogId, status: { not: "removed" } },
+            data: { status: "removed" }
+        });
+    }
     invalidateInstallPresence(row.catalogId);
     // Forget any cached bridge endpoint so the inbox reflects the removal at once.
     if (row.catalogId === "messaging-bridge") invalidateBridgeCache();

@@ -28,6 +28,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addAccount } from "./accounts";
+import { settleRefusalNotices } from "./refused";
 import { recordAudit } from "@/lib/audit-service";
 import { orgIdsWhere, type OrgActor } from "@/lib/orgs/org-service";
 
@@ -160,6 +161,7 @@ export async function takeBackMailbox(
     // is untouched, which is right: it is the company's account with a provider,
     // not Polaris' to close.
     await prisma.mailAccount.delete({ where: { id: row.id } });
+    await settleRefusalNotices(row.userId, row.id);
 
     await recordAudit({
         actorId: actor.id,

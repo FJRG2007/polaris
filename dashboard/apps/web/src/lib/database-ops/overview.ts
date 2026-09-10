@@ -7,7 +7,14 @@
 import { pitrWindow } from "./pitr";
 import { prisma } from "@polaris/db";
 import { listOperations, DatabaseOperationError } from "./ops";
-import { isStorageEngine, upgradeTargets, type ManagedEngine } from "@polaris/core";
+import {
+    isStorageEngine,
+    resolveTopology,
+    topologyLabel,
+    topologyMembers,
+    upgradeTargets,
+    type ManagedEngine
+} from "@polaris/core";
 
 export async function databaseOverview(databaseId: string, ownerId: string) {
     const row = await prisma.managedDatabase.findFirst({
@@ -18,8 +25,15 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
     const engine = row.engine as ManagedEngine;
     const hosted = row.parentId !== null;
     const dedicated = !hosted && !row.recoveryBase;
+    // Moved by a dump and a reload, which a cluster cannot take (`upgradable`).
+    const upgradable = dedicated && !row.clusterMasters;
+    const topology = resolveTopology(row);
+    const members = hosted ? [] : topologyMembers(topology, row.containerName || row.slug);
     const recoveredFrom = row.recoveredFromId
-        ? await prisma.managedDatabase.findUnique({ where: { id: row.recoveredFromId }, select: { name: true } })
+        ? await prisma.managedDatabase.findUnique({
+              where: { id: row.recoveredFromId },
+              select: { name: true }
+          })
         : null;
     return {
         id: row.id,
@@ -31,19 +45,47 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
         hosted,
         hostName: row.parent?.name ?? null,
         storage: isStorageEngine(engine),
-        upgrade: dedicated
-            ? {
-                  versions: upgradeTargets(engine, row.version),
-                  state: row.upgradeState,
-                  to: row.upgradeTo,
-                  at: row.upgradeAt?.toISOString() ?? null,
-                  error: row.upgradeError,
-                  previousVersion: row.previousVolumeName ? row.previousVersion : null,
-                  previousVolume: row.previousVolumeName
-              }
-            : null,
-        redis: engine === "redis" && !hosted ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb } : null,
-        mongo: engine === "mongo" && !hosted ? { replicaSet: row.replicaSet } : null,
+        // A sharded cluster's version is not changed here yet, and a Redis
+        // Cluster cannot take the dump and reload an upgrade is; each says so
+        // in its own section instead of offering a button that would refuse.
+        upgrade:
+            upgradable && topology.kind !== "sharded"
+                ? {
+                      versions: upgradeTargets(engine, row.version),
+                      state: row.upgradeState,
+                      to: row.upgradeTo,
+                      at: row.upgradeAt?.toISOString() ?? null,
+                      error: row.upgradeError,
+                      previousVersion: row.previousVolumeName ? row.previousVersion : null,
+                      previousVolume: row.previousVolumeName
+                  }
+                : null,
+        redis:
+            engine === "redis" && !hosted
+                ? {
+                      mode: row.mode,
+                      maxMemoryMb: row.maxMemoryMb,
+                      clusterMasters: row.clusterMasters
+                  }
+                : null,
+        mongo:
+            engine === "mongo" && !hosted && topology.kind === "single"
+                ? { replicaSet: row.replicaSet }
+                : null,
+        // Laid out over several containers: what it is, and each member by name
+        // and role. How each is doing is read on demand (`databaseMembers`).
+        topology:
+            !hosted && topology.kind !== "single"
+                ? {
+                      kind: topology.kind,
+                      label: topologyLabel(topology),
+                      members: members.map((member) => ({
+                          name: member.name,
+                          role: member.role,
+                          set: member.set
+                      }))
+                  }
+                : null,
         // A hosted database runs in its parent's container, so the parent's limits are its own.
         limits: hosted ? null : { cpus: row.cpuLimit, memoryMb: row.memoryLimitMb },
         pitr: engine === "postgres" && dedicated ? await pitrWindow(databaseId, ownerId) : null,
@@ -64,12 +106,16 @@ export async function copySources(databaseId: string, ownerId: string) {
         select: { engine: true, environment: { select: { projectId: true } } }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    const engines = row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
+    const engines =
+        row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
     // The same project: access was checked for it, and for nothing wider.
     const rows = await prisma.managedDatabase.findMany({
         where: {
             id: { not: databaseId },
             engine: { in: engines },
+            // A cluster cannot be dumped as one database (see `copyInto`).
+            clusterMasters: null,
+            NOT: [{ topology: "sharded" }, { parent: { topology: "sharded" } }],
             environment: { projectId: row.environment.projectId, project: { ownerId } },
             OR: [{ containerName: { not: "" } }, { parent: { containerName: { not: "" } } }]
         },

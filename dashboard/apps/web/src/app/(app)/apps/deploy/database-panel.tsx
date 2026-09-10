@@ -16,8 +16,8 @@ import * as actions from "./database-actions";
 import { useProjectCan } from "./access-context";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { useDisplayFormat } from "@/components/display-format";
-import { KeyRound, Link2, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
+import { KeyRound, Link2, Loader2, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -95,16 +95,21 @@ export function DatabaseManageDialog({
     const tabs: { value: Tab; label: string }[] = overview
         ? [
               ...(overview.upgrade ? [{ value: "versions" as const, label: "Version" }] : []),
-              ...(overview.redis || overview.mongo || overview.limits
+              ...(overview.redis || overview.mongo || overview.limits || overview.topology
                   ? [{ value: "settings" as const, label: "Settings" }]
                   : []),
               ...(overview.pitr ? [{ value: "pitr" as const, label: "Point in time" }] : []),
-              ...(!overview.storage ? [{ value: "copy" as const, label: "Copy data in" }] : []),
+              // A cluster's keys are spread over its masters; one dump cannot be loaded into it.
+              ...(!overview.storage && !overview.redis?.clusterMasters
+                  ? [{ value: "copy" as const, label: "Copy data in" }]
+                  : []),
               ...(overview.storage ? [{ value: "buckets" as const, label: "Buckets" }] : []),
               { value: "activity" as const, label: "Activity" }
           ]
         : [];
-    const current = tabs.some((entry) => entry.value === tab) ? tab : (tabs[0]?.value ?? "activity");
+    const current = tabs.some((entry) => entry.value === tab)
+        ? tab
+        : (tabs[0]?.value ?? "activity");
 
     function ask(confirmation: Confirmation) {
         setConfirmError(null);
@@ -131,16 +136,20 @@ export function DatabaseManageDialog({
                 <DialogHeader className="pr-8">
                     <DialogTitle className="flex items-center gap-2">
                         <DbEngineIcon engine={database.engine} className="size-6" />
-                        <span className="truncate" title={database.name}>{database.name}</span>
+                        <span className="truncate" title={database.name}>
+                            {database.name}
+                        </span>
                         {overview ? (
                             <Badge>
                                 {core.dbEngineLabel(overview.engine)} {overview.version}
                             </Badge>
                         ) : null}
+                        {overview?.topology ? <Badge>{overview.topology.label}</Badge> : null}
                     </DialogTitle>
                     {overview?.hosted ? (
                         <DialogDescription>
-                            Lives inside {overview.hostName ?? "another instance"}. Its version and settings are the instance's.
+                            Lives inside {overview.hostName ?? "another instance"}. Its version and
+                            settings are the instance's.
                         </DialogDescription>
                     ) : overview?.recovery ? (
                         <DialogDescription>
@@ -171,11 +180,19 @@ export function DatabaseManageDialog({
                             </ScrollRow>
                         ) : null}
                         {!overview.deployed && current !== "activity" ? (
-                            <p className="text-sm text-muted-foreground">Provision it first; there is nothing running to manage yet.</p>
+                            <p className="text-sm text-muted-foreground">
+                                Provision it first; there is nothing running to manage yet.
+                            </p>
                         ) : current === "versions" && overview.upgrade ? (
-                            <VersionsSection overview={overview} manage={manage} ask={ask} onChanged={load} />
+                            <VersionsSection
+                                overview={overview}
+                                manage={manage}
+                                ask={ask}
+                                onChanged={load}
+                            />
                         ) : current === "settings" ? (
                             <div className="flex flex-col gap-5">
+                                {overview.topology ? <ClusterSection overview={overview} /> : null}
                                 <LimitsSection overview={overview} manage={manage} ask={ask} />
                                 <SettingsSection overview={overview} manage={manage} ask={ask} />
                             </div>
@@ -186,7 +203,9 @@ export function DatabaseManageDialog({
                         ) : current === "buckets" ? (
                             <BucketsSection storeId={overview.id} manage={manage} ask={ask} />
                         ) : null}
-                        {current === "activity" || running ? <ActivityList overview={overview} compact={current !== "activity"} /> : null}
+                        {current === "activity" || running ? (
+                            <ActivityList overview={overview} compact={current !== "activity"} />
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -197,12 +216,18 @@ export function DatabaseManageDialog({
                                 <DialogTitle>{confirm.title}</DialogTitle>
                                 <DialogDescription>{confirm.body}</DialogDescription>
                             </DialogHeader>
-                            {confirmError ? <p className="text-sm text-danger">{confirmError}</p> : null}
+                            {confirmError ? (
+                                <p className="text-sm text-danger">{confirmError}</p>
+                            ) : null}
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setConfirm(null)}>
                                     Cancel
                                 </Button>
-                                <Button variant={confirm.danger ? "danger" : "primary"} disabled={pending} onClick={agree}>
+                                <Button
+                                    variant={confirm.danger ? "danger" : "primary"}
+                                    disabled={pending}
+                                    onClick={agree}
+                                >
                                     {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                                     {confirm.label}
                                 </Button>
@@ -217,7 +242,15 @@ export function DatabaseManageDialog({
 
 type Ask = (confirmation: Confirmation) => void;
 
-function Section({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
+function Section({
+    title,
+    hint,
+    children
+}: {
+    title: string;
+    hint?: ReactNode;
+    children: ReactNode;
+}) {
     return (
         <section className="flex flex-col gap-2">
             <div>
@@ -276,12 +309,21 @@ function VersionsSection({
                   ? `Update to the newest ${version} release?`
                   : `Upgrade to ${label} ${version}?`,
             body: refresh
-                ? "The instance restarts on the newest release of the version it runs. Its data stays where it is."
-                : overview.storage
-                  ? `The store restarts on ${version} with the data it has. If it does not start, it goes back to ${overview.version}.`
-                  : `Its data is copied out, ${label} ${version} starts on a new volume, and the copy is loaded into it. It is unavailable while that runs. If any step fails it goes back to ${overview.version} on its old data, which is kept either way.${at ? ` Runs at ${format.dateTime(at)}.` : ""}`,
+                ? overview.topology
+                    ? "Every member restarts on the newest release of the version it runs, at the same time. Their data stays where it is."
+                    : "The instance restarts on the newest release of the version it runs. Its data stays where it is."
+                : overview.topology?.kind === "replicaSet"
+                  ? `Each member restarts on ${label} ${version} in turn, secondaries first, while the set keeps a primary. Then its feature compatibility version is raised, and from there it cannot go back to ${overview.version}. If a member does not come back before that, every member returns to ${overview.version}.${at ? ` Runs at ${format.dateTime(at)}.` : ""}`
+                  : overview.storage
+                    ? `The store restarts on ${version} with the data it has. If it does not start, it goes back to ${overview.version}.`
+                    : `Its data is copied out, ${label} ${version} starts on a new volume, and the copy is loaded into it. It is unavailable while that runs. If any step fails it goes back to ${overview.version} on its old data, which is kept either way.${at ? ` Runs at ${format.dateTime(at)}.` : ""}`,
             label: at ? "Schedule" : refresh ? "Update" : "Upgrade",
-            run: () => actions.upgradeDatabaseAction({ databaseId: overview.id, version, ...(at ? { at } : {}) })
+            run: () =>
+                actions.upgradeDatabaseAction({
+                    databaseId: overview.id,
+                    version,
+                    ...(at ? { at } : {})
+                })
         });
     }
 
@@ -357,7 +399,10 @@ function VersionsSection({
                     <div>
                         <Button
                             size="sm"
-                            disabled={when === "later" && (!moment || moment.getTime() < Date.now() + 60_000)}
+                            disabled={
+                                when === "later" &&
+                                (!moment || moment.getTime() < Date.now() + 60_000)
+                            }
                             onClick={start}
                         >
                             {when === "later" ? "Schedule" : refresh ? "Update" : "Upgrade"}
@@ -398,9 +443,124 @@ function VersionsSection({
 // Settings
 // ---------------------------------------------------------------------------
 
+type MemberState = NonNullable<
+    Awaited<ReturnType<typeof actions.databaseMembersAction>>["members"]
+>[number];
+
+const ROLE_LABELS: Readonly<Record<string, string>> = {
+    member: "Member",
+    config: "Config server",
+    shard: "Shard member",
+    router: "Router",
+    primary: "Primary",
+    replica: "Read replica"
+};
+
+/** What upkeep does for each layout, said where somebody looks for it. */
+const TOPOLOGY_NOTES: Readonly<Record<string, string>> = {
+    replicaSet:
+        "Backups are read from a secondary. A version change moves one member at a time while the set keeps a primary, then raises the feature compatibility version, after which the earlier version cannot be returned to.",
+    sharded: `${core.SHARDED_DUMP_REFUSAL} ${core.SHARDED_UPGRADE_REFUSAL}`,
+    replicas:
+        "Backups and copies go through the primary. A version change starts the replicas again, empty, beside the new primary, and they follow it from the start."
+};
+
+/**
+ * The members of a database laid out over several containers, each with what
+ * it is doing now - read from the members when the panel opens, and again on
+ * request. The names and roles are known up front, so they show at once and
+ * only the states wait.
+ */
+function ClusterSection({ overview }: { overview: Overview }) {
+    const topology = overview.topology!;
+    const [states, setStates] = useState<Map<string, MemberState> | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const check = useCallback(() => {
+        startTransition(async () => {
+            const result = await actions.databaseMembersAction(overview.id);
+            if (result.members) {
+                setStates(new Map(result.members.map((member) => [member.name, member])));
+                setError(null);
+            } else setError(result.error ?? "Could not read the members");
+        });
+    }, [overview.id]);
+
+    useEffect(() => {
+        check();
+    }, [check]);
+
+    return (
+        <Section title={topology.label} hint={TOPOLOGY_NOTES[topology.kind]}>
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                    {topology.members.length}{" "}
+                    {topology.members.length === 1 ? "container" : "containers"}
+                </span>
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Check the members again"
+                    title="Check the members again"
+                    disabled={pending}
+                    onClick={check}
+                >
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4" />
+                    )}
+                </Button>
+            </div>
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                {topology.members.map((member) => {
+                    const state = states?.get(member.name);
+                    return (
+                        <li
+                            key={member.name}
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                        >
+                            <span className="flex min-w-0 flex-col">
+                                <span className="truncate font-mono text-xs" title={member.name}>
+                                    {member.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {ROLE_LABELS[member.role] ?? member.role}
+                                    {member.set && member.role !== "member"
+                                        ? ` - ${member.set}`
+                                        : ""}
+                                </span>
+                            </span>
+                            {state ? (
+                                <span
+                                    className={`text-xs ${state.healthy ? "text-success" : "text-warning"}`}
+                                >
+                                    {state.state}
+                                </span>
+                            ) : error ? null : (
+                                <Skeleton className="h-4 w-20" />
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+        </Section>
+    );
+}
+
 /** The most CPU and memory the instance's container may use, applied by
  *  starting it again. Blank is no limit. */
-function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
+function LimitsSection({
+    overview,
+    manage,
+    ask
+}: {
+    overview: Overview;
+    manage: boolean;
+    ask: Ask;
+}) {
     const limits = overview.limits;
     const [cpus, setCpus] = useState(limits?.cpus == null ? "" : String(limits.cpus));
     const [memory, setMemory] = useState(limits?.memoryMb == null ? "" : String(limits.memoryMb));
@@ -412,7 +572,10 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
     const parsed = core.resourceLimitsSchema.safeParse(next);
     const changed = next.cpus !== limits.cpus || next.memoryMb !== limits.memoryMb;
     return (
-        <Section title="Resources" hint="Past its memory the database is stopped and started again; past its CPU it is slowed. Blank = no limit.">
+        <Section
+            title="Resources"
+            hint={`${overview.topology ? "Each member gets these limits. " : ""}Past its memory the database is stopped and started again; past its CPU it is slowed. Blank = no limit.`}
+        >
             <div className="flex flex-wrap gap-3">
                 <label className="flex flex-col gap-1">
                     <span className="text-xs text-muted-foreground">CPU (cores)</span>
@@ -442,7 +605,9 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
                 </label>
             </div>
             {!parsed.success ? (
-                <p className="text-xs text-danger">{parsed.error.issues[0]?.message ?? "Check these limits"}</p>
+                <p className="text-xs text-danger">
+                    {parsed.error.issues[0]?.message ?? "Check these limits"}
+                </p>
             ) : null}
             {manage ? (
                 <div>
@@ -454,7 +619,11 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
                                 title: "Apply the new limits?",
                                 body: "The database is started again with them. Connections drop for the few seconds that takes.",
                                 label: "Apply",
-                                run: () => actions.setDatabaseLimitsAction({ databaseId: overview.id, ...next })
+                                run: () =>
+                                    actions.setDatabaseLimitsAction({
+                                        databaseId: overview.id,
+                                        ...next
+                                    })
                             })
                         }
                     >
@@ -466,64 +635,100 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
     );
 }
 
-function SettingsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
+function SettingsSection({
+    overview,
+    manage,
+    ask
+}: {
+    overview: Overview;
+    manage: boolean;
+    ask: Ask;
+}) {
     const redis = overview.redis;
     const mongo = overview.mongo;
     const [mode, setMode] = useState<core.RedisMode>((redis?.mode as core.RedisMode) ?? "default");
     const [size, setSize] = useState(String(redis?.maxMemoryMb ?? 256));
 
     if (redis) {
-        const changed = mode !== redis.mode || (mode === "cache" && Number(size) !== (redis.maxMemoryMb ?? 256));
+        const changed =
+            mode !== redis.mode ||
+            (mode === "cache" && Number(size) !== (redis.maxMemoryMb ?? 256));
+        const masters = redis.clusterMasters;
         return (
-            <Section title="How Redis keeps its data" hint={core.REDIS_MODE_NOTES[mode]}>
-                <SegmentedControl
-                    aria-label="Mode"
-                    value={mode}
-                    onValueChange={setMode}
-                    options={core.REDIS_MODES.map((value) => ({ value, label: core.REDIS_MODE_LABELS[value] }))}
-                />
-                {mode === "cache" ? (
-                    <div className="w-48">
-                        <Select
-                            value={size}
-                            onValueChange={setSize}
-                            options={core.REDIS_CACHE_SIZES_MB.map((value) => ({
-                                value: String(value),
-                                label: value >= 1024 ? `${value / 1024} GB limit` : `${value} MB limit`
-                            }))}
-                        />
-                    </div>
+            <>
+                {masters ? (
+                    <Section
+                        title="Cluster"
+                        hint={`${masters} masters, each with one replica, on this server. Clients connect in cluster mode; publish and subscribe, and streams, work as they do on one instance.`}
+                    >
+                        <p className="text-xs text-muted-foreground">
+                            A backup copies every master&apos;s data file into one archive. A
+                            cluster is not restored or upgraded in place, and a backup of part of
+                            one is refused.
+                        </p>
+                    </Section>
                 ) : null}
-                <p className="text-xs text-muted-foreground">Publish and subscribe work in every mode.</p>
-                {manage ? (
-                    <div>
-                        <Button
-                            size="sm"
-                            disabled={!changed}
-                            onClick={() =>
-                                ask({
-                                    title: `Switch to ${core.REDIS_MODE_LABELS[mode].toLowerCase()} mode?`,
-                                    body:
-                                        mode === "persistent"
-                                            ? "Redis writes everything it holds to its log first, then restarts with the log on."
-                                            : mode === "cache"
-                                              ? "Redis saves a snapshot, then restarts without writing to disk. Keys are evicted when it reaches the limit."
-                                              : "Redis saves a snapshot, then restarts on its own snapshot schedule.",
-                                    label: "Switch",
-                                    run: () =>
-                                        actions.setRedisModeAction({
-                                            databaseId: overview.id,
-                                            mode,
-                                            ...(mode === "cache" ? { maxMemoryMb: Number(size) } : {})
-                                        })
-                                })
-                            }
-                        >
-                            Apply
-                        </Button>
-                    </div>
-                ) : null}
-            </Section>
+                <Section title="How Redis keeps its data" hint={core.REDIS_MODE_NOTES[mode]}>
+                    <SegmentedControl
+                        aria-label="Mode"
+                        value={mode}
+                        onValueChange={setMode}
+                        options={core.REDIS_MODES.map((value) => ({
+                            value,
+                            label: core.REDIS_MODE_LABELS[value]
+                        }))}
+                    />
+                    {mode === "cache" ? (
+                        <div className="w-48">
+                            <Select
+                                value={size}
+                                onValueChange={setSize}
+                                options={core.REDIS_CACHE_SIZES_MB.map((value) => ({
+                                    value: String(value),
+                                    label:
+                                        value >= 1024
+                                            ? `${value / 1024} GB limit`
+                                            : `${value} MB limit`
+                                }))}
+                            />
+                        </div>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                        Publish and subscribe work in every mode.
+                    </p>
+                    {manage ? (
+                        <div>
+                            <Button
+                                size="sm"
+                                disabled={!changed}
+                                onClick={() =>
+                                    ask({
+                                        title: `Switch to ${core.REDIS_MODE_LABELS[mode].toLowerCase()} mode?`,
+                                        body: `${masters ? "Every node of the cluster is switched in turn. " : ""}${
+                                            mode === "persistent"
+                                                ? "Redis writes everything it holds to its log first, then restarts with the log on."
+                                                : mode === "cache"
+                                                  ? "Redis saves a snapshot, then restarts without writing to disk. Keys are evicted when it reaches the limit."
+                                                  : "Redis saves a snapshot, then restarts on its own snapshot schedule."
+                                        }`,
+                                        label: "Switch",
+                                        run: () =>
+                                            actions.setRedisModeAction({
+                                                databaseId: overview.id,
+                                                mode,
+                                                ...(mode === "cache"
+                                                    ? { maxMemoryMb: Number(size) }
+                                                    : {})
+                                            })
+                                    })
+                                }
+                            >
+                                Apply
+                            </Button>
+                        </div>
+                    ) : null}
+                </Section>
+            </>
         );
     }
 
@@ -539,13 +744,19 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
                         disabled={!manage}
                         onChange={(enabled) =>
                             ask({
-                                title: enabled ? "Run as a replica set?" : "Stop running as a replica set?",
+                                title: enabled
+                                    ? "Run as a replica set?"
+                                    : "Stop running as a replica set?",
                                 body: enabled
                                     ? "The instance restarts with a replica set of one member. If it does not start that way, it is put back."
                                     : "The instance restarts as a standalone server with the same data. Change streams and transactions stop working.",
                                 label: enabled ? "Turn on" : "Turn off",
                                 danger: !enabled,
-                                run: () => actions.setMongoReplicaSetAction({ databaseId: overview.id, enabled })
+                                run: () =>
+                                    actions.setMongoReplicaSetAction({
+                                        databaseId: overview.id,
+                                        enabled
+                                    })
                             })
                         }
                     />
@@ -569,7 +780,9 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
     const [name, setName] = useState(`${overview.name}-recovered`);
     const moment = fromLocalInput(target);
     const earliest = pitr.from ? new Date(pitr.from) : null;
-    const inWindow = Boolean(moment && earliest && moment >= earliest && moment.getTime() <= Date.now());
+    const inWindow = Boolean(
+        moment && earliest && moment >= earliest && moment.getTime() <= Date.now()
+    );
 
     return (
         <div className="flex flex-col gap-4">
@@ -584,14 +797,20 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                             disabled={!manage}
                             onChange={(enabled) =>
                                 ask({
-                                    title: enabled ? "Turn on point-in-time recovery?" : "Turn off point-in-time recovery?",
+                                    title: enabled
+                                        ? "Turn on point-in-time recovery?"
+                                        : "Turn off point-in-time recovery?",
                                     body: enabled
                                         ? "The instance restarts with archiving on, and takes its first base backup."
                                         : "The instance restarts without archiving and the archive is deleted. Nothing before now can be recovered afterwards.",
                                     label: enabled ? "Turn on" : "Turn off",
                                     danger: !enabled,
                                     run: () =>
-                                        actions.setPitrAction({ databaseId: overview.id, enabled, keepDays: Number(keepDays) })
+                                        actions.setPitrAction({
+                                            databaseId: overview.id,
+                                            enabled,
+                                            keepDays: Number(keepDays)
+                                        })
                                 })
                             }
                         />
@@ -604,7 +823,11 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                             onValueChange={(value) => {
                                 setKeepDays(value);
                                 if (pitr.enabled) {
-                                    void actions.setPitrAction({ databaseId: overview.id, enabled: true, keepDays: Number(value) });
+                                    void actions.setPitrAction({
+                                        databaseId: overview.id,
+                                        enabled: true,
+                                        keepDays: Number(value)
+                                    });
                                 }
                             }}
                             options={core.PITR_KEEP_DAYS.map((days) => ({
@@ -645,7 +868,9 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                         </label>
                     </div>
                     {moment && !inWindow ? (
-                        <p className="text-xs text-warning">Pick a moment inside the window above.</p>
+                        <p className="text-xs text-warning">
+                            Pick a moment inside the window above.
+                        </p>
                     ) : null}
                     <div>
                         <Button
@@ -681,7 +906,9 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
 
 function CopySection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
     const [from, setFrom] = useState<"managed" | "url">("managed");
-    const [sources, setSources] = useState<{ id: string; name: string; where: string }[] | null>(null);
+    const [sources, setSources] = useState<{ id: string; name: string; where: string }[] | null>(
+        null
+    );
     const [sourceId, setSourceId] = useState("");
     const [url, setUrl] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -699,13 +926,22 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
         };
     }, [overview.id, manage]);
 
-    if (!manage) return <p className="text-sm text-muted-foreground">Copying data in needs permission to manage databases.</p>;
+    if (!manage)
+        return (
+            <p className="text-sm text-muted-foreground">
+                Copying data in needs permission to manage databases.
+            </p>
+        );
 
     const parsed = core.databaseCopySchema.safeParse(
-        from === "managed" ? { databaseId: overview.id, fromDatabaseId: sourceId || undefined } : { databaseId: overview.id, fromUrl: url.trim() || undefined }
+        from === "managed"
+            ? { databaseId: overview.id, fromDatabaseId: sourceId || undefined }
+            : { databaseId: overview.id, fromUrl: url.trim() || undefined }
     );
     const readable =
-        from === "url" && url.trim() ? core.parseExternalSource(url.trim(), overview.engine) !== null : true;
+        from === "url" && url.trim()
+            ? core.parseExternalSource(url.trim(), overview.engine) !== null
+            : true;
     const sourceName = sources?.find((source) => source.id === sourceId)?.name;
 
     return (
@@ -727,13 +963,19 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                 sources === null && !error ? (
                     <Skeleton className="h-9 w-full" />
                 ) : sources && sources.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No other {core.dbEngineLabel(overview.engine)} database in this project is running.</p>
+                    <p className="text-xs text-muted-foreground">
+                        No other {core.dbEngineLabel(overview.engine)} database in this project is
+                        running.
+                    </p>
                 ) : (
                     <Select
                         value={sourceId}
                         onValueChange={setSourceId}
                         placeholder="Pick a database"
-                        options={(sources ?? []).map((source) => ({ value: source.id, label: `${source.name} (${source.where})` }))}
+                        options={(sources ?? []).map((source) => ({
+                            value: source.id,
+                            label: `${source.name} (${source.where})`
+                        }))}
                     />
                 )
             ) : (
@@ -755,11 +997,18 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                     />
                     {!readable ? (
                         <p className="text-xs text-warning">
-                            Use a {overview.engine === "postgres" ? "postgresql" : overview.engine === "mongo" ? "mongodb" : overview.engine}:// address with a host name and the database at the end.
+                            Use a{" "}
+                            {overview.engine === "postgres"
+                                ? "postgresql"
+                                : overview.engine === "mongo"
+                                  ? "mongodb"
+                                  : overview.engine}
+                            :// address with a host name and the database at the end.
                         </p>
                     ) : (
                         <p className="text-xs text-muted-foreground">
-                            Read from inside this database's container, so the host has to be reachable from its server.
+                            Read from inside this database's container, so the host has to be
+                            reachable from its server.
                         </p>
                     )}
                 </>
@@ -850,21 +1099,41 @@ function BucketsSection({ storeId, manage, ask }: { storeId: string; manage: boo
             {manage ? (
                 <div className="flex flex-wrap items-start gap-2">
                     <div className="min-w-48 flex-1">
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="new-bucket" />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="new-bucket"
+                        />
                         {name.trim() && !valid.success ? (
-                            <p className="mt-1 text-xs text-warning">{valid.error.issues[0]?.message}</p>
+                            <p className="mt-1 text-xs text-warning">
+                                {valid.error.issues[0]?.message}
+                            </p>
                         ) : null}
                     </div>
                     <Button size="sm" disabled={!valid.success || pending} onClick={create}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Bucket
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Plus className="size-4" />
+                        )}{" "}
+                        Bucket
                     </Button>
                 </div>
             ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {list === null && !error ? <Skeleton className="h-24 w-full" /> : null}
-            {list?.buckets?.length === 0 ? <p className="text-sm text-muted-foreground">No buckets yet.</p> : null}
+            {list?.buckets?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No buckets yet.</p>
+            ) : null}
             {list?.buckets?.map((bucket) => (
-                <BucketCard key={bucket.id} bucket={bucket} manage={manage} ask={ask} onChanged={load} onRemove={() => setRemoving(bucket)} />
+                <BucketCard
+                    key={bucket.id}
+                    bucket={bucket}
+                    manage={manage}
+                    ask={ask}
+                    onChanged={load}
+                    onRemove={() => setRemoving(bucket)}
+                />
             ))}
             {list?.unmanaged && list.unmanaged.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
@@ -919,7 +1188,9 @@ function BucketCard({
     const [lifetime, setLifetime] = useState("3600");
     const [baseUrl, setBaseUrl] = useState("");
     const [signed, setSigned] = useState<string | null>(null);
-    const [candidates, setCandidates] = useState<{ id: string; name: string; storeName: string }[] | null>(null);
+    const [candidates, setCandidates] = useState<
+        { id: string; name: string; storeName: string }[] | null
+    >(null);
 
     function run(work: () => Promise<{ error?: string }>, after?: () => void) {
         setError(null);
@@ -932,7 +1203,11 @@ function BucketCard({
     }
 
     const keyValid = core.bucketKeySchema.safeParse({ bucketId: bucket.id, name: keyName, access });
-    const ruleValid = core.lifecycleRuleSchema.safeParse({ bucketId: bucket.id, prefix, days: Number(days) });
+    const ruleValid = core.lifecycleRuleSchema.safeParse({
+        bucketId: bucket.id,
+        prefix,
+        days: Number(days)
+    });
     const presignValid = core.presignSchema.safeParse({
         bucketId: bucket.id,
         key: objectKey,
@@ -944,9 +1219,17 @@ function BucketCard({
     return (
         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-sm" title={bucket.name}>{bucket.name}</span>
+                <span className="truncate font-mono text-sm" title={bucket.name}>
+                    {bucket.name}
+                </span>
                 {manage ? (
-                    <Button size="icon" variant="ghost" aria-label={`Remove ${bucket.name}`} title="Remove bucket" onClick={onRemove}>
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Remove ${bucket.name}`}
+                        title="Remove bucket"
+                        onClick={onRemove}
+                    >
                         <Trash2 className="size-4" />
                     </Button>
                 ) : null}
@@ -954,7 +1237,9 @@ function BucketCard({
             {error ? <p className="text-xs text-danger">{error}</p> : null}
 
             <Section title="Keys" hint="Each reaches this bucket only.">
-                {bucket.keys.length === 0 ? <p className="text-xs text-muted-foreground">No keys yet.</p> : null}
+                {bucket.keys.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No keys yet.</p>
+                ) : null}
                 {bucket.keys.map((key) => (
                     <div key={key.id} className="flex items-center gap-2 text-xs">
                         <KeyRound className="size-3.5 text-muted-foreground" />
@@ -974,7 +1259,11 @@ function BucketCard({
                                         body: "Anything using this key loses access to the bucket at once.",
                                         label: "Revoke",
                                         danger: true,
-                                        run: () => actions.deleteBucketKeyAction({ bucketId: bucket.id, keyId: key.id })
+                                        run: () =>
+                                            actions.deleteBucketKeyAction({
+                                                bucketId: bucket.id,
+                                                keyId: key.id
+                                            })
                                     })
                                 }
                             >
@@ -985,17 +1274,29 @@ function BucketCard({
                 ))}
                 {secret ? (
                     <div className="flex flex-col gap-1 rounded-md border border-warning-edge bg-warning-soft p-2">
-                        <p className="text-xs text-warning">Copy the secret now. It is not shown again.</p>
+                        <p className="text-xs text-warning">
+                            Copy the secret now. It is not shown again.
+                        </p>
                         <CopyRow value={secret.accessKey} />
                         <CopyRow value={secret.secretKey} />
-                        <Button size="sm" variant="ghost" className="self-end" onClick={() => setSecret(null)}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="self-end"
+                            onClick={() => setSecret(null)}
+                        >
                             Done
                         </Button>
                     </div>
                 ) : null}
                 {manage ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="key-name" className="w-40" />
+                        <Input
+                            value={keyName}
+                            onChange={(event) => setKeyName(event.target.value)}
+                            placeholder="key-name"
+                            className="w-40"
+                        />
                         <div className="w-40">
                             <Select
                                 value={access}
@@ -1013,9 +1314,16 @@ function BucketCard({
                             onClick={() =>
                                 run(
                                     async () => {
-                                        const result = await actions.createBucketKeyAction({ bucketId: bucket.id, name: keyName.trim(), access });
+                                        const result = await actions.createBucketKeyAction({
+                                            bucketId: bucket.id,
+                                            name: keyName.trim(),
+                                            access
+                                        });
                                         if (result.accessKey && result.secretKey) {
-                                            setSecret({ accessKey: result.accessKey, secretKey: result.secretKey });
+                                            setSecret({
+                                                accessKey: result.accessKey,
+                                                secretKey: result.secretKey
+                                            });
                                         }
                                         return result;
                                     },
@@ -1029,11 +1337,16 @@ function BucketCard({
                 ) : null}
             </Section>
 
-            <Section title="Expiry" hint="Objects written under a prefix from now on are deleted at that age.">
+            <Section
+                title="Expiry"
+                hint="Objects written under a prefix from now on are deleted at that age."
+            >
                 {bucket.lifecycle.map((rule) => (
                     <div key={rule.prefix} className="flex items-center gap-2 text-xs">
                         <code className="font-mono">{rule.prefix || "(whole bucket)"}</code>
-                        <span className="text-muted-foreground">after {rule.days === 1 ? "1 day" : `${rule.days} days`}</span>
+                        <span className="text-muted-foreground">
+                            after {rule.days === 1 ? "1 day" : `${rule.days} days`}
+                        </span>
                         {manage ? (
                             <Button
                                 size="icon"
@@ -1042,7 +1355,14 @@ function BucketCard({
                                 aria-label="Remove rule"
                                 title="Remove rule"
                                 disabled={pending}
-                                onClick={() => run(() => actions.removeLifecycleRuleAction({ bucketId: bucket.id, prefix: rule.prefix }))}
+                                onClick={() =>
+                                    run(() =>
+                                        actions.removeLifecycleRuleAction({
+                                            bucketId: bucket.id,
+                                            prefix: rule.prefix
+                                        })
+                                    )
+                                }
                             >
                                 <Trash2 className="size-3.5" />
                             </Button>
@@ -1051,7 +1371,12 @@ function BucketCard({
                 ))}
                 {manage ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input value={prefix} onChange={(event) => setPrefix(event.target.value)} placeholder="tmp/ (blank for all)" className="w-44" />
+                        <Input
+                            value={prefix}
+                            onChange={(event) => setPrefix(event.target.value)}
+                            placeholder="tmp/ (blank for all)"
+                            className="w-44"
+                        />
                         <div className="w-36">
                             <Select
                                 value={days}
@@ -1067,7 +1392,15 @@ function BucketCard({
                             variant="secondary"
                             disabled={!ruleValid.success || pending}
                             onClick={() =>
-                                run(() => actions.setLifecycleRuleAction({ bucketId: bucket.id, prefix: prefix.trim(), days: Number(days) }), () => setPrefix(""))
+                                run(
+                                    () =>
+                                        actions.setLifecycleRuleAction({
+                                            bucketId: bucket.id,
+                                            prefix: prefix.trim(),
+                                            days: Number(days)
+                                        }),
+                                    () => setPrefix("")
+                                )
                             }
                         >
                             Add rule
@@ -1077,9 +1410,17 @@ function BucketCard({
             </Section>
 
             {manage ? (
-                <Section title="Presigned URL" hint="Lets whoever holds it download or upload one object until it expires, without a key.">
+                <Section
+                    title="Presigned URL"
+                    hint="Lets whoever holds it download or upload one object until it expires, without a key."
+                >
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input value={objectKey} onChange={(event) => setObjectKey(event.target.value)} placeholder="path/to/file.png" className="min-w-48 flex-1" />
+                        <Input
+                            value={objectKey}
+                            onChange={(event) => setObjectKey(event.target.value)}
+                            placeholder="path/to/file.png"
+                            className="min-w-48 flex-1"
+                        />
                         <div className="w-32">
                             <Select
                                 value={method}
@@ -1091,7 +1432,11 @@ function BucketCard({
                             />
                         </div>
                         <div className="w-32">
-                            <Select value={lifetime} onValueChange={setLifetime} options={PRESIGN_LIFETIMES} />
+                            <Select
+                                value={lifetime}
+                                onValueChange={setLifetime}
+                                options={PRESIGN_LIFETIMES}
+                            />
                         </div>
                     </div>
                     <Input
@@ -1132,9 +1477,12 @@ function BucketCard({
                 {bucket.replicateTo ? (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span>
-                            Into <span className="font-mono">{bucket.replicateTo.name}</span> in {bucket.replicateTo.storeName}
+                            Into <span className="font-mono">{bucket.replicateTo.name}</span> in{" "}
+                            {bucket.replicateTo.storeName}
                         </span>
-                        <Badge variant={bucket.replicationState === "failed" ? "danger" : "success"}>
+                        <Badge
+                            variant={bucket.replicationState === "failed" ? "danger" : "success"}
+                        >
                             {bucket.replicationState === "failed" ? "Stopped" : "Running"}
                         </Badge>
                         {manage ? (
@@ -1142,14 +1490,23 @@ function BucketCard({
                                 size="sm"
                                 variant="ghost"
                                 disabled={pending}
-                                onClick={() => run(() => actions.setBucketReplicationAction({ bucketId: bucket.id, toBucketId: null }))}
+                                onClick={() =>
+                                    run(() =>
+                                        actions.setBucketReplicationAction({
+                                            bucketId: bucket.id,
+                                            toBucketId: null
+                                        })
+                                    )
+                                }
                             >
                                 Stop
                             </Button>
                         ) : null}
                     </div>
                 ) : null}
-                {bucket.replicationError ? <p className="text-xs text-danger">{bucket.replicationError}</p> : null}
+                {bucket.replicationError ? (
+                    <p className="text-xs text-danger">{bucket.replicationError}</p>
+                ) : null}
                 {manage && !bucket.replicateTo ? (
                     candidates === null ? (
                         <div>
@@ -1157,10 +1514,16 @@ function BucketCard({
                                 size="sm"
                                 variant="ghost"
                                 onClick={() =>
-                                    void actions.replicationCandidatesAction(bucket.id).then((result) => {
-                                        if (result.candidates) setCandidates(result.candidates);
-                                        else setError(result.error ?? "Could not list the buckets to replicate into");
-                                    })
+                                    void actions
+                                        .replicationCandidatesAction(bucket.id)
+                                        .then((result) => {
+                                            if (result.candidates) setCandidates(result.candidates);
+                                            else
+                                                setError(
+                                                    result.error ??
+                                                        "Could not list the buckets to replicate into"
+                                                );
+                                        })
                                 }
                             >
                                 Replicate...
@@ -1168,13 +1531,21 @@ function BucketCard({
                         </div>
                     ) : candidates.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            No bucket in another store on this server. Create a second object store here first.
+                            No bucket in another store on this server. Create a second object store
+                            here first.
                         </p>
                     ) : (
                         <Select
                             value=""
                             placeholder="Replicate into..."
-                            onValueChange={(toBucketId) => run(() => actions.setBucketReplicationAction({ bucketId: bucket.id, toBucketId }))}
+                            onValueChange={(toBucketId) =>
+                                run(() =>
+                                    actions.setBucketReplicationAction({
+                                        bucketId: bucket.id,
+                                        toBucketId
+                                    })
+                                )
+                            }
                             options={candidates.map((candidate) => ({
                                 value: candidate.id,
                                 label: `${candidate.name} (${candidate.storeName})`
@@ -1202,22 +1573,45 @@ const KIND_LABEL: Record<string, string> = {
 
 function ActivityList({ overview, compact }: { overview: Overview; compact: boolean }) {
     const format = useDisplayFormat();
-    const rows = compact ? overview.operations.filter((operation) => operation.status === "running") : overview.operations;
+    const rows = compact
+        ? overview.operations.filter((operation) => operation.status === "running")
+        : overview.operations;
     if (rows.length === 0) {
-        return compact ? null : <p className="text-sm text-muted-foreground">Nothing has been run on this database yet.</p>;
+        return compact ? null : (
+            <p className="text-sm text-muted-foreground">
+                Nothing has been run on this database yet.
+            </p>
+        );
     }
     return (
         <ul className="flex flex-col gap-2">
             {rows.map((operation) => (
-                <li key={operation.id} className="rounded-md border border-border px-3 py-2 text-xs">
+                <li
+                    key={operation.id}
+                    className="rounded-md border border-border px-3 py-2 text-xs"
+                >
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{KIND_LABEL[operation.kind] ?? operation.kind}</span>
+                        <span className="font-medium">
+                            {KIND_LABEL[operation.kind] ?? operation.kind}
+                        </span>
                         <Badge
-                            variant={operation.status === "failed" ? "danger" : operation.status === "running" ? "neutral" : "success"}
+                            variant={
+                                operation.status === "failed"
+                                    ? "danger"
+                                    : operation.status === "running"
+                                      ? "neutral"
+                                      : "success"
+                            }
                         >
-                            {operation.status === "running" ? "Running" : operation.status === "failed" ? "Failed" : "Done"}
+                            {operation.status === "running"
+                                ? "Running"
+                                : operation.status === "failed"
+                                  ? "Failed"
+                                  : "Done"}
                         </Badge>
-                        <span className="ml-auto text-muted-foreground">{format.dateTime(operation.startedAt)}</span>
+                        <span className="ml-auto text-muted-foreground">
+                            {format.dateTime(operation.startedAt)}
+                        </span>
                     </div>
                     {operation.status === "running" ? (
                         <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">

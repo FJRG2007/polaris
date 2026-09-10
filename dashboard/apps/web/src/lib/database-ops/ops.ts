@@ -15,10 +15,18 @@ import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import type { RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
-import { databaseCredentials, type DbCredentials } from "@/lib/database-service";
+import {
+    databaseClusterNodes,
+    databaseCredentials,
+    type DbCredentials
+} from "@/lib/database-service";
 import {
     readinessCommand,
     isManagedEngine,
+    mongoSets,
+    resolveTopology,
+    seedList,
+    type DbTopology,
     type ManagedEngine,
     type MaintenanceCommand
 } from "@polaris/core";
@@ -41,6 +49,14 @@ export interface InstanceContext {
     readonly admin: DbCredentials;
     readonly hosted: boolean;
     readonly privileges: string;
+    /** A Redis Cluster's nodes, `container` first; null for anything else. An
+     *  operation that acts on `container` alone reaches one node of several. */
+    readonly cluster: readonly string[] | null;
+    /** How the instance is laid out - for a hosted database, its instance's. */
+    readonly topology: DbTopology;
+    /** A MongoDB replica set of several members as a seed list, for the dump
+     *  and restore tools' `--host`; null otherwise. */
+    readonly mongoSeeds: string | null;
 }
 
 /** Raised for a refusal whose words are meant for the screen. */
@@ -55,19 +71,37 @@ export class DatabaseOperationError extends Error {
  * Resolve an instance the owner holds, with its container and both accounts.
  * Refuses one that has never been deployed: there is no container to act in.
  */
-export async function instanceContext(databaseId: string, ownerId: string): Promise<InstanceContext> {
+export async function instanceContext(
+    databaseId: string,
+    ownerId: string
+): Promise<InstanceContext> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        include: { target: true, parent: { select: { id: true, containerName: true } } }
+        include: {
+            target: true,
+            parent: {
+                select: {
+                    id: true,
+                    containerName: true,
+                    topology: true,
+                    members: true,
+                    shards: true,
+                    readReplicas: true
+                }
+            }
+        }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     if (!isManagedEngine(row.engine)) {
         throw new DatabaseOperationError(`Polaris cannot look after a ${row.engine} instance.`);
     }
     const container = row.parent ? row.parent.containerName : row.containerName;
-    if (!container) throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
+    if (!container)
+        throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
     const own = await databaseCredentials(row.id, ownerId);
     const admin = row.parent ? await databaseCredentials(row.parent.id, ownerId) : own;
+    const topology = resolveTopology(row.parent ?? row);
+    const set = topology.kind === "replicaSet" ? mongoSets(topology, container)[0] : undefined;
     return {
         id: row.id,
         name: row.name,
@@ -80,7 +114,10 @@ export async function instanceContext(databaseId: string, ownerId: string): Prom
         own,
         admin,
         hosted: row.parent !== null,
-        privileges: row.privileges
+        privileges: row.privileges,
+        cluster: row.parent ? null : databaseClusterNodes(row),
+        topology,
+        mongoSeeds: set ? seedList(set) : null
     };
 }
 
@@ -110,9 +147,40 @@ export function lastLine(output: string, secrets: readonly string[] = []): strin
     return line.slice(0, 400);
 }
 
+/**
+ * Run one command in a container, bounded, so a container that never answers
+ * cannot hold whoever waits on it forever. A transport failure is logged here
+ * and reported in words that name nothing internal.
+ */
+export async function runWithin(
+    ports: Pick<RuntimePorts, "runIn">,
+    container: string,
+    argv: readonly string[],
+    limitMs: number
+): Promise<{ code: number; output: string }> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+            () => reject(new Error(`It did not finish within ${limitMs / 60_000} minutes.`)),
+            limitMs
+        );
+    });
+    try {
+        return await Promise.race([
+            ports.runIn(container, argv).catch((error: unknown) => {
+                console.error("polaris: a command could not reach its container:", error);
+                throw new Error("The container did not answer.");
+            }),
+            late
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
 /** Run one step, or throw naming it. */
 export async function runStep(
-    ports: RuntimePorts,
+    ports: Pick<RuntimePorts, "runIn">,
     container: string,
     command: MaintenanceCommand,
     secrets: readonly string[] = []
@@ -165,7 +233,9 @@ export async function stageInto(
     onProgress?: (done: number, total: number) => void
 ): Promise<void> {
     if (!ports.writeFile) {
-        throw new DatabaseOperationError("This server cannot receive files yet. Update Polaris and try again.");
+        throw new DatabaseOperationError(
+            "This server cannot receive files yet. Update Polaris and try again."
+        );
     }
     const { size } = await stat(localPath);
     const body = createReadStream(localPath);
@@ -242,7 +312,10 @@ export async function startOperation(
         progress: async (done, total) => {
             await prisma.databaseOperation.update({
                 where: { id: row.id },
-                data: { doneBytes: BigInt(Math.max(0, Math.floor(done))), ...(total != null ? { totalBytes: BigInt(total) } : {}) }
+                data: {
+                    doneBytes: BigInt(Math.max(0, Math.floor(done))),
+                    ...(total != null ? { totalBytes: BigInt(total) } : {})
+                }
             });
         },
         succeed: async () => {

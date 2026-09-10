@@ -7,6 +7,7 @@ import {
     Bot,
     Building2,
     ChevronRight,
+    ClipboardCheck,
     Gauge,
     Globe,
     HardDrive,
@@ -20,7 +21,8 @@ import {
     SlidersHorizontal,
     Sparkles,
     Users,
-    UsersRound
+    UsersRound,
+    Wallet
 } from "lucide-react";
 
 /**
@@ -29,8 +31,18 @@ import {
  * gather them into a single place instead of the account menu.
  */
 const SECTIONS = [
-    { href: "/admin/users", icon: Users, title: "Users", description: "Accounts, admin rights, and invites." },
-    { href: "/admin/groups", icon: UsersRound, title: "Groups", description: "Group membership for shared access." },
+    {
+        href: "/admin/users",
+        icon: Users,
+        title: "Users",
+        description: "Accounts, admin rights, and invites."
+    },
+    {
+        href: "/admin/groups",
+        icon: UsersRound,
+        title: "Groups",
+        description: "Group membership for shared access."
+    },
     {
         href: "/admin/roles",
         icon: IdCard,
@@ -49,7 +61,18 @@ const SECTIONS = [
         title: "Security",
         description: "Whether an account has to carry a second factor, and which ones count."
     },
-    { href: "/admin/activity", icon: Activity, title: "Activity", description: "Audit log of actions across Polaris." },
+    {
+        href: "/admin/activity",
+        icon: Activity,
+        title: "Activity",
+        description: "Audit log of actions across Polaris."
+    },
+    {
+        href: "/admin/evidence",
+        icon: ClipboardCheck,
+        title: "Evidence",
+        description: "The controls in force, for an audit, as a dated report you can export."
+    },
     {
         href: "/admin/inbox",
         icon: MessagesSquare,
@@ -60,7 +83,8 @@ const SECTIONS = [
         href: "/admin/chat",
         icon: MessageSquare,
         title: "Chat",
-        description: "Message and file limits, how long one stays editable, and what a deleted one leaves."
+        description:
+            "Message and file limits, how long one stays editable, and what a deleted one leaves."
     },
     {
         href: "/admin/email",
@@ -68,12 +92,25 @@ const SECTIONS = [
         title: "Email",
         description: "Who Polaris sends mail as, and the channel that carries sign-in messages."
     },
-    { href: "/admin/domains", icon: Globe, title: "Domains", description: "App and sharing domains, DuckDNS sync." },
+    {
+        href: "/admin/domains",
+        icon: Globe,
+        title: "Domains",
+        description: "App and sharing domains, DuckDNS sync."
+    },
     {
         href: "/admin/consumption",
         icon: Gauge,
         title: "Consumption",
-        description: "What this machine is being spent on: Polaris itself, installed apps, and everything else running."
+        description:
+            "What this machine is being spent on: Polaris itself, installed apps, and everything else running."
+    },
+    {
+        href: "/admin/billing",
+        icon: Wallet,
+        title: "Billing",
+        description:
+            "What each project and organization used each month, priced at your rates, with budgets and exports."
     },
     {
         href: "/admin/organizations",
@@ -145,7 +182,9 @@ export default async function ManagementPage() {
                                     {section.title}
                                     <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                                 </span>
-                                <span className="text-xs text-muted-foreground">{section.description}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {section.description}
+                                </span>
                             </span>
                         </Link>
                     );

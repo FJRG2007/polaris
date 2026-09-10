@@ -62,7 +62,9 @@ function defaultPresets(scopeType: WafScopeType): string[] {
 function parseList(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((v): v is string => typeof v === "string")
+            : [];
     } catch {
         return [];
     }
@@ -240,7 +242,9 @@ const DEFAULT_POLARIS_ROW: RuleRow = {
 /** The rows to merge, standing in the instance defaults when the global scope has
  *  never been written. An existing row always wins, empty packs included. */
 function withInstanceDefaults(rows: readonly RuleRow[]): RuleRow[] {
-    return rows.some((row) => row.scopeType === "global") ? [...rows] : [DEFAULT_GLOBAL_ROW, ...rows];
+    return rows.some((row) => row.scopeType === "global")
+        ? [...rows]
+        : [DEFAULT_GLOBAL_ROW, ...rows];
 }
 
 /**
@@ -311,6 +315,50 @@ export async function resolvePolarisWaf(): Promise<ResolvedWaf> {
     return mergeRules([row ?? DEFAULT_POLARIS_ROW]);
 }
 
+/** What the firewall has in force across the instance, as counts. */
+export interface WafSummary {
+    /** Packs on the instance-wide scope, and whether those are the defaults because
+     *  the scope was never saved. */
+    readonly instancePacks: number;
+    readonly instanceDefaults: boolean;
+    /** The same for the dashboard's own scope. */
+    readonly polarisPacks: number;
+    readonly polarisDefaults: boolean;
+    /** Scopes somebody has saved a rule for. */
+    readonly scopes: number;
+    readonly customRules: number;
+    readonly denyEntries: number;
+    readonly allowScopes: number;
+    readonly loginScopes: number;
+    /** Scopes that switched the SQL injection or the XSS check off. */
+    readonly injectionOffScopes: number;
+}
+
+/**
+ * Every saved scope, counted, for the compliance evidence. Read here rather than
+ * by the evidence itself so the stored lists are parsed, and the unwritten
+ * instance scopes defaulted, exactly the way the edge reads them. One row per
+ * scope, so reading them all is bounded by what exists.
+ */
+export async function wafSummary(): Promise<WafSummary> {
+    const rows = await prisma.wafRule.findMany({ select: { ...RULE_SELECT, scopeId: true } });
+    const instance = rows.find((row) => row.scopeType === "global" && row.scopeId === "");
+    const polaris = rows.find((row) => row.scopeType === "polaris" && row.scopeId === "");
+    return {
+        instancePacks: parseList((instance ?? DEFAULT_GLOBAL_ROW).presets).length,
+        instanceDefaults: !instance,
+        polarisPacks: parseList((polaris ?? DEFAULT_POLARIS_ROW).presets).length,
+        polarisDefaults: !polaris,
+        scopes: rows.length,
+        customRules: rows.reduce((sum, row) => sum + parseCustomRules(row.rules).length, 0),
+        denyEntries: rows.reduce((sum, row) => sum + parseList(row.ipDenylist).length, 0),
+        allowScopes: rows.filter((row) => parseList(row.ipAllowlist).length > 0).length,
+        loginScopes: rows.filter((row) => row.requireLogin).length,
+        injectionOffScopes: rows.filter((row) => !row.sqlInjectionProtection || !row.xssProtection)
+            .length
+    };
+}
+
 /**
  * Resolve the effective WAF decision for many applications at once, in two queries
  * total (apps + rules) rather than the per-app pair resolveWaf runs. Callers that
@@ -318,9 +366,13 @@ export async function resolvePolarisWaf(): Promise<ResolvedWaf> {
  * on instances with many domains. Every id in the input maps to a decision - an
  * unknown id gets the empty decision, so lookups never miss.
  */
-export async function resolveWafBatch(applicationIds: readonly string[]): Promise<Map<string, ResolvedWaf>> {
+export async function resolveWafBatch(
+    applicationIds: readonly string[]
+): Promise<Map<string, ResolvedWaf>> {
     const ids = [...new Set(applicationIds)];
-    const result = new Map<string, ResolvedWaf>(ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF]));
+    const result = new Map<string, ResolvedWaf>(
+        ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF])
+    );
     if (ids.length === 0) return result;
     const apps = await prisma.application.findMany({
         where: { id: { in: ids } },
@@ -368,7 +420,11 @@ export async function resolveWafBatch(applicationIds: readonly string[]): Promis
         const hostId = app.target?.hostId ?? null;
         const applicable = [
             ...globalRows,
-            ...(hostId ? (groupsByHost.get(hostId) ?? []).flatMap((id) => byScope.get(`server-group:${id}`) ?? []) : []),
+            ...(hostId
+                ? (groupsByHost.get(hostId) ?? []).flatMap(
+                      (id) => byScope.get(`server-group:${id}`) ?? []
+                  )
+                : []),
             ...(hostId ? (byScope.get(`server:${hostId}`) ?? []) : []),
             ...(byScope.get(`project:${app.environment.projectId}`) ?? []),
             ...(byScope.get(`environment:${app.environmentId}`) ?? []),
@@ -403,7 +459,11 @@ export interface WafRuleView {
  * `system.manage` (not the member-held `deploy.manage`) - so ownership always passes
  * here for them.
  */
-async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeId: string): Promise<void> {
+async function assertScopeOwner(
+    ownerId: string,
+    scopeType: WafScopeType,
+    scopeId: string
+): Promise<void> {
     if (scopeType === "global" || scopeType === "polaris") return;
     if (scopeType === "project") {
         if ((await prisma.project.count({ where: { id: scopeId, ownerId } })) === 0) {
@@ -412,7 +472,9 @@ async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeI
         return;
     }
     if (scopeType === "environment") {
-        if ((await prisma.environment.count({ where: { id: scopeId, project: { ownerId } } })) === 0) {
+        if (
+            (await prisma.environment.count({ where: { id: scopeId, project: { ownerId } } })) === 0
+        ) {
             throw new Error("Environment not found");
         }
         return;
@@ -429,7 +491,11 @@ async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeI
         }
         return;
     }
-    if ((await prisma.application.count({ where: { id: scopeId, environment: { project: { ownerId } } } })) === 0) {
+    if (
+        (await prisma.application.count({
+            where: { id: scopeId, environment: { project: { ownerId } } }
+        })) === 0
+    ) {
         throw new Error("Service not found");
     }
 }

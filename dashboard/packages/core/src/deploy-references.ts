@@ -107,7 +107,9 @@ function substitute(key: string, value: string, lookup: ReferenceLookup): string
     }
     out += value.slice(from);
     if (out.length > ENV_VALUE_MAX) {
-        throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB once its references are filled in.`);
+        throw new Error(
+            `${key} is longer than ${ENV_VALUE_MAX / 1024} KB once its references are filled in.`
+        );
     }
     return out;
 }
@@ -126,6 +128,10 @@ export function databaseReferenceKeys(connection: {
     readonly username: string;
     readonly password: string;
     readonly uri: string;
+    /** A Redis Cluster's nodes as `host:port`, the seeds a cluster client takes.
+     *  Absent for anything that is not a cluster. */
+    readonly clusterNodes?: readonly string[] | null;
+    readonly readUri?: string | null;
 }): Record<string, string> {
     const port = String(connection.port);
     const keys: Record<string, string> = {
@@ -157,10 +163,24 @@ export function databaseReferenceKeys(connection: {
             MYSQLPASSWORD: connection.password,
             MYSQLDATABASE: connection.database
         });
+        // A primary with read replicas: where to read from, over the name the
+        // replicas share.
+        if (connection.readUri)
+            Object.assign(keys, {
+                READ_URL: connection.readUri,
+                MYSQL_READ_URL: connection.readUri
+            });
     } else if (connection.engine === "mongo") {
         keys.MONGO_URL = connection.uri;
     } else if (connection.engine === "redis") {
-        Object.assign(keys, { REDIS_URL: connection.uri, REDISHOST: connection.host, REDISPORT: port });
+        Object.assign(keys, {
+            REDIS_URL: connection.uri,
+            REDISHOST: connection.host,
+            REDISPORT: port
+        });
+        // A cluster's URL names one node; a cluster client wants every one.
+        if (connection.clusterNodes?.length)
+            keys.REDIS_CLUSTER_NODES = connection.clusterNodes.join(",");
     } else if (connection.engine === "seaweedfs") {
         // An object store's account is an S3 key pair; it answers with the names
         // S3 clients read, the AWS SDKs' own among them.

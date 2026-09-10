@@ -27,13 +27,28 @@ export interface VariableLink {
 }
 
 /** The keys a service is described by, besides the ones set on it (see `references.ts`). */
-const SERVICE_KEYS = ["POLARIS_PRIVATE_DOMAIN", "PORT", "POLARIS_PUBLIC_DOMAIN", "POLARIS_PUBLIC_URL"];
+const SERVICE_KEYS = [
+    "POLARIS_PRIVATE_DOMAIN",
+    "PORT",
+    "POLARIS_PUBLIC_DOMAIN",
+    "POLARIS_PUBLIC_URL"
+];
 
 /** The keys a managed database answers to; the values do not matter here. */
-function databaseKeys(engine: string): Set<string> {
+function databaseKeys(engine: string, cluster: boolean, readable: boolean): Set<string> {
     return new Set(
         Object.keys(
-            core.databaseReferenceKeys({ engine, host: "", port: 0, database: "", username: "", password: "", uri: "" })
+            core.databaseReferenceKeys({
+                engine,
+                host: "",
+                port: 0,
+                database: "",
+                username: "",
+                password: "",
+                uri: "",
+                clusterNodes: cluster ? [""] : null,
+                readUri: readable ? "-" : null
+            })
         )
     );
 }
@@ -60,18 +75,40 @@ export async function variableLinks(
     const environmentId =
         scope === "environment"
             ? scopeId
-            : (await prisma.application.findUnique({ where: { id: scopeId }, select: { environmentId: true } }))
-                  ?.environmentId;
+            : (
+                  await prisma.application.findUnique({
+                      where: { id: scopeId },
+                      select: { environmentId: true }
+                  })
+              )?.environmentId;
     if (!environmentId) return {};
 
     const [applications, databases, shared] = await Promise.all([
-        prisma.application.findMany({ where: { environmentId }, select: { id: true, slug: true, name: true } }),
-        prisma.managedDatabase.findMany({ where: { environmentId }, select: { slug: true, name: true, engine: true } }),
-        prisma.envVar.findMany({ where: { scopeType: "environment", scopeId: environmentId }, select: { key: true } })
+        prisma.application.findMany({
+            where: { environmentId },
+            select: { id: true, slug: true, name: true }
+        }),
+        prisma.managedDatabase.findMany({
+            where: { environmentId },
+            select: {
+                slug: true,
+                name: true,
+                engine: true,
+                clusterMasters: true,
+                topology: true,
+                parent: { select: { topology: true } }
+            }
+        }),
+        prisma.envVar.findMany({
+            where: { scopeType: "environment", scopeId: environmentId },
+            select: { key: true }
+        })
     ]);
     const serviceKeys = new Map<string, Set<string>>();
     const named = [...new Set([...found.values()].flat().map((reference) => reference.name))];
-    const linkedApps = applications.filter((app) => named.includes(app.slug) || named.includes(slugify(app.name)));
+    const linkedApps = applications.filter(
+        (app) => named.includes(app.slug) || named.includes(slugify(app.name))
+    );
     if (linkedApps.length > 0) {
         const keys = await prisma.envVar.findMany({
             where: { scopeType: "application", scopeId: { in: linkedApps.map((app) => app.id) } },
@@ -85,9 +122,15 @@ export async function variableLinks(
     function link(reference: core.VariableReference): VariableLink {
         const base = { written: reference.written, name: reference.name, key: reference.key };
         if (reference.name === "shared") {
-            return { ...base, target: { kind: "shared", label: "Shared variables" }, keyKnown: sharedKeys.has(reference.key) };
+            return {
+                ...base,
+                target: { kind: "shared", label: "Shared variables" },
+                keyKnown: sharedKeys.has(reference.key)
+            };
         }
-        const app = applications.find((one) => one.slug === reference.name || slugify(one.name) === reference.name);
+        const app = applications.find(
+            (one) => one.slug === reference.name || slugify(one.name) === reference.name
+        );
         if (app) {
             return {
                 ...base,
@@ -95,12 +138,18 @@ export async function variableLinks(
                 keyKnown: serviceKeys.get(app.id)?.has(reference.key) ?? false
             };
         }
-        const database = databases.find((one) => one.slug === reference.name || slugify(one.name) === reference.name);
+        const database = databases.find(
+            (one) => one.slug === reference.name || slugify(one.name) === reference.name
+        );
         if (database) {
             return {
                 ...base,
                 target: { kind: "database", label: database.name },
-                keyKnown: databaseKeys(database.engine).has(reference.key)
+                keyKnown: databaseKeys(
+                    database.engine,
+                    database.clusterMasters !== null,
+                    core.resolveTopology(database.parent ?? database).kind === "replicas"
+                ).has(reference.key)
             };
         }
         return { ...base, target: null, keyKnown: false };

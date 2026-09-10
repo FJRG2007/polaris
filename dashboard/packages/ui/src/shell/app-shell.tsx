@@ -126,9 +126,13 @@ export const PAGE_FILL = "h-[calc(100vh-var(--header-height)-var(--page-inset))]
  * account for. A screen using this must not also be `w-full` - a block box with
  * auto width absorbs the negative margins and grows into them, and a fixed width
  * would push the same distance off the right-hand edge instead.
+ *
+ * `page-bleed` is a marker, not a style: while one is on the page the window
+ * itself does not scroll (see tokens.css), because a screen like this owns every
+ * scrollbar in it and a second one on the window moves all of its panes at once.
  */
 export const PAGE_BLEED =
-    "-m-3 h-[calc(100vh-var(--header-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
+    "page-bleed -m-3 h-[calc(100vh-var(--header-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
 
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.

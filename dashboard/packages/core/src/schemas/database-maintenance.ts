@@ -98,7 +98,9 @@ export function upgradeTargets(engine: ManagedEngine, current: string): string[]
  */
 export function databaseDataPath(engine: string, version: string): string {
     if (engine === "postgres") {
-        return compareVersions(version, "18") >= 0 ? "/var/lib/postgresql" : "/var/lib/postgresql/data";
+        return compareVersions(version, "18") >= 0
+            ? "/var/lib/postgresql"
+            : "/var/lib/postgresql/data";
     }
     if (engine === "mysql" || engine === "mariadb") return "/var/lib/mysql";
     if (engine === "mongo") return "/data/db";
@@ -158,7 +160,14 @@ export function listDatabasesCommand(
     }
     if (engine === "mysql" || engine === "mariadb") {
         return {
-            argv: [engine === "mysql" ? "mysql" : "mariadb", "-uroot", `-p${adminPassword}`, "-N", "-e", "SHOW DATABASES"],
+            argv: [
+                engine === "mysql" ? "mysql" : "mariadb",
+                "-uroot",
+                `-p${adminPassword}`,
+                "-N",
+                "-e",
+                "SHOW DATABASES"
+            ],
             describe: "Listing the databases"
         };
     }
@@ -227,7 +236,10 @@ export interface ProbeTarget {
 export function readinessCommand(target: ProbeTarget): MaintenanceCommand {
     switch (target.engine) {
         case "postgres":
-            return { argv: ["pg_isready", "-U", target.username], describe: "Waiting for PostgreSQL" };
+            return {
+                argv: ["pg_isready", "-U", target.username],
+                describe: "Waiting for PostgreSQL"
+            };
         // The root password rides the argv of a process inside the database's own
         // container, the same channel `database-statements` uses; MYSQL_PWD is
         // deprecated by MySQL and not something to build on.
@@ -295,6 +307,9 @@ export interface RestoreTarget {
     /** For MongoDB, the database the dump was taken from, when that is not the
      *  one it is being restored into - a copy between databases. */
     readonly sourceDatabase?: string;
+    /** For a MongoDB replica set of several members, its seed list: the load
+     *  goes to whichever member is primary, not to the container it runs in. */
+    readonly seeds?: string;
 }
 
 /**
@@ -344,14 +359,20 @@ export function restoreCommands(target: RestoreTarget): MaintenanceCommand[] {
             ),
             admin(`DROP DATABASE IF EXISTS ${db}`, "Removing the current contents"),
             admin(
-                owner ? `CREATE DATABASE ${db} OWNER ${quoteIdent(target.username)}` : `CREATE DATABASE ${db}`,
+                owner
+                    ? `CREATE DATABASE ${db} OWNER ${quoteIdent(target.username)}`
+                    : `CREATE DATABASE ${db}`,
                 "Creating the database again"
             ),
             {
                 argv: withEnv({ PGPASSWORD: loaderPassword }, [
                     "sh",
                     "-c",
-                    strictPipe('gunzip -c "$1"', 'psql -v ON_ERROR_STOP=1 -q -U "$2" -d "$3"', "$1.failed"),
+                    strictPipe(
+                        'gunzip -c "$1"',
+                        'psql -v ON_ERROR_STOP=1 -q -U "$2" -d "$3"',
+                        "$1.failed"
+                    ),
                     "polaris",
                     target.file,
                     loader,
@@ -403,7 +424,13 @@ export function restoreCommands(target: RestoreTarget): MaintenanceCommand[] {
         // database's own account keeps what it had without being granted again.
         return [
             {
-                argv: [client, "-uroot", `-p${target.adminPassword}`, "-e", `DROP DATABASE IF EXISTS ${db}; CREATE DATABASE ${db};`],
+                argv: [
+                    client,
+                    "-uroot",
+                    `-p${target.adminPassword}`,
+                    "-e",
+                    `DROP DATABASE IF EXISTS ${db}; CREATE DATABASE ${db};`
+                ],
                 describe: "Removing the current contents"
             },
             {
@@ -426,11 +453,13 @@ export function restoreCommands(target: RestoreTarget): MaintenanceCommand[] {
     // to this database's namespaces, and renames them when the copy came from a
     // database of another name.
     const from = target.sourceDatabase ?? target.database;
-    const rename = from !== target.database ? [`--nsFrom=${from}.*`, `--nsTo=${target.database}.*`] : [];
+    const rename =
+        from !== target.database ? [`--nsFrom=${from}.*`, `--nsTo=${target.database}.*`] : [];
     return [
         {
             argv: [
                 "mongorestore",
+                ...(target.seeds ? [`--host=${target.seeds}`] : []),
                 `--username=${target.adminUser}`,
                 `--password=${target.adminPassword}`,
                 "--authenticationDatabase=admin",
@@ -485,7 +514,10 @@ export const redisModeSchema = z
         maxMemoryMb: z
             .number()
             .int()
-            .refine((value) => (REDIS_CACHE_SIZES_MB as readonly number[]).includes(value), "Pick an offered size")
+            .refine(
+                (value) => (REDIS_CACHE_SIZES_MB as readonly number[]).includes(value),
+                "Pick an offered size"
+            )
             .optional()
     })
     .refine((value) => value.mode !== "cache" || value.maxMemoryMb !== undefined, {
@@ -511,7 +543,15 @@ export function redisServerCommand(password: string, mode: RedisMode, maxMemoryM
         ];
     }
     if (mode === "persistent") {
-        return [...base, "--appendonly", "yes", "--appendfsync", "everysec", "--save", "3600 1 300 100 60 10000"];
+        return [
+            ...base,
+            "--appendonly",
+            "yes",
+            "--appendfsync",
+            "everysec",
+            "--save",
+            "3600 1 300 100 60 10000"
+        ];
     }
     return base;
 }
@@ -629,16 +669,20 @@ const MONGO_KEYFILE = "/data/db/.polaris-keyfile";
  * `mongodb` user with mode 400, as mongod requires) and then hands over to the
  * entrypoint unchanged; the entrypoint drops `--replSet` and `--keyFile` for
  * its own first-boot initialisation and keeps them for the real server.
+ *
+ * One line: a container's command reaches compose through the host daemon,
+ * which refuses any argument holding a control character, and through a YAML
+ * file on a remote server, where a line break inside a quoted value is folded
+ * into a space. A script written over several lines ran on neither.
  */
 export function mongoReplicaSetCommand(): string[] {
     const script = [
-        `if [ ! -s "${MONGO_KEYFILE}" ]; then`,
-        `  head -c 756 /dev/urandom | base64 > "${MONGO_KEYFILE}"`,
-        `  chmod 400 "${MONGO_KEYFILE}"`,
-        `  chown mongodb:mongodb "${MONGO_KEYFILE}"`,
+        `if [ ! -s "${MONGO_KEYFILE}" ]; then head -c 756 /dev/urandom | base64 > "${MONGO_KEYFILE}"`,
+        `chmod 400 "${MONGO_KEYFILE}"`,
+        `chown mongodb:mongodb "${MONGO_KEYFILE}"`,
         "fi",
         `exec docker-entrypoint.sh mongod --replSet ${MONGO_REPLICA_SET} --bind_ip_all --keyFile "${MONGO_KEYFILE}"`
-    ].join("\n");
+    ].join("; ");
     return ["sh", "-c", script];
 }
 
@@ -648,7 +692,11 @@ export function mongoReplicaSetCommand(): string[] {
  * answers with its status rather than an error, and so does one another
  * caller initiated between the status check and the initiation.
  */
-export function mongoInitiateCommand(adminUser: string, adminPassword: string, host: string): MaintenanceCommand {
+export function mongoInitiateCommand(
+    adminUser: string,
+    adminPassword: string,
+    host: string
+): MaintenanceCommand {
     if (!/^[A-Za-z0-9._-]+$/.test(host)) throw new Error("A member host is a container name");
     const config = `{ _id: ${JSON.stringify(MONGO_REPLICA_SET)}, members: [{ _id: 0, host: ${JSON.stringify(`${host}:27017`)} }] }`;
     const script = `try { rs.status().ok } catch (error) { try { rs.initiate(${config}).ok } catch (again) { if (again.codeName !== "AlreadyInitialized") throw again; 1 } }`;
@@ -717,7 +765,13 @@ export function pitrServerCommand(): string[] {
  *  folder mounted in is created by the engine as root. */
 export function pitrPrepareCommand(): MaintenanceCommand {
     return {
-        argv: ["sh", "-c", 'mkdir -p "$1/wal" "$1/base" && chown -R postgres:postgres "$1"', "polaris", PITR_MOUNT],
+        argv: [
+            "sh",
+            "-c",
+            'mkdir -p "$1/wal" "$1/base" && chown -R postgres:postgres "$1"',
+            "polaris",
+            PITR_MOUNT
+        ],
         describe: "Preparing the archive"
     };
 }
@@ -761,14 +815,23 @@ export function pitrBaseBackupCommand(label: string, username: string): Maintena
  *  `pg_archivecleanup` is given to keep the segments a base backup needs. */
 export function pitrNewestHistoryCommand(): MaintenanceCommand {
     return {
-        argv: ["sh", "-c", 'ls -1 "$1/wal" | grep "\\.backup$" | sort | tail -n 1', "polaris", PITR_MOUNT],
+        argv: [
+            "sh",
+            "-c",
+            'ls -1 "$1/wal" | grep "\\.backup$" | sort | tail -n 1',
+            "polaris",
+            PITR_MOUNT
+        ],
         describe: "Finding the newest backup record"
     };
 }
 
 /** Remove the segments older than the oldest base backup still kept, and the
  *  base backups that have fallen out of retention. */
-export function pitrCleanupCommands(oldestHistoryFile: string, removeBases: readonly string[]): MaintenanceCommand[] {
+export function pitrCleanupCommands(
+    oldestHistoryFile: string,
+    removeBases: readonly string[]
+): MaintenanceCommand[] {
     if (!/^[0-9A-F]{24}\.[0-9A-F]{8}\.backup$/.test(oldestHistoryFile)) {
         throw new Error("That is not a backup history file name");
     }
@@ -799,21 +862,22 @@ export function pitrCleanupCommands(oldestHistoryFile: string, removeBases: read
  * The recovered instance does not archive: its settings come from this
  * command, and nothing here repeats the original's archive settings, so it
  * never writes into the archive it is reading from.
+ *
+ * One line, for the reason `mongoReplicaSetCommand` gives.
  */
 export function pitrRecoveryCommand(baseLabel: string, target: Date): string[] {
     if (!/^[0-9TZ-]+$/.test(baseLabel)) throw new Error("A base backup label is a timestamp");
     const script = [
         "set -e",
-        'if [ ! -s "$PGDATA/PG_VERSION" ]; then',
-        '  mkdir -p "$PGDATA"',
-        '  tar -xzf "$1" -C "$PGDATA"',
-        '  touch "$PGDATA/recovery.signal"',
-        "  printf \"%s\\n\" \"restore_command = 'cp $3/wal/%f %p'\" \"recovery_target_time = '$2'\" \"recovery_target_action = 'promote'\" >> \"$PGDATA/postgresql.auto.conf\"",
-        '  chown -R postgres:postgres "$PGDATA"',
-        '  chmod 700 "$PGDATA"',
+        'if [ ! -s "$PGDATA/PG_VERSION" ]; then mkdir -p "$PGDATA"',
+        'tar -xzf "$1" -C "$PGDATA"',
+        'touch "$PGDATA/recovery.signal"',
+        'printf "%s\\n" "restore_command = \'cp $3/wal/%f %p\'" "recovery_target_time = \'$2\'" "recovery_target_action = \'promote\'" >> "$PGDATA/postgresql.auto.conf"',
+        'chown -R postgres:postgres "$PGDATA"',
+        'chmod 700 "$PGDATA"',
         "fi",
         "exec docker-entrypoint.sh postgres"
-    ].join("\n");
+    ].join("; ");
     return [
         "sh",
         "-c",
@@ -832,7 +896,10 @@ export function toRecoveryTime(at: Date): string {
 
 /** A base backup's label from when it started - sortable, and safe in a path. */
 export function pitrLabel(at: Date): string {
-    return at.toISOString().replace(/[:.]/g, "-").replace(/-\d{3}Z$/, "Z");
+    return at
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .replace(/-\d{3}Z$/, "Z");
 }
 
 /**
@@ -860,7 +927,10 @@ export const pitrSettingsSchema = z.object({
     keepDays: z
         .number()
         .int()
-        .refine((value) => (PITR_KEEP_DAYS as readonly number[]).includes(value), "Pick an offered window")
+        .refine(
+            (value) => (PITR_KEEP_DAYS as readonly number[]).includes(value),
+            "Pick an offered window"
+        )
 });
 
 export const mongoReplicaSetSchema = z.object({
@@ -985,28 +1055,36 @@ export function parseExternalSource(raw: string, into: ManagedEngine): ExternalS
 export function externalDumpCommand(source: ExternalSource, file: string): MaintenanceCommand {
     if (source.engine === "postgres") {
         return {
-            argv: withEnv({ PGPASSWORD: source.password, ...(source.tls ? { PGSSLMODE: "require" } : {}) }, [
-                "sh",
-                "-c",
-                strictPipe('pg_dump --no-owner --no-acl -h "$1" -p "$2" -U "$3" -d "$4"', 'gzip > "$5"', "$5.failed"),
-                "polaris",
-                source.host,
-                String(source.port),
-                source.username,
-                source.database,
-                file
-            ]),
+            argv: withEnv(
+                { PGPASSWORD: source.password, ...(source.tls ? { PGSSLMODE: "require" } : {}) },
+                [
+                    "sh",
+                    "-c",
+                    strictPipe(
+                        'pg_dump --no-owner --no-acl -h "$1" -p "$2" -U "$3" -d "$4"',
+                        'gzip > "$5"',
+                        "$5.failed"
+                    ),
+                    "polaris",
+                    source.host,
+                    String(source.port),
+                    source.username,
+                    source.database,
+                    file
+                ]
+            ),
             describe: `Copying ${source.database} from ${source.host}`
         };
     }
     if (source.engine === "mysql" || source.engine === "mariadb") {
         const tool = source.engine === "mysql" ? "mysqldump" : "mariadb-dump";
+        const gtid = source.engine === "mysql" ? " --set-gtid-purged=OFF" : "";
         return {
             argv: [
                 "sh",
                 "-c",
                 strictPipe(
-                    `${tool} --single-transaction --routines --triggers -h "$1" -P "$2" -u "$3" -p"$6" "$4"`,
+                    `${tool} --single-transaction${gtid} --routines --triggers -h "$1" -P "$2" -u "$3" -p"$6" "$4"`,
                     'gzip > "$5"',
                     "$5.failed"
                 ),
@@ -1046,7 +1124,9 @@ export function externalDumpCommand(source: ExternalSource, file: string): Maint
             "-p",
             String(source.port),
             // An ACL account other than the default one is named as well.
-            ...(source.username && source.username !== "default" ? ["--user", source.username] : []),
+            ...(source.username && source.username !== "default"
+                ? ["--user", source.username]
+                : []),
             ...(source.tls ? ["--tls"] : []),
             "--rdb",
             file

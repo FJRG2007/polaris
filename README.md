@@ -187,6 +187,10 @@ lets Polaris manage the machine it runs on - mounts, the Docker engine, its own
 updates - is part of it, along with the dedicated key it uses to reach that
 machine's Docker engine and the `polaris` command for the host.
 
+A native app for Windows, macOS and Linux (Account > Preferences) opens an
+instance in its own window with system notices, log windows and pushing a
+local build to it; see [`desktop/README.md`](desktop/README.md).
+
 ## Requirements
 
 [Docker Engine](https://docs.docker.com/engine/install/) with the Compose v2

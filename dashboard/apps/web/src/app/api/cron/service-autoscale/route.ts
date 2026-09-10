@@ -1,5 +1,5 @@
 /**
- * Move every autoscaled service's replica count toward its CPU target, on demand.
+ * Move every autoscaled service's replica count toward its CPU and traffic targets, on demand.
  *
  * Polaris' own scheduler already does this every minute (see `lib/cron`); the
  * route stays for an operator who would rather drive the timing themselves. It

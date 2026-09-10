@@ -20,7 +20,8 @@ vi.mock("@polaris/db", () => ({
 }));
 // Secrets are "encrypted" here by being kept in the value column behind a flag.
 vi.mock("@/lib/deploy/env-values", () => ({
-    decryptedValue: (row: { value: string | null; secretText?: string }) => row.secretText ?? row.value
+    decryptedValue: (row: { value: string | null; secretText?: string }) =>
+        row.secretText ?? row.value
 }));
 
 const { variableLinks } = await import("@/lib/deploy/variable-links");
@@ -32,21 +33,31 @@ describe("variableLinks", () => {
             { id: "api", slug: "api", name: "API" },
             { id: "web", slug: "web", name: "Web" }
         ]);
-        databaseFindMany.mockResolvedValue([{ slug: "postgres", name: "Postgres", engine: "postgres" }]);
+        databaseFindMany.mockResolvedValue([
+            { slug: "postgres", name: "Postgres", engine: "postgres" }
+        ]);
     });
 
     it("says what each reference points at, and whether the target has the key", async () => {
-        envVarFindMany.mockImplementation(async (query: { where: { scopeType: string; scopeId: unknown } }) => {
-            if (query.where.scopeType === "environment") return [{ key: "SENTRY_DSN" }];
-            if (typeof query.where.scopeId === "object") return [{ scopeId: "api", key: "API_KEY" }];
-            return [
-                { id: "v1", isSecret: false, value: "${{postgres.DATABASE_URL}}" },
-                { id: "v2", isSecret: true, value: null, secretText: "Bearer ${{api.API_KEY}} sk_live_secret" },
-                { id: "v3", isSecret: false, value: "${{shared.MISSING}}" },
-                { id: "v4", isSecret: false, value: "${{redis.URL}}" },
-                { id: "v5", isSecret: false, value: "plain" }
-            ];
-        });
+        envVarFindMany.mockImplementation(
+            async (query: { where: { scopeType: string; scopeId: unknown } }) => {
+                if (query.where.scopeType === "environment") return [{ key: "SENTRY_DSN" }];
+                if (typeof query.where.scopeId === "object")
+                    return [{ scopeId: "api", key: "API_KEY" }];
+                return [
+                    { id: "v1", isSecret: false, value: "${{postgres.DATABASE_URL}}" },
+                    {
+                        id: "v2",
+                        isSecret: true,
+                        value: null,
+                        secretText: "Bearer ${{api.API_KEY}} sk_live_secret"
+                    },
+                    { id: "v3", isSecret: false, value: "${{shared.MISSING}}" },
+                    { id: "v4", isSecret: false, value: "${{redis.URL}}" },
+                    { id: "v5", isSecret: false, value: "plain" }
+                ];
+            }
+        );
 
         const links = await variableLinks("application", "web");
 
@@ -74,8 +85,56 @@ describe("variableLinks", () => {
         expect(links.v5).toBeUndefined();
     });
 
+    it("knows the read URL of a MySQL primary with read replicas, and of a database hosted on one", async () => {
+        databaseFindMany.mockResolvedValue([
+            {
+                slug: "orders",
+                name: "Orders",
+                engine: "mysql",
+                clusterMasters: null,
+                topology: "replicas",
+                parent: null
+            },
+            {
+                slug: "billing",
+                name: "Billing",
+                engine: "mysql",
+                clusterMasters: null,
+                topology: "single",
+                parent: { topology: "replicas" }
+            },
+            {
+                slug: "plain",
+                name: "Plain",
+                engine: "mysql",
+                clusterMasters: null,
+                topology: "single",
+                parent: null
+            }
+        ]);
+        envVarFindMany
+            .mockReset()
+            .mockImplementation(async (query: { where: { scopeType: string } }) =>
+                query.where.scopeType === "environment"
+                    ? []
+                    : [
+                          { id: "v1", isSecret: false, value: "${{orders.READ_URL}}" },
+                          { id: "v2", isSecret: false, value: "${{billing.MYSQL_READ_URL}}" },
+                          { id: "v3", isSecret: false, value: "${{plain.READ_URL}}" }
+                      ]
+            );
+
+        const links = await variableLinks("application", "web");
+
+        expect(links.v1?.[0]?.keyKnown).toBe(true);
+        expect(links.v2?.[0]?.keyKnown).toBe(true);
+        expect(links.v3?.[0]).toMatchObject({ target: { kind: "database" }, keyKnown: false });
+    });
+
     it("reads nothing else when no variable holds a reference", async () => {
-        envVarFindMany.mockReset().mockResolvedValue([{ id: "v1", isSecret: false, value: "plain" }]);
+        envVarFindMany
+            .mockReset()
+            .mockResolvedValue([{ id: "v1", isSecret: false, value: "plain" }]);
         applicationFindMany.mockClear();
         expect(await variableLinks("environment", "env-1")).toEqual({});
         expect(applicationFindMany).not.toHaveBeenCalled();

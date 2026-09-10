@@ -26,6 +26,12 @@ import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
+    DatabaseTopologyField,
+    hasTopologyChoice,
+    SINGLE_TOPOLOGY,
+    type TopologyValue
+} from "./database-topology-field";
+import {
     Badge,
     Button,
     ConfirmDeleteDialog,
@@ -44,6 +50,7 @@ import {
     dbEngineLabel,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
+    REDIS_CLUSTER_MASTERS,
     SERVICE_TEMPLATES,
     type ServiceTemplate,
     type DatabaseCreateInput,
@@ -711,10 +718,40 @@ function DatabaseConnectionDialog({
                         </Field>
                         <Field
                             label="Connection URI"
-                            hint="Reachable by name from any service in this environment."
+                            hint={
+                                connection.cluster
+                                    ? "One node of the cluster, reachable by name from any service in this environment."
+                                    : connection.hosts.length > 1
+                                      ? `Lists all ${connection.hosts.length} members, so a client finds the primary wherever it is.`
+                                      : "Reachable by name from any service in this environment."
+                            }
                         >
                             <CopyRow value={connection.uri} secret={!revealed} />
                         </Field>
+                        {connection.cluster && (
+                            <>
+                                <Field
+                                    label="Cluster nodes"
+                                    hint={`A Redis cluster of ${connection.cluster.masters} masters and ${connection.cluster.masters} replicas. Connect with a client in cluster mode and give it these nodes; it is sent to the right one for each key.`}
+                                >
+                                    <CopyRow value={connection.cluster.nodes.join(",")} />
+                                </Field>
+                                <Field
+                                    label="Nodes reference"
+                                    hint="Resolves to the list above, for a client that takes every node."
+                                >
+                                    <CopyRow value={connection.cluster.reference} />
+                                </Field>
+                            </>
+                        )}
+                        {connection.readUri && (
+                            <Field
+                                label="Read replicas URI"
+                                hint={`Reads only, spread over the replicas. As a reference: ${connection.reference.replace("DATABASE_URL", "READ_URL")}`}
+                            >
+                                <CopyRow value={connection.readUri} secret={!revealed} />
+                            </Field>
+                        )}
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field label="Host">
                                 <CopyRow value={connection.host} />
@@ -871,7 +908,6 @@ export function NewServiceDialog({
                     <NewUploadForm environmentId={environmentId} onDone={done} />
                 ) : view === "template" ? (
                     <NewTemplateForm environmentId={environmentId} onDone={done} />
-
                 ) : (
                     <NewImageForm environmentId={environmentId} onDone={done} />
                 )}
@@ -1059,7 +1095,12 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                                     </span>
                                 )}
                             </span>
-                            <span className="block truncate text-xs text-muted-foreground" title={template.description}>{template.description}</span>
+                            <span
+                                className="block truncate text-xs text-muted-foreground"
+                                title={template.description}
+                            >
+                                {template.description}
+                            </span>
                         </span>
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
@@ -1074,19 +1115,24 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                 {picked.description} <span className="font-mono text-xs">{picked.image}</span>
             </p>
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={picked.name} />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={picked.name}
+                />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {picked.database && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named after the
-                    service. Its variables point at the database, so no password is copied.
+                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named
+                    after the service. Its variables point at the database, so no password is
+                    copied.
                 </p>
             )}
             {picked.companion && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a second service beside it for the {picked.companion.label}, reachable only from
-                    this environment.
+                    Creates a second service beside it for the {picked.companion.label}, reachable
+                    only from this environment.
                 </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -1409,7 +1455,13 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         </Field>
                     )}
                     <ServerField servers={servers} value={serverId} onChange={setServerId} />
-                    {imported && <RepoConfigPreview imported={imported} use={useRepoConfig} onUse={setUseRepoConfig} />}
+                    {imported && (
+                        <RepoConfigPreview
+                            imported={imported}
+                            use={useRepoConfig}
+                            onUse={setUseRepoConfig}
+                        />
+                    )}
                 </>
             )}
 
@@ -1434,6 +1486,16 @@ const PRIVILEGE_OPTIONS: SelectOption[] = [
     { value: "readonly", label: "Read only" }
 ];
 
+/** How a new Redis runs: one instance, or a cluster of so many masters. */
+const SINGLE = "single";
+const REDIS_TOPOLOGY_OPTIONS: SelectOption[] = [
+    { value: SINGLE, label: "A single instance" },
+    ...REDIS_CLUSTER_MASTERS.map((masters) => ({
+        value: String(masters),
+        label: `A cluster - ${masters} masters, ${masters} replicas`
+    }))
+];
+
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");
@@ -1452,14 +1514,22 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [privileges, setPrivileges] = useState("owner");
+    const [redisLayout, setRedisLayout] = useState(SINGLE);
+    const [topology, setTopology] = useState<TopologyValue>(SINGLE_TOPOLOGY);
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
+    const clusterMasters =
+        engine === "redis" && redisLayout !== SINGLE ? Number(redisLayout) : undefined;
+    const layout = !hosted && hasTopologyChoice(engine) ? topology : SINGLE_TOPOLOGY;
 
     // Which instances this engine could be placed on. Reloaded when the engine
-    // changes, because an instance only hosts databases of its own engine.
+    // changes, because an instance only hosts databases of its own engine - and
+    // so is the layout, which each engine offers differently.
     useEffect(() => {
         setInstanceId(DEDICATED);
+        setTopology(SINGLE_TOPOLOGY);
+        setRedisLayout(SINGLE);
         if (!info.namedDatabases) {
             setInstances([]);
             return;
@@ -1483,11 +1553,19 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             serverId: hosted ? undefined : serverId,
             instanceId: hosted ? instanceId : undefined,
             version: !hosted && version ? version : undefined,
-            exposePort: !hosted && exposePort.trim() ? Number(exposePort) : undefined,
+            exposePort:
+                !hosted &&
+                clusterMasters === undefined &&
+                layout.topology !== "replicaSet" &&
+                exposePort.trim()
+                    ? Number(exposePort)
+                    : undefined,
             databaseName: databaseName.trim() || undefined,
             username: username.trim() || undefined,
             password: info.storage ? undefined : password || undefined,
-            privileges: privileges as "owner" | "readwrite" | "readonly"
+            privileges: privileges as "owner" | "readwrite" | "readonly",
+            clusterMasters,
+            ...layout
         };
     }
 
@@ -1522,7 +1600,26 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     options={ENGINE_OPTIONS}
                 />
             </Field>
+            {engine === "redis" && (
+                <Field
+                    label="Runs as"
+                    hint={
+                        clusterMasters === undefined
+                            ? "One Redis, reached at one address."
+                            : `Keys are spread over ${clusterMasters} masters on this server, each with a replica that takes over if it stops. Clients connect in cluster mode.`
+                    }
+                >
+                    <Select
+                        value={redisLayout}
+                        onValueChange={setRedisLayout}
+                        options={REDIS_TOPOLOGY_OPTIONS}
+                    />
+                </Field>
+            )}
             {!hosted && <ServerField servers={servers} value={serverId} onChange={setServerId} />}
+            {!hosted && hasTopologyChoice(engine) && (
+                <DatabaseTopologyField engine={engine} value={topology} onChange={setTopology} />
+            )}
 
             <button
                 type="button"
@@ -1573,18 +1670,28 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                                     }))}
                                 />
                             </Field>
-                            <Field
-                                label="Published port"
-                                hint="Blank keeps it reachable only by the services in this environment, which is what most databases want."
-                            >
-                                <Input
-                                    value={exposePort}
-                                    onChange={(event) => setExposePort(event.target.value)}
-                                    placeholder={String(info.port)}
-                                    inputMode="numeric"
-                                    className="w-32"
-                                />
-                            </Field>
+                            {/* A cluster sends clients between its nodes by name,
+                                which only its network resolves, and a replica set's
+                                members are known by names only the environment
+                                resolves: neither is ever published. */}
+                            {clusterMasters === undefined && layout.topology !== "replicaSet" && (
+                                <Field
+                                    label="Published port"
+                                    hint={
+                                        layout.topology === "sharded"
+                                            ? "Publishes the cluster's router. Blank keeps it reachable only by the services in this environment."
+                                            : "Blank keeps it reachable only by the services in this environment, which is what most databases want."
+                                    }
+                                >
+                                    <Input
+                                        value={exposePort}
+                                        onChange={(event) => setExposePort(event.target.value)}
+                                        placeholder={String(info.port)}
+                                        inputMode="numeric"
+                                        className="w-32"
+                                    />
+                                </Field>
+                            )}
                         </>
                     )}
 

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { LogsView } from "../../logs-view";
 import { requirePermission } from "@/lib/session";
 import { getProjectFull } from "@/lib/deploy-service";
+import { LogsView } from "@/app/(app)/apps/deploy/logs-view";
 import { requireProjectAccess } from "@/lib/deploy-project-access";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,15 @@ export default async function ProjectLogsPage({
     if (!project) notFound();
 
     const requested = pick(query.env);
+    // A link that names a service - the desktop app's "follow logs in a window" -
+    // opens on the environment holding it, with that service selected.
+    const service = pick(query.service);
     const environment =
+        (service
+            ? project.environments.find((entry) =>
+                  entry.applications.some((app) => app.id === service)
+              )
+            : undefined) ??
         project.environments.find((entry) => entry.id === requested) ??
         project.environments.find((entry) => entry.isDefault) ??
         project.environments[0];
@@ -40,6 +48,7 @@ export default async function ProjectLogsPage({
     return (
         <LogsView
             environmentName={environment?.name ?? "production"}
+            initialService={service}
             services={(environment?.applications ?? []).map((app) => ({
                 id: app.id,
                 name: app.name,

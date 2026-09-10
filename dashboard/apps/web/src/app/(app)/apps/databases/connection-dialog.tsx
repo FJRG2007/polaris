@@ -95,7 +95,9 @@ export function ConnectionDialog({
     const chosenManaged = managed.find((entry) => entry.id === managedId) ?? null;
     const complete =
         name.trim() !== "" &&
-        (kind === "managed" ? managedId !== "" : host.trim() !== "" && port.trim() !== "");
+        (kind === "managed"
+            ? managedId !== "" && !chosenManaged?.refusal
+            : host.trim() !== "" && port.trim() !== "");
 
     const save = async () => {
         if (!complete || saving) return;
@@ -106,7 +108,9 @@ export function ConnectionDialog({
                 actions.saveConnectionAction({
                     id: connection?.id ?? null,
                     name: name.trim(),
-                    engine: (kind === "managed" ? (chosenManaged?.engine ?? engine) : engine) as never,
+                    engine: (kind === "managed"
+                        ? (chosenManaged?.engine ?? engine)
+                        : engine) as never,
                     managedDatabaseId: kind === "managed" ? managedId : null,
                     host: kind === "manual" ? host.trim() : null,
                     port: kind === "manual" ? Number(port) : null,
@@ -177,12 +181,17 @@ export function ConnectionDialog({
                                         }))}
                                     />
                                 </Field>
-                                {chosenManaged && !chosenManaged.reachable && (
-                                    <p className="text-xs text-warning">
-                                        This one runs on another server and is not published on a
-                                        port, so Polaris cannot reach it from here. Publish it on a
-                                        port from the database&apos;s own screen first.
-                                    </p>
+                                {chosenManaged?.refusal ? (
+                                    <p className="text-xs text-warning">{chosenManaged.refusal}</p>
+                                ) : (
+                                    chosenManaged &&
+                                    !chosenManaged.reachable && (
+                                        <p className="text-xs text-warning">
+                                            This one runs on another server and is not published on
+                                            a port, so Polaris cannot reach it from here. Publish it
+                                            on a port from the database&apos;s own screen first.
+                                        </p>
+                                    )
                                 )}
                             </>
                         )
@@ -257,7 +266,10 @@ export function ConnectionDialog({
                     />
 
                     {error && (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     )}

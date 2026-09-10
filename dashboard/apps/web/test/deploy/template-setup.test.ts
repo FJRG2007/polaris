@@ -72,12 +72,15 @@ vi.mock("@/lib/deploy-service", () => ({
     }
 }));
 vi.mock("@/lib/database-ops/ops", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/database-ops/ops")>("@/lib/database-ops/ops");
+    const actual =
+        await vi.importActual<typeof import("@/lib/database-ops/ops")>("@/lib/database-ops/ops");
     return {
         DatabaseOperationError: actual.DatabaseOperationError,
         lastLine: actual.lastLine,
+        runWithin: actual.runWithin,
         instanceContext: async () => ({ name: "blog-db" }),
-        withPorts: async (_context: unknown, work: (ports: unknown) => Promise<unknown>) => work({}),
+        withPorts: async (_context: unknown, work: (ports: unknown) => Promise<unknown>) =>
+            work({}),
         waitReady: async () => {
             calls.push("wait for the database to answer");
         }
@@ -87,13 +90,20 @@ vi.mock("@/lib/activity/activity", () => ({
     record: async (entry: { action: string; fromValue: string | null; toValue: string | null }) => {
         lines.push(entry);
     },
-    recordMany: async (entries: { action: string; fromValue: string | null; toValue: string | null }[]) => {
+    recordMany: async (
+        entries: { action: string; fromValue: string | null; toValue: string | null }[]
+    ) => {
         lines.push(...entries);
     }
 }));
 vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit: async () => undefined }));
 vi.mock("@/lib/env-var-service", () => ({
-    setEnvVars: async (_scope: string, id: string, _owner: string, vars: { key: string; value: string; isSecret: boolean }[]) => {
+    setEnvVars: async (
+        _scope: string,
+        id: string,
+        _owner: string,
+        vars: { key: string; value: string; isSecret: boolean }[]
+    ) => {
         variables.set(id, vars);
         return vars.length;
     }
@@ -107,14 +117,19 @@ vi.mock("@/lib/deploy/env-values", () => ({
     scopeValues: async () => ({ GITEA_ADMIN_PASSWORD: "hunter2-secret" })
 }));
 vi.mock("@/lib/deploy/releases", () => ({
-    currentReleaseRef: async () => ({ name: "site-blog-1a2b", project: "site", address: "site-blog-1a2b" })
+    currentReleaseRef: async () => ({
+        name: "site-blog-1a2b",
+        project: "site",
+        address: "site-blog-1a2b"
+    })
 }));
 vi.mock("@/lib/deploy/runtime", () => ({
     getPorts: async () => ({
         runIn: async (container: string, argv: string[]) => {
             const command = argv[2] ?? "";
             calls.push(`exec in ${container}: ${command.slice(0, 24)}`);
-            if (command.includes("admin user list")) return { code: readinessAnswers.shift() ?? 0, output: "" };
+            if (command.includes("admin user list"))
+                return { code: readinessAnswers.shift() ?? 0, output: "" };
             return { code: 0, output: "New user created with hunter2-secret\ndone\n" };
         },
         dispose: async () => undefined
@@ -136,7 +151,12 @@ const service = { id: APP, slug: "blog", environmentId: ENV, targetId: TARGET };
 
 describe("a template with a database", () => {
     it("names the database after the service and points the service at it by reference", async () => {
-        const parts = await setup.addTemplateParts({ template: serviceTemplate("ghost")!, service, ownerId: OWNER, keepReleases: false });
+        const parts = await setup.addTemplateParts({
+            template: serviceTemplate("ghost")!,
+            service,
+            ownerId: OWNER,
+            keepReleases: false
+        });
 
         expect(parts.database).toEqual({ id: "db-1", name: "blog-db" });
         const vars = variables.get(APP) ?? [];
@@ -157,7 +177,11 @@ describe("a template with a database", () => {
             userId: USER
         });
 
-        expect(calls).toEqual(["deploy database", "wait for the database to answer", `deploy ${APP}`]);
+        expect(calls).toEqual([
+            "deploy database",
+            "wait for the database to answer",
+            `deploy ${APP}`
+        ]);
         expect(lines).toEqual([]);
     });
 
@@ -173,21 +197,38 @@ describe("a template with a database", () => {
 
         expect(calls).toEqual(["deploy database"]);
         expect(lines).toEqual([
-            expect.objectContaining({ action: "setup-blocked", fromValue: "its database stats-db", toValue: "the deploy failed" })
+            expect.objectContaining({
+                action: "setup-blocked",
+                fromValue: "its database stats-db",
+                toValue: "the deploy failed"
+            })
         ]);
     });
 });
 
 describe("a template with a companion", () => {
     it("creates the companion beside the service and brings it up first", async () => {
-        const parts = await setup.addTemplateParts({ template: serviceTemplate("kafka")!, service, ownerId: OWNER, keepReleases: false });
+        const parts = await setup.addTemplateParts({
+            template: serviceTemplate("kafka")!,
+            service,
+            ownerId: OWNER,
+            keepReleases: false
+        });
         expect(parts.companion).toEqual({ id: "companion-1", name: "blog-broker" });
-        expect(variables.get("companion-1")?.find((entry) => entry.key === "KAFKA_ADVERTISED_LISTENERS")?.value).toBe(
-            "PLAINTEXT://${{blog-broker.POLARIS_PRIVATE_DOMAIN}}:9092"
-        );
+        expect(
+            variables
+                .get("companion-1")
+                ?.find((entry) => entry.key === "KAFKA_ADVERTISED_LISTENERS")?.value
+        ).toBe("PLAINTEXT://${{blog-broker.POLARIS_PRIVATE_DOMAIN}}:9092");
 
         calls.length = 0;
-        await setup.firstTemplateDeploy({ template: serviceTemplate("kafka")!, applicationId: APP, parts, ownerId: OWNER, userId: USER });
+        await setup.firstTemplateDeploy({
+            template: serviceTemplate("kafka")!,
+            applicationId: APP,
+            parts,
+            ownerId: OWNER,
+            userId: USER
+        });
         expect(calls).toEqual(["deploy and wait companion-1", `deploy ${APP}`]);
     });
 });
@@ -211,7 +252,11 @@ describe("a template with setup", () => {
         ]);
         expect(calls.at(-1)).toContain("su-exec git gitea admin");
         expect(lines).toEqual([
-            expect.objectContaining({ action: "setup", fromValue: "Create the Gitea admin", toValue: "done" })
+            expect.objectContaining({
+                action: "setup",
+                fromValue: "Create the Gitea admin",
+                toValue: "done"
+            })
         ]);
         expect(JSON.stringify(lines)).not.toContain("hunter2-secret");
     });

@@ -1,8 +1,9 @@
 /**
  * What an instance needs once its container answers, that a compose file cannot
- * say: an object store's identities, a MongoDB replica set's initiation, and the
- * archive folder and first base backup of a PostgreSQL instance kept for
- * point-in-time recovery.
+ * say: a Redis Cluster's creation, an object store's identities, a MongoDB
+ * replica set's initiation, the joining of a database laid out over several
+ * containers (`./topology`), and the archive folder and first base backup of a
+ * PostgreSQL instance kept for point-in-time recovery.
  *
  * Run after every successful deploy of a dedicated instance, so each step is
  * safe to repeat. A failure is recorded among the instance's operations - the
@@ -12,8 +13,17 @@
 
 import { prisma } from "@polaris/db";
 import type { RuntimePorts } from "@polaris/deploy";
-import { mongoInitiateCommand } from "@polaris/core";
-import { DatabaseOperationError, instanceContext, runStep, waitReady, withPorts, type InstanceContext } from "./ops";
+import { ensureRedisCluster } from "./redis-cluster";
+import { ensureTopology, topologySetup } from "./topology";
+import { mongoInitiateCommand, resolveTopology } from "@polaris/core";
+import {
+    DatabaseOperationError,
+    instanceContext,
+    runStep,
+    waitReady,
+    withPorts,
+    type InstanceContext
+} from "./ops";
 
 /** How long a new replica set is given to elect its only member. */
 const PRIMARY_WAIT_MS = 60_000;
@@ -21,14 +31,42 @@ const PRIMARY_WAIT_MS = 60_000;
 export async function afterProvision(databaseId: string, ownerId: string): Promise<void> {
     const row = await prisma.managedDatabase.findUnique({
         where: { id: databaseId },
-        select: { engine: true, parentId: true, replicaSet: true, pitr: true, upgradeState: true }
+        select: {
+            engine: true,
+            parentId: true,
+            replicaSet: true,
+            pitr: true,
+            upgradeState: true,
+            clusterMasters: true,
+            topology: true,
+            members: true,
+            shards: true,
+            readReplicas: true
+        }
     });
     if (!row || row.parentId) return;
+    const topology = resolveTopology(row);
     let step = "Setting up";
     try {
-        if (row.engine === "seaweedfs") {
+        if (row.engine === "redis" && row.clusterMasters) {
+            step = "Creating the Redis cluster";
+            const context = await instanceContext(databaseId, ownerId);
+            await withPorts(context, (ports) => ensureRedisCluster(ports, context));
+        } else if (topology.kind === "replicaSet" && row.upgradeState === "running") {
+            // A replica set being upgraded is deployed once per member while its
+            // primary moves between them; the upgrade waits on the set itself, and
+            // a wait for the first member to be primary here would fail mid-way.
+            return;
+        } else if (topology.kind !== "single") {
+            step =
+                topology.kind === "replicas" ? "Starting the read replicas" : "Joining the members";
+            const context = await instanceContext(databaseId, ownerId);
+            await withPorts(context, (ports) => ensureTopology(ports, topologySetup(context)));
+        } else if (row.engine === "seaweedfs") {
             step = "Writing the store's keys";
-            const { ensureStoreIdentities, resumeStoreReplications } = await import("@/lib/object-storage/store");
+            const { ensureStoreIdentities, resumeStoreReplications } = await import(
+                "@/lib/object-storage/store"
+            );
             await ensureStoreIdentities(databaseId, ownerId);
             await resumeStoreReplications(databaseId);
         } else if (row.engine === "mongo" && row.replicaSet) {
@@ -52,7 +90,14 @@ export async function afterProvision(databaseId: string, ownerId: string): Promi
             console.error(`database: setting up ${databaseId} failed:`, error);
         }
         await prisma.databaseOperation.create({
-            data: { databaseId, kind: "setup", status: "failed", step, error: reason, finishedAt: new Date() }
+            data: {
+                databaseId,
+                kind: "setup",
+                status: "failed",
+                step,
+                error: reason,
+                finishedAt: new Date()
+            }
         });
     }
 }
@@ -62,7 +107,10 @@ export async function afterProvision(databaseId: string, ownerId: string): Promi
  * is the primary - a set that is initiated but has not elected yet refuses
  * every write, which is what a restore right after an upgrade would hit.
  */
-export async function ensureMongoReplicaSet(ports: RuntimePorts, context: InstanceContext): Promise<void> {
+export async function ensureMongoReplicaSet(
+    ports: RuntimePorts,
+    context: InstanceContext
+): Promise<void> {
     await waitReady(ports, context);
     const secrets = [context.admin.password];
     await runStep(
@@ -86,7 +134,8 @@ export async function ensureMongoReplicaSet(ports: RuntimePorts, context: Instan
     const deadline = Date.now() + PRIMARY_WAIT_MS;
     while (Date.now() < deadline) {
         const result = await ports.runIn(context.container, probe).catch(() => null);
-        if (result?.code === 0 && result.output.trim().split(/\r?\n/).at(-1)?.trim() === "true") return;
+        if (result?.code === 0 && result.output.trim().split(/\r?\n/).at(-1)?.trim() === "true")
+            return;
         await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     throw new DatabaseOperationError("The replica set did not elect a primary within a minute.");

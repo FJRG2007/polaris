@@ -1,15 +1,18 @@
 # Developer guide
 
-Polaris is a monorepo with two pillars:
+Polaris is a monorepo with three pillars:
 
 - **`dashboard/`** - the web control plane: an npm-workspaces monorepo (Next.js
   app, shared `@polaris/*` packages). This is the main product surface.
 - **`plugins/`** + **`crates/`** - the Rust side: Home Assistant integrations
   and their on-device agents, plus the privileged `polaris-hostd` host daemon.
   These form one Cargo workspace.
+- **`desktop/`** - the native desktop app (Electron): its own npm workspace,
+  independent of `dashboard/`. See [`../../desktop/README.md`](../../desktop/README.md).
 
-The two are independent: you can work on the dashboard without a Rust toolchain,
-and on a plugin without touching Node.
+The three are independent: you can work on the dashboard without a Rust
+toolchain, on a plugin without touching Node, and on the desktop app without
+either.
 
 ## Layout
 
@@ -24,13 +27,14 @@ polaris/
 │       ├── core/              # polaris-unas-core   (Rust lib, reusable)
 │       ├── agent/             # polaris-unas-agent  (Rust bin, on-device)
 │       └── homeassistant/     # HACS-installable integration (Python glue)
-└── dashboard/
-    ├── apps/web/              # the dashboard (Next.js App Router)
-    ├── apps/landing, apps/demo
-    ├── mdns/                  # polaris.local responder
-    ├── packages/              # @polaris/{config,core,db,auth,storage,ui,...}
-    ├── docker/                # Dockerfile, compose, Caddy
-    └── scripts/               # install / update / dev
+├── dashboard/
+│   ├── apps/web/              # the dashboard (Next.js App Router)
+│   ├── apps/landing, apps/demo
+│   ├── mdns/                  # polaris.local responder
+│   ├── packages/              # @polaris/{config,core,db,auth,storage,ui,...}
+│   ├── docker/                # Dockerfile, compose, Caddy
+│   └── scripts/               # install / update / dev
+└── desktop/                   # native desktop app (Electron, own npm workspace)
 ```
 
 ## Dashboard
@@ -88,12 +92,21 @@ Each plugin has three execution contexts that share one domain crate
 
 Cross-plugin Rust graduates to `crates/` only once a second consumer needs it.
 
+## Desktop app
+
+Its own npm workspace, not part of the `dashboard/` one. See
+[`../../desktop/README.md`](../../desktop/README.md) for development and release
+commands.
+
 ## Distribution
 
 - **Plugins** install manually from GitHub Releases: a release workflow builds
   the on-device agent and attaches an installable ZIP. See each plugin's README.
 - **Dashboard** ships as a container image published to GHCR on `dashboard-v*`
   tags, alongside the `polaris-hostd` static musl binaries.
+- **Desktop app** ships as platform installers attached to a GitHub release on
+  `desktop-v*` tags (`.github/workflows/desktop.yml`). See
+  [`../../desktop/README.md`](../../desktop/README.md).
 
 ## Conventions
 

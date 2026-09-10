@@ -1,0 +1,271 @@
+/*
+ * The app's own pages: the address form, the key form and the push window.
+ * The dashboard's palette - its backgrounds in each theme, the violet of the mark -
+ * so moving from one of these to the dashboard does not look like two programs.
+ */
+
+:root {
+    color-scheme: light dark;
+    --ground: #f6f6f9;
+    --surface: #ffffff;
+    --text: #16171a;
+    --muted: #5f6470;
+    --line: #dcdde3;
+    --accent: #7632ec;
+    --accent-text: #ffffff;
+    --danger: #c62828;
+    --success: #1f7a4d;
+    --code: #0f1013;
+    --code-text: #d6d8de;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ground: #0b0c0e;
+        --surface: #131418;
+        --text: #eceef2;
+        --muted: #9a9fab;
+        --line: #272930;
+        --danger: #f0716b;
+        --success: #4cc38a;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 28px 28px 24px;
+    background: var(--ground);
+    color: var(--text);
+    line-height: 1.45;
+}
+
+h1 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+p {
+    margin: 0;
+}
+
+.lead {
+    color: var(--muted);
+    margin-bottom: 20px;
+}
+
+.mark {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+form,
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.field {
+    position: relative;
+    display: flex;
+}
+
+input,
+select {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 11px;
+}
+
+.field input {
+    padding-right: 64px;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+input[aria-invalid="true"] {
+    border-color: var(--danger);
+}
+
+.reveal {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+.hint {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.error {
+    font-size: 0.85rem;
+    color: var(--danger);
+}
+
+.banner {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+}
+
+.banner.bad {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+    color: var(--danger);
+}
+
+.banner.good {
+    border-color: color-mix(in srgb, var(--success) 45%, transparent);
+    color: var(--success);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.row.end {
+    justify-content: flex-end;
+}
+
+.spread {
+    flex: 1;
+    min-width: 0;
+}
+
+button {
+    font: inherit;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    padding: 8px 14px;
+    cursor: pointer;
+}
+
+button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 500;
+}
+
+button.link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+button[aria-disabled="true"],
+button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.path {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+}
+
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.steps li {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+
+.steps li[data-state="current"] {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.steps li[data-state="done"] {
+    color: var(--success);
+}
+
+.steps li[data-state="failed"] {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.steps li[data-state="cancelled"] {
+    color: var(--text);
+}
+
+progress {
+    width: 100%;
+    height: 6px;
+    accent-color: var(--accent);
+}
+
+pre.log {
+    margin: 0;
+    height: 300px;
+    overflow: auto;
+    background: var(--code);
+    color: var(--code-text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+[hidden] {
+    display: none !important;
+}

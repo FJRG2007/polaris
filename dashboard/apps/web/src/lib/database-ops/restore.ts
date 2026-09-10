@@ -50,7 +50,17 @@ export async function restoreDumpInto(
 ): Promise<void> {
     const engine = context.engine;
     if (engine === "seaweedfs") {
-        throw new DatabaseOperationError("An object store is restored from its own bucket copies, not from a dump.");
+        throw new DatabaseOperationError(
+            "An object store is restored from its own bucket copies, not from a dump."
+        );
+    }
+    // A snapshot loaded into one node of a cluster holds keys whose slots other
+    // nodes own, and a node of a cluster cannot be made the replica this load
+    // relies on. Refused whole rather than leaving a cluster half replaced.
+    if (context.cluster) {
+        throw new DatabaseOperationError(
+            "A Redis cluster cannot be restored in place: each master holds its own share of the keys. Nothing was changed."
+        );
     }
     const { operation } = options;
     await withPorts(context, async (ports) => {
@@ -77,15 +87,20 @@ export async function restoreDumpInto(
                 username: context.own.username,
                 password: context.own.password,
                 privileges: context.privileges as DbPrivilege,
-                adminUser: engine === "mysql" || engine === "mariadb" ? "root" : context.admin.username,
+                adminUser:
+                    engine === "mysql" || engine === "mariadb" ? "root" : context.admin.username,
                 adminPassword: context.admin.password,
                 hosted: context.hosted,
                 file: inside,
-                ...(options.sourceDatabase ? { sourceDatabase: options.sourceDatabase } : {})
+                ...(options.sourceDatabase ? { sourceDatabase: options.sourceDatabase } : {}),
+                ...(context.mongoSeeds ? { seeds: context.mongoSeeds } : {})
             });
             for (const step of steps) {
                 await operation.step(step.describe);
-                await runStep(ports, context.container, step, [context.admin.password, context.own.password]);
+                await runStep(ports, context.container, step, [
+                    context.admin.password,
+                    context.own.password
+                ]);
             }
         } finally {
             await unstage(ports, context.container, inside);
@@ -123,7 +138,9 @@ async function loadRedis(
             const info = await runStep(ports, context.container, probe, [password]);
             if (redisSyncDone(info)) break;
             if (Date.now() > deadline) {
-                throw new DatabaseOperationError("Redis did not finish loading the snapshot in 30 minutes.");
+                throw new DatabaseOperationError(
+                    "Redis did not finish loading the snapshot in 30 minutes."
+                );
             }
         }
     } finally {

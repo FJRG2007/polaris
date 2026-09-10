@@ -31,8 +31,21 @@ interface ServiceRef {
     running: boolean;
 }
 
-export function LogsView({ environmentName, services }: { environmentName: string; services: ServiceRef[] }) {
-    const [selected, setSelected] = useState<string>(ALL);
+export function LogsView({
+    environmentName,
+    services,
+    initialService
+}: {
+    environmentName: string;
+    services: ServiceRef[];
+    /** The service to open on, from the link - one not in this environment is ignored. */
+    initialService?: string | null;
+}) {
+    const [selected, setSelected] = useState<string>(() =>
+        initialService && services.some((service) => service.id === initialService)
+            ? initialService
+            : ALL
+    );
 
     const watched = useMemo(() => {
         if (selected !== ALL) return services.filter((service) => service.id === selected);
@@ -77,7 +90,9 @@ export function LogsView({ environmentName, services }: { environmentName: strin
             {services.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 px-4 py-16 text-center">
                     <ScrollText className="size-5 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No services in this environment to log.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No services in this environment to log.
+                    </p>
                 </div>
             ) : (
                 <RuntimeLogs

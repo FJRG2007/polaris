@@ -19,17 +19,26 @@
  * button was the whole reason it felt like two screens. It is cancelled and
  * re-run as the address changes, and a stale answer is dropped rather than
  * filling the form in with the wrong servers.
+ *
+ * The same dialog changes a mailbox that is already here (`editing`): the same
+ * fields, the same checks as they are typed, and the same rule on the server -
+ * nothing is stored until both servers accept it. What differs is only what a
+ * change means: the address is shown rather than asked for, the password box is
+ * empty and empty keeps the one stored - until the servers or the login change,
+ * when it has to be typed again - and an authorized mailbox is offered the way to
+ * authorize it again instead of a password.
  */
 
 import Link from "next/link";
+import { MAIL_PALETTE } from "./palette";
 import { useRouter } from "next/navigation";
-import { mailHost, mailPort } from "@polaris/core";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailDiscovery } from "@/lib/mailbox/autoconfig";
+import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { addressState } from "@/app/(app)/mail/address-state";
-import { addAccountAction, discoverAction } from "@/app/(app)/mail/actions";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { addAccountAction, discoverAction, updateAccountAction } from "@/app/(app)/mail/actions";
 import {
     Button,
     Dialog,
@@ -41,6 +50,15 @@ import {
     cn,
     useToast
 } from "@polaris/ui";
+import {
+    findMailService,
+    mailAccountSetupSchema,
+    mailAccountUpdateSchema,
+    mailHost,
+    mailPort,
+    normalizeMailName,
+    type MailSocketSecurity
+} from "@polaris/core";
 
 /** An outside account somebody has already authorized here. */
 export interface LinkedAccount {
@@ -77,6 +95,9 @@ export function ConnectMailboxDialog({
     done = "",
     lead,
     submit,
+    editing,
+    focusPassword = false,
+    onPending,
     onClose
 }: {
     links: readonly LinkedAccount[];
@@ -129,28 +150,58 @@ export function ConnectMailboxDialog({
      * call is how the two drift into disagreeing about what a valid address is.
      */
     submit?: (setup: unknown) => Promise<unknown>;
+    /**
+     * A mailbox already here, to change rather than to add.
+     *
+     * Everything it has is filled in except its password, which no read ever
+     * returns: the box is empty, and empty keeps the stored one.
+     */
+    editing?: MailAccountView;
+    /** Open with the cursor in the password box - what the "stopped accepting
+     *  its password" notice is asking somebody to do. */
+    focusPassword?: boolean;
+    /**
+     * Told what the mailbox's row should say while the servers are asked, and
+     * told `null` when that has to be taken back because they refused.
+     */
+    onPending?: (pending: Partial<MailAccountView> | null) => void;
     onClose: () => void;
 }) {
     const router = useRouter();
     const toast = useToast();
 
-    const [address, setAddress] = useState("");
-    const [discovery, setDiscovery] = useState<MailDiscovery | null>(null);
+    const [address, setAddress] = useState(editing?.address ?? "");
+    const [discovery, setDiscovery] = useState<MailDiscovery | null>(
+        editing ? seededDiscovery(editing) : null
+    );
     const [looking, setLooking] = useState(false);
     const [password, setPassword] = useState("");
-    const [username, setUsername] = useState("");
-    const [displayName, setDisplayName] = useState("");
-    const [connectionId, setConnectionId] = useState("");
-    const [usePassword, setUsePassword] = useState(false);
+    const [username, setUsername] = useState(editing?.username ?? "");
+    const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
+    const [label, setLabel] = useState(editing?.label ?? "");
+    const [color, setColor] = useState<string | null>(editing?.color ?? null);
+    const [connectionId, setConnectionId] = useState(editing?.connectionId ?? "");
+    const [usePassword, setUsePassword] = useState(editing?.auth === "password");
     const [showServers, setShowServers] = useState(false);
-    const [servers, setServers] = useState({
-        imapHost: "",
-        imapPort: "993",
-        imapSecurity: "tls",
-        smtpHost: "",
-        smtpPort: "465",
-        smtpSecurity: "tls"
-    });
+    const [servers, setServers] = useState(
+        editing
+            ? {
+                  imapHost: editing.imapHost,
+                  imapPort: String(editing.imapPort),
+                  imapSecurity: editing.imapSecurity,
+                  smtpHost: editing.smtpHost,
+                  smtpPort: String(editing.smtpPort),
+                  smtpSecurity: editing.smtpSecurity
+              }
+            : {
+                  imapHost: "",
+                  imapPort: "993",
+                  imapSecurity: "tls",
+                  smtpHost: "",
+                  smtpPort: "465",
+                  smtpSecurity: "tls"
+              }
+    );
     const [problem, setProblem] = useState("");
     const [field, setField] = useState("");
     const [connecting, startConnecting] = useTransition();
@@ -159,13 +210,17 @@ export function ConnectMailboxDialog({
     // a slow lookup must not be filled in with the previous domain's servers.
     const wanted = useRef("");
 
-    const state = addressState(address, taken);
+    // A mailbox being changed is already its own answer: its address is not
+    // typed, so it is neither invalid nor "already here".
+    const state = editing ? "ok" : addressState(address, taken);
     const valid = state === "ok" || state === "taken";
     /** Already here. Nothing else on this dialog applies: there are no servers
      *  worth looking up for a mailbox that is already connected. */
     const already = state === "taken";
 
     useEffect(() => {
+        // Its servers are the ones it has, not the ones a lookup would guess.
+        if (editing) return;
         if (!valid || already) {
             setDiscovery(null);
             setLooking(false);
@@ -200,7 +255,7 @@ export function ConnectMailboxDialog({
             })();
         }, SETTLE_MS);
         return () => clearTimeout(timer);
-    }, [address, valid, already]);
+    }, [address, valid, already, editing]);
 
     const oauthReady = !allowOauth
         ? false
@@ -211,33 +266,119 @@ export function ConnectMailboxDialog({
             : false;
     const authorizable = Boolean(discovery?.oauth) && oauthReady && !usePassword;
     const usable = links.filter((link) => link.provider === discovery?.oauth && link.readyForMail);
-    const chosenConnection = connectionId || usable[0]?.id || "";
+    // The one chosen, while it is still one that can be chosen: a mailbox being
+    // changed may point at a link that has since lost its mail access.
+    const chosenConnection = usable.some((link) => link.id === connectionId)
+        ? connectionId
+        : (usable[0]?.id ?? "");
+    const provider = discovery?.oauth === "microsoft" ? "Microsoft" : "Google";
+
+    /** What would be sent, as it stands. Checked against the server's own
+     *  schema as it is typed, and compared with the mailbox as it was loaded. */
+    const shape = {
+        displayName,
+        auth: authorizable ? ("oauth" as const) : ("password" as const),
+        connectionId: authorizable ? chosenConnection : null,
+        username,
+        imap: {
+            host: servers.imapHost,
+            port: Number(servers.imapPort),
+            security: servers.imapSecurity
+        },
+        smtp: {
+            host: servers.smtpHost,
+            port: Number(servers.smtpPort),
+            security: servers.smtpSecurity
+        }
+    };
+    const update = editing
+        ? { ...shape, label, color, password: authorizable ? "" : password }
+        : null;
+    const checked = update
+        ? mailAccountUpdateSchema.safeParse(update)
+        : mailAccountSetupSchema.safeParse({
+              ...shape,
+              address,
+              label: "",
+              ...(authorizable ? {} : { password }),
+              provider: discovery?.service ?? ""
+          });
+    /** The schema's sentence about one field, for the fields that have one
+     *  worth saying while typing. A blank required field is not among them: it
+     *  is unfinished, and the disabled button already says so. */
+    const issue = (name: string): string =>
+        checked.success
+            ? ""
+            : (checked.error.issues.find((one) => one.path[0] === name)?.message ?? "");
+
+    /**
+     * Whether anything would change. Compared with what was loaded rather than
+     * with whether a field was touched, so a label typed and put back leaves
+     * nothing to save. A refused mailbox always has something to save: pressing
+     * it is asking whether the stored password works again.
+     */
+    const changed =
+        !editing ||
+        !checked.success ||
+        editing.state === "auth" ||
+        (update?.password ?? "") !== "" ||
+        (checked.data as { label?: string }).label !== editing.label ||
+        (checked.data as { color?: string | null }).color !== editing.color ||
+        checked.data.displayName !== editing.displayName ||
+        checked.data.auth !== editing.auth ||
+        (checked.data.auth === "oauth" && checked.data.connectionId !== editing.connectionId) ||
+        checked.data.username !== editing.username ||
+        checked.data.imap.host !== editing.imapHost ||
+        checked.data.imap.port !== editing.imapPort ||
+        checked.data.imap.security !== editing.imapSecurity ||
+        checked.data.smtp.host !== editing.smtpHost ||
+        checked.data.smtp.port !== editing.smtpPort ||
+        checked.data.smtp.security !== editing.smtpSecurity;
 
     function connect(): void {
         if (!discovery) return;
+        if (editing && update) {
+            // The row says the new name now and says it is being checked; a
+            // refusal puts back exactly what it said before. Said here rather
+            // than inside the transition below, which holds every update made
+            // in it until it finishes - the opposite of saying it now.
+            onPending?.({
+                displayName: normalizeMailName(displayName),
+                label: normalizeMailName(label),
+                color,
+                ...(editing.state === "auth" || update.password ? { state: "checking" } : {})
+            });
+        }
         startConnecting(async () => {
             setProblem("");
             setField("");
+            if (editing && update) {
+                const answer = await updateAccountAction(editing.id, update);
+                const said = refusalOf(answer);
+                if (said) {
+                    onPending?.(null);
+                    setProblem(said);
+                    setField(fieldAtFault(answer));
+                    if (said.toLowerCase().includes("server")) setShowServers(true);
+                    return;
+                }
+                toast.show({
+                    title:
+                        editing.state === "auth"
+                            ? `${editing.address} is connected again. Its mail is on its way.`
+                            : `${editing.address} is saved.`
+                });
+                router.refresh();
+                onClose();
+                return;
+            }
             const send = submit ?? addAccountAction;
             const answer = await send({
                 address,
-                displayName,
+                ...shape,
                 label: "",
-                auth: authorizable ? "oauth" : "password",
-                connectionId: authorizable ? chosenConnection : null,
                 ...(authorizable ? {} : { password }),
-                username,
-                provider: discovery.service,
-                imap: {
-                    host: servers.imapHost,
-                    port: Number(servers.imapPort),
-                    security: servers.imapSecurity
-                },
-                smtp: {
-                    host: servers.smtpHost,
-                    port: Number(servers.smtpPort),
-                    security: servers.smtpSecurity
-                }
+                provider: discovery.service
             });
             const said = refusalOf(answer);
             if (said) {
@@ -267,12 +408,31 @@ export function ConnectMailboxDialog({
     useEffect(() => {
         if (serversBroken) setShowServers(true);
     }, [serversBroken]);
+    /** Whether the servers or the login differ from the ones the saved password
+     *  was entered for. The saved one is never sent anywhere else, so the box
+     *  has to be filled again. */
+    const sent = checked.success ? checked.data : shape;
+    const movesServers =
+        editing !== undefined &&
+        (sent.username !== editing.username ||
+            sent.imap.host !== editing.imapHost ||
+            sent.imap.port !== editing.imapPort ||
+            sent.imap.security !== editing.imapSecurity ||
+            sent.smtp.host !== editing.smtpHost ||
+            sent.smtp.port !== editing.smtpPort ||
+            sent.smtp.security !== editing.smtpSecurity);
+    /** Whether a blank password box is a kept password rather than a missing
+     *  one: only for a mailbox that has one stored to keep, on the servers it
+     *  was saved for. */
+    const retypesPassword = editing?.auth === "password" && movesServers;
+    const keepsPassword = editing?.auth === "password" && !movesServers;
     const ready =
         valid &&
         !already &&
         Boolean(discovery) &&
         serversProblem === null &&
-        (authorizable ? Boolean(chosenConnection) : password.length > 0);
+        (authorizable ? Boolean(chosenConnection) : password.length > 0 || keepsPassword) &&
+        (!editing || (checked.success && changed));
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
@@ -283,43 +443,61 @@ export function ConnectMailboxDialog({
 
                 <div className="space-y-3">
                     {lead}
-                    <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Email address <span aria-hidden>*</span>
-                        </span>
-                        <div className="relative">
-                            <Input
-                                value={address}
-                                autoFocus
-                                inputMode="email"
-                                autoComplete="email"
-                                placeholder="you@example.com"
-                                aria-invalid={state === "invalid" || already ? true : undefined}
-                                aria-describedby="mailbox-lookup"
-                                onChange={(event) => {
-                                    setAddress(event.target.value);
-                                    setProblem("");
-                                }}
-                            />
-                            {looking ? (
-                                <Loader2
-                                    className="absolute right-2 top-1/2 size-4 shrink-0 -translate-y-1/2 animate-spin text-foreground-subtle"
-                                    aria-hidden
+                    {editing ? (
+                        <label className="block">
+                            <span className="mb-1 block text-[12px] text-muted-foreground">
+                                Email address
+                            </span>
+                            {/* Shown, not asked: it is what this mailbox is. A
+                                different address is a different mailbox, and
+                                its mail would land in this one's copy. */}
+                            <Input value={address} readOnly aria-describedby="mailbox-fixed" />
+                            <span
+                                id="mailbox-fixed"
+                                className="mt-1 block text-[12px] text-foreground-subtle"
+                            >
+                                To use a different address, add it as a new mailbox.
+                            </span>
+                        </label>
+                    ) : (
+                        <label className="block">
+                            <span className="mb-1 block text-[12px] text-muted-foreground">
+                                Email address <span aria-hidden>*</span>
+                            </span>
+                            <div className="relative">
+                                <Input
+                                    value={address}
+                                    autoFocus
+                                    inputMode="email"
+                                    autoComplete="email"
+                                    placeholder="you@example.com"
+                                    aria-invalid={state === "invalid" || already ? true : undefined}
+                                    aria-describedby="mailbox-lookup"
+                                    onChange={(event) => {
+                                        setAddress(event.target.value);
+                                        setProblem("");
+                                    }}
                                 />
-                            ) : null}
-                        </div>
-                        <span
-                            id="mailbox-lookup"
-                            className={cn(
-                                "mt-1 block text-[12px]",
-                                already ? "text-danger" : "text-foreground-subtle"
-                            )}
-                        >
-                            {already
-                                ? "That mailbox is already here. Open it from the rail, or remove it first to add it again."
-                                : lookupSentence(address, valid, looking, discovery)}
-                        </span>
-                    </label>
+                                {looking ? (
+                                    <Loader2
+                                        className="absolute right-2 top-1/2 size-4 shrink-0 -translate-y-1/2 animate-spin text-foreground-subtle"
+                                        aria-hidden
+                                    />
+                                ) : null}
+                            </div>
+                            <span
+                                id="mailbox-lookup"
+                                className={cn(
+                                    "mt-1 block text-[12px]",
+                                    already ? "text-danger" : "text-foreground-subtle"
+                                )}
+                            >
+                                {already
+                                    ? "That mailbox is already here. Open it from the rail, or remove it first to add it again."
+                                    : lookupSentence(address, valid, looking, discovery)}
+                            </span>
+                        </label>
+                    )}
 
                     {discovery && !looking ? (
                         <>
@@ -359,19 +537,34 @@ export function ConnectMailboxDialog({
                                     ) : (
                                         <>
                                             <p className="text-[13px] text-muted-foreground">
-                                                {discovery.serviceName} can connect this without a
-                                                password. You will be sent to their sign-in and back
-                                                here.
+                                                {editing
+                                                    ? `${provider} no longer lets Polaris into this mailbox. Authorize it again and you will be sent back here.`
+                                                    : `${discovery.serviceName} can connect this without a password. You will be sent to their sign-in and back here.`}
                                             </p>
                                             <Button asChild className="w-full">
                                                 <a
                                                     href={`/api/connections/${discovery.oauth}/link?scope=mail`}
                                                 >
-                                                    Authorize {discovery.serviceName}
+                                                    {editing
+                                                        ? `Reconnect with ${provider}`
+                                                        : `Authorize ${discovery.serviceName}`}
                                                 </a>
                                             </Button>
                                         </>
                                     )}
+                                    {/* A mailbox that is here already and was
+                                        refused needs the authorization redone,
+                                        not another account picked: the token
+                                        that stopped working is this one's. */}
+                                    {editing && usable.length > 0 ? (
+                                        <Button asChild variant="outline" className="w-full">
+                                            <a
+                                                href={`/api/connections/${discovery.oauth}/link?scope=mail`}
+                                            >
+                                                Reconnect with {provider}
+                                            </a>
+                                        </Button>
+                                    ) : null}
                                     <button
                                         type="button"
                                         className="text-[12px] text-muted-foreground underline hover:text-foreground"
@@ -411,15 +604,53 @@ export function ConnectMailboxDialog({
                                         </span>
                                     ) : null}
                                     <span className="mb-1 block text-[12px] text-muted-foreground">
-                                        Password <span aria-hidden>*</span>
+                                        {keepsPassword ? "New password" : "Password"}{" "}
+                                        {keepsPassword ? null : <span aria-hidden>*</span>}
                                     </span>
                                     <Input
                                         type="password"
                                         value={password}
                                         autoComplete="off"
+                                        autoFocus={focusPassword}
+                                        placeholder={
+                                            keepsPassword
+                                                ? "Leave blank to keep the current one"
+                                                : undefined
+                                        }
                                         aria-invalid={field === "password" ? true : undefined}
-                                        onChange={(event) => setPassword(event.target.value)}
+                                        aria-describedby={
+                                            keepsPassword || retypesPassword
+                                                ? "mailbox-password-kept"
+                                                : undefined
+                                        }
+                                        onChange={(event) => {
+                                            setPassword(event.target.value);
+                                            if (field === "password") setField("");
+                                        }}
                                     />
+                                    {retypesPassword ? (
+                                        <span
+                                            id="mailbox-password-kept"
+                                            className="mt-1 block text-[12px] text-foreground-subtle"
+                                        >
+                                            The servers or login changed, so enter the password
+                                            again.
+                                        </span>
+                                    ) : keepsPassword ? (
+                                        <span
+                                            id="mailbox-password-kept"
+                                            className={cn(
+                                                "mt-1 block text-[12px]",
+                                                editing?.state === "auth"
+                                                    ? "text-danger"
+                                                    : "text-foreground-subtle"
+                                            )}
+                                        >
+                                            {editing?.state === "auth"
+                                                ? "The server stopped accepting the saved password. Type the new one - left blank, the saved one is tried again."
+                                                : "Left blank, the saved password is kept."}
+                                        </span>
+                                    ) : null}
                                     {discovery.passwordHelp ? (
                                         <span className="mt-1 block text-[12px] text-foreground-subtle">
                                             {discovery.passwordHelp}{" "}
@@ -446,8 +677,69 @@ export function ConnectMailboxDialog({
                                     value={displayName}
                                     onChange={(event) => setDisplayName(event.target.value)}
                                     placeholder="Left blank, your Polaris name is used"
+                                    aria-invalid={issue("displayName") ? true : undefined}
                                 />
+                                {issue("displayName") ? (
+                                    <span className="mt-1 block text-[12px] text-danger">
+                                        {issue("displayName")}
+                                    </span>
+                                ) : null}
                             </label>
+
+                            {editing ? (
+                                <>
+                                    <label className="block">
+                                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                                            Name in the rail
+                                        </span>
+                                        <Input
+                                            value={label}
+                                            onChange={(event) => setLabel(event.target.value)}
+                                            placeholder="Left blank, the address is used"
+                                            aria-invalid={issue("label") ? true : undefined}
+                                        />
+                                        {issue("label") ? (
+                                            <span className="mt-1 block text-[12px] text-danger">
+                                                {issue("label")}
+                                            </span>
+                                        ) : null}
+                                    </label>
+                                    <fieldset>
+                                        <legend className="mb-1 block text-[12px] text-muted-foreground">
+                                            Colour
+                                        </legend>
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                aria-pressed={color === null}
+                                                onClick={() => setColor(null)}
+                                                className={cn(
+                                                    "h-6 rounded-full border border-border px-2 text-[12px] text-muted-foreground",
+                                                    color === null && "ring-2 ring-foreground"
+                                                )}
+                                            >
+                                                Automatic
+                                            </button>
+                                            {MAIL_PALETTE.map((swatch) => (
+                                                <button
+                                                    key={swatch.hex}
+                                                    type="button"
+                                                    title={swatch.name}
+                                                    aria-label={swatch.name}
+                                                    aria-pressed={color === swatch.hex}
+                                                    onClick={() => setColor(swatch.hex)}
+                                                    className={cn(
+                                                        "size-6 shrink-0 rounded-full ring-offset-2 ring-offset-background",
+                                                        color === swatch.hex &&
+                                                            "ring-2 ring-foreground"
+                                                    )}
+                                                    style={{ backgroundColor: swatch.hex }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </fieldset>
+                                </>
+                            ) : null}
 
                             {!authorizable ? (
                                 <div className="rounded-md border border-border">
@@ -530,13 +822,49 @@ export function ConnectMailboxDialog({
                             {connecting ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             ) : null}
-                            Connect this mailbox
+                            {editing
+                                ? connecting
+                                    ? "Checking with the servers..."
+                                    : "Save changes"
+                                : "Connect this mailbox"}
                         </Button>
                     ) : null}
                 </div>
             </DialogContent>
         </Dialog>
     );
+}
+
+/**
+ * What a mailbox already here knows about itself, in the shape a lookup would
+ * have answered with - so the rest of the form reads the same either way.
+ *
+ * Its servers are the ones it has, not the catalogue's: somebody may have
+ * changed them, and a form that quietly put the defaults back would be
+ * reconnecting a mailbox to somewhere it was moved away from.
+ */
+function seededDiscovery(account: MailAccountView): MailDiscovery {
+    const service = findMailService(account.service);
+    return {
+        address: account.address,
+        service: account.service,
+        serviceName: service?.name ?? account.serviceName,
+        imap: {
+            host: account.imapHost,
+            port: account.imapPort,
+            security: account.imapSecurity as MailSocketSecurity
+        },
+        smtp: {
+            host: account.smtpHost,
+            port: account.smtpPort,
+            security: account.smtpSecurity as MailSocketSecurity
+        },
+        oauth: service?.oauth ?? null,
+        passwordHelp: service?.passwordHelp ?? "",
+        note: service?.note ?? "",
+        passwordUrl: service?.passwordUrl ?? "",
+        source: service ? "catalogue" : "none"
+    };
 }
 
 /**
@@ -581,7 +909,8 @@ function lookupSentence(
  */
 export function serverProblem(host: string, port: string): string | null {
     const hostCheck = mailHost.safeParse(host);
-    if (!hostCheck.success) return hostCheck.error.issues[0]?.message ?? "That is not a server name";
+    if (!hostCheck.success)
+        return hostCheck.error.issues[0]?.message ?? "That is not a server name";
     if (!mailPort.safeParse(port).success) return "The port is a number from 1 to 65535";
     return null;
 }

@@ -23,6 +23,7 @@ import type { Prisma } from "@polaris/db";
 import { readMailPreferences } from "./prefs";
 import { rememberContacts } from "./contacts";
 import { MailAuthError } from "./credentials";
+import { recordCredentialRefusal } from "./refused";
 import { readUpload, attachUploads } from "./uploads";
 import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
@@ -264,6 +265,12 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             return true;
         }
         const auth = caught instanceof MailAuthError;
+        // The same refusal a sync would have found, and it is said the same
+        // way: the mailbox pauses and its owner is told once. The queue then
+        // leaves this message alone until the credential works again.
+        if (auth) {
+            await recordCredentialRefusal(account.id, caught.message).catch(() => undefined);
+        }
         await prisma.mailDraft.update({
             where: { id: draft.id },
             data: {
@@ -538,14 +545,17 @@ function withSignature(
  *
  * The safety net for a restart, and what sends anything scheduled further out
  * than a timer was held for. A message that has failed several times is left
- * alone: the queue is not a place to hammer somebody's mail server from.
+ * alone: the queue is not a place to hammer somebody's mail server from. Nor is
+ * a mailbox whose server refused its credential - every retry would be another
+ * failed sign-in - so its messages wait until the credential works again.
  */
 export async function sweepDueSends(): Promise<number> {
     const due = await prisma.mailDraft.findMany({
         where: {
             state: { in: ["queued", "failed"] },
             sendAt: { not: null, lte: new Date() },
-            attempts: { lt: 5 }
+            attempts: { lt: 5 },
+            account: { state: { not: "auth" } }
         },
         select: { id: true, state: true },
         orderBy: { sendAt: "asc" },

@@ -26,7 +26,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Card, CardBody } from "@polaris/ui";
+import { PageSection } from "@/components/page-section";
 import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
 import { describeBlock } from "@/lib/apps/port-block";
@@ -62,40 +62,44 @@ export function GamePortsCard() {
     if (!reading || reading.servers.length === 0) return null;
 
     return (
-        <Card id="game-ports" className="scroll-mt-4">
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                    <p className="text-sm font-medium">Game server ports</p>
-                    <p className="text-xs text-muted-foreground">
-                        Ports 80 and 443 carry every website Polaris serves and not one game client. Each server below
-                        answers on its own port, on its own transport, and nothing above this opens them.
-                        {reading.policy === "range" ? (
-                            <>
-                                {" "}
-                                Polaris keeps them inside{" "}
-                                <span className="font-mono text-foreground">
-                                    TCP {describeBlock(reading.blocks.tcp)}
-                                </span>{" "}
-                                and{" "}
-                                <span className="font-mono text-foreground">
-                                    UDP {describeBlock(reading.blocks.udp)}
-                                </span>
-                                , so forwarding those two ranges covers the servers you have and the ones you have not
-                                created yet.
-                            </>
-                        ) : null}
-                    </p>
-                </div>
+        <PageSection
+            id="game-ports"
+            title="Game server ports"
+            description={
+                <>
+                    Ports 80 and 443 carry every website Polaris serves and not one game client.
+                    Each server below answers on its own port, on its own transport, and nothing
+                    above this opens them.
+                    {reading.policy === "range" ? (
+                        <>
+                            {" "}
+                            Polaris keeps them inside{" "}
+                            <span className="font-mono text-foreground">
+                                TCP {describeBlock(reading.blocks.tcp)}
+                            </span>{" "}
+                            and{" "}
+                            <span className="font-mono text-foreground">
+                                UDP {describeBlock(reading.blocks.udp)}
+                            </span>
+                            , so forwarding those two ranges covers the servers you have and the
+                            ones you have not created yet.
+                        </>
+                    ) : null}
+                </>
+            }
+        >
+            <PortPolicyForm
+                policy={reading.policy}
+                blocks={reading.blocks}
+                onSaved={live.refresh}
+            />
 
-                <PortPolicyForm policy={reading.policy} blocks={reading.blocks} onSaved={live.refresh} />
-
-                <GamePortsLive
-                    reading={reading}
-                    stale={live.stale}
-                    refreshing={live.refreshing}
-                    onRefresh={live.refresh}
-                />
-            </CardBody>
-        </Card>
+            <GamePortsLive
+                reading={reading}
+                stale={live.stale}
+                refreshing={live.refreshing}
+                onRefresh={live.refresh}
+            />
+        </PageSection>
     );
 }

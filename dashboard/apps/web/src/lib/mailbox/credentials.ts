@@ -22,10 +22,12 @@ import { encryptSecret, decryptSecret, CredentialDecryptError } from "@polaris/s
 import {
     getGoogleOAuthClient,
     googleAccessToken,
+    GoogleAuthExpiredError,
     GOOGLE_MAIL_SCOPES
 } from "@/lib/google-calendar/service";
 import {
     getMicrosoftOAuthClient,
+    MicrosoftAuthExpiredError,
     MICROSOFT_MAIL_SCOPES,
     microsoftAccessToken
 } from "@/lib/connections/microsoft";
@@ -126,9 +128,11 @@ export function grantsMailAccess(provider: string, scope: string): boolean {
 /**
  * What to open a connection with, for one account.
  *
- * Every failure here is a `MailAuthError`: an account with no usable credential
- * is not a network problem and must never be reported as one, because the two
- * lead somewhere different - one to a retry, the other to a person.
+ * A missing or refused credential is a `MailAuthError`: an account with no
+ * usable credential is not a network problem and must never be reported as one,
+ * because the two lead somewhere different - one to a retry, the other to a
+ * person. The reverse holds too: a token endpoint that could not be reached is
+ * a plain error, retried, never a refusal.
  */
 export async function mailCredential(account: MailCredentialSource): Promise<MailCredential> {
     const user = mailLogin(account);
@@ -144,22 +148,30 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
     const credential = await readCredential(account.connectionId);
     const refreshToken = credential?.refreshToken;
     if (!refreshToken) {
-        throw new MailAuthError("The account that authorized this mailbox needs authorizing again.");
+        throw new MailAuthError(
+            "The account that authorized this mailbox needs authorizing again."
+        );
     }
 
     const provider = oauthProviderFor(account.service);
     try {
         if (provider === "google") {
             const client = await getGoogleOAuthClient();
-            if (!client) throw new MailAuthError("Google is not connected on this Polaris any more.");
+            if (!client)
+                throw new MailAuthError("Google is not connected on this Polaris any more.");
             // Google mints one token per refresh token regardless of what was
             // asked for; the scopes it carries are the ones the link was granted,
             // which is what `grantsMailAccess` checked before this account existed.
             void GOOGLE_MAIL_SCOPES;
-            return { kind: "oauth", user, accessToken: await googleAccessToken(client, refreshToken) };
+            return {
+                kind: "oauth",
+                user,
+                accessToken: await googleAccessToken(client, refreshToken)
+            };
         }
         const client = await getMicrosoftOAuthClient();
-        if (!client) throw new MailAuthError("Microsoft is not connected on this Polaris any more.");
+        if (!client)
+            throw new MailAuthError("Microsoft is not connected on this Polaris any more.");
         return {
             kind: "oauth",
             user,
@@ -167,10 +179,19 @@ export async function mailCredential(account: MailCredentialSource): Promise<Mai
         };
     } catch (caught) {
         if (caught instanceof MailAuthError) throw caught;
-        // Anything the provider refused for is the same answer to the person
-        // holding the mailbox: authorize it again. The provider's own words are
-        // kept off the screen deliberately - they name endpoints and scopes.
-        throw new MailAuthError("This mailbox needs authorizing again.");
+        // A grant the provider refused is the same answer to the person holding
+        // the mailbox: authorize it again. The provider's own words are kept off
+        // the screen deliberately - they name endpoints and scopes.
+        if (
+            caught instanceof GoogleAuthExpiredError ||
+            caught instanceof MicrosoftAuthExpiredError
+        ) {
+            throw new MailAuthError("This mailbox needs authorizing again.");
+        }
+        console.warn(`polaris: ${provider} did not answer a mail token request:`, caught);
+        throw new Error(
+            `Polaris could not reach ${provider === "google" ? "Google" : "Microsoft"} to authorize this mailbox.`
+        );
     }
 }
 

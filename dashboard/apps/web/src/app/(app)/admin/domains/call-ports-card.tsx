@@ -19,7 +19,8 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
-import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
+import { Badge, Button, cn } from "@polaris/ui";
+import { PageSection } from "@/components/page-section";
 import { repairCallAddressAction } from "./actions";
 import { useLiveResource } from "@/components/use-live-resource";
 import { CALL_FORWARD_RULES, type CallPortsReading } from "@/lib/chat/call-ports";
@@ -51,120 +52,123 @@ export function CallPortsCard() {
     if (!reading || !reading.shipped) return null;
 
     return (
-        <Card id="call-ports" className="scroll-mt-4">
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                    <p className="text-sm font-medium">Call ports</p>
-                    <p className="text-xs text-muted-foreground">
-                        Setting a call up goes through 443 with everything else. The sound does not:
-                        it arrives on the two ports below. Most calls need neither forwarded:
-                        the call server reaches out first and the reply comes back the way it
-                        went. Forward them for the networks where that does not hold.
-                    </p>
-                </div>
+        <PageSection
+            id="call-ports"
+            title="Call ports"
+            description="Setting a call up goes through 443 with everything else. The sound does not: it arrives on the two ports below. Most calls need neither forwarded: the call server reaches out first and the reply comes back the way it went. Forward them for the networks where that does not hold."
+        >
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                    {live.stale ??
+                        (reading.running
+                            ? "Checked while this page is open: the TCP port is ticked as soon as it answers from outside."
+                            : "The call server is not answering, so nothing here can be checked yet.")}
+                </p>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={live.refresh}
+                    disabled={live.refreshing}
+                    aria-label="Check the ports now"
+                    title="Check the ports now"
+                >
+                    <RefreshCw className={live.refreshing ? "size-4 animate-spin" : "size-4"} />
+                </Button>
+            </div>
 
-                <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">
-                        {live.stale ??
-                            (reading.running
-                                ? "Checked while this page is open: the TCP port is ticked as soon as it answers from outside."
-                                : "The call server is not answering, so nothing here can be checked yet.")}
-                    </p>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={live.refresh}
-                        disabled={live.refreshing}
-                        aria-label="Check the ports now"
-                        title="Check the ports now"
+            <ul className="flex flex-col divide-y divide-border/60">
+                {reading.ports.map((entry) => (
+                    <li
+                        key={`${entry.protocol}-${entry.port}`}
+                        className="flex items-center gap-2 py-2"
                     >
-                        <RefreshCw className={live.refreshing ? "size-4 animate-spin" : "size-4"} />
-                    </Button>
-                </div>
-
-                <ul className="flex flex-col divide-y divide-border/60">
-                    {reading.ports.map((entry) => (
-                        <li key={`${entry.protocol}-${entry.port}`} className="flex items-center gap-2 py-2">
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm" title={entry.label}>{entry.label}</p>
-                                <p className="font-mono text-xs text-muted-foreground">
-                                    {entry.port}/{entry.protocol}
-                                </p>
-                            </div>
-                            {!entry.probeable ? (
-                                // Not a verdict, and no longer an instruction
-                                // either. It used to end "forward it alongside
-                                // the other one", which is how somebody spent
-                                // days on a router that was correct: measured
-                                // from a machine on another network, an
-                                // unsolicited packet to this port does not
-                                // arrive - and a call from that same machine
-                                // connects anyway, because the call server
-                                // reaches out first and the reply comes back the
-                                // way it went.
-                                <Badge title="Nothing answers an unsolicited packet on this port, so it cannot be tested from here. Calls do not depend on it: the call server reaches out first, and forwarding it only helps on networks where that does not work">
-                                    Cannot be checked
-                                </Badge>
-                            ) : !reading.running ? (
-                                // Three states, not two, for the reason the game
-                                // ports card has three: a stopped server answers
-                                // nothing on any port, so "not confirmed" would
-                                // put a warning on a rule that is very likely
-                                // right and send somebody into their router.
-                                <Badge title="A call server that is not answering is silent on every port, so this cannot be checked from here">
-                                    Checked once it answers
-                                </Badge>
-                            ) : reading.confirmed ? (
-                                <Badge
-                                    className="border-success-edge text-success"
-                                    title={
-                                        reading.confirmedAt
-                                            ? `Last answered from outside on ${new Date(reading.confirmedAt).toLocaleString()}`
-                                            : undefined
-                                    }
-                                >
-                                    Reached from outside
-                                </Badge>
-                            ) : (
-                                <Badge className="border-warning-edge text-warning">Not confirmed</Badge>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-
-                {/* The other way calls die, and the one this card used to blame
-                    the router for. Shown always rather than only when it is
-                    wrong: somebody debugging a silent call needs to be able to
-                    see what address their sound is being sent to, and a control
-                    that only appears once Polaris has already noticed is a
-                    control nobody finds while they are looking. */}
-                <AddressRow reading={reading} onDone={live.refresh} />
-
-                {/* Only when the router is the thing in the way. A stopped media
-                    server answers nothing on any port, and sending somebody into
-                    their router over that is an hour spent on a rule that was
-                    already right. */}
-                {!reading.running ? (
-                    <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                        The call server is not answering, so these ports carry nothing yet and
-                        cannot be checked. Chat settings says what it is doing.
-                    </p>
-                ) : reading.confirmed ? null : (
-                    <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
-                        <p className="font-medium text-foreground">
-                            Calls only reach this network so far
-                        </p>
-                        <p className="text-muted-foreground">
-                            {reading.cannotProbe ??
-                                "Nothing has arrived on the call ports from outside yet. Forwarding them in the router fixes it, and this ticks itself the moment they work."}
-                        </p>
-                        <div className="text-muted-foreground">
-                            <RouterSteps server={null} lanIp={reading.lanIp} rules={CALL_FORWARD_RULES} />
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm" title={entry.label}>
+                                {entry.label}
+                            </p>
+                            <p className="font-mono text-xs text-muted-foreground">
+                                {entry.port}/{entry.protocol}
+                            </p>
                         </div>
+                        {!entry.probeable ? (
+                            // Not a verdict, and no longer an instruction
+                            // either. It used to end "forward it alongside
+                            // the other one", which is how somebody spent
+                            // days on a router that was correct: measured
+                            // from a machine on another network, an
+                            // unsolicited packet to this port does not
+                            // arrive - and a call from that same machine
+                            // connects anyway, because the call server
+                            // reaches out first and the reply comes back the
+                            // way it went.
+                            <Badge title="Nothing answers an unsolicited packet on this port, so it cannot be tested from here. Calls do not depend on it: the call server reaches out first, and forwarding it only helps on networks where that does not work">
+                                Cannot be checked
+                            </Badge>
+                        ) : !reading.running ? (
+                            // Three states, not two, for the reason the game
+                            // ports card has three: a stopped server answers
+                            // nothing on any port, so "not confirmed" would
+                            // put a warning on a rule that is very likely
+                            // right and send somebody into their router.
+                            <Badge title="A call server that is not answering is silent on every port, so this cannot be checked from here">
+                                Checked once it answers
+                            </Badge>
+                        ) : reading.confirmed ? (
+                            <Badge
+                                className="border-success-edge text-success"
+                                title={
+                                    reading.confirmedAt
+                                        ? `Last answered from outside on ${new Date(reading.confirmedAt).toLocaleString()}`
+                                        : undefined
+                                }
+                            >
+                                Reached from outside
+                            </Badge>
+                        ) : (
+                            <Badge className="border-warning-edge text-warning">
+                                Not confirmed
+                            </Badge>
+                        )}
+                    </li>
+                ))}
+            </ul>
+
+            {/* The other way calls die, and the one this card used to blame
+                the router for. Shown always rather than only when it is
+                wrong: somebody debugging a silent call needs to be able to
+                see what address their sound is being sent to, and a control
+                that only appears once Polaris has already noticed is a
+                control nobody finds while they are looking. */}
+            <AddressRow reading={reading} onDone={live.refresh} />
+
+            {/* Only when the router is the thing in the way. A stopped media
+                server answers nothing on any port, and sending somebody into
+                their router over that is an hour spent on a rule that was
+                already right. */}
+            {!reading.running ? (
+                <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    The call server is not answering, so these ports carry nothing yet and cannot be
+                    checked. Chat settings says what it is doing.
+                </p>
+            ) : reading.confirmed ? null : (
+                <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
+                    <p className="font-medium text-foreground">
+                        Calls only reach this network so far
+                    </p>
+                    <p className="text-muted-foreground">
+                        {reading.cannotProbe ??
+                            "Nothing has arrived on the call ports from outside yet. Forwarding them in the router fixes it, and this ticks itself the moment they work."}
+                    </p>
+                    <div className="text-muted-foreground">
+                        <RouterSteps
+                            server={null}
+                            lanIp={reading.lanIp}
+                            rules={CALL_FORWARD_RULES}
+                        />
                     </div>
-                )}
-            </CardBody>
-        </Card>
+                </div>
+            )}
+        </PageSection>
     );
 }
 
@@ -182,13 +186,7 @@ export function CallPortsCard() {
  * the minutes before it notices, and for the person who wants to rule the whole
  * theory in or out now rather than in ten minutes.
  */
-function AddressRow({
-    reading,
-    onDone
-}: {
-    reading: CallPortsReading;
-    onDone: () => void;
-}) {
+function AddressRow({ reading, onDone }: { reading: CallPortsReading; onDone: () => void }) {
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState("");
 
@@ -196,7 +194,9 @@ function AddressRow({
         <div
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
-                reading.addressStale ? "border-warning-edge bg-warning-soft" : "border-border bg-muted/40"
+                reading.addressStale
+                    ? "border-warning-edge bg-warning-soft"
+                    : "border-border bg-muted/40"
             )}
         >
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -206,7 +206,9 @@ function AddressRow({
                         : "The address callers are sent to"}
                 </p>
                 {reading.publicIp && (
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{reading.publicIp}</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                        {reading.publicIp}
+                    </code>
                 )}
             </div>
             <p className="text-muted-foreground">

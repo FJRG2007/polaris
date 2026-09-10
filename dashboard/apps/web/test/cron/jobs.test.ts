@@ -74,6 +74,9 @@ describe("the work Polaris runs on a schedule", () => {
             "audit-seal",
             "audit-verify",
             "backups",
+            // A budget crossing its threshold is told to the people running
+            // the organization once; two passes would each tell them.
+            "billing-budgets",
             "chat-scheduled",
             "connection-health",
             // Two passes would take two base backups of the same instance, and

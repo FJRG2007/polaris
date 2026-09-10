@@ -21,6 +21,7 @@ import {
     ChartColumn,
     CalendarClock,
     ChartPie,
+    ClipboardCheck,
     Clock,
     Code2,
     Contact,
@@ -85,6 +86,7 @@ import {
     Users,
     UsersRound,
     Video,
+    Wallet,
     Webhook,
     Workflow,
     Wrench,
@@ -377,6 +379,42 @@ export interface AppSection {
      *  the successor its owner named. Deleting is deliberately not a permission,
      *  so it cannot be expressed as one above. */
     orgDeleter?: boolean;
+    /**
+     * The marketplace app whose install puts this screen here, for a screen that
+     * is a feature somebody opts into inside an app everybody has - the section
+     * counterpart of `AppEntry.requiresApp`.
+     *
+     * Not a permission and not answered like one: nobody is being refused, there
+     * is nothing there yet. So it is asked of administrators too, and resolved on
+     * the server (see `installedSectionApps`) because the answer is a query.
+     */
+    requiresApp?: string;
+}
+
+/**
+ * What narrows a rail and the search for one viewer, resolved on the server and
+ * handed to the client components that draw them.
+ */
+export interface SectionGate {
+    readonly isAdmin: boolean;
+    /** The instance permissions held, of the ones any section names. */
+    readonly held: readonly string[];
+    /** The marketplace apps installed, of the ones any section requires. */
+    readonly installed: readonly string[];
+}
+
+/**
+ * Whether a section is offered to this viewer at all.
+ *
+ * One answer for the rail, the phone drawer and the search, so the three never
+ * disagree about what exists. An app that is not installed is asked first and
+ * of everybody: an administrator passes every permission, and still has no
+ * screen for something this Polaris does not have.
+ */
+export function sectionOffered(section: AppSection, gate: SectionGate): boolean {
+    if (section.requiresApp && !gate.installed.includes(section.requiresApp)) return false;
+    if (section.adminOnly && !gate.isAdmin) return false;
+    return !section.needs || gate.isAdmin || gate.held.includes(section.needs);
 }
 
 /**
@@ -545,12 +583,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["projects", "services", "docker"]
         },
         {
-            label: "Capabilities",
-            href: "/apps/capabilities",
-            icon: Sparkles,
-            keywords: ["features", "what can it do", "overview", "rollbacks", "previews", "domains", "databases"]
-        },
-        {
             label: "Marketplace",
             href: "/apps/marketplace",
             icon: Store,
@@ -685,10 +717,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // Here rather than under Management: a mail server is a service the
             // operator runs on their machines, deployed through Deploy and backed
             // up by Backups, beside which it sits. Management configures Polaris
-            // itself; reading mail stays in Mail.
+            // itself; reading mail stays in Mail. Only here once somebody installs
+            // it from the marketplace: a Polaris that runs no mail server should
+            // not carry a door onto one.
             label: "Mail server",
             href: "/apps/mail-server",
             needs: "mailserver.manage",
+            requiresApp: "mail-server",
             icon: Mails,
             group: OPERATIONS_GROUP,
             keywords: [
@@ -1325,6 +1360,22 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["audit", "logs"]
         },
         {
+            label: "Evidence",
+            href: "/admin/evidence",
+            adminOnly: true,
+            icon: ClipboardCheck,
+            keywords: [
+                "compliance",
+                "soc 2",
+                "iso 27001",
+                "auditor",
+                "controls",
+                "report",
+                "export",
+                "certification"
+            ]
+        },
+        {
             label: "Users",
             href: "/admin/users",
             adminOnly: true,
@@ -1480,6 +1531,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "containers",
                 "apps",
                 "marketplace"
+            ],
+            group: ADMIN_PLATFORM_GROUP
+        },
+        {
+            label: "Billing",
+            href: "/admin/billing",
+            adminOnly: true,
+            icon: Wallet,
+            keywords: [
+                "cost",
+                "costs",
+                "prices",
+                "rates",
+                "charge back",
+                "chargeback",
+                "invoice",
+                "statement",
+                "budget",
+                "spend",
+                "usage",
+                "vcpu",
+                "per project"
             ],
             group: ADMIN_PLATFORM_GROUP
         },
@@ -2012,6 +2085,22 @@ export function orgSubapp(slug: string): AppSubapp {
                 icon: Globe,
                 permission: "domains.manage",
                 keywords: ["dns", "deploys", "hostnames", "custom domain", "wildcard"]
+            },
+            {
+                label: "Billing",
+                href: `${base}/billing`,
+                icon: Wallet,
+                permission: "settings.manage",
+                keywords: [
+                    "cost",
+                    "costs",
+                    "budget",
+                    "spend",
+                    "statement",
+                    "invoice",
+                    "usage",
+                    "charge back"
+                ]
             },
             {
                 label: "Activity",

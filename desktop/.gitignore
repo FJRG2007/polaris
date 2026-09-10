@@ -1,0 +1,5 @@
+# Dependencies, the bundle (build/bundle.mjs) and electron-forge's packaged apps
+# and installers - all rebuilt from source, never committed.
+node_modules/
+dist/
+out/

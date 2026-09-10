@@ -15,6 +15,7 @@ import { PERSONAL_KIND } from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
 import { publishMetricTick } from "./metrics-live";
 import type { DockerDriver } from "@polaris/docker";
+import { recordMachineCores } from "./machine-cores";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
@@ -237,6 +238,9 @@ async function sampleHost(
         driver =
             ownerId === null ? localDockerDriver() : await hostDockerDriver(subjectId, ownerId);
         const info = await driver.info();
+        // What turns a service's share of this machine into cores, for billing.
+        // A failed write costs the reading nothing.
+        await recordMachineCores(subjectId, info.ncpu).catch(() => undefined);
         const running = (await driver.listContainers(false)).filter(
             (entry) => entry.state === "running"
         );

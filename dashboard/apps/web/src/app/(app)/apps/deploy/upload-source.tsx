@@ -8,6 +8,10 @@
  * `node_modules` and `.git` are left out on the way: the build installs what the
  * project needs, and neither belongs in what is sent. The same two are skipped on
  * the server too, so a zip made elsewhere is treated the same.
+ *
+ * Inside the Polaris desktop app, "Choose folder" hands the folder to the app,
+ * which zips it from the disk with the same exclusions and limits - they are
+ * copied in `desktop/src/main/zip-rules.ts`, and a change here belongs there too.
  */
 
 import * as deployActions from "./actions";
@@ -15,6 +19,7 @@ import { formatBytes } from "@polaris/core";
 import { Button, Input, cn } from "@polaris/ui";
 import { FolderUp, Loader2 } from "lucide-react";
 import { uploadedSourceAction } from "./source-actions";
+import { useDesktopBridge } from "@/components/desktop-app";
 import type { UploadedSource } from "@/lib/deploy/source-upload";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
 
@@ -50,19 +55,22 @@ async function walk(entry: FileSystemEntry, prefix: string, into: PickedFile[]):
         into.push({ path, file });
         return;
     }
-    for (const child of await readChildren(entry as FileSystemDirectoryEntry)) await walk(child, path, into);
+    for (const child of await readChildren(entry as FileSystemDirectoryEntry))
+        await walk(child, path, into);
 }
 
 /** Zip the picked files in the browser, refusing a folder too big to send. */
 async function zipped(files: readonly PickedFile[], name: string): Promise<PickedSource> {
     const total = files.reduce((sum, item) => sum + item.file.size, 0);
     if (files.length === 0) throw new Error("There are no files in that folder.");
-    if (total > MAX_FOLDER) throw new Error(`That folder holds more than ${formatBytes(MAX_FOLDER)}.`);
+    if (total > MAX_FOLDER)
+        throw new Error(`That folder holds more than ${formatBytes(MAX_FOLDER)}.`);
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
     for (const item of files) zip.file(item.path, item.file);
     const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-    if (blob.size > MAX_ZIP) throw new Error(`Zipped, that folder is larger than ${formatBytes(MAX_ZIP)}.`);
+    if (blob.size > MAX_ZIP)
+        throw new Error(`Zipped, that folder is larger than ${formatBytes(MAX_ZIP)}.`);
     return { blob, name, files: files.length };
 }
 
@@ -78,11 +86,17 @@ export async function sendSource(
     picked: PickedSource,
     deploy: boolean
 ): Promise<{ error?: string; deployError?: string; upload?: UploadedSource }> {
-    const response = await fetch(`/api/deploy/apps/${applicationId}/source${deploy ? "?deploy=1" : ""}`, {
-        method: "POST",
-        headers: { "content-type": "application/zip", "x-polaris-name": encodeURIComponent(picked.name) },
-        body: picked.blob
-    }).catch(() => null);
+    const response = await fetch(
+        `/api/deploy/apps/${applicationId}/source${deploy ? "?deploy=1" : ""}`,
+        {
+            method: "POST",
+            headers: {
+                "content-type": "application/zip",
+                "x-polaris-name": encodeURIComponent(picked.name)
+            },
+            body: picked.blob
+        }
+    ).catch(() => null);
     if (!response) return { error: "Could not reach Polaris. Check the connection and try again." };
     const body = (await response.json().catch(() => ({}))) as {
         error?: string;
@@ -107,16 +121,18 @@ export function SourceDropZone({
     const zipInput = useRef<HTMLInputElement>(null);
     const [over, setOver] = useState(false);
     const [reading, setReading] = useState(false);
+    const desktop = useDesktopBridge();
 
     useEffect(() => {
         // Not in React's typings: the attribute that makes a file input pick a folder.
         folderInput.current?.setAttribute("webkitdirectory", "");
     }, []);
 
-    async function take(work: () => Promise<PickedSource>) {
+    async function take(work: () => Promise<PickedSource | null>) {
         setReading(true);
         try {
-            onPicked(await work());
+            const next = await work();
+            if (next) onPicked(next);
         } catch (caught) {
             onPicked(null, caught instanceof Error ? caught.message : "Could not read that");
         } finally {
@@ -129,7 +145,9 @@ export function SourceDropZone({
         setOver(false);
         if (disabled) return;
         const items = [...event.dataTransfer.items];
-        const entries = items.map((item) => item.webkitGetAsEntry()).filter((entry) => entry !== null);
+        const entries = items
+            .map((item) => item.webkitGetAsEntry())
+            .filter((entry) => entry !== null);
         const single = entries.length === 1 ? entries[0] : undefined;
         if (single?.isFile && single.name.toLowerCase().endsWith(".zip")) {
             const file = event.dataTransfer.files[0];
@@ -146,6 +164,25 @@ export function SourceDropZone({
             }
             for (const entry of entries) await walk(entry, "", files);
             return zipped(files, "upload");
+        });
+    }
+
+    /** Inside the desktop app the folder is picked with the system's dialog and
+     *  zipped from the disk, skipping node_modules without reading it. */
+    function chooseFolder() {
+        if (!desktop) {
+            folderInput.current?.click();
+            return;
+        }
+        void take(async () => {
+            const picked = await desktop.pickFolder();
+            if (!picked) return null;
+            if (!picked.ok) throw new Error(picked.error);
+            return {
+                blob: new Blob([picked.zip], { type: "application/zip" }),
+                name: picked.name,
+                files: picked.files
+            };
         });
     }
 
@@ -196,7 +233,7 @@ export function SourceDropZone({
                     size="sm"
                     variant="secondary"
                     disabled={disabled || reading}
-                    onClick={() => folderInput.current?.click()}
+                    onClick={chooseFolder}
                 >
                     Choose folder
                 </Button>
@@ -231,7 +268,9 @@ export function SourceDropZone({
                     event.target.value = "";
                 }}
             />
-            <span className="text-xs text-muted-foreground">node_modules and .git are left out.</span>
+            <span className="text-xs text-muted-foreground">
+                node_modules and .git are left out.
+            </span>
         </div>
     );
 }
@@ -242,7 +281,9 @@ async function readChildren(folder: FileSystemDirectoryEntry): Promise<FileSyste
     const reader = folder.createReader();
     const all: FileSystemEntry[] = [];
     for (;;) {
-        const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
+        const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+            reader.readEntries(resolve, reject)
+        );
         if (batch.length === 0) return all;
         all.push(...batch);
     }
@@ -280,7 +321,8 @@ export function NewFolderForm({
                 return;
             }
             const sent = await sendSource(created.applicationId, picked, true);
-            if (sent.error) setError(`The service was created, but the folder did not arrive: ${sent.error}`);
+            if (sent.error)
+                setError(`The service was created, but the folder did not arrive: ${sent.error}`);
             else if (sent.deployError) setError(sent.deployError);
             else onDone();
         });
@@ -319,8 +361,17 @@ export function NewFolderForm({
 
 /** On a service built from an upload: what it was last built from, and a place
  *  to send a newer folder. Nothing for a service built any other way. */
-export function UploadedSourceSection({ applicationId, onChanged }: { applicationId: string; onChanged: () => void }) {
-    const [state, setState] = useState<{ upload: UploadedSource | null; uploadable: boolean } | null>(null);
+export function UploadedSourceSection({
+    applicationId,
+    onChanged
+}: {
+    applicationId: string;
+    onChanged: () => void;
+}) {
+    const [state, setState] = useState<{
+        upload: UploadedSource | null;
+        uploadable: boolean;
+    } | null>(null);
     const [picked, setPicked] = useState<PickedSource | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -328,7 +379,8 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
     useEffect(() => {
         let active = true;
         void uploadedSourceAction(applicationId).then((result) => {
-            if (active && !result.error) setState({ upload: result.upload ?? null, uploadable: Boolean(result.uploadable) });
+            if (active && !result.error)
+                setState({ upload: result.upload ?? null, uploadable: Boolean(result.uploadable) });
         });
         return () => {
             active = false;
@@ -346,7 +398,9 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
                 setError(sent.error);
                 return;
             }
-            setState((current) => (current ? { ...current, upload: sent.upload ?? current.upload } : current));
+            setState((current) =>
+                current ? { ...current, upload: sent.upload ?? current.upload } : current
+            );
             setPicked(null);
             if (sent.deployError) setError(sent.deployError);
             onChanged();
@@ -359,7 +413,8 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
             <div className="flex flex-col gap-3 rounded-md border border-border p-3 text-sm">
                 {state.upload ? (
                     <p className="text-xs text-muted-foreground">
-                        Built from <span className="font-medium text-foreground">{state.upload.name}</span>:{" "}
+                        Built from{" "}
+                        <span className="font-medium text-foreground">{state.upload.name}</span>:{" "}
                         {state.upload.files} files, {formatBytes(state.upload.bytes)}.
                     </p>
                 ) : (

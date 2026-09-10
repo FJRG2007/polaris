@@ -111,7 +111,25 @@ function groupRows(rows: readonly Row[]): Group[] {
     return groups;
 }
 
-export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean; appIds: string[] }) {
+/** A list the palette was handed, back from the joined key its memo is keyed
+ *  on. */
+function fromKey(key: string): string[] {
+    return key ? key.split(",") : [];
+}
+
+export function CommandPalette({
+    isAdmin = false,
+    appIds,
+    held = [],
+    installed = []
+}: {
+    isAdmin?: boolean;
+    appIds: string[];
+    /** The same narrowing the rail is drawn with (see `AppSidebar`), so search
+     *  never finds a screen the rail leaves out. */
+    held?: string[];
+    installed?: string[];
+}) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -139,7 +157,12 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
 
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+            if (
+                event.key.toLowerCase() !== "k" ||
+                !(event.metaKey || event.ctrlKey) ||
+                event.altKey
+            )
+                return;
             // Browsers put Ctrl+K on the address bar; the dashboard claims it here.
             event.preventDefault();
             setOpen((value) => !value);
@@ -265,7 +288,8 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                 })
                     .then(async (response) => {
                         const body: { hits?: SearchHit[]; error?: string } = await response.json();
-                        if (!response.ok) throw new Error(body.error ?? "That search could not be run");
+                        if (!response.ok)
+                            throw new Error(body.error ?? "That search could not be run");
                         const found = body.hits ?? [];
                         rememberLookup(key, found);
                         setHits(found);
@@ -301,13 +325,24 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
     // Keyed on the joined ids: the array is rebuilt on every render of the layout
     // above, so identity alone would rebuild the index for nothing.
     const appKey = appIds.join(",");
-    const navigation = useMemo(() => navigationEntries(isAdmin, appKey ? appKey.split(",") : []), [isAdmin, appKey]);
+    const heldKey = held.join(",");
+    const installedKey = installed.join(",");
+    const navigation = useMemo(
+        () =>
+            navigationEntries(isAdmin, fromKey(appKey), {
+                held: fromKey(heldKey),
+                installed: fromKey(installedKey)
+            }),
+        [isAdmin, appKey, heldKey, installedKey]
+    );
 
     /** What fuse matches against: everything, or one scope's slice of the index. */
     const pool = useMemo(() => {
         if (!scope) return [...navigation, ...resourceEntries(resources)];
         if (!scope.resourceKind) return [];
-        return resourceEntries(resources.filter((resource) => resource.kind === scope.resourceKind));
+        return resourceEntries(
+            resources.filter((resource) => resource.kind === scope.resourceKind)
+        );
     }, [scope, navigation, resources]);
 
     const fuse = useMemo(
@@ -352,13 +387,20 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
         if (!writingCommand) {
             if (scope && !scope.resourceKind) {
                 for (const hit of hits) {
-                    found.push({ kind: "hit", id: `hit:${hit.scope}:${hit.id}`, group: scope.label, hit });
+                    found.push({
+                        kind: "hit",
+                        id: `hit:${hit.scope}:${hit.id}`,
+                        group: scope.label,
+                        hit
+                    });
                 }
             } else {
                 // With nothing typed and no command, the panel is a map of the
                 // dashboard rather than a ranking, so the pages are listed as
                 // their apps order them.
-                const matches = trimmed ? fuse.search(trimmed, { limit: MAX_RESULTS }).map((match) => match.item) : pool;
+                const matches = trimmed
+                    ? fuse.search(trimmed, { limit: MAX_RESULTS }).map((match) => match.item)
+                    : pool;
                 const shown = trimmed || scope ? matches : navigation;
                 for (const entry of shown.slice(0, MAX_RESULTS)) {
                     found.push({
@@ -374,18 +416,28 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
         // A search that already found the thing does not also need to remember
         // it: the live row is the same row, with the state it has now.
         const live = new Set(
-            found.map((row) => (row.kind === "hit" ? row.hit.href : row.kind === "entry" ? row.entry.href : ""))
+            found.map((row) =>
+                row.kind === "hit" ? row.hit.href : row.kind === "entry" ? row.entry.href : ""
+            )
         );
         const remembered: Row[] = recentRows
             .filter((entry) => !entry.href || !live.has(entry.href))
-            .map((entry) => ({ kind: "recent", id: `recent:${core.recentSearchKey(entry)}`, group: "Recent", entry }));
+            .map((entry) => ({
+                kind: "recent",
+                id: `recent:${core.recentSearchKey(entry)}`,
+                group: "Recent",
+                entry
+            }));
 
         return [...remembered, ...commands, ...found];
     }, [recentRows, suggestions, scope, hits, trimmed, query, fuse, pool, navigation]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
     /** Rows that are an answer rather than a memory or a command. */
-    const answers = useMemo(() => rows.filter((row) => row.kind === "hit" || row.kind === "entry").length, [rows]);
+    const answers = useMemo(
+        () => rows.filter((row) => row.kind === "hit" || row.kind === "entry").length,
+        [rows]
+    );
 
     // A shorter result list must not leave the highlight past its end.
     useEffect(() => {
@@ -393,7 +445,9 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
     }, [rows.length]);
 
     useEffect(() => {
-        listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+        listRef.current
+            ?.querySelector('[data-active="true"]')
+            ?.scrollIntoView({ block: "nearest" });
     }, [active, rows]);
 
     function go(row: Row | undefined): void {
@@ -417,13 +471,23 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
 
         const target =
             row.kind === "hit"
-                ? { label: row.hit.label, href: row.hit.href, scope: row.hit.scope as core.SearchScope | null }
+                ? {
+                      label: row.hit.label,
+                      href: row.hit.href,
+                      scope: row.hit.scope as core.SearchScope | null
+                  }
                 : row.kind === "recent"
                   ? { label: row.entry.label, href: row.entry.href!, scope: row.entry.scope }
                   : { label: row.entry.label, href: row.entry.href, scope: scope?.id ?? null };
 
         openedRef.current = true;
-        remember({ kind: "result", scope: target.scope, term: trimmed, label: target.label, href: target.href });
+        remember({
+            kind: "result",
+            scope: target.scope,
+            term: trimmed,
+            label: target.label,
+            href: target.href
+        });
         // Navigate before closing. Closing hands focus back to the trigger, and
         // a push issued in the same tick as that hand-off is dropped when the
         // panel was dismissed from the keyboard - the row opens on a click and
@@ -438,7 +502,9 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
             setActive((current) => (rows.length === 0 ? 0 : (current + 1) % rows.length));
         } else if (event.key === "ArrowUp") {
             event.preventDefault();
-            setActive((current) => (rows.length === 0 ? 0 : (current - 1 + rows.length) % rows.length));
+            setActive((current) =>
+                rows.length === 0 ? 0 : (current - 1 + rows.length) % rows.length
+            );
         } else if (event.key === "Home") {
             event.preventDefault();
             setActive(0);
@@ -487,7 +553,10 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                 <DialogContent showClose={false} className="max-w-xl overflow-hidden p-0">
                     <DialogTitle className="sr-only">Search Polaris</DialogTitle>
                     <div className="flex items-center gap-2 border-b border-border px-3">
-                        <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <Search
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
                         {scope && ScopeIcon ? (
                             <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 pl-2 pr-1 text-xs font-medium">
                                 <ScopeIcon className="size-3.5" aria-hidden="true" />
@@ -510,7 +579,9 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                             value={query}
                             onChange={(event) => onFieldChange(event.target.value)}
                             onKeyDown={onFieldKeyDown}
-                            placeholder={scope ? scope.placeholder : "Search, or type / for commands"}
+                            placeholder={
+                                scope ? scope.placeholder : "Search, or type / for commands"
+                            }
                             enterKeyHint="go"
                             autoCapitalize="none"
                             autoCorrect="off"
@@ -523,13 +594,18 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                             role="combobox"
                             aria-expanded
                             aria-autocomplete="list"
-                            aria-activedescendant={rows[active] ? rowElementId(rows[active]!) : undefined}
+                            aria-activedescendant={
+                                rows[active] ? rowElementId(rows[active]!) : undefined
+                            }
                             aria-controls="polaris-search-results"
                             bare
                             className="h-12"
                         />
                         {loading || searching ? (
-                            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />
+                            <Loader2
+                                className="size-4 shrink-0 animate-spin text-muted-foreground"
+                                aria-hidden="true"
+                            />
                         ) : null}
                     </div>
 
@@ -614,7 +690,9 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                                                     id={rowElementId(row)}
                                                     entry={row.entry}
                                                     scopeLabel={
-                                                        row.entry.scope ? searchScope(row.entry.scope).label : null
+                                                        row.entry.scope
+                                                            ? searchScope(row.entry.scope).label
+                                                            : null
                                                     }
                                                     selected={selected}
                                                     onSelect={select}
@@ -641,8 +719,14 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                     </div>
 
                     <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                        <span className={cn(scope && "hidden sm:inline")}>Up and down to move, Enter to open</span>
-                        <span>{scope ? "Backspace clears the command" : "Type / for commands, @ for people"}</span>
+                        <span className={cn(scope && "hidden sm:inline")}>
+                            Up and down to move, Enter to open
+                        </span>
+                        <span>
+                            {scope
+                                ? "Backspace clears the command"
+                                : "Type / for commands, @ for people"}
+                        </span>
                     </div>
                 </DialogContent>
             </Dialog>

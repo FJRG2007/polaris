@@ -61,7 +61,8 @@ export function telegramTarget(url: string): { endpoint: string; chatId: string 
     } catch {
         return null;
     }
-    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== TELEGRAM_HOST) return null;
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== TELEGRAM_HOST)
+        return null;
     if (!/^\/bot\d+:[A-Za-z0-9_-]+\/sendMessage$/.test(parsed.pathname)) return null;
     const chatId = parsed.searchParams.get("chat_id")?.trim() ?? "";
     if (!/^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(chatId)) return null;
@@ -109,7 +110,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     security: "Security",
     drive: "Drive",
     places: "Places",
-    mail: "Mail server",
+    mail: "Mail",
     network: "Network",
     people: "People",
     system: "Polaris"
@@ -174,6 +175,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A domain that had stopped answering is reachable again.",
         level: "success",
         defaults: { inapp: true, email: false }
+    },
+    {
+        id: "billing.budget",
+        group: "deploy",
+        label: "An organization's budget is running out",
+        description:
+            "What an organization you run spent this month reached 80% of its budget, or went past it.",
+        level: "warning",
+        // Mail on: whoever set a budget wants to hear about it before the month
+        // is over, and the bell is not where anybody watches spending.
+        defaults: { inapp: true, email: true }
     },
     {
         id: "tasks.assigned",
@@ -494,6 +506,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A mail server you run stopped answering, or answers again.",
         level: "warning",
         defaults: { inapp: true, email: true }
+    },
+    {
+        id: "mail.account.refused",
+        group: "mail",
+        label: "A mailbox stopped accepting its password",
+        description:
+            "A mailbox you connected refused its password or authorization, and Polaris paused checking it until you update it.",
+        level: "warning",
+        // Said once per refusal, not once per check: the mailbox stays paused
+        // until its owner fixes it, and the notice in Mail says the rest.
+        defaults: { inapp: true, email: false }
     },
     {
         id: "network.router",

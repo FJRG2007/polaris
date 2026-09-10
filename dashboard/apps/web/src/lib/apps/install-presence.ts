@@ -20,7 +20,23 @@ const CACHE_TTL_MS = 15_000;
 
 const cache = new Map<string, { present: boolean; at: number }>();
 
-/** Whether any non-removed install of this catalog app exists. */
+/**
+ * What else means an app is here, for one that was part of every Polaris before
+ * it became something to install.
+ *
+ * The mail server shipped as a built-in screen, and an instance already running
+ * one has no install row for it. Taking its screens away on the update that made
+ * it installable would hide a server that is receiving somebody's mail, so a
+ * mail server existing is as good as the install. The screens adopt the row the
+ * first time they are opened (see `mail-server/app-install`).
+ */
+const IMPLIED_BY: Readonly<Record<string, () => Promise<boolean>>> = {
+    "mail-server": async () =>
+        (await prisma.mailServer.findFirst({ select: { id: true } })) !== null
+};
+
+/** Whether any non-removed install of this catalog app exists, or anything that
+ *  stands in for one. */
 export async function isAppInstalled(catalogId: string): Promise<boolean> {
     const hit = cache.get(catalogId);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.present;
@@ -28,7 +44,8 @@ export async function isAppInstalled(catalogId: string): Promise<boolean> {
         where: { catalogId, status: { not: "removed" } },
         select: { id: true }
     });
-    const present = row !== null;
+    const implied = IMPLIED_BY[catalogId];
+    const present = row !== null || (implied ? await implied() : false);
     cache.set(catalogId, { present, at: Date.now() });
     return present;
 }

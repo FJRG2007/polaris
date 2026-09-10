@@ -86,13 +86,16 @@ export function EdgePanel({ hostId }: { hostId: string }) {
                     <Line
                         good={state.pushable}
                         yes="It takes routes and firewall changes from Polaris as they happen."
-                        no="It only reads what a deployed container tells it, so a new domain or an edited firewall rule waits for that service to be built again."
+                        no="It only reads what a deployed container tells it, so a new domain or an edited firewall rule waits for that service to be built again, and a deploy replaces the running version with a short gap."
                     />
                 </div>
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}

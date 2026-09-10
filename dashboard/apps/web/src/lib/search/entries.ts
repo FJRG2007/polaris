@@ -9,7 +9,6 @@
  * covers both.
  */
 
-import { APP_SECTIONS, APP_SUBAPPS, POLARIS_APPS } from "@/lib/apps";
 import {
     Boxes,
     Code2,
@@ -20,6 +19,14 @@ import {
     Workflow,
     type LucideIcon
 } from "lucide-react";
+import {
+    APP_SECTIONS,
+    APP_SUBAPPS,
+    POLARIS_APPS,
+    sectionOffered,
+    type AppSection,
+    type SectionGate
+} from "@/lib/apps";
 
 export type SearchResourceKind =
     | "project"
@@ -78,14 +85,24 @@ const RESOURCE_GROUPS: Record<SearchResourceKind, string> = {
  * what this account may actually open, resolved on the server; search must not
  * offer a screen that turns the person away when they pick it. The account's own
  * pages are always in, since everybody has an account.
+ *
+ * `gate` narrows the sections the way the rail does - the permissions a screen
+ * names and the marketplace app it needs installed - so search never finds a
+ * screen the rail beside it leaves out. Without one, every section of an open
+ * app is listed.
  */
-export function navigationEntries(isAdmin: boolean, appIds: readonly string[]): CommandEntry[] {
+export function navigationEntries(
+    isAdmin: boolean,
+    appIds: readonly string[],
+    gate?: Omit<SectionGate, "isAdmin">
+): CommandEntry[] {
     const entries: CommandEntry[] = [];
     const allowed = new Set([...appIds, "account"]);
+    const offered = (section: AppSection) => !gate || sectionOffered(section, { ...gate, isAdmin });
     for (const app of POLARIS_APPS) {
         if (app.adminOnly && !isAdmin) continue;
         if (!allowed.has(app.id)) continue;
-        const sections = APP_SECTIONS[app.id] ?? [];
+        const sections = (APP_SECTIONS[app.id] ?? []).filter(offered);
         // An app whose landing page is already one of its sections would otherwise
         // be listed twice under the same href.
         const root = sections.find((section) => section.href === app.href);
@@ -129,6 +146,7 @@ export function navigationEntries(isAdmin: boolean, appIds: readonly string[]): 
         );
         if (owner && !allowed.has(owner.id)) continue;
         for (const section of subapp.sections) {
+            if (!offered(section)) continue;
             if (entries.some((entry) => entry.href === section.href)) continue;
             entries.push({
                 id: `section:${section.href}`,

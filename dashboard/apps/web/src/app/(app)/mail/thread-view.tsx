@@ -263,7 +263,12 @@ export function ThreadView({
     const account = accounts.find((one) => one.id === newest.accountId);
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
+        // `min-w-0` is the width twin of the panes' `min-h-0`. This is a flex item
+        // in a row, and a flex item's floor is its content: one subject that does
+        // not wrap - the `truncate` heading - made the whole conversation as wide
+        // as that line, thousands of pixels, with the Reply buttons and the
+        // pane's scrollbar pushed off the right-hand edge of the screen.
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <header className="flex shrink-0 items-start gap-2 border-b border-border px-4 py-3">
                 {onBack ? (
                     <Button
@@ -533,7 +538,9 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { muted: !thread.muted },
-                            thread.muted ? "Unmuted." : "Muted. New messages in it will not be announced."
+                            thread.muted
+                                ? "Unmuted."
+                                : "Muted. New messages in it will not be announced."
                         )
                     }
                 >
@@ -545,9 +552,7 @@ function ConversationMenu({
                     {thread.muted ? "Unmute" : "Mute"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                    onSelect={() =>
-                        window.open(`/mail/print/${thread.id}`, "_blank", "noopener")
-                    }
+                    onSelect={() => window.open(`/mail/print/${thread.id}`, "_blank", "noopener")}
                 >
                     <Printer className="size-3.5 shrink-0" aria-hidden />
                     Print
@@ -932,14 +937,18 @@ function MessageCard({
                                         eleven scans on it. Only offered when there
                                         is more than one: an archive of one file is
                                         a file with an extra step. */}
-                                    {message.attachments.filter((file) => !file.inline).length > 1 ? (
+                                    {message.attachments.filter((file) => !file.inline).length >
+                                    1 ? (
                                         <li className="flex items-center">
                                             <a
                                                 href={`/api/mail/zip/${message.id}`}
                                                 className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
                                                 download
                                             >
-                                                <Download className="size-3.5 shrink-0" aria-hidden />
+                                                <Download
+                                                    className="size-3.5 shrink-0"
+                                                    aria-hidden
+                                                />
                                                 Save all as a .zip
                                             </a>
                                         </li>

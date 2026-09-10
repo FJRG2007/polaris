@@ -71,7 +71,8 @@ function failure(
         return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
-    if (caught instanceof templates.MailTemplateNameTaken) return { error: caught.message, field: "name" };
+    if (caught instanceof templates.MailTemplateNameTaken)
+        return { error: caught.message, field: "name" };
     if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
     return { error: fallback };
@@ -233,6 +234,30 @@ export async function editAccountAction(accountId: string, input: unknown) {
     }
 }
 
+/**
+ * Change how a mailbox connects - servers, login, password, authorization - and
+ * what it is called. Both servers are tried before anything is stored, so the
+ * refusal comes back on the form with the field it is about.
+ */
+export async function updateAccountAction(accountId: string, input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailAccountUpdateSchema.safeParse(input);
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return {
+            error: issue?.message ?? "Check the details.",
+            field: String(issue?.path[0] ?? "")
+        };
+    }
+    try {
+        const account = await accounts.updateAccount(userId, accountId, parsed.data);
+        refresh();
+        return { account };
+    } catch (caught) {
+        return failure(caught, "That mailbox could not be saved.");
+    }
+}
+
 export async function setPrivacyAction(accountId: string, input: unknown) {
     const userId = await actorId();
     const parsed = core.mailPrivacySchema.safeParse(input);
@@ -276,12 +301,14 @@ export async function removeAccountAction(accountId: string) {
     }
 }
 
-/** Ask a mailbox for anything new, now. What the refresh button does. */
+/** Ask a mailbox for anything new, now. What the refresh button does - and the
+ *  one try a refused mailbox gets before its backoff is up, because a person
+ *  pressed it rather than a timer. */
 export async function syncAccountAction(accountId: string) {
     const userId = await actorId();
     try {
         await ownedAccount(userId, accountId);
-        await syncAccount(accountId);
+        await syncAccount(accountId, { force: true });
         refresh();
         return {};
     } catch (caught) {
