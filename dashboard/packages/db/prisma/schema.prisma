@@ -3968,6 +3968,10 @@ model Application {
     // JSON {min, max, cpuPercent}: the range the replica count moves in by itself
     // to hold that CPU figure. Null leaves the count where the operator set it.
     autoscale           String?
+    // JSON {deploymentId, baseline, latest, behindBy, checkedAt, error}: what the
+    // updates scan last found for the live release - a newer image digest behind
+    // its tag, or commits on its branch it does not have. Null until scanned.
+    updateCheck         String?
     // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
     currentDeploymentId String?   @db.Uuid
     // Auto-deploy on git push (Vercel-style): redeploy when a matching commit lands.

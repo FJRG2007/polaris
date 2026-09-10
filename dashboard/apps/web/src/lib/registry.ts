@@ -202,6 +202,20 @@ async function registryGet(
 }
 
 /**
+ * The manifest digest a tag points at right now, and nothing else - the one call
+ * "has this tag moved" needs. Throws when the registry cannot be read, so a check
+ * that could not ask is never mistaken for one that found nothing new.
+ */
+export async function readTagDigest(image: string, tag: string): Promise<string | null> {
+    const { host, repository } = splitImage(image);
+    const scope = `${host}/${repository}`;
+    const token = { value: cachedToken(scope) };
+    const head = await registryGet(host, `/v2/${repository}/manifests/${encodeURIComponent(tag)}`, ACCEPT, token, scope);
+    if (!head.ok) throw new Error(`the registry answered ${head.status} for ${image}:${tag}`);
+    return head.headers.get("docker-content-digest");
+}
+
+/**
  * What the registry currently serves for `image:tag`. Throws when the registry
  * cannot be read or answers something unrecognizable - the caller reports the
  * check as failed rather than guessing that a deployment is current.

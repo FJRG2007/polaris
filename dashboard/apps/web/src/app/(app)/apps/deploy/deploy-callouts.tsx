@@ -2,19 +2,20 @@
 
 /**
  * What the deployments list needs said before anything else: the last deploy
- * failed, or the live release is behind the branch it builds from. Each callout
- * carries the one action that answers it.
+ * failed, the live release is behind the branch it builds from, or a newer image
+ * is published behind the tag it runs. Each callout carries the one action that
+ * answers it.
  */
 
 import { Button, cn } from "@polaris/ui";
 import { LikelyCause } from "./likely-cause";
 import { isInFlightStatus } from "@/lib/deploy/status";
-import { deployFreshnessAction } from "./glance-actions";
+import { deployFreshnessAction, imageUpdateAction } from "./glance-actions";
 import { useEffect, useState, type ReactNode } from "react";
 import type { DeployFreshness } from "@/lib/deploy/freshness";
 import type { DeploymentSummary } from "@/lib/deploy-service";
 import { FAILED_DEPLOY_STATUSES } from "@/lib/deploy/attention";
-import { ArrowUpRight, CircleAlert, GitCommitHorizontal, Loader2 } from "lucide-react";
+import { ArrowUpRight, CircleAlert, GitCommitHorizontal, Loader2, PackageCheck } from "lucide-react";
 
 /** The first line of an error that says something, for a callout that has one line. */
 function firstErrorLine(error: string | null): string | null {
@@ -56,6 +57,28 @@ function useFreshness(applicationId: string, sha: string | null): DeployFreshnes
             active = false;
         };
     }, [applicationId, key]);
+    return value;
+}
+
+/** Whether the updates scan found a newer image for this release. Read once per
+ *  release shown, since the scan only runs every half hour. */
+function useImageUpdate(applicationId: string, deploymentId: string | null): { image: string } | null {
+    const [value, setValue] = useState<{ image: string } | null>(null);
+    useEffect(() => {
+        if (!deploymentId) {
+            setValue(null);
+            return;
+        }
+        let active = true;
+        void imageUpdateAction(applicationId)
+            .catch(() => null)
+            .then((result) => {
+                if (active) setValue(result);
+            });
+        return () => {
+            active = false;
+        };
+    }, [applicationId, deploymentId]);
     return value;
 }
 
@@ -121,13 +144,16 @@ export function DeployCallouts({
     const active = items.find((item) => item.isCurrent) ?? null;
     const moving = items.some((item) => isInFlightStatus(item.status));
     const freshness = useFreshness(applicationId, active?.commitSha ?? null);
+    const imageUpdate = useImageUpdate(applicationId, active?.id ?? null);
 
     const failed = latest && FAILED_DEPLOY_STATUSES.includes(latest.status) ? latest : null;
     const errorLine = failed ? firstErrorLine(failed.error) : null;
     // A build already on its way brings the branch head with it.
     const behind = !moving && freshness && freshness.behindBy > 0 ? freshness : null;
 
-    if (!failed && !behind) return null;
+    const newerImage = !moving && imageUpdate ? imageUpdate : null;
+
+    if (!failed && !behind && !newerImage) return null;
 
     const deployButton = (label: string) =>
         canDeploy && (
@@ -191,6 +217,16 @@ export function DeployCallouts({
                             Compare <ArrowUpRight className="size-3" />
                         </a>
                     )}
+                    {deployButton("Deploy latest")}
+                </Callout>
+            )}
+            {newerImage && (
+                <Callout
+                    tone="neutral"
+                    icon={<PackageCheck className="size-4" />}
+                    title="A newer image is published"
+                    detail={<span className="font-mono">{newerImage.image}</span>}
+                >
                     {deployButton("Deploy latest")}
                 </Callout>
             )}

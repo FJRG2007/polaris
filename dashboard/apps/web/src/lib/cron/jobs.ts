@@ -20,13 +20,14 @@ import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { pruneTelemetry } from "@/lib/telemetry/store";
+import { runAutoscale } from "@/lib/deploy/autoscaler";
+import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepMailServers } from "@/lib/mail-server/health";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
-import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -43,9 +44,9 @@ import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
-import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
 import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
 import { ensureManagedCertificates } from "@/lib/tls/managed-certificates";
+import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
 import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
@@ -409,6 +410,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: MINUTE,
         leaseMs: 5 * MINUTE,
         run: () => runAutoscale()
+    },
+    {
+        key: "update-scan",
+        // Half-hourly: a registry is asked once per image service and GitHub once
+        // per repository service, and nothing published is urgent to the minute.
+        // Unleased: two passes write the same answer.
+        everyMs: 30 * MINUTE,
+        leaseMs: null,
+        run: () => scanServiceUpdates()
     },
     {
         key: "runtime-logs",

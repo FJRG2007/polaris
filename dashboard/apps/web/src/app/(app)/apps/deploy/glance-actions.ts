@@ -10,6 +10,7 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/session";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { deployFreshness, type DeployFreshness } from "@/lib/deploy/freshness";
+import { imageUpdateOf } from "@/lib/deploy/update-scan";
 import { readerProjectGlance, type EnvironmentGlance } from "@/lib/deploy/project-glance";
 
 const idSchema = z.string().trim().min(1).max(100);
@@ -21,6 +22,22 @@ export async function deployFreshnessAction(applicationId: string): Promise<Depl
     try {
         await requireApplicationAccess(parsed.data, user.id, "project.read");
         return await deployFreshness(parsed.data);
+    } catch {
+        return null;
+    }
+}
+
+/** A newer image published behind the tag a service runs, as the last updates
+ *  scan found it. */
+export async function imageUpdateAction(
+    applicationId: string
+): Promise<{ image: string; checkedAt: string } | null> {
+    const user = await requirePermission("deploy.read");
+    const parsed = idSchema.safeParse(applicationId);
+    if (!parsed.success) return null;
+    try {
+        await requireApplicationAccess(parsed.data, user.id, "project.read");
+        return await imageUpdateOf(parsed.data);
     } catch {
         return null;
     }
