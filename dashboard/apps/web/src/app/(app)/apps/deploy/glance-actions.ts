@@ -15,9 +15,7 @@ import { readerProjectGlance, type EnvironmentGlance } from "@/lib/deploy/projec
 
 const idSchema = z.string().trim().min(1).max(100);
 
-export async function deployFreshnessAction(
-    applicationId: string
-): Promise<DeployFreshness | null> {
+export async function deployFreshnessAction(applicationId: string): Promise<DeployFreshness | null> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(applicationId);
     if (!parsed.success) return null;
@@ -46,9 +44,7 @@ export async function imageUpdateAction(
 }
 
 /** The project frame's glance, re-read after something in it changed. */
-export async function projectGlanceAction(
-    projectId: string
-): Promise<Record<string, EnvironmentGlance> | null> {
+export async function projectGlanceAction(projectId: string): Promise<Record<string, EnvironmentGlance> | null> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(projectId);
     if (!parsed.success) return null;

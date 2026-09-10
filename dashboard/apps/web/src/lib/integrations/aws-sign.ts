@@ -190,16 +190,7 @@ export function presignAwsUrl(input: {
     readonly expiresIn: number;
     readonly now?: Date;
 }): string {
-    const {
-        credentials,
-        service = "s3",
-        protocol = "https",
-        host,
-        path,
-        method = "GET",
-        expiresIn,
-        now = new Date()
-    } = input;
+    const { credentials, service = "s3", protocol = "https", host, path, method = "GET", expiresIn, now = new Date() } = input;
     if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 604_800) {
         throw new Error("A presigned URL lasts between one second and seven days");
     }
@@ -211,9 +202,7 @@ export function presignAwsUrl(input: {
         ["X-Amz-Date", full],
         ["X-Amz-Expires", String(expiresIn)],
         ["X-Amz-SignedHeaders", "host"],
-        ...(credentials.sessionToken
-            ? ([["X-Amz-Security-Token", credentials.sessionToken]] as [string, string][])
-            : [])
+        ...(credentials.sessionToken ? ([["X-Amz-Security-Token", credentials.sessionToken]] as [string, string][]) : [])
     ];
     const query = params
         .map(([key, value]) => [awsEncode(key), awsEncode(value)] as const)
@@ -221,14 +210,7 @@ export function presignAwsUrl(input: {
         .map(([key, value]) => `${key}=${value}`)
         .join("&");
     const canonicalPath = awsEncode(path.startsWith("/") ? path : `/${path}`, true);
-    const canonicalRequest = [
-        method,
-        canonicalPath,
-        query,
-        `host:${host}\n`,
-        "host",
-        "UNSIGNED-PAYLOAD"
-    ].join("\n");
+    const canonicalRequest = [method, canonicalPath, query, `host:${host}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
     const stringToSign = ["AWS4-HMAC-SHA256", full, scope, sha256(canonicalRequest)].join("\n");
     const dateKey = hmac(`AWS4${credentials.secretAccessKey}`, day);
     const regionKey = hmac(dateKey, credentials.region);

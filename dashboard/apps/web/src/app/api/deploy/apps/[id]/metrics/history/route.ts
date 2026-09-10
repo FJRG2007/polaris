@@ -25,13 +25,7 @@ export async function GET(
         url.searchParams.get("from"),
         url.searchParams.get("to")
     );
-    const points = await getMetricSeries({
-        subjectType: "app",
-        subjectId: id,
-        ownerId: access.ownerId,
-        from,
-        to
-    });
+    const points = await getMetricSeries({ subjectType: "app", subjectId: id, ownerId: access.ownerId, from, to });
     if (points === null) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ points });
 }

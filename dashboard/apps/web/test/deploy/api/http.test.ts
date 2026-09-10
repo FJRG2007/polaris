@@ -12,15 +12,11 @@ const rateLimit = vi.fn();
 vi.mock("@/lib/api-key-auth", () => ({
     authenticateApiKey: (...args: unknown[]) => authenticateApiKey(...args)
 }));
-vi.mock("@/lib/rate-limit-service", () => ({
-    rateLimit: (...args: unknown[]) => rateLimit(...args)
-}));
+vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: (...args: unknown[]) => rateLimit(...args) }));
 
 const { deployRoute, readBody, respond } = await import("@/lib/deploy/api/http");
 const { DeployApiRefusal } = await import("@/lib/deploy/api/refusal");
-const { addDomainSchema, setVariableSchema, serviceRefSchema } = await import(
-    "@/lib/deploy/api/schemas"
-);
+const { addDomainSchema, setVariableSchema, serviceRefSchema } = await import("@/lib/deploy/api/schemas");
 
 const segment = { params: Promise.resolve({ id: "svc" }) };
 
@@ -71,19 +67,13 @@ describe("deployRoute", () => {
 
     it("counts changes against a stricter limit, and says when to try again", async () => {
         rateLimit.mockImplementation(async (bucket: string) =>
-            bucket.startsWith("deploy-api-change:")
-                ? { ok: false, retryAfterMs: 12_300 }
-                : { ok: true, retryAfterMs: 0 }
+            bucket.startsWith("deploy-api-change:") ? { ok: false, retryAfterMs: 12_300 } : { ok: true, retryAfterMs: 0 }
         );
         const response = await deployRoute("deploy", true, vi.fn())(request(), segment);
         expect(response.status).toBe(429);
         expect(response.headers.get("retry-after")).toBe("13");
         // A read is not held back by the change limit.
-        const read = await deployRoute(
-            "read",
-            false,
-            async () => new Response("ok")
-        )(request(), segment);
+        const read = await deployRoute("read", false, async () => new Response("ok"))(request(), segment);
         expect(read.status).toBe(200);
     });
 
@@ -152,8 +142,6 @@ describe("the input shapes", () => {
     it("refuses a hostname that is not one, and a port out of range", () => {
         expect(addDomainSchema.safeParse({ hostname: "not a host" }).success).toBe(false);
         expect(addDomainSchema.safeParse({ targetPort: 70000 }).success).toBe(false);
-        expect(addDomainSchema.parse({ hostname: "API.Example.test" }).hostname).toBe(
-            "api.example.test"
-        );
+        expect(addDomainSchema.parse({ hostname: "API.Example.test" }).hostname).toBe("api.example.test");
     });
 });

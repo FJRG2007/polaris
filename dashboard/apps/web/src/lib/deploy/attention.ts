@@ -25,9 +25,7 @@ export const FAILED_CRON_STATUSES: readonly string[] = ["failed", "timed_out"];
 
 /** Whether anything on the service needs a look. */
 export function needsAttention(attention: ServiceAttention | null | undefined): boolean {
-    return Boolean(
-        attention && (attention.deployFailed || attention.domainDown || attention.cronFailing)
-    );
+    return Boolean(attention && (attention.deployFailed || attention.domainDown || attention.cronFailing));
 }
 
 /** The same, as the words a tooltip says. */

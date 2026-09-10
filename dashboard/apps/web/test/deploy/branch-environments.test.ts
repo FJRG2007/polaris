@@ -41,34 +41,13 @@ describe("which branch a service follows", () => {
 
 describe("what counts as a branch name", () => {
     it("accepts the names people actually use", () => {
-        for (const name of [
-            "main",
-            "feature/login",
-            "release+1",
-            "fix-12_b",
-            "user@feature",
-            "v1.2"
-        ]) {
+        for (const name of ["main", "feature/login", "release+1", "fix-12_b", "user@feature", "v1.2"]) {
             expect(isGitBranchName(name), name).toBe(true);
         }
     });
 
     it("refuses anything git would, and anything that reads as an option", () => {
-        for (const name of [
-            "-x",
-            "--upload-pack=evil",
-            "a..b",
-            "a b",
-            "a:b",
-            "a~1",
-            "a^",
-            "a/",
-            "/a",
-            "a.lock",
-            "a@{1}",
-            "a//b",
-            ""
-        ]) {
+        for (const name of ["-x", "--upload-pack=evil", "a..b", "a b", "a:b", "a~1", "a^", "a/", "/a", "a.lock", "a@{1}", "a//b", ""]) {
             expect(isGitBranchName(name), name).toBe(false);
         }
     });

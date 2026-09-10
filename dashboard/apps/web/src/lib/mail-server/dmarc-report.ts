@@ -57,13 +57,7 @@ function isGzip(bytes: Uint8Array): boolean {
 }
 
 function isZip(bytes: Uint8Array): boolean {
-    return (
-        bytes.length > 4 &&
-        bytes[0] === 0x50 &&
-        bytes[1] === 0x4b &&
-        bytes[2] === 0x03 &&
-        bytes[3] === 0x04
-    );
+    return bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
 }
 
 function looksLikeXml(bytes: Uint8Array): boolean {
@@ -85,11 +79,7 @@ function inflateEntry(entry: JSZip.JSZipObject): Promise<Buffer> {
                 if (size > MAX_XML_BYTES) {
                     stream.pause();
                     stream.removeAllListeners("data");
-                    reject(
-                        new DmarcUploadError(
-                            "That report unpacks to more than any real report does."
-                        )
-                    );
+                    reject(new DmarcUploadError("That report unpacks to more than any real report does."));
                     return;
                 }
                 chunks.push(chunk);
@@ -109,9 +99,7 @@ export async function unpackAttachment(bytes: Uint8Array): Promise<string[]> {
         try {
             inflated = gunzipSync(bytes, { maxOutputLength: MAX_XML_BYTES });
         } catch {
-            throw new DmarcUploadError(
-                "That compressed report is damaged, or unpacks to more than any real report does."
-            );
+            throw new DmarcUploadError("That compressed report is damaged, or unpacks to more than any real report does.");
         }
         return looksLikeXml(inflated) ? [inflated.toString("utf8")] : [];
     }
@@ -128,10 +116,7 @@ export async function unpackAttachment(bytes: Uint8Array): Promise<string[]> {
             if (entry.dir || !entry.name.toLowerCase().endsWith(".xml")) continue;
             const inflated = await inflateEntry(entry);
             total += inflated.length;
-            if (total > MAX_XML_BYTES)
-                throw new DmarcUploadError(
-                    "That zip file unpacks to more than any real report does."
-                );
+            if (total > MAX_XML_BYTES) throw new DmarcUploadError("That zip file unpacks to more than any real report does.");
             documents.push(inflated.toString("utf8"));
         }
         return documents;
@@ -151,10 +136,7 @@ const parser = new XMLParser({
 export function parseReportXml(xml: string): core.DmarcReport {
     // A report never carries a document type, and one that does is somebody
     // reaching for entity expansion.
-    if (/<!DOCTYPE|<!ENTITY/i.test(xml))
-        throw new core.DmarcReportError(
-            "That file declares a document type, which no report does."
-        );
+    if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw new core.DmarcReportError("That file declares a document type, which no report does.");
     let document: unknown;
     try {
         document = parser.parse(xml);
@@ -178,8 +160,7 @@ export async function reportsInUpload(bytes: Uint8Array): Promise<core.DmarcRepo
             documents.push(...(await unpackAttachment(attachment.content)));
         }
     }
-    if (documents.length === 0)
-        throw new DmarcUploadError("No DMARC report was found in that file.");
+    if (documents.length === 0) throw new DmarcUploadError("No DMARC report was found in that file.");
     return documents.map(parseReportXml);
 }
 
@@ -205,9 +186,7 @@ export async function fileReports(
             continue;
         }
         const messages = report.rows.reduce((sum, row) => sum + row.count, 0);
-        const failed = report.rows
-            .filter((row) => !core.rowPasses(row))
-            .reduce((sum, row) => sum + row.count, 0);
+        const failed = report.rows.filter((row) => !core.rowPasses(row)).reduce((sum, row) => sum + row.count, 0);
         const created = await prisma.mailDmarcReport.createMany({
             data: [
                 {
@@ -250,9 +229,7 @@ function storedReport(row: {
 }): core.DmarcReport {
     // Rows were checked when filed; read back defensively all the same, since a
     // stored value outlives the code that wrote it.
-    const rows = Array.isArray(row.rows)
-        ? (row.rows as core.DmarcRow[]).filter((item) => typeof item?.sourceIp === "string")
-        : [];
+    const rows = Array.isArray(row.rows) ? (row.rows as core.DmarcRow[]).filter((item) => typeof item?.sourceIp === "string") : [];
     return {
         orgName: row.orgName,
         reportId: row.reportId,
@@ -313,10 +290,7 @@ export async function dmarcOverview(server: MailServer, sinceDays: number): Prom
 }
 
 /** File an uploaded report for a server. */
-export async function uploadReport(
-    server: MailServer,
-    bytes: Uint8Array
-): Promise<{ filed: number; ignored: number }> {
+export async function uploadReport(server: MailServer, bytes: Uint8Array): Promise<{ filed: number; ignored: number }> {
     const reports = await reportsInUpload(bytes);
     const domains = new Set((await serverDomains(server)).map((domain) => domain.name));
     return fileReports(server.id, domains, reports);
@@ -327,14 +301,8 @@ export async function uploadReport(
 // ---------------------------------------------------------------------------
 
 function reportsCredentials(server: MailServer): StalwartCredentials | null {
-    const password = unseal(
-        server.reportsSecret,
-        server.reportsSecretNonce,
-        server.reportsSecretKeyId
-    );
-    return password
-        ? { username: `${core.MAIL_REPORTS_NAME}@${server.primaryDomain}`, password }
-        : null;
+    const password = unseal(server.reportsSecret, server.reportsSecretNonce, server.reportsSecretKeyId);
+    return password ? { username: `${core.MAIL_REPORTS_NAME}@${server.primaryDomain}`, password } : null;
 }
 
 /**
@@ -351,32 +319,18 @@ export async function ensureReportsMailbox(server: MailServer, without?: string)
     const endpoint = await endpointFor(server.applicationId);
     const credentials = adminCredentials(server);
     const domains = core
-        .listOfAnswer<{
-            id: string;
-            name: string;
-        }>(await call(endpoint, credentials, core.domainListCalls()), "domains")
+        .listOfAnswer<{ id: string; name: string }>(await call(endpoint, credentials, core.domainListCalls()), "domains")
         .filter((domain) => domain.id !== without);
     const primary = domains.find((domain) => domain.name === server.primaryDomain);
-    if (!primary)
-        throw new MailServerAccessError(
-            `${server.primaryDomain} is missing from the mail server. Repair it from the start.`
-        );
+    if (!primary) throw new MailServerAccessError(`${server.primaryDomain} is missing from the mail server. Repair it from the start.`);
 
-    let password = unseal(
-        server.reportsSecret,
-        server.reportsSecretNonce,
-        server.reportsSecretKeyId
-    );
+    let password = unseal(server.reportsSecret, server.reportsSecretNonce, server.reportsSecretKeyId);
     if (!password) {
         password = randomBytes(24).toString("base64url");
         const sealed = seal(password);
         await prisma.mailServer.update({
             where: { id: server.id },
-            data: {
-                reportsSecret: sealed.ciphertext,
-                reportsSecretNonce: sealed.nonce,
-                reportsSecretKeyId: sealed.keyId
-            }
+            data: { reportsSecret: sealed.ciphertext, reportsSecretNonce: sealed.nonce, reportsSecretKeyId: sealed.keyId }
         });
     }
 
@@ -384,15 +338,9 @@ export async function ensureReportsMailbox(server: MailServer, without?: string)
         await call(endpoint, credentials, core.accountListCalls()),
         "accounts"
     );
-    let accountId = accounts.find(
-        (account) => account.name === core.MAIL_REPORTS_NAME && account.domainId === primary.id
-    )?.id;
+    let accountId = accounts.find((account) => account.name === core.MAIL_REPORTS_NAME && account.domainId === primary.id)?.id;
     if (accountId) {
-        core.assertApplied(
-            await call(endpoint, credentials, [core.accountPasswordCall(accountId, password)]),
-            "password",
-            accountId
-        );
+        core.assertApplied(await call(endpoint, credentials, [core.accountPasswordCall(accountId, password)]), "password", accountId);
     } else {
         accountId = core.createdId(
             await call(endpoint, credentials, [
@@ -401,8 +349,7 @@ export async function ensureReportsMailbox(server: MailServer, without?: string)
                     domainId: primary.id,
                     password,
                     quotaBytes: REPORTS_QUOTA_BYTES,
-                    description:
-                        "DMARC reports about this server's domains arrive here; Polaris reads and files them."
+                    description: "DMARC reports about this server's domains arrive here; Polaris reads and files them."
                 })
             ]),
             "account",
@@ -436,9 +383,7 @@ export async function ensureReportsMailbox(server: MailServer, without?: string)
  * them filed, each message marked seen. Records when it ran and what stopped
  * it, for the screen.
  */
-export async function collectReports(
-    server: MailServer
-): Promise<{ filed: number; ignored: number; messages: number }> {
+export async function collectReports(server: MailServer): Promise<{ filed: number; ignored: number; messages: number }> {
     const credentials = reportsCredentials(server);
     if (!server.applicationId || !reached(server.step, "reports") || !credentials) {
         return { filed: 0, ignored: 0, messages: 0 };
@@ -454,9 +399,7 @@ export async function collectReports(
         );
         const messages = core.listOfAnswer<{
             id: string;
-            attachments?:
-                | { blobId?: string; type?: string; name?: string | null; size?: number }[]
-                | null;
+            attachments?: { blobId?: string; type?: string; name?: string | null; size?: number }[] | null;
         }>(response, "messages");
         const domains = new Set((await serverDomains(server)).map((domain) => domain.name));
         let filed = 0;
@@ -496,42 +439,28 @@ export async function collectReports(
                 await call(
                     endpoint,
                     credentials,
-                    [
-                        core.markSeenCall(
-                            session.accountId,
-                            messages.map((message) => message.id)
-                        )
-                    ],
+                    [core.markSeenCall(session.accountId, messages.map((message) => message.id))],
                     core.jmapMailRequest
                 ),
                 "seen"
             );
         }
-        await prisma.mailServer.update({
-            where: { id: server.id },
-            data: { reportsCheckedAt: new Date(), reportsError: null }
-        });
+        await prisma.mailServer.update({ where: { id: server.id }, data: { reportsCheckedAt: new Date(), reportsError: null } });
         return { filed, ignored, messages: messages.length };
     } catch (error) {
         const said =
             error instanceof core.StalwartRefusal || error instanceof MailServerAccessError
                 ? error.message
                 : "The report mailbox could not be read. It is tried again on the next run.";
-        if (!(error instanceof core.StalwartRefusal))
-            console.error("polaris: reading the DMARC report mailbox failed:", error);
-        await prisma.mailServer.update({
-            where: { id: server.id },
-            data: { reportsCheckedAt: new Date(), reportsError: said }
-        });
+        if (!(error instanceof core.StalwartRefusal)) console.error("polaris: reading the DMARC report mailbox failed:", error);
+        await prisma.mailServer.update({ where: { id: server.id }, data: { reportsCheckedAt: new Date(), reportsError: said } });
         return { filed: 0, ignored: 0, messages: 0 };
     }
 }
 
 /** The scheduled read of every ready server's report mailbox. */
 export async function collectAllReports(): Promise<{ servers: number; filed: number }> {
-    const servers = await prisma.mailServer.findMany({
-        where: { status: { in: ["ready", "down"] } }
-    });
+    const servers = await prisma.mailServer.findMany({ where: { status: { in: ["ready", "down"] } } });
     let filed = 0;
     for (const server of servers) {
         filed += (await collectReports(server)).filed;

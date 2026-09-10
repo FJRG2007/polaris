@@ -35,12 +35,7 @@ import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { applyImportedAfterCreate, importedCreate } from "@/lib/deploy/repo-import";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { serviceTemplate, serviceTemplateIdSchema, templateNeedsSetup } from "@polaris/core";
-import {
-    inspectGithubRepo,
-    readGithubRepoSetup,
-    type GithubRepo,
-    type RepoInspection
-} from "@/lib/github-service";
+import { inspectGithubRepo, readGithubRepoSetup, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import {
     getDomainZones,
     isBaseZoneKey,
@@ -242,7 +237,7 @@ export async function createEnvironmentAction(input: {
         }
         if (cloneFrom && deploy && !accessCan(access, "deploy.run")) {
             return {
-                error: 'You can create this environment, but not deploy it. Untick "Deploy it once it is created" and try again.'
+                error: "You can create this environment, but not deploy it. Untick \"Deploy it once it is created\" and try again."
             };
         }
         const environment = cloneFrom
@@ -376,13 +371,7 @@ export async function createApplicationAction(input: {
         const id = serviceTemplateIdSchema.safeParse(input.templateId);
         if (!id.success) return { error: "That template is not in the list" };
         template = serviceTemplate(id.data);
-        if (template)
-            input = {
-                ...input,
-                sourceType: "image",
-                imageRef: template.image,
-                port: template.port
-            };
+        if (template) input = { ...input, sourceType: "image", imageRef: template.image, port: template.port };
     }
     const name = input.name?.trim() || template?.name;
     if (!name) return { error: "An application name is required" };
@@ -452,10 +441,7 @@ export async function createApplicationAction(input: {
         const branch = input.branch?.trim() || undefined;
         // What the repository's own deploy files set, read as the creator - only a
         // GitHub repository can be read before it is cloned.
-        const github =
-            isGit && input.provider === "github"
-                ? parseGithubRepo(sourceConfig.repoUrl as string)
-                : null;
+        const github = isGit && input.provider === "github" ? parseGithubRepo(sourceConfig.repoUrl as string) : null;
         const setup =
             github && branch && input.useRepoConfig !== false
                 ? await readGithubRepoSetup(
@@ -489,9 +475,7 @@ export async function createApplicationAction(input: {
             publishPort: false,
             ...(fromRepo ? { buildConfig: fromRepo.buildConfig } : {}),
             // A service that keeps its previous deployments runs one copy of each.
-            ...(fromRepo?.replicas && !flags.keepReleasesByDefault
-                ? { replicas: fromRepo.replicas }
-                : {})
+            ...(fromRepo?.replicas && !flags.keepReleasesByDefault ? { replicas: fromRepo.replicas } : {})
         });
         const needs = await applyImportedAfterCreate(app.id, owner, setup?.imported ?? null);
         await recordDeployAudit({
@@ -505,12 +489,7 @@ export async function createApplicationAction(input: {
         const parts = template
             ? await templateSetup.addTemplateParts({
                   template,
-                  service: {
-                      id: app.id,
-                      slug: app.slug,
-                      environmentId: input.environmentId,
-                      targetId: target.id
-                  },
+                  service: { id: app.id, slug: app.slug, environmentId: input.environmentId, targetId: target.id },
                   ownerId: owner,
                   keepReleases: flags.keepReleasesByDefault
               })
@@ -520,11 +499,7 @@ export async function createApplicationAction(input: {
         // free sslip.io subdomain works with no setup even on a LAN.
         const requestHeaders = await headers();
         await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
-        const targetPort = Number.isInteger(input.port)
-            ? Number(input.port)
-            : isGit || isUpload
-              ? 3000
-              : 80;
+        const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit || isUpload ? 3000 : 80;
         if (flags.autoSubdomain) {
             try {
                 await deployService.addApplicationDomain(app.id, owner, { targetPort });
@@ -649,16 +624,9 @@ export async function revealEnvVarAction(
         // Written only once the value has actually been handed over: a reveal is
         // the one read in Deploy that puts a secret on somebody's screen, and the
         // question an incident asks first is who looked.
-        await recordVariableEvent(
-            user.id,
-            access.orgId,
-            scope.scope,
-            scope.scopeId,
-            "deploy.variable.reveal",
-            {
-                key: scope.key
-            }
-        );
+        await recordVariableEvent(user.id, access.orgId, scope.scope, scope.scopeId, "deploy.variable.reveal", {
+            key: scope.key
+        });
         return { value };
     } catch (caught) {
         return {
@@ -938,10 +906,7 @@ export async function setDeploymentTrafficAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return {
-            error:
-                caught instanceof Error ? caught.message : "Could not change where the traffic goes"
-        };
+        return { error: caught instanceof Error ? caught.message : "Could not change where the traffic goes" };
     }
 }
 
@@ -997,12 +962,8 @@ export async function setAppSourcePathsAction(input: {
             installCommand: input.installCommand,
             buildCommand: input.buildCommand,
             startCommand: input.startCommand,
-            ...(input.runtimeVersion !== undefined
-                ? { runtimeVersion: runtimeVersion?.data ?? "" }
-                : {}),
-            ...(input.outputDirectory !== undefined
-                ? { outputDirectory: input.outputDirectory }
-                : {})
+            ...(input.runtimeVersion !== undefined ? { runtimeVersion: runtimeVersion?.data ?? "" } : {}),
+            ...(input.outputDirectory !== undefined ? { outputDirectory: input.outputDirectory } : {})
         });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -1466,9 +1427,7 @@ export async function setServedByAction(
  */
 export async function edgeSettingsAction(
     applicationId: string
-): Promise<
-    { error: string } | (deployService.EdgeSettingsView & { guardChallenge: boolean | null })
-> {
+): Promise<{ error: string } | (deployService.EdgeSettingsView & { guardChallenge: boolean | null })> {
     const user = await requirePermission("deploy.manage");
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "project.read");
@@ -1477,9 +1436,7 @@ export async function edgeSettingsAction(
         // and is updated with the rest of that server's edge.
         return { ...view, guardChallenge: view.local ? await guardSupportsChallenge() : null };
     } catch (caught) {
-        return {
-            error: caught instanceof Error ? caught.message : "Could not read the edge settings"
-        };
+        return { error: caught instanceof Error ? caught.message : "Could not read the edge settings" };
     }
 }
 
@@ -1514,9 +1471,7 @@ export async function saveEdgeSettingsAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return {
-            error: caught instanceof Error ? caught.message : "Could not save the edge settings"
-        };
+        return { error: caught instanceof Error ? caught.message : "Could not save the edge settings" };
     }
 }
 

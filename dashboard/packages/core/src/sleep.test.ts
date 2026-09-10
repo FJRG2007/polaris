@@ -31,13 +31,9 @@ describe("sleepDecision", () => {
     });
 
     it("never sleeps on a log too short to show the whole stretch", () => {
-        expect(sleepDecision({ ...awake, lastVisit: null, windowStart: NOW - 5 * MIN })).toBe(
-            "stay"
-        );
+        expect(sleepDecision({ ...awake, lastVisit: null, windowStart: NOW - 5 * MIN })).toBe("stay");
         expect(sleepDecision({ ...awake, lastVisit: null, windowStart: null })).toBe("stay");
-        expect(sleepDecision({ ...awake, lastVisit: null, windowStart: NOW - 30 * MIN })).toBe(
-            "sleep"
-        );
+        expect(sleepDecision({ ...awake, lastVisit: null, windowStart: NOW - 30 * MIN })).toBe("sleep");
     });
 
     it("leaves a service with sleeping off alone", () => {
@@ -51,14 +47,9 @@ describe("sleepDecision", () => {
     });
 
     it("wakes a sleeping service when sleeping is turned off", () => {
-        expect(
-            sleepDecision({
-                ...awake,
-                asleepSince: NOW - MIN,
-                sleepAfterMinutes: null,
-                lastVisit: null
-            })
-        ).toBe("wake");
+        expect(sleepDecision({ ...awake, asleepSince: NOW - MIN, sleepAfterMinutes: null, lastVisit: null })).toBe(
+            "wake"
+        );
     });
 });
 

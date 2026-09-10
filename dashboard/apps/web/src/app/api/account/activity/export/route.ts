@@ -19,9 +19,7 @@ const sessionSchema = z.union([z.string().uuid(), z.literal(NO_SESSION)]).option
 export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
-    const session = sessionSchema.safeParse(
-        new URL(request.url).searchParams.get("session") || undefined
-    );
+    const session = sessionSchema.safeParse(new URL(request.url).searchParams.get("session") || undefined);
     if (!session.success) return NextResponse.json({ error: "Not a session" }, { status: 400 });
 
     // The session parameter is read here and nowhere else, so stripping it from
@@ -33,9 +31,7 @@ export async function GET(request: Request): Promise<Response> {
         {
             kind: "user",
             userId: user.id,
-            ...(session.data === undefined
-                ? {}
-                : { sessionId: session.data === NO_SESSION ? null : session.data })
+            ...(session.data === undefined ? {} : { sessionId: session.data === NO_SESSION ? null : session.data })
         },
         { label: "my", actorId: user.id }
     );

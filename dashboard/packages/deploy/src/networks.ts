@@ -95,8 +95,7 @@ export function serviceNetworks(input: NetworkPlanInput): string[] {
     // same network the request came in on.
     const peers = new Set<string>();
     for (const link of input.links ?? []) {
-        if (link.source === input.serviceId && link.target !== input.serviceId)
-            peers.add(link.target);
+        if (link.source === input.serviceId && link.target !== input.serviceId) peers.add(link.target);
     }
     return [...proxy, serviceNetwork(input.serviceId), ...[...peers].sort().map(serviceNetwork)];
 }
@@ -161,9 +160,7 @@ export function ensurePrivateNetworksScript(names: readonly string[], swarm: boo
     const statements: string[] = [];
     for (const name of [...new Set(names)].filter(isPrivateNetwork)) {
         const create = `docker network create --label ${PRIVATE_NETWORK_LABEL} ${driver}`;
-        const ranges = Array.from({ length: FALLBACK_ATTEMPTS }, (_, attempt) =>
-            fallbackSubnet(name, attempt)
-        );
+        const ranges = Array.from({ length: FALLBACK_ATTEMPTS }, (_, attempt) => fallbackSubnet(name, attempt));
         const missing = [
             `${create} ${name} >/dev/null 2>&1 || { for s in ${ranges.join(" ")}; do ${create} --subnet "$s" ${name} >/dev/null 2>&1 && break; done; true; }`,
             `docker network inspect ${name} >/dev/null 2>&1 || { echo "could not create network ${name}: this server has no address range left for another network" >&2; exit 1; }`

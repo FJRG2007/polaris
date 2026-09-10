@@ -95,13 +95,8 @@ describe("organization roles", () => {
     it("refuses a written role that grants the wildcard", () => {
         // Only the seeded admin holds it. A role anybody writes must not quietly
         // inherit whatever a later version of Polaris adds.
-        expect(
-            orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["*"] }).success
-        ).toBe(false);
-        expect(
-            orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["teams.manage"] })
-                .success
-        ).toBe(true);
+        expect(orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["*"] }).success).toBe(false);
+        expect(orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["teams.manage"] }).success).toBe(true);
     });
 
     it("keeps role handles short and typeable", () => {

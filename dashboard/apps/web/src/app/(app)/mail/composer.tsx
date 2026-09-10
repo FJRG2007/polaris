@@ -146,11 +146,7 @@ export function Composer() {
         setBcc([...(composing.bcc ?? [])]);
         setShowCopies((composing.cc ?? []).length + (composing.bcc ?? []).length > 0);
         setSubject(composing.subject ?? "");
-        const body = withSignature(
-            composing,
-            accounts.find((one) => one.id === account),
-            identity
-        );
+        const body = withSignature(composing, accounts.find((one) => one.id === account), identity);
         setBody(body);
         setFiles([]);
         saves.current = draftSaves(
@@ -651,8 +647,7 @@ export function Composer() {
                                 setInsert({ token: Date.now(), text: template.body });
                                 // A template's subject fills an empty line and
                                 // never replaces one somebody already wrote.
-                                if (template.subject && !subject.trim())
-                                    setSubject(template.subject);
+                                if (template.subject && !subject.trim()) setSubject(template.subject);
                             }}
                         />
 
@@ -743,9 +738,7 @@ function TemplateMenu({
                 ) : (
                     offered.map((template) => (
                         <DropdownMenuItem key={template.id} onSelect={() => onPick(template)}>
-                            <span className="truncate" title={template.name}>
-                                {template.name}
-                            </span>
+                            <span className="truncate" title={template.name}>{template.name}</span>
                         </DropdownMenuItem>
                     ))
                 )}

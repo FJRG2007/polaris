@@ -158,9 +158,7 @@ export function FivemPanel({
     const pathname = usePathname();
     const tab = useMemo(() => {
         const base = `/apps/installed/${installedAppId}`;
-        const slug = pathname.startsWith(base)
-            ? pathname.slice(base.length).replace(/^\//, "")
-            : "";
+        const slug = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
         return isGameTab(slug, "fivem") && canOpenGameTab(slug, held, "fivem") ? slug : "";
     }, [pathname, installedAppId, held]);
     const tabs = useMemo(() => visibleGameTabs(held, "fivem"), [held]);
@@ -279,10 +277,7 @@ export function FivemPanel({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <ScrollRow
-                as="nav"
-                className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm"
-            >
+            <ScrollRow as="nav" className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm">
                 {tabs.map((entry) => (
                     <a
                         key={entry.slug}
@@ -403,10 +398,7 @@ export function FivemPanel({
                         suffix={game?.suffix ?? null}
                         address={reading.address}
                     />
-                    <ServerKeyCard
-                        installedAppId={installedAppId}
-                        canManage={held.includes("games.manage")}
-                    />
+                    <ServerKeyCard installedAppId={installedAppId} canManage={held.includes("games.manage")} />
                 </div>
             )}
         </div>
@@ -449,11 +441,7 @@ function withPresence(
         // against a slot the newcomer now holds, with Kick offered on it.
         const same = sameRoster(presence.players, status.players);
         return same && status.answering
-            ? {
-                  ...status,
-                  answering: presence.answering,
-                  containerRunning: presence.containerRunning
-              }
+            ? { ...status, answering: presence.answering, containerRunning: presence.containerRunning }
             : { ...status, ...live };
     }
     return {
@@ -485,8 +473,7 @@ function StatusBadge({ status, running }: { status: FivemStatus | null; running:
     if (label === null) return <Skeleton className="h-6 w-20" />;
     if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting")
-        return <Badge className="border-warning-edge text-warning">Starting</Badge>;
+    if (label === "Starting") return <Badge className="border-warning-edge text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;
     return <Badge className="border-success-edge text-success">Online</Badge>;
 }
@@ -528,30 +515,23 @@ function ConnectCard({
                             <Skeleton className="h-7 w-56" />
                         ) : (
                             <span className="text-sm text-muted-foreground">
-                                Not published yet - the address appears once the server has
-                                deployed.
+                                Not published yet - the address appears once the server has deployed.
                             </span>
                         )
                     ) : (
                         <div className="flex flex-col gap-1">
                             <span className="text-xs text-muted-foreground">
-                                In FiveM, press F8 and type this - or paste it into the direct
-                                connect box.
+                                In FiveM, press F8 and type this - or paste it into the direct connect box.
                             </span>
                             <span className="flex min-w-0 items-center gap-1">
                                 <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
                                     connect {joined}
                                 </code>
-                                <CopyButton
-                                    value={`connect ${joined}`}
-                                    label="the connect command"
-                                />
+                                <CopyButton value={`connect ${joined}`} label="the connect command" />
                             </span>
                         </div>
                     )}
-                    {status?.build && (
-                        <span className="text-xs text-muted-foreground">{status.build}</span>
-                    )}
+                    {status?.build && <span className="text-xs text-muted-foreground">{status.build}</span>}
                     {/* Only when there is something the operator can actually do
                         about it: a probe that proved nothing is not a warning. */}
                     {reach && !reach.ok && reach.actionable && (
@@ -654,19 +634,13 @@ function PlayersTab({
 
     const rows = useMemo(
         () =>
-            foldFivemPlayers(
-                status?.players ?? [],
-                access ?? { allowList: [], bans: [], admins: [] }
-            )
+            foldFivemPlayers(status?.players ?? [], access ?? { allowList: [], bans: [], admins: [] })
                 .filter((entry) => matchesFivemPlayer(entry, query))
                 .filter((entry) => matchesFivemFilter(entry, filter)),
         [status?.players, access, query, filter]
     );
 
-    async function run(
-        key: string,
-        work: () => Promise<{ access?: FivemAccessView; error?: string }>
-    ): Promise<void> {
+    async function run(key: string, work: () => Promise<{ access?: FivemAccessView; error?: string }>): Promise<void> {
         setBusy(key);
         setError(null);
         const result = await work();
@@ -694,11 +668,7 @@ function PlayersTab({
                 toolbar={
                     canModerate ? (
                         <div className="flex items-center gap-1">
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => setBroadcasting(true)}
-                            >
+                            <Button size="sm" variant="secondary" onClick={() => setBroadcasting(true)}>
                                 <Megaphone className="size-4" /> Announce
                             </Button>
                             <Button size="sm" onClick={() => setAdding(true)}>
@@ -726,24 +696,13 @@ function PlayersTab({
                         onAllow={() =>
                             entry.identifier &&
                             void run(entry.identifier, () =>
-                                actions.addFivemPlayerAction(
-                                    installedAppId,
-                                    entry.identifier!,
-                                    entry.name
-                                )
+                                actions.addFivemPlayerAction(installedAppId, entry.identifier!, entry.name)
                             )
                         }
                         onDisallow={async () => {
                             if (!entry.identifier) return;
                             const question = playerConfirm.remove(entry.name);
-                            if (
-                                !(await confirm({
-                                    ...question,
-                                    confirmLabel: "Remove",
-                                    danger: true
-                                }))
-                            )
-                                return;
+                            if (!(await confirm({ ...question, confirmLabel: "Remove", danger: true }))) return;
                             void run(entry.identifier, () =>
                                 actions.removeFivemPlayerAction(installedAppId, entry.identifier!)
                             );
@@ -751,14 +710,7 @@ function PlayersTab({
                         onKick={async () => {
                             if (entry.playerId === null) return;
                             const question = playerConfirm.kick(entry.name);
-                            if (
-                                !(await confirm({
-                                    ...question,
-                                    confirmLabel: "Kick",
-                                    danger: true
-                                }))
-                            )
-                                return;
+                            if (!(await confirm({ ...question, confirmLabel: "Kick", danger: true }))) return;
                             void run(entry.identifier ?? entry.name, async () =>
                                 actions.kickFivemPlayerAction(
                                     installedAppId,
@@ -770,10 +722,7 @@ function PlayersTab({
                         onBan={async () => {
                             if (!entry.identifier) return;
                             const question = playerConfirm.ban(entry.name);
-                            if (
-                                !(await confirm({ ...question, confirmLabel: "Ban", danger: true }))
-                            )
-                                return;
+                            if (!(await confirm({ ...question, confirmLabel: "Ban", danger: true }))) return;
                             void run(entry.identifier, () =>
                                 actions.banFivemPlayerAction(
                                     installedAppId,
@@ -794,12 +743,7 @@ function PlayersTab({
                         onAdmin={(isAdmin) =>
                             entry.identifier &&
                             void run(entry.identifier, () =>
-                                actions.setFivemAdminAction(
-                                    installedAppId,
-                                    entry.identifier!,
-                                    entry.name,
-                                    isAdmin
-                                )
+                                actions.setFivemAdminAction(installedAppId, entry.identifier!, entry.name, isAdmin)
                             )
                         }
                     />
@@ -807,8 +751,8 @@ function PlayersTab({
             />
 
             <p className="text-xs text-muted-foreground">
-                A player is matched by the identifiers their game hands over, never by the name they
-                chose - two people can pick the same name, and either can change it.
+                A player is matched by the identifiers their game hands over, never by the name they chose - two people
+                can pick the same name, and either can change it.
             </p>
 
             {adding && (
@@ -816,9 +760,7 @@ function PlayersTab({
                     onClose={() => setAdding(false)}
                     onAdd={(identifier, label) => {
                         setAdding(false);
-                        void run(identifier, () =>
-                            actions.addFivemPlayerAction(installedAppId, identifier, label)
-                        );
+                        void run(identifier, () => actions.addFivemPlayerAction(installedAppId, identifier, label));
                     }}
                 />
             )}
@@ -831,11 +773,7 @@ function PlayersTab({
                         setMessaging(null);
                         if (target.playerId === null) return;
                         void run(target.identifier ?? target.name, async () =>
-                            actions.messageFivemPlayerAction(
-                                installedAppId,
-                                target.playerId!,
-                                message
-                            )
+                            actions.messageFivemPlayerAction(installedAppId, target.playerId!, message)
                         );
                     }}
                 />
@@ -846,9 +784,7 @@ function PlayersTab({
                     onClose={() => setBroadcasting(false)}
                     onSend={(message) => {
                         setBroadcasting(false);
-                        void run("broadcast", async () =>
-                            actions.broadcastFivemAction(installedAppId, message)
-                        );
+                        void run("broadcast", async () => actions.broadcastFivemAction(installedAppId, message));
                     }}
                 />
             )}
@@ -923,14 +859,8 @@ function PlayerRow({
         <tr className="border-t border-border">
             <td className="px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate font-medium" title={entry.name}>
-                        {entry.name}
-                    </span>
-                    {entry.admin && (
-                        <Badge className="shrink-0 text-[0.6875rem]">
-                            {playerStanding.operator}
-                        </Badge>
-                    )}
+                    <span className="truncate font-medium" title={entry.name}>{entry.name}</span>
+                    {entry.admin && <Badge className="shrink-0 text-[0.6875rem]">{playerStanding.operator}</Badge>}
                 </span>
                 <span className="text-xs text-muted-foreground">
                     {entry.online
@@ -958,11 +888,7 @@ function PlayerRow({
                 <span
                     className={cn(
                         "text-xs",
-                        entry.banned
-                            ? "text-danger"
-                            : entry.waiting
-                              ? "text-warning"
-                              : "text-muted-foreground"
+                        entry.banned ? "text-danger" : entry.waiting ? "text-warning" : "text-muted-foreground"
                     )}
                 >
                     {standing}
@@ -1034,8 +960,7 @@ function PlayerRow({
                                 <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
                                 {entry.online && entry.playerId !== null && (
                                     <DropdownMenuItem onSelect={onMessage}>
-                                        <MessageSquare className="size-4" />{" "}
-                                        {playerMenuItem.message}
+                                        <MessageSquare className="size-4" /> {playerMenuItem.message}
                                     </DropdownMenuItem>
                                 )}
                                 {entry.banned ? (
@@ -1048,8 +973,7 @@ function PlayerRow({
                                             <Timer className="size-4" /> {playerMenuItem.timeout}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onSelect={onBan}>
-                                            <Ban className="size-4" />{" "}
-                                            {playerAction.ban(entry.name)}
+                                            <Ban className="size-4" /> {playerAction.ban(entry.name)}
                                         </DropdownMenuItem>
                                     </>
                                 )}
@@ -1059,13 +983,11 @@ function PlayerRow({
                                         <DropdownMenuItem onSelect={() => onAdmin(!entry.admin)}>
                                             {entry.admin ? (
                                                 <>
-                                                    <ShieldMinus className="size-4" /> Stop them
-                                                    administering it
+                                                    <ShieldMinus className="size-4" /> Stop them administering it
                                                 </>
                                             ) : (
                                                 <>
-                                                    <ShieldPlus className="size-4" /> Let them
-                                                    administer it
+                                                    <ShieldPlus className="size-4" /> Let them administer it
                                                 </>
                                             )}
                                         </DropdownMenuItem>
@@ -1118,11 +1040,7 @@ function AddPlayerDialog({
                 </span>
             </PlayerFormField>
             <PlayerFormField label="Name on the list">
-                <Input
-                    value={label}
-                    onChange={(event) => setLabel(event.target.value)}
-                    placeholder="Optional"
-                />
+                <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Optional" />
             </PlayerFormField>
         </PlayerFormDialog>
     );
@@ -1150,11 +1068,7 @@ function MessageDialog({
             onConfirm={() => onSend(message.trim())}
         >
             <PlayerFormField label="Message">
-                <Input
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    maxLength={200}
-                />
+                <Input value={message} onChange={(event) => setMessage(event.target.value)} maxLength={200} />
                 {invalid && <span className="text-xs text-danger">{REASON_HINT}</span>}
             </PlayerFormField>
         </PlayerFormDialog>
@@ -1189,9 +1103,8 @@ function ClosedServerCard({
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Only players you add can join</p>
                         <p className="text-xs text-muted-foreground">
-                            Everyone else is turned away as they connect, with a line telling them
-                            why. FiveM has no list of its own, so this is Polaris&apos; and it is
-                            enforced inside the server.
+                            Everyone else is turned away as they connect, with a line telling them why. FiveM has no
+                            list of its own, so this is Polaris&apos; and it is enforced inside the server.
                         </p>
                     </div>
                     <Switch
@@ -1201,10 +1114,7 @@ function ClosedServerCard({
                         onChange={(next: boolean) =>
                             startTransition(async () => {
                                 setError(null);
-                                const result = await actions.setFivemExclusiveJoinAction(
-                                    installedAppId,
-                                    next
-                                );
+                                const result = await actions.setFivemExclusiveJoinAction(installedAppId, next);
                                 if (result.error) {
                                     setError(result.error);
                                     return;
@@ -1223,9 +1133,8 @@ function ClosedServerCard({
                     <p className="flex items-start gap-2 text-sm text-warning">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                         <span>
-                            The server is not running what turns people away, so anyone with the
-                            address can join right now. Polaris puts it back within a few seconds;
-                            if this stays, restart the server.
+                            The server is not running what turns people away, so anyone with the address can join
+                            right now. Polaris puts it back within a few seconds; if this stays, restart the server.
                         </span>
                     </p>
                 )}
@@ -1233,11 +1142,7 @@ function ClosedServerCard({
                     {access === null
                         ? "Reading the list..."
                         : `${access.allowList.length} on the list, ${access.bans.length} banned.`}{" "}
-                    <button
-                        type="button"
-                        onClick={onOpenPlayers}
-                        className="text-primary hover:underline"
-                    >
+                    <button type="button" onClick={onOpenPlayers} className="text-primary hover:underline">
                         Open the players screen
                     </button>
                     .
@@ -1271,8 +1176,8 @@ function ConsolePasswordCard({
                         <KeyRound className="size-4" /> Console password
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        What opens the server&apos;s own console. Polaris uses it for everything on
-                        these screens; you only need it for a tool of your own.
+                        What opens the server&apos;s own console. Polaris uses it for everything on these screens; you
+                        only need it for a tool of your own.
                     </p>
                 </div>
 
@@ -1285,8 +1190,7 @@ function ConsolePasswordCard({
                             onClick={() =>
                                 startTransition(async () => {
                                     setError(null);
-                                    const result =
-                                        await actions.revealFivemPasswordAction(installedAppId);
+                                    const result = await actions.revealFivemPasswordAction(installedAppId);
                                     if (result.error) {
                                         setError(result.error);
                                         return;
@@ -1335,15 +1239,8 @@ function ConsolePasswordCard({
                                     <RefreshCw className="size-4" />
                                 </Button>
                             </div>
-                            <span
-                                className={cn(
-                                    "text-xs",
-                                    invalid ? "text-danger" : "text-muted-foreground"
-                                )}
-                            >
-                                {invalid
-                                    ? CONSOLE_PASSWORD_HINT
-                                    : "It takes effect at once on a running server."}
+                            <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
+                                {invalid ? CONSOLE_PASSWORD_HINT : "It takes effect at once on a running server."}
                             </span>
                         </label>
                         <Button
@@ -1353,10 +1250,7 @@ function ConsolePasswordCard({
                                 startTransition(async () => {
                                     setError(null);
                                     setNote(null);
-                                    const result = await actions.setFivemPasswordAction(
-                                        installedAppId,
-                                        draft
-                                    );
+                                    const result = await actions.setFivemPasswordAction(installedAppId, draft);
                                     if (result.error) {
                                         setError(result.error);
                                         return;
@@ -1384,13 +1278,7 @@ function ConsolePasswordCard({
     );
 }
 
-function ServerKeyCard({
-    installedAppId,
-    canManage
-}: {
-    installedAppId: string;
-    canManage: boolean;
-}) {
+function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
     const [draft, setDraft] = useState("");
     const [pending, startTransition] = useTransition();
     const [note, setNote] = useState<string | null>(null);
@@ -1404,16 +1292,11 @@ function ServerKeyCard({
                     <p className="text-sm font-medium">Server key</p>
                     <p className="text-xs text-muted-foreground">
                         The free key from{" "}
-                        <Link
-                            href={KEYMASTER_URL}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary hover:underline"
-                        >
+                        <Link href={KEYMASTER_URL} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                             keymaster
                         </Link>
-                        . A key is tied to the address it was issued for, so a server that has moved
-                        needs a new one. It is never shown back.
+                        . A key is tied to the address it was issued for, so a server that has moved needs a new one.
+                        It is never shown back.
                     </p>
                 </div>
                 {canManage && (
@@ -1428,15 +1311,8 @@ function ServerKeyCard({
                                 autoComplete="off"
                                 spellCheck={false}
                             />
-                            <span
-                                className={cn(
-                                    "text-xs",
-                                    invalid ? "text-danger" : "text-muted-foreground"
-                                )}
-                            >
-                                {invalid
-                                    ? LICENSE_KEY_HINT
-                                    : "The server picks it up the next time it starts."}
+                            <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
+                                {invalid ? LICENSE_KEY_HINT : "The server picks it up the next time it starts."}
                             </span>
                         </label>
                         <Button
@@ -1446,10 +1322,7 @@ function ServerKeyCard({
                                 startTransition(async () => {
                                     setError(null);
                                     setNote(null);
-                                    const result = await actions.setFivemLicenseKeyAction(
-                                        installedAppId,
-                                        draft.trim()
-                                    );
+                                    const result = await actions.setFivemLicenseKeyAction(installedAppId, draft.trim());
                                     if (result.error) {
                                         setError(result.error);
                                         return;

@@ -24,10 +24,7 @@ export interface DnsRecordField {
 
 export type DnsRecordStatus = "done" | "waiting" | "conflict";
 
-const STATUS: Record<
-    DnsRecordStatus,
-    { label: string; variant: "success" | "neutral" | "warning" }
-> = {
+const STATUS: Record<DnsRecordStatus, { label: string; variant: "success" | "neutral" | "warning" }> = {
     done: { label: "In place", variant: "success" },
     waiting: { label: "Not seen yet", variant: "neutral" },
     conflict: { label: "Points elsewhere", variant: "warning" }
@@ -76,9 +73,7 @@ export function DnsRecordCard({
                 <span className="rounded bg-foreground px-1.5 py-px font-mono text-[0.6875rem] font-semibold uppercase leading-[18px] text-background">
                     {type}
                 </span>
-                {note && (
-                    <span className="min-w-0 flex-1 text-xs text-muted-foreground">{note}</span>
-                )}
+                {note && <span className="min-w-0 flex-1 text-xs text-muted-foreground">{note}</span>}
                 {status && (
                     <Badge variant={STATUS[status].variant} className="ml-auto">
                         <StatusIcon status={status} />
@@ -105,9 +100,7 @@ export function DnsRecordCard({
                                     />
                                 </>
                             ) : (
-                                <span className="text-xs italic text-muted-foreground">
-                                    {row.fallback ?? "not known yet"}
-                                </span>
+                                <span className="text-xs italic text-muted-foreground">{row.fallback ?? "not known yet"}</span>
                             )}
                         </dd>
                     </div>

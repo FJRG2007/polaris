@@ -72,12 +72,7 @@ const EXPIRY_WARN_MS = 14 * 24 * 60 * 60 * 1000;
 
 export async function engineHealth(server: MailServer): Promise<EngineHealth> {
     if (!server.applicationId) {
-        return {
-            answers: false,
-            managed: false,
-            queued: null,
-            note: "The mail server's service is missing. Repair it from the start."
-        };
+        return { answers: false, managed: false, queued: null, note: "The mail server's service is missing. Repair it from the start." };
     }
     let endpoint;
     try {
@@ -87,20 +82,12 @@ export async function engineHealth(server: MailServer): Promise<EngineHealth> {
             answers: false,
             managed: false,
             queued: null,
-            note:
-                error instanceof MailServerUnreachable
-                    ? error.message
-                    : "The mail server could not be reached."
+            note: error instanceof MailServerUnreachable ? error.message : "The mail server could not be reached."
         };
     }
     const answers = await engineAnswers(endpoint).catch(() => false);
     if (!answers) {
-        return {
-            answers,
-            managed: false,
-            queued: null,
-            note: "The mail server is not answering. It may be stopped or restarting."
-        };
+        return { answers, managed: false, queued: null, note: "The mail server is not answering. It may be stopped or restarting." };
     }
     if (!reached(server.step, "admin")) {
         return { answers, managed: false, queued: null, note: "Setup has not finished yet." };
@@ -130,10 +117,7 @@ async function publicAddress(server: MailServer): Promise<string | null> {
     const resolved = await resolver.resolve4(server.hostname).catch(() => [] as string[]);
     if (resolved[0]) return resolved[0];
     if (server.placement === "local") return publicProbeHost();
-    const host = await prisma.host.findUnique({
-        where: { id: server.placement },
-        select: { address: true }
-    });
+    const host = await prisma.host.findUnique({ where: { id: server.placement }, select: { address: true } });
     return host && core.isPublicIpv4(host.address) ? host.address : null;
 }
 
@@ -156,15 +140,7 @@ export async function checkPorts(server: MailServer): Promise<PortReport> {
         core.MAIL_SERVER_PORTS.map(async (entry) => {
             const outcome = await probeTcpOutcome(address, entry.port);
             const { verdict, note } = core.portVerdict(entry.port, outcome, throughOwnRouter);
-            return {
-                port: entry.port,
-                label: entry.label,
-                purpose: entry.purpose,
-                required: entry.required,
-                outcome,
-                verdict,
-                note
-            };
+            return { port: entry.port, label: entry.label, purpose: entry.purpose, required: entry.required, outcome, verdict, note };
         })
     );
     const report: PortReport = { at, address, results, note: null };
@@ -173,46 +149,26 @@ export async function checkPorts(server: MailServer): Promise<PortReport> {
 }
 
 async function store(serverId: string, report: PortReport): Promise<void> {
-    await prisma.mailServer.update({
-        where: { id: serverId },
-        data: { lastPorts: JSON.stringify(report) }
-    });
+    await prisma.mailServer.update({ where: { id: serverId }, data: { lastPorts: JSON.stringify(report) } });
 }
 
 /** The certificate a mail app sees on the submission port, checked the way a
  *  mail app checks it: against the mail name, by the system's trust store. */
-export function checkCertificate(
-    hostname: string,
-    address: string | null
-): Promise<CertificateCheck> {
+export function checkCertificate(hostname: string, address: string | null): Promise<CertificateCheck> {
     if (!address) {
-        return Promise.resolve({
-            verdict: "unverified",
-            issuer: null,
-            expiresAt: null,
-            note: "There is no address to check it at yet."
-        });
+        return Promise.resolve({ verdict: "unverified", issuer: null, expiresAt: null, note: "There is no address to check it at yet." });
     }
     return new Promise((resolve) => {
-        const socket = tlsConnect({
-            host: address,
-            port: 465,
-            servername: hostname,
-            rejectUnauthorized: false,
-            timeout: TLS_TIMEOUT_MS
-        });
+        const socket = tlsConnect({ host: address, port: 465, servername: hostname, rejectUnauthorized: false, timeout: TLS_TIMEOUT_MS });
         const settle = (check: CertificateCheck): void => {
             socket.destroy();
             resolve(check);
         };
         socket.once("secureConnect", () => {
             const certificate = socket.getPeerCertificate();
-            const issuer = certificate.issuer
-                ? (certificate.issuer.O ?? certificate.issuer.CN ?? null)
-                : null;
+            const issuer = certificate.issuer ? (certificate.issuer.O ?? certificate.issuer.CN ?? null) : null;
             const expires = certificate.valid_to ? new Date(certificate.valid_to) : null;
-            const expiresAt =
-                expires && !Number.isNaN(expires.getTime()) ? expires.toISOString() : null;
+            const expiresAt = expires && !Number.isNaN(expires.getTime()) ? expires.toISOString() : null;
             if (!socket.authorized) {
                 settle({
                     verdict: "fail",
@@ -227,26 +183,14 @@ export function checkCertificate(
                 verdict: soon ? "warn" : "pass",
                 issuer: typeof issuer === "string" ? issuer : null,
                 expiresAt,
-                note: soon
-                    ? "The certificate expires within two weeks and has not been renewed yet."
-                    : null
+                note: soon ? "The certificate expires within two weeks and has not been renewed yet." : null
             });
         });
         socket.once("timeout", () =>
-            settle({
-                verdict: "unverified",
-                issuer: null,
-                expiresAt: null,
-                note: "Port 465 did not answer, so the certificate could not be read."
-            })
+            settle({ verdict: "unverified", issuer: null, expiresAt: null, note: "Port 465 did not answer, so the certificate could not be read." })
         );
         socket.once("error", () =>
-            settle({
-                verdict: "unverified",
-                issuer: null,
-                expiresAt: null,
-                note: "Port 465 did not complete a secure connection."
-            })
+            settle({ verdict: "unverified", issuer: null, expiresAt: null, note: "Port 465 did not complete a secure connection." })
         );
     });
 }
@@ -264,9 +208,7 @@ export async function mailHealth(server: MailServer): Promise<MailHealth> {
  * and they are told that too. A server still being set up is setup's business.
  */
 export async function sweepMailServers(): Promise<{ checked: number; changed: number }> {
-    const servers = await prisma.mailServer.findMany({
-        where: { status: { in: ["ready", "down"] } }
-    });
+    const servers = await prisma.mailServer.findMany({ where: { status: { in: ["ready", "down"] } } });
     let changed = 0;
     for (const server of servers) {
         const engine = await engineHealth(server);
@@ -279,9 +221,7 @@ export async function sweepMailServers(): Promise<{ checked: number; changed: nu
             userId: server.ownerId,
             event: "mailserver.attention",
             level: up ? "success" : "warning",
-            title: up
-                ? `${server.hostname} is answering again`
-                : `${server.hostname} stopped answering`,
+            title: up ? `${server.hostname} is answering again` : `${server.hostname} stopped answering`,
             body: up ? null : (engine.note ?? "The mail server is not answering."),
             href: `/apps/mail-server/${server.id}`
         });

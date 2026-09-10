@@ -58,10 +58,7 @@ export async function pollAutoDeploys(): Promise<void> {
         // First sighting: baseline to the current head without deploying, so only a
         // genuinely new commit triggers a deploy (never a redeploy just for enabling).
         if (app.lastDeployedSha == null) {
-            await prisma.application.update({
-                where: { id: app.id },
-                data: { lastDeployedSha: latest.sha }
-            });
+            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
             continue;
         }
         if (!commitPassesFilter(latest.message, app.commitFilter)) continue;
@@ -72,13 +69,7 @@ export async function pollAutoDeploys(): Promise<void> {
         const watch = parseWatchPaths(app.watchPaths);
         if (watch.length > 0) {
             const token = await githubTokenForOwner(ownerId, parsed.owner);
-            const changed = await getChangedFiles(
-                parsed.owner,
-                parsed.repo,
-                app.lastDeployedSha,
-                latest.sha,
-                token
-            );
+            const changed = await getChangedFiles(parsed.owner, parsed.repo, app.lastDeployedSha, latest.sha, token);
             if (!shouldDeployForPaths(changed, watch)) {
                 console.info(
                     `polaris: skipping auto-deploy of ${app.slug}; nothing it watches changed since ${app.lastDeployedSha.slice(0, 7)}`
@@ -95,10 +86,7 @@ export async function pollAutoDeploys(): Promise<void> {
                 authorAvatarUrl: latest.authorAvatarUrl ?? undefined,
                 trigger: "push"
             });
-            await prisma.application.update({
-                where: { id: app.id },
-                data: { lastDeployedSha: latest.sha }
-            });
+            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
         } catch {
             // Leave lastDeployedSha unchanged so the next tick retries this commit.
         }

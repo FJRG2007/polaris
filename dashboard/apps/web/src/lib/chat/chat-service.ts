@@ -21,8 +21,7 @@ import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
-import {
-    // enigma: predates the namespace-import rule; converting its call sites is its own change.
+import { // enigma: predates the namespace-import rule; converting its call sites is its own change.
     ChatAccessError,
     ChatRuleError,
     channelAccess,
@@ -1602,10 +1601,7 @@ export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElse
         new Map(heard.map((row) => [row.channelId, row]))
     );
 
-    const grouped = new Map<
-        string | null,
-        { name: string; conversations: number; unread: number }
-    >();
+    const grouped = new Map<string | null, { name: string; conversations: number; unread: number }>();
     for (const channel of away) {
         const entry = grouped.get(channel.orgId) ?? {
             // A conversation filed under an organization that is gone cannot

@@ -54,17 +54,7 @@ type Plan = NonNullable<DetectedBuild["image"]>;
 
 /** A detected stack with nothing but a note, for one that cannot be built as is. */
 function explain(path: string, framework: string, note: string): DetectedBuild {
-    return {
-        framework,
-        buildRoot: path,
-        install: null,
-        build: null,
-        start: null,
-        packages: [],
-        nodeRequirement: null,
-        image: null,
-        note
-    };
+    return { framework, buildRoot: path, install: null, build: null, start: null, packages: [], nodeRequirement: null, image: null, note };
 }
 
 /** A detected stack with the image plan that builds it. */
@@ -94,9 +84,7 @@ function planned(
         packages: [],
         nodeRequirement: null,
         image: plan,
-        note: steps.start
-            ? `${note}; on ${image}`
-            : `${note}, but nothing here says how to start it - set a start command`
+        note: steps.start ? `${note}; on ${image}` : `${note}, but nothing here says how to start it - set a start command`
     };
 }
 
@@ -160,15 +148,11 @@ function pythonDependencies(texts: Readonly<Record<string, string>>): Set<string
     const pyproject = texts["pyproject.toml"] ?? "";
     // Every quoted requirement string in the file, which covers PEP 621
     // dependencies and optional groups alike.
-    for (const match of pyproject.matchAll(
-        /["']([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*(?:[<>=!~^;][^"']*)?["']/g
-    )) {
+    for (const match of pyproject.matchAll(/["']([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*(?:[<>=!~^;][^"']*)?["']/g)) {
         if (match[1]) add(match[1]);
     }
     // Poetry and Pipfile tables: `name = "..."` lines.
-    for (const match of `${pyproject}\n${texts.Pipfile ?? ""}`.matchAll(
-        /^\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*[{"']/gm
-    )) {
+    for (const match of `${pyproject}\n${texts.Pipfile ?? ""}`.matchAll(/^\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*=\s*[{"']/gm)) {
         if (match[1] && match[1] !== "python") add(match[1]);
     }
     return names;
@@ -179,12 +163,10 @@ function pythonVersion(input: LanguageInput): string {
     const fallback = "3.12";
     const own = majorMinor(input.runtimeVersion);
     if (own) return own;
-    const pinned =
-        majorMinor(input.texts[".python-version"]) ?? majorMinor(input.texts["runtime.txt"]);
+    const pinned = majorMinor(input.texts[".python-version"]) ?? majorMinor(input.texts["runtime.txt"]);
     if (pinned) return pinned;
-    const requires =
-        /requires-python\s*=\s*["']([^"']+)["']/.exec(input.texts["pyproject.toml"] ?? "")?.[1] ??
-        /^\s*python\s*=\s*["']([^"']+)["']/m.exec(input.texts["pyproject.toml"] ?? "")?.[1];
+    const requires = /requires-python\s*=\s*["']([^"']+)["']/.exec(input.texts["pyproject.toml"] ?? "")?.[1]
+        ?? /^\s*python\s*=\s*["']([^"']+)["']/m.exec(input.texts["pyproject.toml"] ?? "")?.[1];
     return versionFor(requires, fallback);
 }
 
@@ -206,10 +188,7 @@ function pythonInstall(input: LanguageInput): { command: string; tool: string } 
         };
     }
     if (has(input, "Pipfile")) {
-        return {
-            tool: "Pipenv",
-            command: "pip install --no-cache-dir pipenv && pipenv install --system --deploy"
-        };
+        return { tool: "Pipenv", command: "pip install --no-cache-dir pipenv && pipenv install --system --deploy" };
     }
     if (has(input, "requirements.txt")) {
         return { tool: "pip", command: "pip install --no-cache-dir -r requirements.txt" };
@@ -219,34 +198,23 @@ function pythonInstall(input: LanguageInput): { command: string; tool: string } 
 
 /** The Django project module, read from manage.py's settings default. */
 function djangoModule(managePy: string | undefined): string | null {
-    const match = managePy
-        ? /DJANGO_SETTINGS_MODULE["']\s*,\s*["']([A-Za-z0-9_]+)\.settings/.exec(managePy)
-        : null;
+    const match = managePy ? /DJANGO_SETTINGS_MODULE["']\s*,\s*["']([A-Za-z0-9_]+)\.settings/.exec(managePy) : null;
     return match?.[1] ?? null;
 }
 
 function detectPython(input: LanguageInput): DetectedBuild | null {
-    if (
-        !["requirements.txt", "pyproject.toml", "Pipfile", "setup.py"].some((name) =>
-            has(input, name)
-        )
-    )
-        return null;
+    if (!["requirements.txt", "pyproject.toml", "Pipfile", "setup.py"].some((name) => has(input, name))) return null;
     const deps = pythonDependencies(input.texts);
     const image = `python:${pythonVersion(input)}-slim`;
     const install = pythonInstall(input);
     /** Add a server the project does not already depend on. */
     const withServer = (server: string) =>
-        deps.has(server)
-            ? install.command
-            : `${install.command} && pip install --no-cache-dir ${server}`;
+        deps.has(server) ? install.command : `${install.command} && pip install --no-cache-dir ${server}`;
     const procfile = procfileWeb(input.texts.Procfile);
 
     if (has(input, "manage.py") || deps.has("django")) {
         const module = djangoModule(input.texts["manage.py"]);
-        const start =
-            procfile ??
-            (module ? `gunicorn ${module}.wsgi:application --bind 0.0.0.0:$PORT` : null);
+        const start = procfile ?? (module ? `gunicorn ${module}.wsgi:application --bind 0.0.0.0:$PORT` : null);
         return planned(
             input.path,
             "Django",
@@ -255,22 +223,14 @@ function detectPython(input: LanguageInput): DetectedBuild | null {
                 install: procfile ? install.command : withServer("gunicorn"),
                 // Without every setting in place collectstatic can refuse; a build is
                 // not the place that should stop on it.
-                build: has(input, "manage.py")
-                    ? "python manage.py collectstatic --noinput || true"
-                    : null,
+                build: has(input, "manage.py") ? "python manage.py collectstatic --noinput || true" : null,
                 start
             },
             `Django, installed with ${install.tool}`
         );
     }
     if (deps.has("fastapi")) {
-        const module = has(input, "main.py")
-            ? "main"
-            : has(input, "app.py")
-              ? "app"
-              : has(input, "app")
-                ? "app.main"
-                : null;
+        const module = has(input, "main.py") ? "main" : has(input, "app.py") ? "app" : has(input, "app") ? "app.main" : null;
         return planned(
             input.path,
             "FastAPI",
@@ -278,21 +238,13 @@ function detectPython(input: LanguageInput): DetectedBuild | null {
             {
                 install: procfile ? install.command : withServer("uvicorn"),
                 build: null,
-                start:
-                    procfile ??
-                    (module ? `uvicorn ${module}:app --host 0.0.0.0 --port $PORT` : null)
+                start: procfile ?? (module ? `uvicorn ${module}:app --host 0.0.0.0 --port $PORT` : null)
             },
             `FastAPI, installed with ${install.tool}`
         );
     }
     if (deps.has("flask")) {
-        const module = has(input, "app.py")
-            ? "app"
-            : has(input, "wsgi.py")
-              ? "wsgi"
-              : has(input, "main.py")
-                ? "main"
-                : null;
+        const module = has(input, "app.py") ? "app" : has(input, "wsgi.py") ? "wsgi" : has(input, "main.py") ? "main" : null;
         return planned(
             input.path,
             "Flask",
@@ -310,11 +262,7 @@ function detectPython(input: LanguageInput): DetectedBuild | null {
         input.path,
         "Python",
         image,
-        {
-            install: install.command,
-            build: null,
-            start: procfile ?? (script ? `python ${script}` : null)
-        },
+        { install: install.command, build: null, start: procfile ?? (script ? `python ${script}` : null) },
         `Python, installed with ${install.tool}`
     );
 }
@@ -326,9 +274,7 @@ function detectPython(input: LanguageInput): DetectedBuild | null {
 function detectGo(input: LanguageInput): DetectedBuild | null {
     const mod = input.texts["go.mod"];
     if (!has(input, "go.mod")) return null;
-    const version =
-        majorMinor(input.runtimeVersion) ??
-        majorMinor(/^go\s+(\d+\.\d+)/m.exec(mod ?? "")?.[1] ?? null);
+    const version = majorMinor(input.runtimeVersion) ?? majorMinor(/^go\s+(\d+\.\d+)/m.exec(mod ?? "")?.[1] ?? null);
     // `golang:1` is the newest 1.x, which a module without a go line builds on.
     const image = `golang:${version ?? "1"}`;
     const framework = /github\.com\/gin-gonic\/gin/.test(mod ?? "")
@@ -352,11 +298,7 @@ function detectGo(input: LanguageInput): DetectedBuild | null {
         input.path,
         framework,
         image,
-        {
-            install: "go mod download",
-            build: "go build -o /usr/local/bin/app .",
-            start: procfile ?? "app"
-        },
+        { install: "go mod download", build: "go build -o /usr/local/bin/app .", start: procfile ?? "app" },
         framework
     );
 }
@@ -376,13 +318,7 @@ function cargoBinary(cargo: string): string | null {
 function detectRust(input: LanguageInput): DetectedBuild | null {
     if (!has(input, "Cargo.toml")) return null;
     const cargo = input.texts["Cargo.toml"] ?? "";
-    const framework = /\bactix-web\b/.test(cargo)
-        ? "Actix Web"
-        : /\baxum\b/.test(cargo)
-          ? "Axum"
-          : /\brocket\b/.test(cargo)
-            ? "Rocket"
-            : "Rust";
+    const framework = /\bactix-web\b/.test(cargo) ? "Actix Web" : /\baxum\b/.test(cargo) ? "Axum" : /\brocket\b/.test(cargo) ? "Rocket" : "Rust";
     const binary = cargoBinary(cargo);
     if (!binary) {
         return explain(
@@ -391,9 +327,7 @@ function detectRust(input: LanguageInput): DetectedBuild | null {
             "a Cargo workspace rather than a crate - set the root directory to the crate you want to deploy"
         );
     }
-    const version =
-        majorMinor(input.runtimeVersion) ??
-        majorMinor(/rust-version\s*=\s*["']([^"']+)["']/.exec(cargo)?.[1] ?? null);
+    const version = majorMinor(input.runtimeVersion) ?? majorMinor(/rust-version\s*=\s*["']([^"']+)["']/.exec(cargo)?.[1] ?? null);
     const image = version ? `rust:${version}-slim` : "rust:1-slim";
     return planned(
         input.path,
@@ -401,8 +335,7 @@ function detectRust(input: LanguageInput): DetectedBuild | null {
         image,
         {
             // Most web crates reach TLS through OpenSSL, which the slim image lacks.
-            install:
-                "apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*",
+            install: "apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*",
             build: "cargo build --release",
             start: procfileWeb(input.texts.Procfile) ?? `./target/release/${binary}`
         },
@@ -421,22 +354,13 @@ function detectPhp(input: LanguageInput): DetectedBuild | null {
     if (!has(input, "composer.json") && !has(input, "index.php")) return null;
     let require: Record<string, unknown> = {};
     try {
-        const composer = JSON.parse(input.texts["composer.json"] ?? "{}") as {
-            require?: Record<string, unknown>;
-        };
+        const composer = JSON.parse(input.texts["composer.json"] ?? "{}") as { require?: Record<string, unknown> };
         require = composer.require && typeof composer.require === "object" ? composer.require : {};
     } catch {
         // A composer.json that is not JSON fails on install, where the error says so.
     }
-    const framework =
-        "laravel/framework" in require
-            ? "Laravel"
-            : "symfony/framework-bundle" in require
-              ? "Symfony"
-              : "PHP";
-    const asked =
-        majorMinor(input.runtimeVersion) ??
-        versionFor(typeof require.php === "string" ? require.php : null, "8.4");
+    const framework = "laravel/framework" in require ? "Laravel" : "symfony/framework-bundle" in require ? "Symfony" : "PHP";
+    const asked = majorMinor(input.runtimeVersion) ?? versionFor(typeof require.php === "string" ? require.php : null, "8.4");
     // An image exists for each listed version; anything else is met by the newest.
     const version = (PHP_VERSIONS as readonly string[]).includes(asked) ? asked : "8.4";
     const image = `dunglas/frankenphp:1-php${version}-bookworm`;
@@ -451,13 +375,7 @@ function detectPhp(input: LanguageInput): DetectedBuild | null {
             ? 'SERVER_NAME=":$PORT" exec frankenphp run --config /etc/frankenphp/Caddyfile --adapter caddyfile'
             : "php -S 0.0.0.0:$PORT -t .");
     const needs = framework === "Laravel" ? " (it needs APP_KEY set as a variable)" : "";
-    return planned(
-        input.path,
-        framework,
-        image,
-        { install, build: null, start },
-        `${framework}${needs}`
-    );
+    return planned(input.path, framework, image, { install, build: null, start }, `${framework}${needs}`);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -485,9 +403,7 @@ function detectRuby(input: LanguageInput): DetectedBuild | null {
             image,
             {
                 install,
-                build: assets
-                    ? "SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile"
-                    : null,
+                build: assets ? "SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile" : null,
                 start: procfile ?? "bundle exec rails server -b 0.0.0.0 -p $PORT -e production"
             },
             "Ruby on Rails (it needs SECRET_KEY_BASE or RAILS_MASTER_KEY set as a variable)"
@@ -519,32 +435,22 @@ function detectJava(input: LanguageInput): DetectedBuild | null {
     const maven = has(input, "pom.xml");
     const gradle = has(input, "build.gradle") || has(input, "build.gradle.kts");
     if (!maven && !gradle) return null;
-    const manifest = maven
-        ? (input.texts["pom.xml"] ?? "")
-        : (input.texts["build.gradle.kts"] ?? input.texts["build.gradle"] ?? "");
+    const manifest = maven ? (input.texts["pom.xml"] ?? "") : (input.texts["build.gradle.kts"] ?? input.texts["build.gradle"] ?? "");
     const spring = /spring[-.]boot/.test(manifest);
     const quarkus = /io\.quarkus/.test(manifest);
     const framework = spring ? "Spring Boot" : quarkus ? "Quarkus" : "Java";
     const requested =
         /^(\d+)/.exec(input.runtimeVersion ?? "")?.[1] ??
-        /<(?:java\.version|maven\.compiler\.release|maven\.compiler\.source)>\s*(?:1\.)?(\d+)/.exec(
-            manifest
-        )?.[1] ??
-        /(?:languageVersion\.set\(JavaLanguageVersion\.of\(|sourceCompatibility\s*=\s*(?:JavaVersion\.VERSION_)?)(\d+)/.exec(
-            manifest
-        )?.[1] ??
+        /<(?:java\.version|maven\.compiler\.release|maven\.compiler\.source)>\s*(?:1\.)?(\d+)/.exec(manifest)?.[1] ??
+        /(?:languageVersion\.set\(JavaLanguageVersion\.of\(|sourceCompatibility\s*=\s*(?:JavaVersion\.VERSION_)?)(\d+)/.exec(manifest)?.[1] ??
         null;
     const jdk = jdkFor(requested);
     // Spring Boot and Quarkus read their port from a property rather than PORT.
     const portFlag = spring ? "-Dserver.port=$PORT " : quarkus ? "-Dquarkus.http.port=$PORT " : "";
     const procfile = procfileWeb(input.texts.Procfile);
     if (maven) {
-        const build = has(input, "mvnw")
-            ? "chmod +x mvnw && ./mvnw -B -DskipTests package"
-            : "mvn -B -DskipTests package";
-        const jar = quarkus
-            ? "target/quarkus-app/quarkus-run.jar"
-            : "$(ls target/*.jar | head -n 1)";
+        const build = has(input, "mvnw") ? "chmod +x mvnw && ./mvnw -B -DskipTests package" : "mvn -B -DskipTests package";
+        const jar = quarkus ? "target/quarkus-app/quarkus-run.jar" : "$(ls target/*.jar | head -n 1)";
         return planned(
             input.path,
             framework,
@@ -560,13 +466,9 @@ function detectJava(input: LanguageInput): DetectedBuild | null {
         wrapper ? `eclipse-temurin:${jdk}-jdk` : `gradle:jdk${jdk}`,
         {
             install: null,
-            build: wrapper
-                ? "chmod +x gradlew && ./gradlew build -x test --no-daemon"
-                : "gradle build -x test --no-daemon",
+            build: wrapper ? "chmod +x gradlew && ./gradlew build -x test --no-daemon" : "gradle build -x test --no-daemon",
             // Gradle also writes a `-plain` jar without dependencies, which cannot run.
-            start:
-                procfile ??
-                `java ${portFlag}-jar $(ls build/libs/*.jar | grep -v -- '-plain.jar' | head -n 1)`
+            start: procfile ?? `java ${portFlag}-jar $(ls build/libs/*.jar | grep -v -- '-plain.jar' | head -n 1)`
         },
         `${framework} with Gradle`
     );
@@ -580,25 +482,17 @@ function detectElixir(input: LanguageInput): DetectedBuild | null {
     if (!has(input, "mix.exs")) return null;
     const mix = input.texts["mix.exs"] ?? "";
     const phoenix = /\{\s*:phoenix\s*,/.test(mix);
-    const version = versionFor(
-        majorMinor(input.runtimeVersion) ?? /elixir:\s*["']([^"']+)["']/.exec(mix)?.[1] ?? null,
-        "1.17"
-    );
+    const version = versionFor(majorMinor(input.runtimeVersion) ?? /elixir:\s*["']([^"']+)["']/.exec(mix)?.[1] ?? null, "1.17");
     return planned(
         input.path,
         phoenix ? "Phoenix" : "Elixir",
         `elixir:${version}`,
         {
-            install:
-                "mix local.hex --force && mix local.rebar --force && MIX_ENV=prod mix deps.get --only prod",
+            install: "mix local.hex --force && mix local.rebar --force && MIX_ENV=prod mix deps.get --only prod",
             build: phoenix
                 ? "MIX_ENV=prod mix compile && (MIX_ENV=prod mix assets.deploy || true)"
                 : "MIX_ENV=prod mix compile",
-            start:
-                procfileWeb(input.texts.Procfile) ??
-                (phoenix
-                    ? "MIX_ENV=prod PHX_SERVER=true mix phx.server"
-                    : "MIX_ENV=prod mix run --no-halt")
+            start: procfileWeb(input.texts.Procfile) ?? (phoenix ? "MIX_ENV=prod PHX_SERVER=true mix phx.server" : "MIX_ENV=prod mix run --no-halt")
         },
         phoenix ? "Phoenix (it needs SECRET_KEY_BASE and PHX_HOST set as variables)" : "Elixir"
     );
@@ -652,31 +546,14 @@ function detectStatic(input: LanguageInput): DetectedBuild | null {
 }
 
 /** In order: a repository holding several manifests is decided by the first. */
-const DETECTORS = [
-    detectPython,
-    detectGo,
-    detectRust,
-    detectPhp,
-    detectRuby,
-    detectJava,
-    detectElixir,
-    detectStatic
-];
+const DETECTORS = [detectPython, detectGo, detectRust, detectPhp, detectRuby, detectJava, detectElixir, detectStatic];
 
 /**
  * How to build a non-JavaScript project, or null when nothing here recognizes
  * the directory.
  */
-export function detectLanguageBuild(
-    app: DirectorySnapshot,
-    runtimeVersion?: string | null
-): DetectedBuild | null {
-    const input: LanguageInput = {
-        path: app.path,
-        files: app.files,
-        texts: app.texts ?? {},
-        runtimeVersion
-    };
+export function detectLanguageBuild(app: DirectorySnapshot, runtimeVersion?: string | null): DetectedBuild | null {
+    const input: LanguageInput = { path: app.path, files: app.files, texts: app.texts ?? {}, runtimeVersion };
     for (const detect of DETECTORS) {
         const found = detect(input);
         if (found) return found;

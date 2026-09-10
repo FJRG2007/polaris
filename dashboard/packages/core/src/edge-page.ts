@@ -74,10 +74,7 @@ export interface EdgePageInput {
 /** Render one edge page. */
 export function edgePage(input: EdgePageInput): string {
     const sections = input.sections
-        .map(
-            (section) =>
-                `<section>\n<h2>${section.heading}</h2>\n<p>${section.body}</p>\n</section>`
-        )
+        .map((section) => `<section>\n<h2>${section.heading}</h2>\n<p>${section.body}</p>\n</section>`)
         .join("\n");
     const facts = input.facts
         .filter((fact) => fact.value !== "")
@@ -88,12 +85,8 @@ export function edgePage(input: EdgePageInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">${
-        input.refreshSeconds
-            ? `
-<meta http-equiv="refresh" content="${Math.round(input.refreshSeconds)}">`
-            : ""
-    }
+<meta name="robots" content="noindex, nofollow">${input.refreshSeconds ? `
+<meta http-equiv="refresh" content="${Math.round(input.refreshSeconds)}">` : ""}
 <title>${input.title}</title>
 <style>
 :root {

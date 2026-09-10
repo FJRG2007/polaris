@@ -20,9 +20,7 @@ describe("the manifest", () => {
     });
 
     it("offers the installed app for mailto links, at the address Mail registers", () => {
-        expect(manifest().protocol_handlers).toEqual([
-            { protocol: "mailto", url: "/mail/compose?url=%s" }
-        ]);
+        expect(manifest().protocol_handlers).toEqual([{ protocol: "mailto", url: "/mail/compose?url=%s" }]);
     });
 });
 

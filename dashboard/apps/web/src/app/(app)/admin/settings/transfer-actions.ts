@@ -10,11 +10,7 @@ import { z } from "zod";
 import { stat } from "node:fs/promises";
 import { requireAdmin } from "@/lib/session";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
-import {
-    BREACHED_PASSWORD_MESSAGE,
-    IDENTITY_PASSWORD_MESSAGE,
-    passwordMatchesIdentity
-} from "@polaris/core";
+import { BREACHED_PASSWORD_MESSAGE, IDENTITY_PASSWORD_MESSAGE, passwordMatchesIdentity } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import * as transfer from "@/lib/instance-transfer/transfer";
 import { dropTransferFile, newTransferFile, transferPath } from "@/lib/instance-transfer/files";
@@ -41,8 +37,7 @@ export async function exportInstanceAction(
     const parsed = passphraseSchema.safeParse(passphrase);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose a passphrase" };
     // Asked again here: the screen's answer is advice the server does not take on trust.
-    if (passwordMatchesIdentity(parsed.data, ["polaris", user.email, user.name]))
-        return { error: IDENTITY_PASSWORD_MESSAGE };
+    if (passwordMatchesIdentity(parsed.data, ["polaris", user.email, user.name])) return { error: IDENTITY_PASSWORD_MESSAGE };
     if (await passwordIsBreached(parsed.data)) return { error: BREACHED_PASSWORD_MESSAGE };
     const file = await newTransferFile();
     try {
@@ -105,10 +100,7 @@ export async function applyImportAction(
         await recordAudit({
             actorId: null,
             action: "instance.imported",
-            metadata: {
-                exportedAt: summary.exportedAt,
-                unreadableSecrets: summary.unreadableSecrets
-            }
+            metadata: { exportedAt: summary.exportedAt, unreadableSecrets: summary.unreadableSecrets }
         }).catch(() => undefined);
         return { summary };
     } catch (error) {

@@ -123,12 +123,7 @@ export type DnsRecordFields =
           ttl: number;
           data: { priority: number; weight: number; port: number; target: string };
       }
-    | {
-          type: "CAA";
-          name: string;
-          ttl: number;
-          data: { flags: number; tag: string; value: string };
-      };
+    | { type: "CAA"; name: string; ttl: number; data: { flags: number; tag: string; value: string } };
 
 /** Every field that is wrong, keyed by the field, with the sentence to show. */
 export type DraftProblems = Partial<Record<keyof DnsRecordDraft, string>>;
@@ -142,9 +137,7 @@ export type DraftProblems = Partial<Record<keyof DnsRecordDraft, string>>;
 export function recordFields(
     draft: DnsRecordDraft,
     zone: string
-):
-    | { ok: true; record: DnsRecordFields }
-    | { ok: false; problems: DraftProblems; missing: (keyof DnsRecordDraft)[] } {
+): { ok: true; record: DnsRecordFields } | { ok: false; problems: DraftProblems; missing: (keyof DnsRecordDraft)[] } {
     const problems: DraftProblems = {};
     const missing: (keyof DnsRecordDraft)[] = [];
     const need = (field: keyof DnsRecordDraft, value: string): boolean => {
@@ -155,8 +148,7 @@ export function recordFields(
 
     if (!DNS_RECORD_TYPES.includes(draft.type)) problems.type = "Pick one of the offered types";
     const name = absoluteName(draft.name, zone);
-    if (!isRecordName(name))
-        problems.name = "Use letters, digits and hyphens, like www or @ for the domain itself";
+    if (!isRecordName(name)) problems.name = "Use letters, digits and hyphens, like www or @ for the domain itself";
     if (draft.type === "SRV" && !/^_[a-z0-9-]+\._(?:tcp|udp|tls)\./.test(name)) {
         problems.name = "A service record is named _service._protocol, like _minecraft._tcp";
     }
@@ -172,14 +164,10 @@ export function recordFields(
     const content = draft.type === "TXT" ? draft.content.trim() : normalizeHostname(draft.content);
     switch (draft.type) {
         case "A":
-            if (need("content", draft.content) && !IPV4.test(content))
-                problems.content = "An IPv4 address, like 203.0.113.10";
+            if (need("content", draft.content) && !IPV4.test(content)) problems.content = "An IPv4 address, like 203.0.113.10";
             break;
         case "AAAA":
-            if (
-                need("content", draft.content) &&
-                !(content.includes(":") && isIpAddress(content))
-            ) {
+            if (need("content", draft.content) && !(content.includes(":") && isIpAddress(content))) {
                 problems.content = "An IPv6 address, like 2001:db8::10";
             }
             break;
@@ -189,8 +177,7 @@ export function recordFields(
             } else if (content === name) problems.content = "A name cannot point at itself";
             break;
         case "TXT":
-            if (need("content", draft.content) && content.length > 4096)
-                problems.content = "At most 4096 characters";
+            if (need("content", draft.content) && content.length > 4096) problems.content = "At most 4096 characters";
             break;
         case "MX":
             if (need("content", draft.content) && !isTargetHostname(content)) {
@@ -201,32 +188,23 @@ export function recordFields(
             }
             break;
         case "SRV":
-            if (
-                need("target", draft.target) &&
-                !isTargetHostname(normalizeHostname(draft.target))
-            ) {
+            if (need("target", draft.target) && !isTargetHostname(normalizeHostname(draft.target))) {
                 problems.target = "The hostname the service runs on";
             }
             for (const field of ["priority", "weight", "port"] as const) {
-                if (need(field, draft[field]) && integer(draft[field], 0, 65535) === null)
-                    problems[field] = "0 to 65535";
+                if (need(field, draft[field]) && integer(draft[field], 0, 65535) === null) problems[field] = "0 to 65535";
             }
             break;
         case "CAA":
             if (integer(draft.flags, 0, 255) === null) problems.flags = "0 to 255";
-            if (!(CAA_TAGS as readonly string[]).includes(draft.tag))
-                problems.tag = "Pick one of the offered tags";
+            if (!(CAA_TAGS as readonly string[]).includes(draft.tag)) problems.tag = "Pick one of the offered tags";
             if (need("value", draft.value) && /\s/.test(draft.value.trim())) {
-                problems.value =
-                    draft.tag === "iodef"
-                        ? "An address like mailto:security@example.com"
-                        : "A domain, like letsencrypt.org";
+                problems.value = draft.tag === "iodef" ? "An address like mailto:security@example.com" : "A domain, like letsencrypt.org";
             }
             break;
     }
 
-    if (Object.keys(problems).length > 0 || missing.length > 0)
-        return { ok: false, problems, missing };
+    if (Object.keys(problems).length > 0 || missing.length > 0) return { ok: false, problems, missing };
 
     switch (draft.type) {
         case "A":
@@ -236,10 +214,7 @@ export function recordFields(
         case "TXT":
             return { ok: true, record: { type: "TXT", name, content, ttl } };
         case "MX":
-            return {
-                ok: true,
-                record: { type: "MX", name, content, priority: Number(draft.priority), ttl }
-            };
+            return { ok: true, record: { type: "MX", name, content, priority: Number(draft.priority), ttl } };
         case "SRV":
             return {
                 ok: true,

@@ -27,7 +27,7 @@ async function collect(stream: NodeJS.ReadableStream): Promise<Buffer> {
 /** Feed `bytes` in uneven pieces, the way a network stream delivers them. */
 function pieces(bytes: Buffer): Readable {
     const out: Buffer[] = [];
-    for (let at = 0, step = 1; at < bytes.length; at += step, step = ((step * 7 + 3) % 9000) + 1) {
+    for (let at = 0, step = 1; at < bytes.length; at += step, step = (step * 7 + 3) % 9000 + 1) {
         out.push(bytes.subarray(at, at + step));
     }
     return Readable.from(out);
@@ -99,23 +99,17 @@ describe("sealing a file", () => {
     });
 
     it("refuses bytes that were never sealed", async () => {
-        await expect(open(Buffer.from("just a plain gzip, honest"))).rejects.toBeInstanceOf(
-            SealError
-        );
+        await expect(open(Buffer.from("just a plain gzip, honest"))).rejects.toBeInstanceOf(SealError);
     });
 
     it("seals under a passphrase and names no key", async () => {
         const header = newHeader("passphrase");
         const plain = randomBytes(5000);
         const sealed = await collect(
-            pieces(plain).pipe(
-                sealStream(header, passphraseFileKey("correct horse battery", header))
-            )
+            pieces(plain).pipe(sealStream(header, passphraseFileKey("correct horse battery", header)))
         );
         const opened = await collect(
-            pieces(sealed).pipe(
-                openStream((read) => passphraseFileKey("correct horse battery", read))
-            )
+            pieces(sealed).pipe(openStream((read) => passphraseFileKey("correct horse battery", read)))
         );
         expect(opened.equals(plain)).toBe(true);
         await expect(

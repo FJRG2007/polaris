@@ -40,8 +40,7 @@ export async function saveServiceCronAction(
 ): Promise<{ error?: string; cron?: crons.ServiceCronView }> {
     const user = await requirePermission("deploy.manage");
     const parsed = core.serviceCronInputSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the job's details" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the job's details" };
     try {
         await requireApplicationAccess(applicationId, user.id, "console.use");
         const cron = await crons.saveServiceCron(applicationId, parsed.data, user.id);

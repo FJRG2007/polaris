@@ -36,9 +36,7 @@ function Stat({
                 <div className="min-w-0">
                     <p className={cn("text-2xl font-semibold leading-none", tone)}>{value}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-                    {hint && (
-                        <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">{hint}</p>
-                    )}
+                    {hint && <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">{hint}</p>}
                 </div>
             </CardBody>
         </Card>
@@ -68,12 +66,7 @@ export function ReportsView({
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Stat label="Open tasks" value={summary.open} icon={ListTodo} />
-                <Stat
-                    label="Overdue"
-                    value={summary.overdue}
-                    tone="text-danger"
-                    icon={CircleAlert}
-                />
+                <Stat label="Overdue" value={summary.overdue} tone="text-danger" icon={CircleAlert} />
                 <Stat
                     label="Completed this week"
                     value={summary.completedThisWeek}
@@ -109,10 +102,7 @@ export function ReportsView({
                             </div>
                             <ul className="flex flex-wrap gap-x-4 gap-y-1">
                                 {report.byStatus.map((slice) => (
-                                    <li
-                                        key={slice.id}
-                                        className="flex items-center gap-1.5 text-xs"
-                                    >
+                                    <li key={slice.id} className="flex items-center gap-1.5 text-xs">
                                         <span
                                             aria-hidden
                                             className="size-2.5 rounded-full"
@@ -132,13 +122,7 @@ export function ReportsView({
                 <Card>
                     <CardBody className="flex flex-col gap-3 p-4">
                         <h2 className="text-sm font-medium">Completed, last 30 days</h2>
-                        <svg
-                            viewBox="0 0 300 60"
-                            preserveAspectRatio="none"
-                            className="h-20 w-full"
-                            role="img"
-                            aria-label="Tasks completed per day"
-                        >
+                        <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="h-20 w-full" role="img" aria-label="Tasks completed per day">
                             {report.completion.map((point, index) => (
                                 <rect
                                     key={point.date}
@@ -155,8 +139,8 @@ export function ReportsView({
                             ))}
                         </svg>
                         <p className="text-xs text-muted-foreground">
-                            {report.completion.reduce((sum, point) => sum + point.completed, 0)}{" "}
-                            finished in the last month.
+                            {report.completion.reduce((sum, point) => sum + point.completed, 0)} finished in the last
+                            month.
                         </p>
                     </CardBody>
                 </Card>
@@ -166,26 +150,18 @@ export function ReportsView({
                         <h2 className="text-sm font-medium">Open work by priority</h2>
                         <ul className="flex flex-col gap-2">
                             {report.byPriority.map((slice) => (
-                                <li
-                                    key={slice.priority}
-                                    className="flex items-center gap-2 text-xs"
-                                >
-                                    <span className="w-20 shrink-0">
-                                        {core.TASK_PRIORITY_LABELS[slice.priority]}
-                                    </span>
+                                <li key={slice.priority} className="flex items-center gap-2 text-xs">
+                                    <span className="w-20 shrink-0">{core.TASK_PRIORITY_LABELS[slice.priority]}</span>
                                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                                         <span
                                             className="block h-full rounded-full"
                                             style={{
                                                 width: `${(slice.count / Math.max(1, summary.open)) * 100}%`,
-                                                backgroundColor:
-                                                    core.TASK_PRIORITY_COLORS[slice.priority]
+                                                backgroundColor: core.TASK_PRIORITY_COLORS[slice.priority]
                                             }}
                                         />
                                     </div>
-                                    <span className="w-8 text-right text-muted-foreground">
-                                        {slice.count}
-                                    </span>
+                                    <span className="w-8 text-right text-muted-foreground">{slice.count}</span>
                                 </li>
                             ))}
                             {report.byPriority.length === 0 && (
@@ -212,27 +188,16 @@ export function ReportsView({
                                 </span>
                                 <div className="min-w-32 flex-1">
                                     <ProgressBar
-                                        percent={
-                                            (person.open / Math.max(1, report.load[0]?.open ?? 1)) *
-                                            100
-                                        }
+                                        percent={(person.open / Math.max(1, report.load[0]?.open ?? 1)) * 100}
                                     />
                                 </div>
                                 <span className="text-muted-foreground">{person.open} open</span>
-                                {person.overdue > 0 && (
-                                    <span className="text-danger">{person.overdue} overdue</span>
-                                )}
-                                {person.points > 0 && (
-                                    <span className="text-muted-foreground">
-                                        {person.points} pts
-                                    </span>
-                                )}
+                                {person.overdue > 0 && <span className="text-danger">{person.overdue} overdue</span>}
+                                {person.points > 0 && <span className="text-muted-foreground">{person.points} pts</span>}
                             </PersonRow>
                         ))}
                         {report.load.length === 0 && (
-                            <li className="text-xs text-muted-foreground">
-                                Nothing is assigned to anybody yet.
-                            </li>
+                            <li className="text-xs text-muted-foreground">Nothing is assigned to anybody yet.</li>
                         )}
                     </ul>
                 </CardBody>
@@ -254,11 +219,7 @@ export function ReportsView({
                                 </span>
                                 <div className="min-w-32 flex-1">
                                     <ProgressBar
-                                        percent={
-                                            (person.seconds /
-                                                Math.max(1, timeByPerson[0]?.seconds ?? 1)) *
-                                            100
-                                        }
+                                        percent={(person.seconds / Math.max(1, timeByPerson[0]?.seconds ?? 1)) * 100}
                                     />
                                 </div>
                                 <span className="text-muted-foreground">
@@ -267,9 +228,7 @@ export function ReportsView({
                             </PersonRow>
                         ))}
                         {timeByPerson.length === 0 && (
-                            <li className="text-xs text-muted-foreground">
-                                No time tracked this week.
-                            </li>
+                            <li className="text-xs text-muted-foreground">No time tracked this week.</li>
                         )}
                     </ul>
                 </CardBody>

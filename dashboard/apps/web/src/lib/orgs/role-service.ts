@@ -49,20 +49,14 @@ export async function ensureSystemRoles(orgId: string): Promise<void> {
         where: { orgId, slug: { in: [...core.ORG_SYSTEM_ROLE_SLUGS] } },
         select: { slug: true }
     });
-    const missing = core.ORG_SYSTEM_ROLE_SLUGS.filter(
-        (slug) => !existing.some((role) => role.slug === slug)
-    );
+    const missing = core.ORG_SYSTEM_ROLE_SLUGS.filter((slug) => !existing.some((role) => role.slug === slug));
     if (missing.length === 0) return;
 
     await prisma.orgRole.createMany({
         data: missing.map((slug) => {
             // ORG_SYSTEM_ROLE_SLUGS is the key list of ORG_SYSTEM_ROLES, so this
             // is always present; the fallback only satisfies the type.
-            const role = core.ORG_SYSTEM_ROLES[slug] ?? {
-                name: slug,
-                description: "",
-                permissions: []
-            };
+            const role = core.ORG_SYSTEM_ROLES[slug] ?? { name: slug, description: "", permissions: [] };
             return {
                 orgId,
                 slug,
@@ -99,11 +93,7 @@ export async function listOrgRoles(orgId: string): Promise<OrgRoleView[]> {
     await ensureSystemRoles(orgId);
     const [roles, counts] = await Promise.all([
         prisma.orgRole.findMany({ where: { orgId }, orderBy: { name: "asc" } }),
-        prisma.organizationMember.groupBy({
-            by: ["role"],
-            where: { orgId },
-            _count: { role: true }
-        })
+        prisma.organizationMember.groupBy({ by: ["role"], where: { orgId }, _count: { role: true } })
     ]);
     const held = new Map(counts.map((row) => [row.role, row._count.role]));
 
@@ -118,10 +108,7 @@ export async function listOrgRoles(orgId: string): Promise<OrgRoleView[]> {
             restricted: role.restricted,
             memberCount: held.get(role.slug) ?? 0
         }))
-        .sort(
-            (left, right) =>
-                Number(right.system) - Number(left.system) || left.name.localeCompare(right.name)
-        );
+        .sort((left, right) => Number(right.system) - Number(left.system) || left.name.localeCompare(right.name));
 }
 
 /** Stored as JSON so one column carries the set. Anything unreadable grants
@@ -129,9 +116,7 @@ export async function listOrgRoles(orgId: string): Promise<OrgRoleView[]> {
 function parsePermissions(raw: string): string[] {
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed)
-            ? parsed.filter((value): value is string => typeof value === "string")
-            : [];
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
     } catch {
         return [];
     }
@@ -173,10 +158,7 @@ export async function updateOrgRole(
     input: Pick<core.OrgRoleInput, "name" | "description" | "permissions">
 ): Promise<void> {
     if (slug === core.UNEDITABLE_ORG_ROLE) throw new OrgError("The Admin role cannot be changed");
-    const role = await prisma.orgRole.findUnique({
-        where: { orgId_slug: { orgId, slug } },
-        select: { id: true }
-    });
+    const role = await prisma.orgRole.findUnique({ where: { orgId_slug: { orgId, slug } }, select: { id: true } });
     if (!role) throw new OrgError("That role no longer exists");
 
     await prisma.orgRole.update({

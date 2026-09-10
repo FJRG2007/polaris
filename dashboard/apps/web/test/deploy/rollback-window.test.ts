@@ -49,8 +49,6 @@ describe("the rollback window", () => {
 describe("a remote server's tidy-up", () => {
     it("leaves the kept release images alone", () => {
         // `-a` takes every image no container is on, which a kept version is.
-        expect(PRUNE_EVERY_ENGINE).toContain(
-            "docker system prune -af --filter 'label!=polaris.release'"
-        );
+        expect(PRUNE_EVERY_ENGINE).toContain("docker system prune -af --filter 'label!=polaris.release'");
     });
 });

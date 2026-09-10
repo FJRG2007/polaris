@@ -41,13 +41,7 @@ interface Opened {
     local?: { command: string; base: string; insecureTransport: boolean };
 }
 
-export function QuickEnroll({
-    onDone,
-    kind = "server"
-}: {
-    onDone: () => void;
-    kind?: "server" | "local";
-}) {
+export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; kind?: "server" | "local" }) {
     const router = useRouter();
     const isLocal = kind === "local";
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
@@ -171,11 +165,7 @@ export function QuickEnroll({
                             setCopied(true);
                         }}
                     >
-                        {copied ? (
-                            <Check className="size-4 text-success" />
-                        ) : (
-                            <Copy className="size-4" />
-                        )}
+                        {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
                     </Button>
                 </div>
 
@@ -192,8 +182,8 @@ export function QuickEnroll({
                         />
                         <span className="text-muted-foreground">
                             This server cannot reach the internet. Point the command at{" "}
-                            <code className="font-mono text-xs">{local.base}</code> instead, which
-                            only works from the same network.
+                            <code className="font-mono text-xs">{local.base}</code> instead, which only
+                            works from the same network.
                         </span>
                     </label>
                 ) : null}
@@ -211,15 +201,13 @@ export function QuickEnroll({
                         <p className="text-sm text-danger">{waitError}</p>
                         {stillUsable ? (
                             <p className="text-sm text-muted-foreground">
-                                It was not used, so the command above still works. Fix that and run
-                                it again before it expires - this picks it up on its own.
+                                It was not used, so the command above still works. Fix that and run it
+                                again before it expires - this picks it up on its own.
                             </p>
                         ) : null}
                     </div>
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        Waiting for the server to check in...
-                    </p>
+                    <p className="text-sm text-muted-foreground">Waiting for the server to check in...</p>
                 )}
 
                 <div className="mt-1 flex justify-end gap-2">
@@ -236,18 +224,18 @@ export function QuickEnroll({
             <p className="text-sm text-muted-foreground">
                 {isLocal ? (
                     <>
-                        Polaris runs in a container, so it reaches this machine through its
-                        container engine and nothing else - which is why it has no shell here. Run
-                        this command on the machine itself and it joins like any other server: a
-                        dedicated <code className="font-mono text-xs">polaris</code> login with no
-                        password, authorized for one key Polaris keeps.
+                        Polaris runs in a container, so it reaches this machine through its container
+                        engine and nothing else - which is why it has no shell here. Run this command on
+                        the machine itself and it joins like any other server: a dedicated{" "}
+                        <code className="font-mono text-xs">polaris</code> login with no password,
+                        authorized for one key Polaris keeps.
                     </>
                 ) : (
                     <>
                         Polaris generates a command you run on the server. It creates a dedicated{" "}
                         <code className="font-mono text-xs">polaris</code> login with no password,
-                        authorizes one key Polaris keeps, and registers the machine. No credential
-                        of yours is typed anywhere.
+                        authorizes one key Polaris keeps, and registers the machine. No credential of
+                        yours is typed anywhere.
                     </>
                 )}
             </p>
@@ -271,9 +259,7 @@ export function QuickEnroll({
                         onValueChange={(value) => setEnvironment(value as ServerEnvironment)}
                         options={ENVIRONMENT_OPTIONS}
                     />
-                    <span className="text-xs text-muted-foreground">
-                        {ENVIRONMENT_META[environment].routing}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{ENVIRONMENT_META[environment].routing}</span>
                 </label>
             )}
 

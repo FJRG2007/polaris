@@ -698,10 +698,7 @@ export function SpaceTree({
             )}
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink">
                     {error}
                 </p>
             )}

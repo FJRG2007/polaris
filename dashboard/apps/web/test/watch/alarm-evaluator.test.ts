@@ -34,12 +34,7 @@ let alarms: Record<string, unknown>[] = [];
 const updates: { id: string; state: string }[] = [];
 const events: { kind: string; detail: string }[] = [];
 
-function sample(
-    subjectType: string,
-    subjectId: string,
-    agoMs: number,
-    fields: Partial<Sample>
-): Sample {
+function sample(subjectType: string, subjectId: string, agoMs: number, fields: Partial<Sample>): Sample {
     return {
         subjectType,
         subjectId,
@@ -70,14 +65,12 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         alarm: {
             findMany: vi.fn(async () => alarms),
-            update: vi.fn(
-                async ({ where, data }: { where: { id: string }; data: { state: string } }) => {
-                    updates.push({ id: where.id, state: data.state });
-                    const alarm = alarms.find((row) => row.id === where.id);
-                    if (alarm) Object.assign(alarm, data);
-                    return alarm;
-                }
-            )
+            update: vi.fn(async ({ where, data }: { where: { id: string }; data: { state: string } }) => {
+                updates.push({ id: where.id, state: data.state });
+                const alarm = alarms.find((row) => row.id === where.id);
+                if (alarm) Object.assign(alarm, data);
+                return alarm;
+            })
         },
         alarmEvent: {
             create: vi.fn(async ({ data }: { data: { kind: string; detail: string } }) => {
@@ -87,30 +80,18 @@ vi.mock("@polaris/db", () => ({
         },
         host: {
             findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
-                where.id === HOST
-                    ? { id: HOST, dockerId: "docker-local", address: "10.0.0.2" }
-                    : null
+                where.id === HOST ? { id: HOST, dockerId: "docker-local", address: "10.0.0.2" } : null
             )
         },
         volume: {
             findMany: vi.fn(async () => [{ id: "vol-1" }, { id: "vol-2" }])
         },
         metricSample: {
-            findMany: vi.fn(
-                async ({
-                    where,
-                    take
-                }: {
-                    where: { subjectType: string; subjectId: string };
-                    take: number;
-                }) => newest(where).slice(0, take)
+            findMany: vi.fn(async ({ where, take }: { where: { subjectType: string; subjectId: string }; take: number }) =>
+                newest(where).slice(0, take)
             ),
-            findFirst: vi.fn(
-                async ({
-                    where
-                }: {
-                    where: { subjectType: string; subjectId: string; ts?: { gte: Date } };
-                }) => newest(where)[0] ?? null
+            findFirst: vi.fn(async ({ where }: { where: { subjectType: string; subjectId: string; ts?: { gte: Date } } }) =>
+                newest(where)[0] ?? null
             )
         }
     }
@@ -118,11 +99,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: vi.fn(async () => undefined) }));
 vi.mock("@/lib/messaging/bridge-client", () => ({ bridgeSend: vi.fn(async () => undefined) }));
 vi.mock("@/lib/local-machine", () => ({
-    localMachineIdentity: vi.fn(async () => ({
-        hostId: null,
-        dockerId: "docker-local",
-        addresses: new Set<string>()
-    })),
+    localMachineIdentity: vi.fn(async () => ({ hostId: null, dockerId: "docker-local", addresses: new Set<string>() })),
     isLocalMachine: (host: { dockerId?: string | null }, identity: { dockerId: string | null }) =>
         Boolean(host.dockerId && host.dockerId === identity.dockerId)
 }));
@@ -166,9 +143,7 @@ describe("disk and network alarms", () => {
             sample("app", APP, 90_000, { netTxBytes: 0n }),
             sample("app", APP, 30_000, { netTxBytes: 60n * 3n * MIB })
         ];
-        alarms = [
-            alarm({ targetType: "application", targetId: APP, metric: "network_out", threshold: 2 })
-        ];
+        alarms = [alarm({ targetType: "application", targetId: APP, metric: "network_out", threshold: 2 })];
         await evaluateAlarms();
         expect(events[0]?.detail).toBe("Network out 3.00 MB/s (threshold > 2 MB/s)");
     });
@@ -178,17 +153,13 @@ describe("disk and network alarms", () => {
             sample("volume", "vol-1", 60_000, { diskUsedBytes: 2n * GIB }),
             sample("volume", "vol-2", 60_000, { diskUsedBytes: GIB })
         ];
-        alarms = [
-            alarm({ targetType: "application", targetId: APP, metric: "disk", threshold: 2.5 })
-        ];
+        alarms = [alarm({ targetType: "application", targetId: APP, metric: "disk", threshold: 2.5 })];
         await evaluateAlarms();
         expect(events[0]?.detail).toBe("Disk 3.00 GB (threshold > 2.5 GB)");
     });
 
     it("says there is no data when the reading is stale, rather than firing or clearing", async () => {
-        samples = [
-            sample("host", LOCAL, 10 * 60_000, { diskUsedBytes: 99n, diskTotalBytes: 100n })
-        ];
+        samples = [sample("host", LOCAL, 10 * 60_000, { diskUsedBytes: 99n, diskTotalBytes: 100n })];
         alarms = [alarm({ targetType: "host", targetId: LOCAL, metric: "disk", threshold: 90 })];
         await evaluateAlarms();
         expect(updates.at(-1)?.state).toBe("insufficient");

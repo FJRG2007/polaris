@@ -29,16 +29,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        domain: {
-            findFirst: mocks.domainFindFirst,
-            findMany: mocks.domainFindMany,
-            update: mocks.domainUpdate
-        }
+        domain: { findFirst: mocks.domainFindFirst, findMany: mocks.domainFindMany, update: mocks.domainUpdate }
     }
 }));
-vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({
-    loadCloudflareToken: mocks.loadCloudflareToken
-}));
+vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: mocks.loadCloudflareToken }));
 vi.mock("../../src/lib/integrations/cloudflare-api", () => ({
     resolveZoneForHostname: mocks.resolveZoneForHostname,
     findAddressRecords: mocks.findAddressRecords,
@@ -50,13 +44,10 @@ vi.mock("../../src/lib/integrations/cloudflare-api", () => ({
 
 vi.mock("../../src/lib/domain-edge", () => ({
     dashboardHosts: mocks.dashboardHosts,
-    publicHostname: (value: string | undefined) =>
-        value ? value.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null
+    publicHostname: (value: string | undefined) => (value ? value.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null)
 }));
 vi.mock("../../src/lib/domain-zones", () => ({ deployZoneHosts: mocks.deployZoneHosts }));
-vi.mock("../../src/lib/dns/zone-records", () => ({
-    instanceTokenAllowed: mocks.instanceTokenAllowed
-}));
+vi.mock("../../src/lib/dns/zone-records", () => ({ instanceTokenAllowed: mocks.instanceTokenAllowed }));
 
 const cdn = await import("../../src/lib/cdn");
 
@@ -68,13 +59,7 @@ function standing(): void {
     mocks.instanceTokenAllowed.mockResolvedValue(true);
 }
 
-const DOMAIN = {
-    id: "d1",
-    hostname: "app.example.com",
-    cdn: false,
-    enabled: true,
-    applicationId: "a1"
-};
+const DOMAIN = { id: "d1", hostname: "app.example.com", cdn: false, enabled: true, applicationId: "a1" };
 
 describe("setDomainCdn", () => {
     beforeEach(() => {
@@ -88,39 +73,19 @@ describe("setDomainCdn", () => {
 
     it("sets only proxied on the name's own record", async () => {
         mocks.findAddressRecords.mockResolvedValue([
-            {
-                id: "r1",
-                type: "A",
-                name: "app.example.com",
-                content: "51.15.20.30",
-                proxied: false,
-                ttl: 300
-            }
+            { id: "r1", type: "A", name: "app.example.com", content: "51.15.20.30", proxied: false, ttl: 300 }
         ]);
         await cdn.setDomainCdn("d1", CALLER, true);
         expect(mocks.setRecordProxied).toHaveBeenCalledWith("cf-token", "zone-1", "r1", true);
         expect(mocks.createAddressRecord).not.toHaveBeenCalled();
-        expect(mocks.domainUpdate).toHaveBeenCalledWith({
-            where: { id: "d1" },
-            data: { cdn: true }
-        });
+        expect(mocks.domainUpdate).toHaveBeenCalledWith({ where: { id: "d1" }, data: { cdn: true } });
     });
 
     it("gives a wildcard-covered name a record of its own with the wildcard's address", async () => {
-        mocks.findAddressRecords.mockImplementation(
-            async (_token: string, _zone: string, name: string) =>
-                name === "*.example.com"
-                    ? [
-                          {
-                              id: "w1",
-                              type: "A",
-                              name,
-                              content: "51.15.20.30",
-                              proxied: false,
-                              ttl: 1
-                          }
-                      ]
-                    : []
+        mocks.findAddressRecords.mockImplementation(async (_token: string, _zone: string, name: string) =>
+            name === "*.example.com"
+                ? [{ id: "w1", type: "A", name, content: "51.15.20.30", proxied: false, ttl: 1 }]
+                : []
         );
         await cdn.setDomainCdn("d1", CALLER, true);
         expect(mocks.createAddressRecord).toHaveBeenCalledWith("cf-token", "zone-1", {
@@ -145,22 +110,8 @@ describe("setDomainCdn", () => {
 
     it("leaves a tunnel's record proxied when it is turned off", async () => {
         mocks.findAddressRecords.mockResolvedValue([
-            {
-                id: "t1",
-                type: "CNAME",
-                name: "app.example.com",
-                content: "abc.cfargotunnel.com",
-                proxied: true,
-                ttl: 1
-            },
-            {
-                id: "r2",
-                type: "AAAA",
-                name: "app.example.com",
-                content: "2001:db8::1",
-                proxied: true,
-                ttl: 1
-            }
+            { id: "t1", type: "CNAME", name: "app.example.com", content: "abc.cfargotunnel.com", proxied: true, ttl: 1 },
+            { id: "r2", type: "AAAA", name: "app.example.com", content: "2001:db8::1", proxied: true, ttl: 1 }
         ]);
         await cdn.setDomainCdn("d1", CALLER, false);
         expect(mocks.setRecordProxied).toHaveBeenCalledTimes(1);
@@ -179,23 +130,16 @@ describe("purging", () => {
     it("empties a prefix under the hostname when one is given", async () => {
         mocks.domainFindFirst.mockResolvedValue({ ...DOMAIN, cdn: true });
         await cdn.purgeDomainCache("d1", CALLER, "assets/");
-        expect(mocks.purgeCache).toHaveBeenCalledWith("cf-token", "zone-1", {
-            prefixes: ["app.example.com/assets/"]
-        });
+        expect(mocks.purgeCache).toHaveBeenCalledWith("cf-token", "zone-1", { prefixes: ["app.example.com/assets/"] });
     });
 
     it("refuses a domain that is not served through Cloudflare", async () => {
         mocks.domainFindFirst.mockResolvedValue(DOMAIN);
-        await expect(cdn.purgeDomainCache("d1", CALLER)).rejects.toThrow(
-            /not served through Cloudflare/
-        );
+        await expect(cdn.purgeDomainCache("d1", CALLER)).rejects.toThrow(/not served through Cloudflare/);
     });
 
     it("purges every proxied domain of a service after a release, in one call per zone", async () => {
-        mocks.domainFindMany.mockResolvedValue([
-            { hostname: "app.example.com" },
-            { hostname: "www.example.com" }
-        ]);
+        mocks.domainFindMany.mockResolvedValue([{ hostname: "app.example.com" }, { hostname: "www.example.com" }]);
         await cdn.purgeAfterPromotion("a1");
         expect(mocks.purgeCache).toHaveBeenCalledWith("cf-token", "zone-1", {
             hosts: ["app.example.com", "www.example.com"]
@@ -219,14 +163,7 @@ describe("whose name it is", () => {
         mocks.resolveZoneForHostname.mockResolvedValue({ id: "zone-1", name: "example.com" });
         mocks.zoneSslMode.mockResolvedValue("strict");
         mocks.findAddressRecords.mockResolvedValue([
-            {
-                id: "r1",
-                type: "A",
-                name: "mail.example.com",
-                content: "51.15.20.30",
-                proxied: false,
-                ttl: 300
-            }
+            { id: "r1", type: "A", name: "mail.example.com", content: "51.15.20.30", proxied: false, ttl: 300 }
         ]);
         mocks.dashboardHosts.mockResolvedValue(["polaris.example.com"]);
         mocks.deployZoneHosts.mockResolvedValue(["plr.example.com"]);
@@ -235,26 +172,16 @@ describe("whose name it is", () => {
 
     it("refuses a typed name in a zone the caller has not proven, before touching Cloudflare", async () => {
         mocks.domainFindFirst.mockResolvedValue({ ...DOMAIN, hostname: "mail.example.com" });
-        await expect(cdn.setDomainCdn("d1", CALLER, true)).rejects.toThrow(
-            /Add its domain under Domains/
-        );
-        await expect(cdn.setDomainCdn("d1", CALLER, false)).rejects.toThrow(
-            /Add its domain under Domains/
-        );
+        await expect(cdn.setDomainCdn("d1", CALLER, true)).rejects.toThrow(/Add its domain under Domains/);
+        await expect(cdn.setDomainCdn("d1", CALLER, false)).rejects.toThrow(/Add its domain under Domains/);
         expect(mocks.loadCloudflareToken).not.toHaveBeenCalled();
         expect(mocks.setRecordProxied).not.toHaveBeenCalled();
         expect(mocks.domainUpdate).not.toHaveBeenCalled();
     });
 
     it("refuses the manual purge the same way", async () => {
-        mocks.domainFindFirst.mockResolvedValue({
-            ...DOMAIN,
-            hostname: "mail.example.com",
-            cdn: true
-        });
-        await expect(cdn.purgeDomainCache("d1", CALLER)).rejects.toThrow(
-            /Add its domain under Domains/
-        );
+        mocks.domainFindFirst.mockResolvedValue({ ...DOMAIN, hostname: "mail.example.com", cdn: true });
+        await expect(cdn.purgeDomainCache("d1", CALLER)).rejects.toThrow(/Add its domain under Domains/);
         expect(mocks.purgeCache).not.toHaveBeenCalled();
     });
 
@@ -262,20 +189,13 @@ describe("whose name it is", () => {
         mocks.domainFindFirst.mockResolvedValue({ ...DOMAIN, hostname: "shop.plr.example.com" });
         await cdn.setDomainCdn("d1", CALLER, true);
         expect(mocks.instanceTokenAllowed).not.toHaveBeenCalled();
-        expect(mocks.domainUpdate).toHaveBeenCalledWith({
-            where: { id: "d1" },
-            data: { cdn: true }
-        });
+        expect(mocks.domainUpdate).toHaveBeenCalledWith({ where: { id: "d1" }, data: { cdn: true } });
     });
 
     it("asks about the project's organization and the person asking", async () => {
         mocks.domainFindFirst.mockResolvedValue({ ...DOMAIN, hostname: "shop.acme.com" });
         mocks.instanceTokenAllowed.mockResolvedValue(true);
-        await cdn.setDomainCdn(
-            "d1",
-            { ownerId: "owner", orgId: "org-1", actorId: "member", isAdmin: false },
-            true
-        );
+        await cdn.setDomainCdn("d1", { ownerId: "owner", orgId: "org-1", actorId: "member", isAdmin: false }, true);
         expect(mocks.instanceTokenAllowed).toHaveBeenCalledWith("shop.acme.com", {
             isAdmin: false,
             owners: [
@@ -287,9 +207,7 @@ describe("whose name it is", () => {
 
     it("never changes the dashboard's own name, even for an administrator", async () => {
         mocks.domainFindFirst.mockResolvedValue({ ...DOMAIN, hostname: "polaris.example.com" });
-        await expect(cdn.setDomainCdn("d1", { ...CALLER, isAdmin: true }, false)).rejects.toThrow(
-            /own address/
-        );
+        await expect(cdn.setDomainCdn("d1", { ...CALLER, isAdmin: true }, false)).rejects.toThrow(/own address/);
         expect(mocks.setRecordProxied).not.toHaveBeenCalled();
     });
 });

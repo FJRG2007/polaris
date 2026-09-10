@@ -29,32 +29,22 @@ export class SwarmRuntime implements RuntimeDriver {
         return undefined;
     }
 
-    public async deployApplication(
-        plan: AppDeployPlan,
-        ctx: RuntimeContext
-    ): Promise<DeployResult> {
+    public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         let imageTag: string;
         let kept: string | null;
         try {
             kept = (await loadPrebuilt(plan, ctx)) ?? (await rollbackImageOf(plan, ctx));
         } catch (error) {
-            return {
-                ok: false,
-                error: error instanceof Error ? error.message : RELEASE_IMAGE_GONE
-            };
+            return { ok: false, error: error instanceof Error ? error.message : RELEASE_IMAGE_GONE };
         }
         if (kept) {
             imageTag = kept;
         } else if (plan.build.method === "image") {
-            if (!plan.build.imageRef)
-                return { ok: false, error: "an image source needs an image reference" };
+            if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
             imageTag = plan.build.imageRef;
             await ctx.ports.pull(imageTag, sink);
-        } else if (
-            (plan.build.method === "dockerfile" || plan.build.method === "nixpacks") &&
-            ctx.buildContext
-        ) {
+        } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const context = await ctx.buildContext();
             await buildPorts(ctx).build(
@@ -66,18 +56,12 @@ export class SwarmRuntime implements RuntimeDriver {
                     // Detection may have moved the build up to the repository root -
                     // a workspace cannot install from inside one of its members.
                     root: context.root ?? plan.build.rootDirectory,
-                    builder:
-                        context.dockerfile || plan.build.method !== "nixpacks"
-                            ? "docker"
-                            : "nixpacks"
+                    builder: context.dockerfile || plan.build.method !== "nixpacks" ? "docker" : "nixpacks"
                 },
                 sink
             );
         } else {
-            return {
-                ok: false,
-                error: `build method "${plan.build.method}" is not yet supported on the swarm runtime`
-            };
+            return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the swarm runtime` };
         }
         // Kept under the release's own name before it runs - see the compose runtime,
         // including for a build made on another machine and carried here.
@@ -86,10 +70,7 @@ export class SwarmRuntime implements RuntimeDriver {
             try {
                 imageTag = await shipRelease(imageTag, plan, ctx);
             } catch (error) {
-                return {
-                    ok: false,
-                    error: error instanceof Error ? error.message : "the image could not be copied"
-                };
+                return { ok: false, error: error instanceof Error ? error.message : "the image could not be copied" };
             }
         } else if (!kept) {
             imageTag = await pinRelease(imageTag, plan, ctx);
@@ -98,10 +79,7 @@ export class SwarmRuntime implements RuntimeDriver {
         try {
             await ctx.ports.stackUp(spec, sink);
         } catch (error) {
-            return {
-                ok: false,
-                error: error instanceof Error ? error.message : "stack deploy failed"
-            };
+            return { ok: false, error: error instanceof Error ? error.message : "stack deploy failed" };
         }
         return { ok: true, imageTag };
     }
@@ -113,10 +91,7 @@ export class SwarmRuntime implements RuntimeDriver {
         try {
             await ctx.ports.stackUp(spec, sink);
         } catch (error) {
-            return {
-                ok: false,
-                error: error instanceof Error ? error.message : "database deploy failed"
-            };
+            return { ok: false, error: error instanceof Error ? error.message : "database deploy failed" };
         }
         return { ok: true };
     }

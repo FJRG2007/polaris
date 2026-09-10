@@ -98,11 +98,7 @@ const REMOTE_EDGE_DYNAMIC = "/dynamic";
  * a file the edge refuses, and refusing one file freezes all the others.
  */
 export function remoteCertificatesScript(
-    certificates: readonly {
-        readonly id: string;
-        readonly certPem: string;
-        readonly keyPem: string;
-    }[],
+    certificates: readonly { readonly id: string; readonly certPem: string; readonly keyPem: string }[],
     nonce = randomBytes(6).toString("hex")
 ): string {
     const lines = ["set -e", `mkdir -p ${quoteArg(DYNAMIC_DIR)}`];
@@ -123,17 +119,9 @@ export function remoteCertificatesScript(
         const key = `${REMOTE_CERT_PREFIX}${certificate.id}.key`;
         put(crt, certificate.certPem, false);
         put(key, certificate.keyPem, true);
-        entries.push(
-            `    - certFile: ${REMOTE_EDGE_DYNAMIC}/${crt}`,
-            `      keyFile: ${REMOTE_EDGE_DYNAMIC}/${key}`
-        );
+        entries.push(`    - certFile: ${REMOTE_EDGE_DYNAMIC}/${crt}`, `      keyFile: ${REMOTE_EDGE_DYNAMIC}/${key}`);
     }
-    if (entries.length > 0)
-        put(
-            `${REMOTE_CERT_PREFIX}certs.yml`,
-            ["tls:", "  certificates:", ...entries, ""].join("\n"),
-            false
-        );
+    if (entries.length > 0) put(`${REMOTE_CERT_PREFIX}certs.yml`, ["tls:", "  certificates:", ...entries, ""].join("\n"), false);
     const keep = kept.length > 0 ? kept.map((name) => quoteArg(name)).join("|") : "''";
     lines.push(
         `for f in ${quoteArg(DYNAMIC_DIR)}/${REMOTE_CERT_PREFIX}*; do case "$(basename "$f")" in ${keep}) ;; *) rm -f "$f" ;; esac; done`
@@ -176,11 +164,7 @@ export class RemoteRouter implements Router {
 
     /** Replace the certificates Polaris gave this server's edge with exactly these. */
     public async pushCertificates(
-        certificates: readonly {
-            readonly id: string;
-            readonly certPem: string;
-            readonly keyPem: string;
-        }[]
+        certificates: readonly { readonly id: string; readonly certPem: string; readonly keyPem: string }[]
     ): Promise<void> {
         await this.run(remoteCertificatesScript(certificates));
     }

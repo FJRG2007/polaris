@@ -19,15 +19,7 @@
 import { counterRate } from "@/lib/metrics-shared";
 
 export const ALARM_TARGET_TYPES = ["application", "host", "domain"] as const;
-export const ALARM_METRICS = [
-    "cpu",
-    "memory",
-    "disk",
-    "network_in",
-    "network_out",
-    "service",
-    "http"
-] as const;
+export const ALARM_METRICS = ["cpu", "memory", "disk", "network_in", "network_out", "service", "http"] as const;
 
 export type AlarmTargetType = (typeof ALARM_TARGET_TYPES)[number];
 export type AlarmMetric = (typeof ALARM_METRICS)[number];
@@ -88,9 +80,7 @@ export interface SampleReading {
 }
 
 function share(used: bigint | null, total: bigint | null): number | null {
-    return used !== null && total !== null && total > 0n
-        ? (Number(used) / Number(total)) * 100
-        : null;
+    return used !== null && total !== null && total > 0n ? (Number(used) / Number(total)) * 100 : null;
 }
 
 /**
@@ -101,11 +91,7 @@ function share(used: bigint | null, total: bigint | null): number | null {
  * Not for a service's disk, which is its volumes rather than its own column - see
  * `volumeDiskGb`.
  */
-export function sampleValue(
-    metric: string,
-    latest: SampleReading,
-    previous: SampleReading | null
-): number | null {
+export function sampleValue(metric: string, latest: SampleReading, previous: SampleReading | null): number | null {
     if (metric === "cpu") return latest.cpuPercent;
     if (metric === "memory") return share(latest.memUsedBytes, latest.memTotalBytes);
     if (metric === "disk") return share(latest.diskUsedBytes, latest.diskTotalBytes);
@@ -124,9 +110,7 @@ export function sampleValue(
 
 /** What a service's volumes hold together, in GB. Null when none was measured. */
 export function volumeDiskGb(readings: readonly { diskUsedBytes: bigint | null }[]): number | null {
-    const present = readings
-        .map((reading) => reading.diskUsedBytes)
-        .filter((value): value is bigint => value !== null);
+    const present = readings.map((reading) => reading.diskUsedBytes).filter((value): value is bigint => value !== null);
     if (present.length === 0) return null;
     return Number(present.reduce((total, value) => total + value, 0n)) / GIB;
 }
@@ -141,22 +125,13 @@ export function formatAlarmValue(value: number, unit: AlarmUnit): string {
 }
 
 /** A threshold as it was typed, with its unit: "> 90%", "< 2.5 GB". */
-export function formatThreshold(
-    operator: string,
-    threshold: number,
-    unit: AlarmUnit | null
-): string {
+export function formatThreshold(operator: string, threshold: number, unit: AlarmUnit | null): string {
     const amount = unit === "%" ? `${threshold}%` : `${threshold} ${unit ?? ""}`.trim();
     return `${operator === "lt" ? "<" : ">"} ${amount}`;
 }
 
 /** "Disk > 90%", "Network in > 10 MB/s". */
-export function describeThreshold(
-    metric: string,
-    targetType: string,
-    operator: string,
-    threshold: number
-): string {
+export function describeThreshold(metric: string, targetType: string, operator: string, threshold: number): string {
     const label = METRIC_LABEL[metric as AlarmMetric] ?? metric;
     return `${label} ${formatThreshold(operator, threshold, alarmUnit(metric, targetType))}`;
 }

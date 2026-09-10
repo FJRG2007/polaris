@@ -58,14 +58,7 @@ export interface MailDiscovery {
     readonly passwordUrl: string;
     /** Which of the five questions answered, so the form can say how sure it is
      *  and a support conversation has somewhere to start. */
-    readonly source:
-        | "catalogue"
-        | "polaris"
-        | "domain"
-        | "directory"
-        | "exchangers"
-        | "probe"
-        | "none";
+    readonly source: "catalogue" | "polaris" | "domain" | "directory" | "exchangers" | "probe" | "none";
 }
 
 /** How long any one lookup may take. Five of them run in sequence and somebody
@@ -76,11 +69,7 @@ const PROBE_TIMEOUT_MS = 4000;
  *  domain answering with a video is a failed lookup rather than a full disk. */
 const CONFIG_MAX_BYTES = 256 * 1024;
 
-function fromService(
-    address: string,
-    service: core.MailService,
-    source: MailDiscovery["source"]
-): MailDiscovery {
+function fromService(address: string, service: core.MailService, source: MailDiscovery["source"]): MailDiscovery {
     return {
         address,
         service: service.slug,
@@ -111,10 +100,7 @@ export async function discoverMailbox(address: string): Promise<MailDiscovery> {
     // A mail server this Polaris runs: its settings are known without asking
     // anybody, and before its DNS is published nothing else would find them.
     const ours = await prisma.mailServer
-        .findFirst({
-            where: { primaryDomain: domain, status: { in: ["ready", "down"] } },
-            select: { hostname: true }
-        })
+        .findFirst({ where: { primaryDomain: domain, status: { in: ["ready", "down"] } }, select: { hostname: true } })
         .catch(() => null);
     if (ours) {
         return {
@@ -189,10 +175,7 @@ async function domainAutoconfig(domain: string, address: string): Promise<Partia
 /** The same document, out of the directory Mozilla keeps for the domains whose
  *  owners never published one. */
 function directoryAutoconfig(domain: string, address: string): Promise<PartialDiscovery | null> {
-    return fetchAutoconfig(
-        `https://autoconfig.thunderbird.net/v1.1/${encodeURIComponent(domain)}`,
-        address
-    );
+    return fetchAutoconfig(`https://autoconfig.thunderbird.net/v1.1/${encodeURIComponent(domain)}`, address);
 }
 
 async function fetchAutoconfig(url: string, address: string): Promise<PartialDiscovery | null> {
@@ -254,17 +237,10 @@ function readServer(xml: string, type: "imap" | "smtp"): core.MailServerSettings
     if (!block) return null;
     const host = /<hostname>([^<]+)<\/hostname>/i.exec(block)?.[1]?.trim().toLowerCase();
     const port = Number(/<port>(\d+)<\/port>/i.exec(block)?.[1]);
-    const socket =
-        /<socketType>([^<]+)<\/socketType>/i.exec(block)?.[1]?.trim().toUpperCase() ?? "";
+    const socket = /<socketType>([^<]+)<\/socketType>/i.exec(block)?.[1]?.trim().toUpperCase() ?? "";
     if (!host || !Number.isInteger(port) || port < 1 || port > 65535) return null;
     const security: core.MailSocketSecurity =
-        socket === "SSL"
-            ? "tls"
-            : socket === "STARTTLS"
-              ? "starttls"
-              : port === 993 || port === 465
-                ? "tls"
-                : "starttls";
+        socket === "SSL" ? "tls" : socket === "STARTTLS" ? "starttls" : port === 993 || port === 465 ? "tls" : "starttls";
     return { host, port, security };
 }
 
@@ -287,37 +263,25 @@ async function serviceByExchangers(domain: string): Promise<core.MailService | n
  * with the target `.` is the domain saying explicitly that it offers none, which
  * is an answer and is treated as one.
  */
-async function serversBySrv(
-    domain: string
-): Promise<Pick<PartialDiscovery, "imap" | "smtp"> | null> {
+async function serversBySrv(domain: string): Promise<Pick<PartialDiscovery, "imap" | "smtp"> | null> {
     const [imaps, submission] = await Promise.all([
         resolveSrv(`_imaps._tcp.${domain}`).catch(() => []),
         resolveSrv(`_submission._tcp.${domain}`).catch(() => [])
     ]);
-    const inbound = imaps
-        .filter((record) => record.name && record.name !== ".")
-        .sort((a, b) => a.priority - b.priority)[0];
+    const inbound = imaps.filter((record) => record.name && record.name !== ".").sort((a, b) => a.priority - b.priority)[0];
     if (!inbound) return null;
     const outbound = submission
         .filter((record) => record.name && record.name !== ".")
         .sort((a, b) => a.priority - b.priority)[0];
     return {
-        imap: {
-            host: inbound.name.toLowerCase(),
-            port: inbound.port,
-            security: inbound.port === 993 ? "tls" : "starttls"
-        },
+        imap: { host: inbound.name.toLowerCase(), port: inbound.port, security: inbound.port === 993 ? "tls" : "starttls" },
         smtp: outbound
             ? {
                   host: outbound.name.toLowerCase(),
                   port: outbound.port,
                   security: outbound.port === 465 ? "tls" : "starttls"
               }
-            : {
-                  host: inbound.name.toLowerCase().replace(/^imaps?\./, "smtp."),
-                  port: 465,
-                  security: "tls"
-              }
+            : { host: inbound.name.toLowerCase().replace(/^imaps?\./, "smtp."), port: 465, security: "tls" }
     };
 }
 
@@ -334,9 +298,7 @@ async function serversBySrv(
  * host is derived from typed input and a name that resolves to the machine next
  * to this one must not be connected to.
  */
-async function probeConventionalHosts(
-    domain: string
-): Promise<Pick<PartialDiscovery, "imap" | "smtp"> | null> {
+async function probeConventionalHosts(domain: string): Promise<Pick<PartialDiscovery, "imap" | "smtp"> | null> {
     for (const host of core.guessedHosts(domain)) {
         if (!(await reachable(host))) continue;
         if (!(await handshakes(host, 993))) continue;

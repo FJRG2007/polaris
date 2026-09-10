@@ -18,17 +18,9 @@ const DIRECT = "direct";
 
 export function SendingTab({ serverId }: { serverId: string }) {
     const panel = usePanelData(`relay:${serverId}`, () => relayAction(serverId));
-    if (panel.error && !panel.data)
-        return <PanelError message={panel.error} onRetry={() => void panel.reload()} />;
+    if (panel.error && !panel.data) return <PanelError message={panel.error} onRetry={() => void panel.reload()} />;
     if (!panel.data) return <Skeleton className="h-40 w-full" />;
-    return (
-        <RelayForm
-            key={JSON.stringify(panel.data.relay)}
-            serverId={serverId}
-            current={panel.data.relay}
-            onSaved={() => void panel.reload()}
-        />
-    );
+    return <RelayForm key={JSON.stringify(panel.data.relay)} serverId={serverId} current={panel.data.relay} onSaved={() => void panel.reload()} />;
 }
 
 function RelayForm({
@@ -61,13 +53,8 @@ function RelayForm({
     };
     const parsed = mailRelaySchema.safeParse(input);
     const issue = (path: string, typed: string): string | null =>
-        parsed.success || !typed.trim()
-            ? null
-            : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
-    const needsSecret =
-        spec !== null &&
-        !secret &&
-        !(current && current.provider === provider && current.hasSecret);
+        parsed.success || !typed.trim() ? null : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
+    const needsSecret = spec !== null && !secret && !(current && current.provider === provider && current.hasSecret);
     const unchanged =
         (provider === DIRECT && current === null) ||
         (current !== null &&
@@ -89,13 +76,7 @@ function RelayForm({
             return;
         }
         setSecret("");
-        setMessage({
-            tone: "ok",
-            text:
-                provider === DIRECT
-                    ? "Mail now goes straight to each recipient."
-                    : "Mail now goes out through the relay."
-        });
+        setMessage({ tone: "ok", text: provider === DIRECT ? "Mail now goes straight to each recipient." : "Mail now goes out through the relay." });
         onSaved();
     }
 
@@ -107,14 +88,7 @@ function RelayForm({
                 void save();
             }}
         >
-            <Field
-                label="Send through"
-                hint={
-                    spec?.spfInclude
-                        ? `Adds ${spec.spfInclude} to each domain's SPF in the DNS plan.`
-                        : undefined
-                }
-            >
+            <Field label="Send through" hint={spec?.spfInclude ? `Adds ${spec.spfInclude} to each domain's SPF in the DNS plan.` : undefined}>
                 {(id) => (
                     <Select
                         id={id}
@@ -126,106 +100,47 @@ function RelayForm({
                         }}
                         options={[
                             { value: DIRECT, label: "Directly, to each recipient's server" },
-                            ...RELAY_PROVIDERS.map((entry) => ({
-                                value: entry.id,
-                                label: entry.label
-                            }))
+                            ...RELAY_PROVIDERS.map((entry) => ({ value: entry.id, label: entry.label }))
                         ]}
                     />
                 )}
             </Field>
             {spec?.regional ? (
                 <Field label="Region" required error={issue("region", region)}>
-                    {(id) => (
-                        <Input
-                            id={id}
-                            value={region}
-                            onChange={(event) => setRegion(event.target.value)}
-                            placeholder="eu-west-1"
-                        />
-                    )}
+                    {(id) => <Input id={id} value={region} onChange={(event) => setRegion(event.target.value)} placeholder="eu-west-1" />}
                 </Field>
             ) : null}
             {provider === "custom" ? (
                 <Field label="SMTP host" required error={issue("host", host)}>
-                    {(id) => (
-                        <Input
-                            id={id}
-                            value={host}
-                            onChange={(event) => setHost(event.target.value)}
-                            placeholder="smtp.example.net"
-                        />
-                    )}
+                    {(id) => <Input id={id} value={host} onChange={(event) => setHost(event.target.value)} placeholder="smtp.example.net" />}
                 </Field>
             ) : null}
             {spec ? (
                 <>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Field
-                            label="Port"
-                            error={issue("port", port)}
-                            hint="587 for STARTTLS, 465 for TLS."
-                        >
+                        <Field label="Port" error={issue("port", port)} hint="587 for STARTTLS, 465 for TLS.">
                             {(id) => (
-                                <Input
-                                    id={id}
-                                    inputMode="numeric"
-                                    value={port}
-                                    onChange={(event) =>
-                                        setPort(event.target.value.replace(/[^\d]/g, ""))
-                                    }
-                                />
+                                <Input id={id} inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value.replace(/[^\d]/g, ""))} />
                             )}
                         </Field>
-                        <Field
-                            label="Username"
-                            hint={spec.username ? `Leave empty for "${spec.username}".` : undefined}
-                        >
-                            {(id) => (
-                                <Input
-                                    id={id}
-                                    value={username}
-                                    onChange={(event) => setUsername(event.target.value)}
-                                    autoComplete="off"
-                                />
-                            )}
+                        <Field label="Username" hint={spec.username ? `Leave empty for "${spec.username}".` : undefined}>
+                            {(id) => <Input id={id} value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" />}
                         </Field>
                     </div>
                     <Field
                         label="Password or API key"
                         required={needsSecret}
-                        hint={
-                            current?.hasSecret && current.provider === provider
-                                ? "Leave empty to keep the one saved."
-                                : undefined
-                        }
+                        hint={current?.hasSecret && current.provider === provider ? "Leave empty to keep the one saved." : undefined}
                     >
                         {(id) => (
-                            <Input
-                                id={id}
-                                type="password"
-                                value={secret}
-                                onChange={(event) => setSecret(event.target.value)}
-                                autoComplete="off"
-                            />
+                            <Input id={id} type="password" value={secret} onChange={(event) => setSecret(event.target.value)} autoComplete="off" />
                         )}
                     </Field>
                 </>
             ) : null}
-            {message ? (
-                <p
-                    className={
-                        message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"
-                    }
-                >
-                    {message.text}
-                </p>
-            ) : null}
+            {message ? <p className={message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"}>{message.text}</p> : null}
             <div className="flex flex-wrap items-center gap-3">
-                <Button
-                    type="submit"
-                    disabled={!parsed.success || pending || needsSecret || unchanged}
-                >
+                <Button type="submit" disabled={!parsed.success || pending || needsSecret || unchanged}>
                     {pending ? "Saving..." : "Save"}
                 </Button>
                 <p className="text-xs text-muted-foreground">

@@ -46,18 +46,11 @@ function headerSafe(value: string): string {
 /** The request as bytes. */
 export function serializeRequest(request: HttpExchange): Buffer {
     const body = request.body !== undefined ? Buffer.from(request.body, "utf8") : null;
-    const lines = [
-        `${headerSafe(request.method)} ${headerSafe(request.path)} HTTP/1.1`,
-        `Host: ${headerSafe(request.host)}`
-    ];
-    for (const [name, value] of Object.entries(request.headers))
-        lines.push(`${headerSafe(name)}: ${headerSafe(value)}`);
+    const lines = [`${headerSafe(request.method)} ${headerSafe(request.path)} HTTP/1.1`, `Host: ${headerSafe(request.host)}`];
+    for (const [name, value] of Object.entries(request.headers)) lines.push(`${headerSafe(name)}: ${headerSafe(value)}`);
     lines.push("Connection: close");
     if (body) lines.push(`Content-Length: ${body.length}`);
-    return Buffer.concat([
-        Buffer.from(`${lines.join("\r\n")}\r\n\r\n`, "latin1"),
-        body ?? Buffer.alloc(0)
-    ]);
+    return Buffer.concat([Buffer.from(`${lines.join("\r\n")}\r\n\r\n`, "latin1"), body ?? Buffer.alloc(0)]);
 }
 
 /** Decode a chunked body. Stops at the zero chunk or at data that is not one. */
@@ -67,10 +60,7 @@ function dechunk(input: Buffer): Buffer {
     while (offset < input.length) {
         const lineEnd = input.indexOf("\r\n", offset);
         if (lineEnd < 0) break;
-        const size = Number.parseInt(
-            input.subarray(offset, lineEnd).toString("latin1").split(";")[0] ?? "",
-            16
-        );
+        const size = Number.parseInt(input.subarray(offset, lineEnd).toString("latin1").split(";")[0] ?? "", 16);
         if (!Number.isFinite(size) || size <= 0) break;
         const start = lineEnd + 2;
         out.push(input.subarray(start, Math.min(start + size, input.length)));
@@ -89,12 +79,10 @@ export function parseHttpResponse(raw: Buffer): HttpAnswer {
     const headers: Record<string, string> = {};
     for (const line of head.slice(1)) {
         const colon = line.indexOf(":");
-        if (colon > 0)
-            headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+        if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
     }
     let body = raw.subarray(split + 4);
-    if ((headers["transfer-encoding"] ?? "").toLowerCase().includes("chunked"))
-        body = dechunk(body);
+    if ((headers["transfer-encoding"] ?? "").toLowerCase().includes("chunked")) body = dechunk(body);
     else if (headers["content-length"] !== undefined) {
         const length = Number(headers["content-length"]);
         if (Number.isFinite(length)) body = body.subarray(0, length);
@@ -122,11 +110,7 @@ export function exchangeOverStream(stream: Duplex, request: HttpExchange): Promi
         stream.on("data", (chunk: Buffer) => {
             size += chunk.length;
             if (size > MAX_ANSWER) {
-                finish(() =>
-                    reject(
-                        new Error("the mail server's answer was larger than any management answer")
-                    )
-                );
+                finish(() => reject(new Error("the mail server's answer was larger than any management answer")));
                 stream.destroy();
                 return;
             }

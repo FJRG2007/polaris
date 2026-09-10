@@ -69,10 +69,7 @@ export async function attachFromDrive(
     connectionId: string,
     path: string
 ): Promise<StoredUpload> {
-    return storeUpload(
-        userId,
-        await fileFromDrive(userId, connectionId, path, MAX_ATTACHMENT_BYTES)
-    );
+    return storeUpload(userId, await fileFromDrive(userId, connectionId, path, MAX_ATTACHMENT_BYTES));
 }
 
 /** A file at an address somebody pasted, attached. */

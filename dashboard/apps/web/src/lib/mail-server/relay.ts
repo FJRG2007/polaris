@@ -64,25 +64,15 @@ async function engine(server: MailServer) {
     if (!server.applicationId || !reached(server.step, "admin")) {
         throw new MailServerAccessError("This mail server is still being set up.");
     }
-    return {
-        endpoint: await endpointFor(server.applicationId),
-        credentials: adminCredentials(server)
-    };
+    return { endpoint: await endpointFor(server.applicationId), credentials: adminCredentials(server) };
 }
 
 /** Remove the relay route the engine has, if it has one. */
 async function dropRoute(server: MailServer): Promise<void> {
     const { endpoint, credentials } = await engine(server);
-    const routes = core.listOfAnswer<{ id: string; name?: string }>(
-        await call(endpoint, credentials, core.routeListCall()),
-        "routes"
-    );
+    const routes = core.listOfAnswer<{ id: string; name?: string }>(await call(endpoint, credentials, core.routeListCall()), "routes");
     for (const route of routes.filter((one) => one.name === core.RELAY_ROUTE_NAME)) {
-        core.assertApplied(
-            await call(endpoint, credentials, [core.routeDestroyCall(route.id)]),
-            "destroy",
-            route.id
-        );
+        core.assertApplied(await call(endpoint, credentials, [core.routeDestroyCall(route.id)]), "destroy", route.id);
     }
 }
 
@@ -94,17 +84,9 @@ async function dropRoute(server: MailServer): Promise<void> {
  * strategy pointed at it. A refusal half way leaves mail going out directly,
  * never at a route that does not exist.
  */
-export async function setRelay(
-    actorId: string,
-    server: MailServer,
-    input: core.MailRelayInput
-): Promise<void> {
+export async function setRelay(actorId: string, server: MailServer, input: core.MailRelayInput): Promise<void> {
     const { endpoint, credentials } = await engine(server);
-    core.assertApplied(
-        await call(endpoint, credentials, [core.outboundRouteCall(core.DIRECT_ROUTE_NAME)]),
-        "strategy",
-        "singleton"
-    );
+    core.assertApplied(await call(endpoint, credentials, [core.outboundRouteCall(core.DIRECT_ROUTE_NAME)]), "strategy", "singleton");
     await dropRoute(server);
 
     if (input.provider === null) {
@@ -112,13 +94,7 @@ export async function setRelay(
             where: { id: server.id },
             data: { relay: "", relaySecret: null, relaySecretNonce: null, relaySecretKeyId: null }
         });
-        await recordAudit({
-            actorId,
-            action: "mailserver.relay.clear",
-            targetType: "mail-server",
-            targetId: server.id,
-            orgId: server.orgId ?? undefined
-        });
+        await recordAudit({ actorId, action: "mailserver.relay.clear", targetType: "mail-server", targetId: server.id, orgId: server.orgId ?? undefined });
         return;
     }
 
@@ -134,41 +110,19 @@ export async function setRelay(
 
     core.createdId(
         await call(endpoint, credentials, [
-            core.relayRouteCreateCall({
-                host,
-                port: input.port,
-                implicitTls: input.port === 465,
-                username,
-                secret
-            })
+            core.relayRouteCreateCall({ host, port: input.port, implicitTls: input.port === 465, username, secret })
         ]),
         "route",
         "relay"
     );
-    core.assertApplied(
-        await call(endpoint, credentials, [core.outboundRouteCall(core.RELAY_ROUTE_NAME)]),
-        "strategy",
-        "singleton"
-    );
+    core.assertApplied(await call(endpoint, credentials, [core.outboundRouteCall(core.RELAY_ROUTE_NAME)]), "strategy", "singleton");
 
     const sealed = typed ? seal(typed) : null;
     await prisma.mailServer.update({
         where: { id: server.id },
         data: {
-            relay: JSON.stringify({
-                provider,
-                host,
-                region: input.region,
-                port: input.port,
-                username
-            }),
-            ...(sealed
-                ? {
-                      relaySecret: sealed.ciphertext,
-                      relaySecretNonce: sealed.nonce,
-                      relaySecretKeyId: sealed.keyId
-                  }
-                : {})
+            relay: JSON.stringify({ provider, host, region: input.region, port: input.port, username }),
+            ...(sealed ? { relaySecret: sealed.ciphertext, relaySecretNonce: sealed.nonce, relaySecretKeyId: sealed.keyId } : {})
         }
     });
     await recordAudit({

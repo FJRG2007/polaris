@@ -79,8 +79,8 @@ export function NoAudioNotice({
         >
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span>
-                Your microphone has not picked anything up for a while. Check that it is not muted
-                on the machine itself, and that the right one is chosen under Account &gt; Devices.
+                Your microphone has not picked anything up for a while. Check that it is not muted on
+                the machine itself, and that the right one is chosen under Account &gt; Devices.
             </span>
         </p>
     );

@@ -9,10 +9,7 @@ export const dynamic = "force-dynamic";
 /** Says when a server has a new load sample to draw. `local` is the machine
  *  Polaris runs on, filed under its reserved subject. Authorized like the history
  *  it wakes. */
-export async function GET(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-): Promise<Response> {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
     const user = await apiPermission("deploy.read");
     if (user instanceof Response) return user;
     const { id } = await params;

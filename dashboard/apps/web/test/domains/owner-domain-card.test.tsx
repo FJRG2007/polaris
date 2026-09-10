@@ -51,12 +51,7 @@ describe("a domain of one's own", () => {
     it("says what its wildcard certificate covers once it is issued", () => {
         const markup = render([
             domain({
-                certificate: {
-                    status: "issued",
-                    expiresAt: "2026-12-01T00:00:00.000Z",
-                    nextAttemptAt: null,
-                    detail: null
-                }
+                certificate: { status: "issued", expiresAt: "2026-12-01T00:00:00.000Z", nextAttemptAt: null, detail: null }
             })
         ]);
         expect(markup).toContain("Wildcard certificate");

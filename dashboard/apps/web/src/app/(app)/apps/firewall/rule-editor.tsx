@@ -94,9 +94,7 @@ export function emptyRule(count: number): WafCustomRule {
 function anyEmpty(conditions: readonly WafCondition[]): boolean {
     return conditions.some((condition) => {
         if (core.isWafSignalCondition(condition)) return false;
-        return core.isWafConditionGroup(condition)
-            ? anyEmpty(condition.conditions)
-            : condition.values.length === 0;
+        return core.isWafConditionGroup(condition) ? anyEmpty(condition.conditions) : condition.values.length === 0;
     });
 }
 
@@ -106,14 +104,9 @@ function blockingReason(rule: WafCustomRule): string | null {
     if (rule.name.trim() === "") return "Give the rule a name.";
     if (rule.conditions.length === 0) return "Add at least one condition.";
     if (anyEmpty(rule.conditions)) return "Every condition needs at least one value.";
-    const tests = rule.conditions.reduce(
-        (total, condition) => total + core.wafConditionTests(condition),
-        0
-    );
-    if (tests > core.WAF_RULE_TESTS_MAX)
-        return `A rule can hold at most ${core.WAF_RULE_TESTS_MAX} conditions.`;
-    if (rule.action === "skip" && (rule.skip ?? []).length === 0)
-        return "Choose at least one thing to skip.";
+    const tests = rule.conditions.reduce((total, condition) => total + core.wafConditionTests(condition), 0);
+    if (tests > core.WAF_RULE_TESTS_MAX) return `A rule can hold at most ${core.WAF_RULE_TESTS_MAX} conditions.`;
+    if (rule.action === "skip" && (rule.skip ?? []).length === 0) return "Choose at least one thing to skip.";
     return null;
 }
 
@@ -144,10 +137,7 @@ export function RuleEditor({
 
     return (
         <div className="flex flex-col gap-4">
-            <PageHeader
-                title={creating ? "Create custom rule" : "Edit custom rule"}
-                onBack={onCancel}
-            />
+            <PageHeader title={creating ? "Create custom rule" : "Edit custom rule"} onBack={onCancel} />
 
             <Section
                 title="Rule name"
@@ -183,9 +173,7 @@ export function RuleEditor({
                         aria-label="Action"
                         className="max-w-xs"
                         options={ACTION_OPTIONS}
-                        onValueChange={(value) =>
-                            setRule({ ...rule, action: value as WafCustomRule["action"] })
-                        }
+                        onValueChange={(value) => setRule({ ...rule, action: value as WafCustomRule["action"] })}
                     />
                     <p className="text-xs text-muted-foreground">{ACTION_EFFECT[rule.action]}</p>
                 </div>
@@ -195,14 +183,9 @@ export function RuleEditor({
                     picked rather than to nothing. */}
                 {rule.action === "skip" ? (
                     <fieldset className="flex flex-col gap-2 border-t border-border pt-3">
-                        <legend className="text-xs font-medium text-muted-foreground">
-                            What to skip
-                        </legend>
+                        <legend className="text-xs font-medium text-muted-foreground">What to skip</legend>
                         {(Object.keys(SKIP_LABELS) as WafSkipComponent[]).map((component) => (
-                            <label
-                                key={component}
-                                className="flex w-fit cursor-pointer items-start gap-2 text-sm"
-                            >
+                            <label key={component} className="flex w-fit cursor-pointer items-start gap-2 text-sm">
                                 <Checkbox
                                     className="mt-0.5"
                                     checked={skip.includes(component)}
@@ -234,9 +217,7 @@ export function RuleEditor({
             >
                 <div className="flex flex-wrap gap-4">
                     <div className="flex min-w-0 flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                            Select order
-                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">Select order</span>
                         <Select
                             value={position.kind === "after" ? "custom" : position.kind}
                             aria-label="Order"
@@ -257,9 +238,7 @@ export function RuleEditor({
                                 Select which rule this will fire after
                             </span>
                             {others.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    There is no other rule yet.
-                                </p>
+                                <p className="text-sm text-muted-foreground">There is no other rule yet.</p>
                             ) : (
                                 <Select
                                     value={String(position.index)}
@@ -269,9 +248,7 @@ export function RuleEditor({
                                         value: String(entry.index),
                                         label: entry.name
                                     }))}
-                                    onValueChange={(value) =>
-                                        setPosition({ kind: "after", index: Number(value) })
-                                    }
+                                    onValueChange={(value) => setPosition({ kind: "after", index: Number(value) })}
                                 />
                             )}
                         </div>

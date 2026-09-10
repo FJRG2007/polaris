@@ -157,10 +157,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                         <div className="flex items-center gap-3">
                                             <OrgAvatar org={org} size={36} />
                                             <div className="min-w-0">
-                                                <p
-                                                    className="truncate font-medium"
-                                                    title={org.name}
-                                                >
+                                                <p className="truncate font-medium" title={org.name}>
                                                     {org.name}
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
@@ -170,9 +167,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                         </div>
                                     </td>
                                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
-                                        <span className="truncate" title={org.ownerName}>
-                                            {org.ownerName}
-                                        </span>
+                                        <span className="truncate" title={org.ownerName}>{org.ownerName}</span>
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                         {org.memberCount}
@@ -328,10 +323,7 @@ function OrganizationPolicyForm({
                     </p>
 
                     {error && (
-                        <p
-                            role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                        >
+                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                             {error}
                         </p>
                     )}

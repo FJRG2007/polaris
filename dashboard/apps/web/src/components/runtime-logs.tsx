@@ -70,16 +70,13 @@ export function useRuntimeLogStream(serviceIds: readonly string[], enabled = tru
             return;
         }
         setStatus("connecting");
-        const source = new EventSource(
-            `/api/deploy/logs/stream?services=${encodeURIComponent(key)}&tail=${LIVE_TAIL}`
-        );
+        const source = new EventSource(`/api/deploy/logs/stream?services=${encodeURIComponent(key)}&tail=${LIVE_TAIL}`);
         let retry: ReturnType<typeof setTimeout> | null = null;
 
         source.addEventListener("open", () => setStatus("live"));
         source.addEventListener("following", (event) => {
             const data = readEvent<{ serviceId: string; containers: string[] }>(event);
-            if (data)
-                setContainers((current) => ({ ...current, [data.serviceId]: data.containers }));
+            if (data) setContainers((current) => ({ ...current, [data.serviceId]: data.containers }));
         });
         source.addEventListener("lines", (event) => {
             const batch = readEvent<StreamLine[]>(event);
@@ -88,14 +85,8 @@ export function useRuntimeLogStream(serviceIds: readonly string[], enabled = tru
             setLines((current) => mergeStreamLines(current, batch, seen.current));
         });
         source.addEventListener("ended", (event) => {
-            const data = readEvent<{ serviceId: string; container: string; reason: string | null }>(
-                event
-            );
-            if (data?.reason)
-                setStopped((current) => ({
-                    ...current,
-                    [`${data.serviceId}/${data.container}`]: data.reason as string
-                }));
+            const data = readEvent<{ serviceId: string; container: string; reason: string | null }>(event);
+            if (data?.reason) setStopped((current) => ({ ...current, [`${data.serviceId}/${data.container}`]: data.reason as string }));
         });
         source.addEventListener("done", () => {
             source.close();
@@ -114,10 +105,7 @@ export function useRuntimeLogStream(serviceIds: readonly string[], enabled = tru
         };
     }, [key, enabled, paused, attempt]);
 
-    const containerCount = Object.values(containers).reduce(
-        (total, list) => total + list.length,
-        0
-    );
+    const containerCount = Object.values(containers).reduce((total, list) => total + list.length, 0);
     return { lines, status, paused, setPaused, containerCount, stopped };
 }
 
@@ -163,13 +151,7 @@ export function RuntimeLogs({
         />
     );
     return mode === "live" ? (
-        <LiveLog
-            serviceIds={serviceIds}
-            name={name}
-            className={className}
-            lead={toggle}
-            note={followNote}
-        />
+        <LiveLog serviceIds={serviceIds} name={name} className={className} lead={toggle} note={followNote} />
     ) : (
         <HistoryLog serviceIds={historyIds} name={name} className={className} lead={toggle} />
     );
@@ -189,10 +171,7 @@ function LiveLog({
     note?: string;
 }) {
     const stream = useRuntimeLogStream(serviceIds);
-    const labelled = useMemo(
-        () => new Set(stream.lines.map((line) => `${line.serviceId}/${line.container}`)).size > 1,
-        [stream.lines]
-    );
+    const labelled = useMemo(() => new Set(stream.lines.map((line) => `${line.serviceId}/${line.container}`)).size > 1, [stream.lines]);
     const log = useMemo(() => formatStreamLog(stream.lines, labelled), [stream.lines, labelled]);
     const reasons = [...new Set(Object.values(stream.stopped))];
 
@@ -218,20 +197,14 @@ function LiveLog({
                             onClick={() => stream.setPaused(!stream.paused)}
                             className="shrink-0"
                         >
-                            {stream.paused ? (
-                                <Play className="size-4" />
-                            ) : (
-                                <Pause className="size-4" />
-                            )}
+                            {stream.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
                             {stream.paused ? "Resume" : "Pause"}
                         </Button>
                     </>
                 }
             />
             {(note || reasons.length > 0) && (
-                <p className="text-xs text-muted-foreground">
-                    {[note, ...reasons].filter(Boolean).join(" ")}
-                </p>
+                <p className="text-xs text-muted-foreground">{[note, ...reasons].filter(Boolean).join(" ")}</p>
             )}
         </div>
     );
@@ -262,11 +235,7 @@ function LiveBadge({ status, containers }: { status: LiveStatus; containers: num
             <span
                 className={cn(
                     "size-1.5 rounded-full",
-                    status === "live"
-                        ? "animate-pulse bg-success-solid"
-                        : status === "failed"
-                          ? "bg-danger"
-                          : "bg-muted-foreground/60"
+                    status === "live" ? "animate-pulse bg-success-solid" : status === "failed" ? "bg-danger" : "bg-muted-foreground/60"
                 )}
             />
             {label}
@@ -289,13 +258,7 @@ function instantOf(value: string, timeZone: string): string | null {
     if (!match) return null;
     const [, year, month, day, hours, minutes] = match.map(Number) as number[];
     const date = zonedInstant(
-        {
-            year: year ?? 0,
-            month: month ?? 1,
-            day: day ?? 1,
-            hours: hours ?? 0,
-            minutes: minutes ?? 0
-        },
+        { year: year ?? 0, month: month ?? 1, day: day ?? 1, hours: hours ?? 0, minutes: minutes ?? 0 },
         timeZone
     );
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
@@ -336,9 +299,7 @@ function HistoryLog({
     }, [typed]);
 
     const fetchPage = useCallback(
-        async (
-            before: string | null
-        ): Promise<{ lines: HistoryLine[]; next: string | null } | null> => {
+        async (before: string | null): Promise<{ lines: HistoryLine[]; next: string | null } | null> => {
             const params = new URLSearchParams({ services: key, limit: String(HISTORY_PAGE) });
             if (query) params.set("q", query);
             const fromIso = instantOf(from, timeZone);
@@ -346,14 +307,10 @@ function HistoryLog({
             if (fromIso) params.set("from", fromIso);
             if (toIso) params.set("to", toIso);
             if (before) params.set("before", before);
-            const res = await fetch(`/api/deploy/logs/search?${params.toString()}`, {
-                cache: "no-store"
-            });
-            const data = (await res.json().catch(() => null)) as {
-                lines?: HistoryLine[];
-                next?: string | null;
-                error?: string;
-            } | null;
+            const res = await fetch(`/api/deploy/logs/search?${params.toString()}`, { cache: "no-store" });
+            const data = (await res.json().catch(() => null)) as
+                | { lines?: HistoryLine[]; next?: string | null; error?: string }
+                | null;
             if (!res.ok || !data?.lines) {
                 setError(data?.error ?? "Could not read the kept logs.");
                 return null;
@@ -395,9 +352,7 @@ function HistoryLog({
             void fetchPage(next)
                 .then((page) => {
                     if (!page || epoch.current !== mine) return;
-                    setLines((current) =>
-                        replace ? page.lines : [...(current ?? []), ...page.lines]
-                    );
+                    setLines((current) => (replace ? page.lines : [...(current ?? []), ...page.lines]));
                     setNext(page.next);
                 })
                 .finally(() => {
@@ -410,10 +365,7 @@ function HistoryLog({
     );
 
     const shown = useMemo(() => (lines ? lines.slice().reverse() : []), [lines]);
-    const labelled = useMemo(
-        () => new Set(shown.map((line) => `${line.serviceId}/${line.container}`)).size > 1,
-        [shown]
-    );
+    const labelled = useMemo(() => new Set(shown.map((line) => `${line.serviceId}/${line.container}`)).size > 1, [shown]);
     const log = useMemo(() => formatStreamLog(shown, labelled), [shown, labelled]);
     const full = (lines?.length ?? 0) >= HISTORY_CAP;
     const filtered = Boolean(query || from || to);
@@ -426,21 +378,13 @@ function HistoryLog({
         ) : next && full ? (
             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
                 Showing the latest {HISTORY_CAP} lines.{" "}
-                <button
-                    type="button"
-                    onClick={() => loadOlder(true)}
-                    className="text-zinc-300 underline-offset-2 hover:underline"
-                >
+                <button type="button" onClick={() => loadOlder(true)} className="text-zinc-300 underline-offset-2 hover:underline">
                     Read further back
                 </button>
             </p>
         ) : next ? (
             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
-                <button
-                    type="button"
-                    onClick={() => loadOlder()}
-                    className="text-zinc-300 underline-offset-2 hover:underline"
-                >
+                <button type="button" onClick={() => loadOlder()} className="text-zinc-300 underline-offset-2 hover:underline">
                     Load older lines
                 </button>
             </p>

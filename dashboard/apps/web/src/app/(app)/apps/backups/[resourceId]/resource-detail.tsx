@@ -19,16 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PointRow, ResourceDetail } from "../types";
 import { useDisplayFormat } from "@/components/display-format";
 import { backUpNowAction, deletePointAction, restoreAction } from "../actions";
-import {
-    ArrowLeft,
-    Download,
-    HardDriveDownload,
-    Loader2,
-    Lock,
-    LockOpen,
-    RotateCcw,
-    Trash2
-} from "lucide-react";
+import { ArrowLeft, Download, HardDriveDownload, Loader2, Lock, LockOpen, RotateCcw, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -108,9 +99,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-3 py-10">
-                    <p className="text-sm text-muted-foreground">
-                        That protected item does not exist any more.
-                    </p>
+                    <p className="text-sm text-muted-foreground">That protected item does not exist any more.</p>
                     <Button asChild variant="ghost" size="sm">
                         <Link href="/apps/backups">
                             <ArrowLeft className="size-4" />
@@ -130,18 +119,11 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                 <div className="min-w-0">
                     {resource ? (
                         <>
-                            <h1
-                                className="truncate text-[1.0625rem] font-semibold tracking-tight"
-                                title={resource.name}
-                            >
-                                {resource.name}
-                            </h1>
+                            <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={resource.name}>{resource.name}</h1>
                             <p className="text-xs text-muted-foreground">
                                 {resource.kindLabel}
                                 {resource.planName ? ` - ${resource.planName}` : " - on demand"}
-                                {resource.nextDueAt
-                                    ? ` - next ${format.dateTime(resource.nextDueAt)}`
-                                    : ""}
+                                {resource.nextDueAt ? ` - next ${format.dateTime(resource.nextDueAt)}` : ""}
                             </p>
                         </>
                     ) : (
@@ -155,11 +137,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                             Back
                         </Link>
                     </Button>
-                    <Button
-                        size="sm"
-                        onClick={() => void onBackUpNow()}
-                        disabled={busy || !resource}
-                    >
+                    <Button size="sm" onClick={() => void onBackUpNow()} disabled={busy || !resource}>
                         {busy ? (
                             <Loader2 className="size-4 animate-spin" />
                         ) : (
@@ -173,8 +151,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {resource?.lastStatus === "partial" ? (
                 <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
-                    The last copy landed in some destinations but not all. What did land is still
-                    restorable.
+                    The last copy landed in some destinations but not all. What did land is still restorable.
                 </p>
             ) : null}
 
@@ -193,10 +170,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                         <tbody>
                             {detail === null ? (
                                 Array.from({ length: 4 }, (_, index) => (
-                                    <tr
-                                        key={index}
-                                        className="border-b border-border last:border-0"
-                                    >
+                                    <tr key={index} className="border-b border-border last:border-0">
                                         <td colSpan={5} className="px-3 py-2.5">
                                             <Skeleton className="h-5 w-full" />
                                         </td>
@@ -204,19 +178,13 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                 ))
                             ) : detail.points.length === 0 ? (
                                 <tr>
-                                    <td
-                                        colSpan={5}
-                                        className="px-3 py-10 text-center text-sm text-muted-foreground"
-                                    >
+                                    <td colSpan={5} className="px-3 py-10 text-center text-sm text-muted-foreground">
                                         No copies yet. Back it up now, or give it a plan.
                                     </td>
                                 </tr>
                             ) : (
                                 detail.points.map((point) => (
-                                    <tr
-                                        key={point.id}
-                                        className="border-b border-border last:border-0 align-top"
-                                    >
+                                    <tr key={point.id} className="border-b border-border last:border-0 align-top">
                                         <td className="px-3 py-2.5">
                                             {format.dateTime(point.takenAt)}
                                             {point.status === "partial" ? (
@@ -234,10 +202,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                         <td className="px-3 py-2.5">
                                             <ul className="flex flex-col gap-1">
                                                 {point.copies.map((copy) => (
-                                                    <li
-                                                        key={copy.id}
-                                                        className="flex items-center gap-2 text-xs"
-                                                    >
+                                                    <li key={copy.id} className="flex items-center gap-2 text-xs">
                                                         <span
                                                             className={
                                                                 copy.status === "available"
@@ -253,30 +218,19 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                                     className="size-3.5 text-muted-foreground"
                                                                     aria-label="Encrypted"
                                                                 >
-                                                                    <title>
-                                                                        Encrypted with this
-                                                                        account's backup key
-                                                                    </title>
+                                                                    <title>Encrypted with this account's backup key</title>
                                                                 </Lock>
                                                             ) : (
                                                                 <LockOpen
                                                                     className="size-3.5 text-muted-foreground"
                                                                     aria-label="Not encrypted"
                                                                 >
-                                                                    <title>
-                                                                        Not encrypted: kept on the
-                                                                        disk it copies, or taken
-                                                                        before backups were
-                                                                        encrypted
-                                                                    </title>
+                                                                    <title>Not encrypted: kept on the disk it copies, or taken before backups were encrypted</title>
                                                                 </LockOpen>
                                                             )
                                                         ) : null}
                                                         {copy.status !== "available" ? (
-                                                            <span
-                                                                className="text-danger"
-                                                                title={copy.error ?? ""}
-                                                            >
+                                                            <span className="text-danger" title={copy.error ?? ""}>
                                                                 {copy.status}
                                                             </span>
                                                         ) : null}
@@ -290,8 +244,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                                 <Download className="size-3.5" />
                                                             </a>
                                                         ) : null}
-                                                        {copy.downloadable &&
-                                                        resource?.canRestore ? (
+                                                        {copy.downloadable && resource?.canRestore ? (
                                                             <button
                                                                 type="button"
                                                                 className="text-primary hover:underline"
@@ -312,9 +265,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                             </ul>
                                         </td>
                                         <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                                            {point.expiresAt
-                                                ? format.dateTime(point.expiresAt)
-                                                : "Kept"}
+                                            {point.expiresAt ? format.dateTime(point.expiresAt) : "Kept"}
                                         </td>
                                         <td className="px-3 py-2.5">
                                             <Button
@@ -349,8 +300,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                         <DialogHeader>
                             <DialogTitle>Put this copy back?</DialogTitle>
                             <DialogDescription>
-                                The copy in {restoring.where} will be written over what is there
-                                now.{" "}
+                                The copy in {restoring.where} will be written over what is there now.{" "}
                                 {resource?.kind === "minecraft-world"
                                     ? "It lands as a new level beside the one being played, so nothing is lost until you switch to it."
                                     : resource?.kind === "managed-database"

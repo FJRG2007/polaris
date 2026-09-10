@@ -63,12 +63,8 @@ export default async function AgentSetupPage() {
                 <Card className="mt-4">
                     <CardBody className="space-y-2 py-6">
                         <p className="text-sm">
-                            Everything is in place. Open an issue in one of your repositories and
-                            mention{" "}
-                            <code className="rounded bg-white/5 px-1">
-                                @{github?.login ?? "the app"}
-                            </code>{" "}
-                            to try it.
+                            Everything is in place. Open an issue in one of your repositories and mention{" "}
+                            <code className="rounded bg-white/5 px-1">@{github?.login ?? "the app"}</code> to try it.
                         </p>
                         <p className="text-sm text-muted-foreground">
                             To have it act without being asked, add a rule under Automations.
@@ -99,9 +95,7 @@ function Step({
                 <span
                     aria-hidden
                     className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border ${
-                        done
-                            ? "border-success-edge bg-success-soft text-success-ink"
-                            : "border-white/15"
+                        done ? "border-success-edge bg-success-soft text-success-ink" : "border-white/15"
                     }`}
                 >
                     {done ? <Check className="size-3.5 shrink-0" /> : null}

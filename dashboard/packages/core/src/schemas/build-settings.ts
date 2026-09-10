@@ -25,10 +25,7 @@ export const variableNameSchema = z
     .string()
     .trim()
     .max(128)
-    .regex(
-        /^[A-Za-z_][A-Za-z0-9_]*$/,
-        "Letters, digits and underscores, not starting with a digit"
-    );
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "Letters, digits and underscores, not starting with a digit");
 
 /**
  * A fix from a failed deploy's "Likely cause": the setting to change and the value
@@ -38,10 +35,7 @@ export const deployFixInputSchema = z.union([
     z.object({ kind: z.literal("set-port"), port: z.number().int().min(1).max(65535) }),
     z.object({
         kind: z.literal("set-start-command"),
-        value: serviceCommandSchema.refine(
-            (value) => value.length > 0,
-            "Name the command that starts it"
-        )
+        value: serviceCommandSchema.refine((value) => value.length > 0, "Name the command that starts it")
     }),
     // Empty clears it, which is the fix when the command names a script that does not exist.
     z.object({ kind: z.literal("set-build-command"), value: serviceCommandSchema }),
@@ -61,11 +55,7 @@ export const deployFixInputSchema = z.union([
         })
         .superRefine((fix, ctx) => {
             if (!fix.generate && fix.value !== null && hasControlCharacter(fix.value)) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: envValueMessage(fix.name),
-                    path: ["value"]
-                });
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: envValueMessage(fix.name), path: ["value"] });
             }
         }),
     z.object({ kind: z.literal("use-detected-build") })

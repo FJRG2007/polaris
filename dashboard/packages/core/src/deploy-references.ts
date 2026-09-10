@@ -107,9 +107,7 @@ function substitute(key: string, value: string, lookup: ReferenceLookup): string
     }
     out += value.slice(from);
     if (out.length > ENV_VALUE_MAX) {
-        throw new Error(
-            `${key} is longer than ${ENV_VALUE_MAX / 1024} KB once its references are filled in.`
-        );
+        throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB once its references are filled in.`);
     }
     return out;
 }
@@ -162,11 +160,7 @@ export function databaseReferenceKeys(connection: {
     } else if (connection.engine === "mongo") {
         keys.MONGO_URL = connection.uri;
     } else if (connection.engine === "redis") {
-        Object.assign(keys, {
-            REDIS_URL: connection.uri,
-            REDISHOST: connection.host,
-            REDISPORT: port
-        });
+        Object.assign(keys, { REDIS_URL: connection.uri, REDISHOST: connection.host, REDISPORT: port });
     } else if (connection.engine === "seaweedfs") {
         // An object store's account is an S3 key pair; it answers with the names
         // S3 clients read, the AWS SDKs' own among them.

@@ -145,11 +145,7 @@ export function RestartPlanner({
                         </Button>
                     ) : (
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() => void book("empty")}
-                            >
+                            <Button variant="secondary" disabled={busy} onClick={() => void book("empty")}>
                                 <Users className="size-4" /> When nobody is playing
                             </Button>
                             <Button
@@ -160,11 +156,7 @@ export function RestartPlanner({
                                 <CalendarClock className="size-4" /> At a time
                             </Button>
                             <Button disabled={busy} onClick={() => void now()}>
-                                {busy ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    <RotateCcw className="size-4" />
-                                )}
+                                {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
                                 Restart now
                             </Button>
                         </div>

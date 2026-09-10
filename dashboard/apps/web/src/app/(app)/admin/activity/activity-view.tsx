@@ -31,9 +31,7 @@ export function ActivityView() {
                     emptyLabel="No activity recorded yet."
                     context={(entry) => entry.actorName}
                     detail={(entry) =>
-                        entry.targetType
-                            ? [entry.targetType, entry.targetId].filter(Boolean).join(" ")
-                            : ""
+                        entry.targetType ? [entry.targetType, entry.targetId].filter(Boolean).join(" ") : ""
                     }
                 />
             </div>

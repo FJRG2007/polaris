@@ -55,9 +55,7 @@ export function SprintsView({
             <header className="flex flex-wrap items-center gap-3">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">Sprints</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Time-boxed runs of work, with what is left each day.
-                    </p>
+                    <p className="text-sm text-muted-foreground">Time-boxed runs of work, with what is left each day.</p>
                 </div>
                 <span className="flex-1" />
                 {canEdit && spaces.length > 0 && !creating && (
@@ -68,10 +66,7 @@ export function SprintsView({
             </header>
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -84,10 +79,7 @@ export function SprintsView({
                             <Select
                                 value={spaceId}
                                 onValueChange={setSpaceId}
-                                options={spaces.map((space) => ({
-                                    value: space.id,
-                                    label: space.name
-                                }))}
+                                options={spaces.map((space) => ({ value: space.id, label: space.name }))}
                                 aria-label="Space"
                                 className="h-8 w-40 text-xs"
                             />
@@ -151,21 +143,17 @@ export function SprintsView({
             )}
 
             {sprints.length === 0 && !creating && (
-                <EmptyState
-                    title="No sprints yet."
-                    description="A sprint groups work into a window without moving it out of its list."
-                />
+                <EmptyState title="No sprints yet." description="A sprint groups work into a window without moving it out of its list." />
             )}
 
             <ul className="flex flex-col gap-3">
                 {sprints.map((sprint) => {
                     const points = burndowns[sprint.id] ?? [];
-                    const percent =
-                        sprint.points > 0
-                            ? Math.round((sprint.donePoints / sprint.points) * 100)
-                            : sprint.taskCount > 0
-                              ? Math.round((sprint.doneCount / sprint.taskCount) * 100)
-                              : 0;
+                    const percent = sprint.points > 0
+                        ? Math.round((sprint.donePoints / sprint.points) * 100)
+                        : sprint.taskCount > 0
+                          ? Math.round((sprint.doneCount / sprint.taskCount) * 100)
+                          : 0;
                     return (
                         <li key={sprint.id}>
                             <Card>
@@ -180,12 +168,9 @@ export function SprintsView({
                                                 </span>
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {format.date(sprint.startDate)} to{" "}
-                                                {format.date(sprint.endDate)} - {sprint.doneCount}{" "}
-                                                of {sprint.taskCount} done
-                                                {sprint.points > 0
-                                                    ? `, ${sprint.donePoints}/${sprint.points} points`
-                                                    : ""}
+                                                {format.date(sprint.startDate)} to {format.date(sprint.endDate)} -{" "}
+                                                {sprint.doneCount} of {sprint.taskCount} done
+                                                {sprint.points > 0 ? `, ${sprint.donePoints}/${sprint.points} points` : ""}
                                             </p>
                                         </div>
                                         <Select
@@ -219,10 +204,7 @@ export function SprintsView({
                                                 onClick={() =>
                                                     setAccess({
                                                         scope: sprint.folderId
-                                                            ? {
-                                                                  kind: "folder",
-                                                                  id: sprint.folderId
-                                                              }
+                                                            ? { kind: "folder", id: sprint.folderId }
                                                             : { kind: "space", id: sprint.spaceId },
                                                         asked: { kind: "sprint", name: sprint.name }
                                                     })
@@ -232,27 +214,21 @@ export function SprintsView({
                                                 <Users className="size-3.5" />
                                             </button>
                                         )}
-                                        {canEdit && (
-                                            <button
-                                                type="button"
-                                                aria-label={`Delete ${sprint.name}`}
-                                                title="Delete sprint"
-                                                onClick={async () => {
-                                                    const result = await runAction(
-                                                        () =>
-                                                            actions.deleteSprintAction(
-                                                                sprint.spaceId,
-                                                                sprint.id
-                                                            ),
-                                                        setError
-                                                    );
-                                                    if (result?.error) setError(result.error);
-                                                }}
-                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                            >
-                                                <Trash2 className="size-3.5" />
-                                            </button>
-                                        )}
+                                        {canEdit && <button
+                                            type="button"
+                                            aria-label={`Delete ${sprint.name}`}
+                                            title="Delete sprint"
+                                            onClick={async () => {
+                                                const result = await runAction(
+                                                    () => actions.deleteSprintAction(sprint.spaceId, sprint.id),
+                                                    setError
+                                                );
+                                                if (result?.error) setError(result.error);
+                                            }}
+                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                        </button>}
                                     </div>
 
                                     <ProgressBar percent={percent} />
@@ -283,27 +259,9 @@ function Burndown({ points }: { points: readonly core.BurndownPoint[] }) {
         .join(" ");
 
     return (
-        <svg
-            viewBox={`0 0 ${width} ${height}`}
-            preserveAspectRatio="none"
-            className="h-16 w-full"
-            role="img"
-            aria-label="Burndown"
-        >
-            <polyline
-                points={ideal}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="0.5"
-                className="text-muted-foreground/40"
-            />
-            <polyline
-                points={actual}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1"
-                className="text-primary"
-            />
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label="Burndown">
+            <polyline points={ideal} fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground/40" />
+            <polyline points={actual} fill="none" stroke="currentColor" strokeWidth="1" className="text-primary" />
         </svg>
     );
 }
@@ -337,8 +295,7 @@ export function GoalsView({
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">Goals</h1>
                     <p className="text-sm text-muted-foreground">
-                        Objectives measured by targets. A target that watches a list keeps itself
-                        current.
+                        Objectives measured by targets. A target that watches a list keeps itself current.
                     </p>
                 </div>
                 <span className="flex-1" />
@@ -350,10 +307,7 @@ export function GoalsView({
             </header>
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -384,11 +338,7 @@ export function GoalsView({
                             onClick={async () => {
                                 setError("");
                                 const result = await runAction(
-                                    () =>
-                                        actions.createGoalAction({
-                                            name: name.trim(),
-                                            spaceId: spaceId || null
-                                        }),
+                                    () => actions.createGoalAction({ name: name.trim(), spaceId: spaceId || null }),
                                     setError
                                 );
                                 if (result?.error) setError(result.error);
@@ -408,10 +358,7 @@ export function GoalsView({
             )}
 
             {goals.length === 0 && !creating && (
-                <EmptyState
-                    title="No goals yet."
-                    description="A goal is the outcome; the tasks are how you get there."
-                />
+                <EmptyState title="No goals yet." description="A goal is the outcome; the tasks are how you get there." />
             )}
 
             <ul className="grid gap-3 md:grid-cols-2">
@@ -420,57 +367,37 @@ export function GoalsView({
                         <Card>
                             <CardBody className="flex flex-col gap-3 p-4">
                                 <div className="flex items-start gap-3">
-                                    <Target
-                                        className="mt-0.5 size-4"
-                                        style={{ color: goal.color }}
-                                    />
+                                    <Target className="mt-0.5 size-4" style={{ color: goal.color }} />
                                     <div className="min-w-0 flex-1">
-                                        <p
-                                            className={cn(
-                                                "truncate font-medium",
-                                                goal.completedAt && "text-muted-foreground"
-                                            )}
-                                        >
+                                        <p className={cn("truncate font-medium", goal.completedAt && "text-muted-foreground")}>
                                             {goal.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             {goal.ownerName}
-                                            {goal.dueDate
-                                                ? ` - due ${format.date(goal.dueDate)}`
-                                                : ""}
+                                            {goal.dueDate ? ` - due ${format.date(goal.dueDate)}` : ""}
                                         </p>
                                     </div>
                                     <span className="text-sm font-semibold">{goal.percent}%</span>
-                                    {canEdit && (
-                                        <button
-                                            type="button"
-                                            aria-label={`Delete ${goal.name}`}
-                                            title="Delete goal"
-                                            onClick={async () => {
-                                                const result = await runAction(
-                                                    () => actions.deleteGoalAction(goal.id),
-                                                    setError
-                                                );
-                                                if (result?.error) setError(result.error);
-                                            }}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </button>
-                                    )}
+                                    {canEdit && <button
+                                        type="button"
+                                        aria-label={`Delete ${goal.name}`}
+                                        title="Delete goal"
+                                        onClick={async () => {
+                                            const result = await runAction(() => actions.deleteGoalAction(goal.id), setError);
+                                            if (result?.error) setError(result.error);
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </button>}
                                 </div>
 
                                 <ProgressBar percent={goal.percent} />
 
                                 <ul className="flex flex-col gap-2">
                                     {goal.targets.map((target) => (
-                                        <li
-                                            key={target.id}
-                                            className="flex items-center gap-2 text-xs"
-                                        >
-                                            <span className="min-w-0 flex-1 truncate">
-                                                {target.name}
-                                            </span>
+                                        <li key={target.id} className="flex items-center gap-2 text-xs">
+                                            <span className="min-w-0 flex-1 truncate">{target.name}</span>
                                             {target.type === "tasks" ? (
                                                 <span className="text-muted-foreground">
                                                     {target.currentValue}/{target.targetValue} tasks
@@ -485,11 +412,7 @@ export function GoalsView({
                                                         const value = Number(event.target.value);
                                                         if (value === target.currentValue) return;
                                                         const result = await runAction(
-                                                            () =>
-                                                                actions.setGoalTargetValueAction(
-                                                                    target.id,
-                                                                    value
-                                                                ),
+                                                            () => actions.setGoalTargetValueAction(target.id, value),
                                                             setError
                                                         );
                                                         if (result?.error) setError(result.error);
@@ -497,29 +420,22 @@ export function GoalsView({
                                                     className="h-7 w-20 rounded-md border border-border bg-field px-2 text-xs"
                                                 />
                                             )}
-                                            <span className="w-10 text-right text-muted-foreground">
-                                                {target.percent}%
-                                            </span>
-                                            {canEdit && (
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Remove ${target.name}`}
-                                                    title="Remove target"
-                                                    onClick={async () => {
-                                                        const result = await runAction(
-                                                            () =>
-                                                                actions.deleteGoalTargetAction(
-                                                                    target.id
-                                                                ),
-                                                            setError
-                                                        );
-                                                        if (result?.error) setError(result.error);
-                                                    }}
-                                                    className="rounded p-0.5 text-muted-foreground transition-colors hover:text-danger"
-                                                >
-                                                    <Trash2 className="size-3" />
-                                                </button>
-                                            )}
+                                            <span className="w-10 text-right text-muted-foreground">{target.percent}%</span>
+                                            {canEdit && <button
+                                                type="button"
+                                                aria-label={`Remove ${target.name}`}
+                                                title="Remove target"
+                                                onClick={async () => {
+                                                    const result = await runAction(
+                                                        () => actions.deleteGoalTargetAction(target.id),
+                                                        setError
+                                                    );
+                                                    if (result?.error) setError(result.error);
+                                                }}
+                                                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-danger"
+                                            >
+                                                <Trash2 className="size-3" />
+                                            </button>}
                                         </li>
                                     ))}
                                     {goal.targets.length === 0 && (
@@ -543,11 +459,7 @@ export function GoalsView({
                                         }}
                                     />
                                 ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => setTargetFor(goal.id)}
-                                    >
+                                    <Button size="sm" variant="ghost" onClick={() => setTargetFor(goal.id)}>
                                         <Plus className="size-3.5" /> Target
                                     </Button>
                                 )}

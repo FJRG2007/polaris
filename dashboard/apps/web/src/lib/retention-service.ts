@@ -161,21 +161,27 @@ export async function retentionTotals(
     const activityCutoff = core.retentionCutoff(policy.activity, now);
     const auditCutoff = core.retentionCutoff(policy.audit, now);
 
-    const [notificationsTotal, notificationsDue, activityTotal, activityDue, auditTotal, auditDue] =
-        await Promise.all([
-            prisma.notification.count(),
-            notificationsCutoff
-                ? prisma.notification.count({ where: { createdAt: { lt: notificationsCutoff } } })
-                : Promise.resolve(0),
-            prisma.activity.count(),
-            activityCutoff
-                ? prisma.activity.count({ where: { createdAt: { lt: activityCutoff } } })
-                : Promise.resolve(0),
-            prisma.auditLog.count(),
-            auditCutoff
-                ? prisma.auditLog.count({ where: { at: { lt: auditCutoff } } })
-                : Promise.resolve(0)
-        ]);
+    const [
+        notificationsTotal,
+        notificationsDue,
+        activityTotal,
+        activityDue,
+        auditTotal,
+        auditDue
+    ] = await Promise.all([
+        prisma.notification.count(),
+        notificationsCutoff
+            ? prisma.notification.count({ where: { createdAt: { lt: notificationsCutoff } } })
+            : Promise.resolve(0),
+        prisma.activity.count(),
+        activityCutoff
+            ? prisma.activity.count({ where: { createdAt: { lt: activityCutoff } } })
+            : Promise.resolve(0),
+        prisma.auditLog.count(),
+        auditCutoff
+            ? prisma.auditLog.count({ where: { at: { lt: auditCutoff } } })
+            : Promise.resolve(0)
+    ]);
 
     return {
         notifications: { total: notificationsTotal, due: notificationsDue },

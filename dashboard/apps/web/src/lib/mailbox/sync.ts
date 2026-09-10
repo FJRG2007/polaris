@@ -857,7 +857,8 @@ async function reconcileFlags(
     }
 
     // Seen on any message here, the keyword is the folder saying it keeps them.
-    const keywords = folder.keywords || [...changed.values()].some((flags) => flags.has(IMPORTANT));
+    const keywords =
+        folder.keywords || [...changed.values()].some((flags) => flags.has(IMPORTANT));
     if (keywords && !folder.keywords) await learnKeywords(folder.id);
 
     for (const row of held) {

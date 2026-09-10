@@ -105,8 +105,7 @@ export function ranked(parts: readonly BreakdownPart[], total: number | null): B
  */
 export function wholeOf(measured: number | null, parts: readonly BreakdownPart[]): number | null {
     const sum = parts.reduce((total, part) => total + Math.max(0, part.value), 0);
-    if (measured === null || !Number.isFinite(measured) || measured <= 0)
-        return sum > 0 ? sum : null;
+    if (measured === null || !Number.isFinite(measured) || measured <= 0) return sum > 0 ? sum : null;
     return measured >= sum ? measured : sum;
 }
 

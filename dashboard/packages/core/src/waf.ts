@@ -10,11 +10,7 @@
 
 import { expandWafPresets } from "./waf-presets.js";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import {
-    wafCustomRuleSchema,
-    type WafCustomRule,
-    type WafPrincipalGrant
-} from "./schemas/deploy.js";
+import { wafCustomRuleSchema, type WafCustomRule, type WafPrincipalGrant } from "./schemas/deploy.js";
 
 /** The per-route rule the guard enforces. Empty denylist, no packs, no custom rules,
  *  no principal lists and no login = a no-op. */
@@ -252,12 +248,8 @@ function decodeUncached(header: string): GuardRule {
                 p?: unknown;
                 r?: unknown;
             };
-            const deny = Array.isArray(obj.d)
-                ? obj.d.filter((v): v is string => typeof v === "string")
-                : [];
-            const presets = Array.isArray(obj.p)
-                ? obj.p.filter((v): v is string => typeof v === "string")
-                : [];
+            const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
+            const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
             // `i` is the single injection flag the two below were split out of. A route
             // materialized before the split still carries it, and keeps both checks
             // until its edge is rewritten - dropping one silently on upgrade would be a
@@ -266,8 +258,7 @@ function decodeUncached(header: string): GuardRule {
             return {
                 deny,
                 requireLogin: obj.l === true,
-                loginUrl:
-                    normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
+                loginUrl: normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
                 loginAllowLists: parsePrincipalLists(obj.n),
                 loginDeny: parseGrants(obj.y),
                 browserIntegrity: obj.b === true,
@@ -319,11 +310,7 @@ function parseGrants(value: unknown): WafPrincipalGrant[] {
         if (!entry || typeof entry !== "object") continue;
         const { r, f, u } = entry as { r?: unknown; f?: unknown; u?: unknown };
         if (typeof r !== "string" || r.length === 0) continue;
-        if (
-            (f !== undefined && typeof f !== "number") ||
-            (u !== undefined && typeof u !== "number")
-        )
-            continue;
+        if ((f !== undefined && typeof f !== "number") || (u !== undefined && typeof u !== "number")) continue;
         grants.push({ ref: r, from: f as number | undefined, until: u as number | undefined });
     }
     return grants;
@@ -400,9 +387,7 @@ export function verifyEdgeOrigin(value: string | undefined | null, secret: strin
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);
     const provided = Buffer.from(value.slice(dot + 1));
-    const expected = Buffer.from(
-        createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url")
-    );
+    const expected = Buffer.from(createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url"));
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
     try {
         const origin = Buffer.from(payload, "base64url").toString("utf8");
@@ -514,10 +499,7 @@ export function signEdgeToken(token: EdgeToken, secret: string): string {
  *
  * A token with no `iat` cannot be compared, so a known change supersedes it.
  */
-export function principalsSuperseded(
-    token: { readonly iat?: number },
-    movedAt: number | null
-): boolean {
+export function principalsSuperseded(token: { readonly iat?: number }, movedAt: number | null): boolean {
     if (movedAt === null) return false;
     return token.iat === undefined || movedAt > token.iat * 1000;
 }
@@ -555,20 +537,12 @@ export function verifyEdgeToken(
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);
     const provided = Buffer.from(value.slice(dot + 1));
-    const expected = Buffer.from(
-        createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url")
-    );
+    const expected = Buffer.from(createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url"));
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
     try {
         const raw: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as {
-                sub?: unknown;
-                aud?: unknown;
-                exp?: unknown;
-                iat?: unknown;
-                prn?: unknown;
-            };
+            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown; iat?: unknown; prn?: unknown };
             if (
                 typeof obj.sub === "string" &&
                 typeof obj.aud === "string" &&
@@ -694,26 +668,17 @@ export function verifyEdgePass(
     if (dot <= 0 || dot === challenge.length - 1) return false;
     const body = challenge.slice(0, dot);
     const provided = Buffer.from(challenge.slice(dot + 1));
-    const expected = Buffer.from(
-        createHmac("sha256", secret).update(`challenge:${body}`).digest("base64url")
-    );
+    const expected = Buffer.from(createHmac("sha256", secret).update(`challenge:${body}`).digest("base64url"));
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return false;
     let payload: Partial<ChallengePayload>;
     try {
-        payload = JSON.parse(
-            Buffer.from(body, "base64url").toString("utf8")
-        ) as Partial<ChallengePayload>;
+        payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Partial<ChallengePayload>;
     } catch {
         return false;
     }
     if (typeof payload.h !== "string" || payload.h !== host.toLowerCase()) return false;
     if (typeof payload.a !== "string" || payload.a !== (ip ?? "")) return false;
-    if (
-        typeof payload.i !== "number" ||
-        payload.i > now ||
-        now - payload.i >= EDGE_PASS_TTL_SECONDS
-    )
-        return false;
+    if (typeof payload.i !== "number" || payload.i > now || now - payload.i >= EDGE_PASS_TTL_SECONDS) return false;
     if (typeof payload.b !== "number" || payload.b < 1 || payload.b > 32) return false;
     return edgeChallengeAnswered(challenge, counter, payload.b);
 }

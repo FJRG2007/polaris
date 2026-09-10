@@ -27,12 +27,8 @@ export const GET = deployRoute("list the domains", false, async ({ caller, url, 
     );
 });
 
-export const POST = deployRoute(
-    "add the domain",
-    true,
-    async ({ caller, request, url, params }) => {
-        const input = addDomainSchema.parse(await readBody(request));
-        const added = await addDomain(caller, params.id ?? "", input);
-        return respond(url, added, () => `${added.hostname}\n`, 201);
-    }
-);
+export const POST = deployRoute("add the domain", true, async ({ caller, request, url, params }) => {
+    const input = addDomainSchema.parse(await readBody(request));
+    const added = await addDomain(caller, params.id ?? "", input);
+    return respond(url, added, () => `${added.hostname}\n`, 201);
+});

@@ -115,9 +115,7 @@ export function ProjectsGrid({
         [projects, removing]
     );
     const fuse = useMemo(() => new Fuse(visible, { keys: ["name"], threshold: 0.4 }), [visible]);
-    const filtered = search.trim()
-        ? fuse.search(search.trim()).map((result) => result.item)
-        : visible;
+    const filtered = search.trim() ? fuse.search(search.trim()).map((result) => result.item) : visible;
     const count = visible.length;
 
     return (
@@ -145,12 +143,9 @@ export function ProjectsGrid({
 
             {!localReady && canManage && (
                 <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-muted-foreground">
-                    The local host is not ready to build and deploy. This needs the full edition
-                    with a running{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
-                        polaris-hostd
-                    </code>
-                    . Remote servers added in the Servers view work regardless.
+                    The local host is not ready to build and deploy. This needs the full edition with a running{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>. Remote
+                    servers added in the Servers view work regardless.
                 </div>
             )}
 
@@ -191,10 +186,7 @@ export function ProjectsGrid({
                 >
                     <div
                         className="pointer-events-none absolute inset-0"
-                        style={{
-                            background:
-                                "radial-gradient(120% 90% at 50% 40%, transparent 45%, hsl(var(--background)) 100%)"
-                        }}
+                        style={{ background: "radial-gradient(120% 90% at 50% 40%, transparent 45%, hsl(var(--background)) 100%)" }}
                     />
                     <span className="relative grid size-12 place-items-center rounded-xl border border-border bg-card text-primary">
                         <Rocket className="size-5" />
@@ -207,9 +199,7 @@ export function ProjectsGrid({
                     </div>
                 </div>
             ) : filtered.length === 0 ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">
-                    No projects match &ldquo;{search}&rdquo;.
-                </p>
+                <p className="py-16 text-center text-sm text-muted-foreground">No projects match &ldquo;{search}&rdquo;.</p>
             ) : layout === "grid" ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((project) => (
@@ -282,17 +272,13 @@ function ProjectMenu({
                     <ContextMenuItem onSelect={() => router.push(href)}>
                         <ExternalLink className="size-4" /> Open
                     </ContextMenuItem>
-                    <ContextMenuItem
-                        onSelect={() => window.open(href, "_blank", "noopener,noreferrer")}
-                    >
+                    <ContextMenuItem onSelect={() => window.open(href, "_blank", "noopener,noreferrer")}>
                         <SquareArrowOutUpRight className="size-4" /> Open in new tab
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => router.push(`${href}/settings`)}>
                         <Settings className="size-4" /> Settings
                     </ContextMenuItem>
-                    <ContextMenuItem
-                        onSelect={() => void navigator.clipboard?.writeText(project.id)}
-                    >
+                    <ContextMenuItem onSelect={() => void navigator.clipboard?.writeText(project.id)}>
                         <Copy className="size-4" /> Copy project ID
                     </ContextMenuItem>
                     {canManage && (
@@ -325,13 +311,7 @@ function ProjectMenu({
 /** How a project reads on its card. A build in progress is what the project is doing,
  *  so it is what the card says: a count of what is up says nothing at all while the
  *  first service is still being made. */
-function statusTone(project: ProjectCardData): {
-    dot: string;
-    text: string;
-    chip: string;
-    label: string;
-    busy: boolean;
-} {
+function statusTone(project: ProjectCardData): { dot: string; text: string; chip: string; label: string; busy: boolean } {
     const { online, total, deploying } = project;
     const busy = deploying > 0;
     const label = busy
@@ -359,13 +339,7 @@ function statusTone(project: ProjectCardData): {
             busy
         };
     }
-    return {
-        dot: "bg-warning-solid",
-        text: "text-warning-ink",
-        chip: "border-warning-edge bg-warning-soft text-warning-ink",
-        label,
-        busy
-    };
+    return { dot: "bg-warning-solid", text: "text-warning-ink", chip: "border-warning-edge bg-warning-soft text-warning-ink", label, busy };
 }
 
 function ServiceTiles({ services }: { services: ServiceKind[] }) {
@@ -391,8 +365,7 @@ function ServiceTiles({ services }: { services: ServiceKind[] }) {
 }
 
 const DOT_CANVAS: React.CSSProperties = {
-    backgroundImage:
-        "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
+    backgroundImage: "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
     backgroundSize: "16px 16px"
 };
 
@@ -403,22 +376,20 @@ const DOT_CANVAS: React.CSSProperties = {
  * they were given onto the anchor. Without this the card renders perfectly and
  * right-clicking it does nothing at all.
  */
-const ProjectCard = forwardRef<
-    HTMLAnchorElement,
-    { project: ProjectCardData } & ComponentPropsWithoutRef<"a">
->(function ProjectCard({ project, className, ...rest }, ref) {
-    const status = statusTone(project);
-    const partial = status.busy || (project.total > 0 && project.online < project.total);
-    return (
-        <Link
-            ref={ref}
-            href={`/apps/deploy/${project.id}`}
-            className={cn(
-                "group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-muted-foreground/40 hover:bg-card-hover",
-                className
-            )}
-            {...rest}
-        >
+const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & ComponentPropsWithoutRef<"a">>(
+    function ProjectCard({ project, className, ...rest }, ref) {
+        const status = statusTone(project);
+        const partial = status.busy || (project.total > 0 && project.online < project.total);
+        return (
+            <Link
+                ref={ref}
+                href={`/apps/deploy/${project.id}`}
+                className={cn(
+                    "group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-muted-foreground/40 hover:bg-card-hover",
+                    className
+                )}
+                {...rest}
+            >
             <div className="flex items-center justify-between gap-2 px-4 py-3">
                 <h3 className="truncate text-sm font-medium" title={project.name}>
                     {project.name}
@@ -427,69 +398,59 @@ const ProjectCard = forwardRef<
                     {project.total} {project.total === 1 ? "service" : "services"}
                 </span>
             </div>
-            <div
-                className="mx-4 flex min-h-44 flex-1 items-center justify-center rounded-lg border border-border/60"
-                style={DOT_CANVAS}
-            >
+            <div className="mx-4 flex min-h-44 flex-1 items-center justify-center rounded-lg border border-border/60" style={DOT_CANVAS}>
                 {project.total === 0 ? (
                     <span className="text-xs text-muted-foreground">Empty project</span>
                 ) : (
                     <ServiceTiles services={project.services} />
                 )}
             </div>
-            <div className="flex items-center justify-between gap-2 px-4 py-3">
-                <span
-                    className="truncate text-xs text-muted-foreground"
-                    title={project.environmentName}
-                >
-                    {project.environmentName}
-                </span>
-                <span
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${status.chip}`}
-                >
+                <div className="flex items-center justify-between gap-2 px-4 py-3">
+                    <span className="truncate text-xs text-muted-foreground" title={project.environmentName}>
+                        {project.environmentName}
+                    </span>
                     <span
-                        className={`size-1.5 rounded-full ${status.dot} ${partial ? "animate-pulse" : ""}`}
-                    />
-                    {status.label}
-                </span>
-            </div>
-        </Link>
-    );
-});
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${status.chip}`}
+                    >
+                        <span className={`size-1.5 rounded-full ${status.dot} ${partial ? "animate-pulse" : ""}`} />
+                        {status.label}
+                    </span>
+                </div>
+            </Link>
+        );
+    }
+);
 
-const ProjectRow = forwardRef<
-    HTMLAnchorElement,
-    { project: ProjectCardData } & ComponentPropsWithoutRef<"a">
->(function ProjectRow({ project, className, ...rest }, ref) {
-    const status = statusTone(project);
-    return (
-        <Link
-            ref={ref}
-            href={`/apps/deploy/${project.id}`}
-            className={cn(
-                "flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-muted-foreground/40",
-                className
-            )}
-            {...rest}
-        >
-            <span className="flex-1 truncate text-sm font-medium" title={project.name}>
-                {project.name}
-            </span>
-            <div className="flex items-center gap-1.5">
-                {project.services.slice(0, 5).map((kind, index) => (
-                    <ServiceIcon key={index} kind={kind} className="size-4 text-muted-foreground" />
-                ))}
-            </div>
-            <span className="flex items-center gap-2 text-xs">
-                <span
-                    className={`size-1.5 rounded-full ${status.dot} ${status.busy ? "animate-pulse" : ""}`}
-                />
-                <span className="text-muted-foreground">{project.environmentName}</span>
-                <span className={status.text}>{status.label}</span>
-            </span>
-        </Link>
-    );
-});
+const ProjectRow = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & ComponentPropsWithoutRef<"a">>(
+    function ProjectRow({ project, className, ...rest }, ref) {
+        const status = statusTone(project);
+        return (
+            <Link
+                ref={ref}
+                href={`/apps/deploy/${project.id}`}
+                className={cn(
+                    "flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-muted-foreground/40",
+                    className
+                )}
+                {...rest}
+            >
+                <span className="flex-1 truncate text-sm font-medium" title={project.name}>
+                    {project.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                    {project.services.slice(0, 5).map((kind, index) => (
+                        <ServiceIcon key={index} kind={kind} className="size-4 text-muted-foreground" />
+                    ))}
+                </div>
+                <span className="flex items-center gap-2 text-xs">
+                    <span className={`size-1.5 rounded-full ${status.dot} ${status.busy ? "animate-pulse" : ""}`} />
+                    <span className="text-muted-foreground">{project.environmentName}</span>
+                    <span className={status.text}>{status.label}</span>
+                </span>
+            </Link>
+        );
+    }
+);
 
 function CreateProjectButton() {
     const router = useRouter();
@@ -526,9 +487,7 @@ function CreateProjectButton() {
                     </DialogHeader>
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">
-                                Project name
-                            </span>
+                            <span className="text-xs font-medium text-muted-foreground">Project name</span>
                             <Input
                                 autoFocus
                                 value={name}

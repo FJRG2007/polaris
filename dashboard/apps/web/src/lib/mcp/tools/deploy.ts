@@ -142,12 +142,13 @@ const deploymentsTool: McpTool<z.infer<typeof serviceInput>> = {
         return {
             text:
                 deployments
-                    .map((row) =>
-                        `${row.id}  ${row.status}${row.isCurrent ? " (current)" : ""}${
-                            row.rollbackable && !row.isCurrent ? " (can roll back)" : ""
-                        }  ${row.createdAt}  ${row.commitSha?.slice(0, 7) ?? ""} ${
-                            row.commitMessage?.split("\n")[0] ?? ""
-                        }`.trimEnd()
+                    .map(
+                        (row) =>
+                            `${row.id}  ${row.status}${row.isCurrent ? " (current)" : ""}${
+                                row.rollbackable && !row.isCurrent ? " (can roll back)" : ""
+                            }  ${row.createdAt}  ${row.commitSha?.slice(0, 7) ?? ""} ${
+                                row.commitMessage?.split("\n")[0] ?? ""
+                            }`.trimEnd()
                     )
                     .join("\n") || "This service has never been deployed.",
             structured: { deployments }
@@ -204,10 +205,7 @@ const logsTool: McpTool<z.infer<typeof logsInput>> = {
         const { log } = await attempt("read the service's logs", () =>
             surface.runtimeLog(deployCaller(caller), input.service, { tail: input.tail })
         );
-        return {
-            text: log || "The container has printed nothing, or is not running.",
-            structured: { log }
-        };
+        return { text: log || "The container has printed nothing, or is not running.", structured: { log } };
     }
 };
 
@@ -246,12 +244,7 @@ const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
             surface.setVariable(
                 deployCaller(caller),
                 { kind: "service", ref: input.service },
-                {
-                    key: input.key,
-                    value: input.value,
-                    secret: input.secret,
-                    redeploy: input.redeploy
-                }
+                { key: input.key, value: input.value, secret: input.secret, redeploy: input.redeploy }
             )
         );
         return {

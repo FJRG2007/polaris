@@ -122,9 +122,7 @@ export const deployVolumeSource: BackupSource = {
                 takenAt: at.toISOString()
             });
         } finally {
-            await ports
-                .runIn(runtime.container, ["rm", "-f", "--", inContainer])
-                .catch(() => undefined);
+            await ports.runIn(runtime.container, ["rm", "-f", "--", inContainer]).catch(() => undefined);
             await ports.dispose();
         }
     },
@@ -156,9 +154,7 @@ export const deployVolumeSource: BackupSource = {
                 );
             }
         } finally {
-            await ports
-                .runIn(runtime.container, ["rm", "-f", "--", inContainer])
-                .catch(() => undefined);
+            await ports.runIn(runtime.container, ["rm", "-f", "--", inContainer]).catch(() => undefined);
             await ports.dispose();
         }
     }
@@ -189,8 +185,7 @@ export const nasPathSource: BackupSource = {
     async produce(resource: SourceResource): Promise<StagedArtifact> {
         const [, connectionId, ...rest] = resource.selector.split(":");
         const path = rest.join(":");
-        if (!connectionId)
-            throw new SourceUnavailableError("This folder's connection is missing from its record");
+        if (!connectionId) throw new SourceUnavailableError("This folder's connection is missing from its record");
 
         const driver = await getDriverForConnection(connectionId).catch((error: unknown) => {
             throw new SourceUnavailableError(
@@ -225,12 +220,7 @@ export const nasPathSource: BackupSource = {
  * length limit an archive passes immediately - hence the chunking.
  */
 export async function writeThroughShell(
-    ports: {
-        runIn(
-            container: string,
-            argv: readonly string[]
-        ): Promise<{ code: number; output: string }>;
-    },
+    ports: { runIn(container: string, argv: readonly string[]): Promise<{ code: number; output: string }> },
     container: string,
     path: string,
     bytes: Buffer
@@ -240,15 +230,10 @@ export async function writeThroughShell(
     const staged = `${path}.b64`;
     const refuse = (result: { code: number; output: string }, what: string): void => {
         if (result.code !== 0) {
-            throw new SourceUnavailableError(
-                `${what}: ${result.output.trim().slice(0, 300) || `exit ${result.code}`}`
-            );
+            throw new SourceUnavailableError(`${what}: ${result.output.trim().slice(0, 300) || `exit ${result.code}`}`);
         }
     };
-    refuse(
-        await ports.runIn(container, ["sh", "-c", `: > ${shellQuote(staged)}`]),
-        "Could not stage the archive"
-    );
+    refuse(await ports.runIn(container, ["sh", "-c", `: > ${shellQuote(staged)}`]), "Could not stage the archive");
     for (let at = 0; at < encoded.length; at += CHUNK) {
         refuse(
             await ports.runIn(container, [

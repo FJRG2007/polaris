@@ -111,11 +111,11 @@ export function onboardingScript(options: OnboardingOptions): string {
         // engine check.
         'echo "== build toolchain =="',
         `NIXPACKS_WANT=${NIXPACKS_VERSION}`,
-        "NIXPACKS_HAVE=\"$(nixpacks --version 2>/dev/null | awk '{print $2}')\"",
+        'NIXPACKS_HAVE="$(nixpacks --version 2>/dev/null | awk \'{print $2}\')"',
         'if [ "$NIXPACKS_HAVE" != "$NIXPACKS_WANT" ]; then',
         '  echo "installing nixpacks $NIXPACKS_WANT (found: ${NIXPACKS_HAVE:-none})";',
         // The installer reads the version it should fetch from the environment.
-        '  NIXPACKS_VERSION="$NIXPACKS_WANT" bash -c "$(curl -fsSL https://nixpacks.com/install.sh)";',
+        "  NIXPACKS_VERSION=\"$NIXPACKS_WANT\" bash -c \"$(curl -fsSL https://nixpacks.com/install.sh)\";",
         "fi",
         "nixpacks --version",
         `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik ${DYNAMIC_DIR}`,

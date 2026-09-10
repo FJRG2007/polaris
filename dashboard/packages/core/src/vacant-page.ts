@@ -86,11 +86,7 @@ export function vacantStatus(state: VacantState): number {
 
 /** The machine-readable code the page shows, for a report that quotes it. */
 export function vacantCode(state: VacantState): string {
-    return state === "down"
-        ? "SERVICE_NOT_RUNNING"
-        : state === "asleep"
-          ? "SERVICE_WAKING_UP"
-          : "NO_SERVICE_HERE";
+    return state === "down" ? "SERVICE_NOT_RUNNING" : state === "asleep" ? "SERVICE_WAKING_UP" : "NO_SERVICE_HERE";
 }
 
 /** Which state the edge asked for, read off the rewritten path. Anything that is not

@@ -22,9 +22,7 @@ const CUSTOM_RULE = {
     name: "Block the admin path",
     enabled: true,
     action: "block" as const,
-    conditions: [
-        { field: "path" as const, operator: "starts_with" as const, values: ["/wp-admin"] }
-    ]
+    conditions: [{ field: "path" as const, operator: "starts_with" as const, values: ["/wp-admin"] }]
 };
 
 describe("guard rule codec", () => {
@@ -56,32 +54,16 @@ describe("guard rule codec", () => {
             enabled: true,
             action: "block" as const,
             conditions: [
-                {
-                    field: "ip" as const,
-                    operator: "not_equals" as const,
-                    values: ["203.0.113.0/24"]
-                },
+                { field: "ip" as const, operator: "not_equals" as const, values: ["203.0.113.0/24"] },
                 {
                     match: "any" as const,
                     conditions: [
-                        {
-                            field: "path" as const,
-                            operator: "starts_with" as const,
-                            values: ["/admin"]
-                        },
+                        { field: "path" as const, operator: "starts_with" as const, values: ["/admin"] },
                         {
                             match: "all" as const,
                             conditions: [
-                                {
-                                    field: "method" as const,
-                                    operator: "equals" as const,
-                                    values: ["POST"]
-                                },
-                                {
-                                    field: "query" as const,
-                                    operator: "contains" as const,
-                                    values: ["debug=1"]
-                                }
+                                { field: "method" as const, operator: "equals" as const, values: ["POST"] },
+                                { field: "query" as const, operator: "contains" as const, values: ["debug=1"] }
                             ]
                         }
                     ]
@@ -133,9 +115,7 @@ describe("guard rule codec", () => {
     });
 
     it("drops non-string denylist entries", () => {
-        const header = Buffer.from(JSON.stringify({ d: ["10.0.0.1", 5, null], l: false })).toString(
-            "base64"
-        );
+        const header = Buffer.from(JSON.stringify({ d: ["10.0.0.1", 5, null], l: false })).toString("base64");
         expect(decodeGuardRule(header)).toEqual({
             deny: ["10.0.0.1"],
             requireLogin: false,
@@ -247,9 +227,7 @@ describe("edge token", () => {
     it("leaves prn undefined for a token minted before principals existed", () => {
         // Signed by hand, because signEdgeToken always writes the key now - which is
         // exactly what makes its absence a reliable signal of an old token.
-        const payload = Buffer.from(
-            JSON.stringify({ sub: "u1", aud: HOST, exp: NOW + 60 })
-        ).toString("base64url");
+        const payload = Buffer.from(JSON.stringify({ sub: "u1", aud: HOST, exp: NOW + 60 })).toString("base64url");
         const sig = createHmac("sha256", SECRET).update(`edge:${payload}`).digest("base64url");
         expect(verifyEdgeToken(`${payload}.${sig}`, SECRET, NOW, HOST)?.prn).toBeUndefined();
     });
@@ -265,10 +243,7 @@ describe("edge token", () => {
     });
 
     it("rejects a token signed with a different secret", () => {
-        const token = signEdgeToken(
-            { sub: "u1", aud: HOST, exp: NOW + 60 },
-            "another-secret-16char"
-        );
+        const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60 }, "another-secret-16char");
         expect(verifyEdgeToken(token, SECRET, NOW, HOST)).toBeNull();
     });
 
@@ -320,22 +295,13 @@ describe("wafRuleInputSchema", () => {
 
     it("rejects a condition with no values", () => {
         const result = wafRuleInputSchema.safeParse({
-            rules: [
-                {
-                    name: "empty",
-                    action: "block",
-                    conditions: [{ field: "path", operator: "equals", values: [] }]
-                }
-            ]
+            rules: [{ name: "empty", action: "block", conditions: [{ field: "path", operator: "equals", values: [] }] }]
         });
         expect(result.success).toBe(false);
     });
 
     it("rejects an entry present in both allow and deny", () => {
-        const result = wafRuleInputSchema.safeParse({
-            ipAllowlist: ["10.0.0.1"],
-            ipDenylist: ["10.0.0.1"]
-        });
+        const result = wafRuleInputSchema.safeParse({ ipAllowlist: ["10.0.0.1"], ipDenylist: ["10.0.0.1"] });
         expect(result.success).toBe(false);
     });
 
@@ -344,33 +310,20 @@ describe("wafRuleInputSchema", () => {
     });
 
     it("caps a list at WAF_LIST_MAX entries", () => {
-        const many = Array.from(
-            { length: WAF_LIST_MAX + 1 },
-            (_, i) => `10.0.${Math.floor(i / 256)}.${i % 256}`
-        );
+        const many = Array.from({ length: WAF_LIST_MAX + 1 }, (_, i) => `10.0.${Math.floor(i / 256)}.${i % 256}`);
         expect(wafRuleInputSchema.safeParse({ ipDenylist: many }).success).toBe(false);
     });
 
     it("accepts the three principal kinds and rejects anything else", () => {
         const ok = wafRuleInputSchema.safeParse({
-            loginAllowPrincipals: [
-                { ref: "user:abc" },
-                { ref: "group:ops-1" },
-                { ref: "role:admin" }
-            ]
+            loginAllowPrincipals: [{ ref: "user:abc" }, { ref: "group:ops-1" }, { ref: "role:admin" }]
         });
         expect(ok.success).toBe(true);
         // A bare id names nothing in particular, and an unknown kind would be stored,
         // shipped to the edge and silently matched against nobody.
-        expect(
-            wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "abc" }] }).success
-        ).toBe(false);
-        expect(
-            wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "host:abc" }] }).success
-        ).toBe(false);
-        expect(
-            wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "user:" }] }).success
-        ).toBe(false);
+        expect(wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "abc" }] }).success).toBe(false);
+        expect(wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "host:abc" }] }).success).toBe(false);
+        expect(wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "user:" }] }).success).toBe(false);
     });
 
     it("rejects a window that ends before it starts", () => {
@@ -395,9 +348,7 @@ describe("principalVerdict", () => {
 
     it("admits anybody when no scope named anyone", () => {
         expect(principalVerdict({}, held, NOW)).toBe("admitted");
-        expect(principalVerdict({ loginAllowLists: [], loginDeny: [] }, new Set(), NOW)).toBe(
-            "admitted"
-        );
+        expect(principalVerdict({ loginAllowLists: [], loginDeny: [] }, new Set(), NOW)).toBe("admitted");
     });
 
     it("admits a visitor matching any entry of a list", () => {
@@ -406,22 +357,16 @@ describe("principalVerdict", () => {
     });
 
     it("does not admit a visitor matching no entry", () => {
-        expect(principalVerdict({ loginAllowLists: [[{ ref: "group:sales" }]] }, held, NOW)).toBe(
-            "not-admitted"
-        );
+        expect(principalVerdict({ loginAllowLists: [[{ ref: "group:sales" }]] }, held, NOW)).toBe("not-admitted");
     });
 
     it("requires every scope's list, so a narrower scope can only restrict", () => {
         // In the broad scope's list and not in the narrow one's: the narrow scope wins.
         const lists = [[{ ref: "group:ops" }], [{ ref: "group:release" }]];
         expect(principalVerdict({ loginAllowLists: lists }, held, NOW)).toBe("not-admitted");
-        expect(
-            principalVerdict(
-                { loginAllowLists: [[{ ref: "group:ops" }], [{ ref: "user:u1" }]] },
-                held,
-                NOW
-            )
-        ).toBe("admitted");
+        expect(principalVerdict({ loginAllowLists: [[{ ref: "group:ops" }], [{ ref: "user:u1" }]] }, held, NOW)).toBe(
+            "admitted"
+        );
     });
 
     it("refuses a denied principal even when a list admits them", () => {
@@ -457,9 +402,7 @@ describe("a membership claim's freshness", () => {
     it("treats a token from before this existed as having no moment at all", () => {
         // Signed by hand: the signer always writes `iat` now, which is what makes its
         // absence a reliable signal rather than a guess.
-        const payload = Buffer.from(
-            JSON.stringify({ sub: "u1", aud: HOST, exp: NOW + 60 })
-        ).toString("base64url");
+        const payload = Buffer.from(JSON.stringify({ sub: "u1", aud: HOST, exp: NOW + 60 })).toString("base64url");
         const sig = createHmac("sha256", SECRET).update(`edge:${payload}`).digest("base64url");
         const token = verifyEdgeToken(`${payload}.${sig}`, SECRET, NOW, HOST);
         expect(token?.iat).toBeUndefined();

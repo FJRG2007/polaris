@@ -40,10 +40,9 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
     const [stored, setStored] = useState<core.MailKeymap>(keymap);
     const [held, setHeld] = useState<core.MailKeymap>(keymap);
     const [recording, setRecording] = useState<core.MailKeyCommand | null>(null);
-    const [problem, setProblem] = useState<{
-        command: core.MailKeyCommand;
-        message: string;
-    } | null>(null);
+    const [problem, setProblem] = useState<{ command: core.MailKeyCommand; message: string } | null>(
+        null
+    );
 
     const changed = useMemo(() => !sameKeyboard(held, stored), [held, stored]);
     const moved = core.MAIL_REBINDABLE_COMMANDS.some(
@@ -69,8 +68,7 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
         if (!core.isBindableMailKey(event.key)) {
             setProblem({
                 command,
-                message:
-                    "That key cannot be used. Enter, Escape, the arrows, Delete and Backspace keep their own jobs."
+                message: "That key cannot be used. Enter, Escape, the arrows, Delete and Backspace keep their own jobs."
             });
             return;
         }
@@ -78,10 +76,7 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
             event.key === core.MAIL_KEY_DEFINITIONS[command].key
                 ? without(held, command)
                 : { ...held, [command]: event.key };
-        const clash = core
-            .mailKeyConflicts(next)
-            .get(event.key)
-            ?.find((other) => other !== command);
+        const clash = core.mailKeyConflicts(next).get(event.key)?.find((other) => other !== command);
         if (clash) {
             setProblem({
                 command,
@@ -129,8 +124,8 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                                 <span className="block text-[13px]">{definition.label}</span>
                                 {definition.fixed.length > 0 ? (
                                     <span className="block text-[12px] text-foreground-subtle">
-                                        Also {definition.fixed.map(core.mailKeyLabel).join(" and ")}
-                                        , which do not move
+                                        Also {definition.fixed.map(core.mailKeyLabel).join(" and ")},
+                                        which do not move
                                     </span>
                                 ) : null}
                                 {wrong ? (

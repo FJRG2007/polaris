@@ -25,22 +25,8 @@ import type { EnvironmentGlance } from "@/lib/deploy/project-glance";
 import { ProjectGlanceBar, useProjectGlance } from "./project-glance-bar";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
-import {
-    NEW_ENVIRONMENT,
-    NewEnvironmentDialog,
-    newEnvironmentOption
-} from "./new-environment-dialog";
-import {
-    Button,
-    cn,
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    Input,
-    ScrollRow,
-    Select
-} from "@polaris/ui";
+import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
+import { Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle, Input, ScrollRow, Select } from "@polaris/ui";
 
 /** Picking this opens the create dialog instead of switching to it. */
 const NEW_PROJECT = "__new_project__";
@@ -79,16 +65,12 @@ export function ProjectShell({
     const search = useSearchParams();
 
     const base = `/apps/deploy/${project.id}`;
-    const defaultEnv =
-        project.environments.find((environment) => environment.isDefault) ??
-        project.environments[0];
+    const defaultEnv = project.environments.find((environment) => environment.isDefault) ?? project.environments[0];
     // A link that names an environment wins; otherwise the project's default. An
     // id belonging to another project simply falls back rather than 404ing.
     const requested = search.get("env");
     const active =
-        project.environments.find((environment) => environment.id === requested) ??
-        defaultEnv ??
-        null;
+        project.environments.find((environment) => environment.id === requested) ?? defaultEnv ?? null;
 
     const [showNewProject, setShowNewProject] = useState(false);
     const [showNewEnv, setShowNewEnv] = useState(false);
@@ -121,26 +103,15 @@ export function ProjectShell({
     }
 
     const newProjectOption = canManage
-        ? [
-              {
-                  value: NEW_PROJECT,
-                  label: "New project",
-                  icon: <Plus className="size-3.5 text-muted-foreground" />
-              }
-          ]
+        ? [{ value: NEW_PROJECT, label: "New project", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
         : [];
     const newEnvOption = newEnvironmentOption(canManage);
 
     const projectSelect = (
         <Select
             value={project.id}
-            onValueChange={(id) =>
-                id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`)
-            }
-            options={[
-                ...projects.map((item) => ({ value: item.id, label: item.name })),
-                ...newProjectOption
-            ]}
+            onValueChange={(id) => (id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`))}
+            options={[...projects.map((item) => ({ value: item.id, label: item.name })), ...newProjectOption]}
             className="h-8 min-w-0 flex-1 font-medium md:w-44 md:min-w-[11rem] md:flex-none"
             aria-label="Project"
         />
@@ -150,10 +121,7 @@ export function ProjectShell({
             value={active?.id ?? ""}
             onValueChange={selectEnvironment}
             options={[
-                ...project.environments.map((environment) => ({
-                    value: environment.id,
-                    label: environment.name
-                })),
+                ...project.environments.map((environment) => ({ value: environment.id, label: environment.name })),
                 ...newEnvOption
             ]}
             className="h-8 min-w-0 flex-1 md:w-52 md:min-w-[13rem] md:flex-none"
@@ -163,59 +131,53 @@ export function ProjectShell({
 
     return (
         <StagedChangesProvider projectId={project.id} initial={staged}>
-            <div className="flex w-full flex-col gap-4">
-                {/* The switchers sit in the top bar where there is room for them beside
+        <div className="flex w-full flex-col gap-4">
+            {/* The switchers sit in the top bar where there is room for them beside
                 the app switcher, and at the top of the page where there is not -
                 the same controls, never both visible at once. */}
-                <HeaderPortal>
-                    <span className="hidden text-muted-foreground/40 md:inline">/</span>
-                    <span className="hidden items-center gap-2 md:flex">
-                        {projectSelect}
-                        <span className="text-muted-foreground/40">/</span>
-                        {environmentSelect}
-                    </span>
-                </HeaderPortal>
-
-                <div className="flex items-center gap-2 md:hidden">
+            <HeaderPortal>
+                <span className="hidden text-muted-foreground/40 md:inline">/</span>
+                <span className="hidden items-center gap-2 md:flex">
                     {projectSelect}
+                    <span className="text-muted-foreground/40">/</span>
                     {environmentSelect}
-                </div>
+                </span>
+            </HeaderPortal>
 
-                {canManage && active && (
-                    <StagedChangesBanner
-                        projectId={project.id}
-                        environmentId={active.id}
-                        environments={project.environments}
-                    />
-                )}
+            <div className="flex items-center gap-2 md:hidden">
+                {projectSelect}
+                {environmentSelect}
+            </div>
 
-                {active && (
-                    <ProjectGlanceBar
-                        environmentId={active.id}
-                        glance={glance}
-                        serviceHref={serviceHref}
-                    />
-                )}
-
-                <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-                    <ProjectNav
-                        base={base}
-                        pathname={pathname}
-                        sectionHref={sectionHref}
-                        attention={glance?.attention.length ?? 0}
-                    />
-                    <div className="min-w-0 flex-1">{children}</div>
-                </div>
-
-                <NewProjectDialog open={showNewProject} onOpenChange={setShowNewProject} />
-                <NewEnvironmentDialog
+            {canManage && active && (
+                <StagedChangesBanner
                     projectId={project.id}
-                    open={showNewEnv}
-                    onOpenChange={setShowNewEnv}
-                    onCreated={(id) => selectEnvironment(id)}
+                    environmentId={active.id}
                     environments={project.environments}
                 />
+            )}
+
+            {active && <ProjectGlanceBar environmentId={active.id} glance={glance} serviceHref={serviceHref} />}
+
+            <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+                <ProjectNav
+                    base={base}
+                    pathname={pathname}
+                    sectionHref={sectionHref}
+                    attention={glance?.attention.length ?? 0}
+                />
+                <div className="min-w-0 flex-1">{children}</div>
             </div>
+
+            <NewProjectDialog open={showNewProject} onOpenChange={setShowNewProject} />
+            <NewEnvironmentDialog
+                projectId={project.id}
+                open={showNewEnv}
+                onOpenChange={setShowNewEnv}
+                onCreated={(id) => selectEnvironment(id)}
+                environments={project.environments}
+            />
+        </div>
         </StagedChangesProvider>
     );
 }
@@ -241,17 +203,12 @@ function ProjectNav({
         const target = `${base}${path}`;
         // The root is the only one that must match exactly, or it would stay lit
         // while a sibling section is open.
-        return path === ""
-            ? pathname === base
-            : pathname === target || pathname.startsWith(`${target}/`);
+        return path === "" ? pathname === base : pathname === target || pathname.startsWith(`${target}/`);
     }
 
     return (
         <nav className="lg:w-52 lg:shrink-0">
-            <ScrollRow
-                as="ul"
-                className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
-            >
+            <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
                 {SECTIONS.map((section) => {
                     const active = isActive(section.path);
                     const Icon = section.icon;
@@ -263,9 +220,7 @@ function ProjectNav({
                                 aria-current={active ? "page" : undefined}
                                 className={cn(
                                     "flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
-                                    active
-                                        ? "bg-muted font-medium text-foreground"
-                                        : "text-muted-foreground"
+                                    active ? "bg-muted font-medium text-foreground" : "text-muted-foreground"
                                 )}
                             >
                                 <Icon className="size-4 shrink-0" />
@@ -285,13 +240,7 @@ function ProjectNav({
     );
 }
 
-function NewProjectDialog({
-    open,
-    onOpenChange
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-}) {
+function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const router = useRouter();
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -321,9 +270,7 @@ function NewProjectDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                            Project name
-                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">Project name</span>
                         <Input
                             autoFocus
                             value={name}

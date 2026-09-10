@@ -32,10 +32,7 @@ export async function buildMachineAction(
     }
 }
 
-export async function setBuildMachineAction(
-    applicationId: string,
-    value: unknown
-): Promise<{ error?: string }> {
+export async function setBuildMachineAction(applicationId: string, value: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = buildMachine.buildOnSchema.safeParse(value);
     if (!parsed.success) return { error: "Choose a machine from the list" };
@@ -74,8 +71,7 @@ export async function uploadedSourceAction(
         if (!app) return { error: "Service not found" };
         const source = JSON.parse(app.sourceConfig || "{}") as Record<string, unknown>;
         const fromRepository = typeof source.repoUrl === "string" && source.repoUrl.length > 0;
-        const uploadable =
-            !fromRepository && (app.sourceType === "dockerfile" || app.sourceType === "nixpacks");
+        const uploadable = !fromRepository && (app.sourceType === "dockerfile" || app.sourceType === "nixpacks");
         return { upload: uploadedSourceOf(source), uploadable };
     } catch (caught) {
         return failure(caught, "Could not read this service's source");

@@ -46,9 +46,7 @@ function entry(name: string, content: Buffer): Buffer {
 
 /** A gzipped `docker save`-shaped archive: a layer, then the manifest last. */
 function archive(tags: string[] | null, layerBytes = 5000): Buffer {
-    const manifest = JSON.stringify([
-        { Config: "config.json", RepoTags: tags, Layers: ["blobs/sha256/aa"] }
-    ]);
+    const manifest = JSON.stringify([{ Config: "config.json", RepoTags: tags, Layers: ["blobs/sha256/aa"] }]);
     return gzipSync(
         Buffer.concat([
             entry("blobs/sha256/aa", randomBytes(layerBytes)),
@@ -60,19 +58,13 @@ function archive(tags: string[] | null, layerBytes = 5000): Buffer {
 
 describe("reading what an archive would load", () => {
     it("finds the manifest wherever it sits and lists every tag", async () => {
-        expect(await archiveImageTags(Readable.from([archive([RELEASE], 70_000)]))).toEqual([
-            RELEASE
-        ]);
+        expect(await archiveImageTags(Readable.from([archive([RELEASE], 70_000)]))).toEqual([RELEASE]);
     });
 
     it("names nothing for an untagged image, a tar without a manifest, or not a tar", async () => {
         expect(await archiveImageTags(Readable.from([archive(null)]))).toBeNull();
         expect(
-            await archiveImageTags(
-                Readable.from([
-                    gzipSync(Buffer.concat([entry("x", Buffer.from("y")), Buffer.alloc(1024)]))
-                ])
-            )
+            await archiveImageTags(Readable.from([gzipSync(Buffer.concat([entry("x", Buffer.from("y")), Buffer.alloc(1024)]))]))
         ).toBeNull();
         await expect(archiveImageTags(Readable.from([Buffer.from("not gzip")]))).rejects.toThrow();
     });
@@ -100,8 +92,7 @@ describe("carrying an image between machines", () => {
         const to = {
             importImage: vi.fn(async (stream: NodeJS.ReadableStream, size: number) => {
                 declared = size;
-                for await (const chunk of stream as AsyncIterable<Buffer>)
-                    received = Buffer.concat([received, chunk]);
+                for await (const chunk of stream as AsyncIterable<Buffer>) received = Buffer.concat([received, chunk]);
             })
         };
         const logged: string[] = [];
@@ -122,12 +113,7 @@ describe("carrying an image between machines", () => {
         const from = { exportImage: async () => Readable.from([Buffer.alloc(10)]) };
         const to = { importImage: vi.fn() };
         await expect(
-            shipImage(RELEASE, from as never, to as never, {
-                stageDir,
-                log: () => undefined,
-                fromName: "b",
-                toName: "r"
-            })
+            shipImage(RELEASE, from as never, to as never, { stageDir, log: () => undefined, fromName: "b", toName: "r" })
         ).rejects.toThrow("could not be read on b");
         expect(to.importImage).not.toHaveBeenCalled();
     });
@@ -210,10 +196,7 @@ describe("a service built on another machine", () => {
 
     it("stops in words when the release could not be kept to be carried", async () => {
         const { ctx, runner } = machines(stageDir);
-        const result = await new ComposeRuntime().deployApplication(
-            plan({ release: undefined }),
-            ctx
-        );
+        const result = await new ComposeRuntime().deployApplication(plan({ release: undefined }), ctx);
         expect(result.ok).toBe(false);
         expect(result.error).toContain("cannot be sent to the small server");
         expect(runner.composeUp).not.toHaveBeenCalled();
@@ -241,11 +224,7 @@ describe("a release uploaded from somebody's own machine", () => {
         const { ctx, runner } = machines(dir);
         const noBuilder = { ...ctx, builder: undefined } as RuntimeContext;
         const result = await new ComposeRuntime().deployApplication(
-            plan({
-                method: "dockerfile",
-                release: undefined,
-                prebuilt: { image: RELEASE, archive: file, bytes: bytes.length }
-            }),
+            plan({ method: "dockerfile", release: undefined, prebuilt: { image: RELEASE, archive: file, bytes: bytes.length } }),
             noBuilder
         );
         expect(result).toMatchObject({ ok: true, imageTag: RELEASE });

@@ -28,11 +28,7 @@ self.addEventListener("activate", (event) => {
     event.waitUntil(
         caches
             .keys()
-            .then((names) =>
-                Promise.all(
-                    names.filter((name) => name !== CACHE).map((name) => caches.delete(name))
-                )
-            )
+            .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
             .then(() => self.clients.claim())
     );
 });
@@ -41,9 +37,7 @@ self.addEventListener("fetch", (event) => {
     if (event.request.mode !== "navigate") return;
     event.respondWith(
         fetch(event.request).catch(() =>
-            caches
-                .match(OFFLINE)
-                .then((page) => page || new Response("Polaris is not reachable.", { status: 503 }))
+            caches.match(OFFLINE).then((page) => page || new Response("Polaris is not reachable.", { status: 503 }))
         )
     );
 });

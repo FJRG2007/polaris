@@ -40,15 +40,7 @@ import {
 const DUMPERS = {
     postgres: {
         extension: "sql.gz",
-        argv: (db: string, user: string) => [
-            "pg_dump",
-            "--no-owner",
-            "--no-acl",
-            "-U",
-            user,
-            "-d",
-            db
-        ]
+        argv: (db: string, user: string) => ["pg_dump", "--no-owner", "--no-acl", "-U", user, "-d", db]
     },
     mysql: {
         extension: "sql.gz",
@@ -134,10 +126,7 @@ export const polarisDatabaseSource: BackupSource = {
         const fileName = `polaris-${stamp(at)}.json.gz`;
         const target = join(dir, fileName);
 
-        const client = prisma as unknown as Record<
-            string,
-            { findMany?: (args?: unknown) => Promise<unknown[]> }
-        >;
+        const client = prisma as unknown as Record<string, { findMany?: (args?: unknown) => Promise<unknown[]> }>;
         const tables: Record<string, unknown[]> = {};
         for (const model of Prisma.dmmf.datamodel.models) {
             const key = model.name.charAt(0).toLowerCase() + model.name.slice(1);
@@ -186,10 +175,7 @@ export const managedDatabaseSource: BackupSource = {
     async resolveName(resource: SourceResource): Promise<string | null> {
         const id = resource.selector.split(":")[1];
         if (!id) return null;
-        const row = await prisma.managedDatabase.findUnique({
-            where: { id },
-            select: { name: true }
-        });
+        const row = await prisma.managedDatabase.findUnique({ where: { id }, select: { name: true } });
         return row?.name ?? null;
     },
 
@@ -198,13 +184,7 @@ export const managedDatabaseSource: BackupSource = {
         if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
         const row = await prisma.managedDatabase.findUnique({
             where: { id },
-            select: {
-                engine: true,
-                containerName: true,
-                targetId: true,
-                parentId: true,
-                name: true
-            }
+            select: { engine: true, containerName: true, targetId: true, parentId: true, name: true }
         });
         if (!row) throw new SourceUnavailableError("That database no longer exists");
         if (!isEngine(row.engine)) {
@@ -249,14 +229,9 @@ export const managedDatabaseSource: BackupSource = {
         const id = resource.selector.split(":")[1];
         if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
         const { runBackup } = await import("../service");
-        const safety = await runBackup(resource.id, {
-            trigger: "pre-restore",
-            actorUserId: actorId
-        });
+        const safety = await runBackup(resource.id, { trigger: "pre-restore", actorUserId: actorId });
         if (safety.status === "failed") {
-            const why = safety.failures
-                .map((failure) => `${failure.destination}: ${failure.reason}`)
-                .join("; ");
+            const why = safety.failures.map((failure) => `${failure.destination}: ${failure.reason}`).join("; ");
             throw new SourceUnavailableError(
                 `Nothing was restored: a copy of what is there now could not be taken first${why ? ` (${why})` : ""}.`
             );
@@ -265,25 +240,18 @@ export const managedDatabaseSource: BackupSource = {
         const dir = await stageDir();
         const staged = join(dir, "restore");
         try {
-            await pipeline(
-                Readable.fromWeb(body as import("node:stream/web").ReadableStream),
-                createWriteStream(staged)
-            );
+            await pipeline(Readable.fromWeb(body as import("node:stream/web").ReadableStream), createWriteStream(staged));
             const context = await instanceContext(id, resource.ownerId);
             const operation = await startOperation(id, "restore", actorId);
             try {
-                await restoreDumpInto(
-                    context,
-                    { local: staged },
-                    {
-                        operation,
-                        // Only MongoDB names the database inside the dump; a copy of
-                        // the same database restores into itself either way.
-                        ...(typeof metadata.database === "string" && metadata.database
-                            ? { sourceDatabase: metadata.database }
-                            : {})
-                    }
-                );
+                await restoreDumpInto(context, { local: staged }, {
+                    operation,
+                    // Only MongoDB names the database inside the dump; a copy of
+                    // the same database restores into itself either way.
+                    ...(typeof metadata.database === "string" && metadata.database
+                        ? { sourceDatabase: metadata.database }
+                        : {})
+                });
                 await operation.succeed();
             } catch (error) {
                 throw new SourceUnavailableError(await operation.fail(error));
@@ -334,32 +302,20 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         where: { id: request.targetId },
         select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
     });
-    if (!target)
-        throw new SourceUnavailableError("The server this database runs on is not registered");
+    if (!target) throw new SourceUnavailableError("The server this database runs on is not registered");
 
     const ports = await getPorts(target, request.ownerId);
     const container = request.container;
     try {
         const argv =
             request.engine === "mongo"
-                ? [
-                      ...DUMPERS.mongo.argv(
-                          request.database,
-                          request.username,
-                          request.password,
-                          request.authDatabase
-                      )
-                  ]
+                ? [...DUMPERS.mongo.argv(request.database, request.username, request.password, request.authDatabase)]
                 : [...dumper.argv(request.database, request.username, request.password)];
         // redis-cli exits 0 on an error reply, so the answer itself is checked:
         // a refused SAVE must not be followed by copying a stale snapshot.
         const command =
             request.engine === "redis"
-                ? [
-                      "sh",
-                      "-c",
-                      `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`
-                  ]
+                ? ["sh", "-c", `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`]
                 : ["sh", "-c", `${argv.map(shellQuote).join(" ")} > ${inContainer}`];
         // Redis is started with `--requirepass`, so an unauthenticated SAVE was
         // refused and the copy that followed was whatever snapshot Redis had last
@@ -373,11 +329,7 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         const result = await ports.runIn(
             container,
             Object.keys(environment).length > 0
-                ? [
-                      "env",
-                      ...Object.entries(environment).map(([key, value]) => `${key}=${value}`),
-                      ...command
-                  ]
+                ? ["env", ...Object.entries(environment).map(([key, value]) => `${key}=${value}`), ...command]
                 : command
         );
         if (result.code !== 0) {

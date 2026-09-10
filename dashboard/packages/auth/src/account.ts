@@ -86,8 +86,7 @@ export async function updateUserProfile(
         // Checked here rather than only in the form: this is the copy that
         // decides what is stored, and an API key posting a name never sees a blur.
         const parsed = displayNameField.safeParse(input.name);
-        if (!parsed.success)
-            return { error: parsed.error.issues[0]?.message ?? "Check the display name." };
+        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the display name." };
         data.name = parsed.data;
     }
     for (const half of ["firstName", "lastName"] as const) {
@@ -141,8 +140,7 @@ export async function updateUserProfile(
     }
     if (input.company !== undefined) {
         const parsed = companyField.safeParse(input.company ?? "");
-        if (!parsed.success)
-            return { error: parsed.error.issues[0]?.message ?? "Check the company." };
+        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the company." };
         data.company = parsed.data || null;
     }
     if (input.description !== undefined) {
@@ -208,10 +206,7 @@ export async function emailOwner(email: string): Promise<string | null> {
 /** Every address a user holds, primary first. */
 export async function listUserEmails(userId: string): Promise<UserEmailView[]> {
     const [user, alternates] = await Promise.all([
-        prisma.user.findUnique({
-            where: { id: userId },
-            select: { email: true, emailVerified: true }
-        }),
+        prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true } }),
         prisma.userEmail.findMany({
             where: { userId },
             orderBy: { createdAt: "asc" },
@@ -252,10 +247,7 @@ export const MAX_ALTERNATE_EMAILS = 10;
 export async function addUserEmail(userId: string, newEmail: string): Promise<{ error?: string }> {
     const email = normalizeEmail(newEmail);
     if (!isEmail(email)) return { error: "Enter a valid email address." };
-    const current = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true }
-    });
+    const current = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (current?.email === email) return { error: "That is already your primary address." };
     // Anybody's, including this account's own alternates: the column is unique
     // across the table, so an address the caller already holds is refused with a
@@ -334,10 +326,7 @@ export async function adoptProviderEmail(
 }
 
 /** Drop one of a user's own alternate addresses. */
-export async function removeUserEmail(
-    userId: string,
-    emailId: string
-): Promise<{ error?: string }> {
+export async function removeUserEmail(userId: string, emailId: string): Promise<{ error?: string }> {
     const result = await prisma.userEmail.deleteMany({ where: { id: emailId, userId } });
     return result.count > 0 ? {} : { error: "That address is no longer on your account." };
 }
@@ -348,10 +337,7 @@ export async function setUserEmailRecovery(
     emailId: string,
     recovery: boolean
 ): Promise<{ error?: string }> {
-    const result = await prisma.userEmail.updateMany({
-        where: { id: emailId, userId },
-        data: { recovery }
-    });
+    const result = await prisma.userEmail.updateMany({ where: { id: emailId, userId }, data: { recovery } });
     return result.count > 0 ? {} : { error: "That address is no longer on your account." };
 }
 
@@ -368,10 +354,7 @@ export async function promoteUserEmail(
     currentPassword: string
 ): Promise<{ error?: string }> {
     const [user, alternate] = await Promise.all([
-        prisma.user.findUnique({
-            where: { id: userId },
-            select: { email: true, emailVerified: true }
-        }),
+        prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true } }),
         prisma.userEmail.findFirst({
             where: { id: emailId, userId },
             select: { id: true, email: true, verifiedAt: true }

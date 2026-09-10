@@ -64,26 +64,16 @@ export function ForwardsTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-40 w-full" />
                 )
             ) : forwards.length === 0 ? (
-                <EmptyState
-                    icon={<Forward />}
-                    title="No forwards"
-                    description="Send an address's mail on to other people without giving it a mailbox."
-                />
+                <EmptyState icon={<Forward />} title="No forwards" description="Send an address's mail on to other people without giving it a mailbox." />
             ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                     {forwards.map((forward) => (
                         <li key={forward.id} className="flex items-center gap-3 px-3 py-2">
                             <div className="flex min-w-0 flex-1 flex-col">
-                                <span
-                                    className="truncate text-[0.8125rem] text-foreground"
-                                    title={forward.address}
-                                >
+                                <span className="truncate text-[0.8125rem] text-foreground" title={forward.address}>
                                     {forward.address}
                                 </span>
-                                <span
-                                    className="truncate text-xs text-muted-foreground"
-                                    title={forward.recipients.join(", ")}
-                                >
+                                <span className="truncate text-xs text-muted-foreground" title={forward.recipients.join(", ")}>
                                     To {forward.recipients.join(", ")}
                                 </span>
                             </div>
@@ -100,13 +90,7 @@ export function ForwardsTab({ serverId }: { serverId: string }) {
                     ))}
                 </ul>
             )}
-            <CreateForward
-                serverId={serverId}
-                domains={domains}
-                open={creating}
-                onOpenChange={setCreating}
-                onCreated={() => void panel.reload()}
-            />
+            <CreateForward serverId={serverId} domains={domains} open={creating} onOpenChange={setCreating} onCreated={() => void panel.reload()} />
             <ConfirmDeleteDialog
                 open={deleting !== null}
                 onOpenChange={(open) => (open ? undefined : setDeleting(null))}
@@ -145,16 +129,9 @@ function CreateForward({
         .split(/[\s,;]+/)
         .map((entry) => entry.trim())
         .filter(Boolean);
-    const parsed = mailForwardSchema.safeParse({
-        serverId,
-        domainId: chosenDomain,
-        localPart,
-        recipients: list
-    });
+    const parsed = mailForwardSchema.safeParse({ serverId, domainId: chosenDomain, localPart, recipients: list });
     const issue = (path: string, typed: string): string | null =>
-        parsed.success || !typed.trim()
-            ? null
-            : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
+        parsed.success || !typed.trim() ? null : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
 
     async function submit(): Promise<void> {
         if (!parsed.success || pending) return;
@@ -177,10 +154,7 @@ function CreateForward({
             <DialogContent className="w-[min(32rem,95vw)] max-w-[min(32rem,95vw)]">
                 <DialogHeader>
                     <DialogTitle>New forward</DialogTitle>
-                    <DialogDescription>
-                        Receivers may treat forwarded mail as suspicious when the sender's domain
-                        enforces DMARC.
-                    </DialogDescription>
+                    <DialogDescription>Receivers may treat forwarded mail as suspicious when the sender's domain enforces DMARC.</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-4"
@@ -191,14 +165,7 @@ function CreateForward({
                 >
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label="Address" required error={issue("localPart", localPart)}>
-                            {(id) => (
-                                <Input
-                                    id={id}
-                                    value={localPart}
-                                    onChange={(event) => setLocalPart(event.target.value)}
-                                    placeholder="team"
-                                />
-                            )}
+                            {(id) => <Input id={id} value={localPart} onChange={(event) => setLocalPart(event.target.value)} placeholder="team" />}
                         </Field>
                         <Field label="Domain" required>
                             {(id) => (
@@ -206,28 +173,13 @@ function CreateForward({
                                     id={id}
                                     value={chosenDomain}
                                     onValueChange={setDomainId}
-                                    options={domains.map((domain) => ({
-                                        value: domain.id,
-                                        label: `@${domain.name}`
-                                    }))}
+                                    options={domains.map((domain) => ({ value: domain.id, label: `@${domain.name}` }))}
                                 />
                             )}
                         </Field>
                     </div>
-                    <Field
-                        label="Send to"
-                        required
-                        error={issue("recipients", recipients)}
-                        hint="One address per line, or separated by commas."
-                    >
-                        {(id) => (
-                            <Textarea
-                                id={id}
-                                rows={3}
-                                value={recipients}
-                                onChange={(event) => setRecipients(event.target.value)}
-                            />
-                        )}
+                    <Field label="Send to" required error={issue("recipients", recipients)} hint="One address per line, or separated by commas.">
+                        {(id) => <Textarea id={id} rows={3} value={recipients} onChange={(event) => setRecipients(event.target.value)} />}
                     </Field>
                     {error ? <p className="text-xs text-danger">{error}</p> : null}
                     <DialogFooter>

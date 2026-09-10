@@ -83,8 +83,7 @@ export async function waitUntilServing(
             if (state.health === "healthy") return { ok: true };
             if (state.health === undefined && state.status === "running") {
                 const started = state.startedAt ? Date.parse(state.startedAt) : Number.NaN;
-                if (Number.isFinite(started) && clock.now() - started >= STEADY_MS)
-                    return { ok: true };
+                if (Number.isFinite(started) && clock.now() - started >= STEADY_MS) return { ok: true };
             }
         } else if (state && !seen) {
             // Not a container's answer at all: an engine or a stand-in that does not
@@ -108,15 +107,9 @@ export async function waitUntilServing(
 
 /** The last lines a container printed, into the deploy log, so a release that
  *  did not come up says why in the place somebody is already reading. */
-export async function tailIntoLog(
-    ctx: RuntimeContext,
-    container: string,
-    lines = 40
-): Promise<void> {
+export async function tailIntoLog(ctx: RuntimeContext, container: string, lines = 40): Promise<void> {
     ctx.log(Buffer.from(`==> The last ${lines} lines it printed:\n`));
-    await ctx.ports
-        .logs(container, (chunk) => ctx.log(chunk), { tail: lines })
-        .catch(() => {
-            ctx.log(Buffer.from("(its output could not be read)\n"));
-        });
+    await ctx.ports.logs(container, (chunk) => ctx.log(chunk), { tail: lines }).catch(() => {
+        ctx.log(Buffer.from("(its output could not be read)\n"));
+    });
 }

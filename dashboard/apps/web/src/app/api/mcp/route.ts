@@ -172,9 +172,7 @@ async function answer(
     message: Record<string, unknown>,
     caller: McpCaller
 ): Promise<JsonRpcResponse | null> {
-    return (
-        (await overBudget(message, caller)) ?? handleMcpMessage(message, MCP_TOOLS, caller, SERVER)
-    );
+    return (await overBudget(message, caller)) ?? handleMcpMessage(message, MCP_TOOLS, caller, SERVER);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -184,8 +182,7 @@ export async function POST(request: Request): Promise<Response> {
     // rather than reporting a tool failure to the model.
     if (!caller) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const tooLarge = () =>
-        jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
+    const tooLarge = () => jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
     const declared = Number(request.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > BODY_MAX) return tooLarge();
     const bytes = await readCappedBody(request, BODY_MAX);

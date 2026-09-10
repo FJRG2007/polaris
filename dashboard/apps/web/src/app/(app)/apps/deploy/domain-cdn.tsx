@@ -56,17 +56,9 @@ export function DomainCdnButton({
         setError(null);
         setDone(null);
         startTransition(async () => {
-            const result = await purgeDomainCacheAction({
-                domainId,
-                ...(prefix.trim() ? { prefix: prefix.trim() } : {})
-            });
+            const result = await purgeDomainCacheAction({ domainId, ...(prefix.trim() ? { prefix: prefix.trim() } : {}) });
             if (result.error) setError(result.error);
-            else
-                setDone(
-                    prefix.trim()
-                        ? `Emptied ${hostname}/${prefix.trim().replace(/^\/+/, "")}.`
-                        : `Emptied the cache for ${hostname}.`
-                );
+            else setDone(prefix.trim() ? `Emptied ${hostname}/${prefix.trim().replace(/^\/+/, "")}.` : `Emptied the cache for ${hostname}.`);
         });
     }
 
@@ -89,28 +81,20 @@ export function DomainCdnButton({
                     <DialogHeader>
                         <DialogTitle>Cloudflare CDN</DialogTitle>
                         <DialogDescription>
-                            Serves {hostname} through Cloudflare&apos;s proxy, which caches static
-                            assets at its edge. Needs the domain&apos;s DNS on the Cloudflare
-                            account connected under Domains.
+                            Serves {hostname} through Cloudflare&apos;s proxy, which caches static assets at its edge. Needs the
+                            domain&apos;s DNS on the Cloudflare account connected under Domains.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
                         <label className="flex items-center gap-2 text-sm">
-                            <Switch
-                                checked={enabled}
-                                disabled={pending}
-                                onChange={toggle}
-                                aria-label="Serve through Cloudflare"
-                            />
-                            {enabled
-                                ? "Served through Cloudflare"
-                                : "Not served through Cloudflare"}
+                            <Switch checked={enabled} disabled={pending} onChange={toggle} aria-label="Serve through Cloudflare" />
+                            {enabled ? "Served through Cloudflare" : "Not served through Cloudflare"}
                         </label>
                         {enabled ? (
                             <div className="flex flex-col gap-2">
                                 <p className="text-xs text-muted-foreground">
-                                    The cache is emptied after every successful deploy. Empty it
-                                    now, for the whole domain or under one path.
+                                    The cache is emptied after every successful deploy. Empty it now, for the whole domain or
+                                    under one path.
                                 </p>
                                 <Input
                                     value={prefix}
@@ -118,9 +102,7 @@ export function DomainCdnButton({
                                     placeholder="Path, e.g. assets/ (blank for everything)"
                                 />
                                 {prefix.trim() && !valid.success ? (
-                                    <p className="text-xs text-warning">
-                                        {valid.error.issues[0]?.message}
-                                    </p>
+                                    <p className="text-xs text-warning">{valid.error.issues[0]?.message}</p>
                                 ) : null}
                             </div>
                         ) : null}
@@ -133,8 +115,7 @@ export function DomainCdnButton({
                         </Button>
                         {enabled ? (
                             <Button disabled={pending || !valid.success} onClick={purge}>
-                                {pending ? <Loader2 className="size-4 animate-spin" /> : null} Empty
-                                cache
+                                {pending ? <Loader2 className="size-4 animate-spin" /> : null} Empty cache
                             </Button>
                         ) : null}
                     </DialogFooter>

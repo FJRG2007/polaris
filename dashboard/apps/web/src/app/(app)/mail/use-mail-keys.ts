@@ -51,10 +51,7 @@ function typing(target: EventTarget | null): boolean {
  *  on every render. */
 const DEFAULT_KEYMAP: core.MailKeymap = {};
 
-export function useMailKeys(
-    actions: MailKeyActions,
-    keymap: core.MailKeymap = DEFAULT_KEYMAP
-): void {
+export function useMailKeys(actions: MailKeyActions, keymap: core.MailKeymap = DEFAULT_KEYMAP): void {
     // Held in a ref so a screen can close over fresh state without the listener
     // being torn down and rebound on every render.
     const held = useRef(actions);
@@ -78,11 +75,7 @@ export function useMailKeys(
             // it is the chord every list in every file manager has. Handled
             // before the bail below, which exists to leave the browser's own
             // chords alone.
-            if (
-                (event.metaKey || event.ctrlKey) &&
-                !event.altKey &&
-                event.key.toLowerCase() === "a"
-            ) {
+            if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a") {
                 return run(now.selectAll);
             }
             if (event.metaKey || event.ctrlKey || event.altKey) return;

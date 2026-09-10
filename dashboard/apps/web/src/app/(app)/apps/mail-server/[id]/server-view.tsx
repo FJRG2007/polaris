@@ -42,9 +42,7 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
         if (next === "overview") query.delete("tab");
         else query.set("tab", next);
         const search = query.toString();
-        router.replace(`/apps/mail-server/${serverId}${search ? `?${search}` : ""}`, {
-            scroll: false
-        });
+        router.replace(`/apps/mail-server/${serverId}${search ? `?${search}` : ""}`, { scroll: false });
     }
 
     return (
@@ -58,10 +56,7 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
                 >
                     <ArrowLeft className="size-4" />
                 </Link>
-                <h1
-                    className="min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground"
-                    title={hostname}
-                >
+                <h1 className="min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground" title={hostname}>
                     {hostname}
                 </h1>
             </div>
@@ -76,9 +71,7 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
                             onClick={() => choose(entry.id)}
                             className={cn(
                                 "shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
-                                tab === entry.id
-                                    ? "bg-muted font-medium text-foreground"
-                                    : "text-muted-foreground"
+                                tab === entry.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground"
                             )}
                         >
                             {entry.label}

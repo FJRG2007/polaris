@@ -117,8 +117,7 @@ async function insideCheckout(root: string, path: string): Promise<boolean> {
 async function readRepoFile(root: string, path: string, limit: number): Promise<string | null> {
     try {
         const info = await lstat(path);
-        if (!info.isFile() || info.size > limit || !(await insideCheckout(root, dirname(path))))
-            return null;
+        if (!info.isFile() || info.size > limit || !(await insideCheckout(root, dirname(path)))) return null;
         const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
         try {
             const buffer = Buffer.alloc(info.size + 1);
@@ -146,11 +145,7 @@ async function writeRepoFile(root: string, path: string, text: string): Promise<
 }
 
 /** The text of the detection manifests present in a directory. */
-async function readTexts(
-    root: string,
-    directory: string,
-    files: readonly string[]
-): Promise<Record<string, string>> {
+async function readTexts(root: string, directory: string, files: readonly string[]): Promise<Record<string, string>> {
     const texts: Record<string, string> = {};
     for (const name of LANGUAGE_FILES) {
         if (!files.includes(name)) continue;
@@ -228,14 +223,10 @@ async function snapshot(dir: string, rootDirectory: string | undefined): Promise
     const levels = await Promise.all(
         paths.map(async (path, at) => {
             const directory = path ? join(dir, path) : dir;
-            const [files, manifest] = await Promise.all([
-                listDirectory(dir, directory),
-                readManifest(dir, directory)
-            ]);
+            const [files, manifest] = await Promise.all([listDirectory(dir, directory), readManifest(dir, directory)]);
             // Only the service's own directory is read for the other languages'
             // manifests; the levels above it only matter to a JavaScript workspace.
-            const texts =
-                at === paths.length - 1 ? await readTexts(dir, directory, files) : undefined;
+            const texts = at === paths.length - 1 ? await readTexts(dir, directory, files) : undefined;
             return { path, files, manifest, texts };
         })
     );
@@ -259,10 +250,7 @@ export async function configureBuild(
 ): Promise<{ root?: string; dockerfile?: string }> {
     const rootDirectory = commands.rootDirectory || undefined;
     const detected = await snapshot(dir, rootDirectory).then((found) =>
-        detectBuild(found, {
-            languages: commands.languages,
-            runtimeVersion: commands.runtimeVersion
-        })
+        detectBuild(found, { languages: commands.languages, runtimeVersion: commands.runtimeVersion })
     );
     const buildRoot = detected?.buildRoot ?? rootDirectory ?? "";
     const configDir = buildRoot ? join(dir, buildRoot) : dir;
@@ -316,13 +304,8 @@ export async function configureBuild(
         start: commands.startCommand
     });
 
-    const overridden = (["installCommand", "buildCommand", "startCommand"] as const).filter(
-        (key) => commands[key]
-    );
-    if (overridden.length > 0)
-        log(
-            `Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`
-        );
+    const overridden = (["installCommand", "buildCommand", "startCommand"] as const).filter((key) => commands[key]);
+    if (overridden.length > 0) log(`Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`);
     else if (!detected) log("No framework recognized; letting the builder work it out.\n");
 
     if (config) await writeRepoFile(dir, join(configDir, "nixpacks.toml"), config);
@@ -374,8 +357,7 @@ export function gitBuildContext(
         } catch (error) {
             await rm(dir, { recursive: true, force: true });
             const refusal = cloneRefusal(said, source);
-            if (!refusal)
-                throw new Error(error instanceof Error ? error.message : "the clone failed");
+            if (!refusal) throw new Error(error instanceof Error ? error.message : "the clone failed");
             const more = source.explain ? await source.explain().catch(() => null) : null;
             throw new Error(more ? `${refusal} ${more}` : refusal);
         }
@@ -416,9 +398,7 @@ export async function contextFromDirectory(
         try {
             configured = await configureBuild(dir, commands, log);
         } catch (error) {
-            log(
-                `Could not inspect the source: ${error instanceof Error ? error.message : "unknown error"}\n`
-            );
+            log(`Could not inspect the source: ${error instanceof Error ? error.message : "unknown error"}\n`);
         }
     }
 
@@ -470,21 +450,9 @@ async function checkoutCommit(
     });
     if (head.trim().toLowerCase().startsWith(sha.toLowerCase())) return;
     const config = source.authHeader ? ["-c", `http.extraHeader=${source.authHeader}`] : [];
-    onOutput(
-        Buffer.from(`The branch has moved on; building ${sha.slice(0, 7)} as this deploy asked.\n`)
-    );
-    await runCommand(
-        "git",
-        [...config, "-C", dir, "fetch", "--depth", "1", "origin", sha],
-        onOutput,
-        NO_PROMPTS
-    );
-    await runCommand(
-        "git",
-        ["-C", dir, "checkout", "--detach", "FETCH_HEAD"],
-        onOutput,
-        NO_PROMPTS
-    );
+    onOutput(Buffer.from(`The branch has moved on; building ${sha.slice(0, 7)} as this deploy asked.\n`));
+    await runCommand("git", [...config, "-C", dir, "fetch", "--depth", "1", "origin", sha], onOutput, NO_PROMPTS);
+    await runCommand("git", ["-C", dir, "checkout", "--detach", "FETCH_HEAD"], onOutput, NO_PROMPTS);
 }
 
 function runCommand(

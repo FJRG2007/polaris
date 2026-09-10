@@ -20,16 +20,7 @@ import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import { drawFavicon } from "@/lib/favicon";
 import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
-import {
-    Badge,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    SegmentedControl,
-    Switch,
-    cn
-} from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, SegmentedControl, Switch, cn } from "@polaris/ui";
 import {
     notificationSoundEnabled,
     playNotificationSound,
@@ -64,9 +55,7 @@ export function NotificationSettingsView({
     senders: SmsSenderView[];
     deliveries: DeliveryView[];
 }) {
-    const [state, setState] = useState(
-        () => new Map(rules.map((entry) => [entry.event, entry.rule]))
-    );
+    const [state, setState] = useState(() => new Map(rules.map((entry) => [entry.event, entry.rule])));
     const [error, setError] = useState<string | null>(null);
     const [, startSaving] = useTransition();
 
@@ -110,10 +99,7 @@ export function NotificationSettingsView({
                 />
             ))}
 
-            <DestinationsCard
-                destinations={destinations}
-                smsReady={senders.some((s) => s.status === "connected")}
-            />
+            <DestinationsCard destinations={destinations} smsReady={senders.some((s) => s.status === "connected")} />
             <DeliveryLog deliveries={deliveries} />
         </div>
     );
@@ -266,9 +252,7 @@ function EventGroup({
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium">{entry.label}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {entry.description}
-                                        </p>
+                                        <p className="text-xs text-muted-foreground">{entry.description}</p>
                                     </div>
                                     {isMuted(rule) ? <Badge>Muted</Badge> : null}
                                 </div>
@@ -306,9 +290,7 @@ function RuleChips({
         const on = rule.destinations.includes(id);
         onChange(eventId, {
             ...rule,
-            destinations: on
-                ? rule.destinations.filter((entry) => entry !== id)
-                : [...rule.destinations, id]
+            destinations: on ? rule.destinations.filter((entry) => entry !== id) : [...rule.destinations, id]
         });
     }
 
@@ -337,11 +319,7 @@ function RuleChips({
                     label={destination.name}
                     on={rule.destinations.includes(destination.id)}
                     disabled={!destination.enabled}
-                    title={
-                        destination.enabled
-                            ? destination.targetHint
-                            : "This destination is switched off"
-                    }
+                    title={destination.enabled ? destination.targetHint : "This destination is switched off"}
                     onClick={() => toggleDestination(destination.id)}
                 />
             ))}

@@ -38,24 +38,14 @@ export type UploadedReleaseMeta = z.infer<typeof uploadedReleaseMetaSchema>;
 async function repositoryOf(applicationId: string): Promise<string> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
-        select: {
-            id: true,
-            slug: true,
-            environment: { select: { project: { select: { slug: true } } } }
-        }
+        select: { id: true, slug: true, environment: { select: { project: { select: { slug: true } } } } }
     });
     if (!app) throw new DeployApiRefusal(404, "Service not found.");
-    return releaseImage(
-        serviceName(app.environment.project.slug, app.slug, app.id),
-        app.id
-    ).replace(/:[a-f0-9]{12}$/, "");
+    return releaseImage(serviceName(app.environment.project.slug, app.slug, app.id), app.id).replace(/:[a-f0-9]{12}$/, "");
 }
 
 /** Where to tag an image before uploading it: `<repository>:<12 hex>`. */
-export async function uploadTarget(
-    caller: DeployCaller,
-    ref: string
-): Promise<{ repository: string }> {
+export async function uploadTarget(caller: DeployCaller, ref: string): Promise<{ repository: string }> {
     requireScope(caller, "deploy.manage");
     const { applicationId } = await resolveService(caller, ref, "deploy.run");
     return { repository: await repositoryOf(applicationId) };
@@ -76,56 +66,29 @@ export async function deployUploadedRelease(
     const { access, applicationId } = await resolveService(caller, ref, "deploy.run");
     const repository = await repositoryOf(applicationId);
     const tags = await archiveImageTags(createReadStream(archive.file)).catch(() => null);
-    if (!tags)
-        throw new DeployApiRefusal(
-            400,
-            "That is not a `docker save` archive with a tagged image in it."
-        );
+    if (!tags) throw new DeployApiRefusal(400, "That is not a `docker save` archive with a tagged image in it.");
     const distinct = [...new Set(tags)];
     const image = distinct[0];
-    if (
-        distinct.length !== 1 ||
-        !image ||
-        !isReleaseImage(image) ||
-        !image.startsWith(`${repository}:`)
-    ) {
-        throw new DeployApiRefusal(
-            400,
-            `The archive must hold one image, tagged ${repository}:<12 hex characters>.`
-        );
+    if (distinct.length !== 1 || !image || !isReleaseImage(image) || !image.startsWith(`${repository}:`)) {
+        throw new DeployApiRefusal(400, `The archive must hold one image, tagged ${repository}:<12 hex characters>.`);
     }
     const used = await prisma.deployment.findFirst({
         where: { deployableType: "application", deployableId: applicationId, imageTag: image },
         select: { id: true }
     });
-    if (used)
-        throw new DeployApiRefusal(
-            409,
-            "An image with that tag was deployed before. Tag the new build with a new one."
-        );
-    const deploymentId = await deployService.deployApplication(
-        applicationId,
-        access.ownerId,
-        caller.userId,
-        {
-            trigger: "upload",
-            commitSha: meta.commitSha,
-            commitMessage: meta.commitMessage,
-            prebuilt: { image, archive: archive.file, bytes: archive.bytes }
-        }
-    );
+    if (used) throw new DeployApiRefusal(409, "An image with that tag was deployed before. Tag the new build with a new one.");
+    const deploymentId = await deployService.deployApplication(applicationId, access.ownerId, caller.userId, {
+        trigger: "upload",
+        commitSha: meta.commitSha,
+        commitMessage: meta.commitMessage,
+        prebuilt: { image, archive: archive.file, bytes: archive.bytes }
+    });
     await recordDeployAudit({
         actorId: caller.userId,
         action: "deploy.app.deploy",
         targetType: "application",
         targetId: applicationId,
-        metadata: {
-            via: caller.via,
-            keyId: caller.keyId,
-            deploymentId,
-            uploaded: image,
-            bytes: archive.bytes
-        }
+        metadata: { via: caller.via, keyId: caller.keyId, deploymentId, uploaded: image, bytes: archive.bytes }
     });
     return { deploymentId, image };
 }

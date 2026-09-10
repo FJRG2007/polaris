@@ -149,9 +149,7 @@ export function AcceptInviteForm({
                                 }}
                                 aria-invalid={Boolean(form.error("name"))}
                             />
-                            {form.error("name") ? (
-                                <p className="text-xs text-danger">{form.error("name")}</p>
-                            ) : null}
+                            {form.error("name") ? <p className="text-xs text-danger">{form.error("name")}</p> : null}
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Username</label>
@@ -182,10 +180,8 @@ export function AcceptInviteForm({
                                 onBlur={() => form.markTouched("password")}
                                 aria-invalid={Boolean(form.error("password") ?? passwordError)}
                             />
-                            {(form.error("password") ?? passwordError) ? (
-                                <p className="text-xs text-danger">
-                                    {form.error("password") ?? passwordError}
-                                </p>
+                            {form.error("password") ?? passwordError ? (
+                                <p className="text-xs text-danger">{form.error("password") ?? passwordError}</p>
                             ) : null}
                             {/* And what is true about it either way. The refusal
                                 above only appears once the password is long

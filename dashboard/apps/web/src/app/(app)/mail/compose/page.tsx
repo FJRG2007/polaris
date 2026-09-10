@@ -25,10 +25,7 @@ export default async function MailComposePage({
     const seed = url ? core.parseMailto(url) : null;
     return (
         <>
-            <MailListPage
-                route={MAIL_VIEWS.inbox!}
-                searchParams={searchParams as MailSearchParams}
-            />
+            <MailListPage route={MAIL_VIEWS.inbox!} searchParams={searchParams as MailSearchParams} />
             <OpenFromLink seed={seed} />
         </>
     );

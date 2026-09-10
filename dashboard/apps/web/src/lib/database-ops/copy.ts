@@ -47,19 +47,15 @@ export async function copyInto(
     source: { fromDatabaseId: string } | { fromUrl: string }
 ): Promise<{ operationId: string }> {
     const into = await instanceContext(databaseId, ownerId);
-    if (!isDumpableEngine(into.engine))
-        throw new DatabaseOperationError("Data cannot be copied into an object store this way.");
+    if (!isDumpableEngine(into.engine)) throw new DatabaseOperationError("Data cannot be copied into an object store this way.");
 
     let from: InstanceContext | null = null;
     let external: ReturnType<typeof parseExternalSource> = null;
     if ("fromDatabaseId" in source) {
-        if (source.fromDatabaseId === databaseId)
-            throw new DatabaseOperationError("A database cannot be copied into itself.");
+        if (source.fromDatabaseId === databaseId) throw new DatabaseOperationError("A database cannot be copied into itself.");
         from = await instanceContext(source.fromDatabaseId, ownerId);
         if (family(from.engine) !== family(into.engine)) {
-            throw new DatabaseOperationError(
-                `${from.name} runs a different engine from ${into.name}.`
-            );
+            throw new DatabaseOperationError(`${from.name} runs a different engine from ${into.name}.`);
         }
     } else {
         external = parseExternalSource(source.fromUrl, into.engine as ManagedEngine);
@@ -69,14 +65,10 @@ export async function copyInto(
             );
         }
         if (family(external.engine) !== family(into.engine)) {
-            throw new DatabaseOperationError(
-                `That connection string is for a different engine from ${into.name}.`
-            );
+            throw new DatabaseOperationError(`That connection string is for a different engine from ${into.name}.`);
         }
         if (external.engine !== "redis" && !external.database) {
-            throw new DatabaseOperationError(
-                "Name the database to copy at the end of the connection string."
-            );
+            throw new DatabaseOperationError("Name the database to copy at the end of the connection string.");
         }
     }
 
@@ -96,11 +88,7 @@ export async function copyInto(
 
 /** A backup of the destination first, when it is protected - its contents are
  *  about to be replaced. */
-async function safetyCopy(
-    databaseId: string,
-    actorId: string,
-    operation: OperationHandle
-): Promise<void> {
+async function safetyCopy(databaseId: string, actorId: string, operation: OperationHandle): Promise<void> {
     const resource = await prisma.protectedResource.findFirst({
         where: { selector: buildSelector("managed-database", [databaseId]) },
         select: { id: true }
@@ -110,9 +98,7 @@ async function safetyCopy(
     const { runBackup } = await import("@/lib/backups/service");
     const copy = await runBackup(resource.id, { trigger: "pre-restore", actorUserId: actorId });
     if (copy.status === "failed") {
-        throw new DatabaseOperationError(
-            "The backup of what is there now failed, so nothing was copied."
-        );
+        throw new DatabaseOperationError("The backup of what is there now failed, so nothing was copied.");
     }
 }
 
@@ -122,8 +108,7 @@ async function copyFromManaged(
     ownerId: string,
     operation: OperationHandle
 ): Promise<void> {
-    if (!isDumpableEngine(from.engine))
-        throw new DatabaseOperationError("That source cannot be dumped.");
+    if (!isDumpableEngine(from.engine)) throw new DatabaseOperationError("That source cannot be dumped.");
     await operation.step(`Copying out ${from.name}`);
     const artifact = await dumpInContainer({
         ownerId,
@@ -136,17 +121,11 @@ async function copyFromManaged(
         authDatabase: from.hosted ? from.own.database : "admin",
         label: from.slug
     }).catch((error: unknown) => {
-        throw new DatabaseOperationError(
-            `Copying out ${from.name} failed${error instanceof Error ? `: ${error.message}` : ""}`
-        );
+        throw new DatabaseOperationError(`Copying out ${from.name} failed${error instanceof Error ? `: ${error.message}` : ""}`);
     });
     try {
         await operation.progress(0, artifact.sizeBytes);
-        await restoreDumpInto(
-            into,
-            { local: artifact.path },
-            { operation, sourceDatabase: from.own.database }
-        );
+        await restoreDumpInto(into, { local: artifact.path }, { operation, sourceDatabase: from.own.database });
     } finally {
         await artifact.cleanup();
     }
@@ -173,18 +152,9 @@ async function copyFromExternal(
             while (running) {
                 await new Promise((resolve) => setTimeout(resolve, 3000));
                 if (!running) break;
-                const size = await ports
-                    .runIn(into.container, [
-                        "sh",
-                        "-c",
-                        'wc -c < "$1" 2>/dev/null || echo 0',
-                        "polaris",
-                        file
-                    ])
-                    .catch(() => null);
+                const size = await ports.runIn(into.container, ["sh", "-c", 'wc -c < "$1" 2>/dev/null || echo 0', "polaris", file]).catch(() => null);
                 const bytes = Number.parseInt(size?.output.trim() ?? "", 10);
-                if (Number.isFinite(bytes) && bytes > 0)
-                    await operation.progress(bytes).catch(() => undefined);
+                if (Number.isFinite(bytes) && bytes > 0) await operation.progress(bytes).catch(() => undefined);
             }
         })();
         try {
@@ -202,9 +172,5 @@ async function copyFromExternal(
             await measuring;
         }
     });
-    await restoreDumpInto(
-        into,
-        { inside: file },
-        { operation, sourceDatabase: source.database || undefined }
-    );
+    await restoreDumpInto(into, { inside: file }, { operation, sourceDatabase: source.database || undefined });
 }

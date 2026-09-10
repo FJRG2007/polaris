@@ -23,9 +23,7 @@ describe("an asleep service at the edge", () => {
         expect(config).toContain(`query: "${VACANT_ASLEEP_PATH}"`);
         expect(config).toMatch(/polaris-app-d1:\n[\s\S]*?middlewares: \[polaris-vacant-asleep/);
         // The plain-http router only redirects; it never shows either page.
-        expect(config).not.toMatch(
-            /polaris-app-d1-http:[\s\S]*?polaris-vacant-asleep[\s\S]*?polaris-redirect-https/
-        );
+        expect(config).not.toMatch(/polaris-app-d1-http:[\s\S]*?polaris-vacant-asleep[\s\S]*?polaris-redirect-https/);
     });
 
     it("keeps an awake service on the page that says it is down", () => {

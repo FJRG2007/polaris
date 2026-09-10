@@ -16,12 +16,7 @@ import { SwarmRuntime } from "../src/runtime/swarm.js";
 import { ComposeRuntime } from "../src/runtime/compose.js";
 import { RELEASE_IMAGE_GONE } from "../src/runtime/release.js";
 import type { AppDeployPlan, RuntimeContext } from "../src/runtime/driver.js";
-import {
-    isReleaseImage,
-    pinDockerfile,
-    releaseImage,
-    singleFileTar
-} from "../src/release-image.js";
+import { isReleaseImage, pinDockerfile, releaseImage, singleFileTar } from "../src/release-image.js";
 
 const DEPLOYMENT = "0190f7a2-5b1c-7d3e-8f00-1234567890ab";
 

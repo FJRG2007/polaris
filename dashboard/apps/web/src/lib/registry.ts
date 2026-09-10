@@ -121,10 +121,7 @@ function splitImage(image: string): { host: string; repository: string } {
     const host = first && rest.length > 0 && /[.:]/.test(first) ? first.toLowerCase() : null;
     if (host && !DOCKER_HUB.has(host)) return { host, repository: rest.join("/") };
     const path = host ? rest : [first ?? "", ...rest];
-    return {
-        host: "registry-1.docker.io",
-        repository: path.length > 1 ? path.join("/") : `library/${path.join("/")}`
-    };
+    return { host: "registry-1.docker.io", repository: path.length > 1 ? path.join("/") : `library/${path.join("/")}` };
 }
 
 /** One name for every way of writing the same image and tag - "nginx",
@@ -254,13 +251,7 @@ export async function readPublishedImage(image: string, tag: string): Promise<Pu
     const scope = `${host}/${repository}`;
     const token = { value: cachedToken(scope) };
 
-    const head = await registryGet(
-        host,
-        `/v2/${repository}/manifests/${encodeURIComponent(tag)}`,
-        ACCEPT,
-        token,
-        scope
-    );
+    const head = await registryGet(host, `/v2/${repository}/manifests/${encodeURIComponent(tag)}`, ACCEPT, token, scope);
     if (!head.ok) throw new Error(`the registry answered ${head.status} for ${image}:${tag}`);
     const digest = head.headers.get("docker-content-digest");
 
@@ -280,36 +271,20 @@ export async function readPublishedImage(image: string, tag: string): Promise<Pu
     let config = index.config?.digest ?? null;
     if (!config && index.manifests?.length) {
         const entry =
-            index.manifests.find(
-                (item) => item.platform?.architecture === "amd64" && item.platform?.os === "linux"
-            ) ?? index.manifests[0];
+            index.manifests.find((item) => item.platform?.architecture === "amd64" && item.platform?.os === "linux") ??
+            index.manifests[0];
         if (!entry) throw new Error("the registry returned an empty manifest list");
-        const platform = await registryGet(
-            host,
-            `/v2/${repository}/manifests/${entry.digest}`,
-            ACCEPT,
-            token,
-            scope
-        );
-        if (!platform.ok)
-            throw new Error(`the registry answered ${platform.status} for a platform manifest`);
+        const platform = await registryGet(host, `/v2/${repository}/manifests/${entry.digest}`, ACCEPT, token, scope);
+        if (!platform.ok) throw new Error(`the registry answered ${platform.status} for a platform manifest`);
         config = manifestSchema.parse(await platform.json()).config?.digest ?? null;
     }
     if (!config) throw new Error("the published image carries no config to read");
 
     // Blob reads redirect to the registry's storage backend; fetch follows that.
-    const blob = await registryGet(
-        host,
-        `/v2/${repository}/blobs/${config}`,
-        "application/json",
-        token,
-        scope
-    );
+    const blob = await registryGet(host, `/v2/${repository}/blobs/${config}`, "application/json", token, scope);
     if (!blob.ok) throw new Error(`the registry answered ${blob.status} for the image config`);
     const parsed = configSchema.parse(await blob.json());
-    const stamped = (parsed.config?.Env ?? []).find((entry) =>
-        entry.startsWith("POLARIS_BUILD_SHA=")
-    );
+    const stamped = (parsed.config?.Env ?? []).find((entry) => entry.startsWith("POLARIS_BUILD_SHA="));
 
     const published: PublishedImage = {
         digest,

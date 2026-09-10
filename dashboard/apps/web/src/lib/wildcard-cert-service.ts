@@ -131,14 +131,8 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
 
 /** Run the ACME order for `*.base` (and the base itself, which a wildcard does not
  *  cover) against the DNS-01 challenge. */
-async function orderWildcard(
-    base: string,
-    token: string
-): Promise<{ certificate: string; key: string }> {
-    return orderDns01Certificate({
-        names: [`*.${base}`, base],
-        provider: await cloudflareDns01(token, base)
-    });
+async function orderWildcard(base: string, token: string): Promise<{ certificate: string; key: string }> {
+    return orderDns01Certificate({ names: [`*.${base}`, base], provider: await cloudflareDns01(token, base) });
 }
 
 /**

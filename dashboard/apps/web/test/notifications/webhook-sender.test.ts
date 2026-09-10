@@ -119,10 +119,7 @@ describe("Teams and Telegram", () => {
         expect(result).toEqual({});
         const body = received.find((entry) => entry.path === "/teams")?.body as {
             type: string;
-            attachments: {
-                contentType: string;
-                content: { type: string; actions: { url: string }[] };
-            }[];
+            attachments: { contentType: string; content: { type: string; actions: { url: string }[] } }[];
         };
         expect(body.type).toBe("message");
         expect(body.attachments[0]?.contentType).toBe("application/vnd.microsoft.card.adaptive");
@@ -131,9 +128,7 @@ describe("Teams and Telegram", () => {
     });
 
     it("posts Telegram's sendMessage with the chat from the URL in the body", async () => {
-        const fetchMock = vi
-            .spyOn(globalThis, "fetch")
-            .mockResolvedValue(new Response("{}", { status: 200 }));
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
         try {
             const result = await sendWebhook(
                 "https://api.telegram.org/bot123:abc/sendMessage?chat_id=-100",
@@ -152,11 +147,7 @@ describe("Teams and Telegram", () => {
     });
 
     it("says so when a Telegram destination does not name a chat", async () => {
-        const result = await sendWebhook(
-            "https://api.telegram.org/bot123:abc/sendMessage",
-            "telegram",
-            PAYLOAD
-        );
+        const result = await sendWebhook("https://api.telegram.org/bot123:abc/sendMessage", "telegram", PAYLOAD);
         expect(result.error).toMatch(/chat_id/);
     });
 });

@@ -19,12 +19,7 @@ const config = { min: 1, max: 4, cpuPercent: 50 };
 const NOW = Date.parse("2026-09-10T12:00:00Z");
 
 /** Feed the same reading `times` times, a minute apart. */
-function feed(
-    replicas: number,
-    cpu: number,
-    times: number,
-    state: AutoscaleState = AUTOSCALE_IDLE
-) {
+function feed(replicas: number, cpu: number, times: number, state: AutoscaleState = AUTOSCALE_IDLE) {
     let current = { replicas, state };
     for (let tick = 0; tick < times; tick++) {
         current = autoscaleStep(config, current.replicas, cpu, current.state, NOW + tick * 60_000);
@@ -82,11 +77,7 @@ describe("the autoscale setting", () => {
     });
 
     it("reads a stored value that no longer validates as unset", () => {
-        expect(parseAutoscale('{"min":1,"max":2,"cpuPercent":50}')).toEqual({
-            min: 1,
-            max: 2,
-            cpuPercent: 50
-        });
+        expect(parseAutoscale('{"min":1,"max":2,"cpuPercent":50}')).toEqual({ min: 1, max: 2, cpuPercent: 50 });
         expect(parseAutoscale('{"min":0}')).toBeNull();
         expect(parseAutoscale("nope")).toBeNull();
         expect(parseAutoscale(null)).toBeNull();

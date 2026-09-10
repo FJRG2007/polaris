@@ -276,11 +276,7 @@ export async function probeAllDomains(): Promise<void> {
         // URL - and a probe that cannot even be made would read as the site being down.
         // An asleep service is stopped on purpose; probing it would report an outage
         // that is not one.
-        where: {
-            enabled: true,
-            NOT: { hostname: { startsWith: "*." } },
-            application: { asleepSince: null }
-        },
+        where: { enabled: true, NOT: { hostname: { startsWith: "*." } }, application: { asleepSince: null } },
         select: {
             id: true,
             hostname: true,

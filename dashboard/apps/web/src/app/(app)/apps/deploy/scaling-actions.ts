@@ -44,16 +44,10 @@ export async function saveServiceScalingAction(
 ): Promise<{ error?: string; redeployed?: boolean }> {
     const user = await requirePermission("deploy.manage");
     const parsed = scalingInputSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the scaling settings" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the scaling settings" };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
-        const outcome = await scaling.setServiceScaling(
-            applicationId,
-            access.ownerId,
-            user.id,
-            parsed.data
-        );
+        const outcome = await scaling.setServiceScaling(applicationId, access.ownerId, user.id, parsed.data);
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.scaling",

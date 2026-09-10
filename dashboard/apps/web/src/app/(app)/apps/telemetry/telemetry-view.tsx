@@ -130,14 +130,12 @@ export function TelemetryView({
         // The same rule as the list above, and this is the call it was written
         // for: opening a fault from a tab whose build had been replaced refused
         // silently, so the row was pressed and the screen did not move.
-        void runAction(() => actions.openIssueAction(project.id, issueId), setError).then(
-            (result) => {
-                if (!live) return;
-                if (!result) return;
-                if (result.error) setError(result.error);
-                setIssue(result.issue ?? null);
-            }
-        );
+        void runAction(() => actions.openIssueAction(project.id, issueId), setError).then((result) => {
+            if (!live) return;
+            if (!result) return;
+            if (result.error) setError(result.error);
+            setIssue(result.issue ?? null);
+        });
         return () => {
             live = false;
         };
@@ -210,10 +208,7 @@ export function TelemetryView({
                     action={<NewProject onDone={load} />}
                 />
                 {error && (
-                    <p
-                        role="alert"
-                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                    >
+                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                         {error}
                     </p>
                 )}
@@ -224,11 +219,7 @@ export function TelemetryView({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => go({ project: null, issue: null })}
-                >
+                <Button variant="ghost" size="sm" onClick={() => go({ project: null, issue: null })}>
                     <ArrowLeft className="size-3.5" />
                     Projects
                 </Button>
@@ -249,10 +240,7 @@ export function TelemetryView({
             </div>
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -270,9 +258,7 @@ export function TelemetryView({
                                 busy={busy}
                                 onBack={() => go({ issue: null })}
                                 onStatus={(next) =>
-                                    act(() =>
-                                        actions.setIssueStatusAction(project.id, issue.id, next)
-                                    )
+                                    act(() => actions.setIssueStatusAction(project.id, issue.id, next))
                                 }
                                 onDelete={async () => {
                                     const result = await act(() =>
@@ -317,10 +303,7 @@ export function TelemetryView({
 function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => void }) {
     return (
         <nav className="lg:w-48 lg:shrink-0">
-            <ScrollRow
-                as="ul"
-                className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
-            >
+            <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
                 {SECTIONS.map((section) => {
                     const active = section.key === open;
                     const Icon = section.icon;
@@ -423,13 +406,14 @@ function ProjectSettings({
                 Accept reports
             </label>
             <p className="text-xs text-muted-foreground">
-                Turned off, the address keeps answering and nothing is stored - which is what stops
-                a crash loop filling this project while somebody works on it.
+                Turned off, the address keeps answering and nothing is stored - which is what
+                stops a crash loop filling this project while somebody works on it.
             </p>
             {error && <p className="text-xs text-danger">{error}</p>}
         </div>
     );
 }
+
 
 function NewProject({ onDone }: { onDone: () => Promise<void> }) {
     const [name, setName] = useState("");
@@ -527,8 +511,8 @@ function ProjectAddress({
                 )}
             </div>
             <p className="text-xs text-muted-foreground">
-                Set it as the DSN of any Sentry client. Events older than {project.retentionDays}{" "}
-                days are removed; how often each fault happened is kept.
+                Set it as the DSN of any Sentry client. Events older than {project.retentionDays} days
+                are removed; how often each fault happened is kept.
             </p>
             {error && <p className="text-xs text-danger">{error}</p>}
 
@@ -541,10 +525,7 @@ function ProjectAddress({
                 description="Every fault it recorded goes with it, and the address stops being accepted."
                 confirmLabel="Delete project"
                 onConfirm={async () => {
-                    await runAction(
-                        () => actions.deleteTelemetryProjectAction(project.id),
-                        setError
-                    );
+                    await runAction(() => actions.deleteTelemetryProjectAction(project.id), setError);
                     setRemoving(false);
                     await onDone();
                 }}
@@ -582,10 +563,7 @@ function IssueList({
                     >
                         <span
                             aria-hidden="true"
-                            className={cn(
-                                "size-2 shrink-0 rounded-full",
-                                LEVEL_TONE[issue.level] ?? LEVEL_TONE.error
-                            )}
+                            className={cn("size-2 shrink-0 rounded-full", LEVEL_TONE[issue.level] ?? LEVEL_TONE.error)}
                         />
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                             <span className="truncate text-sm font-medium" title={issue.title}>
@@ -669,9 +647,7 @@ function IssuePanel({
                         size="sm"
                         variant={issue.status === "resolved" ? "secondary" : "primary"}
                         disabled={busy}
-                        onClick={() =>
-                            onStatus(issue.status === "resolved" ? "unresolved" : "resolved")
-                        }
+                        onClick={() => onStatus(issue.status === "resolved" ? "unresolved" : "resolved")}
                     >
                         <CircleCheck className="size-4" />
                         {issue.status === "resolved" ? "Resolved" : "Resolve"}
@@ -680,9 +656,7 @@ function IssuePanel({
                         size="sm"
                         variant="ghost"
                         disabled={busy}
-                        onClick={() =>
-                            onStatus(issue.status === "ignored" ? "unresolved" : "ignored")
-                        }
+                        onClick={() => onStatus(issue.status === "ignored" ? "unresolved" : "ignored")}
                     >
                         <CircleSlash className="size-4" />
                         {issue.status === "ignored" ? "Ignored" : "Ignore"}
@@ -739,10 +713,7 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="rounded-lg border border-border bg-surface px-3 py-2">
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd
-                className="truncate text-sm font-medium"
-                title={typeof value === "string" ? value : undefined}
-            >
+            <dd className="truncate text-sm font-medium" title={typeof value === "string" ? value : undefined}>
                 {value}
             </dd>
         </div>

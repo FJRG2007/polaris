@@ -8,13 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { sendVacant } from "../src/vacant.js";
 import type { ServerResponse } from "node:http";
-import {
-    VACANT_ASLEEP_PATH,
-    VACANT_DOWN_PATH,
-    VACANT_HEADER,
-    VACANT_HEADER_VALUE,
-    VACANT_PATH
-} from "@polaris/core";
+import { VACANT_ASLEEP_PATH, VACANT_DOWN_PATH, VACANT_HEADER, VACANT_HEADER_VALUE, VACANT_PATH } from "@polaris/core";
 
 /** A ServerResponse stand-in that records what was written to it. */
 function capture() {

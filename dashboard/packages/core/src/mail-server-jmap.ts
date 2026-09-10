@@ -64,8 +64,7 @@ export function fromList<T>(value: unknown): T[] {
 
 /** Read a set the engine sent back as its members. */
 export function fromSet(value: unknown): string[] {
-    if (Array.isArray(value))
-        return value.filter((item): item is string => typeof item === "string");
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
     if (!value || typeof value !== "object") return [];
     return Object.entries(value as Record<string, unknown>)
         .filter(([, member]) => member === true)
@@ -138,14 +137,7 @@ export function domainListCalls(): JmapCall[] {
             "x:Domain/get",
             {
                 "#ids": { resultOf: "q", name: "x:Domain/query", path: "/ids" },
-                properties: [
-                    "id",
-                    "name",
-                    "isEnabled",
-                    "catchAllAddress",
-                    "dnsZoneFile",
-                    "reportAddressUri"
-                ]
+                properties: ["id", "name", "isEnabled", "catchAllAddress", "dnsZoneFile", "reportAddressUri"]
             },
             "domains"
         ]
@@ -169,11 +161,7 @@ export function domainDestroyCall(domainId: string): JmapCall {
  * authorization record for it (RFC 7489 section 7.1).
  */
 export function domainReportAddressCall(domainId: string, address: string): JmapCall {
-    return [
-        "x:Domain/set",
-        { update: { [domainId]: { reportAddressUri: `mailto:${address}` } } },
-        "reports"
-    ];
+    return ["x:Domain/set", { update: { [domainId]: { reportAddressUri: `mailto:${address}` } } }, "reports"];
 }
 
 // ---------------------------------------------------------------------------
@@ -229,16 +217,7 @@ export function accountListCalls(): JmapCall[] {
             "x:Account/get",
             {
                 "#ids": { resultOf: "q", name: "x:Account/query", path: "/ids" },
-                properties: [
-                    "id",
-                    "name",
-                    "domainId",
-                    "emailAddress",
-                    "aliases",
-                    "quotas",
-                    "description",
-                    "roles"
-                ]
+                properties: ["id", "name", "domainId", "emailAddress", "aliases", "quotas", "description", "roles"]
             },
             "accounts"
         ]
@@ -258,11 +237,7 @@ export function accountPasswordCall(accountId: string, password: string): JmapCa
 export function accountQuotaCall(accountId: string, quotaBytes: number | null): JmapCall {
     return [
         "x:Account/set",
-        {
-            update: {
-                [accountId]: { quotas: quotaBytes !== null ? { maxDiskQuota: quotaBytes } : {} }
-            }
-        },
+        { update: { [accountId]: { quotas: quotaBytes !== null ? { maxDiskQuota: quotaBytes } : {} } } },
         "quota"
     ];
 }
@@ -277,13 +252,7 @@ export function accountAliasesCall(
         {
             update: {
                 [accountId]: {
-                    aliases: listOf(
-                        aliases.map((alias) => ({
-                            enabled: true,
-                            name: alias.name,
-                            domainId: alias.domainId
-                        }))
-                    )
+                    aliases: listOf(aliases.map((alias) => ({ enabled: true, name: alias.name, domainId: alias.domainId })))
                 }
             }
         },
@@ -380,9 +349,7 @@ export function relayRouteCreateCall(relay: RelayRoute): JmapCall {
                     implicitTls: relay.implicitTls,
                     allowInvalidCerts: false,
                     authUsername: relay.username,
-                    authSecret: relay.secret
-                        ? { "@type": "Value", secret: relay.secret }
-                        : { "@type": "None" }
+                    authSecret: relay.secret ? { "@type": "Value", secret: relay.secret } : { "@type": "None" }
                 }
             }
         },
@@ -395,10 +362,7 @@ export function routeListCall(): JmapCall[] {
         ["x:MtaRoute/query", {}, "q"],
         [
             "x:MtaRoute/get",
-            {
-                "#ids": { resultOf: "q", name: "x:MtaRoute/query", path: "/ids" },
-                properties: ["id", "name"]
-            },
+            { "#ids": { resultOf: "q", name: "x:MtaRoute/query", path: "/ids" }, properties: ["id", "name"] },
             "routes"
         ]
     ];
@@ -477,9 +441,8 @@ export function downloadPath(
     template: string,
     values: { accountId: string; blobId: string; type: string; name: string }
 ): string {
-    const expanded = template.replace(
-        /\{(accountId|blobId|type|name)\}/g,
-        (_, key: keyof typeof values) => encodeURIComponent(values[key])
+    const expanded = template.replace(/\{(accountId|blobId|type|name)\}/g, (_, key: keyof typeof values) =>
+        encodeURIComponent(values[key])
     );
     const url = new URL(expanded, "http://engine");
     return `${url.pathname}${url.search}`;
@@ -530,9 +493,7 @@ export class StalwartRefusal extends Error {
 /** The arguments of the answer to one call, or the engine's refusal of it. */
 export function answerOf(response: unknown, callId: string): Record<string, unknown> {
     const responses =
-        response &&
-        typeof response === "object" &&
-        Array.isArray((response as { methodResponses?: unknown }).methodResponses)
+        response && typeof response === "object" && Array.isArray((response as { methodResponses?: unknown }).methodResponses)
             ? ((response as { methodResponses: unknown[] }).methodResponses as unknown[])
             : [];
     for (const entry of responses) {

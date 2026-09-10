@@ -25,9 +25,7 @@ describe("an ordinary link", () => {
     });
 
     it("takes several addresses, in the head and in to=, once each", () => {
-        const seed = parseMailto(
-            "mailto:a@example.com,B@Example.com?to=a@example.com,c@example.com"
-        );
+        const seed = parseMailto("mailto:a@example.com,B@Example.com?to=a@example.com,c@example.com");
         expect(seed?.to).toEqual(["a@example.com", "b@example.com", "c@example.com"]);
     });
 
@@ -55,9 +53,7 @@ describe("a link nobody should trust", () => {
     });
 
     it("ignores headers a link has no business setting", () => {
-        const seed = parseMailto(
-            "mailto:a@example.com?in-reply-to=%3Cx%40y%3E&from=boss@example.com"
-        );
+        const seed = parseMailto("mailto:a@example.com?in-reply-to=%3Cx%40y%3E&from=boss@example.com");
         expect(seed).toEqual({ to: ["a@example.com"], cc: [], bcc: [], subject: "", body: "" });
     });
 

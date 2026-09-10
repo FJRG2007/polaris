@@ -33,8 +33,7 @@ export class DeployApiRefusal extends Error {
 /** The service layer's own "not found" sentences, from the access checks and the
  *  owner-scoped queries. Reported as one 404 whichever it was: whether a project
  *  exists is not something a caller who cannot see it is owed. */
-const NOT_FOUND =
-    /^(?:Project|Environment|Service|Application|Database|Domain|Deployment) not found$/;
+const NOT_FOUND = /^(?:Project|Environment|Service|Application|Database|Domain|Deployment) not found$/;
 
 /** What a message from beneath the service layer looks like: paths, daemons,
  *  status codes in brackets, stack frames and multi-line bodies. */

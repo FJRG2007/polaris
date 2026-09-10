@@ -12,15 +12,7 @@ import { formatBytes } from "@polaris/core";
 import { useDisplayFormat } from "@/components/display-format";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { Clock, HardDrive, RefreshCw, TriangleAlert } from "lucide-react";
-import {
-    Badge,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    RadialGauge,
-    type GaugeTone
-} from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, type GaugeTone } from "@polaris/ui";
 
 /** Pick a gauge color from a 0..1 ratio: calm, then warning, then danger. */
 function ratioTone(ratio: number, warn = 0.75, bad = 0.9): GaugeTone {
@@ -64,8 +56,7 @@ export function UnasMetrics({
                 <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
-                        Showing the last reading
-                        {updatedAt !== null ? ` from ${format.time(updatedAt)}` : ""}. {stale}
+                        Showing the last reading{updatedAt !== null ? ` from ${format.time(updatedAt)}` : ""}. {stale}
                     </span>
                 </div>
             ) : null}
@@ -74,8 +65,8 @@ export function UnasMetrics({
                 <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
-                        Storage is at risk. Check the pool below - a degraded RAID keeps serving
-                        data but has no redundancy until the missing disk is replaced.
+                        Storage is at risk. Check the pool below - a degraded RAID keeps serving data but has no
+                        redundancy until the missing disk is replaced.
                     </span>
                 </div>
             ) : null}
@@ -88,11 +79,7 @@ export function UnasMetrics({
                 <CardBody className="grid grid-cols-2 gap-2 py-5">
                     <RadialGauge
                         value={metrics.system.cpuLoad ?? 0}
-                        label={
-                            metrics.system.cpuLoad !== null
-                                ? `${Math.round(metrics.system.cpuLoad * 100)}%`
-                                : "-"
-                        }
+                        label={metrics.system.cpuLoad !== null ? `${Math.round(metrics.system.cpuLoad * 100)}%` : "-"}
                         sublabel="CPU load"
                         tone={ratioTone(metrics.system.cpuLoad ?? 0)}
                     />
@@ -136,25 +123,18 @@ export function UnasMetrics({
                                         {pool.raidLevel ? (
                                             <Badge variant="neutral">{pool.raidLevel}</Badge>
                                         ) : null}
-                                        <Badge
-                                            variant={
-                                                pool.health === "health" ? "success" : "danger"
-                                            }
-                                        >
+                                        <Badge variant={pool.health === "health" ? "success" : "danger"}>
                                             {pool.raidState ?? pool.health}
                                         </Badge>
                                     </span>
                                     <span className="text-muted-foreground">
-                                        {formatBytes(pool.usedBytes)} /{" "}
-                                        {formatBytes(pool.totalBytes)}
+                                        {formatBytes(pool.usedBytes)} / {formatBytes(pool.totalBytes)}
                                     </span>
                                 </div>
                                 <Meter used={pool.usedBytes} total={pool.totalBytes} />
                                 <div className="mt-1 text-xs text-muted-foreground">
                                     {pool.membersPresent}/{pool.membersExpected} disks
-                                    {pool.reasons.length > 0
-                                        ? ` - ${pool.reasons.join(", ").replace(/_/g, " ")}`
-                                        : ""}
+                                    {pool.reasons.length > 0 ? ` - ${pool.reasons.join(", ").replace(/_/g, " ")}` : ""}
                                 </div>
                             </div>
                         ))
@@ -172,9 +152,7 @@ export function UnasMetrics({
                             <div
                                 key={disk.slot}
                                 className={`rounded-md border p-3 ${
-                                    disk.present
-                                        ? "border-border bg-card"
-                                        : "border-dashed border-border/60"
+                                    disk.present ? "border-border bg-card" : "border-dashed border-border/60"
                                 }`}
                             >
                                 <div className="flex items-center justify-between text-sm">
@@ -194,9 +172,7 @@ export function UnasMetrics({
                                 </div>
                                 {disk.present ? (
                                     <div className="mt-2 flex flex-col gap-0.5 text-xs text-muted-foreground">
-                                        <span className="truncate text-foreground">
-                                            {disk.model ?? "Disk"}
-                                        </span>
+                                        <span className="truncate text-foreground">{disk.model ?? "Disk"}</span>
                                         <span>
                                             {formatBytes(disk.sizeBytes)}
                                             {disk.type ? ` ${disk.type}` : ""}
@@ -228,17 +204,7 @@ export function UnasMetrics({
     );
 }
 
-function Stat({
-    icon,
-    label,
-    value,
-    hint
-}: {
-    icon: ReactNode;
-    label: string;
-    value: string;
-    hint: string;
-}) {
+function Stat({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
     return (
         <Card>
             <CardBody className="p-3">

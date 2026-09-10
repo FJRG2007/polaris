@@ -66,10 +66,7 @@ export async function GET(request: Request): Promise<Response> {
 
     const userId = (session.user as { id: string }).id;
     const now = Math.floor(Date.now() / 1000);
-    const [waf, principals] = await Promise.all([
-        resolveWaf(applicationId),
-        principalsOfUser(userId)
-    ]);
+    const [waf, principals] = await Promise.all([resolveWaf(applicationId), principalsOfUser(userId)]);
     const held = new Set(principals.map((entry) => `${entry.principalType}:${entry.principalId}`));
     // Signed in, but this service's firewall names who may reach it and this account is
     // not one of them - or is one of the accounts it refuses. Answered here rather than

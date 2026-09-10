@@ -39,9 +39,7 @@ vi.mock("@/lib/successor-service", () => ({ isOrgSuccessor: async () => false })
 vi.mock("@/lib/privacy-service", () => ({ contactLines: async () => new Map() }));
 vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => [] }));
 
-const { resolveOrgAccess, memberOrgIds, orgCan, readsOrgWhere } = await import(
-    "@/lib/orgs/org-service"
-);
+const { resolveOrgAccess, memberOrgIds, orgCan, readsOrgWhere } = await import("@/lib/orgs/org-service");
 const core = await import("@polaris/core");
 
 beforeEach(() => {
@@ -64,11 +62,7 @@ describe("the restricted role", () => {
     });
 
     it("keeps what was explicitly granted to it, and still not org.read", async () => {
-        state.role = {
-            name: "Restricted",
-            permissions: '["teams.manage","org.read"]',
-            restricted: true
-        };
+        state.role = { name: "Restricted", permissions: '["teams.manage","org.read"]', restricted: true };
         const access = await resolveOrgAccess({ id: "someone", isAdmin: false }, "org-1");
         expect(orgCan(access, "teams.manage")).toBe(true);
         expect(orgCan(access, "org.read")).toBe(false);
@@ -84,10 +78,7 @@ describe("the restricted role", () => {
         await memberOrgIds("someone");
         expect(state.memberWhere).toEqual({ userId: "someone", restricted: false });
         expect(readsOrgWhere("someone")).toEqual({
-            OR: [
-                { ownerId: "someone" },
-                { members: { some: { userId: "someone", restricted: false } } }
-            ]
+            OR: [{ ownerId: "someone" }, { members: { some: { userId: "someone", restricted: false } } }]
         });
     });
 });

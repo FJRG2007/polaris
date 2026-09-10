@@ -36,15 +36,9 @@ export function countsAsVisit(entry: { status: number; userAgent: string | null 
 
 /** Why a service cannot sleep, or null when it can: only one copy, and only on the
  *  machine whose edge log says who visited. */
-export function sleepRefusal(app: {
-    replicas: number;
-    autoscale: string | null;
-    target: { kind: string };
-}): string | null {
-    if (app.target.kind !== "local")
-        return "Only a service on the machine Polaris runs on can sleep.";
-    if (app.replicas > 1 || app.autoscale)
-        return "A service that sleeps runs one copy; turn off the extra copies first.";
+export function sleepRefusal(app: { replicas: number; autoscale: string | null; target: { kind: string } }): string | null {
+    if (app.target.kind !== "local") return "Only a service on the machine Polaris runs on can sleep.";
+    if (app.replicas > 1 || app.autoscale) return "A service that sleeps runs one copy; turn off the extra copies first.";
     return null;
 }
 
@@ -77,10 +71,7 @@ export function sleepDecision(facts: SleepFacts): "sleep" | "wake" | "stay" {
     const idleSince = Math.max(facts.lastVisit ?? 0, facts.awakeSince);
     if (facts.now - idleSince < idleFor) return "stay";
     // No visit in the window: idle only if the window reaches back past the stretch.
-    if (
-        facts.lastVisit === null &&
-        (facts.windowStart === null || facts.windowStart > facts.now - idleFor)
-    ) {
+    if (facts.lastVisit === null && (facts.windowStart === null || facts.windowStart > facts.now - idleFor)) {
         return "stay";
     }
     return "sleep";

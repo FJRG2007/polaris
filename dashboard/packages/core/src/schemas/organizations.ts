@@ -183,8 +183,7 @@ export const ORG_SYSTEM_ROLES: Readonly<
     // a team, a project, a space - and nothing because of where they belong.
     restricted: {
         name: "Restricted",
-        description:
-            "Reaches only what is granted to them. Does not see the roster, the files or internal work.",
+        description: "Reaches only what is granted to them. Does not see the roster, the files or internal work.",
         permissions: [],
         restricted: true
     }
@@ -370,8 +369,7 @@ export const ORG_NEW_PEOPLE_LABELS: Record<OrgNewPeopleMode, string> = {
 
 export const ORG_NEW_PEOPLE_HINTS: Record<OrgNewPeopleMode, string> = {
     admins: "Administrators can invite by email from any organization. Everybody else invites people who already have an account.",
-    managers:
-        "The invitation creates their account when they accept it, so this lets organizations bring in new people.",
+    managers: "The invitation creates their account when they accept it, so this lets organizations bring in new people.",
     off: "Organizations only invite people who already have an account."
 };
 
@@ -390,7 +388,12 @@ export const organizationPolicySchema = z.object({
     maxTeams: limitField,
     newPeople: z.enum(ORG_NEW_PEOPLE_MODES).default("admins"),
     /** Per person, per organization, per hour. Zero is no limit. */
-    invitesPerHour: z.coerce.number().int().min(0).max(10_000).default(ORG_INVITES_PER_HOUR_DEFAULT)
+    invitesPerHour: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(10_000)
+        .default(ORG_INVITES_PER_HOUR_DEFAULT)
 });
 
 export type OrganizationPolicy = z.infer<typeof organizationPolicySchema>;

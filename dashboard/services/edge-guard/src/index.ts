@@ -41,14 +41,10 @@ function loadConfig(): GuardConfig {
 const port = Number(process.env.POLARIS_EDGE_GUARD_PORT ?? 8080);
 const startup = loadConfig();
 if (!startup.secret) {
-    console.warn(
-        "polaris-edge-guard: POLARIS_AUTH_SECRET is unset; require-login routes will always redirect to login."
-    );
+    console.warn("polaris-edge-guard: POLARIS_AUTH_SECRET is unset; require-login routes will always redirect to login.");
 }
 if (!startup.authorizeUrl) {
-    console.warn(
-        "polaris-edge-guard: POLARIS_PUBLIC_URL is unset; login redirects will be malformed until it is set."
-    );
+    console.warn("polaris-edge-guard: POLARIS_PUBLIC_URL is unset; login redirects will be malformed until it is set.");
 }
 
 createGuardServer(loadConfig).listen(port, () => {

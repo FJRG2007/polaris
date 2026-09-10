@@ -93,8 +93,7 @@ export const DropdownMenuSubTrigger = forwardRef<
                 // A submenu whose options all do the same heavy thing is that
                 // thing, and the trigger is the only part of it anybody reads
                 // before deciding. Same red as an item, for the same reason.
-                variant === "danger" &&
-                    "text-danger focus:bg-danger-soft data-[state=open]:bg-danger-soft",
+                variant === "danger" && "text-danger focus:bg-danger-soft data-[state=open]:bg-danger-soft",
                 className
             )}
             {...props}
@@ -142,10 +141,7 @@ export function DropdownMenuSeparator({ className }: { className?: string }) {
     return <RadixMenu.Separator className={cn("-mx-1 my-1 h-px bg-border", className)} />;
 }
 
-export function DropdownMenuLabel({
-    className,
-    ...props
-}: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
+export function DropdownMenuLabel({ className, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
     return (
         <RadixMenu.Label
             className={cn(

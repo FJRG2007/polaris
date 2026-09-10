@@ -80,21 +80,15 @@ export function ChipList({
                     <Plus className="size-4" aria-hidden="true" />
                 </Button>
             </div>
-            {invalid && invalidMessage ? (
-                <p className="text-xs text-danger">{invalidMessage}</p>
-            ) : null}
-            {duplicate && trimmed !== "" ? (
-                <p className="text-xs text-muted-foreground">Already in the list.</p>
-            ) : null}
+            {invalid && invalidMessage ? <p className="text-xs text-danger">{invalidMessage}</p> : null}
+            {duplicate && trimmed !== "" ? <p className="text-xs text-muted-foreground">Already in the list.</p> : null}
             {entries.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                     {entries.map((entry) => (
                         <span
                             key={entry}
                             className={`inline-flex max-w-full items-center gap-1 rounded-md px-2 py-1 text-xs ${
-                                accent === "deny"
-                                    ? "bg-danger-soft text-danger-ink"
-                                    : "bg-muted text-foreground"
+                                accent === "deny" ? "bg-danger-soft text-danger-ink" : "bg-muted text-foreground"
                             }`}
                         >
                             <span className="truncate [overflow-wrap:anywhere]" title={entry}>

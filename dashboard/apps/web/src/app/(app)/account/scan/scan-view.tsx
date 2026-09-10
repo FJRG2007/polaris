@@ -139,8 +139,8 @@ function ReadCard({ stale }: { stale: boolean }) {
             <CardBody className="flex flex-col gap-4">
                 {stale ? (
                     <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                        That code is no longer valid. Ask for a new one on the sign-in screen and
-                        scan it again.
+                        That code is no longer valid. Ask for a new one on the sign-in screen and scan it
+                        again.
                     </p>
                 ) : null}
 
@@ -168,10 +168,7 @@ function ReadCard({ stale }: { stale: boolean }) {
                     )}
                 </div>
 
-                <form
-                    onSubmit={onSubmit}
-                    className="flex flex-col gap-2 border-t border-border pt-4"
-                >
+                <form onSubmit={onSubmit} className="flex flex-col gap-2 border-t border-border pt-4">
                     <label className="text-sm" htmlFor="qr-code">
                         Or type the code under the QR
                     </label>
@@ -275,10 +272,7 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
         <Card className="border-warning-edge">
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-start gap-3">
-                    <ShieldQuestion
-                        className="mt-0.5 size-5 shrink-0 text-muted-foreground"
-                        aria-hidden
-                    />
+                    <ShieldQuestion className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">Allow this sign-in?</h2>
                         <p className="text-xs text-muted-foreground">
@@ -331,10 +325,7 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                         <X className="size-4" />
                         Refuse
                     </Button>
-                    <Button
-                        disabled={busy || !hasPin || pin.length < 4}
-                        onClick={() => void decide(true)}
-                    >
+                    <Button disabled={busy || !hasPin || pin.length < 4} onClick={() => void decide(true)}>
                         <Check className="size-4" />
                         {busy ? "Checking..." : "Allow"}
                     </Button>

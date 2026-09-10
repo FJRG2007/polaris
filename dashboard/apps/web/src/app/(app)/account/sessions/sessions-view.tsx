@@ -51,9 +51,7 @@ function Origin({ session }: { session: SessionView }) {
                 a sign-in that already answered a code is a different thing to
                 allow than one that only had the password. */}
             {describeSignIn(session.signIn).length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    Signed in with {signInSummary(session.signIn)}
-                </p>
+                <p className="text-xs text-muted-foreground">Signed in with {signInSummary(session.signIn)}</p>
             ) : null}
         </>
     );
@@ -219,9 +217,7 @@ export function SessionsView({
                         busyId={busyId}
                         emptyLabel="Nothing is signed in."
                         activityHref={(session) => `/account/activity?session=${session.id}`}
-                        onRevoke={(session) =>
-                            void (session.current ? signOutHere() : revoke(session))
-                        }
+                        onRevoke={(session) => void (session.current ? signOutHere() : revoke(session))}
                         onPin={(session, pinned) => void pin(session, pinned)}
                     />
                 </CardBody>

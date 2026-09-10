@@ -60,8 +60,8 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
 
                 {thread.leftOut > 0 ? (
                     <p className="mb-4 text-[12px] text-[#555555]">
-                        The {thread.leftOut} oldest{" "}
-                        {thread.leftOut === 1 ? "message is" : "messages are"} not included.
+                        The {thread.leftOut} oldest {thread.leftOut === 1 ? "message is" : "messages are"}{" "}
+                        not included.
                     </p>
                 ) : null}
 
@@ -90,18 +90,12 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
                             </dl>
                             {message.html.trim() || message.text.trim() ? (
                                 <SandboxedHtml
-                                    html={
-                                        message.html.trim()
-                                            ? message.html
-                                            : core.textToHtml(message.text)
-                                    }
+                                    html={message.html.trim() ? message.html : core.textToHtml(message.text)}
                                     showRemote={message.remoteAllowed}
                                     paper="own"
                                 />
                             ) : (
-                                <p className="text-[13px] text-[#555555]">
-                                    This message has nothing in it.
-                                </p>
+                                <p className="text-[13px] text-[#555555]">This message has nothing in it.</p>
                             )}
                         </li>
                     ))}

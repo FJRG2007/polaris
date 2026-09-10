@@ -58,12 +58,7 @@ export const CLOUDFLARE_TOKEN_LINKS: Record<CloudflareTokenScope, string> = {
 /** The permissions each scope asks for, written out for the operator to check
  *  against the form - and to tick by hand if the pre-fill ever misses one. */
 export const CLOUDFLARE_TOKEN_PERMISSIONS: Record<CloudflareTokenScope, string[]> = {
-    all: [
-        "Zone - DNS: Edit",
-        "Zone - Zone: Read",
-        "Zone - Cache Purge: Purge",
-        "Account - Cloudflare Tunnel: Edit"
-    ],
+    all: ["Zone - DNS: Edit", "Zone - Zone: Read", "Zone - Cache Purge: Purge", "Account - Cloudflare Tunnel: Edit"],
     dns: ["Zone - DNS: Edit", "Zone - Zone: Read", "Zone - Cache Purge: Purge"],
     tunnel: ["Account - Cloudflare Tunnel: Edit"]
 };

@@ -25,8 +25,7 @@ const LEVEL_RANK: Record<LogLevel, number> = { default: 0, info: 1, warn: 2, err
 // `\w*errors?` so the named errors a runtime throws - TypeError, ReferenceError,
 // OSError - colour like the failures they are, which is what a stack trace leads
 // with and what the eye goes to first.
-const ERROR_RE =
-    /\b(\w*errors?|fatal|panic|exception|traceback|unhandled|failed|failure|denied|refused)\b/i;
+const ERROR_RE = /\b(\w*errors?|fatal|panic|exception|traceback|unhandled|failed|failure|denied|refused)\b/i;
 const WARN_RE = /\b(warn|warning|warnings|deprecated|deprecation)\b/i;
 const INFO_RE = /\b(info|notice|listening|started|ready|success|succeeded|completed?)\b/i;
 
@@ -70,7 +69,5 @@ export function parseLog(raw: string): LogEntry[] {
 export function formatLogTime(stamp: string, format: DisplayFormat, withDate = false): string {
     const date = new Date(stamp);
     if (Number.isNaN(date.getTime())) return stamp;
-    return withDate
-        ? format.dateTime(date, { seconds: true })
-        : format.time(date, { seconds: true });
+    return withDate ? format.dateTime(date, { seconds: true }) : format.time(date, { seconds: true });
 }

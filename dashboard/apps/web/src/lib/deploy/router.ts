@@ -216,8 +216,7 @@ let challengeProbe: { at: number; supported: boolean } | null = null;
  * and only a yes is remembered, for the same startup race as the vacant page.
  */
 export async function guardSupportsChallenge(now: number = Date.now()): Promise<boolean> {
-    if (challengeProbe && now - challengeProbe.at < PROXY_PROBE_TTL_MS)
-        return challengeProbe.supported;
+    if (challengeProbe && now - challengeProbe.at < PROXY_PROBE_TTL_MS) return challengeProbe.supported;
     let supported = false;
     try {
         const response = await fetch(`${guardUrl()}/health`, {
@@ -369,7 +368,12 @@ const APP_PRIORITY = 40;
  *  router over the route it narrows. */
 function rankOf(route: AppRoute, options: RenderOptions, bump = 0): number {
     const base = options.routePriority ?? APP_PRIORITY;
-    return base + (route.pathPrefix ? 5 : 0) - (isWildcardHostname(route.hostname) ? 20 : 0) + bump;
+    return (
+        base +
+        (route.pathPrefix ? 5 : 0) -
+        (isWildcardHostname(route.hostname) ? 20 : 0) +
+        bump
+    );
 }
 
 /** A path prefix safe to write into a rule. Anything else drops the route rather
@@ -451,19 +455,14 @@ function edgeChain(route: AppRoute, name: string, defs: Map<string, string>): Ed
             edge.concurrencyScope === "service"
                 ? "        sourceCriterion:\n          requestHost: true"
                 : sourceByIp(route, "        ");
-        defs.set(
-            mw,
-            `    ${mw}:\n      inFlightReq:\n        amount: ${edge.concurrency}\n${source}`
-        );
+        defs.set(mw, `    ${mw}:\n      inFlightReq:\n        amount: ${edge.concurrency}\n${source}`);
         chain.early.push(mw);
     }
 
     const headers = Object.entries(securityHeaderMap(edge.headers));
     if (headers.length > 0) {
         const mw = `${name}-headers`;
-        const lines = headers
-            .map(([key, value]) => `          ${yamlQuote(key)}: ${yamlQuote(value)}`)
-            .join("\n");
+        const lines = headers.map(([key, value]) => `          ${yamlQuote(key)}: ${yamlQuote(value)}`).join("\n");
         defs.set(mw, `    ${mw}:\n      headers:\n        customResponseHeaders:\n${lines}`);
         chain.late.push(mw);
     }
@@ -482,11 +481,7 @@ function edgeChain(route: AppRoute, name: string, defs: Map<string, string>): Ed
                 replacement = "${1}://${2}${3}";
             }
         } else if (redirect.kind === "apex-to-www") {
-            if (
-                !hostname.startsWith("www.") &&
-                !isWildcardHostname(hostname) &&
-                siblings.has(`www.${hostname}`)
-            ) {
+            if (!hostname.startsWith("www.") && !isWildcardHostname(hostname) && siblings.has(`www.${hostname}`)) {
                 regex = "^(https?)://([^/:]+)(.*)$";
                 replacement = "${1}://www.${2}${3}";
             }
@@ -505,15 +500,9 @@ function edgeChain(route: AppRoute, name: string, defs: Map<string, string>): Ed
     edge.rewrites.forEach((rewrite, index) => {
         const mw = `${name}-rewrite-${index}`;
         if (rewrite.kind === "strip-prefix" && rewrite.prefix) {
-            defs.set(
-                mw,
-                `    ${mw}:\n      stripPrefix:\n        prefixes: [${yamlQuote(rewrite.prefix)}]`
-            );
+            defs.set(mw, `    ${mw}:\n      stripPrefix:\n        prefixes: [${yamlQuote(rewrite.prefix)}]`);
         } else if (rewrite.kind === "add-prefix" && rewrite.prefix) {
-            defs.set(
-                mw,
-                `    ${mw}:\n      addPrefix:\n        prefix: ${yamlQuote(rewrite.prefix)}`
-            );
+            defs.set(mw, `    ${mw}:\n      addPrefix:\n        prefix: ${yamlQuote(rewrite.prefix)}`);
         } else if (rewrite.kind === "replace-path" && rewrite.regex && rewrite.replacement) {
             defs.set(
                 mw,
@@ -668,8 +657,7 @@ export function renderDynamicConfig(
         // out rather than written: the edge refusing this whole file over one row would
         // take every service on the machine down with it.
         const hostname = normalizeDeployHostname(route.hostname);
-        if (!hostname || (route.pathPrefix !== undefined && !PATH_PREFIX.test(route.pathPrefix)))
-            continue;
+        if (!hostname || (route.pathPrefix !== undefined && !PATH_PREFIX.test(route.pathPrefix))) continue;
         const name = `polaris-app-${route.id}`;
         const dial = `${route.dialHost}:${route.dialPort}`;
         const edge = edgeChain({ ...route, hostname }, name, defs);

@@ -13,15 +13,7 @@
  * common thing an operator needs to see and the verdict alone hides it.
  */
 
-export type DmarcResult =
-    | "pass"
-    | "fail"
-    | "none"
-    | "neutral"
-    | "softfail"
-    | "temperror"
-    | "permerror"
-    | "policy";
+export type DmarcResult = "pass" | "fail" | "none" | "neutral" | "softfail" | "temperror" | "permerror" | "policy";
 
 export interface DmarcRow {
     readonly sourceIp: string;
@@ -53,8 +45,7 @@ export const MAX_DMARC_ROWS = 5000;
 function text(value: unknown): string {
     if (typeof value === "string") return value.trim();
     if (typeof value === "number") return String(value);
-    if (value && typeof value === "object" && "#text" in value)
-        return text((value as { "#text": unknown })["#text"]);
+    if (value && typeof value === "object" && "#text" in value) return text((value as { "#text": unknown })["#text"]);
     return "";
 }
 
@@ -70,9 +61,7 @@ function many(value: unknown): unknown[] {
 }
 
 function record(value: unknown): Record<string, unknown> {
-    return value && typeof value === "object" && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {};
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function verdict(value: unknown): "pass" | "fail" {
@@ -187,17 +176,10 @@ export interface DmarcSource {
  * SPF and DKIM - the screen says which question to ask, not which answer is true.
  */
 export function summarizeDmarcSources(reports: readonly DmarcReport[]): DmarcSource[] {
-    const bySource = new Map<
-        string,
-        { messages: number; passed: number; reporters: Set<string> }
-    >();
+    const bySource = new Map<string, { messages: number; passed: number; reporters: Set<string> }>();
     for (const report of reports) {
         for (const row of report.rows) {
-            const entry = bySource.get(row.sourceIp) ?? {
-                messages: 0,
-                passed: 0,
-                reporters: new Set<string>()
-            };
+            const entry = bySource.get(row.sourceIp) ?? { messages: 0, passed: 0, reporters: new Set<string>() };
             entry.messages += row.count;
             if (rowPasses(row)) entry.passed += row.count;
             entry.reporters.add(report.orgName);
@@ -208,8 +190,7 @@ export function summarizeDmarcSources(reports: readonly DmarcReport[]): DmarcSou
     return [...bySource.entries()]
         .map(([sourceIp, entry]) => {
             const failed = entry.messages - entry.passed;
-            const verdict: DmarcSource["verdict"] =
-                failed === 0 ? "pass" : entry.passed === 0 ? "fail" : "warn";
+            const verdict: DmarcSource["verdict"] = failed === 0 ? "pass" : entry.passed === 0 ? "fail" : "warn";
             return {
                 sourceIp,
                 messages: entry.messages,
@@ -219,8 +200,5 @@ export function summarizeDmarcSources(reports: readonly DmarcReport[]): DmarcSou
                 verdict
             };
         })
-        .sort(
-            (left, right) =>
-                rank[left.verdict] - rank[right.verdict] || right.messages - left.messages
-        );
+        .sort((left, right) => rank[left.verdict] - rank[right.verdict] || right.messages - left.messages);
 }

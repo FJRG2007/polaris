@@ -44,11 +44,7 @@ function wrap(key: Buffer) {
 function unwrap(row: { encryptedKey: Uint8Array; keyNonce: Uint8Array; keyKeyId: string }): Buffer {
     try {
         const plain = decryptSecret(
-            {
-                ciphertext: Buffer.from(row.encryptedKey),
-                nonce: Buffer.from(row.keyNonce),
-                keyId: row.keyKeyId
-            },
+            { ciphertext: Buffer.from(row.encryptedKey), nonce: Buffer.from(row.keyNonce), keyId: row.keyKeyId },
             loadEnv().POLARIS_MASTER_KEY
         );
         return Buffer.from(plain, "base64");
@@ -67,10 +63,7 @@ export async function sealingKey(ownerId: string): Promise<{ id: string; key: Bu
     });
     if (current) return { id: current.id, key: unwrap(current) };
     const key = randomBytes(32);
-    const row = await prisma.backupKey.create({
-        data: { ownerId, ...wrap(key) },
-        select: { id: true }
-    });
+    const row = await prisma.backupKey.create({ data: { ownerId, ...wrap(key) }, select: { id: true } });
     return { id: row.id, key };
 }
 
@@ -78,9 +71,7 @@ export async function sealingKey(ownerId: string): Promise<{ id: string; key: Bu
 export async function keyById(ownerId: string, id: string): Promise<Buffer> {
     const row = await prisma.backupKey.findFirst({ where: { id, ownerId } });
     if (!row) {
-        throw new BackupKeyError(
-            "This copy was sealed under a key this Polaris does not have. Add its recovery key first."
-        );
+        throw new BackupKeyError("This copy was sealed under a key this Polaris does not have. Add its recovery key first.");
     }
     return unwrap(row);
 }
@@ -110,10 +101,7 @@ export async function listKeys(ownerId: string): Promise<BackupKeyView[]> {
 export async function rotateKey(ownerId: string): Promise<{ id: string }> {
     const key = randomBytes(32);
     return prisma.$transaction(async (tx) => {
-        await tx.backupKey.updateMany({
-            where: { ownerId, retiredAt: null },
-            data: { retiredAt: new Date() }
-        });
+        await tx.backupKey.updateMany({ where: { ownerId, retiredAt: null }, data: { retiredAt: new Date() } });
         return tx.backupKey.create({ data: { ownerId, ...wrap(key) }, select: { id: true } });
     });
 }
@@ -135,17 +123,12 @@ export function parseRecoveryKey(text: string): { id: string; key: Buffer } | { 
     const [, id = "", encoded = ""] = parts;
     if (!UUID.test(id)) return { error: "The key's id is not one Polaris writes" };
     const key = Buffer.from(encoded, "base64url");
-    if (key.length !== 32 || key.toString("base64url") !== encoded)
-        return { error: "The key itself is not 32 bytes" };
+    if (key.length !== 32 || key.toString("base64url") !== encoded) return { error: "The key itself is not 32 bytes" };
     return { id: id.toLowerCase(), key };
 }
 
 /** The stored key when this instance's master key still unwraps it, null when it does not. */
-function unwrapped(row: {
-    encryptedKey: Uint8Array;
-    keyNonce: Uint8Array;
-    keyKeyId: string;
-}): Buffer | null {
+function unwrapped(row: { encryptedKey: Uint8Array; keyNonce: Uint8Array; keyKeyId: string }): Buffer | null {
     try {
         return unwrap(row);
     } catch {
@@ -170,8 +153,7 @@ export async function addRecoveryKey(ownerId: string, text: string): Promise<{ a
         select: { ownerId: true, encryptedKey: true, keyNonce: true, keyKeyId: true }
     });
     if (existing) {
-        if (existing.ownerId !== ownerId)
-            throw new BackupKeyError("That key belongs to somebody else here");
+        if (existing.ownerId !== ownerId) throw new BackupKeyError("That key belongs to somebody else here");
         const stored = unwrapped(existing);
         if (stored) {
             if (stored.length !== parsed.key.length || !timingSafeEqual(stored, parsed.key)) {

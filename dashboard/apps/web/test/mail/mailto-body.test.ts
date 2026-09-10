@@ -27,8 +27,7 @@ function words(node: Node): string {
 
 describe("a link's body in the editor", () => {
     it("keeps every character and every line", () => {
-        const text =
-            "Hi *there* [x](y)\n# not a heading\n- not a list\n1. not numbered\n2) nor this";
+        const text = "Hi *there* [x](y)\n# not a heading\n- not a list\n1. not numbered\n2) nor this";
         const doc = markdownToDoc(plainTextToMarkdown(text), "https://polaris.test") as Node;
         const blocks = doc.content ?? [];
         expect(blocks.map((block) => block.type)).toEqual(["paragraph"]);
@@ -36,10 +35,7 @@ describe("a link's body in the editor", () => {
     });
 
     it("keeps a blank line as a new paragraph", () => {
-        const doc = markdownToDoc(
-            plainTextToMarkdown("one\n\ntwo"),
-            "https://polaris.test"
-        ) as Node;
+        const doc = markdownToDoc(plainTextToMarkdown("one\n\ntwo"), "https://polaris.test") as Node;
         expect((doc.content ?? []).map((block) => words(block))).toEqual(["one", "two"]);
     });
 });

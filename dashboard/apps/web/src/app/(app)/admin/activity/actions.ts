@@ -23,11 +23,7 @@ export async function verifyAuditChainAction(): Promise<{
         await recordAudit({
             actorId: user.id,
             action: "audit.verify",
-            metadata: {
-                ok: result.ok,
-                checked: result.checked,
-                ...(result.broken ? { brokenAt: result.broken.seq } : {})
-            }
+            metadata: { ok: result.ok, checked: result.checked, ...(result.broken ? { brokenAt: result.broken.seq } : {}) }
         });
         return { result };
     } catch (caught) {

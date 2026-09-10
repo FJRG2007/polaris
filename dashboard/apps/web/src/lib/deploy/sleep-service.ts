@@ -27,9 +27,7 @@ const STARTED_AT = Date.now();
  *  back to sleep on a log that has not caught up with the visit yet. */
 const wokenAt = new Map<string, number>();
 
-export async function runSleepPass(
-    now = Date.now()
-): Promise<{ asleep: number; woke: number; slept: number }> {
+export async function runSleepPass(now = Date.now()): Promise<{ asleep: number; woke: number; slept: number }> {
     const apps = await prisma.application.findMany({
         where: {
             OR: [{ sleepAfterMinutes: { not: null } }, { asleepSince: { not: null } }],
@@ -52,9 +50,7 @@ export async function runSleepPass(
 
     const entries = parseHttpLogs(await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES));
     const times = entries.map((entry) => (entry.time ? Date.parse(entry.time) : Number.NaN));
-    const windowStart = times
-        .filter(Number.isFinite)
-        .reduce<number | null>((min, t) => (min === null || t < min ? t : min), null);
+    const windowStart = times.filter(Number.isFinite).reduce<number | null>((min, t) => (min === null || t < min ? t : min), null);
 
     const deployments = new Map(
         (
@@ -70,15 +66,11 @@ export async function runSleepPass(
     let woke = 0;
     let slept = 0;
     for (const app of apps) {
-        const names = [
-            ...app.domains.map((domain) => domain.hostname.toLowerCase()),
-            tunnelHostForApp(app.id).toLowerCase()
-        ];
+        const names = [...app.domains.map((domain) => domain.hostname.toLowerCase()), tunnelHostForApp(app.id).toLowerCase()];
         let lastVisit: number | null = null;
         entries.forEach((entry, index) => {
             const at = times[index];
-            if (at === undefined || !Number.isFinite(at) || !entry.host || !countsAsVisit(entry))
-                return;
+            if (at === undefined || !Number.isFinite(at) || !entry.host || !countsAsVisit(entry)) return;
             const host = entry.host.toLowerCase().split(":")[0] ?? "";
             if (!names.some((name) => hostnameCovers(name, host))) return;
             if (lastVisit === null || at > lastVisit) lastVisit = at;
@@ -90,11 +82,7 @@ export async function runSleepPass(
             asleepSince: app.asleepSince?.getTime() ?? null,
             lastVisit,
             windowStart,
-            awakeSince: Math.max(
-                STARTED_AT,
-                deployments.get(app.currentDeploymentId as string) ?? 0,
-                wokenAt.get(app.id) ?? 0
-            ),
+            awakeSince: Math.max(STARTED_AT, deployments.get(app.currentDeploymentId as string) ?? 0, wokenAt.get(app.id) ?? 0),
             now
         });
         if (decision === "stay") {
@@ -112,10 +100,7 @@ export async function runSleepPass(
                 asleep += 1;
             }
         } catch (error) {
-            console.error(
-                `polaris: could not ${decision} ${app.id}:`,
-                error instanceof Error ? error.message : error
-            );
+            console.error(`polaris: could not ${decision} ${app.id}:`, error instanceof Error ? error.message : error);
         }
     }
     // The waking page is chosen per route, so the edge follows every change.

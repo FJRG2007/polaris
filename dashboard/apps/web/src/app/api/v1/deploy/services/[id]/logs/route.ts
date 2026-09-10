@@ -20,12 +20,8 @@ const querySchema = z.object({
     since: z.string().trim().max(64).optional()
 });
 
-export const GET = deployRoute(
-    "read the service's logs",
-    false,
-    async ({ caller, url, params }) => {
-        const query = querySchema.parse(queryOf(url));
-        const { log } = await runtimeLog(caller, params.id ?? "", query);
-        return respond(url, { log }, () => (log && !log.endsWith("\n") ? `${log}\n` : log));
-    }
-);
+export const GET = deployRoute("read the service's logs", false, async ({ caller, url, params }) => {
+    const query = querySchema.parse(queryOf(url));
+    const { log } = await runtimeLog(caller, params.id ?? "", query);
+    return respond(url, { log }, () => (log && !log.endsWith("\n") ? `${log}\n` : log));
+});

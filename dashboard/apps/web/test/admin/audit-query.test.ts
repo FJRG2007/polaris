@@ -162,24 +162,16 @@ describe("an export", () => {
             }
         ];
         const csv = await drain(
-            streamAuditExport({ kind: "all" }, filter(), "csv", {
-                scope: "all",
-                total: 1,
-                truncated: false
-            })
+            streamAuditExport({ kind: "all" }, filter(), "csv", { scope: "all", total: 1, truncated: false })
         );
         const [header, line] = csv.trim().split("\r\n");
         expect(header?.startsWith("id,at,seq,actor_id,actor,action")).toBe(true);
-        expect(line).toContain('"\'=HYPERLINK(""https://evil.example"",""x"")"');
+        expect(line).toContain("\"'=HYPERLINK(\"\"https://evil.example\"\",\"\"x\"\")\"");
     });
 
     it("opens a JSON export with the chain head, the anchor worth keeping elsewhere", async () => {
         const json = await drain(
-            streamAuditExport({ kind: "all" }, filter(), "json", {
-                scope: "all",
-                total: 1,
-                truncated: false
-            })
+            streamAuditExport({ kind: "all" }, filter(), "json", { scope: "all", total: 1, truncated: false })
         );
         const parsed = JSON.parse(json) as { chain: { head: { seq: string } }; entries: unknown[] };
         expect(parsed.chain.head.seq).toBe("7");

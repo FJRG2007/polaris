@@ -134,12 +134,7 @@ const shelfKey = (shelf: ShelfData) => shelf.space?.id ?? OWN;
 /** Whether a role may change what is on a shelf. The private one is always
  *  yours; a space's guests read and no more. */
 function canWrite(shelf: ShelfData): boolean {
-    return (
-        !shelf.space ||
-        shelf.space.role === "owner" ||
-        shelf.space.role === "admin" ||
-        shelf.space.role === "member"
-    );
+    return !shelf.space || shelf.space.role === "owner" || shelf.space.role === "admin" || shelf.space.role === "member";
 }
 
 function canAdminister(shelf: ShelfData): boolean {
@@ -170,12 +165,9 @@ export function NoteTree({
     const [renaming, setRenaming] = useState<string | null>(null);
     const [dragged, setDragged] = useState<Dragged | null>(null);
     const [over, setOver] = useState<string | null>(null);
-    const [removing, setRemoving] = useState<{
-        kind: "folder" | "space";
-        id: string;
-        name: string;
-        held: string;
-    } | null>(null);
+    const [removing, setRemoving] = useState<
+        { kind: "folder" | "space"; id: string; name: string; held: string } | null
+    >(null);
 
     // Read after mount rather than during render: the server has no window, and
     // a first paint that differed from the second would be a hydration error.
@@ -286,11 +278,7 @@ export function NoteTree({
         const hits = index.search(term).map((hit) => hit.item);
         return (
             <aside className="flex w-full flex-col gap-2 md:w-72 md:shrink-0">
-                <TreeSearch
-                    query={query}
-                    onQuery={setQuery}
-                    onNew={() => void create({ spaceId: null, folderId: null })}
-                />
+                <TreeSearch query={query} onQuery={setQuery} onNew={() => void create({ spaceId: null, folderId: null })} />
                 {hits.length === 0 ? (
                     <Empty>No note matches that.</Empty>
                 ) : (
@@ -305,12 +293,7 @@ export function NoteTree({
                                         activeNoteId === hit.id && "bg-muted"
                                     )}
                                 >
-                                    <span
-                                        className="truncate text-sm font-medium"
-                                        title={hit.title}
-                                    >
-                                        {hit.title}
-                                    </span>
+                                    <span className="truncate text-sm font-medium" title={hit.title}>{hit.title}</span>
                                     <span className="truncate text-xs text-muted-foreground">
                                         {hit.shelf.space?.name ?? "My notes"}
                                         {hit.excerpt ? ` - ${hit.excerpt}` : ""}
@@ -326,17 +309,10 @@ export function NoteTree({
 
     return (
         <aside className="flex w-full flex-col gap-3 md:w-72 md:shrink-0">
-            <TreeSearch
-                query={query}
-                onQuery={setQuery}
-                onNew={() => void create({ spaceId: null, folderId: null })}
-            />
+            <TreeSearch query={query} onQuery={setQuery} onNew={() => void create({ spaceId: null, folderId: null })} />
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink">
                     {error}
                 </p>
             )}
@@ -357,30 +333,17 @@ export function NoteTree({
                                     setRenaming(null);
                                     if (shelf.space && name && name !== shelf.space.name) {
                                         void act(() =>
-                                            actions.updateSpaceAction({
-                                                spaceId: shelf.space!.id,
-                                                name
-                                            })
+                                            actions.updateSpaceAction({ spaceId: shelf.space!.id, name })
                                         );
                                     }
                                 }}
                                 onStartRename={() => setRenaming(`space:${shelf.space?.id}`)}
-                                onNewNote={() =>
-                                    void create({
-                                        spaceId: shelf.space?.id ?? null,
-                                        folderId: null
-                                    })
-                                }
+                                onNewNote={() => void create({ spaceId: shelf.space?.id ?? null, folderId: null })}
                                 onNewFolder={() =>
-                                    void addFolder({
-                                        spaceId: shelf.space?.id ?? null,
-                                        parentId: null
-                                    })
+                                    void addFolder({ spaceId: shelf.space?.id ?? null, parentId: null })
                                 }
                                 onPeople={() => shelf.space && onPeople(shelf.space.id)}
-                                onImport={() =>
-                                    onImport({ spaceId: shelf.space?.id ?? null, folderId: null })
-                                }
+                                onImport={() => onImport({ spaceId: shelf.space?.id ?? null, folderId: null })}
                                 onExport={() => download("space", shelf.space?.id ?? null)}
                                 onDelete={() =>
                                     shelf.space &&
@@ -392,12 +355,8 @@ export function NoteTree({
                                     })
                                 }
                                 onDragOver={() => setOver(`shelf:${key}`)}
-                                onDragLeave={() =>
-                                    setOver((at) => (at === `shelf:${key}` ? null : at))
-                                }
-                                onDrop={() =>
-                                    void drop({ spaceId: shelf.space?.id ?? null, folderId: null })
-                                }
+                                onDragLeave={() => setOver((at) => (at === `shelf:${key}` ? null : at))}
+                                onDrop={() => void drop({ spaceId: shelf.space?.id ?? null, folderId: null })}
                             />
 
                             {!folded && (
@@ -414,17 +373,11 @@ export function NoteTree({
                                     onStartRename={setRenaming}
                                     onRenameFolder={(folderId, name) => {
                                         setRenaming(null);
-                                        if (name)
-                                            void act(() =>
-                                                actions.updateFolderAction({ folderId, name })
-                                            );
+                                        if (name) void act(() => actions.updateFolderAction({ folderId, name }));
                                     }}
                                     onRenameNote={(noteId, title) => {
                                         setRenaming(null);
-                                        if (title)
-                                            void act(() =>
-                                                actions.updateNoteAction({ noteId, title })
-                                            );
+                                        if (title) void act(() => actions.updateNoteAction({ noteId, title }));
                                     }}
                                     onCreateNote={create}
                                     onCreateFolder={addFolder}
@@ -612,8 +565,7 @@ function ShelfRow({
                 <div
                     onKeyDown={(event) =>
                         rowKeys(event, {
-                            onRename:
-                                shelf.space && canAdminister(shelf) ? onStartRename : undefined,
+                            onRename: shelf.space && canAdminister(shelf) ? onStartRename : undefined,
                             onDelete: shelf.space && canAdminister(shelf) ? onDelete : undefined
                         })
                     }
@@ -639,9 +591,7 @@ function ShelfRow({
                         aria-label={folded ? `Show ${name}` : `Hide ${name}`}
                         className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        <ChevronRight
-                            className={cn("size-3.5 transition-transform", !folded && "rotate-90")}
-                        />
+                        <ChevronRight className={cn("size-3.5 transition-transform", !folded && "rotate-90")} />
                     </button>
                     {shelf.space ? (
                         <span
@@ -761,22 +711,13 @@ function Branch({
     onStartRename: (key: string) => void;
     onRenameFolder: (folderId: string, name: string) => void;
     onRenameNote: (noteId: string, title: string) => void;
-    onCreateNote: (where: {
-        spaceId: string | null;
-        folderId: string | null;
-        parentId?: string | null;
-    }) => void;
+    onCreateNote: (where: { spaceId: string | null; folderId: string | null; parentId?: string | null }) => void;
     onCreateFolder: (where: { spaceId: string | null; parentId: string | null }) => void;
     onImport: (shelf: { spaceId: string | null; folderId: string | null }) => void;
     onMoveNote: (noteId: string) => void;
     onShareNote: (noteId: string) => void;
     onAct: (run: () => Promise<{ error?: string }>) => Promise<{ error?: string } | null>;
-    onRemove: (target: {
-        kind: "folder" | "space";
-        id: string;
-        name: string;
-        held: string;
-    }) => void;
+    onRemove: (target: { kind: "folder" | "space"; id: string; name: string; held: string }) => void;
     onDragStart: (dragged: Dragged) => void;
     onDragEnd: () => void;
     onOver: (key: string | null) => void;
@@ -787,9 +728,7 @@ function Branch({
     const folders = shelf.folders.filter((folder) => folder.parentId === parentId);
     // Only the top of each note tree: a nested note is drawn by its own parent,
     // and the service already ordered them depth-first.
-    const notes = shelf.notes.filter(
-        (note) => note.folderId === parentId && note.parentId === null
-    );
+    const notes = shelf.notes.filter((note) => note.folderId === parentId && note.parentId === null);
 
     if (folders.length === 0 && notes.length === 0) {
         return parentId === null ? (
@@ -810,9 +749,7 @@ function Branch({
                                     draggable={writable}
                                     onKeyDown={(event) =>
                                         rowKeys(event, {
-                                            onRename: writable
-                                                ? () => onStartRename(key)
-                                                : undefined,
+                                            onRename: writable ? () => onStartRename(key) : undefined,
                                             onDelete: writable
                                                 ? () =>
                                                       onRemove({
@@ -848,16 +785,11 @@ function Branch({
                                         type="button"
                                         onClick={() => onToggle(key)}
                                         aria-expanded={!folded}
-                                        aria-label={
-                                            folded ? `Open ${folder.name}` : `Close ${folder.name}`
-                                        }
+                                        aria-label={folded ? `Open ${folder.name}` : `Close ${folder.name}`}
                                         className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                                     >
                                         <ChevronRight
-                                            className={cn(
-                                                "size-3.5 transition-transform",
-                                                !folded && "rotate-90"
-                                            )}
+                                            className={cn("size-3.5 transition-transform", !folded && "rotate-90")}
                                         />
                                     </button>
                                     {folder.icon ? (
@@ -880,9 +812,7 @@ function Branch({
                                             type="button"
                                             aria-label={`New note in ${folder.name}`}
                                             title="New note"
-                                            onClick={() =>
-                                                onCreateNote({ spaceId, folderId: folder.id })
-                                            }
+                                            onClick={() => onCreateNote({ spaceId, folderId: folder.id })}
                                             className="ml-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                                         >
                                             <Plus className="size-3.5" />
@@ -893,17 +823,13 @@ function Branch({
                             {writable && (
                                 <ContextMenuContent>
                                     <ContextMenuItem
-                                        onSelect={() =>
-                                            onCreateNote({ spaceId, folderId: folder.id })
-                                        }
+                                        onSelect={() => onCreateNote({ spaceId, folderId: folder.id })}
                                     >
                                         <FilePlus2 className="size-3.5" />
                                         New note
                                     </ContextMenuItem>
                                     <ContextMenuItem
-                                        onSelect={() =>
-                                            onCreateFolder({ spaceId, parentId: folder.id })
-                                        }
+                                        onSelect={() => onCreateFolder({ spaceId, parentId: folder.id })}
                                     >
                                         <FolderPlus className="size-3.5" />
                                         New folder inside
@@ -1029,11 +955,7 @@ function NoteBranch({
     onOpen: (id: string) => void;
     onStartRename: (key: string) => void;
     onRenameNote: (noteId: string, title: string) => void;
-    onCreateNote: (where: {
-        spaceId: string | null;
-        folderId: string | null;
-        parentId?: string | null;
-    }) => void;
+    onCreateNote: (where: { spaceId: string | null; folderId: string | null; parentId?: string | null }) => void;
     onMoveNote: (noteId: string) => void;
     onShareNote: (noteId: string) => void;
     onAct: (run: () => Promise<{ error?: string }>) => Promise<{ error?: string } | null>;
@@ -1074,17 +996,12 @@ function NoteBranch({
                                 onClick={() => onToggle(key)}
                                 aria-expanded={!folded}
                                 aria-label={
-                                    folded
-                                        ? `Show what is under ${note.title}`
-                                        : `Hide what is under ${note.title}`
+                                    folded ? `Show what is under ${note.title}` : `Hide what is under ${note.title}`
                                 }
                                 className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                             >
                                 <ChevronRight
-                                    className={cn(
-                                        "size-3.5 transition-transform",
-                                        !folded && "rotate-90"
-                                    )}
+                                    className={cn("size-3.5 transition-transform", !folded && "rotate-90")}
                                 />
                             </button>
                         ) : (
@@ -1105,13 +1022,8 @@ function NoteBranch({
                                 className="flex min-w-0 flex-1 flex-col gap-0.5 py-1.5 pr-1 text-left"
                             >
                                 <span className="flex min-w-0 items-center gap-1.5">
-                                    {note.pinned && (
-                                        <Pin className="size-3 shrink-0 text-primary" />
-                                    )}
-                                    <span
-                                        className="truncate text-sm font-medium"
-                                        title={note.title}
-                                    >
+                                    {note.pinned && <Pin className="size-3 shrink-0 text-primary" />}
+                                    <span className="truncate text-sm font-medium" title={note.title}>
                                         {note.title}
                                     </span>
                                 </span>
@@ -1131,11 +1043,7 @@ function NoteBranch({
                     <ContextMenuContent>
                         <ContextMenuItem
                             onSelect={() =>
-                                onCreateNote({
-                                    spaceId,
-                                    folderId: note.folderId,
-                                    parentId: note.id
-                                })
+                                onCreateNote({ spaceId, folderId: note.folderId, parentId: note.id })
                             }
                         >
                             <CornerDownRight className="size-3.5" />
@@ -1149,18 +1057,11 @@ function NoteBranch({
                         <ContextMenuItem
                             onSelect={() =>
                                 void onAct(() =>
-                                    actions.updateNoteAction({
-                                        noteId: note.id,
-                                        pinned: !note.pinned
-                                    })
+                                    actions.updateNoteAction({ noteId: note.id, pinned: !note.pinned })
                                 )
                             }
                         >
-                            {note.pinned ? (
-                                <PinOff className="size-3.5" />
-                            ) : (
-                                <Pin className="size-3.5" />
-                            )}
+                            {note.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
                             {note.pinned ? "Unpin" : "Pin to the top"}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => onMoveNote(note.id)}>

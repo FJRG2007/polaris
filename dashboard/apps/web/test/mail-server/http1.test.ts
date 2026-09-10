@@ -26,30 +26,21 @@ describe("the request", () => {
 
     it("refuses a line break in a header, which would start a header of its own", () => {
         expect(() =>
-            serializeRequest({
-                method: "GET",
-                path: "/",
-                host: "h",
-                headers: { authorization: "x\r\nX-Injected: 1" }
-            })
+            serializeRequest({ method: "GET", path: "/", host: "h", headers: { authorization: "x\r\nX-Injected: 1" } })
         ).toThrow();
     });
 });
 
 describe("the answer", () => {
     it("reads a body by its length", () => {
-        const answer = parseHttpResponse(
-            Buffer.from("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nokEXTRA")
-        );
+        const answer = parseHttpResponse(Buffer.from("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nokEXTRA"));
         expect(answer.status).toBe(200);
         expect(answer.body).toBe("ok");
     });
 
     it("joins a chunked body", () => {
         const answer = parseHttpResponse(
-            Buffer.from(
-                "HTTP/1.1 401 Unauthorized\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n5\r\npedia\r\n0\r\n\r\n"
-            )
+            Buffer.from("HTTP/1.1 401 Unauthorized\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n5\r\npedia\r\n0\r\n\r\n")
         );
         expect(answer.status).toBe(401);
         expect(answer.body).toBe("Wikipedia");
@@ -64,9 +55,7 @@ describe("the answer", () => {
     });
 
     it("refuses an answer with no end to its headers", () => {
-        expect(() =>
-            parseHttpResponse(Buffer.from("HTTP/1.1 200 OK\r\nContent-Length: 2"))
-        ).toThrow();
+        expect(() => parseHttpResponse(Buffer.from("HTTP/1.1 200 OK\r\nContent-Length: 2"))).toThrow();
     });
 
     it("is read over a stream until the far side closes", async () => {
@@ -82,15 +71,8 @@ describe("the answer", () => {
             });
             return true;
         }) as typeof stream.write;
-        const answer = await exchangeOverStream(stream, {
-            method: "GET",
-            path: "/.well-known/jmap",
-            host: "x",
-            headers: {}
-        });
+        const answer = await exchangeOverStream(stream, { method: "GET", path: "/.well-known/jmap", host: "x", headers: {} });
         expect(answer.body).toBe("pong");
-        expect(Buffer.concat(written).toString("latin1")).toContain(
-            "GET /.well-known/jmap HTTP/1.1"
-        );
+        expect(Buffer.concat(written).toString("latin1")).toContain("GET /.well-known/jmap HTTP/1.1");
     });
 });

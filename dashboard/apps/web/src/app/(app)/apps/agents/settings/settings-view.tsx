@@ -52,10 +52,7 @@ export function SettingsView({
         const stored = new Map(tiers.map((tier) => [tier.scope, tier]));
         // The catch-all tier is always on the screen even when it has never been
         // saved: it is where everything below it inherits from.
-        return [
-            stored.get(GENERAL) ?? emptyTier(GENERAL),
-            ...tiers.filter((tier) => tier.scope !== GENERAL)
-        ];
+        return [stored.get(GENERAL) ?? emptyTier(GENERAL), ...tiers.filter((tier) => tier.scope !== GENERAL)];
     });
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -83,9 +80,7 @@ export function SettingsView({
                     title={row.scope === GENERAL ? "All your repositories" : row.scope}
                     inherited={row.scope === GENERAL ? fromPlatform : fromGeneral}
                     inheritedFrom={
-                        row.scope === GENERAL
-                            ? "the deployment's defaults"
-                            : "your settings for all repositories"
+                        row.scope === GENERAL ? "the deployment's defaults" : "your settings for all repositories"
                     }
                     pools={pools}
                     providers={providers}
@@ -95,10 +90,7 @@ export function SettingsView({
                     onRemoved={
                         row.scope === GENERAL
                             ? undefined
-                            : () =>
-                                  setRows((current) =>
-                                      current.filter((entry) => entry.scope !== row.scope)
-                                  )
+                            : () => setRows((current) => current.filter((entry) => entry.scope !== row.scope))
                     }
                     onError={setError}
                 />
@@ -131,12 +123,7 @@ export function SettingsView({
                     </CardBody>
                 </Card>
             ) : (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setAdding(true)}
-                    disabled={addable.length === 0}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setAdding(true)} disabled={addable.length === 0}>
                     <Plus className="size-4 shrink-0" />
                     Settings for one account
                 </Button>

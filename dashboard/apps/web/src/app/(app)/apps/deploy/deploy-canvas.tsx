@@ -260,9 +260,7 @@ export function DeployCanvas({
         hostedCount?: number;
     } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
-    const [managing, setManaging] = useState<{ id: string; name: string; engine: string } | null>(
-        null
-    );
+    const [managing, setManaging] = useState<{ id: string; name: string; engine: string } | null>(null);
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
         open: false,

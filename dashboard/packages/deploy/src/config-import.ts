@@ -84,17 +84,12 @@ function text(value: unknown): string | undefined {
 /** Whether a command changes into another directory first, which means it
  *  describes that directory's build rather than this one's. */
 function changesDirectory(command: string | undefined): boolean {
-    return command
-        ? /(?:^|&&|;|\|)\s*cd\s+['"]?(?!\.\/?['"]?(?:\s|&|;|$))[^'"&;|\s]+/.test(command)
-        : false;
+    return command ? /(?:^|&&|;|\|)\s*cd\s+['"]?(?!\.\/?['"]?(?:\s|&|;|$))[^'"&;|\s]+/.test(command) : false;
 }
 
 /** A directory as the service stores it: relative, no leading or trailing slash. */
 function directory(value: string | undefined): string | undefined {
-    const cleaned = value
-        ?.replace(/^\.?\/+/, "")
-        .replace(/\/+$/, "")
-        .trim();
+    const cleaned = value?.replace(/^\.?\/+/, "").replace(/\/+$/, "").trim();
     return cleaned ? cleaned : undefined;
 }
 
@@ -168,8 +163,7 @@ function fromRailway(build: Record<string, unknown>, deploy: Record<string, unkn
     const settings: Settings = {};
     const skipped: string[] = [];
     const buildCommand = text(build.buildCommand);
-    if (buildCommand && changesDirectory(buildCommand))
-        skipped.push(`its build command changes into another directory: ${buildCommand}`);
+    if (buildCommand && changesDirectory(buildCommand)) skipped.push(`its build command changes into another directory: ${buildCommand}`);
     else if (buildCommand) settings.buildCommand = buildCommand;
     const start = text(deploy.startCommand);
     if (start) settings.startCommand = start;
@@ -191,20 +185,14 @@ function parseRailwayJson(raw: string): Parsed | null {
     if (!parsed || typeof parsed !== "object") return null;
     const object = parsed as Record<string, unknown>;
     const section = (name: string) =>
-        object[name] && typeof object[name] === "object"
-            ? (object[name] as Record<string, unknown>)
-            : {};
+        object[name] && typeof object[name] === "object" ? (object[name] as Record<string, unknown>) : {};
     return fromRailway(section("build"), section("deploy"));
 }
 
 function parseRailwayToml(raw: string): Parsed {
     const values = tomlScalars(raw);
     const pick = (table: string) =>
-        Object.fromEntries(
-            [...values]
-                .filter(([key]) => key.startsWith(`${table}.`))
-                .map(([key, value]) => [key.slice(table.length + 1), value])
-        );
+        Object.fromEntries([...values].filter(([key]) => key.startsWith(`${table}.`)).map(([key, value]) => [key.slice(table.length + 1), value]));
     return fromRailway(pick("build"), pick("deploy"));
 }
 
@@ -214,14 +202,7 @@ function parseRailwayToml(raw: string): Parsed {
 
 function yamlScalar(raw: string): string | undefined {
     const trimmed = raw.replace(/\s+#.*$/, "").trim();
-    if (
-        !trimmed ||
-        trimmed === "|" ||
-        trimmed === ">" ||
-        trimmed.startsWith("|") ||
-        trimmed.startsWith(">")
-    )
-        return undefined;
+    if (!trimmed || trimmed === "|" || trimmed === ">" || trimmed.startsWith("|") || trimmed.startsWith(">")) return undefined;
     const quoted = /^(['"])(.*)\1$/.exec(trimmed);
     return quoted ? quoted[2] : trimmed;
 }
@@ -253,10 +234,7 @@ function parseRender(raw: string): Parsed | null {
         }
         blocks[blocks.length - 1]?.push(line);
     }
-    const block =
-        blocks.find((lines) =>
-            lines.some((line) => /^\s*type\s*:\s*['"]?web['"]?\s*$/.test(line))
-        ) ?? blocks[0];
+    const block = blocks.find((lines) => lines.some((line) => /^\s*type\s*:\s*['"]?web['"]?\s*$/.test(line))) ?? blocks[0];
     if (!block) return null;
     const keyIndent = indentOf(block[0] ?? "");
     const settings: Settings = {};
@@ -283,11 +261,9 @@ function parseRender(raw: string): Parsed | null {
             if (key === "rootDir") settings.rootDirectory = value;
             else if (key === "buildCommand") {
                 // Render's build step is often only the install; that is not a build.
-                if (!/^(npm|yarn|pnpm|bun)\s+(install|i|ci)\s*$/.test(value))
-                    settings.buildCommand = value;
+                if (!/^(npm|yarn|pnpm|bun)\s+(install|i|ci)\s*$/.test(value)) settings.buildCommand = value;
             } else if (key === "startCommand") settings.startCommand = value;
-            else if (key === "healthCheckPath" && value.startsWith("/"))
-                settings.healthPath = value;
+            else if (key === "healthCheckPath" && value.startsWith("/")) settings.healthPath = value;
             else if (key === "dockerfilePath") settings.dockerfilePath = value;
             else if (key === "numInstances" && /^\d+$/.test(value)) settings.replicas = value;
             continue;
@@ -327,15 +303,11 @@ function parseNetlify(raw: string): Parsed {
     const publish = directory(values.get("build.publish"));
     // Netlify's publish directory is relative to its base, as the service's is to
     // its root directory.
-    if (publish)
-        settings.outputDirectory =
-            base && publish.startsWith(`${base}/`) ? publish.slice(base.length + 1) : publish;
+    if (publish) settings.outputDirectory = base && publish.startsWith(`${base}/`) ? publish.slice(base.length + 1) : publish;
     const command = values.get("build.command");
     if (command) settings.buildCommand = command;
     const variables = Object.fromEntries(
-        [...values]
-            .filter(([key]) => key.startsWith("build.environment."))
-            .map(([key, value]) => [key.slice("build.environment.".length), value])
+        [...values].filter(([key]) => key.startsWith("build.environment.")).map(([key, value]) => [key.slice("build.environment.".length), value])
     );
     return { settings, variables };
 }
@@ -353,8 +325,7 @@ function parseVercel(raw: string): Parsed | null {
     const skipped: string[] = [];
     for (const key of ["installCommand", "buildCommand"] as const) {
         const command = text(object[key]);
-        if (command && changesDirectory(command))
-            skipped.push(`vercel.json's ${key} changes into another directory: ${command}`);
+        if (command && changesDirectory(command)) skipped.push(`vercel.json's ${key} changes into another directory: ${command}`);
         else if (command) settings[key] = command;
     }
     const output = directory(text(object.outputDirectory));
@@ -375,8 +346,7 @@ function parseAppJson(raw: string): Parsed | null {
     const variables: Record<string, string> = {};
     const generate: string[] = [];
     const needs: string[] = [];
-    const env =
-        object.env && typeof object.env === "object" ? (object.env as Record<string, unknown>) : {};
+    const env = object.env && typeof object.env === "object" ? (object.env as Record<string, unknown>) : {};
     for (const [key, entry] of Object.entries(env)) {
         if (typeof entry === "string") {
             variables[key] = entry;
@@ -389,16 +359,9 @@ function parseAppJson(raw: string): Parsed | null {
         // Required unless it says otherwise - that is app.json's own default.
         else if (spec.required !== false) needs.push(key);
     }
-    const formation =
-        object.formation && typeof object.formation === "object"
-            ? (object.formation as Record<string, unknown>)
-            : {};
-    const web =
-        formation.web && typeof formation.web === "object"
-            ? (formation.web as { quantity?: unknown })
-            : {};
-    if (typeof web.quantity === "number" && Number.isInteger(web.quantity) && web.quantity > 0)
-        settings.replicas = String(web.quantity);
+    const formation = object.formation && typeof object.formation === "object" ? (object.formation as Record<string, unknown>) : {};
+    const web = formation.web && typeof formation.web === "object" ? (formation.web as { quantity?: unknown }) : {};
+    if (typeof web.quantity === "number" && Number.isInteger(web.quantity) && web.quantity > 0) settings.replicas = String(web.quantity);
     return { settings, variables, generate, needs };
 }
 
@@ -415,20 +378,15 @@ const PARSERS: ReadonlyArray<readonly [ConfigFile, (raw: string) => Parsed | nul
     ["netlify.toml", parseNetlify],
     ["vercel.json", parseVercel],
     ["render.yaml", parseRender],
-    [
-        "Procfile",
-        (raw) => {
-            const web = procfileWeb(raw);
-            return web ? { settings: { startCommand: web } } : null;
-        }
-    ],
+    ["Procfile", (raw) => {
+        const web = procfileWeb(raw);
+        return web ? { settings: { startCommand: web } } : null;
+    }],
     ["app.json", parseAppJson]
 ];
 
 /** Read whichever of `CONFIG_FILES` the caller found, keyed by file name. */
-export function importDeployConfig(
-    texts: Readonly<Partial<Record<string, string>>>
-): ImportedConfig {
+export function importDeployConfig(texts: Readonly<Partial<Record<string, string>>>): ImportedConfig {
     const settings: PickedSetting[] = [];
     const variables: Record<string, string> = {};
     const generate = new Set<string>();
@@ -442,15 +400,10 @@ export function importDeployConfig(
             skipped.push(`${file} could not be read`);
             continue;
         }
-        for (const [setting, value] of Object.entries(parsed.settings) as [
-            PickedSetting["setting"],
-            string
-        ][]) {
-            if (!settings.some((picked) => picked.setting === setting))
-                settings.push({ setting, value, from: file });
+        for (const [setting, value] of Object.entries(parsed.settings) as [PickedSetting["setting"], string][]) {
+            if (!settings.some((picked) => picked.setting === setting)) settings.push({ setting, value, from: file });
         }
-        for (const [key, value] of Object.entries(parsed.variables ?? {}))
-            if (!(key in variables)) variables[key] = value;
+        for (const [key, value] of Object.entries(parsed.variables ?? {})) if (!(key in variables)) variables[key] = value;
         for (const key of parsed.generate ?? []) generate.add(key);
         for (const key of parsed.needs ?? []) needs.add(key);
         skipped.push(...(parsed.skipped ?? []));

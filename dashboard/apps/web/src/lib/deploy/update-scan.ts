@@ -50,8 +50,7 @@ export function parseUpdateCheck(raw: string | null | undefined): UpdateCheck | 
 /** Whether a check says there is something newer to deploy. */
 export function hasUpdate(check: UpdateCheck | null): boolean {
     if (!check || check.error) return false;
-    if (check.kind === "image")
-        return Boolean(check.baseline && check.latest && check.baseline !== check.latest);
+    if (check.kind === "image") return Boolean(check.baseline && check.latest && check.baseline !== check.latest);
     return (check.behindBy ?? 0) > 0;
 }
 
@@ -64,8 +63,7 @@ export function splitImageRef(ref: string): { image: string; tag: string } | nul
     if (!value || value.includes("@") || /\s/.test(value)) return null;
     const slash = value.lastIndexOf("/");
     const colon = value.lastIndexOf(":");
-    if (colon > slash)
-        return { image: value.slice(0, colon), tag: value.slice(colon + 1) || "latest" };
+    if (colon > slash) return { image: value.slice(0, colon), tag: value.slice(colon + 1) || "latest" };
     return { image: value, tag: "latest" };
 }
 
@@ -92,10 +90,7 @@ export async function checkService(
     if (ref) {
         const split = splitImageRef(ref);
         if (!split) return null;
-        const prior =
-            previous?.kind === "image" && previous.deploymentId === app.currentDeploymentId
-                ? previous
-                : null;
+        const prior = previous?.kind === "image" && previous.deploymentId === app.currentDeploymentId ? previous : null;
         try {
             const latest = await readDigest(split.image, split.tag);
             return updateCheckSchema.parse({
@@ -141,13 +136,7 @@ export async function scanServiceUpdates(
 ): Promise<{ checked: number; updates: number }> {
     const apps = await prisma.application.findMany({
         where: { currentDeploymentId: { not: null }, desiredState: "running" },
-        select: {
-            id: true,
-            sourceType: true,
-            sourceConfig: true,
-            currentDeploymentId: true,
-            updateCheck: true
-        }
+        select: { id: true, sourceType: true, sourceConfig: true, currentDeploymentId: true, updateCheck: true }
     });
     const asked = new Map<string, Promise<string | null>>();
     const readOnce = (image: string, tag: string): Promise<string | null> => {
@@ -172,29 +161,19 @@ export async function scanServiceUpdates(
         if (!next) continue;
         checked += 1;
         if (hasUpdate(next)) updates += 1;
-        await prisma.application.update({
-            where: { id: app.id },
-            data: { updateCheck: JSON.stringify(next) }
-        });
+        await prisma.application.update({ where: { id: app.id }, data: { updateCheck: JSON.stringify(next) } });
     }
     return { checked, updates };
 }
 
 /** A service's newer image, as its panel shows it, or null when there is none. */
-export async function imageUpdateOf(
-    applicationId: string
-): Promise<{ image: string; checkedAt: string } | null> {
+export async function imageUpdateOf(applicationId: string): Promise<{ image: string; checkedAt: string } | null> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
         select: { updateCheck: true, currentDeploymentId: true }
     });
     const check = parseUpdateCheck(app?.updateCheck);
-    if (
-        !check ||
-        check.kind !== "image" ||
-        check.deploymentId !== app?.currentDeploymentId ||
-        !hasUpdate(check)
-    ) {
+    if (!check || check.kind !== "image" || check.deploymentId !== app?.currentDeploymentId || !hasUpdate(check)) {
         return null;
     }
     return { image: check.image ?? "", checkedAt: check.checkedAt };

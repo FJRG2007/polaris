@@ -95,10 +95,7 @@ async function chainHead(): Promise<{ seq: bigint; hash: string }> {
             orderBy: { seq: "desc" },
             select: { seq: true, hash: true }
         }),
-        prisma.auditCheckpoint.findFirst({
-            orderBy: { seq: "desc" },
-            select: { seq: true, hash: true }
-        })
+        prisma.auditCheckpoint.findFirst({ orderBy: { seq: "desc" }, select: { seq: true, hash: true } })
     ]);
     if (head?.seq != null && head.hash) {
         // A checkpoint past the newest surviving entry means retention removed
@@ -204,12 +201,7 @@ export async function verifyAuditChain(): Promise<ChainVerification> {
             const seq = row.seq ?? 0n;
             const where = { seq: seq.toString(), entryId: row.id, entryAt: row.at.toISOString() };
             if (seq !== expectedSeq) {
-                broken = {
-                    seq: expectedSeq.toString(),
-                    entryId: null,
-                    entryAt: null,
-                    reason: "missing"
-                };
+                broken = { seq: expectedSeq.toString(), entryId: null, entryAt: null, reason: "missing" };
                 break;
             }
             if (row.prevHash !== expectedPrev) {
@@ -269,12 +261,7 @@ export async function auditChainStatus(): Promise<ChainStatus> {
         pending,
         head: head?.seq != null && head.hash ? { seq: head.seq.toString(), hash: head.hash } : null,
         checkpoint: cut
-            ? {
-                  seq: cut.seq.toString(),
-                  hash: cut.hash,
-                  at: cut.at.toISOString(),
-                  pruned: cut.pruned
-              }
+            ? { seq: cut.seq.toString(), hash: cut.hash, at: cut.at.toISOString(), pruned: cut.pruned }
             : null,
         lastVerification: parseVerification(stored)
     };
@@ -310,10 +297,7 @@ function parseVerification(stored: string | null): ChainVerification | null {
  *
  * Answers how many it removed and whether the batch was full.
  */
-export async function pruneSealedAudit(
-    cutoff: Date,
-    batch: number
-): Promise<{ removed: number; more: boolean }> {
+export async function pruneSealedAudit(cutoff: Date, batch: number): Promise<{ removed: number; more: boolean }> {
     const rows = await prisma.auditLog.findMany({
         where: { seq: { not: null } },
         orderBy: { seq: "asc" },

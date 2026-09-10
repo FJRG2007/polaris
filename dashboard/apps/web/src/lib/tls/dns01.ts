@@ -8,11 +8,7 @@
  * to the order.
  */
 
-import {
-    createTxtRecord,
-    deleteDnsRecord,
-    resolveZoneForHostname
-} from "@/lib/integrations/cloudflare-api";
+import { createTxtRecord, deleteDnsRecord, resolveZoneForHostname } from "@/lib/integrations/cloudflare-api";
 
 export const DNS01_PROVIDERS = ["cloudflare"] as const;
 export type Dns01ProviderKind = (typeof DNS01_PROVIDERS)[number];
@@ -38,11 +34,7 @@ export async function cloudflareDns01(token: string, domain: string): Promise<Dn
 }
 
 /** The provider of a given kind for a domain, with the credential it takes. */
-export function dns01Provider(
-    kind: Dns01ProviderKind,
-    credential: string,
-    domain: string
-): Promise<Dns01Provider> {
+export function dns01Provider(kind: Dns01ProviderKind, credential: string, domain: string): Promise<Dns01Provider> {
     switch (kind) {
         case "cloudflare":
             return cloudflareDns01(credential, domain);

@@ -40,11 +40,7 @@ export class TooLarge extends Error {
  * were. Streamed: nothing but the chunk in flight is held. A body that runs past
  * the limit stops there, and the partial file is removed.
  */
-export async function stageBody(
-    body: ReadableStream<Uint8Array> | null,
-    file: string,
-    max: number
-): Promise<number> {
+export async function stageBody(body: ReadableStream<Uint8Array> | null, file: string, max: number): Promise<number> {
     if (!body) throw new Error("nothing was sent");
     let bytes = 0;
     const counted = new Transform({

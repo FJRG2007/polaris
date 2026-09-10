@@ -148,8 +148,6 @@ describe("the list route", () => {
         const list = await readFile(`${SCREENS}use-mail-list.ts`, "utf8");
         expect(list).toContain("cacheKey: `mail.list.${shelf}.${params}`");
         const shell = await readFile(`${SCREENS}mail-shell.tsx`, "utf8");
-        expect(shell).toMatch(
-            /if \(shownShelf\.current === shelf\) return;[\s\S]*reloadLists\(\);[\s\S]*router\.replace\("\/mail"/
-        );
+        expect(shell).toMatch(/if \(shownShelf\.current === shelf\) return;[\s\S]*reloadLists\(\);[\s\S]*router\.replace\("\/mail"/);
     });
 });

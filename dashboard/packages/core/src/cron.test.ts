@@ -27,14 +27,7 @@ describe("reading an expression", () => {
     });
 
     it("says what is wrong rather than guessing", () => {
-        for (const bad of [
-            "* * * *",
-            "60 * * * *",
-            "* 24 * * *",
-            "5-1 * * * *",
-            "*/0 * * * *",
-            "0 0 * FOO *"
-        ]) {
+        for (const bad of ["* * * *", "60 * * * *", "* 24 * * *", "5-1 * * * *", "*/0 * * * *", "0 0 * FOO *"]) {
             expect(() => parseCron(bad), bad).toThrow(CronError);
         }
         expect(cronExpression.safeParse("0 9 * * *").success).toBe(true);
@@ -57,54 +50,34 @@ describe("when it next fires", () => {
     it("keeps nine in the morning at nine across a clock change", () => {
         // Europe/Madrid leaves summer time on 2026-10-25: 09:00 is 07:00Z the
         // day before and 08:00Z the day after.
-        expect(next("0 9 * * *", "2026-10-24T10:00:00Z", "Europe/Madrid")).toBe(
-            "2026-10-25T08:00:00.000Z"
-        );
-        expect(next("0 9 * * *", "2026-10-23T10:00:00Z", "Europe/Madrid")).toBe(
-            "2026-10-24T07:00:00.000Z"
-        );
+        expect(next("0 9 * * *", "2026-10-24T10:00:00Z", "Europe/Madrid")).toBe("2026-10-25T08:00:00.000Z");
+        expect(next("0 9 * * *", "2026-10-23T10:00:00Z", "Europe/Madrid")).toBe("2026-10-24T07:00:00.000Z");
     });
 
     it("fires at midnight on the day after the clocks go forward", () => {
         // Europe/Madrid springs forward on Sunday 2026-03-29, a 23-hour day.
         // Monday's midnight is 22:00Z, not the following week.
-        expect(next("0 0 * * MON", "2026-03-24T12:00:00Z", "Europe/Madrid")).toBe(
-            "2026-03-29T22:00:00.000Z"
-        );
-        expect(next("@monthly", "2026-03-15T12:00:00Z", "Europe/Madrid")).toBe(
-            "2026-03-31T22:00:00.000Z"
-        );
+        expect(next("0 0 * * MON", "2026-03-24T12:00:00Z", "Europe/Madrid")).toBe("2026-03-29T22:00:00.000Z");
+        expect(next("@monthly", "2026-03-15T12:00:00Z", "Europe/Madrid")).toBe("2026-03-31T22:00:00.000Z");
         // America/New_York springs forward on Sunday 2026-03-08.
-        expect(next("0 0 * * MON", "2026-03-03T12:00:00Z", "America/New_York")).toBe(
-            "2026-03-09T04:00:00.000Z"
-        );
+        expect(next("0 0 * * MON", "2026-03-03T12:00:00Z", "America/New_York")).toBe("2026-03-09T04:00:00.000Z");
     });
 
     it("skips a time the clocks jump over that day", () => {
         // 02:30 does not exist in Madrid on 2026-03-29; the next one is Monday's.
-        expect(next("30 2 * * *", "2026-03-28T12:00:00Z", "Europe/Madrid")).toBe(
-            "2026-03-30T00:30:00.000Z"
-        );
+        expect(next("30 2 * * *", "2026-03-28T12:00:00Z", "Europe/Madrid")).toBe("2026-03-30T00:30:00.000Z");
     });
 
     it("fires a repeated time only the first time", () => {
         // Madrid reads 02:30 at 00:30Z and again at 01:30Z on 2026-10-25.
-        expect(next("30 2 * * *", "2026-10-24T12:00:00Z", "Europe/Madrid")).toBe(
-            "2026-10-25T00:30:00.000Z"
-        );
-        expect(next("30 2 * * *", "2026-10-25T00:30:00Z", "Europe/Madrid")).toBe(
-            "2026-10-26T01:30:00.000Z"
-        );
+        expect(next("30 2 * * *", "2026-10-24T12:00:00Z", "Europe/Madrid")).toBe("2026-10-25T00:30:00.000Z");
+        expect(next("30 2 * * *", "2026-10-25T00:30:00Z", "Europe/Madrid")).toBe("2026-10-26T01:30:00.000Z");
         // New York reads 01:30 at 05:30Z and again at 06:30Z on 2026-11-01.
-        expect(next("30 1 * * *", "2026-11-01T05:30:00Z", "America/New_York")).toBe(
-            "2026-11-02T06:30:00.000Z"
-        );
+        expect(next("30 1 * * *", "2026-11-01T05:30:00Z", "America/New_York")).toBe("2026-11-02T06:30:00.000Z");
     });
 
     it("keeps an hourly schedule running through the repeated hour", () => {
-        expect(next("@hourly", "2026-10-25T00:00:00Z", "Europe/Madrid")).toBe(
-            "2026-10-25T01:00:00.000Z"
-        );
+        expect(next("@hourly", "2026-10-25T00:00:00Z", "Europe/Madrid")).toBe("2026-10-25T01:00:00.000Z");
     });
 
     it("answers null for a date that never comes", () => {

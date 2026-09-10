@@ -122,11 +122,7 @@ export interface RuntimePorts {
      * Load such an archive, `size` bytes long, streaming what the load printed.
      * The local daemon refuses an archive naming anything but release images.
      */
-    importImage?(
-        archive: NodeJS.ReadableStream,
-        size: number,
-        onOutput?: OutputSink
-    ): Promise<void>;
+    importImage?(archive: NodeJS.ReadableStream, size: number, onOutput?: OutputSink): Promise<void>;
     /** Authenticate to a private registry (`docker login`) so a following pull can
      *  access it. An empty registry targets Docker Hub. The password is sent out of
      *  band (stdin / request body), never on the command line. */
@@ -183,11 +179,6 @@ export interface RuntimePorts {
      * front. Optional so a runtime without the route fails in words rather than
      * pretending.
      */
-    writeFile?(
-        container: string,
-        path: string,
-        body: NodeJS.ReadableStream,
-        size: number
-    ): Promise<void>;
+    writeFile?(container: string, path: string, body: NodeJS.ReadableStream, size: number): Promise<void>;
     dispose(): Promise<void>;
 }

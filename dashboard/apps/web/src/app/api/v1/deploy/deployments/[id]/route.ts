@@ -23,25 +23,21 @@ const querySchema = z.object({
     follow: z.enum(["1", "true", "0", "false"]).optional()
 });
 
-export const GET = deployRoute(
-    "read the deployment",
-    false,
-    async ({ caller, request, url, params }) => {
-        const id = idSchema.parse(params.id);
-        const query = querySchema.parse(queryOf(url));
-        if (query.follow === "1" || query.follow === "true") {
-            const stream = await followDeploymentLog(caller, id, query.offset, request.signal);
-            return new Response(stream, {
-                headers: {
-                    "content-type": "text/plain; charset=utf-8",
-                    "cache-control": "no-store",
-                    // Proxies that buffer would hold the whole build back until it
-                    // finished, which is the one thing a follow must not do.
-                    "x-accel-buffering": "no"
-                }
-            });
-        }
-        const result = await deploymentLog(caller, id, { offset: query.offset, tail: query.tail });
-        return respond(url, result, () => result.log);
+export const GET = deployRoute("read the deployment", false, async ({ caller, request, url, params }) => {
+    const id = idSchema.parse(params.id);
+    const query = querySchema.parse(queryOf(url));
+    if (query.follow === "1" || query.follow === "true") {
+        const stream = await followDeploymentLog(caller, id, query.offset, request.signal);
+        return new Response(stream, {
+            headers: {
+                "content-type": "text/plain; charset=utf-8",
+                "cache-control": "no-store",
+                // Proxies that buffer would hold the whole build back until it
+                // finished, which is the one thing a follow must not do.
+                "x-accel-buffering": "no"
+            }
+        });
     }
-);
+    const result = await deploymentLog(caller, id, { offset: query.offset, tail: query.tail });
+    return respond(url, result, () => result.log);
+});

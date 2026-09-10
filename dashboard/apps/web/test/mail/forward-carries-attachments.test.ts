@@ -35,11 +35,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/mailbox/messages", () => ({
     readAttachment: async (_userId: string, attachmentId: string) => {
         if (attachmentId === "broken") throw new Error("the mail server hung up");
-        return {
-            name: `${attachmentId}.pdf`,
-            contentType: "application/pdf",
-            bytes: Buffer.from("x")
-        };
+        return { name: `${attachmentId}.pdf`, contentType: "application/pdf", bytes: Buffer.from("x") };
     }
 }));
 
@@ -47,14 +43,7 @@ vi.mock("@/lib/mailbox/uploads", () => ({
     MAX_ATTACHMENT_BYTES: 1000,
     storeUpload: async (_userId: string, file: { name: string }) => {
         stored.push(file.name);
-        return {
-            id: `u-${file.name}`,
-            name: file.name,
-            size: 1,
-            contentType: "",
-            inline: false,
-            contentId: ""
-        };
+        return { id: `u-${file.name}`, name: file.name, size: 1, contentType: "", inline: false, contentId: "" };
     }
 }));
 

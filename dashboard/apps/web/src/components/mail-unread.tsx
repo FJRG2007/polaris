@@ -21,15 +21,7 @@ import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { canNotify, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
-    type ReactNode
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 export interface MailUnread {
     /** Unread messages across every mailbox in the merged views. */

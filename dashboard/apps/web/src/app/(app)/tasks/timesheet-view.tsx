@@ -23,10 +23,7 @@ import type { RunningTimer, Timesheet } from "@/lib/tasks/time-service";
  *  header that disagrees with the columns under it is worse than none. */
 function weekdayHeadings(from: string): string[] {
     const first = new Date(from);
-    return Array.from(
-        { length: 7 },
-        (_, offset) => core.WEEKDAY_SHORT_NAMES[core.addDays(first, offset).getDay()] as string
-    );
+    return Array.from({ length: 7 }, (_, offset) => core.WEEKDAY_SHORT_NAMES[core.addDays(first, offset).getDay()] as string);
 }
 
 export function TimesheetView({
@@ -82,10 +79,7 @@ export function TimesheetView({
                 <Card>
                     <CardBody className="flex flex-wrap items-center gap-3 p-3">
                         <span className="size-2 animate-pulse rounded-full bg-primary" />
-                        <Link
-                            href={`/tasks/t/${timer.taskId}`}
-                            className="min-w-0 flex-1 truncate text-sm hover:underline"
-                        >
+                        <Link href={`/tasks/t/${timer.taskId}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
                             {timer.taskName}
                         </Link>
                         <span className="font-mono text-sm">{core.formatTimer(timer.elapsed)}</span>
@@ -104,10 +98,7 @@ export function TimesheetView({
             )}
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -115,9 +106,7 @@ export function TimesheetView({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Card>
                     <CardBody className="p-4">
-                        <p className="text-2xl font-semibold leading-none">
-                            {core.formatTrackedSeconds(sheet.total)}
-                        </p>
+                        <p className="text-2xl font-semibold leading-none">{core.formatTrackedSeconds(sheet.total)}</p>
                         <p className="mt-1 text-xs text-muted-foreground">Tracked this week</p>
                     </CardBody>
                 </Card>
@@ -131,9 +120,7 @@ export function TimesheetView({
                 </Card>
                 <Card>
                     <CardBody className="p-4">
-                        <p className="text-2xl font-semibold leading-none">
-                            {sheet.entries.length}
-                        </p>
+                        <p className="text-2xl font-semibold leading-none">{sheet.entries.length}</p>
                         <p className="mt-1 text-xs text-muted-foreground">Tasks worked on</p>
                     </CardBody>
                 </Card>
@@ -145,10 +132,7 @@ export function TimesheetView({
                         <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
                             <th className="px-3 py-2 font-medium">Task</th>
                             {weekdayHeadings(sheet.from).map((day, index) => (
-                                <th
-                                    key={`${day}-${index}`}
-                                    className="px-2 py-2 text-center font-medium"
-                                >
+                                <th key={`${day}-${index}`} className="px-2 py-2 text-center font-medium">
                                     {day}
                                 </th>
                             ))}
@@ -157,23 +141,15 @@ export function TimesheetView({
                     </thead>
                     <tbody>
                         {sheet.entries.map((entry) => (
-                            <tr
-                                key={`${entry.taskId}-${entry.billable}`}
-                                className="border-b border-border"
-                            >
+                            <tr key={`${entry.taskId}-${entry.billable}`} className="border-b border-border">
                                 <td className="max-w-xs px-3 py-2">
-                                    <Link
-                                        href={`/tasks/t/${entry.taskId}`}
-                                        className="flex items-center gap-2 hover:underline"
-                                    >
+                                    <Link href={`/tasks/t/${entry.taskId}`} className="flex items-center gap-2 hover:underline">
                                         <span className="font-mono text-[0.6875rem] text-muted-foreground">
                                             {entry.reference}
                                         </span>
                                         <span className="truncate">{entry.taskName}</span>
                                         {entry.billable && (
-                                            <span className="shrink-0 text-[0.625rem] text-success">
-                                                billable
-                                            </span>
+                                            <span className="shrink-0 text-[0.625rem] text-success">billable</span>
                                         )}
                                     </Link>
                                     <p className="truncate text-[0.6875rem] text-muted-foreground">
@@ -198,12 +174,8 @@ export function TimesheetView({
                         ))}
                         {sheet.entries.length === 0 && (
                             <tr>
-                                <td
-                                    colSpan={9}
-                                    className="px-4 py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    No time logged this week. Start a timer from any task, or log it
-                                    by hand.
+                                <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                                    No time logged this week. Start a timer from any task, or log it by hand.
                                 </td>
                             </tr>
                         )}
@@ -217,9 +189,7 @@ export function TimesheetView({
                                         {seconds > 0 ? core.formatTrackedSeconds(seconds) : "-"}
                                     </td>
                                 ))}
-                                <td className="px-3 py-2 text-right">
-                                    {core.formatTrackedSeconds(sheet.total)}
-                                </td>
+                                <td className="px-3 py-2 text-right">{core.formatTrackedSeconds(sheet.total)}</td>
                             </tr>
                         </tfoot>
                     )}

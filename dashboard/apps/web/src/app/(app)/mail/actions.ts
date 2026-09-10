@@ -71,8 +71,7 @@ function failure(
         return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
-    if (caught instanceof templates.MailTemplateNameTaken)
-        return { error: caught.message, field: "name" };
+    if (caught instanceof templates.MailTemplateNameTaken) return { error: caught.message, field: "name" };
     if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
     return { error: fallback };

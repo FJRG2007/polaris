@@ -44,11 +44,7 @@ function sameAddresses(
         left.length === right.length &&
         left.every((one, index) => {
             const other = right[index];
-            return (
-                other !== undefined &&
-                one.name === other.name &&
-                core.sameAddress(one.address, other.address)
-            );
+            return other !== undefined && one.name === other.name && core.sameAddress(one.address, other.address);
         })
     );
 }

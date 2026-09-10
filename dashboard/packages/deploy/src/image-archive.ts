@@ -30,9 +30,7 @@ export function manifestTags(raw: string): string[] | null {
     if (!Array.isArray(parsed)) return null;
     const tags = parsed.flatMap((entry: unknown) => {
         const listed = (entry as { RepoTags?: unknown } | null)?.RepoTags;
-        return Array.isArray(listed)
-            ? listed.filter((tag): tag is string => typeof tag === "string")
-            : [];
+        return Array.isArray(listed) ? listed.filter((tag): tag is string => typeof tag === "string") : [];
     });
     return tags.length > 0 ? tags : null;
 }
@@ -96,8 +94,7 @@ export async function archiveImageTags(gzipped: NodeJS.ReadableStream): Promise<
             const type = String.fromCharCode(header[156] ?? 0);
             remaining = size;
             padding = (BLOCK - (size % BLOCK)) % BLOCK;
-            const isManifest =
-                (type === "0" || type === "\0") && name.replace(/^\.\//, "") === "manifest.json";
+            const isManifest = (type === "0" || type === "\0") && name.replace(/^\.\//, "") === "manifest.json";
             if (isManifest) {
                 if (size > MAX_MANIFEST) return null;
                 keeping = [];

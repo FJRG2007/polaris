@@ -28,15 +28,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import type { ExternalServiceView } from "@/lib/deploy/external-services";
-import {
-    ExternalLink,
-    HardDriveDownload,
-    Loader2,
-    Plus,
-    RefreshCw,
-    RotateCw,
-    Trash2
-} from "lucide-react";
+import { ExternalLink, HardDriveDownload, Loader2, Plus, RefreshCw, RotateCw, Trash2 } from "lucide-react";
 import { MoveHomeDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import {
     Badge,
@@ -117,9 +109,7 @@ export function ElsewhereView({
     const [error, setError] = useState("");
 
     const settle = useCallback((service: ExternalServiceView) => {
-        setServices((current) =>
-            current.map((entry) => (entry.id === service.id ? service : entry))
-        );
+        setServices((current) => current.map((entry) => (entry.id === service.id ? service : entry)));
     }, []);
 
     const refresh = useCallback(
@@ -137,8 +127,7 @@ export function ElsewhereView({
         const timer = setInterval(() => {
             if (document.visibilityState !== "visible") return;
             for (const service of services) {
-                if (service.status === "queued" || service.status === "building")
-                    void refresh(service.id);
+                if (service.status === "queued" || service.status === "building") void refresh(service.id);
             }
         }, WATCH_MS);
         return () => clearInterval(timer);
@@ -196,10 +185,7 @@ export function ElsewhereView({
             </div>
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                >
+                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                     {error}
                 </p>
             )}
@@ -240,10 +226,7 @@ export function ElsewhereView({
                             />
                             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                                 <span className="flex flex-wrap items-center gap-2">
-                                    <span
-                                        className="truncate text-sm font-medium"
-                                        title={service.name}
-                                    >
+                                    <span className="truncate text-sm font-medium" title={service.name}>
                                         {service.name}
                                     </span>
                                     <Badge
@@ -265,20 +248,14 @@ export function ElsewhereView({
                                     {[
                                         service.account,
                                         service.lastCommitMessage,
-                                        service.lastCommitSha
-                                            ? service.lastCommitSha.slice(0, 7)
-                                            : null,
-                                        service.lastDeployAt
-                                            ? format.dateTime(service.lastDeployAt)
-                                            : null
+                                        service.lastCommitSha ? service.lastCommitSha.slice(0, 7) : null,
+                                        service.lastDeployAt ? format.dateTime(service.lastDeployAt) : null
                                     ]
                                         .filter(Boolean)
                                         .join(" - ")}
                                 </span>
                                 {service.error && (
-                                    <span className="text-[0.6875rem] text-danger">
-                                        {service.error}
-                                    </span>
+                                    <span className="text-[0.6875rem] text-danger">{service.error}</span>
                                 )}
                             </span>
 
@@ -299,11 +276,7 @@ export function ElsewhereView({
                                         title="Open on the provider"
                                         asChild
                                     >
-                                        <Link
-                                            href={service.inspectUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
+                                        <Link href={service.inspectUrl} target="_blank" rel="noreferrer">
                                             <IntegrationLogo
                                                 slug={service.provider}
                                                 className="size-4 w-5 shrink-0 object-contain"
@@ -456,9 +429,7 @@ function AddDialog({
     // one. What to store is on the choice itself now.
     const asksForChild = children.length > 0;
     const picked = asksForChild ? children.find((entry) => entry.id === child) : project;
-    const ready = Boolean(
-        account && environment && chosen && (!asksForChild || child) && name.trim()
-    );
+    const ready = Boolean(account && environment && chosen && (!asksForChild || child) && name.trim());
 
     const submit = async () => {
         if (!ready || saving) return;
@@ -538,13 +509,9 @@ function AddDialog({
                                     const picked = choices.find((entry) => entry.id === next);
                                     // Named after the thing being added, which is
                                     // what somebody would have typed anyway.
-                                    if (picked && !name.trim())
-                                        setName(picked.name.split(" / ").at(-1) ?? "");
+                                    if (picked && !name.trim()) setName(picked.name.split(" / ").at(-1) ?? "");
                                 }}
-                                options={choices.map((entry) => ({
-                                    value: entry.id,
-                                    label: entry.name
-                                }))}
+                                options={choices.map((entry) => ({ value: entry.id, label: entry.name }))}
                                 aria-label="Project there"
                             />
                         )}
@@ -600,10 +567,7 @@ function AddDialog({
                     </div>
 
                     {error && (
-                        <p
-                            role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                        >
+                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                             {error}
                         </p>
                     )}
@@ -613,11 +577,7 @@ function AddDialog({
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
                         Cancel
                     </Button>
-                    <Button
-                        onClick={() => void submit()}
-                        disabled={!ready || saving}
-                        aria-disabled={!ready || saving}
-                    >
+                    <Button onClick={() => void submit()} disabled={!ready || saving} aria-disabled={!ready || saving}>
                         {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
                         {saving ? "Adding" : "Add"}
                     </Button>

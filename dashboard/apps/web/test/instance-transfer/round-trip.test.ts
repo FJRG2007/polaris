@@ -37,16 +37,8 @@ vi.mock("@polaris/db", async () => {
                 rowsOf(model).push(...data.map((row) => ({ ...row })));
                 return { count: data.length };
             },
-            update: async ({
-                where,
-                data
-            }: {
-                where: Record<string, unknown>;
-                data: Record<string, unknown>;
-            }) => {
-                const row = rowsOf(model).find((one) =>
-                    Object.entries(where).every(([k, v]) => one[k] === v)
-                );
+            update: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+                const row = rowsOf(model).find((one) => Object.entries(where).every(([k, v]) => one[k] === v));
                 if (row) Object.assign(row, data);
                 return row;
             },
@@ -61,8 +53,7 @@ vi.mock("@polaris/db", async () => {
         {},
         {
             get(_target, key: string) {
-                if (key === "$transaction")
-                    return async (run: (tx: unknown) => Promise<unknown>) => run(client);
+                if (key === "$transaction") return async (run: (tx: unknown) => Promise<unknown>) => run(client);
                 if (key === "$executeRawUnsafe")
                     return async (sql: string) => {
                         raw.push(sql);
@@ -99,17 +90,9 @@ beforeEach(() => {
     raw.length = 0;
     useKey(SOURCE_KEY);
     const sealed = encryptSecret("db-password", SOURCE_KEY);
-    tables.set("User", [
-        { id: USER, email: "a@example.com", name: "A", createdAt: new Date("2026-01-01T00:00:00Z") }
-    ]);
+    tables.set("User", [{ id: USER, email: "a@example.com", name: "A", createdAt: new Date("2026-01-01T00:00:00Z") }]);
     tables.set("EnvVar", [
-        {
-            id: "e1",
-            key: "DATABASE_PASSWORD",
-            encryptedValue: sealed.ciphertext,
-            valueNonce: sealed.nonce,
-            valueKeyId: sealed.keyId
-        }
+        { id: "e1", key: "DATABASE_PASSWORD", encryptedValue: sealed.ciphertext, valueNonce: sealed.nonce, valueKeyId: sealed.keyId }
     ]);
     tables.set("AuditLog", [{ id: "a1", action: "x", seq: 7n, hash: "old", at: new Date() }]);
     tables.set("Session", [{ id: "s1", userId: USER, token: "t" }]);
@@ -131,9 +114,7 @@ describe("moving an instance", () => {
 
     it("refuses the wrong passphrase", async () => {
         const { path } = await exported();
-        await expect(transfer.previewTransfer(path, "not the passphrase!!")).rejects.toThrow(
-            /passphrase is wrong/
-        );
+        await expect(transfer.previewTransfer(path, "not the passphrase!!")).rejects.toThrow(/passphrase is wrong/);
     });
 
     it("lands on a fresh install with its secrets sealed under the new key", async () => {
@@ -163,9 +144,7 @@ describe("moving an instance", () => {
     it("refuses an instance that is already in use, before writing anything", async () => {
         const { path } = await exported();
         tables.set("User", [{ id: "one" }, { id: "two" }]);
-        await expect(transfer.applyTransfer(path, "correct horse battery staple")).rejects.toThrow(
-            /fresh install/
-        );
+        await expect(transfer.applyTransfer(path, "correct horse battery staple")).rejects.toThrow(/fresh install/);
         expect(raw).toHaveLength(0);
     });
 });

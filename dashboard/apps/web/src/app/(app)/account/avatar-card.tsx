@@ -453,9 +453,7 @@ export function PictureEditor({
                                     <span
                                         className={cn(
                                             "text-xs",
-                                            action.danger
-                                                ? "text-danger/80"
-                                                : "text-muted-foreground"
+                                            action.danger ? "text-danger/80" : "text-muted-foreground"
                                         )}
                                     >
                                         {action.note}

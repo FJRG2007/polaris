@@ -15,11 +15,7 @@ const orgAllows = new Set<string>();
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@polaris/storage", () => ({
-    encryptSecret: (secret: string) => ({
-        ciphertext: Buffer.from(secret),
-        nonce: Buffer.from("n"),
-        keyId: "k"
-    }),
+    encryptSecret: (secret: string) => ({ ciphertext: Buffer.from(secret), nonce: Buffer.from("n"), keyId: "k" }),
     decryptSecret: (sealed: { ciphertext: Buffer }) => sealed.ciphertext.toString()
 }));
 vi.mock("@/lib/orgs/org-service", () => ({
@@ -28,13 +24,7 @@ vi.mock("@/lib/orgs/org-service", () => ({
     })
 }));
 vi.mock("@polaris/db", () => ({
-    prisma: {
-        mailServer: {
-            findUnique: vi.fn(
-                async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null
-            )
-        }
-    }
+    prisma: { mailServer: { findUnique: vi.fn(async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null) } }
 }));
 
 const access = await import("@/lib/mail-server/access");
@@ -48,28 +38,18 @@ beforeEach(() => {
 
 describe("reaching a server", () => {
     it("lets the owner reach their own and nobody else", async () => {
-        await expect(
-            access.requireServer({ id: "alice", isAdmin: false }, "own")
-        ).resolves.toMatchObject({ id: "own" });
-        await expect(access.requireServer({ id: "bob", isAdmin: true }, "own")).rejects.toThrow(
-            "That mail server was not found."
-        );
+        await expect(access.requireServer({ id: "alice", isAdmin: false }, "own")).resolves.toMatchObject({ id: "own" });
+        await expect(access.requireServer({ id: "bob", isAdmin: true }, "own")).rejects.toThrow("That mail server was not found.");
     });
 
     it("lets whoever the organization lets deploy reach its server", async () => {
         orgAllows.add("bob:acme");
-        await expect(
-            access.requireServer({ id: "bob", isAdmin: false }, "org")
-        ).resolves.toMatchObject({ id: "org" });
-        await expect(access.requireServer({ id: "dave", isAdmin: false }, "org")).rejects.toThrow(
-            "That mail server was not found."
-        );
+        await expect(access.requireServer({ id: "bob", isAdmin: false }, "org")).resolves.toMatchObject({ id: "org" });
+        await expect(access.requireServer({ id: "dave", isAdmin: false }, "org")).rejects.toThrow("That mail server was not found.");
     });
 
     it("says the same about a server that does not exist", async () => {
-        await expect(
-            access.requireServer({ id: "alice", isAdmin: false }, "missing")
-        ).rejects.toThrow("That mail server was not found.");
+        await expect(access.requireServer({ id: "alice", isAdmin: false }, "missing")).rejects.toThrow("That mail server was not found.");
     });
 });
 
@@ -85,17 +65,11 @@ describe("the credential", () => {
         }) as never;
 
     it("is the recovery administrator until Polaris's own account exists", () => {
-        expect(access.adminCredentials(server("bootstrap"))).toEqual({
-            username: "polaris-setup",
-            password: "s3cret-password"
-        });
+        expect(access.adminCredentials(server("bootstrap"))).toEqual({ username: "polaris-setup", password: "s3cret-password" });
     });
 
     it("is Polaris's own account from then on, with the same password", () => {
-        expect(access.adminCredentials(server("admin"))).toEqual({
-            username: "polaris-admin@example.com",
-            password: "s3cret-password"
-        });
+        expect(access.adminCredentials(server("admin"))).toEqual({ username: "polaris-admin@example.com", password: "s3cret-password" });
         expect(access.adminCredentials(server("done")).username).toBe("polaris-admin@example.com");
     });
 });

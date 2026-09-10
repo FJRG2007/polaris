@@ -44,16 +44,10 @@ export function subjectKey(type: MetricSubjectType, id: string): string {
 
 /** Announce new samples. Never throws: a listener that fails is one dead browser
  *  connection, and it must not cost the collector its tick. */
-export function publishMetricTick(
-    rows: readonly { subjectType: string; subjectId: string }[],
-    at = Date.now()
-): void {
+export function publishMetricTick(rows: readonly { subjectType: string; subjectId: string }[], at = Date.now()): void {
     const { listeners } = registry();
     if (listeners.size === 0 || rows.length === 0) return;
-    const tick: MetricTick = {
-        subjects: new Set(rows.map((row) => `${row.subjectType}:${row.subjectId}`)),
-        at
-    };
+    const tick: MetricTick = { subjects: new Set(rows.map((row) => `${row.subjectType}:${row.subjectId}`)), at };
     for (const listener of listeners) {
         try {
             listener(tick);

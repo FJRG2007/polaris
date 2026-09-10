@@ -11,23 +11,7 @@ import { PassThrough } from "node:stream";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
-import {
-    ensurePrivateNetworksScript,
-    forCompose,
-    isReleaseImage,
-    parseReclaimedBytes,
-    quoteArg,
-    renderComposeYaml,
-    type BuildRequest,
-    type ComposeSpec,
-    type ExecResult,
-    type ExecSpec,
-    type ExecStream,
-    type LogOptions,
-    type MountTarget,
-    type OutputSink,
-    type RuntimePorts
-} from "@polaris/deploy";
+import { ensurePrivateNetworksScript, forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -56,9 +40,7 @@ export class SshPorts implements RuntimePorts {
         private readonly target: SshTarget,
         signal?: AbortSignal
     ) {
-        signal?.addEventListener("abort", () => void this.dispose().catch(() => undefined), {
-            once: true
-        });
+        signal?.addEventListener("abort", () => void this.dispose().catch(() => undefined), { once: true });
     }
 
     private async connect(): Promise<Client> {
@@ -164,9 +146,7 @@ export class SshPorts implements RuntimePorts {
                     code = exitCode;
                 });
                 channel.on("close", () =>
-                    code === 0
-                        ? resolve()
-                        : reject(new Error(`the build exited with code ${code ?? -1}`))
+                    code === 0 ? resolve() : reject(new Error(`the build exited with code ${code ?? -1}`))
                 );
                 channel.on("error", reject);
                 const tar = request.contextTar;
@@ -208,8 +188,7 @@ export class SshPorts implements RuntimePorts {
      * with an error rather than a valid, empty archive.
      */
     public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
-        if (!isReleaseImage(image))
-            throw new Error("only a kept release image can be sent to another machine");
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be sent to another machine");
         const client = await this.connect();
         return new Promise<NodeJS.ReadableStream>((resolve, reject) => {
             client.exec(`docker save ${quoteArg(image)} | gzip -1`, (error, channel) => {
@@ -224,12 +203,7 @@ export class SshPorts implements RuntimePorts {
                 });
                 channel.on("close", (code: number) => {
                     if (code === 0 && !said.trim()) out.end();
-                    else
-                        out.destroy(
-                            new Error(
-                                `reading ${image} exited with code ${code}${said ? `: ${said.trim()}` : ""}`
-                            )
-                        );
+                    else out.destroy(new Error(`reading ${image} exited with code ${code}${said ? `: ${said.trim()}` : ""}`));
                 });
                 channel.on("error", (channelError: Error) => out.destroy(channelError));
                 channel.pipe(out, { end: false });
@@ -239,11 +213,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     /** `docker load` on the server, fed the archive on stdin. */
-    public async importImage(
-        archive: NodeJS.ReadableStream,
-        _size: number,
-        onOutput?: OutputSink
-    ): Promise<void> {
+    public async importImage(archive: NodeJS.ReadableStream, _size: number, onOutput?: OutputSink): Promise<void> {
         const client = await this.connect();
         await new Promise<void>((resolve, reject) => {
             client.exec("docker load", (error, channel) => {
@@ -258,9 +228,7 @@ export class SshPorts implements RuntimePorts {
                     code = exitCode;
                 });
                 channel.on("close", () =>
-                    code === 0
-                        ? resolve()
-                        : reject(new Error(`loading the image exited with code ${code ?? -1}`))
+                    code === 0 ? resolve() : reject(new Error(`loading the image exited with code ${code ?? -1}`))
                 );
                 channel.on("error", reject);
                 archive.on("error", (archiveError: Error) => {
@@ -384,9 +352,7 @@ export class SshPorts implements RuntimePorts {
                 channel.on("exit", (exitCode: number) => {
                     code = exitCode;
                 });
-                channel.on("close", () =>
-                    code === 0 ? resolve() : reject(new Error("registry login failed"))
-                );
+                channel.on("close", () => (code === 0 ? resolve() : reject(new Error("registry login failed"))));
                 channel.on("error", reject);
                 channel.write(password);
                 channel.end();
@@ -421,7 +387,7 @@ export class SshPorts implements RuntimePorts {
         const lines = [
             "set -e",
             `t=${quoteArg(target)}`,
-            "if awk -v t=\"$t\" '$5 == t { found = 1 } END { exit !found }' /proc/self/mountinfo 2>/dev/null; then",
+            'if awk -v t="$t" \'$5 == t { found = 1 } END { exit !found }\' /proc/self/mountinfo 2>/dev/null; then',
             '    if ls "$t" >/dev/null 2>&1; then echo polaris:already; exit 0; fi',
             '    umount -f "$t" 2>/dev/null || umount -l "$t"',
             "fi",
@@ -433,16 +399,12 @@ export class SshPorts implements RuntimePorts {
         const useCreds = spec.kind === "smb" && spec.username && spec.password;
         if (useCreds) {
             lines.push("creds=$(mktemp)", 'chmod 600 "$creds"');
-            lines.push(
-                `printf 'username=%s\\npassword=%s\\n' ${quoteArg(spec.username as string)} ${quoteArg(spec.password as string)} > "$creds"`
-            );
+            lines.push(`printf 'username=%s\\npassword=%s\\n' ${quoteArg(spec.username as string)} ${quoteArg(spec.password as string)} > "$creds"`);
             optionValue = staticOpts ? `credentials=$creds,${staticOpts}` : "credentials=$creds";
         }
         // The source is quoted; the option value is our own controlled string plus the
         // $creds shell var, so it is embedded in double quotes to let $creds expand.
-        lines.push(
-            `mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`
-        );
+        lines.push(`mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`);
         if (useCreds) lines.push('rm -f "$creds"');
         lines.push("echo polaris:created");
         let out = "";
@@ -459,30 +421,19 @@ export class SshPorts implements RuntimePorts {
         parts.push(quoteArg(ref));
         const client = await this.connect();
         // A PTY so the remote `logs -f` dies when the client disconnects.
-        await execCommand(client, parts.join(" "), {
-            pty: true,
-            onStdout: onData,
-            onStderr: onData
-        });
+        await execCommand(client, parts.join(" "), { pty: true, onStdout: onData, onStderr: onData });
     }
 
     /** `docker ps` by the compose and swarm labels, names only. The project name
      *  is quoted like every other value that reaches the remote shell. */
     public async listContainers(project: string): Promise<string[]> {
         const names = new Set<string>();
-        for (const label of [
-            `com.docker.compose.project=${project}`,
-            `com.docker.stack.namespace=${project}`
-        ]) {
+        for (const label of [`com.docker.compose.project=${project}`, `com.docker.stack.namespace=${project}`]) {
             let out = "";
-            await this.run(
-                `docker ps --filter ${quoteArg(`label=${label}`)} --format ${quoteArg("{{.Names}}")}`,
-                (chunk) => {
-                    out += chunk.toString("utf8");
-                }
-            ).catch(() => undefined);
-            for (const name of out.split("\n").map((line) => line.trim()))
-                if (name) names.add(name);
+            await this.run(`docker ps --filter ${quoteArg(`label=${label}`)} --format ${quoteArg("{{.Names}}")}`, (chunk) => {
+                out += chunk.toString("utf8");
+            }).catch(() => undefined);
+            for (const name of out.split("\n").map((line) => line.trim())) if (name) names.add(name);
         }
         return [...names].sort();
     }
@@ -504,10 +455,8 @@ export class SshPorts implements RuntimePorts {
     public async wipePath(ref: string, path: string): Promise<void> {
         // The path is a positional argument, never interpolated into the inner
         // command, so the same guarantee holds here as on the local daemon.
-        const script = 'rm -rf -- "$1"/* "$1"/.[!.]* "$1"/..?* 2>/dev/null; exit 0';
-        await this.run(
-            `docker exec ${quoteArg(ref)} sh -c ${quoteArg(script)} polaris ${quoteArg(path)}`
-        );
+        const script = "rm -rf -- \"$1\"/* \"$1\"/.[!.]* \"$1\"/..?* 2>/dev/null; exit 0";
+        await this.run(`docker exec ${quoteArg(ref)} sh -c ${quoteArg(script)} polaris ${quoteArg(path)}`);
     }
 
     public async exec(spec: ExecSpec): Promise<ExecStream> {
@@ -516,10 +465,8 @@ export class SshPorts implements RuntimePorts {
         const command = `docker exec -it ${quoteArg(spec.container)} ${shellCmd}`;
         // Run the container exec inside a PTY channel so it behaves like a terminal.
         const channel = await new Promise<import("ssh2").ClientChannel>((resolve, reject) => {
-            client.exec(
-                command,
-                { pty: { cols: spec.cols ?? 80, rows: spec.rows ?? 24 } },
-                (error, ch) => (error ? reject(error) : resolve(ch))
+            client.exec(command, { pty: { cols: spec.cols ?? 80, rows: spec.rows ?? 24 } }, (error, ch) =>
+                error ? reject(error) : resolve(ch)
             );
         });
         return {
@@ -573,23 +520,17 @@ export class SshPorts implements RuntimePorts {
                 });
                 const web = new ReadableStream<Uint8Array>({
                     start(controller) {
-                        channel.on("data", (chunk: Buffer) =>
-                            controller.enqueue(new Uint8Array(chunk))
-                        );
+                        channel.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
                         channel.on("close", (code: number) => {
                             if (code === 0) {
                                 controller.close();
                                 return;
                             }
                             controller.error(
-                                new Error(
-                                    `reading ${path} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`
-                                )
+                                new Error(`reading ${path} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`)
                             );
                         });
-                        channel.on("error", (channelError: Error) =>
-                            controller.error(channelError)
-                        );
+                        channel.on("error", (channelError: Error) => controller.error(channelError));
                     },
                     cancel() {
                         channel.close();
@@ -632,11 +573,7 @@ export class SshPorts implements RuntimePorts {
                 channel.on("close", () =>
                     code === 0
                         ? resolve()
-                        : reject(
-                              new Error(
-                                  `writing ${path} exited with code ${code ?? -1}${said ? `: ${said.trim()}` : ""}`
-                              )
-                          )
+                        : reject(new Error(`writing ${path} exited with code ${code ?? -1}${said ? `: ${said.trim()}` : ""}`))
                 );
                 channel.on("error", reject);
                 body.on("error", (bodyError: Error) => {

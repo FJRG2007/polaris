@@ -42,10 +42,7 @@ export function releaseMarker(deployment: { id: string; commitSha?: string | nul
 /** The single project and container a service uses when it does not keep history.
  *  Unchanged from what every existing service already runs under. */
 export function serviceRef(projectSlug: string, appSlug: string, appId: string): ReleaseRef {
-    return {
-        name: serviceName(projectSlug, appSlug, appId),
-        project: `polaris-${shortHash(appId, 8)}`
-    };
+    return { name: serviceName(projectSlug, appSlug, appId), project: `polaris-${shortHash(appId, 8)}` };
 }
 
 /**
@@ -107,10 +104,8 @@ export function runsCutover(app: {
     volumes: readonly unknown[];
     target: { kind: string; runtime: string };
 }): boolean {
-    if (app.keepReleases || app.publishPort || app.replicas > 1 || app.sourceType === "compose")
-        return false;
-    if (app.volumes.length > 0 || app.target.kind !== "local" || app.target.runtime !== "compose")
-        return false;
+    if (app.keepReleases || app.publishPort || app.replicas > 1 || app.sourceType === "compose") return false;
+    if (app.volumes.length > 0 || app.target.kind !== "local" || app.target.runtime !== "compose") return false;
     try {
         const source = JSON.parse(app.sourceConfig) as { extraPorts?: unknown };
         return !Array.isArray(source.extraPorts) || source.extraPorts.length === 0;
@@ -125,11 +120,7 @@ export function runsCutover(app: {
  * up beside the one it replaces rather than on top of it; a kept release is named
  * after its commit, which is also what its hostname carries.
  */
-export function markerOf(deployment: {
-    id: string;
-    commitSha?: string | null;
-    cutover?: boolean;
-}): string {
+export function markerOf(deployment: { id: string; commitSha?: string | null; cutover?: boolean }): string {
     return deployment.cutover ? releaseMarker({ id: deployment.id }) : releaseMarker(deployment);
 }
 
@@ -142,10 +133,7 @@ export function markerOf(deployment: {
  * Read off the deployment rather than the current setting: turning the setting off
  * must not move a running version out from under the address serving it.
  */
-export function portSubject(
-    appId: string,
-    current: { id: string; isolated: boolean } | null
-): string {
+export function portSubject(appId: string, current: { id: string; isolated: boolean } | null): string {
     return current?.isolated ? current.id : appId;
 }
 
@@ -227,12 +215,8 @@ export async function currentReleaseRef(app: ReleaseSubject): Promise<ServingRel
  * one query for all of them rather than `currentReleaseRef` per service, for a
  * caller that walks every service on a machine.
  */
-export async function servingContainerNames(
-    apps: readonly ReleaseSubject[]
-): Promise<Map<string, string>> {
-    const ids = apps
-        .map((app) => app.currentDeploymentId)
-        .filter((id): id is string => id !== null);
+export async function servingContainerNames(apps: readonly ReleaseSubject[]): Promise<Map<string, string>> {
+    const ids = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
     const releases = new Map(
         (ids.length > 0
             ? await prisma.deployment.findMany({
@@ -245,9 +229,7 @@ export async function servingContainerNames(
     return new Map(
         apps.map((app) => {
             const base = serviceRef(app.environment.project.slug, app.slug, app.id);
-            const current = app.currentDeploymentId
-                ? releases.get(app.currentDeploymentId)
-                : undefined;
+            const current = app.currentDeploymentId ? releases.get(app.currentDeploymentId) : undefined;
             return [app.id, current ? releaseRef(base, markerOf(current)).name : base.name];
         })
     );

@@ -104,9 +104,7 @@ export async function setOwnerDomainDnsTokenAction(
         await recordAudit({
             actorId: caller.userId,
             orgId: caller.orgId ?? undefined,
-            action: updated.hasDnsToken
-                ? "domain.owner.dns-token.set"
-                : "domain.owner.dns-token.clear",
+            action: updated.hasDnsToken ? "domain.owner.dns-token.set" : "domain.owner.dns-token.clear",
             targetType: "domain",
             targetId: id,
             metadata: { domain: updated.domain }
@@ -132,10 +130,7 @@ export async function retryOwnerDomainCertificateAction(
     }
 }
 
-export async function removeOwnerDomainAction(
-    ref: DomainOwnerRef,
-    id: string
-): Promise<{ error?: string }> {
+export async function removeOwnerDomainAction(ref: DomainOwnerRef, id: string): Promise<{ error?: string }> {
     try {
         const caller = await callerFor(ref);
         await removeOwnerDomain(caller.owner, id);

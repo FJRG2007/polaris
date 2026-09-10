@@ -26,9 +26,7 @@ export function describeServiceEvent(line: ActivityLine): string {
         case "variable":
             // The name, never the value: a feed anybody with the service open can
             // read is not where a secret goes.
-            return line.toValue
-                ? `${who} changed the ${line.toValue} variable`
-                : `${who} changed a variable`;
+            return line.toValue ? `${who} changed the ${line.toValue} variable` : `${who} changed a variable`;
         case "variables-imported":
             return `${who} imported ${line.toValue ?? "some"} variables`;
         case "variable-removed":

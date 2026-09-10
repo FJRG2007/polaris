@@ -87,14 +87,12 @@ export function newHeader(kdf: SealKdf, keyId = ""): SealHeader {
  */
 export function parseHeader(bytes: Buffer): SealHeader | null {
     if (bytes.length < SEAL_MAGIC.length + 3) return null;
-    if (!bytes.subarray(0, SEAL_MAGIC.length).equals(SEAL_MAGIC))
-        throw new SealError("That file is not sealed");
+    if (!bytes.subarray(0, SEAL_MAGIC.length).equals(SEAL_MAGIC)) throw new SealError("That file is not sealed");
     const version = bytes[8];
     const kdfByte = bytes[9];
     const idLength = bytes[10] ?? 0;
     if (version !== VERSION) throw new SealError("That file was sealed by a newer Polaris");
-    if (kdfByte !== 1 && kdfByte !== 2)
-        throw new SealError("That file names a key kind Polaris does not know");
+    if (kdfByte !== 1 && kdfByte !== 2) throw new SealError("That file names a key kind Polaris does not know");
     const fixed = 11 + idLength + SALT_BYTES + PREFIX_BYTES + 4 + (kdfByte === 2 ? 3 : 0);
     if (bytes.length < fixed) return null;
     let at = 11;
@@ -106,20 +104,12 @@ export function parseHeader(bytes: Buffer): SealHeader | null {
     at += PREFIX_BYTES;
     const chunkBytes = bytes.readUInt32BE(at);
     at += 4;
-    if (chunkBytes < 1 || chunkBytes > 16 * 1024 * 1024)
-        throw new SealError("That file's chunk size is not one Polaris writes");
+    if (chunkBytes < 1 || chunkBytes > 16 * 1024 * 1024) throw new SealError("That file's chunk size is not one Polaris writes");
     let scrypt: SealHeader["scrypt"];
     if (kdfByte === 2) {
         scrypt = { log2N: bytes[at] ?? 0, r: bytes[at + 1] ?? 0, p: bytes[at + 2] ?? 0 };
         // Bounded so a crafted header cannot ask for gigabytes of memory.
-        if (
-            scrypt.log2N < 10 ||
-            scrypt.log2N > 20 ||
-            scrypt.r < 1 ||
-            scrypt.r > 16 ||
-            scrypt.p < 1 ||
-            scrypt.p > 4
-        ) {
+        if (scrypt.log2N < 10 || scrypt.log2N > 20 || scrypt.r < 1 || scrypt.r > 16 || scrypt.p < 1 || scrypt.p > 4) {
             throw new SealError("That file's passphrase settings are out of range");
         }
     }
@@ -136,17 +126,13 @@ export function parseHeader(bytes: Buffer): SealHeader | null {
 
 /** Whether `bytes` - the start of a file - is a sealed one. */
 export function looksSealed(bytes: Buffer): boolean {
-    return (
-        bytes.length >= SEAL_MAGIC.length && bytes.subarray(0, SEAL_MAGIC.length).equals(SEAL_MAGIC)
-    );
+    return bytes.length >= SEAL_MAGIC.length && bytes.subarray(0, SEAL_MAGIC.length).equals(SEAL_MAGIC);
 }
 
 /** The file key under a 32-byte backup key. */
 export function keyringFileKey(rootKey: Buffer, header: SealHeader): Buffer {
     if (rootKey.length !== 32) throw new Error("A backup key is 32 bytes");
-    return Buffer.from(
-        hkdfSync("sha256", rootKey, header.salt, Buffer.from("polaris-backup-v1"), 32)
-    );
+    return Buffer.from(hkdfSync("sha256", rootKey, header.salt, Buffer.from("polaris-backup-v1"), 32));
 }
 
 /** The file key under a passphrase. */
@@ -169,34 +155,19 @@ function nonceFor(header: SealHeader, counter: number, last: boolean): Buffer {
     return nonce;
 }
 
-function sealChunk(
-    key: Buffer,
-    header: SealHeader,
-    counter: number,
-    last: boolean,
-    plain: Buffer
-): Buffer {
+function sealChunk(key: Buffer, header: SealHeader, counter: number, last: boolean, plain: Buffer): Buffer {
     const cipher = createCipheriv("aes-256-gcm", key, nonceFor(header, counter, last));
     cipher.setAAD(header.raw);
     return Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
 }
 
-function openChunk(
-    key: Buffer,
-    header: SealHeader,
-    counter: number,
-    last: boolean,
-    sealed: Buffer
-): Buffer {
+function openChunk(key: Buffer, header: SealHeader, counter: number, last: boolean, sealed: Buffer): Buffer {
     if (sealed.length < TAG_BYTES) throw new SealError("That file ends in the middle of a chunk");
     const decipher = createDecipheriv("aes-256-gcm", key, nonceFor(header, counter, last));
     decipher.setAAD(header.raw);
     decipher.setAuthTag(sealed.subarray(sealed.length - TAG_BYTES));
     try {
-        return Buffer.concat([
-            decipher.update(sealed.subarray(0, sealed.length - TAG_BYTES)),
-            decipher.final()
-        ]);
+        return Buffer.concat([decipher.update(sealed.subarray(0, sealed.length - TAG_BYTES)), decipher.final()]);
     } catch {
         throw new SealError("That file does not open with this key, or has been changed");
     }
@@ -222,15 +193,7 @@ export function sealStream(header: SealHeader, fileKey: Buffer): Transform {
                 // Only a chunk known not to be the last goes now: the last one
                 // carries the flag, so it waits for the end.
                 while (pending.length > header.chunkBytes) {
-                    this.push(
-                        sealChunk(
-                            fileKey,
-                            header,
-                            next(),
-                            false,
-                            pending.subarray(0, header.chunkBytes)
-                        )
-                    );
+                    this.push(sealChunk(fileKey, header, next(), false, pending.subarray(0, header.chunkBytes)));
                     pending = pending.subarray(header.chunkBytes);
                 }
                 done();
@@ -274,21 +237,10 @@ export function openStream(keyFor: (header: SealHeader) => Promise<Buffer> | Buf
                 // Strictly more than one chunk: the one after it proves this one
                 // is not the last.
                 while (pending.length > width()) {
-                    this.push(
-                        openChunk(
-                            key as Buffer,
-                            header,
-                            counter++,
-                            false,
-                            pending.subarray(0, width())
-                        )
-                    );
+                    this.push(openChunk(key as Buffer, header, counter++, false, pending.subarray(0, width())));
                     pending = pending.subarray(width());
                 }
-            })().then(
-                () => done(),
-                (error: Error) => done(error)
-            );
+            })().then(() => done(), (error: Error) => done(error));
         },
         flush(done: TransformCallback) {
             try {

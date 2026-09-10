@@ -21,17 +21,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { OrgEmailInviteView, OrgInvitationView } from "@/lib/orgs/invitation-service";
 import { Copy, Mail, MailQuestion, RotateCw, Search, UserPlus, Users, X } from "lucide-react";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    Input,
-    Select,
-    useToast
-} from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select, useToast } from "@polaris/ui";
 import {
     inviteOrgMemberAction,
     removeOrgMemberAction,
@@ -121,10 +111,7 @@ export function PeopleView({
         <PlainNames>
             <div className="flex flex-col gap-4">
                 {error && (
-                    <p
-                        role="alert"
-                        className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
-                    >
+                    <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
                         {error}
                     </p>
                 )}
@@ -241,9 +228,7 @@ export function PeopleView({
                                                     <td className="px-3 py-2">
                                                         {owner || !canManage ? (
                                                             <Badge
-                                                                variant={
-                                                                    owner ? "primary" : "neutral"
-                                                                }
+                                                                variant={owner ? "primary" : "neutral"}
                                                             >
                                                                 {member.roleName}
                                                             </Badge>
@@ -359,23 +344,16 @@ export function PeopleView({
                                                 className="text-muted-foreground hover:bg-card-hover hover:text-foreground rounded p-1 transition-colors"
                                                 onClick={async () => {
                                                     setError("");
-                                                    const result = await resendOrgEmailInviteAction(
-                                                        orgId,
-                                                        invite.id
-                                                    );
+                                                    const result = await resendOrgEmailInviteAction(orgId, invite.id);
                                                     if (result.error) {
                                                         setError(result.error);
                                                         return;
                                                     }
                                                     if (result.sendError) {
-                                                        setError(
-                                                            `${result.sendError} Copy the new link from Invite somebody.`
-                                                        );
+                                                        setError(`${result.sendError} Copy the new link from Invite somebody.`);
                                                         setLastLink(result.url ?? null);
                                                     } else {
-                                                        toast.show({
-                                                            title: `Sent again to ${invite.email}.`
-                                                        });
+                                                        toast.show({ title: `Sent again to ${invite.email}.` });
                                                     }
                                                     router.refresh();
                                                 }}
@@ -396,9 +374,7 @@ export function PeopleView({
                                                         danger: true
                                                     });
                                                     if (!ok) return;
-                                                    await run(() =>
-                                                        revokeOrgEmailInviteAction(orgId, invite.id)
-                                                    );
+                                                    await run(() => revokeOrgEmailInviteAction(orgId, invite.id));
                                                 }}
                                             >
                                                 <X className="size-4 shrink-0" />
@@ -545,15 +521,11 @@ function InvitePerson({
                         setIdentifier("");
                         if (emailed.sendError) {
                             onLink(emailed.url ?? null);
-                            toast.show({
-                                title: "The invitation was made but could not be emailed. Copy the link below."
-                            });
+                            toast.show({ title: "The invitation was made but could not be emailed. Copy the link below." });
                         } else if (emailed.emailed) {
                             toast.show({ title: `Invitation emailed to ${typed}.` });
                         } else {
-                            toast.show({
-                                title: "Invitation sent. They will see it when they next sign in."
-                            });
+                            toast.show({ title: "Invitation sent. They will see it when they next sign in." });
                         }
                     }}
                 >
@@ -628,20 +600,14 @@ function InvitePerson({
                 <label className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                     New invitations offer
                     <Select
-                        value={
-                            roles.some((entry) => entry.slug === defaultRole)
-                                ? defaultRole
-                                : initial
-                        }
+                        value={roles.some((entry) => entry.slug === defaultRole) ? defaultRole : initial}
                         options={options}
                         aria-label="The role new invitations offer by default"
                         className="h-8 w-40"
                         disabled={savingDefault}
                         onValueChange={async (next) => {
                             setSavingDefault(true);
-                            const done = await onRun(() =>
-                                setOrgDefaultInviteRoleAction(orgId, next)
-                            );
+                            const done = await onRun(() => setOrgDefaultInviteRoleAction(orgId, next));
                             setSavingDefault(false);
                             if (done) {
                                 setRole(next);

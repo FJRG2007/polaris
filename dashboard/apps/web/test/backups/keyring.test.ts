@@ -31,16 +31,12 @@ const { rows } = vi.hoisted(() => ({ rows: [] as Row[] }));
 vi.mock("@polaris/db", () => {
     let n = 0;
     const matches = (row: Row, where: Record<string, unknown>) =>
-        Object.entries(where).every(
-            ([key, value]) => (row as Record<string, unknown>)[key] === value
-        );
+        Object.entries(where).every(([key, value]) => (row as Record<string, unknown>)[key] === value);
     const backupKey = {
         findFirst: async ({ where }: { where: Record<string, unknown> }) =>
             [...rows].reverse().find((row) => matches(row, where)) ?? null,
-        findUnique: async ({ where }: { where: { id: string } }) =>
-            rows.find((row) => row.id === where.id) ?? null,
-        findMany: async ({ where }: { where: { ownerId: string } }) =>
-            rows.filter((row) => row.ownerId === where.ownerId),
+        findUnique: async ({ where }: { where: { id: string } }) => rows.find((row) => row.id === where.id) ?? null,
+        findMany: async ({ where }: { where: { ownerId: string } }) => rows.filter((row) => row.ownerId === where.ownerId),
         create: async ({ data }: { data: Partial<Row> }) => {
             n += 1;
             const row = {
@@ -57,13 +53,7 @@ vi.mock("@polaris/db", () => {
             if (row) Object.assign(row, data);
             return row;
         },
-        updateMany: async ({
-            where,
-            data
-        }: {
-            where: Record<string, unknown>;
-            data: Partial<Row>;
-        }) => {
+        updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
             for (const row of rows) if (matches(row, where)) Object.assign(row, data);
             return { count: 0 };
         }
@@ -85,19 +75,12 @@ async function staged(bytes: Buffer) {
     const dir = await mkdtemp(join(tmpdir(), "polaris-keyring-test-"));
     const path = join(dir, "db.sql.gz");
     await writeFile(path, bytes);
-    return {
-        path,
-        fileName: "db.sql.gz",
-        sizeBytes: bytes.length,
-        metadata: {},
-        cleanup: async () => undefined
-    };
+    return { path, fileName: "db.sql.gz", sizeBytes: bytes.length, metadata: {}, cleanup: async () => undefined };
 }
 
 async function readAll(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
     const parts: Buffer[] = [];
-    for await (const part of Readable.fromWeb(stream as import("node:stream/web").ReadableStream))
-        parts.push(part as Buffer);
+    for await (const part of Readable.fromWeb(stream as import("node:stream/web").ReadableStream)) parts.push(part as Buffer);
     return Buffer.concat(parts);
 }
 
@@ -168,9 +151,7 @@ describe("a sealed copy", () => {
         expect(artifact.fileName).toBe("db.sql.gz.sealed");
         expect(plainName(artifact.fileName)).toBe("db.sql.gz");
         expect(keyId).toBe(rows[0]?.id);
-        const opened = await readAll(
-            openSealed(OWNER, Readable.toWeb(Readable.from([onDisk])) as ReadableStream<Uint8Array>)
-        );
+        const opened = await readAll(openSealed(OWNER, Readable.toWeb(Readable.from([onDisk])) as ReadableStream<Uint8Array>));
         expect(opened.equals(plain)).toBe(true);
     });
 
@@ -181,12 +162,7 @@ describe("a sealed copy", () => {
         const next = await keyring.sealingKey(OWNER);
         expect(next.id).not.toBe(rows[0]?.id);
         const opened = await readAll(
-            openSealed(
-                OWNER,
-                Readable.toWeb(
-                    Readable.from([await readFile(artifact.path)])
-                ) as ReadableStream<Uint8Array>
-            )
+            openSealed(OWNER, Readable.toWeb(Readable.from([await readFile(artifact.path)])) as ReadableStream<Uint8Array>)
         );
         expect(opened.equals(plain)).toBe(true);
     });
@@ -198,18 +174,11 @@ describe("a sealed copy", () => {
         const bytes = await readFile(artifact.path);
         rows.length = 0;
         await expect(
-            readAll(
-                openSealed(
-                    OWNER,
-                    Readable.toWeb(Readable.from([bytes])) as ReadableStream<Uint8Array>
-                )
-            )
+            readAll(openSealed(OWNER, Readable.toWeb(Readable.from([bytes])) as ReadableStream<Uint8Array>))
         ).rejects.toThrow(/recovery key/);
         expect(await keyring.addRecoveryKey(OWNER, line)).toEqual({ added: true });
         expect(rows[0]?.retiredAt).not.toBeNull();
-        const opened = await readAll(
-            openSealed(OWNER, Readable.toWeb(Readable.from([bytes])) as ReadableStream<Uint8Array>)
-        );
+        const opened = await readAll(openSealed(OWNER, Readable.toWeb(Readable.from([bytes])) as ReadableStream<Uint8Array>));
         expect(opened.equals(plain)).toBe(true);
     });
 });

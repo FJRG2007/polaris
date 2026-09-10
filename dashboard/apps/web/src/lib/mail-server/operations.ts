@@ -28,10 +28,7 @@ async function engine(server: MailServer) {
     if (!server.applicationId || !reached(server.step, "admin")) {
         throw new MailServerAccessError("This mail server is still being set up.");
     }
-    return {
-        endpoint: await endpointFor(server.applicationId),
-        credentials: adminCredentials(server)
-    };
+    return { endpoint: await endpointFor(server.applicationId), credentials: adminCredentials(server) };
 }
 
 async function run(server: MailServer, calls: readonly core.JmapCall[]): Promise<unknown> {
@@ -80,17 +77,10 @@ export async function listDomains(server: MailServer): Promise<MailDomainView[]>
             primary: row.name === server.primaryDomain,
             zoneFile: typeof row.dnsZoneFile === "string" ? row.dnsZoneFile : ""
         }))
-        .sort(
-            (left, right) =>
-                Number(right.primary) - Number(left.primary) || left.name.localeCompare(right.name)
-        );
+        .sort((left, right) => Number(right.primary) - Number(left.primary) || left.name.localeCompare(right.name));
 }
 
-export async function addDomain(
-    actor: MailServerActor,
-    server: MailServer,
-    name: string
-): Promise<string> {
+export async function addDomain(actor: MailServerActor, server: MailServer, name: string): Promise<string> {
     const existing = (await listDomains(server)).find((domain) => domain.name === name);
     if (existing) return existing.id;
     await requireMailDomainStanding(actor, server.orgId, name);
@@ -101,21 +91,13 @@ export async function addDomain(
     return id;
 }
 
-export async function removeDomain(
-    actorId: string,
-    server: MailServer,
-    domainId: string
-): Promise<void> {
+export async function removeDomain(actorId: string, server: MailServer, domainId: string): Promise<void> {
     const domain = (await listDomains(server)).find((one) => one.id === domainId);
     if (!domain) throw new MailServerAccessError("That domain is not on this mail server.");
     if (domain.primary) {
-        throw new MailServerAccessError(
-            "The server's first domain holds Polaris's own accounts and cannot be removed."
-        );
+        throw new MailServerAccessError("The server's first domain holds Polaris's own accounts and cannot be removed.");
     }
-    const mailboxes = (await listMailboxes(server)).filter(
-        (mailbox) => mailbox.domainId === domainId
-    );
+    const mailboxes = (await listMailboxes(server)).filter((mailbox) => mailbox.domainId === domainId);
     if (mailboxes.length > 0) {
         throw new MailServerAccessError(
             `${domain.name} still has ${mailboxes.length} mailbox${mailboxes.length === 1 ? "" : "es"}. Remove them first.`
@@ -133,11 +115,7 @@ export async function setCatchAll(
     domainId: string,
     address: string | null
 ): Promise<void> {
-    core.assertApplied(
-        await run(server, [core.domainCatchAllCall(domainId, address)]),
-        "catchall",
-        domainId
-    );
+    core.assertApplied(await run(server, [core.domainCatchAllCall(domainId, address)]), "catchall", domainId);
     await audit(actorId, server, address ? "catchall.set" : "catchall.clear");
 }
 
@@ -178,10 +156,7 @@ export async function listMailboxes(server: MailServer): Promise<MailboxView[]> 
     return rows
         .filter(
             (row) =>
-                !(
-                    row.domainId === primaryId &&
-                    (row.name === core.MAIL_ADMIN_NAME || row.name === core.MAIL_REPORTS_NAME)
-                )
+                !(row.domainId === primaryId && (row.name === core.MAIL_ADMIN_NAME || row.name === core.MAIL_REPORTS_NAME))
         )
         .map((row) => ({
             id: row.id,
@@ -189,17 +164,10 @@ export async function listMailboxes(server: MailServer): Promise<MailboxView[]> 
             name: row.name,
             domainId: row.domainId,
             description: row.description ?? "",
-            quotaMb:
-                typeof row.quotas?.maxDiskQuota === "number"
-                    ? Math.round(row.quotas.maxDiskQuota / (1024 * 1024))
-                    : 0,
+            quotaMb: typeof row.quotas?.maxDiskQuota === "number" ? Math.round(row.quotas.maxDiskQuota / (1024 * 1024)) : 0,
             aliases: core
                 .fromList<{ name?: string; domainId?: string }>(row.aliases)
-                .flatMap((alias) =>
-                    alias.name && alias.domainId
-                        ? [{ name: alias.name, domainId: alias.domainId }]
-                        : []
-                ),
+                .flatMap((alias) => (alias.name && alias.domainId ? [{ name: alias.name, domainId: alias.domainId }] : [])),
             polaris: row.name === core.MAIL_SENDER_NAME && row.domainId === primaryId
         }))
         .sort((left, right) => left.address.localeCompare(right.address));
@@ -209,10 +177,7 @@ export async function listMailboxes(server: MailServer): Promise<MailboxView[]> 
  *  the first domain, and the report mailbox, which has an alias at every one. */
 function reservedAt(domain: MailDomainView, localPart: string): boolean {
     if (localPart === core.MAIL_REPORTS_NAME) return true;
-    return (
-        domain.primary &&
-        (localPart === core.MAIL_ADMIN_NAME || localPart === core.MAIL_SENDER_NAME)
-    );
+    return domain.primary && (localPart === core.MAIL_ADMIN_NAME || localPart === core.MAIL_SENDER_NAME);
 }
 
 /**
@@ -221,24 +186,16 @@ function reservedAt(domain: MailDomainView, localPart: string): boolean {
  * these are the ones that count. The breach lookup fails open.
  */
 async function refuseWeakPassword(password: string, address: string): Promise<void> {
-    if (core.passwordMatchesIdentity(password, [address]))
-        throw new MailServerAccessError(core.MAILBOX_IDENTITY_PASSWORD_MESSAGE);
-    if (await passwordIsBreached(password))
-        throw new MailServerAccessError(core.BREACHED_PASSWORD_MESSAGE);
+    if (core.passwordMatchesIdentity(password, [address])) throw new MailServerAccessError(core.MAILBOX_IDENTITY_PASSWORD_MESSAGE);
+    if (await passwordIsBreached(password)) throw new MailServerAccessError(core.BREACHED_PASSWORD_MESSAGE);
 }
 
 /** The mailbox, when it exists and is not one Polaris guards. */
-async function ownMailbox(
-    server: MailServer,
-    accountId: string,
-    allowPolaris = false
-): Promise<MailboxView> {
+async function ownMailbox(server: MailServer, accountId: string, allowPolaris = false): Promise<MailboxView> {
     const mailbox = (await listMailboxes(server)).find((one) => one.id === accountId);
     if (!mailbox) throw new MailServerAccessError("That mailbox is not on this mail server.");
     if (mailbox.polaris && !allowPolaris) {
-        throw new MailServerAccessError(
-            "Polaris sends its own mail from this mailbox, so it is left as it is."
-        );
+        throw new MailServerAccessError("Polaris sends its own mail from this mailbox, so it is left as it is.");
     }
     return mailbox;
 }
@@ -251,9 +208,7 @@ export async function createMailbox(
     const domain = (await listDomains(server)).find((one) => one.id === input.domainId);
     if (!domain) throw new MailServerAccessError("That domain is not on this mail server.");
     if (reservedAt(domain, input.localPart)) {
-        throw new MailServerAccessError(
-            `${input.localPart}@${domain.name} is Polaris's own. Choose another name.`
-        );
+        throw new MailServerAccessError(`${input.localPart}@${domain.name} is Polaris's own. Choose another name.`);
     }
     await refuseWeakPassword(input.password, `${input.localPart}@${domain.name}`);
     const id = core.createdId(
@@ -281,26 +236,13 @@ export async function setMailboxPassword(
 ): Promise<void> {
     const mailbox = await ownMailbox(server, accountId);
     await refuseWeakPassword(password, mailbox.address);
-    core.assertApplied(
-        await run(server, [core.accountPasswordCall(accountId, password)]),
-        "password",
-        accountId
-    );
+    core.assertApplied(await run(server, [core.accountPasswordCall(accountId, password)]), "password", accountId);
     await audit(actorId, server, "mailbox.password");
 }
 
-export async function setMailboxQuota(
-    actorId: string,
-    server: MailServer,
-    accountId: string,
-    quotaMb: number
-): Promise<void> {
+export async function setMailboxQuota(actorId: string, server: MailServer, accountId: string, quotaMb: number): Promise<void> {
     await ownMailbox(server, accountId, true);
-    core.assertApplied(
-        await run(server, [core.accountQuotaCall(accountId, core.quotaBytes(quotaMb))]),
-        "quota",
-        accountId
-    );
+    core.assertApplied(await run(server, [core.accountQuotaCall(accountId, core.quotaBytes(quotaMb))]), "quota", accountId);
     await audit(actorId, server, "mailbox.quota");
 }
 
@@ -314,14 +256,9 @@ export async function setMailboxAliases(
     const domains = new Map((await listDomains(server)).map((domain) => [domain.id, domain]));
     for (const alias of aliases) {
         const domain = domains.get(alias.domainId);
-        if (!domain)
-            throw new MailServerAccessError(
-                "An alias names a domain that is not on this mail server."
-            );
+        if (!domain) throw new MailServerAccessError("An alias names a domain that is not on this mail server.");
         if (reservedAt(domain, alias.localPart)) {
-            throw new MailServerAccessError(
-                `${alias.localPart}@${domain.name} is Polaris's own. Choose another name.`
-            );
+            throw new MailServerAccessError(`${alias.localPart}@${domain.name} is Polaris's own. Choose another name.`);
         }
     }
     core.assertApplied(
@@ -337,17 +274,9 @@ export async function setMailboxAliases(
     await audit(actorId, server, "mailbox.aliases");
 }
 
-export async function deleteMailbox(
-    actorId: string,
-    server: MailServer,
-    accountId: string
-): Promise<void> {
+export async function deleteMailbox(actorId: string, server: MailServer, accountId: string): Promise<void> {
     await ownMailbox(server, accountId);
-    core.assertApplied(
-        await run(server, [core.accountDestroyCall(accountId)]),
-        "destroy",
-        accountId
-    );
+    core.assertApplied(await run(server, [core.accountDestroyCall(accountId)]), "destroy", accountId);
     await audit(actorId, server, "mailbox.delete");
 }
 
@@ -390,19 +319,12 @@ export async function listForwards(server: MailServer): Promise<ForwardView[]> {
 export async function createForward(
     actorId: string,
     server: MailServer,
-    input: {
-        domainId: string;
-        localPart: string;
-        recipients: readonly string[];
-        description: string;
-    }
+    input: { domainId: string; localPart: string; recipients: readonly string[]; description: string }
 ): Promise<string> {
     const domain = (await listDomains(server)).find((one) => one.id === input.domainId);
     if (!domain) throw new MailServerAccessError("That domain is not on this mail server.");
     if (reservedAt(domain, input.localPart)) {
-        throw new MailServerAccessError(
-            `${input.localPart}@${domain.name} is Polaris's own. Choose another name.`
-        );
+        throw new MailServerAccessError(`${input.localPart}@${domain.name} is Polaris's own. Choose another name.`);
     }
     const own = `${input.localPart}@${domain.name}`;
     // A forward to itself is a loop the engine would deliver until it gave up.
@@ -425,19 +347,11 @@ export async function createForward(
     return id;
 }
 
-export async function deleteForward(
-    actorId: string,
-    server: MailServer,
-    forwardId: string
-): Promise<void> {
+export async function deleteForward(actorId: string, server: MailServer, forwardId: string): Promise<void> {
     if (!(await listForwards(server)).some((forward) => forward.id === forwardId)) {
         throw new MailServerAccessError("That forward is not on this mail server.");
     }
-    core.assertApplied(
-        await run(server, [core.forwardDestroyCall(forwardId)]),
-        "destroy",
-        forwardId
-    );
+    core.assertApplied(await run(server, [core.forwardDestroyCall(forwardId)]), "destroy", forwardId);
     await audit(actorId, server, "forward.delete");
 }
 

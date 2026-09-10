@@ -13,16 +13,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Layers, Pencil, Plus, Trash2, X } from "lucide-react";
-import {
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    Checkbox,
-    ConfirmDeleteDialog,
-    Input
-} from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, ConfirmDeleteDialog, Input } from "@polaris/ui";
 import {
     createHostGroupAction,
     deleteHostGroupAction,
@@ -37,11 +28,7 @@ interface Group {
     hostIds: string[];
 }
 
-export function ServerGroups({
-    servers
-}: {
-    servers: readonly { id: string; name: string; kind: string }[];
-}) {
+export function ServerGroups({ servers }: { servers: readonly { id: string; name: string; kind: string }[] }) {
     const [groups, setGroups] = useState<Group[] | null>(null);
     const [creating, setCreating] = useState(false);
     const [draftName, setDraftName] = useState("");
@@ -79,14 +66,10 @@ export function ServerGroups({
     }
 
     function toggleMember(group: Group, hostId: string, member: boolean) {
-        const nextIds = member
-            ? [...group.hostIds, hostId]
-            : group.hostIds.filter((id) => id !== hostId);
+        const nextIds = member ? [...group.hostIds, hostId] : group.hostIds.filter((id) => id !== hostId);
         const previous = groups;
         setGroups((current) =>
-            (current ?? []).map((entry) =>
-                entry.id === group.id ? { ...entry, hostIds: nextIds } : entry
-            )
+            (current ?? []).map((entry) => (entry.id === group.id ? { ...entry, hostIds: nextIds } : entry))
         );
         setError(null);
         start(async () => {
@@ -106,20 +89,15 @@ export function ServerGroups({
                     Server groups
                 </CardTitle>
                 {!creating ? (
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setCreating(true)}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setCreating(true)}>
                         <Plus className="size-4" /> New group
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Write a firewall rule once for a set of machines. Adding a server to a group
-                    brings it under the group&apos;s rules straight away.
+                    Write a firewall rule once for a set of machines. Adding a server to a group brings it under the
+                    group&apos;s rules straight away.
                 </p>
 
                 {creating ? (
@@ -153,19 +131,14 @@ export function ServerGroups({
                 ) : null}
 
                 {groups === null ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">
-                        Loading groups...
-                    </p>
+                    <p className="py-4 text-center text-sm text-muted-foreground">Loading groups...</p>
                 ) : groups.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
                         No groups yet.
                     </p>
                 ) : (
                     groups.map((group) => (
-                        <div
-                            key={group.id}
-                            className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5"
-                        >
+                        <div key={group.id} className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
                             <div className="flex items-center justify-between gap-2">
                                 {renaming === group.id ? (
                                     <Input
@@ -211,24 +184,15 @@ export function ServerGroups({
                                 </div>
                             </div>
                             {eligible.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">
-                                    Enroll a server to put one in here.
-                                </p>
+                                <p className="text-xs text-muted-foreground">Enroll a server to put one in here.</p>
                             ) : (
                                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                                     {eligible.map((server) => (
-                                        <label
-                                            key={server.id}
-                                            className="flex items-center gap-2 text-xs"
-                                        >
+                                        <label key={server.id} className="flex items-center gap-2 text-xs">
                                             <Checkbox
                                                 checked={group.hostIds.includes(server.id)}
                                                 onChange={(event) =>
-                                                    toggleMember(
-                                                        group,
-                                                        server.id,
-                                                        event.target.checked
-                                                    )
+                                                    toggleMember(group, server.id, event.target.checked)
                                                 }
                                             />
                                             {server.name}

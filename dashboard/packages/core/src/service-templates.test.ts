@@ -24,9 +24,7 @@ const VARIABLE_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 function containers(): { id: string; service: TemplateService }[] {
     return SERVICE_TEMPLATES.flatMap((template) => [
         { id: template.id, service: template },
-        ...(template.companion
-            ? [{ id: `${template.id} companion`, service: template.companion }]
-            : [])
+        ...(template.companion ? [{ id: `${template.id} companion`, service: template.companion }] : [])
     ]);
 }
 
@@ -37,8 +35,7 @@ describe("the template list", () => {
         for (const { service } of containers()) {
             expect(service.image).toMatch(/^[a-z0-9./_-]+(:[\w.-]+)?$/);
             expect(service.port).toBeGreaterThan(0);
-            for (const volume of service.volumes)
-                expect(volume.mountPath.startsWith("/")).toBe(true);
+            for (const volume of service.volumes) expect(volume.mountPath.startsWith("/")).toBe(true);
             // A secret is generated, never also written as a plain value.
             for (const key of service.secrets) expect(service.env[key]).toBeUndefined();
         }
@@ -55,9 +52,7 @@ describe("the template list", () => {
     it("asks for database versions Polaris offers", () => {
         for (const template of SERVICE_TEMPLATES) {
             if (!template.database) continue;
-            expect(DB_ENGINE_INFO[template.database.engine].versions).toContain(
-                template.database.version
-            );
+            expect(DB_ENGINE_INFO[template.database.engine].versions).toContain(template.database.version);
         }
     });
 
@@ -78,20 +73,15 @@ describe("the template list", () => {
             const slugs = {
                 self: template.id,
                 ...(template.database ? { database: `${template.id}-db` } : {}),
-                ...(template.companion
-                    ? { companion: `${template.id}-${template.companion.suffix}` }
-                    : {})
+                ...(template.companion ? { companion: `${template.id}-${template.companion.suffix}` } : {})
             };
             const vars = [
                 ...templateVariables(template, slugs, () => "x"),
-                ...(template.companion
-                    ? templateVariables(template.companion, { self: slugs.companion! }, () => "x")
-                    : [])
+                ...(template.companion ? templateVariables(template.companion, { self: slugs.companion! }, () => "x") : [])
             ];
             // Nothing is left in the template's own notation: every `{{` is the
             // start of a `${{...}}` reference.
-            for (const entry of vars)
-                expect(entry.value, `${template.id}: ${entry.key}`).not.toMatch(/(^|[^$])\{\{/);
+            for (const entry of vars) expect(entry.value, `${template.id}: ${entry.key}`).not.toMatch(/(^|[^$])\{\{/);
         }
     });
 });
@@ -99,11 +89,7 @@ describe("the template list", () => {
 describe("the templates added with a database, a companion or setup", () => {
     it("transcribes Ghost with a MySQL database it reaches by reference", () => {
         const ghost = serviceTemplate("ghost")!;
-        expect(ghost).toMatchObject({
-            image: "ghost:5-alpine",
-            port: 2368,
-            database: { engine: "mysql" }
-        });
+        expect(ghost).toMatchObject({ image: "ghost:5-alpine", port: 2368, database: { engine: "mysql" } });
         expect(ghost.volumes).toEqual([{ name: "content", mountPath: "/var/lib/ghost/content" }]);
         expect(templateNeedsSetup(ghost)).toBe(true);
     });
@@ -130,32 +116,20 @@ describe("the templates added with a database, a companion or setup", () => {
 
         const freshrss = serviceTemplate("freshrss")!;
         expect(freshrss).toMatchObject({ image: "freshrss/freshrss:latest", port: 80 });
-        expect(freshrss.prepare?.[0]?.readiness).toEqual({
-            test: "test -d /var/www/FreshRSS/cli",
-            intervalMs: 3000,
-            retries: 30
-        });
+        expect(freshrss.prepare?.[0]?.readiness).toEqual({ test: "test -d /var/www/FreshRSS/cli", intervalMs: 3000, retries: 30 });
 
         const minio = serviceTemplate("minio")!;
         expect(minio).toMatchObject({ image: "minio/minio:latest", port: 9001 });
         expect(minio.command).toEqual(["server", "/data", "--console-address", ":9001"]);
         expect(minio.prepare?.[0]?.readiness).toMatchObject({ intervalMs: 1000, retries: 30 });
-        expect(minio.prepare?.[0]?.command).toContain(
-            'mc mb --ignore-existing "local/$OPENSHIP_BUCKET"'
-        );
+        expect(minio.prepare?.[0]?.command).toContain('mc mb --ignore-existing "local/$OPENSHIP_BUCKET"');
     });
 
     it("transcribes Kafka as its console and a broker companion", () => {
         const kafka = serviceTemplate("kafka")!;
         expect(kafka).toMatchObject({ image: "ghcr.io/kafbat/kafka-ui:latest", port: 8080 });
-        expect(kafka.companion).toMatchObject({
-            suffix: "broker",
-            image: "apache/kafka:4.0.0",
-            port: 9092
-        });
-        expect(kafka.companion?.volumes).toEqual([
-            { name: "data", mountPath: "/var/lib/kafka/data" }
-        ]);
+        expect(kafka.companion).toMatchObject({ suffix: "broker", image: "apache/kafka:4.0.0", port: 9092 });
+        expect(kafka.companion?.volumes).toEqual([{ name: "data", mountPath: "/var/lib/kafka/data" }]);
     });
 
     it("leaves the plain templates as one deploy of one container", () => {
@@ -169,19 +143,12 @@ describe("templateVariables", () => {
         const webhook = vars.find((entry) => entry.key === "WEBHOOK_URL");
         expect(webhook?.value).toBe("${{automations.POLARIS_PUBLIC_URL}}");
         expect(hasReferences(webhook?.value ?? "")).toBe(true);
-        expect(referencesIn(webhook?.value ?? "")[0]).toMatchObject({
-            name: "automations",
-            key: "POLARIS_PUBLIC_URL"
-        });
+        expect(referencesIn(webhook?.value ?? "")[0]).toMatchObject({ name: "automations", key: "POLARIS_PUBLIC_URL" });
     });
 
     it("generates each secret and marks it secret", () => {
         let n = 0;
-        const vars = templateVariables(
-            serviceTemplate("vaultwarden")!,
-            { self: "vault" },
-            () => `secret-${++n}`
-        );
+        const vars = templateVariables(serviceTemplate("vaultwarden")!, { self: "vault" }, () => `secret-${++n}`);
         expect(vars.find((entry) => entry.key === "ADMIN_TOKEN")).toEqual({
             key: "ADMIN_TOKEN",
             value: "secret-1",
@@ -192,14 +159,10 @@ describe("templateVariables", () => {
 
     it("points a service at its database by reference and copies nothing secret", () => {
         const generated: string[] = [];
-        const vars = templateVariables(
-            serviceTemplate("ghost")!,
-            { self: "blog", database: "blog-db" },
-            () => {
-                generated.push("g");
-                return "g";
-            }
-        );
+        const vars = templateVariables(serviceTemplate("ghost")!, { self: "blog", database: "blog-db" }, () => {
+            generated.push("g");
+            return "g";
+        });
         const value = (key: string) => vars.find((entry) => entry.key === key)?.value;
 
         expect(value("database__connection__host")).toBe("${{blog-db.HOST}}");
@@ -212,23 +175,13 @@ describe("templateVariables", () => {
         expect(generated).toEqual([]);
         expect(vars.every((entry) => !entry.isSecret)).toBe(true);
 
-        const umami = templateVariables(
-            serviceTemplate("umami")!,
-            { self: "stats", database: "stats-db" },
-            () => "s"
-        );
-        expect(umami.find((entry) => entry.key === "DATABASE_URL")?.value).toBe(
-            "${{stats-db.DATABASE_URL}}"
-        );
+        const umami = templateVariables(serviceTemplate("umami")!, { self: "stats", database: "stats-db" }, () => "s");
+        expect(umami.find((entry) => entry.key === "DATABASE_URL")?.value).toBe("${{stats-db.DATABASE_URL}}");
     });
 
     it("points a console at its companion, and the companion at itself", () => {
         const kafka = serviceTemplate("kafka")!;
-        const ui = templateVariables(
-            kafka,
-            { self: "events", companion: "events-broker" },
-            () => "p"
-        );
+        const ui = templateVariables(kafka, { self: "events", companion: "events-broker" }, () => "p");
         expect(ui.find((entry) => entry.key === "KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS")?.value).toBe(
             "${{events-broker.POLARIS_PRIVATE_DOMAIN}}:9092"
         );
@@ -239,9 +192,7 @@ describe("templateVariables", () => {
     });
 
     it("refuses a placeholder for something the caller did not create", () => {
-        expect(() =>
-            templateVariables(serviceTemplate("ghost")!, { self: "blog" }, () => "x")
-        ).toThrow(/database/);
+        expect(() => templateVariables(serviceTemplate("ghost")!, { self: "blog" }, () => "x")).toThrow(/database/);
     });
 });
 
@@ -296,12 +247,7 @@ describe("runPrepareSteps", () => {
         // No wait after the last check: there is nothing left to wait for.
         expect(run.waits).toHaveLength(3);
         expect(outcomes).toEqual([
-            {
-                ok: false,
-                title: "Create the admin",
-                reason: "It was not ready after 4 checks 3 seconds apart.",
-                output: ""
-            }
+            { ok: false, title: "Create the admin", reason: "It was not ready after 4 checks 3 seconds apart.", output: "" }
         ]);
     });
 
@@ -310,12 +256,7 @@ describe("runPrepareSteps", () => {
         const outcomes = await runPrepareSteps([step()], run.exec, run.sleep);
 
         expect(outcomes).toEqual([
-            {
-                ok: false,
-                title: "Create the admin",
-                reason: "It exited with code 2.",
-                output: "no such bucket"
-            }
+            { ok: false, title: "Create the admin", reason: "It exited with code 2.", output: "no such bucket" }
         ]);
     });
 

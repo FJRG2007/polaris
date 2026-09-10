@@ -29,28 +29,12 @@ vi.mock("acme-client", () => ({
     },
     Client: class {
         async auto(options: {
-            challengeCreateFn: (
-                authz: unknown,
-                challenge: unknown,
-                keyAuthorization: string
-            ) => Promise<void>;
-            challengeRemoveFn: (
-                authz: unknown,
-                challenge: unknown,
-                keyAuthorization: string
-            ) => Promise<void>;
+            challengeCreateFn: (authz: unknown, challenge: unknown, keyAuthorization: string) => Promise<void>;
+            challengeRemoveFn: (authz: unknown, challenge: unknown, keyAuthorization: string) => Promise<void>;
         }) {
             const authorizations = [
-                {
-                    identifier: { value: "example.test" },
-                    wildcard: true,
-                    answer: "answer-for-wildcard"
-                },
-                {
-                    identifier: { value: "example.test" },
-                    wildcard: false,
-                    answer: "answer-for-base"
-                }
+                { identifier: { value: "example.test" }, wildcard: true, answer: "answer-for-wildcard" },
+                { identifier: { value: "example.test" }, wildcard: false, answer: "answer-for-base" }
             ];
             // As the real client does: every authorization in parallel, each one
             // published, validated against what is live, then removed.
@@ -58,9 +42,7 @@ vi.mock("acme-client", () => ({
                 authorizations.map(async (authz) => {
                     const challenge = { type: "dns-01" };
                     await options.challengeCreateFn(authz, challenge, authz.answer);
-                    live.push(
-                        `checked ${authz.answer}: ${[...records.values()].includes(authz.answer)}`
-                    );
+                    live.push(`checked ${authz.answer}: ${[...records.values()].includes(authz.answer)}`);
                     await options.challengeRemoveFn(authz, challenge, authz.answer);
                 })
             );
@@ -105,18 +87,13 @@ describe("the DNS-01 order", () => {
         // Both halves answer at the one name, as two records.
         expect(names).toEqual(["_acme-challenge.example.test", "_acme-challenge.example.test"]);
         // Each validation found its own answer still published.
-        expect(live.sort()).toEqual([
-            "checked answer-for-base: true",
-            "checked answer-for-wildcard: true"
-        ]);
+        expect(live.sort()).toEqual(["checked answer-for-base: true", "checked answer-for-wildcard: true"]);
         // And nothing is left behind.
         expect(records.size).toBe(0);
     });
 
     it("puts a wildcard's answer at its base", () => {
-        expect(challengeRecordName("*.shop.example.test")).toBe(
-            "_acme-challenge.shop.example.test"
-        );
+        expect(challengeRecordName("*.shop.example.test")).toBe("_acme-challenge.shop.example.test");
         expect(challengeRecordName("example.test")).toBe("_acme-challenge.example.test");
     });
 });
@@ -130,11 +107,7 @@ describe("which certificates Polaris holds", () => {
     ];
 
     it("holds one for every verified owner domain, and none for an unproven one", () => {
-        const wanted = plannedCertificates({
-            ownerDomains,
-            wildcardHosts: [],
-            deployBase: "plr.example.org"
-        });
+        const wanted = plannedCertificates({ ownerDomains, wildcardHosts: [], deployBase: "plr.example.org" });
         expect(wanted).toEqual([
             { domain: "example.test", source: "owner", ownerDomainId: "od-1" },
             { domain: "acme.test", source: "owner", ownerDomainId: "od-3" }
@@ -145,13 +118,7 @@ describe("which certificates Polaris holds", () => {
         const wanted = plannedCertificates({
             ownerDomains: [{ id: "od-9", domain: "plr.example.org", verified: true, ...owner }],
             wildcardHosts: [
-                {
-                    hostname: "*.plr.example.org",
-                    hasUpload: false,
-                    ownerId: "user-1",
-                    orgId: null,
-                    ownerIsAdmin: true
-                }
+                { hostname: "*.plr.example.org", hasUpload: false, ownerId: "user-1", orgId: null, ownerIsAdmin: true }
             ],
             deployBase: "plr.example.org"
         });
@@ -162,33 +129,13 @@ describe("which certificates Polaris holds", () => {
         const wanted = plannedCertificates({
             ownerDomains,
             wildcardHosts: [
-                {
-                    hostname: "*.shop.example.test",
-                    hasUpload: false,
-                    ownerId: "user-1",
-                    orgId: null,
-                    ownerIsAdmin: false
-                },
-                {
-                    hostname: "*.store.acme.test",
-                    hasUpload: false,
-                    ownerId: "user-2",
-                    orgId: "org-1",
-                    ownerIsAdmin: false
-                }
+                { hostname: "*.shop.example.test", hasUpload: false, ownerId: "user-1", orgId: null, ownerIsAdmin: false },
+                { hostname: "*.store.acme.test", hasUpload: false, ownerId: "user-2", orgId: "org-1", ownerIsAdmin: false }
             ],
             deployBase: null
         });
-        expect(wanted).toContainEqual({
-            domain: "shop.example.test",
-            source: "hostname",
-            ownerDomainId: "od-1"
-        });
-        expect(wanted).toContainEqual({
-            domain: "store.acme.test",
-            source: "hostname",
-            ownerDomainId: "od-3"
-        });
+        expect(wanted).toContainEqual({ domain: "shop.example.test", source: "hostname", ownerDomainId: "od-1" });
+        expect(wanted).toContainEqual({ domain: "store.acme.test", source: "hostname", ownerDomainId: "od-3" });
     });
 
     it("never orders in a zone the service owner has no standing over", () => {
@@ -196,29 +143,11 @@ describe("which certificates Polaris holds", () => {
             ownerDomains,
             wildcardHosts: [
                 // Somebody else's domain.
-                {
-                    hostname: "*.shop.example.test",
-                    hasUpload: false,
-                    ownerId: "user-2",
-                    orgId: null,
-                    ownerIsAdmin: false
-                },
+                { hostname: "*.shop.example.test", hasUpload: false, ownerId: "user-2", orgId: null, ownerIsAdmin: false },
                 // Nobody's.
-                {
-                    hostname: "*.elsewhere.test",
-                    hasUpload: false,
-                    ownerId: "user-2",
-                    orgId: null,
-                    ownerIsAdmin: false
-                },
+                { hostname: "*.elsewhere.test", hasUpload: false, ownerId: "user-2", orgId: null, ownerIsAdmin: false },
                 // Covered by an upload.
-                {
-                    hostname: "*.mine.example.test",
-                    hasUpload: true,
-                    ownerId: "user-1",
-                    orgId: null,
-                    ownerIsAdmin: false
-                }
+                { hostname: "*.mine.example.test", hasUpload: true, ownerId: "user-1", orgId: null, ownerIsAdmin: false }
             ],
             deployBase: null
         });
@@ -229,19 +158,11 @@ describe("which certificates Polaris holds", () => {
         const wanted = plannedCertificates({
             ownerDomains: [],
             wildcardHosts: [
-                {
-                    hostname: "*.Apps.Operator.test",
-                    hasUpload: false,
-                    ownerId: "admin",
-                    orgId: null,
-                    ownerIsAdmin: true
-                }
+                { hostname: "*.Apps.Operator.test", hasUpload: false, ownerId: "admin", orgId: null, ownerIsAdmin: true }
             ],
             deployBase: null
         });
-        expect(wanted).toEqual([
-            { domain: "apps.operator.test", source: "hostname", ownerDomainId: null }
-        ]);
+        expect(wanted).toEqual([{ domain: "apps.operator.test", source: "hostname", ownerDomainId: null }]);
     });
 });
 
@@ -288,24 +209,16 @@ describe("which edge gets which certificate", () => {
         const list = script.indexOf("polaris-managed-certs.yml");
         expect(script.indexOf("polaris-managed-c1.crt")).toBeLessThan(list);
         expect(script.indexOf("polaris-managed-c1.key")).toBeLessThan(list);
-        expect(script).toContain(
-            "chmod 600 /var/lib/polaris/traefik/dynamic/.polaris-managed-c1.key.n0nce"
-        );
+        expect(script).toContain("chmod 600 /var/lib/polaris/traefik/dynamic/.polaris-managed-c1.key.n0nce");
         // The payload travels encoded, never as raw text a shell could change.
         expect(script).not.toContain("KEY\n");
         expect(script).toContain(Buffer.from("KEY").toString("base64"));
         expect(script).toContain(
-            'case "$(basename "$f")" in polaris-managed-c1.crt|polaris-managed-c1.key|polaris-managed-certs.yml) ;; *) rm -f "$f" ;; esac'
+            "case \"$(basename \"$f\")\" in polaris-managed-c1.crt|polaris-managed-c1.key|polaris-managed-certs.yml) ;; *) rm -f \"$f\" ;; esac"
         );
         // The list names the files where that server's edge sees them.
         const yml = Buffer.from(
-            [
-                "tls:",
-                "  certificates:",
-                "    - certFile: /dynamic/polaris-managed-c1.crt",
-                "      keyFile: /dynamic/polaris-managed-c1.key",
-                ""
-            ].join("\n")
+            ["tls:", "  certificates:", "    - certFile: /dynamic/polaris-managed-c1.crt", "      keyFile: /dynamic/polaris-managed-c1.key", ""].join("\n")
         ).toString("base64");
         expect(script).toContain(yml);
     });

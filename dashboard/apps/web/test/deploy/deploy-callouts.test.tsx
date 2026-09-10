@@ -65,11 +65,7 @@ function callouts(items: DeploymentSummary[], canDeploy = true): string {
 describe("the callouts over a service's deployments", () => {
     it("says the last deploy failed with the first line of its error, and offers the log and a redeploy", () => {
         const html = callouts([
-            deployment({
-                id: "new",
-                status: "failed",
-                error: "\n  npm ERR! missing script: build\nat line 2"
-            }),
+            deployment({ id: "new", status: "failed", error: "\n  npm ERR! missing script: build\nat line 2" }),
             deployment({ id: "old", isCurrent: true })
         ]);
         expect(html).toContain("Action required");
@@ -87,47 +83,17 @@ describe("the callouts over a service's deployments", () => {
     });
 
     it("says nothing when the newest deploy went through", () => {
-        expect(
-            callouts([deployment({ isCurrent: true }), deployment({ id: "x", status: "failed" })])
-        ).toBe("");
+        expect(callouts([deployment({ isCurrent: true }), deployment({ id: "x", status: "failed" })])).toBe("");
     });
 });
 
 const GLANCE: EnvironmentGlance = {
     addresses: [
-        {
-            id: "a",
-            hostname: "web-1.example.test",
-            kind: "auto",
-            enabled: true,
-            healthStatus: "up",
-            applicationId: "web",
-            service: "Web"
-        },
-        {
-            id: "b",
-            hostname: "shop.example.test",
-            kind: "custom",
-            enabled: true,
-            healthStatus: "down",
-            applicationId: "web",
-            service: "Web"
-        },
-        {
-            id: "c",
-            hostname: "off.example.test",
-            kind: "custom",
-            enabled: false,
-            applicationId: "api",
-            service: "API"
-        }
+        { id: "a", hostname: "web-1.example.test", kind: "auto", enabled: true, healthStatus: "up", applicationId: "web", service: "Web" },
+        { id: "b", hostname: "shop.example.test", kind: "custom", enabled: true, healthStatus: "down", applicationId: "web", service: "Web" },
+        { id: "c", hostname: "off.example.test", kind: "custom", enabled: false, applicationId: "api", service: "API" }
     ],
-    lastDeploy: {
-        applicationId: "api",
-        service: "API",
-        status: "failed",
-        createdAt: "2026-09-10T10:00:00.000Z"
-    },
+    lastDeploy: { applicationId: "api", service: "API", status: "failed", createdAt: "2026-09-10T10:00:00.000Z" },
     attention: [
         { applicationId: "api", service: "API", reasons: ["last deploy failed"] },
         { applicationId: "web", service: "Web", reasons: ["an address is down"] }
@@ -137,11 +103,7 @@ const GLANCE: EnvironmentGlance = {
 describe("the project summary line", () => {
     const render = (glance: EnvironmentGlance | undefined) =>
         renderToStaticMarkup(
-            <ProjectGlanceBar
-                environmentId="prod"
-                glance={glance}
-                serviceHref={(id) => `/p?service=${id}`}
-            />
+            <ProjectGlanceBar environmentId="prod" glance={glance} serviceHref={(id) => `/p?service=${id}`} />
         );
 
     it("shows the most stable address first and offers the others, never a disabled one", () => {

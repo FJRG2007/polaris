@@ -45,8 +45,7 @@ function matches(row: Row, where: Record<string, unknown> | undefined): boolean 
         if (condition && typeof condition === "object") {
             const test = condition as { not?: null; gte?: bigint };
             if ("not" in test && value === null) return false;
-            if (test.gte !== undefined && (value === null || (value as bigint) < test.gte))
-                return false;
+            if (test.gte !== undefined && (value === null || (value as bigint) < test.gte)) return false;
             continue;
         }
         if (value !== condition) return false;
@@ -61,10 +60,7 @@ function ordered(list: Row[], orderBy: unknown): Row[] {
         for (const key of keys as Record<string, "asc" | "desc">[]) {
             const [field, direction] = Object.entries(key)[0] ?? ["id", "asc"];
             const a = (left as unknown as Record<string, unknown>)[field] as bigint | Date | string;
-            const b = (right as unknown as Record<string, unknown>)[field] as
-                | bigint
-                | Date
-                | string;
+            const b = (right as unknown as Record<string, unknown>)[field] as bigint | Date | string;
             const cmp = a < b ? -1 : a > b ? 1 : 0;
             if (cmp !== 0) return direction === "desc" ? -cmp : cmp;
         }
@@ -76,30 +72,10 @@ function ordered(list: Row[], orderBy: unknown): Row[] {
 vi.mock("@polaris/db", () => ({
     prisma: {
         auditLog: {
-            findMany: async ({
-                where,
-                orderBy,
-                take
-            }: {
-                where?: Record<string, unknown>;
-                orderBy: unknown;
-                take: number;
-            }) =>
-                ordered(
-                    rows.filter((row) => matches(row, where)),
-                    orderBy
-                ).slice(0, take),
-            findFirst: async ({
-                where,
-                orderBy
-            }: {
-                where?: Record<string, unknown>;
-                orderBy: unknown;
-            }) =>
-                ordered(
-                    rows.filter((row) => matches(row, where)),
-                    orderBy
-                )[0] ?? null,
+            findMany: async ({ where, orderBy, take }: { where?: Record<string, unknown>; orderBy: unknown; take: number }) =>
+                ordered(rows.filter((row) => matches(row, where)), orderBy).slice(0, take),
+            findFirst: async ({ where, orderBy }: { where?: Record<string, unknown>; orderBy: unknown }) =>
+                ordered(rows.filter((row) => matches(row, where)), orderBy)[0] ?? null,
             update: async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => {
                 const row = rows.find((entry) => entry.id === where.id);
                 if (row) Object.assign(row, data);
@@ -114,13 +90,8 @@ vi.mock("@polaris/db", () => ({
             }
         },
         auditCheckpoint: {
-            findFirst: async () =>
-                [...checkpoints].sort((a, b) => (a.seq < b.seq ? 1 : -1))[0] ?? null,
-            upsert: async ({
-                create
-            }: {
-                create: { seq: bigint; hash: string; pruned: number };
-            }) => {
+            findFirst: async () => [...checkpoints].sort((a, b) => (a.seq < b.seq ? 1 : -1))[0] ?? null,
+            upsert: async ({ create }: { create: { seq: bigint; hash: string; pruned: number } }) => {
                 checkpoints.push({ ...create, at: new Date() });
                 return create;
             }
@@ -141,9 +112,7 @@ vi.mock("@/lib/setting-store", () => ({
     }
 }));
 
-const { sealAuditChain, verifyAuditChain, pruneSealedAudit, chainLink } = await import(
-    "@/lib/audit-chain"
-);
+const { sealAuditChain, verifyAuditChain, pruneSealedAudit, chainLink } = await import("@/lib/audit-chain");
 const core = await import("@polaris/core");
 
 function entry(index: number, minutesAgo: number): Row {
@@ -202,9 +171,7 @@ describe("sealing", () => {
         const first = rows.find((row) => row.seq === 1n)!;
         const { createHash } = await import("node:crypto");
         const plain = createHash("sha256")
-            .update(
-                core.auditChainPayload({ ...first, seq: 1n, prevHash: core.AUDIT_CHAIN_GENESIS })
-            )
+            .update(core.auditChainPayload({ ...first, seq: 1n, prevHash: core.AUDIT_CHAIN_GENESIS }))
             .digest("hex");
         expect(first.hash).not.toBe(plain);
         expect(first.hash).toBe(chainLink(first, 1n, core.AUDIT_CHAIN_GENESIS));

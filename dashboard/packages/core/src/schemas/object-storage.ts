@@ -52,12 +52,7 @@ export function lifecycleTtl(days: number): string {
 
 /** A prefix inside a bucket: a relative path of safe characters, or nothing. */
 export function isObjectPrefix(value: string): boolean {
-    return (
-        value === "" ||
-        (/^[A-Za-z0-9._\/-]{1,512}$/.test(value) &&
-            !value.split("/").includes("..") &&
-            !value.startsWith("/"))
-    );
+    return value === "" || (/^[A-Za-z0-9._\/-]{1,512}$/.test(value) && !value.split("/").includes("..") && !value.startsWith("/"));
 }
 
 export const bucketCreateSchema = z.object({
@@ -76,17 +71,11 @@ export const bucketKeySchema = z.object({
 
 export const lifecycleRuleSchema = z.object({
     bucketId: z.string().uuid(),
-    prefix: z
-        .string()
-        .trim()
-        .refine(isObjectPrefix, "A prefix is a relative path inside the bucket"),
+    prefix: z.string().trim().refine(isObjectPrefix, "A prefix is a relative path inside the bucket"),
     days: z
         .number()
         .int()
-        .refine(
-            (value) => (LIFECYCLE_DAYS as readonly number[]).includes(value),
-            "Pick an offered age"
-        )
+        .refine((value) => (LIFECYCLE_DAYS as readonly number[]).includes(value), "Pick an offered age")
 });
 
 export const presignSchema = z.object({
@@ -96,10 +85,7 @@ export const presignSchema = z.object({
         .trim()
         .min(1)
         .max(1024)
-        .refine(
-            (value) => !value.startsWith("/") && !value.split("/").includes(".."),
-            "An object key is a relative path"
-        ),
+        .refine((value) => !value.startsWith("/") && !value.split("/").includes(".."), "An object key is a relative path"),
     method: z.enum(["GET", "PUT"]),
     /** Seconds, up to the seven days SigV4 allows. */
     expiresIn: z.number().int().min(60).max(604_800),
@@ -111,20 +97,14 @@ export const presignSchema = z.object({
         .trim()
         .max(255)
         .optional()
-        .refine(
-            (value) => value === undefined || value === "" || parseStoreBaseUrl(value) !== null,
-            {
-                message:
-                    "Use http:// or https:// and a host, with an optional port and nothing after it"
-            }
-        )
+        .refine((value) => value === undefined || value === "" || parseStoreBaseUrl(value) !== null, {
+            message: "Use http:// or https:// and a host, with an optional port and nothing after it"
+        })
 });
 
 /** An address a store is reached on: protocol and host (with its port), or null
  *  for anything else - a path, a query or credentials in it would not be signed. */
-export function parseStoreBaseUrl(
-    raw: string
-): { protocol: "http" | "https"; host: string } | null {
+export function parseStoreBaseUrl(raw: string): { protocol: "http" | "https"; host: string } | null {
     let url: URL;
     try {
         url = new URL(raw.trim());
@@ -132,13 +112,7 @@ export function parseStoreBaseUrl(
         return null;
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    if (
-        url.username ||
-        url.password ||
-        url.search ||
-        url.hash ||
-        (url.pathname !== "/" && url.pathname !== "")
-    ) {
+    if (url.username || url.password || url.search || url.hash || (url.pathname !== "/" && url.pathname !== "")) {
         return null;
     }
     return { protocol: url.protocol === "http:" ? "http" : "https", host: url.host };
@@ -197,13 +171,7 @@ export function weedShellCommand(lines: readonly string[], describe: string): Ma
         if (/[\r\n]/.test(line)) throw new Error("A shell line cannot contain a line break");
     }
     return {
-        argv: [
-            "sh",
-            "-c",
-            'printf "%s\\n" "$@" | weed shell -master=localhost:9333',
-            "polaris",
-            ...lines
-        ],
+        argv: ["sh", "-c", 'printf "%s\\n" "$@" | weed shell -master=localhost:9333', "polaris", ...lines],
         describe
     };
 }
@@ -223,8 +191,7 @@ export function weedShellFailure(output: string): string | null {
 
 /** A value that may stand after `=` on a shell line: no spaces, no quotes. */
 function shellToken(value: string, what: string): string {
-    if (!/^[A-Za-z0-9._\/:,+-]{1,256}$/.test(value))
-        throw new Error(`${what} has characters the store cannot take`);
+    if (!/^[A-Za-z0-9._\/:,+-]{1,256}$/.test(value)) throw new Error(`${what} has characters the store cannot take`);
     return value;
 }
 
@@ -244,10 +211,7 @@ export function storeIdentityLine(identity: {
     readonly actions: string;
     readonly bucket?: string;
 }): string {
-    const bucket =
-        identity.bucket === undefined
-            ? []
-            : [`-buckets=${shellToken(identity.bucket, "The bucket")}`];
+    const bucket = identity.bucket === undefined ? [] : [`-buckets=${shellToken(identity.bucket, "The bucket")}`];
     return [
         "s3.configure",
         `-user=${shellToken(identity.user, "The identity")}`,
@@ -361,8 +325,7 @@ export function replicationEnsureCommand(link: {
     readonly sourceBucket: string;
     readonly targetBucket: string;
 }): MaintenanceCommand {
-    if (!/^[0-9a-f-]{36}$/.test(link.id))
-        throw new Error("A replication is named by its bucket id");
+    if (!/^[0-9a-f-]{36}$/.test(link.id)) throw new Error("A replication is named by its bucket id");
     const script = [
         'pid=$(cat "$1" 2>/dev/null || true)',
         'if [ -n "$pid" ] && grep -q filer.sync "/proc/$pid/cmdline" 2>/dev/null; then echo running; exit 0; fi',
@@ -406,13 +369,7 @@ export function replicationStopCommand(id: string): MaintenanceCommand {
 export function replicationLogCommand(id: string): MaintenanceCommand {
     if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("A replication is named by its bucket id");
     return {
-        argv: [
-            "sh",
-            "-c",
-            'tail -n 5 "$1" 2>/dev/null || true',
-            "polaris",
-            `/data/.polaris-sync-${id}.log`
-        ],
+        argv: ["sh", "-c", 'tail -n 5 "$1" 2>/dev/null || true', "polaris", `/data/.polaris-sync-${id}.log`],
         describe: "Reading the replication log"
     };
 }

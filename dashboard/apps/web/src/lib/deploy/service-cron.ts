@@ -97,12 +97,7 @@ function toView(row: {
 }
 
 /** When a job next fires from now, or null when it is off or never fires. */
-function nextFiring(
-    schedule: string,
-    timezone: string,
-    enabled: boolean,
-    after = new Date()
-): Date | null {
+function nextFiring(schedule: string, timezone: string, enabled: boolean, after = new Date()): Date | null {
     if (!enabled) return null;
     return core.nextCronRun(core.parseCron(schedule), after, timezone);
 }
@@ -145,9 +140,7 @@ export async function saveServiceCron(
         if (!existing) throw new Error("Scheduled job not found");
         return toView(await prisma.serviceCron.update({ where: { id: input.id }, data }));
     }
-    return toView(
-        await prisma.serviceCron.create({ data: { ...data, applicationId, createdById: userId } })
-    );
+    return toView(await prisma.serviceCron.create({ data: { ...data, applicationId, createdById: userId } }));
 }
 
 /** Remove one of this service's jobs and its run history. */
@@ -157,10 +150,7 @@ export async function deleteServiceCron(applicationId: string, cronId: string): 
 }
 
 /** A job's recent runs, newest first. */
-export async function listServiceCronRuns(
-    applicationId: string,
-    cronId: string
-): Promise<ServiceCronRunView[]> {
+export async function listServiceCronRuns(applicationId: string, cronId: string): Promise<ServiceCronRunView[]> {
     const rows = await prisma.serviceCronRun.findMany({
         where: { cronId, cron: { applicationId } },
         orderBy: { startedAt: "desc" },
@@ -181,10 +171,7 @@ export async function listServiceCronRuns(
 
 /** Run one of this service's jobs now, whatever its schedule. Answers the run. */
 export async function runServiceCronNow(applicationId: string, cronId: string): Promise<string> {
-    const cron = await prisma.serviceCron.findFirst({
-        where: { id: cronId, applicationId },
-        select: { id: true }
-    });
+    const cron = await prisma.serviceCron.findFirst({ where: { id: cronId, applicationId }, select: { id: true } });
     if (!cron) throw new Error("Scheduled job not found");
     return startRun(cronId, "manual", 1);
 }
@@ -196,9 +183,7 @@ export async function runServiceCronNow(applicationId: string, cronId: string): 
  * only where it still holds the value this pass read - so a second process
  * reading the same row a moment later finds nothing left to claim.
  */
-export async function tickServiceCrons(
-    now = new Date()
-): Promise<{ started: number; skipped: number }> {
+export async function tickServiceCrons(now = new Date()): Promise<{ started: number; skipped: number }> {
     let started = 0;
     let skipped = 0;
     const due = await prisma.serviceCron.findMany({
@@ -234,10 +219,7 @@ export async function tickServiceCrons(
             } catch {
                 // A schedule that no longer parses is switched off rather than
                 // re-read and refused every minute.
-                await prisma.serviceCron.update({
-                    where: { id: cron.id },
-                    data: { enabled: false, nextRunAt: null }
-                });
+                await prisma.serviceCron.update({ where: { id: cron.id }, data: { enabled: false, nextRunAt: null } });
                 continue;
             }
             const claimed = await prisma.serviceCron.updateMany({
@@ -252,9 +234,7 @@ export async function tickServiceCrons(
             where: {
                 cronId: cron.id,
                 status: "running",
-                startedAt: {
-                    gt: new Date(now.getTime() - (cron.timeoutSeconds + GRACE_SECONDS) * 1000)
-                }
+                startedAt: { gt: new Date(now.getTime() - (cron.timeoutSeconds + GRACE_SECONDS) * 1000) }
             },
             select: { id: true }
         });
@@ -278,14 +258,8 @@ export async function tickServiceCrons(
 }
 
 /** Record a run and start it in the background. Answers its id. */
-async function startRun(
-    cronId: string,
-    trigger: "schedule" | "manual" | "retry",
-    attempt: number
-): Promise<string> {
-    const run = await prisma.serviceCronRun.create({
-        data: { cronId, trigger, attempt, status: "running" }
-    });
+async function startRun(cronId: string, trigger: "schedule" | "manual" | "retry", attempt: number): Promise<string> {
+    const run = await prisma.serviceCronRun.create({ data: { cronId, trigger, attempt, status: "running" } });
     void execute(run.id).catch((error: unknown) => {
         console.error("polaris: a scheduled job could not be run:", error);
     });
@@ -295,8 +269,7 @@ async function startRun(
 /** The wrapper the command runs in: `timeout` where the image has one, so the
  *  command stops inside the container when its time is up. Positional arguments,
  *  never interpolated, so the command reaches `sh -c` exactly as it was written. */
-const WRAPPER =
-    'if command -v timeout >/dev/null 2>&1; then exec timeout "$2" sh -c "$1"; else exec sh -c "$1"; fi';
+const WRAPPER = 'if command -v timeout >/dev/null 2>&1; then exec timeout "$2" sh -c "$1"; else exec sh -c "$1"; fi';
 
 async function execute(runId: string): Promise<void> {
     const run = await prisma.serviceCronRun.findUnique({
@@ -307,13 +280,7 @@ async function execute(runId: string): Promise<void> {
                     application: {
                         include: {
                             target: true,
-                            environment: {
-                                select: {
-                                    project: {
-                                        select: { id: true, name: true, slug: true, ownerId: true }
-                                    }
-                                }
-                            }
+                            environment: { select: { project: { select: { id: true, name: true, slug: true, ownerId: true } } } }
                         }
                     }
                 }
@@ -341,19 +308,9 @@ async function execute(runId: string): Promise<void> {
             let timer: ReturnType<typeof setTimeout> | undefined;
             try {
                 const outcome = await Promise.race([
-                    ports.runIn(release.name, [
-                        "sh",
-                        "-c",
-                        WRAPPER,
-                        "polaris",
-                        cron.command,
-                        String(cron.timeoutSeconds)
-                    ]),
+                    ports.runIn(release.name, ["sh", "-c", WRAPPER, "polaris", cron.command, String(cron.timeoutSeconds)]),
                     new Promise<"timeout">((resolve) => {
-                        timer = setTimeout(
-                            () => resolve("timeout"),
-                            (cron.timeoutSeconds + GRACE_SECONDS) * 1000
-                        );
+                        timer = setTimeout(() => resolve("timeout"), (cron.timeoutSeconds + GRACE_SECONDS) * 1000);
                     })
                 ]);
                 if (outcome === "timeout") {
@@ -363,19 +320,12 @@ async function execute(runId: string): Promise<void> {
                     exitCode = outcome.code;
                     output = outcome.output.slice(-CRON_OUTPUT_LIMIT);
                     // 124 is what `timeout` exits with when it had to stop the command.
-                    status =
-                        outcome.code === 0
-                            ? "succeeded"
-                            : outcome.code === 124
-                              ? "timed_out"
-                              : "failed";
-                    if (status === "timed_out")
-                        error = `Stopped after ${cron.timeoutSeconds} seconds.`;
+                    status = outcome.code === 0 ? "succeeded" : outcome.code === 124 ? "timed_out" : "failed";
+                    if (status === "timed_out") error = `Stopped after ${cron.timeoutSeconds} seconds.`;
                     else if (status === "failed") error = `Exited with code ${outcome.code}.`;
                 }
             } catch (caught) {
-                error =
-                    caught instanceof Error ? caught.message : "The command could not be started.";
+                error = caught instanceof Error ? caught.message : "The command could not be started.";
             } finally {
                 if (timer) clearTimeout(timer);
                 await ports.dispose().catch(() => undefined);
@@ -389,8 +339,7 @@ async function execute(runId: string): Promise<void> {
         data: { status, exitCode, output, error, finishedAt }
     });
 
-    const retry =
-        status !== "succeeded" && run.attempt < cron.maxAttempts && run.trigger !== "manual";
+    const retry = status !== "succeeded" && run.attempt < cron.maxAttempts && run.trigger !== "manual";
     await prisma.serviceCron.update({
         where: { id: cron.id },
         data: {
@@ -398,9 +347,7 @@ async function execute(runId: string): Promise<void> {
             lastStatus: status,
             ...(retry
                 ? {
-                      retryAt: new Date(
-                          finishedAt.getTime() + cron.retryDelaySeconds * run.attempt * 1000
-                      ),
+                      retryAt: new Date(finishedAt.getTime() + cron.retryDelaySeconds * run.attempt * 1000),
                       retryAttempt: run.attempt + 1
                   }
                 : { retryAttempt: 0 })
@@ -433,8 +380,6 @@ async function pruneRuns(cronId: string): Promise<void> {
         select: { id: true }
     });
     if (stale.length > 0) {
-        await prisma.serviceCronRun.deleteMany({
-            where: { id: { in: stale.map((row) => row.id) } }
-        });
+        await prisma.serviceCronRun.deleteMany({ where: { id: { in: stale.map((row) => row.id) } } });
     }
 }

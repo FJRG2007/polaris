@@ -32,9 +32,9 @@ export function BackupsTab({ serverId }: { serverId: string }) {
     return (
         <div className="flex flex-col gap-4">
             <p className="text-xs text-muted-foreground">
-                Each copy is the engine&apos;s own export, taken with the server paused for as long
-                as it runs, so every mailbox is caught at the same moment. Mail sent meanwhile is
-                retried by the sender. Restoring pauses it again and puts the whole server back.
+                Each copy is the engine&apos;s own export, taken with the server paused for as long as it runs, so every
+                mailbox is caught at the same moment. Mail sent meanwhile is retried by the sender. Restoring pauses it
+                again and puts the whole server back.
             </p>
             {error ? <PanelError message={error} /> : null}
             {!backups ? (
@@ -44,23 +44,16 @@ export function BackupsTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-20 w-full" />
                 )
             ) : !backups.ready ? (
-                <EmptyState
-                    icon={<Archive />}
-                    title="Not running yet"
-                    description="It can be protected once setup has finished."
-                />
+                <EmptyState icon={<Archive />} title="Not running yet" description="It can be protected once setup has finished." />
             ) : (
                 <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2">
-                    <span className="min-w-0 flex-1 text-[0.8125rem] text-foreground">
-                        Whole server
-                    </span>
+                    <span className="min-w-0 flex-1 text-[0.8125rem] text-foreground">Whole server</span>
                     {backups.resourceId ? (
                         <>
                             <span className="text-xs text-muted-foreground">
                                 {backups.lastBackupAt ? (
                                     <>
-                                        Last copy <RelativeTime iso={backups.lastBackupAt} />,{" "}
-                                        {backups.copyCount} kept
+                                        Last copy <RelativeTime iso={backups.lastBackupAt} />, {backups.copyCount} kept
                                     </>
                                 ) : (
                                     "No copy yet"
@@ -74,9 +67,7 @@ export function BackupsTab({ serverId }: { serverId: string }) {
                                 <Badge variant="success">Protected</Badge>
                             )}
                             <Button asChild size="sm" variant="outline">
-                                <Link href={`/apps/backups/${backups.resourceId}`}>
-                                    Copies and restore
-                                </Link>
+                                <Link href={`/apps/backups/${backups.resourceId}`}>Copies and restore</Link>
                             </Button>
                         </>
                     ) : (
@@ -95,10 +86,7 @@ export function BackupsTab({ serverId }: { serverId: string }) {
                     {backups.volumeResources.map((resource, index) => (
                         <span key={resource.id}>
                             {index > 0 ? ", " : ""}
-                            <Link
-                                href={`/apps/backups/${resource.id}`}
-                                className="text-primary hover:underline"
-                            >
+                            <Link href={`/apps/backups/${resource.id}`} className="text-primary hover:underline">
                                 {resource.name}
                             </Link>
                         </span>

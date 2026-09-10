@@ -18,12 +18,7 @@ import type { AccessExplanation } from "@/lib/access-explain-service";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Checkbox, Select, Skeleton } from "@polaris/ui";
-import {
-    removeUserGrantAction,
-    setUserGroupAction,
-    setUserPolicyAction,
-    userAccessAction
-} from "./actions";
+import { removeUserGrantAction, setUserGroupAction, setUserPolicyAction, userAccessAction } from "./actions";
 
 interface Named {
     id: string;
@@ -136,8 +131,8 @@ function RoleCard({
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">Role</h2>
                     <p className="text-sm text-muted-foreground">
-                        What they may do across Polaris. One role each, and anything narrower is a
-                        policy or access to one particular thing.
+                        What they may do across Polaris. One role each, and anything narrower is a policy or access to
+                        one particular thing.
                     </p>
                 </div>
                 <div className="flex max-w-sm items-center gap-2">
@@ -203,9 +198,7 @@ function MembershipCard({
         startTransition(async () => {
             const result = await onToggle(id, next);
             if (result.error) {
-                setChecked((current) =>
-                    next ? current.filter((held) => held !== id) : [...current, id]
-                );
+                setChecked((current) => (next ? current.filter((held) => held !== id) : [...current, id]));
                 setError(result.error);
                 return;
             }
@@ -234,9 +227,7 @@ function MembershipCard({
                                 <span className="flex flex-col">
                                     <span>{item.name}</span>
                                     {item.description && (
-                                        <span className="text-xs text-muted-foreground">
-                                            {item.description}
-                                        </span>
+                                        <span className="text-xs text-muted-foreground">{item.description}</span>
                                     )}
                                 </span>
                             </label>
@@ -284,37 +275,21 @@ function ResourcesCard({
                 ) : (
                     <div className="flex flex-col divide-y divide-border/60">
                         {access.resources.map((grant) => (
-                            <div
-                                key={grant.id}
-                                className="flex items-center justify-between gap-3 py-2"
-                            >
+                            <div key={grant.id} className="flex items-center justify-between gap-3 py-2">
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                     <div className="flex items-center gap-2">
-                                        <span
-                                            className="truncate text-sm"
-                                            title={grant.resourceLabel}
-                                        >
-                                            {grant.resourceLabel}
-                                        </span>
+                                        <span className="truncate text-sm" title={grant.resourceLabel}>{grant.resourceLabel}</span>
                                         <Badge>{grant.kindLabel}</Badge>
                                         {grant.effect === "deny" && (
-                                            <Badge className="border-danger-edge text-danger">
-                                                deny
-                                            </Badge>
+                                            <Badge className="border-danger-edge text-danger">deny</Badge>
                                         )}
-                                        {grant.expired && (
-                                            <Badge className="border-danger-edge text-danger">
-                                                ended
-                                            </Badge>
-                                        )}
+                                        {grant.expired && <Badge className="border-danger-edge text-danger">ended</Badge>}
                                         {grant.canShare && <Badge>can invite others</Badge>}
                                     </div>
                                     <span className="text-xs text-muted-foreground">
                                         {grant.actions.join(", ")}
-                                        {grant.principalType !== "user" &&
-                                            ` - via ${grant.principalLabel}`}
-                                        {grant.expiresAt &&
-                                            ` - until ${display.date(grant.expiresAt)}`}
+                                        {grant.principalType !== "user" && ` - via ${grant.principalLabel}`}
+                                        {grant.expiresAt && ` - until ${display.date(grant.expiresAt)}`}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1">

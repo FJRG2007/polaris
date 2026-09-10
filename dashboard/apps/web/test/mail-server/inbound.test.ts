@@ -30,48 +30,27 @@ vi.mock("@/lib/mail-server/access", () => ({
 }));
 vi.mock("@polaris/db", () => ({
     prisma: {
-        mailServer: {
-            findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
-                where.id === server.id ? server : null
-            )
-        },
+        mailServer: { findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === server.id ? server : null)) },
         mailInboundRule: {
             findMany: vi.fn(async () => rules.filter((rule) => rule.enabled)),
-            findUnique: vi.fn(
-                async ({ where }: { where: { id: string } }) =>
-                    rules.find((rule) => rule.id === where.id) ?? null
-            ),
-            update: vi.fn(
-                async ({
-                    where,
-                    data
-                }: {
-                    where: { id: string };
-                    data: Record<string, unknown>;
-                }) => {
-                    const rule = rules.find((entry) => entry.id === where.id);
-                    if (rule) Object.assign(rule, data);
-                    return rule;
-                }
-            )
+            findUnique: vi.fn(async ({ where }: { where: { id: string } }) => rules.find((rule) => rule.id === where.id) ?? null),
+            update: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                const rule = rules.find((entry) => entry.id === where.id);
+                if (rule) Object.assign(rule, data);
+                return rule;
+            })
         }
     }
 }));
 
 const inbound = await import("@/lib/mail-server/inbound");
 
-function signed(
-    body: unknown,
-    key = "hook-secret",
-    algorithm = "sha256"
-): { raw: Buffer; signature: string } {
+function signed(body: unknown, key = "hook-secret", algorithm = "sha256"): { raw: Buffer; signature: string } {
     const raw = Buffer.from(JSON.stringify(body));
     return { raw, signature: createHmac(algorithm, key).update(raw).digest("base64") };
 }
 
-const ingest = (from: string, to: string[]) => ({
-    events: [{ id: "1", type: "message-ingest.ham", data: { from, to } }]
-});
+const ingest = (from: string, to: string[]) => ({ events: [{ id: "1", type: "message-ingest.ham", data: { from, to } }] });
 
 beforeEach(() => {
     notify.mockClear();
@@ -103,21 +82,15 @@ describe("the signature", () => {
         const { raw, signature } = signed({ events: [] }, "someone-else");
         expect(inbound.signatureMatches(raw, signature, "hook-secret")).toBe(false);
         const good = signed({ events: [] });
-        expect(
-            inbound.signatureMatches(Buffer.from('{"events":[1]}'), good.signature, "hook-secret")
-        ).toBe(false);
+        expect(inbound.signatureMatches(Buffer.from('{"events":[1]}'), good.signature, "hook-secret")).toBe(false);
         expect(inbound.signatureMatches(good.raw, null, "hook-secret")).toBe(false);
-        expect(inbound.signatureMatches(good.raw, "not base64 of a digest", "hook-secret")).toBe(
-            false
-        );
+        expect(inbound.signatureMatches(good.raw, "not base64 of a digest", "hook-secret")).toBe(false);
     });
 
     it("answers a bad signature and an unknown server the same way", async () => {
         const { raw } = signed(ingest("a@b.test", ["billing@example.com"]));
         expect(await inbound.receiveEvents(server.id, raw, "AAAA")).toBe(401);
-        expect(
-            await inbound.receiveEvents("0190f1c2-0000-7000-8000-00000000ffff", raw, "AAAA")
-        ).toBe(401);
+        expect(await inbound.receiveEvents("0190f1c2-0000-7000-8000-00000000ffff", raw, "AAAA")).toBe(401);
     });
 
     it("refuses a signed body that is not the engine's", async () => {
@@ -131,10 +104,7 @@ describe("a matching message", () => {
         const { raw, signature } = signed(ingest("alerts@bank.test", ["billing@example.com"]));
         expect(await inbound.receiveEvents(server.id, raw, signature)).toBe(200);
         expect(notify).toHaveBeenCalledTimes(1);
-        expect(notify.mock.calls[0]?.[0]).toMatchObject({
-            userId: "owner-1",
-            event: "mailserver.inbound"
-        });
+        expect(notify.mock.calls[0]?.[0]).toMatchObject({ userId: "owner-1", event: "mailserver.inbound" });
     });
 
     it("does not notify for another address, or for the server's own system mail", async () => {
@@ -160,19 +130,9 @@ describe("a matching message", () => {
 describe("the ceiling on its own", () => {
     it("starts a new window once the last one is ten minutes old", () => {
         const now = Date.now();
-        expect(inbound.withinCeiling({ windowStartedAt: null, windowCount: 0 }, now)).toMatchObject(
-            { allowed: true, fresh: true }
-        );
-        expect(
-            inbound.withinCeiling({ windowStartedAt: new Date(now - 60_000), windowCount: 20 }, now)
-                .allowed
-        ).toBe(false);
-        expect(
-            inbound.withinCeiling(
-                { windowStartedAt: new Date(now - 11 * 60_000), windowCount: 99 },
-                now
-            )
-        ).toMatchObject({
+        expect(inbound.withinCeiling({ windowStartedAt: null, windowCount: 0 }, now)).toMatchObject({ allowed: true, fresh: true });
+        expect(inbound.withinCeiling({ windowStartedAt: new Date(now - 60_000), windowCount: 20 }, now).allowed).toBe(false);
+        expect(inbound.withinCeiling({ windowStartedAt: new Date(now - 11 * 60_000), windowCount: 99 }, now)).toMatchObject({
             allowed: true,
             windowCount: 1
         });

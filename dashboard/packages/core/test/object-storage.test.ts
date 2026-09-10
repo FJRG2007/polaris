@@ -21,16 +21,7 @@ describe("bucket names", () => {
     });
 
     it("refuses the rest", () => {
-        for (const name of [
-            "ab",
-            "Uploads",
-            "my.bucket",
-            "-lead",
-            "trail-",
-            "two--dashes",
-            "a b",
-            "x".repeat(64)
-        ]) {
+        for (const name of ["ab", "Uploads", "my.bucket", "-lead", "trail-", "two--dashes", "a b", "x".repeat(64)]) {
             expect(core.isBucketName(name)).toBe(false);
         }
         expect(() => core.bucketCreateLine("a; rm")).toThrow();
@@ -39,29 +30,22 @@ describe("bucket names", () => {
 
 describe("expiry", () => {
     it("writes every offered age as a TTL the engine accepts", () => {
-        for (const days of core.LIFECYCLE_DAYS)
-            expect(core.lifecycleTtl(days)).toMatch(/^([1-9]\d?|1\d\d|2[0-4]\d|25[0-5])[dwy]$/);
+        for (const days of core.LIFECYCLE_DAYS) expect(core.lifecycleTtl(days)).toMatch(/^([1-9]\d?|1\d\d|2[0-4]\d|25[0-5])[dwy]$/);
         expect(core.lifecycleTtl(30)).toBe("30d");
         expect(core.lifecycleTtl(365)).toBe("1y");
     });
 
     it("sets the rule on the bucket's folder, and refuses a prefix that leaves it", () => {
-        expect(core.lifecycleRuleLine("logs", "tmp", 7)).toBe(
-            "fs.configure -locationPrefix=/buckets/logs/tmp/ -ttl=7d -apply"
-        );
-        expect(core.lifecycleRuleLine("logs", "", 1)).toBe(
-            "fs.configure -locationPrefix=/buckets/logs/ -ttl=1d -apply"
-        );
+        expect(core.lifecycleRuleLine("logs", "tmp", 7)).toBe("fs.configure -locationPrefix=/buckets/logs/tmp/ -ttl=7d -apply");
+        expect(core.lifecycleRuleLine("logs", "", 1)).toBe("fs.configure -locationPrefix=/buckets/logs/ -ttl=1d -apply");
         expect(() => core.lifecycleRuleLine("logs", "../other", 7)).toThrow();
         expect(() => core.lifecycleRuleLine("logs", "a b", 7)).toThrow();
     });
 
     it("reads stored rules back, dropping anything that is not one", () => {
-        expect(
-            core.parseLifecycleRules(
-                '[{"prefix":"tmp/","days":7},{"prefix":"../x","days":1},{"days":3}]'
-            )
-        ).toEqual([{ prefix: "tmp/", days: 7 }]);
+        expect(core.parseLifecycleRules('[{"prefix":"tmp/","days":7},{"prefix":"../x","days":1},{"days":3}]')).toEqual([
+            { prefix: "tmp/", days: 7 }
+        ]);
         expect(core.parseLifecycleRules("not json")).toEqual([]);
     });
 });
@@ -74,9 +58,7 @@ describe("the engine's shell", () => {
     });
 
     it("refuses a line that would carry a second command", () => {
-        expect(() =>
-            core.weedShellCommand(["s3.bucket.list\ns3.bucket.delete -name x"], "x")
-        ).toThrow();
+        expect(() => core.weedShellCommand(["s3.bucket.list\ns3.bucket.delete -name x"], "x")).toThrow();
     });
 
     it("reads a failure from the output, since the exit status does not always say", () => {
@@ -88,31 +70,13 @@ describe("the engine's shell", () => {
 
     it("scopes a key to its bucket and refuses characters that would split the line", () => {
         expect(
-            core.storeIdentityLine({
-                user: "key-AK",
-                accessKey: "AK",
-                secretKey: "s-3_cr",
-                actions: core.bucketActions("readonly"),
-                bucket: "files"
-            })
-        ).toBe(
-            "s3.configure -user=key-AK -access_key=AK -secret_key=s-3_cr -actions=Read,List -buckets=files -apply"
-        );
-        expect(() =>
-            core.storeIdentityLine({
-                user: "u",
-                accessKey: "AK",
-                secretKey: "a b",
-                actions: "Admin"
-            })
-        ).toThrow();
+            core.storeIdentityLine({ user: "key-AK", accessKey: "AK", secretKey: "s-3_cr", actions: core.bucketActions("readonly"), bucket: "files" })
+        ).toBe("s3.configure -user=key-AK -access_key=AK -secret_key=s-3_cr -actions=Read,List -buckets=files -apply");
+        expect(() => core.storeIdentityLine({ user: "u", accessKey: "AK", secretKey: "a b", actions: "Admin" })).toThrow();
     });
 
     it("lists the bucket names from the shell's output", () => {
-        expect(core.parseBucketList("> files\tsize:12\tchunk:3\n  logs\tsize:0\n> \n")).toEqual([
-            "files",
-            "logs"
-        ]);
+        expect(core.parseBucketList("> files\tsize:12\tchunk:3\n  logs\tsize:0\n> \n")).toEqual(["files", "logs"]);
     });
 });
 
@@ -141,14 +105,8 @@ describe("replication", () => {
 
 describe("presigned URLs", () => {
     it("signs for an address with a protocol and host only", () => {
-        expect(core.parseStoreBaseUrl("https://files.example.com")).toEqual({
-            protocol: "https",
-            host: "files.example.com"
-        });
-        expect(core.parseStoreBaseUrl("http://10.0.0.5:9000/")).toEqual({
-            protocol: "http",
-            host: "10.0.0.5:9000"
-        });
+        expect(core.parseStoreBaseUrl("https://files.example.com")).toEqual({ protocol: "https", host: "files.example.com" });
+        expect(core.parseStoreBaseUrl("http://10.0.0.5:9000/")).toEqual({ protocol: "http", host: "10.0.0.5:9000" });
         expect(core.parseStoreBaseUrl("https://files.example.com/prefix")).toBeNull();
         expect(core.parseStoreBaseUrl("https://user:pw@files.example.com")).toBeNull();
         expect(core.parseStoreBaseUrl("ftp://files.example.com")).toBeNull();
@@ -159,9 +117,7 @@ describe("presigned URLs", () => {
         expect(core.presignSchema.safeParse(base).success).toBe(true);
         expect(core.presignSchema.safeParse({ ...base, key: "../x" }).success).toBe(false);
         expect(core.presignSchema.safeParse({ ...base, expiresIn: 700_000 }).success).toBe(false);
-        expect(
-            core.presignSchema.safeParse({ ...base, baseUrl: "https://x.example.com/y" }).success
-        ).toBe(false);
+        expect(core.presignSchema.safeParse({ ...base, baseUrl: "https://x.example.com/y" }).success).toBe(false);
     });
 });
 
@@ -189,15 +145,9 @@ describe("references", () => {
 
 describe("cache purge", () => {
     it("takes a path under the hostname and drops a leading slash", () => {
-        expect(core.cachePurgeSchema.parse({ domainId: ID, prefix: "/assets/" }).prefix).toBe(
-            "assets/"
-        );
-        expect(core.cachePurgeSchema.safeParse({ domainId: ID, prefix: "../x" }).success).toBe(
-            false
-        );
-        expect(core.cachePurgeSchema.safeParse({ domainId: ID, prefix: "a?b=1" }).success).toBe(
-            false
-        );
+        expect(core.cachePurgeSchema.parse({ domainId: ID, prefix: "/assets/" }).prefix).toBe("assets/");
+        expect(core.cachePurgeSchema.safeParse({ domainId: ID, prefix: "../x" }).success).toBe(false);
+        expect(core.cachePurgeSchema.safeParse({ domainId: ID, prefix: "a?b=1" }).success).toBe(false);
         expect(core.cachePurgeSchema.safeParse({ domainId: ID }).success).toBe(true);
     });
 });

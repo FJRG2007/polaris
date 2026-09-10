@@ -48,18 +48,12 @@ export async function requireServer(actor: MailServerActor, serverId: string): P
 }
 
 /** The servers on the shelf that is open. */
-export async function listServers(
-    actor: MailServerActor,
-    shelfOrgId: string | null
-): Promise<MailServer[]> {
+export async function listServers(actor: MailServerActor, shelfOrgId: string | null): Promise<MailServer[]> {
     if (shelfOrgId) {
         await requireOrgPermission(actor, shelfOrgId, "deploy.manage").catch(() => {
             throw new MailServerAccessError("You cannot manage this organization's mail servers.");
         });
-        return prisma.mailServer.findMany({
-            where: { orgId: shelfOrgId },
-            orderBy: { createdAt: "asc" }
-        });
+        return prisma.mailServer.findMany({ where: { orgId: shelfOrgId }, orderBy: { createdAt: "asc" } });
     }
     return prisma.mailServer.findMany({
         where: { ownerId: actor.id, orgId: null },
@@ -79,11 +73,7 @@ export function seal(secret: string): Sealed {
     return encryptSecret(secret, loadEnv().POLARIS_MASTER_KEY);
 }
 
-export function unseal(
-    ciphertext: Uint8Array | null,
-    nonce: Uint8Array | null,
-    keyId: string | null
-): string | null {
+export function unseal(ciphertext: Uint8Array | null, nonce: Uint8Array | null, keyId: string | null): string | null {
     if (!ciphertext || !nonce) return null;
     return decryptSecret(
         { ciphertext: Buffer.from(ciphertext), nonce: Buffer.from(nonce), keyId: keyId ?? "" },
@@ -104,10 +94,7 @@ export const RECOVERY_USERNAME = "polaris-setup";
  */
 export function adminCredentials(server: MailServer): StalwartCredentials {
     const password = unseal(server.adminSecret, server.adminSecretNonce, server.adminSecretKeyId);
-    if (!password)
-        throw new MailServerAccessError(
-            "This mail server has no administrator credential yet. Run setup again."
-        );
+    if (!password) throw new MailServerAccessError("This mail server has no administrator credential yet. Run setup again.");
     return reached(server.step, "admin")
         ? { username: `${core.MAIL_ADMIN_NAME}@${server.primaryDomain}`, password }
         : { username: RECOVERY_USERNAME, password };

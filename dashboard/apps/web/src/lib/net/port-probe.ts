@@ -24,11 +24,7 @@ export const PROBE_TIMEOUT_MS = 4000;
  * which is the forward working. A refusal or a timeout is reported as false and
  * means nothing on its own.
  */
-export async function probeTcpPort(
-    host: string,
-    port: number,
-    timeoutMs = PROBE_TIMEOUT_MS
-): Promise<boolean> {
+export async function probeTcpPort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
     return (await probeTcpOutcome(host, port, timeoutMs)) === "open";
 }
 
@@ -51,13 +47,7 @@ export function probeTcpOutcome(
         socket.once("connect", () => settle("open"));
         socket.once("timeout", () => settle("timeout"));
         socket.once("error", (error: NodeJS.ErrnoException) =>
-            settle(
-                error.code === "ECONNREFUSED"
-                    ? "refused"
-                    : error.code === "ETIMEDOUT"
-                      ? "timeout"
-                      : "error"
-            )
+            settle(error.code === "ECONNREFUSED" ? "refused" : error.code === "ETIMEDOUT" ? "timeout" : "error")
         );
     });
 }

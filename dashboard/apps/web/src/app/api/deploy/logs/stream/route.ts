@@ -30,12 +30,7 @@ const BEAT_MS = 15_000;
 const QuerySchema = z.object({
     services: z
         .string()
-        .transform((raw) =>
-            raw
-                .split(",")
-                .map((id) => id.trim())
-                .filter(Boolean)
-        )
+        .transform((raw) => raw.split(",").map((id) => id.trim()).filter(Boolean))
         .pipe(z.array(z.string().uuid()).min(1).max(20)),
     tail: z.coerce.number().int().min(0).max(1000).default(200)
 });
@@ -51,12 +46,10 @@ export async function GET(request: Request): Promise<Response> {
         services: url.searchParams.get("services") ?? "",
         tail: url.searchParams.get("tail") ?? undefined
     });
-    if (!parsed.success)
-        return Response.json({ error: "Name the services to follow." }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: "Name the services to follow." }, { status: 400 });
 
     const services = await readableServices(user.id, parsed.data.services);
-    if (services.length === 0)
-        return Response.json({ error: "Service not found" }, { status: 404 });
+    if (services.length === 0) return Response.json({ error: "Service not found" }, { status: 404 });
 
     const encoder = new TextEncoder();
     const abort = new AbortController();
@@ -75,9 +68,7 @@ export async function GET(request: Request): Promise<Response> {
             const send = (event: string, data: unknown): void => {
                 if (closed) return;
                 try {
-                    controller.enqueue(
-                        encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-                    );
+                    controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
                 } catch {
                     stop();
                 }
@@ -105,11 +96,9 @@ export async function GET(request: Request): Promise<Response> {
                 services,
                 tail: parsed.data.tail,
                 signal: abort.signal,
-                onFollowing: (serviceId, containers) =>
-                    send("following", { serviceId, containers }),
+                onFollowing: (serviceId, containers) => send("following", { serviceId, containers }),
                 onLines: (lines) => send("lines", lines),
-                onEnded: (serviceId, container, reason) =>
-                    send("ended", { serviceId, container, reason })
+                onEnded: (serviceId, container, reason) => send("ended", { serviceId, container, reason })
             })
                 .catch(() => undefined)
                 .finally(() => {

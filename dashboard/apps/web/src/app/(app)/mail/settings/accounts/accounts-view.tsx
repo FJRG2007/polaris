@@ -222,9 +222,7 @@ function AccountRow({ account }: { account: MailAccountView }) {
                         onChange={(next) => {
                             setNotify(next);
                             startBusy(async () => {
-                                const answer = await editAccountAction(account.id, {
-                                    notify: next
-                                });
+                                const answer = await editAccountAction(account.id, { notify: next });
                                 const said = refusalOf(answer);
                                 if (said) {
                                     setNotify(!next);

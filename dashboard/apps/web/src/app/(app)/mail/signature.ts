@@ -86,9 +86,7 @@ export interface SignedSeed {
  */
 export function withSignature(
     seed: SignedSeed,
-    account:
-        | Pick<MailAccountView, "signature" | "signatureAuto" | "signatureAboveQuote">
-        | undefined,
+    account: Pick<MailAccountView, "signature" | "signatureAuto" | "signatureAboveQuote"> | undefined,
     identity: Pick<MailIdentityView, "signature"> | undefined
 ): string {
     const body = keepSignatureDelimiter(seed.body ?? "");

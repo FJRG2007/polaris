@@ -126,9 +126,7 @@ export function composeValue(value: string): string {
 
 /** Every value in a map, escaped for compose. */
 function composeValues(values: Readonly<Record<string, string>>): Record<string, string> {
-    return Object.fromEntries(
-        Object.entries(values).map(([key, value]) => [key, composeValue(value)])
-    );
+    return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, composeValue(value)]));
 }
 
 /**
@@ -158,11 +156,7 @@ export function forCompose(spec: ComposeSpec): ComposeSpec {
 }
 
 /** Build the structured spec for an application deployment. */
-export function appComposeSpec(
-    plan: AppDeployPlan,
-    imageTag: string,
-    network: string
-): ComposeSpec {
+export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
     const joined = joinedNetworks(plan.networks, network);
     const labels = traefikLabels({
         serviceName: plan.ref.name,
@@ -174,9 +168,7 @@ export function appComposeSpec(
         edge: plan.edge,
         replicas: plan.replicas
     });
-    const namedVolumes = plan.volumes
-        .filter((volume) => volume.kind === "volume")
-        .map((volume) => volume.source);
+    const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
     // The planned networks plus any extra networks the plan requests (deduped, in
     // order, so the proxy network stays first where the service is on it). Both the
     // daemon and the remote YAML renderer emit every top-level network as external,
@@ -201,9 +193,7 @@ export function appComposeSpec(
                               {
                                   host: plan.expose.host,
                                   container: plan.expose.container,
-                                  ...(plan.expose.protocol
-                                      ? { protocol: plan.expose.protocol }
-                                      : {})
+                                  ...(plan.expose.protocol ? { protocol: plan.expose.protocol } : {})
                               }
                           ]
                         : []),
@@ -321,10 +311,7 @@ export function deployBlockLines(
     if (!replicated && !service.rollingUpdate && !limited) return [];
     const lines = ["    deploy:"];
     if (replicated || service.rollingUpdate) {
-        lines.push(
-            "      mode: replicated",
-            `      replicas: ${replicated ? service.replicas : 1}`
-        );
+        lines.push("      mode: replicated", `      replicas: ${replicated ? service.replicas : 1}`);
     }
     if (limited) {
         lines.push("      resources:", "        limits:");
@@ -351,13 +338,10 @@ export function deployBlockLines(
  * network, the services beside it on their environment's own. The daemon renders
  * the same.
  */
-export function serviceNetworkLines(
-    service: Pick<ComposeSpecService, "networks" | "aliases">
-): string[] {
+export function serviceNetworkLines(service: Pick<ComposeSpecService, "networks" | "aliases">): string[] {
     if (service.networks.length === 0) return [];
     const aliases = service.aliases ?? [];
-    if (aliases.length === 0)
-        return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
+    if (aliases.length === 0) return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
     return [
         "    networks:",
         ...service.networks.flatMap((net) => [
@@ -371,9 +355,7 @@ export function serviceNetworkLines(
 /** Build the structured spec for a managed-database deployment. */
 export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec {
     const ports: ComposeSpecPort[] =
-        plan.exposePort !== undefined
-            ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }]
-            : [];
+        plan.exposePort !== undefined ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }] : [];
     const networks = joinedNetworks(plan.networks, network);
     return {
         project: plan.ref.project,
@@ -398,18 +380,14 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
         ],
         volumes: [
             plan.volumeName,
-            ...(plan.extraVolumes ?? [])
-                .filter((volume) => volume.kind === "volume")
-                .map((volume) => volume.source)
+            ...(plan.extraVolumes ?? []).filter((volume) => volume.kind === "volume").map((volume) => volume.source)
         ],
         networks
     };
 }
 
 /** A plan's limits as spec fields, leaving out the ones it does not set. */
-function limitFields(
-    limits: ResourceLimits | undefined
-): Pick<ComposeSpecService, "cpus" | "memoryMb"> {
+function limitFields(limits: ResourceLimits | undefined): Pick<ComposeSpecService, "cpus" | "memoryMb"> {
     return {
         ...(limits?.cpus !== undefined ? { cpus: limits.cpus } : {}),
         ...(limits?.memoryMb !== undefined ? { memoryMb: limits.memoryMb } : {})
@@ -438,11 +416,7 @@ export function defaultDbPort(image: string): number {
  * `bind` sources are confined under `volumeRoot`, `nas` sources under `mountRoot`
  * (where storage connections are mounted) - mirroring the daemon's confinement.
  */
-export function renderComposeYaml(
-    spec: ComposeSpec,
-    volumeRoot: string,
-    mountRoot: string
-): string {
+export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRoot: string): string {
     const lines: string[] = ["services:"];
     for (const service of spec.services) {
         lines.push(`  ${service.name}:`);
@@ -495,12 +469,9 @@ export function renderComposeYaml(
         if (service.healthcheck) {
             lines.push("    healthcheck:");
             lines.push(`      test: [${service.healthcheck.test.map(yamlQuote).join(", ")}]`);
-            if (service.healthcheck.interval)
-                lines.push(`      interval: ${service.healthcheck.interval}s`);
-            if (service.healthcheck.retries)
-                lines.push(`      retries: ${service.healthcheck.retries}`);
-            if (service.healthcheck.startPeriod)
-                lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
+            if (service.healthcheck.interval) lines.push(`      interval: ${service.healthcheck.interval}s`);
+            if (service.healthcheck.retries) lines.push(`      retries: ${service.healthcheck.retries}`);
+            if (service.healthcheck.startPeriod) lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
         }
         lines.push(...deployBlockLines(service));
     }

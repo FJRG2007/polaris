@@ -91,9 +91,7 @@ export const MAIL_REBINDABLE_COMMANDS: readonly MailKeyCommand[] = MAIL_KEY_COMM
 export type MailKeymap = Readonly<Partial<Record<MailKeyCommand, string>>>;
 
 /** Every key that is never on offer, whoever holds it. */
-const FIXED_KEYS = new Set(
-    MAIL_KEY_COMMANDS.flatMap((command) => MAIL_KEY_DEFINITIONS[command].fixed)
-);
+const FIXED_KEYS = new Set(MAIL_KEY_COMMANDS.flatMap((command) => MAIL_KEY_DEFINITIONS[command].fixed));
 
 /**
  * Whether a key can be given to a command at all.
@@ -182,18 +180,13 @@ export const mailKeymapSchema = z
     .superRefine((value, context) => {
         for (const [command, key] of Object.entries(value)) {
             if (!(MAIL_REBINDABLE_COMMANDS as readonly string[]).includes(command)) {
-                context.addIssue({
-                    code: "custom",
-                    message: "That is not a shortcut.",
-                    path: [command]
-                });
+                context.addIssue({ code: "custom", message: "That is not a shortcut.", path: [command] });
                 continue;
             }
             if (!isBindableMailKey(key)) {
                 context.addIssue({
                     code: "custom",
-                    message:
-                        "Use one key with nothing held down, other than Enter, Escape, the arrows or Delete.",
+                    message: "Use one key with nothing held down, other than Enter, Escape, the arrows or Delete.",
                     path: [command]
                 });
             }

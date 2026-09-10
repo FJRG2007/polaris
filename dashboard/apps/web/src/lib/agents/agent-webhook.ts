@@ -55,12 +55,7 @@ interface Payload {
     repository?: { full_name?: string; default_branch?: string };
     sender?: { login?: string; type?: string };
     label?: { name?: string };
-    issue?: {
-        number?: number;
-        body?: string;
-        labels?: Array<{ name?: string }>;
-        pull_request?: unknown;
-    };
+    issue?: { number?: number; body?: string; labels?: Array<{ name?: string }>; pull_request?: unknown };
     comment?: { body?: string };
     review?: { body?: string; state?: string };
     requested_reviewer?: { login?: string };
@@ -95,8 +90,7 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
     // A pull request whose head repository GitHub no longer knows - a deleted
     // fork - is treated as a fork: nothing says the code is the repository's own.
     const fromFork = payload.pull_request
-        ? !headRepo ||
-          headRepo.toLowerCase() !== (payload.repository?.full_name ?? "").toLowerCase()
+        ? !headRepo || headRepo.toLowerCase() !== (payload.repository?.full_name ?? "").toLowerCase()
         : false;
     const base = { issueNumber, prNumber, actor, labels, branch, fromFork };
 
@@ -117,8 +111,7 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
 
     switch (event) {
         case "issues":
-            if (payload.action === "opened")
-                return { ...base, trigger: "issue.opened", body: payload.issue?.body ?? "" };
+            if (payload.action === "opened") return { ...base, trigger: "issue.opened", body: payload.issue?.body ?? "" };
             if (payload.action === "labeled") {
                 const added = payload.label?.name;
                 return {
@@ -214,23 +207,12 @@ export function describe(incident: Incident, repoFullName: string): string {
 }
 
 /** Whether the operator's conditions let this incident through. */
-function matches(
-    condition: { labels: string[]; branches: string[]; authors: string[] },
-    incident: Incident
-): boolean {
+function matches(condition: { labels: string[]; branches: string[]; authors: string[] }, incident: Incident): boolean {
     // Every list is a narrowing, and an empty one does not narrow. That is what an
     // empty form means, and reading it as "match nothing" would silently disable
     // the rule it belongs to.
-    if (
-        condition.labels.length > 0 &&
-        !condition.labels.some((label) => incident.labels.includes(label))
-    )
-        return false;
-    if (
-        condition.branches.length > 0 &&
-        (!incident.branch || !condition.branches.includes(incident.branch))
-    )
-        return false;
+    if (condition.labels.length > 0 && !condition.labels.some((label) => incident.labels.includes(label))) return false;
+    if (condition.branches.length > 0 && (!incident.branch || !condition.branches.includes(incident.branch))) return false;
     if (condition.authors.length > 0 && !condition.authors.includes(incident.actor)) return false;
     return true;
 }
@@ -242,14 +224,8 @@ function parseCondition(raw: string): { labels: string[]; branches: string[]; au
         if (!parsed || typeof parsed !== "object") return empty;
         const row = parsed as Record<string, unknown>;
         const list = (value: unknown): string[] =>
-            Array.isArray(value)
-                ? value.filter((entry): entry is string => typeof entry === "string")
-                : [];
-        return {
-            labels: list(row.labels),
-            branches: list(row.branches),
-            authors: list(row.authors)
-        };
+            Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+        return { labels: list(row.labels), branches: list(row.branches), authors: list(row.authors) };
     } catch {
         return empty;
     }
@@ -292,8 +268,7 @@ export async function handleAgentWebhook(params: {
 
     // A run's own comments and pushes come back as webhooks. Answering them is how
     // an agent ends up in a conversation with itself.
-    if (payload.sender?.type === "Bot" && payload.sender.login?.startsWith(params.appHandle))
-        return [];
+    if (payload.sender?.type === "Bot" && payload.sender.login?.startsWith(params.appHandle)) return [];
 
     const repo = await agentRepoByFullName(repoFullName);
     if (!repo) return [];
@@ -387,11 +362,7 @@ async function canWriteToRepo(repoFullName: string, actor: string): Promise<bool
         );
         if (!response.ok) return false;
         const body = (await response.json()) as { permission?: string };
-        return (
-            body.permission === "write" ||
-            body.permission === "admin" ||
-            body.permission === "maintain"
-        );
+        return body.permission === "write" || body.permission === "admin" || body.permission === "maintain";
     } catch {
         return false;
     }
@@ -429,12 +400,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
                   // Only a run that never said which job it was. One that did is
                   // matched above, and claiming it here would close out somebody
                   // else's job.
-                  where: {
-                      ...open,
-                      githubRunId: null,
-                      execution: { not: "server" },
-                      repo: { repoFullName }
-                  },
+                  where: { ...open, githubRunId: null, execution: { not: "server" }, repo: { repoFullName } },
                   orderBy: { createdAt: "asc" },
                   select: { id: true, error: true, failureKind: true }
               })
@@ -442,12 +408,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
     if (!run) return [];
 
     const conclusion = payload.workflow_run?.conclusion;
-    const state =
-        conclusion === "success"
-            ? "succeeded"
-            : conclusion === "cancelled"
-              ? "cancelled"
-              : "failed";
+    const state = conclusion === "success" ? "succeeded" : conclusion === "cancelled" ? "cancelled" : "failed";
     // A run that got far enough to work out why it failed has already reported
     // it, and that is the reason worth keeping. This webhook only ever knows
     // that the job ended badly, so it fills in for the failures that never got

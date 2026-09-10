@@ -285,10 +285,7 @@ function withFallback(strict: string, loose: string): string {
 function installCommand(manager: PackageManager, files: readonly string[]): string {
     switch (manager) {
         case "pnpm":
-            return withFallback(
-                "pnpm install --frozen-lockfile",
-                "pnpm install --no-frozen-lockfile"
-            );
+            return withFallback("pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile");
         case "yarn":
             // Yarn 2 and up rejects `--frozen-lockfile` as an option rather than
             // failing the install, so the fallback is what carries those versions.
@@ -298,9 +295,7 @@ function installCommand(manager: PackageManager, files: readonly string[]): stri
             return "bun install";
         case "npm":
             // `npm ci` needs a lockfile and refuses without one.
-            return files.includes("package-lock.json")
-                ? withFallback("npm ci", "npm install")
-                : "npm install";
+            return files.includes("package-lock.json") ? withFallback("npm ci", "npm install") : "npm install";
     }
 }
 
@@ -340,29 +335,20 @@ function inDirectory(directory: string, command: string): string {
  * and for a plain Node app with a `start` script - both of which nixpacks already
  * handles, and neither of which is improved by being second-guessed.
  */
-export function detectBuild(
-    snapshot: RepoSnapshot,
-    options: DetectOptions = {}
-): DetectedBuild | null {
+export function detectBuild(snapshot: RepoSnapshot, options: DetectOptions = {}): DetectedBuild | null {
     const app = snapshot.levels[snapshot.levels.length - 1];
     if (!app) return null;
     // A Node app that says how to start itself stays Node's, whatever else is in
     // the directory; past that, the other languages get their turn - but only
     // where the caller asked for them (see `DetectOptions`).
     const others = () =>
-        options.languages && !app.manifest?.scripts?.start
-            ? detectLanguageBuild(app, options.runtimeVersion)
-            : null;
+        options.languages && !app.manifest?.scripts?.start ? detectLanguageBuild(app, options.runtimeVersion) : null;
     if (!app.manifest) return others();
     return detectNode(snapshot, app, options) ?? others();
 }
 
 /** How to build a JavaScript project, or null when nothing here knows better. */
-function detectNode(
-    snapshot: RepoSnapshot,
-    app: DirectorySnapshot,
-    options: DetectOptions
-): DetectedBuild | null {
+function detectNode(snapshot: RepoSnapshot, app: DirectorySnapshot, options: DetectOptions): DetectedBuild | null {
     if (!app.manifest) return null;
 
     const enclosing = workspaceRoot(snapshot.levels);
@@ -424,9 +410,7 @@ function detectNode(
     let start: string | null = null;
     let note: string;
 
-    const servesItself =
-        framework?.start ??
-        (framework?.serverDep && framework.serverDep in deps ? framework.serverStart : undefined);
+    const servesItself = framework?.start ?? (framework?.serverDep && framework.serverDep in deps ? framework.serverStart : undefined);
     const label = framework?.label ?? "Node.js";
     const foreignAdapter = framework?.foreignAdapters?.find((adapter) => adapter in deps);
 
@@ -467,8 +451,7 @@ function detectNode(
     const nodeMajor = nodeImageMajor(options.runtimeVersion || declaredNodeRange(snapshot.levels));
     const image = baseImage(manager, nodeMajor);
     const rootInstall = installCommand(manager, (enclosing ?? app).files);
-    const staticDirectory =
-        !scripts.start && !servesItself && !foreignAdapter ? (framework?.dist ?? null) : null;
+    const staticDirectory = !scripts.start && !servesItself && !foreignAdapter ? (framework?.dist ?? null) : null;
 
     if (nodeRequirement) note = `${note}; on Node ${nodeMajor}, which is what it asks for`;
     else if (!foreignAdapter) note = `${note}; on Node ${nodeMajor}`;
@@ -490,7 +473,9 @@ function detectNode(
                   workspaceInstall: workspaceBuild ? rootInstall : null,
                   install: workspaceBuild ? null : rootInstall,
                   build: scripts.build ? runScript(manager, "build", null) : null,
-                  start: scripts.start ? runScript(manager, "start", null) : (servesItself ?? null),
+                  start: scripts.start
+                      ? runScript(manager, "start", null)
+                      : (servesItself ?? null),
                   staticDirectory
               },
         note: workspaceBuild ? `${note}; built from the workspace root for ${workspace}` : note

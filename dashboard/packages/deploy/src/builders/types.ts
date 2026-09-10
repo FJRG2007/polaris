@@ -54,11 +54,7 @@ export interface BuildInput {
      * and run as it is: nothing is fetched, built or pinned. `archive` is a path
      * on the machine Polaris runs on.
      */
-    readonly prebuilt?: {
-        readonly image: string;
-        readonly archive: string;
-        readonly bytes: number;
-    };
+    readonly prebuilt?: { readonly image: string; readonly archive: string; readonly bytes: number };
 }
 
 /** Normalized build description with the resolved image tag. */

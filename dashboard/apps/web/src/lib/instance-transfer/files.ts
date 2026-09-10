@@ -31,8 +31,7 @@ export async function newTransferFile(): Promise<{ id: string; path: string }> {
     for (const name of await readdir(dir()).catch(() => [] as string[])) {
         const path = join(dir(), name);
         const info = await stat(path).catch(() => null);
-        if (info && now - info.mtimeMs > MAX_AGE_MS)
-            await rm(path, { force: true }).catch(() => undefined);
+        if (info && now - info.mtimeMs > MAX_AGE_MS) await rm(path, { force: true }).catch(() => undefined);
     }
     const id = randomUUID();
     return { id, path: join(dir(), `${id}.polaris`) };

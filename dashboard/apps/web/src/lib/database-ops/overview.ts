@@ -19,10 +19,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
     const hosted = row.parentId !== null;
     const dedicated = !hosted && !row.recoveryBase;
     const recoveredFrom = row.recoveredFromId
-        ? await prisma.managedDatabase.findUnique({
-              where: { id: row.recoveredFromId },
-              select: { name: true }
-          })
+        ? await prisma.managedDatabase.findUnique({ where: { id: row.recoveredFromId }, select: { name: true } })
         : null;
     return {
         id: row.id,
@@ -45,8 +42,7 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
                   previousVolume: row.previousVolumeName
               }
             : null,
-        redis:
-            engine === "redis" && !hosted ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb } : null,
+        redis: engine === "redis" && !hosted ? { mode: row.mode, maxMemoryMb: row.maxMemoryMb } : null,
         mongo: engine === "mongo" && !hosted ? { replicaSet: row.replicaSet } : null,
         // A hosted database runs in its parent's container, so the parent's limits are its own.
         limits: hosted ? null : { cpus: row.cpuLimit, memoryMb: row.memoryLimitMb },
@@ -68,8 +64,7 @@ export async function copySources(databaseId: string, ownerId: string) {
         select: { engine: true, environment: { select: { projectId: true } } }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    const engines =
-        row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
+    const engines = row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
     // The same project: access was checked for it, and for nothing wider.
     const rows = await prisma.managedDatabase.findMany({
         where: {

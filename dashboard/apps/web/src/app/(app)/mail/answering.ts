@@ -68,9 +68,7 @@ export function replySeed(
         to: [...to],
         cc: [...cc],
         subject: core.replySubject(message.subject),
-        body: quoted.trim()
-            ? `\n\n${core.quoteForReply(quoted, sender, new Date(message.sentAt))}`
-            : "",
+        body: quoted.trim() ? `\n\n${core.quoteForReply(quoted, sender, new Date(message.sentAt))}` : "",
         inReplyToId: message.id,
         forward: false
     };

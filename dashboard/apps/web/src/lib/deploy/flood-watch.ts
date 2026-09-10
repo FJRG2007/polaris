@@ -28,9 +28,7 @@ const HOLD_MS = 15 * 60 * 1000;
  * One pass. Answers how many services are marked now and whether the set changed, so
  * the tick can say something when it did - the edge is re-rendered only then.
  */
-export async function runFloodWatch(
-    now = Date.now()
-): Promise<{ flooded: number; changed: boolean }> {
+export async function runFloodWatch(now = Date.now()): Promise<{ flooded: number; changed: boolean }> {
     // Every stored mark, lapsed ones included: a mark that lapsed since the last
     // pass is still what the edge was last rendered with, so letting it go is a
     // change like any other, and it is dropped from storage by the save below.
@@ -55,10 +53,7 @@ export async function runFloodWatch(
         const raw = await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES);
         const hosts = raw ? detectFloodedHosts(parseHttpLogs(raw), now, WINDOW_MINUTES) : [];
         for (const app of candidates) {
-            const names = [
-                ...app.domains.map((domain) => domain.hostname.toLowerCase()),
-                tunnelHostForApp(app.id).toLowerCase()
-            ];
+            const names = [...app.domains.map((domain) => domain.hostname.toLowerCase()), tunnelHostForApp(app.id).toLowerCase()];
             const hit = hosts.some((host) => names.some((name) => hostnameCovers(name, host)));
             const held = before.get(app.id);
             // A service set back to "on" or "off" drops out of the map entirely: the
@@ -69,9 +64,7 @@ export async function runFloodWatch(
     }
 
     const changed =
-        stored.size !== before.size ||
-        before.size !== after.size ||
-        [...after.keys()].some((id) => !before.has(id));
+        stored.size !== before.size || before.size !== after.size || [...after.keys()].some((id) => !before.has(id));
     if (changed || [...after].some(([id, until]) => before.get(id) !== until)) {
         await saveFloodedServices(after);
     }

@@ -88,22 +88,19 @@ export function ExecutionPicker({
                                 // A pool that does not serve this repository yet is
                                 // offered and labelled as such, rather than silently
                                 // producing a job nothing picks up.
-                                label: covering.has(pool.id)
-                                    ? pool.name
-                                    : `${pool.name} - does not cover this repository yet`
+                                label: covering.has(pool.id) ? pool.name : `${pool.name} - does not cover this repository yet`
                             }))}
                         />
                         {poolId && !covering.has(poolId) ? (
                             <p className="text-xs text-warning">
-                                Widen that pool&apos;s scope to include this repository under Apps
-                                &gt; Runners, or its jobs will queue forever.
+                                Widen that pool&apos;s scope to include this repository under Apps &gt; Runners, or its
+                                jobs will queue forever.
                             </p>
                         ) : null}
                     </div>
                 ) : (
                     <p className="text-xs text-warning">
-                        You have no runner pools yet. Create one under Apps &gt; Runners, then pick
-                        it here.
+                        You have no runner pools yet. Create one under Apps &gt; Runners, then pick it here.
                     </p>
                 )
             ) : null}

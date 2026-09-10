@@ -31,11 +31,7 @@ describe("a service with more than one copy", () => {
 
     it("runs one named service per copy, the first under the service's own name", () => {
         const expanded = expandReplicas(spec);
-        expect(expanded.services.map((service) => service.name)).toEqual([
-            "web",
-            "web-r2",
-            "web-r3"
-        ]);
+        expect(expanded.services.map((service) => service.name)).toEqual(["web", "web-r2", "web-r3"]);
         expect(expanded.services[0]?.ports).toHaveLength(1);
         expect(expanded.services[1]?.ports).toHaveLength(0);
         expect(expanded.services[2]?.aliases).toEqual(["web"]);
@@ -57,34 +53,18 @@ describe("a service with more than one copy", () => {
 });
 
 describe("the labels every copy carries", () => {
-    const edge = (balancing: { sticky: boolean; healthPath: string | null }) => ({
-        ...parseAppEdgeConfig("{}"),
-        balancing
-    });
-    const input = {
-        serviceName: "web",
-        network: "polaris-proxy",
-        domains: [{ hostname: "shop.example.com", targetPort: 80, certResolver: "le" as const }]
-    };
+    const edge = (balancing: { sticky: boolean; healthPath: string | null }) =>
+        ({ ...parseAppEdgeConfig("{}"), balancing });
+    const input = { serviceName: "web", network: "polaris-proxy", domains: [{ hostname: "shop.example.com", targetPort: 80, certResolver: "le" as const }] };
 
     it("pin a visitor to one copy when the service asks", () => {
         const labels = traefikLabels({ ...input, edge: edge({ sticky: true, healthPath: null }) });
-        expect(labels["traefik.http.services.web.loadbalancer.sticky.cookie.name"]).toBe(
-            "polaris_lb"
-        );
+        expect(labels["traefik.http.services.web.loadbalancer.sticky.cookie.name"]).toBe("polaris_lb");
     });
 
     it("check health only where there is another copy to send traffic to", () => {
         const asked = edge({ sticky: false, healthPath: "/healthz" });
-        expect(
-            traefikLabels({ ...input, edge: asked, replicas: 2 })[
-                "traefik.http.services.web.loadbalancer.healthcheck.path"
-            ]
-        ).toBe("/healthz");
-        expect(
-            traefikLabels({ ...input, edge: asked, replicas: 1 })[
-                "traefik.http.services.web.loadbalancer.healthcheck.path"
-            ]
-        ).toBeUndefined();
+        expect(traefikLabels({ ...input, edge: asked, replicas: 2 })["traefik.http.services.web.loadbalancer.healthcheck.path"]).toBe("/healthz");
+        expect(traefikLabels({ ...input, edge: asked, replicas: 1 })["traefik.http.services.web.loadbalancer.healthcheck.path"]).toBeUndefined();
     });
 });

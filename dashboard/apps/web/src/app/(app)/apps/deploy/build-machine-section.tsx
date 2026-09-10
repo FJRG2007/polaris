@@ -46,15 +46,12 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
                 <Select
                     value={view.value}
                     onValueChange={(value) => void choose(value)}
-                    options={view.options.map((option) => ({
-                        value: option.value,
-                        label: option.label
-                    }))}
+                    options={view.options.map((option) => ({ value: option.value, label: option.label }))}
                     aria-label="Build on"
                 />
                 <span className="text-xs text-muted-foreground">
-                    Another machine builds the image and sends it here, so a small server can run
-                    what it could not build.
+                    Another machine builds the image and sends it here, so a small server can run what it could
+                    not build.
                 </span>
                 {error && <p className="text-sm text-danger">{error}</p>}
             </div>

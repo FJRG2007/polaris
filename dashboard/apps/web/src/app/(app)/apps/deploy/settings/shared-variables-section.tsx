@@ -16,11 +16,7 @@ import { Button, Select } from "@polaris/ui";
 import { SettingsCard } from "../project-settings";
 import { VariablesEditor } from "../variables-editor";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
-import {
-    NEW_ENVIRONMENT,
-    NewEnvironmentDialog,
-    newEnvironmentOption
-} from "../new-environment-dialog";
+import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "../new-environment-dialog";
 
 export function SharedVariablesSection({
     settings,
@@ -29,9 +25,7 @@ export function SharedVariablesSection({
     settings: ProjectSettingsView;
     canManage: boolean;
 }) {
-    const first =
-        settings.environments.find((environment) => environment.isDefault) ??
-        settings.environments[0];
+    const first = settings.environments.find((environment) => environment.isDefault) ?? settings.environments[0];
     const [environmentId, setEnvironmentId] = useState(first?.id ?? "");
     const [creating, setCreating] = useState(false);
     const environment = settings.environments.find((one) => one.id === environmentId);
@@ -45,13 +39,8 @@ export function SharedVariablesSection({
     if (!first) {
         return (
             <>
-                <SettingsCard
-                    title="Shared variables"
-                    description="Values every service in an environment receives."
-                >
-                    <p className="text-sm text-muted-foreground">
-                        This project has no environments yet.
-                    </p>
+                <SettingsCard title="Shared variables" description="Values every service in an environment receives.">
+                    <p className="text-sm text-muted-foreground">This project has no environments yet.</p>
                     {canManage && (
                         <div>
                             <Button variant="ghost" onClick={() => setCreating(true)}>

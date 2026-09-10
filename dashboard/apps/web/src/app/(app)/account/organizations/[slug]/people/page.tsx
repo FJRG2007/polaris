@@ -34,10 +34,7 @@ export default async function OrganizationPeoplePage({
         listOrgEmailInvites(org.id, { canManage }),
         listOrgRoles(org.id),
         organizationPolicy(),
-        prisma.organization.findUnique({
-            where: { id: org.id },
-            select: { defaultInviteRole: true }
-        })
+        prisma.organization.findUnique({ where: { id: org.id }, select: { defaultInviteRole: true } })
     ]);
 
     return (

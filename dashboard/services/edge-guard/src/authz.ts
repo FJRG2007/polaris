@@ -144,9 +144,7 @@ function parseUri(uri: string | undefined, proto: string, host: string | undefin
 
 /** The absolute original URL of the request (for the post-login return trip). */
 function originalUrl(req: GuardRequest, proto: string): string | undefined {
-    return req.forwardedHost
-        ? `${proto}://${req.forwardedHost}${req.forwardedUri ?? "/"}`
-        : undefined;
+    return req.forwardedHost ? `${proto}://${req.forwardedHost}${req.forwardedUri ?? "/"}` : undefined;
 }
 
 /**
@@ -218,11 +216,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // address should not be able to talk its way past with a well-chosen header.
     if (cfg.intel && cfg.intel.size > 0) {
         const hit = cfg.intel.match(clientIp(req.forwardedFor), cfg.now * 1000);
-        if (hit)
-            return {
-                status: 403,
-                reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}`
-            };
+        if (hit) return { status: 403, reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}` };
     }
 
     // Custom rules next, before the login handoff: a rule that admits a request is
@@ -252,16 +246,14 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
 
         const own = evaluateWafRules(rule.rules, facts);
         skipped = own.skipped;
-        if (own.verdict?.action === "block")
-            return { status: 403, reason: `rule: ${own.verdict.rule.name}` };
+        if (own.verdict?.action === "block") return { status: 403, reason: `rule: ${own.verdict.rule.name}` };
         if (own.verdict?.action === "allow") return { status: 200 };
 
         // The packs, unless a rule above stepped over them. They are only ever `block`
         // rules, so their outcome cannot skip anything further.
         if (!skipped.has("managed_rules") && managed.length > 0) {
             const verdict = evaluateWafRules(managed, facts).verdict;
-            if (verdict?.action === "block")
-                return { status: 403, reason: `rule: ${verdict.rule.name}` };
+            if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
             if (verdict?.action === "allow") return { status: 200 };
         }
     }
@@ -274,10 +266,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // check that runs for every request on every route, and the raw request line is
     // what should be scanned anyway - the signatures are matched against the bytes the
     // client actually sent, after this check's own decoding.
-    if (
-        !skipped.has("injection_checks") &&
-        (rule.sqlInjectionProtection === true || rule.xssProtection === true)
-    ) {
+    if (!skipped.has("injection_checks") && (rule.sqlInjectionProtection === true || rule.xssProtection === true)) {
         const uri = req.forwardedUri ?? "";
         const split = uri.indexOf("?");
         const failure = injectionFailure(
@@ -317,10 +306,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         if (!verifyEdgePass(readCookie(req.cookie, EDGE_PASS_COOKIE), secret, cfg.now, host, ip)) {
             return {
                 status: 503,
-                challenge: issueEdgeChallenge(
-                    { host, ip, now: cfg.now, nonce: cfg.nonce ?? "" },
-                    secret
-                ),
+                challenge: issueEdgeChallenge({ host, ip, now: cfg.now, nonce: cfg.nonce ?? "" }, secret),
                 bits: EDGE_CHALLENGE_BITS
             };
         }
@@ -403,8 +389,5 @@ function admits(
     const held = new Set([`user:${token.sub}`, ...token.prn]);
     const verdict = principalVerdict(rule, held, cfg.now);
     if (verdict === "admitted") return { status: 200 };
-    return {
-        status: 403,
-        reason: verdict === "refused" ? "refused by this scope" : "not admitted by this scope"
-    };
+    return { status: 403, reason: verdict === "refused" ? "refused by this scope" : "not admitted by this scope" };
 }

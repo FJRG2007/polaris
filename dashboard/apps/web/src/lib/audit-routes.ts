@@ -21,10 +21,7 @@ function params(request: Request): Record<string, string> {
 }
 
 function refused(error: { issues: { message: string }[] }): Response {
-    return NextResponse.json(
-        { error: error.issues[0]?.message ?? "Invalid request" },
-        { status: 400 }
-    );
+    return NextResponse.json({ error: error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
 }
 
 /**
@@ -34,10 +31,7 @@ function refused(error: { issues: { message: string }[] }): Response {
  * thing appear in this scope - so the filters can offer only what is there; the
  * pages after it do not repeat them.
  */
-export async function auditPageResponse(
-    request: Request,
-    scope: audit.AuditScope
-): Promise<Response> {
+export async function auditPageResponse(request: Request, scope: audit.AuditScope): Promise<Response> {
     const parsed = core.auditFilterSchema.safeParse(params(request));
     if (!parsed.success) return refused(parsed.error);
     const [page, facets] = await Promise.all([
@@ -89,8 +83,7 @@ export async function auditExportResponse(
     });
     return new Response(body, {
         headers: {
-            "content-type":
-                format === "csv" ? "text/csv; charset=utf-8" : "application/json; charset=utf-8",
+            "content-type": format === "csv" ? "text/csv; charset=utf-8" : "application/json; charset=utf-8",
             "content-disposition": `attachment; filename="${name}"`,
             "cache-control": "private, no-store",
             "x-content-type-options": "nosniff",

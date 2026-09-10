@@ -31,13 +31,7 @@ const MODE_HINTS: Record<EnvironmentNetworkMode, string> = {
     links: "A service reaches only the services it is linked to on the canvas, and a database is reached only through a link."
 };
 
-export function NetworkingCard({
-    settings,
-    canManage
-}: {
-    settings: ProjectSettingsView;
-    canManage: boolean;
-}) {
+export function NetworkingCard({ settings, canManage }: { settings: ProjectSettingsView; canManage: boolean }) {
     return (
         <SettingsCard
             title="Private networking"
@@ -108,9 +102,7 @@ function EnvironmentNetworkRow({
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
                     <Network className="size-4 text-muted-foreground" />
-                    <span className="truncate" title={environment.name}>
-                        {environment.name}
-                    </span>
+                    <span className="truncate" title={environment.name}>{environment.name}</span>
                 </p>
                 <Select
                     value={mode}
@@ -119,10 +111,7 @@ function EnvironmentNetworkRow({
                         setMode(value as EnvironmentNetworkMode);
                         setOutcome(null);
                     }}
-                    options={ENVIRONMENT_NETWORK_MODES.map((value) => ({
-                        value,
-                        label: MODE_LABELS[value]
-                    }))}
+                    options={ENVIRONMENT_NETWORK_MODES.map((value) => ({ value, label: MODE_LABELS[value] }))}
                     className="w-full sm:w-52"
                     aria-label={`How services in ${environment.name} connect`}
                 />
@@ -130,42 +119,33 @@ function EnvironmentNetworkRow({
             <p className="text-xs text-muted-foreground">{MODE_HINTS[mode]}</p>
             {mode === "links" && environment.linkCount === 0 && (
                 <p className="text-xs text-warning">
-                    This environment&apos;s canvas has no links yet, so no service would reach
-                    another. Link them on the canvas first.
+                    This environment&apos;s canvas has no links yet, so no service would reach another. Link them on the
+                    canvas first.
                 </p>
             )}
             {mode !== "shared" && !privateNetworksHere && (
                 <p className="text-xs text-warning">
-                    Services on this server stay on the shared network until Polaris is updated from
-                    Settings. Services on your other servers get their own network now.
+                    Services on this server stay on the shared network until Polaris is updated from Settings.
+                    Services on your other servers get their own network now.
                 </p>
             )}
             {dirty && environment.networkMode === "shared" && (
                 <p className="text-xs text-muted-foreground">
-                    Anything that reaches these services by name from another project stops reaching
-                    them.
+                    Anything that reaches these services by name from another project stops reaching them.
                 </p>
             )}
             {error && <p className="text-sm text-danger">{error}</p>}
             {outcome && <p className="text-xs text-muted-foreground">{outcome}</p>}
             {canManage && dirty && (
                 <div className="flex flex-wrap justify-end gap-2">
-                    <Button
-                        variant="ghost"
-                        onClick={() => setMode(environment.networkMode)}
-                        disabled={pending}
-                    >
+                    <Button variant="ghost" onClick={() => setMode(environment.networkMode)} disabled={pending}>
                         Cancel
                     </Button>
                     <Button variant="secondary" onClick={() => save(false)} disabled={pending}>
                         {pending && !deploying && <Loader2 className="size-4 animate-spin" />} Save
                     </Button>
-                    <Button
-                        onClick={() => save(true)}
-                        disabled={pending || environment.serviceCount === 0}
-                    >
-                        {pending && deploying && <Loader2 className="size-4 animate-spin" />} Save
-                        and deploy
+                    <Button onClick={() => save(true)} disabled={pending || environment.serviceCount === 0}>
+                        {pending && deploying && <Loader2 className="size-4 animate-spin" />} Save and deploy
                     </Button>
                 </div>
             )}

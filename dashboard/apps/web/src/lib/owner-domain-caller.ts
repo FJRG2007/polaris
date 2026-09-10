@@ -27,18 +27,8 @@ export interface DomainCaller {
 export async function domainCallerFor(ref: DomainOwnerRef): Promise<DomainCaller> {
     const user = await requireUser();
     if (ref.kind === "user") {
-        return {
-            owner: { kind: "user", id: user.id },
-            userId: user.id,
-            isAdmin: user.isAdmin,
-            orgId: null
-        };
+        return { owner: { kind: "user", id: user.id }, userId: user.id, isAdmin: user.isAdmin, orgId: null };
     }
     await requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, ref.orgId, "domains.manage");
-    return {
-        owner: { kind: "org", id: ref.orgId },
-        userId: user.id,
-        isAdmin: user.isAdmin,
-        orgId: ref.orgId
-    };
+    return { owner: { kind: "org", id: ref.orgId }, userId: user.id, isAdmin: user.isAdmin, orgId: ref.orgId };
 }

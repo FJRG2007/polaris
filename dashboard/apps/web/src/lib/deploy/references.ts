@@ -25,12 +25,7 @@ import { scopeValues } from "./env-values";
 import { currentReleaseRef } from "./releases";
 
 /** The variables a service is described by, besides the ones set on it. */
-const SERVICE_KEYS = [
-    "POLARIS_PRIVATE_DOMAIN",
-    "PORT",
-    "POLARIS_PUBLIC_DOMAIN",
-    "POLARIS_PUBLIC_URL"
-] as const;
+const SERVICE_KEYS = ["POLARIS_PRIVATE_DOMAIN", "PORT", "POLARIS_PUBLIC_DOMAIN", "POLARIS_PUBLIC_URL"] as const;
 
 interface Scope {
     readonly environmentId: string;
@@ -77,8 +72,7 @@ export async function resolveServiceReferences(
 
 function namesIn(texts: Iterable<string>): Set<string> {
     const names = new Set<string>();
-    for (const text of texts)
-        for (const reference of core.referencesIn(text)) names.add(reference.name);
+    for (const text of texts) for (const reference of core.referencesIn(text)) names.add(reference.name);
     return names;
 }
 
@@ -91,8 +85,7 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
         texts.push(...Object.values(record));
     };
 
-    if (names.has("shared"))
-        remember("shared", await scopeValues("environment", scope.environmentId));
+    if (names.has("shared")) remember("shared", await scopeValues("environment", scope.environmentId));
 
     const wanted = [...names].filter((name) => name !== "shared");
     if (wanted.length === 0) return texts;
@@ -122,9 +115,7 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
     ]);
 
     for (const name of wanted) {
-        const application = applications.find(
-            (one) => one.slug === name || slugify(one.name) === name
-        );
+        const application = applications.find((one) => one.slug === name || slugify(one.name) === name);
         if (application) {
             remember(name, {
                 ...(await scopeValues("application", application.id)),
@@ -136,16 +127,10 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
         if (database) {
             // Cycle: database-service reaches the deploy service, which reaches this.
             const { databaseConnection } = await import("@/lib/database-service");
-            const connection = await databaseConnection(database.id, scope.ownerId).catch(
-                () => null
-            );
+            const connection = await databaseConnection(database.id, scope.ownerId).catch(() => null);
             // A database never deployed has no address yet; the reference stays
             // unresolved and the refusal says which one.
-            if (connection)
-                remember(
-                    name,
-                    core.databaseReferenceKeys({ engine: database.engine, ...connection })
-                );
+            if (connection) remember(name, core.databaseReferenceKeys({ engine: database.engine, ...connection }));
         }
     }
     return texts;
@@ -170,8 +155,7 @@ async function describeService(application: {
         // A service whose stored config cannot be read falls back to its domain.
     }
     const domain = application.domains.find((one) => one.kind !== "lan") ?? application.domains[0];
-    const containerPort =
-        port ?? domain?.targetPort ?? (application.sourceType === "image" ? 80 : 3000);
+    const containerPort = port ?? domain?.targetPort ?? (application.sourceType === "image" ? 80 : 3000);
     return {
         POLARIS_PRIVATE_DOMAIN: release.address,
         PORT: String(containerPort),

@@ -16,15 +16,7 @@ import { Eye, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { stopViewAsAction } from "@/app/(app)/view-as-actions";
 
-export function ViewAsBanner({
-    mode,
-    label,
-    actorName
-}: {
-    mode: "user" | "role";
-    label: string;
-    actorName: string;
-}) {
+export function ViewAsBanner({ mode, label, actorName }: { mode: "user" | "role"; label: string; actorName: string }) {
     const router = useRouter();
     const [leaving, setLeaving] = useState(false);
 
@@ -51,18 +43,9 @@ export function ViewAsBanner({
                             Seeing Polaris as the <span className="font-medium">{label}</span> role
                         </>
                     )}
-                    <span className="hidden text-muted-foreground sm:inline">
-                        {" "}
-                        - you are {actorName}
-                    </span>
+                    <span className="hidden text-muted-foreground sm:inline"> - you are {actorName}</span>
                 </p>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-full"
-                    disabled={leaving}
-                    onClick={() => void leave()}
-                >
+                <Button size="sm" variant="ghost" className="rounded-full" disabled={leaving} onClick={() => void leave()}>
                     <LogOut className="size-4" />
                     {leaving ? "Leaving..." : "Back to my account"}
                 </Button>

@@ -18,15 +18,11 @@ let outside = "";
 /** A directory beside the checkout, standing for the rest of this machine. */
 async function elsewhere(files: Record<string, string>): Promise<string> {
     outside = await mkdtemp(join(tmpdir(), "polaris-outside-"));
-    for (const [name, text] of Object.entries(files))
-        await writeFile(join(outside, name), text, "utf8");
+    for (const [name, text] of Object.entries(files)) await writeFile(join(outside, name), text, "utf8");
     return outside;
 }
 
-const VITE_MANIFEST = JSON.stringify({
-    scripts: { build: "vite build" },
-    devDependencies: { vite: "5" }
-});
+const VITE_MANIFEST = JSON.stringify({ scripts: { build: "vite build" }, devDependencies: { vite: "5" } });
 
 async function repo(files: Record<string, string>): Promise<string> {
     dir = await mkdtemp(join(tmpdir(), "polaris-configure-"));
@@ -53,9 +49,7 @@ describe("a Python service created since the other languages were detected", () 
             ".python-version": "3.11\n"
         });
         const said: string[] = [];
-        const result = await configureBuild(root, { port: 5000, languages: true }, (line) =>
-            said.push(line)
-        );
+        const result = await configureBuild(root, { port: 5000, languages: true }, (line) => said.push(line));
         expect(result.dockerfile).toBe("Dockerfile.polaris");
         const dockerfile = await readFile(join(root, "Dockerfile.polaris"), "utf8");
         expect(dockerfile).toContain("FROM python:3.11-slim");
@@ -64,19 +58,9 @@ describe("a Python service created since the other languages were detected", () 
     });
 
     it("builds on the runtime version the service set over the repository's", async () => {
-        const root = await repo({
-            "requirements.txt": "flask\n",
-            "app.py": "",
-            ".python-version": "3.11"
-        });
-        await configureBuild(
-            root,
-            { port: 5000, languages: true, runtimeVersion: "3.12" },
-            () => undefined
-        );
-        expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).toContain(
-            "FROM python:3.12-slim"
-        );
+        const root = await repo({ "requirements.txt": "flask\n", "app.py": "", ".python-version": "3.11" });
+        await configureBuild(root, { port: 5000, languages: true, runtimeVersion: "3.12" }, () => undefined);
+        expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).toContain("FROM python:3.12-slim");
     });
 });
 
@@ -125,16 +109,11 @@ describe("a repository that ships symlinks", () => {
             "go.mod": `module example.com/app\n\ngo 1.22\n${"// padding\n".repeat(8000)}`
         });
         await configureBuild(root, { port: 8080, languages: true }, () => undefined);
-        expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).not.toContain(
-            "golang:1.22"
-        );
+        expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).not.toContain("golang:1.22");
     });
 
     it("still reads a go.mod the repository really holds", async () => {
-        const root = await repo({
-            "main.go": "package main\n",
-            "go.mod": "module example.com/app\n\ngo 1.22\n"
-        });
+        const root = await repo({ "main.go": "package main\n", "go.mod": "module example.com/app\n\ngo 1.22\n" });
         await configureBuild(root, { port: 8080, languages: true }, () => undefined);
         expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).toContain("golang:1.22");
     });
@@ -145,11 +124,7 @@ describe("a repository that ships symlinks", () => {
         await symlink(host, join(root, "web"), "junction");
 
         await expect(
-            configureBuild(
-                root,
-                { rootDirectory: "web", port: 8080, startCommand: "node server.js" },
-                () => undefined
-            )
+            configureBuild(root, { rootDirectory: "web", port: 8080, startCommand: "node server.js" }, () => undefined)
         ).rejects.toThrow("outside the repository");
         expect(await readdir(host)).toEqual(["package.json"]);
     });
@@ -160,11 +135,7 @@ describe("a repository that ships symlinks", () => {
         const climb = `../${host.split(/[\\/]/).pop()}`;
 
         await expect(
-            configureBuild(
-                root,
-                { rootDirectory: climb, port: 8080, startCommand: "node server.js" },
-                () => undefined
-            )
+            configureBuild(root, { rootDirectory: climb, port: 8080, startCommand: "node server.js" }, () => undefined)
         ).rejects.toThrow("outside the repository");
         expect(await readdir(host)).toEqual(["package.json"]);
     });
@@ -186,18 +157,9 @@ describe("a repository that ships symlinks", () => {
 describe("a built site with an output directory of its own", () => {
     it("serves the directory the service names instead of the framework's", async () => {
         const root = await repo({
-            "package.json": JSON.stringify({
-                scripts: { build: "vite build" },
-                devDependencies: { vite: "5" }
-            })
+            "package.json": JSON.stringify({ scripts: { build: "vite build" }, devDependencies: { vite: "5" } })
         });
-        await configureBuild(
-            root,
-            { port: 8080, outputDirectory: "public-build" },
-            () => undefined
-        );
-        expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).toContain(
-            "/workspace/public-build /usr/share/nginx/html"
-        );
+        await configureBuild(root, { port: 8080, outputDirectory: "public-build" }, () => undefined);
+        expect(await readFile(join(root, "Dockerfile.polaris"), "utf8")).toContain("/workspace/public-build /usr/share/nginx/html");
     });
 });

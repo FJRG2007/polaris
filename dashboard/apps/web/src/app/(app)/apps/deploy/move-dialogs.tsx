@@ -125,8 +125,7 @@ function variableNote(
 ): string {
     const many = `${plan.variableCount} variable${plan.variableCount === 1 ? "" : "s"}`;
     if (plan.variableCount === 0) return "There are no variables to carry across.";
-    if (!canCopy)
-        return `${many} stay where they are: copying them is not part of your access here.`;
+    if (!canCopy) return `${many} stay where they are: copying them is not part of your access here.`;
     if (plan.variableKeys.length === 0) return `${many} can travel.`;
     const listed = plan.variableKeys.slice(0, 6).join(", ");
     return `${many} can travel: ${listed}${plan.variableKeys.length > 6 ? ", and more" : ""}.`;
@@ -313,16 +312,16 @@ export function MoveOutDialog({
                                 <Note>{variableNote(plan, canCopy)}</Note>
                                 {plan.volumes.length > 0 && (
                                     <Note>
-                                        Its volumes stay here and are not copied:{" "}
-                                        {plan.volumes.join(", ")}. A provider that builds from a
-                                        repository has nowhere to put them.
+                                        Its volumes stay here and are not copied: {plan.volumes.join(", ")}.
+                                        A provider that builds from a repository has nowhere to put
+                                        them.
                                     </Note>
                                 )}
                                 {plan.domains.length > 0 && (
                                     <Note>
-                                        {plan.domains.join(", ")} points at this server and will go
-                                        on pointing at it. Moving a name is a DNS record at whoever
-                                        holds it.
+                                        {plan.domains.join(", ")} points at this server and will go on
+                                        pointing at it. Moving a name is a DNS record at whoever holds
+                                        it.
                                     </Note>
                                 )}
                             </ul>
@@ -474,9 +473,7 @@ export function MoveHomeDialog({
 }) {
     const [plan, setPlan] = useState<MoveHomePlan | null>(null);
     const [targets, setTargets] = useState<{ id: string; name: string }[]>([]);
-    const [environment, setEnvironment] = useState(
-        service.environmentId || environments[0]?.id || ""
-    );
+    const [environment, setEnvironment] = useState(service.environmentId || environments[0]?.id || "");
     const [target, setTarget] = useState("");
     const [name, setName] = useState(service.name);
     const [repoUrl, setRepoUrl] = useState("");
@@ -546,9 +543,7 @@ export function MoveHomeDialog({
         const moved = result.result;
         setDone(
             [
-                moved.deploying
-                    ? "Polaris is building it now."
-                    : "It is created and ready to deploy.",
+                moved.deploying ? "Polaris is building it now." : "It is created and ready to deploy.",
                 moved.copied > 0
                     ? `${moved.copied} variable${moved.copied === 1 ? "" : "s"} came with it.`
                     : "No variables came with it.",
@@ -596,7 +591,9 @@ export function MoveHomeDialog({
                                         ? `They build ${plan.source.repo}${plan.source.branch ? ` on ${plan.source.branch}` : ""}.`
                                         : `${service.provider} does not say which repository it builds, so Polaris needs the address below.`}
                                 </Note>
-                                <Note>{plan.variablesError ?? variableNote(plan, canCopy)}</Note>
+                                <Note>
+                                    {plan.variablesError ?? variableNote(plan, canCopy)}
+                                </Note>
                                 <Note>
                                     Whatever domain it answers on there keeps answering there.
                                     Pointing a name at this server is a DNS record and a domain on

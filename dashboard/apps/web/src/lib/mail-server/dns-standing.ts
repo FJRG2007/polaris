@@ -16,10 +16,7 @@ import { resolveZoneForHostname } from "@/lib/integrations/cloudflare-api";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 
 function ownersFor(actor: MailServerActor, orgId: string | null): DomainOwner[] {
-    return [
-        { kind: "user", id: actor.id },
-        ...(orgId ? [{ kind: "org" as const, id: orgId }] : [])
-    ];
+    return [{ kind: "user", id: actor.id }, ...(orgId ? [{ kind: "org" as const, id: orgId }] : [])];
 }
 
 /**
@@ -27,11 +24,7 @@ function ownersFor(actor: MailServerActor, orgId: string | null): DomainOwner[] 
  * verified domain every record has to be at or under. Refuses a caller with no
  * standing over the domain at all.
  */
-export async function publishWithin(
-    actor: MailServerActor,
-    orgId: string | null,
-    domain: string
-): Promise<string | null> {
+export async function publishWithin(actor: MailServerActor, orgId: string | null, domain: string): Promise<string | null> {
     if (actor.isAdmin) return null;
     const proven = await provenDomainOf(domain, ownersFor(actor, orgId));
     if (proven) return proven;
@@ -47,11 +40,7 @@ export async function publishWithin(
  * a lookup that fails refuses nothing - without the token nothing here can write
  * to the zone anyway.
  */
-export async function requireMailDomainStanding(
-    actor: MailServerActor,
-    orgId: string | null,
-    domain: string
-): Promise<void> {
+export async function requireMailDomainStanding(actor: MailServerActor, orgId: string | null, domain: string): Promise<void> {
     if (actor.isAdmin) return;
     if (await provenDomainOf(domain, ownersFor(actor, orgId))) return;
     const token = await loadCloudflareToken().catch(() => null);
@@ -61,8 +50,6 @@ export async function requireMailDomainStanding(
         () => false
     );
     if (onAccount) {
-        throw new MailServerAccessError(
-            `${domain} is on this Polaris's own DNS account. Verify it under Domains, then add it here.`
-        );
+        throw new MailServerAccessError(`${domain} is on this Polaris's own DNS account. Verify it under Domains, then add it here.`);
     }
 }

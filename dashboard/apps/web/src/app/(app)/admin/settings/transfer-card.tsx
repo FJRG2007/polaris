@@ -35,10 +35,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
     const [importPass, setImportPass] = useState("");
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [busy, setBusy] = useState<"upload" | "preview" | "apply" | null>(null);
-    const [preview, setPreview] = useState<{
-        summary: TransferSummary;
-        refused: string | null;
-    } | null>(null);
+    const [preview, setPreview] = useState<{ summary: TransferSummary; refused: string | null } | null>(null);
     const [confirm, setConfirm] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -77,10 +74,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                 headers: { "x-polaris-transfer": "1", "content-type": "application/octet-stream" },
                 body: file
             }).catch(() => null);
-            const answer = (await response?.json().catch(() => null)) as {
-                id?: string;
-                error?: string;
-            } | null;
+            const answer = (await response?.json().catch(() => null)) as { id?: string; error?: string } | null;
             if (!response?.ok || !answer?.id) {
                 setBusy(null);
                 setError(answer?.error ?? "The file could not be uploaded");
@@ -120,8 +114,8 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
             <CardBody className="flex flex-col gap-5 text-sm">
                 <section className="flex flex-col gap-2">
                     <p className="text-muted-foreground">
-                        Everything this Polaris knows - accounts, services, settings and secrets -
-                        in one file, sealed with a passphrase. Sessions and metrics stay behind.
+                        Everything this Polaris knows - accounts, services, settings and secrets - in one file, sealed
+                        with a passphrase. Sessions and metrics stay behind.
                     </p>
                     <div className="flex flex-wrap gap-2">
                         {/* enigma:allow-identity-password - the refusal is usePasswordSafety above,
@@ -144,12 +138,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                         />
                         <Button
                             onClick={() => void runExport()}
-                            disabled={
-                                exporting ||
-                                !exportPass ||
-                                exportConfirm !== exportPass ||
-                                exportProblem !== null
-                            }
+                            disabled={exporting || !exportPass || exportConfirm !== exportPass || exportProblem !== null}
                         >
                             {exporting && <Loader2 className="size-4 animate-spin" />} Export
                         </Button>
@@ -157,9 +146,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                     {exportProblem && <p className="text-xs text-danger">{exportProblem}</p>}
                     {exported && (
                         <p className="text-xs text-muted-foreground">
-                            Exported{" "}
-                            {exported.summary.tables.reduce((sum, table) => sum + table.rows, 0)}{" "}
-                            rows.
+                            Exported {exported.summary.tables.reduce((sum, table) => sum + table.rows, 0)} rows.
                             {exported.summary.unreadableSecrets > 0 &&
                                 ` ${exported.summary.unreadableSecrets} saved secrets could not be opened here and will need entering again.`}{" "}
                             Without the passphrase the file cannot be opened.
@@ -169,8 +156,8 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
 
                 <section className="flex flex-col gap-2 border-t border-border pt-4">
                     <p className="text-muted-foreground">
-                        On a fresh install: read an export in. It replaces every account and setting
-                        here, this one included.
+                        On a fresh install: read an export in. It replaces every account and setting here, this one
+                        included.
                     </p>
                     <div className="flex flex-wrap gap-2">
                         <input
@@ -199,29 +186,26 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             onClick={() => void runPreview()}
                             disabled={busy !== null || !file || importPass.length < MIN_PASSPHRASE}
                         >
-                            {(busy === "upload" || busy === "preview") && (
-                                <Loader2 className="size-4 animate-spin" />
-                            )}{" "}
+                            {(busy === "upload" || busy === "preview") && <Loader2 className="size-4 animate-spin" />}{" "}
                             {busy === "upload" ? "Uploading" : "Check file"}
                         </Button>
                     </div>
                     {preview && (
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-xs">
                             <p>
-                                Exported {format.dateTime(preview.summary.exportedAt)}: {rows} rows
-                                in {preview.summary.tables.length} tables,{" "}
-                                {preview.summary.carriedSecrets} secrets.
+                                Exported {format.dateTime(preview.summary.exportedAt)}:{" "}
+                                {rows} rows in {preview.summary.tables.length} tables, {preview.summary.carriedSecrets}{" "}
+                                secrets.
                             </p>
                             {preview.summary.unreadableSecrets > 0 && (
                                 <p className="text-warning">
-                                    {preview.summary.unreadableSecrets} secrets could not be opened
-                                    where it was exported and will need entering again.
+                                    {preview.summary.unreadableSecrets} secrets could not be opened where it was exported
+                                    and will need entering again.
                                 </p>
                             )}
                             {preview.summary.unknownTables.length > 0 && (
                                 <p className="text-warning">
-                                    Skipped, this version does not have them:{" "}
-                                    {preview.summary.unknownTables.join(", ")}.
+                                    Skipped, this version does not have them: {preview.summary.unknownTables.join(", ")}.
                                 </p>
                             )}
                             {preview.refused ? (
@@ -239,10 +223,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                                         onClick={() => void runApply()}
                                         disabled={busy !== null || confirm !== "replace"}
                                     >
-                                        {busy === "apply" && (
-                                            <Loader2 className="size-4 animate-spin" />
-                                        )}{" "}
-                                        Import
+                                        {busy === "apply" && <Loader2 className="size-4 animate-spin" />} Import
                                     </Button>
                                 </div>
                             )}

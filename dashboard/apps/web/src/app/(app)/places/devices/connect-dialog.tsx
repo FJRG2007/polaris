@@ -81,10 +81,7 @@ function Field({
                 <Select
                     value={value || field.defaultValue || ""}
                     onValueChange={onChange}
-                    options={field.choices.map((choice) => ({
-                        value: choice.value,
-                        label: choice.label
-                    }))}
+                    options={field.choices.map((choice) => ({ value: choice.value, label: choice.label }))}
                     aria-label={field.label}
                 />
             ) : (
@@ -119,9 +116,7 @@ export function ConnectDialog({
 }) {
     const brands = useMemo(() => registry.deviceBrands(), []);
     const [brand, setBrand] = useState(brands[0]?.brand ?? "");
-    const [chosen, setChosen] = useState(
-        registry.connectionsOfBrand(brands[0]?.brand ?? "")[0]?.id ?? ""
-    );
+    const [chosen, setChosen] = useState(registry.connectionsOfBrand(brands[0]?.brand ?? "")[0]?.id ?? "");
     const [label, setLabel] = useState("");
     const [fields, setFields] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
@@ -247,24 +242,18 @@ export function ConnectDialog({
                                         <Check
                                             className={cn(
                                                 "mt-0.5 size-4 shrink-0",
-                                                entry.id === chosen
-                                                    ? "text-accent"
-                                                    : "text-transparent"
+                                                entry.id === chosen ? "text-accent" : "text-transparent"
                                             )}
                                         />
                                         <span className="flex min-w-0 flex-col gap-0.5">
                                             <span className="text-sm font-medium">
                                                 {entry.label}
                                                 {index === 0 && (
-                                                    <span className="text-foreground-subtle">
-                                                        {" "}
-                                                        - recommended
-                                                    </span>
+                                                    <span className="text-foreground-subtle"> - recommended</span>
                                                 )}
                                             </span>
                                             <span className="text-[0.6875rem] text-muted-foreground">
-                                                {registry.REACH_LABELS[entry.reach]} -{" "}
-                                                {entry.summary}
+                                                {registry.REACH_LABELS[entry.reach]} - {entry.summary}
                                             </span>
                                         </span>
                                     </button>
@@ -282,13 +271,9 @@ export function ConnectDialog({
                                 />
                                 {connection.label} - {registry.REACH_LABELS[connection.reach]}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                                {connection.summary}
-                            </span>
+                            <span className="text-xs text-muted-foreground">{connection.summary}</span>
                             {connection.note && (
-                                <span className="text-xs text-foreground-subtle">
-                                    {connection.note}
-                                </span>
+                                <span className="text-xs text-foreground-subtle">{connection.note}</span>
                             )}
                         </div>
                     )}
@@ -345,10 +330,7 @@ export function ConnectDialog({
                     </label>
 
                     {error && (
-                        <p
-                            role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                        >
+                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                             {error}
                         </p>
                     )}

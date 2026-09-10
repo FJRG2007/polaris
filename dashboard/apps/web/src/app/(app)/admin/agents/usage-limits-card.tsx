@@ -30,28 +30,12 @@ import {
 /** What each kind of subject is called, and what its id looks like, so the field
  *  can say what to type instead of leaving somebody to guess. */
 const SUBJECTS: Record<LimitSubject, { label: string; placeholder: string; note: string }> = {
-    everyone: {
-        label: "Everyone",
-        placeholder: "",
-        note: "Applies to every account, each counted on its own."
-    },
+    everyone: { label: "Everyone", placeholder: "", note: "Applies to every account, each counted on its own." },
     user: { label: "One person", placeholder: "account id", note: "" },
-    role: {
-        label: "A role",
-        placeholder: "role id",
-        note: "Each member of the role gets this much."
-    },
-    group: {
-        label: "A group",
-        placeholder: "group id",
-        note: "Each member of the group gets this much."
-    },
+    role: { label: "A role", placeholder: "role id", note: "Each member of the role gets this much." },
+    group: { label: "A group", placeholder: "group id", note: "Each member of the group gets this much." },
     repo: { label: "One repository", placeholder: "owner/name", note: "" },
-    org: {
-        label: "A GitHub account",
-        placeholder: "login",
-        note: "Every repository under it, counted together."
-    }
+    org: { label: "A GitHub account", placeholder: "login", note: "Every repository under it, counted together." }
 };
 
 const METRICS: Record<LimitMetric, string> = { runs: "runs", tokens: "tokens" };
@@ -79,16 +63,11 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
                     <div className="min-w-0 flex-1 space-y-1">
                         <p className="text-sm font-medium">Usage limits</p>
                         <p className="text-muted-foreground text-xs">
-                            A run that would cross any limit that applies to it is refused before it
-                            starts, with the reason. Nothing is limited until you add one.
+                            A run that would cross any limit that applies to it is refused before it starts, with the
+                            reason. Nothing is limited until you add one.
                         </p>
                     </div>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setAdding(true)}
-                        disabled={adding}
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => setAdding(true)} disabled={adding}>
                         <Plus className="size-4 shrink-0" />
                         Add
                     </Button>
@@ -191,10 +170,7 @@ function AddLimit({
                 <Select
                     value={subjectType}
                     onValueChange={(next) => setSubjectType(next as LimitSubject)}
-                    options={LIMIT_SUBJECTS.map((slug) => ({
-                        value: slug,
-                        label: SUBJECTS[slug].label
-                    }))}
+                    options={LIMIT_SUBJECTS.map((slug) => ({ value: slug, label: SUBJECTS[slug].label }))}
                 />
                 {subjectType === "everyone" ? null : (
                     <Input
@@ -203,11 +179,7 @@ function AddLimit({
                         onChange={(event) => setSubjectId(event.target.value)}
                     />
                 )}
-                <Input
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    placeholder="50"
-                />
+                <Input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="50" />
                 <Select
                     value={metric}
                     onValueChange={(next) => setMetric(next as LimitMetric)}
@@ -216,10 +188,7 @@ function AddLimit({
                 <Select
                     value={period}
                     onValueChange={(next) => setPeriod(next as LimitPeriod)}
-                    options={LIMIT_PERIODS.map((slug) => ({
-                        value: slug,
-                        label: LIMIT_PERIOD_PER[slug]
-                    }))}
+                    options={LIMIT_PERIODS.map((slug) => ({ value: slug, label: LIMIT_PERIOD_PER[slug] }))}
                 />
             </div>
 

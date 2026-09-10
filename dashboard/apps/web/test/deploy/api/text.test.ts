@@ -21,10 +21,7 @@ describe("textTable", () => {
     });
 
     it("keeps a value with a tab or a newline in it on its own line", () => {
-        const table = textTable(
-            [{ message: "fix:\tthe\nbuild" }],
-            [["MESSAGE", (row) => row.message]]
-        );
+        const table = textTable([{ message: "fix:\tthe\nbuild" }], [["MESSAGE", (row) => row.message]]);
         expect(table).toBe("MESSAGE\nfix: the build\n");
     });
 });

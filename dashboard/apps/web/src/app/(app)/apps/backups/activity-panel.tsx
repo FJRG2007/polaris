@@ -52,9 +52,7 @@ export function ActivityPanel() {
     if (jobs.length === 0) {
         return (
             <Card>
-                <p className="py-10 text-center text-sm text-muted-foreground">
-                    Nothing has run yet.
-                </p>
+                <p className="py-10 text-center text-sm text-muted-foreground">Nothing has run yet.</p>
             </Card>
         );
     }
@@ -76,9 +74,7 @@ export function ActivityPanel() {
                         {jobs.map((job) => (
                             <tr key={job.id} className="border-b border-border last:border-0">
                                 <td className="px-3 py-2.5">
-                                    <span className="text-muted-foreground">
-                                        {VERB[job.type] ?? job.type}{" "}
-                                    </span>
+                                    <span className="text-muted-foreground">{VERB[job.type] ?? job.type} </span>
                                     {job.resourceId && job.resourceName ? (
                                         <Link
                                             href={`/apps/backups/${job.resourceId}`}
@@ -87,9 +83,7 @@ export function ActivityPanel() {
                                             {job.resourceName}
                                         </Link>
                                     ) : (
-                                        <span className="font-medium">
-                                            {job.resourceName ?? "something removed"}
-                                        </span>
+                                        <span className="font-medium">{job.resourceName ?? "something removed"}</span>
                                     )}
                                     <span className="ml-2 text-xs text-muted-foreground">
                                         {job.trigger === "scheduled"
@@ -100,9 +94,7 @@ export function ActivityPanel() {
                                                 ? "before an upgrade"
                                                 : "by hand"}
                                     </span>
-                                    {job.error ? (
-                                        <p className="text-xs text-danger">{job.error}</p>
-                                    ) : null}
+                                    {job.error ? <p className="text-xs text-danger">{job.error}</p> : null}
                                 </td>
                                 <td className="px-3 py-2.5 text-muted-foreground">
                                     {format.dateTime(job.startedAt)}

@@ -53,9 +53,7 @@ function isTunnelRecord(record: { type: string; content: string }): boolean {
 async function cloudflareToken(): Promise<string> {
     const token = await loadCloudflareToken();
     if (!token) {
-        throw new CdnError(
-            "Connect a Cloudflare account under Domains first - the domain's DNS has to be on Cloudflare."
-        );
+        throw new CdnError("Connect a Cloudflare account under Domains first - the domain's DNS has to be on Cloudflare.");
     }
     return token;
 }
@@ -81,10 +79,7 @@ export interface CdnCaller {
 /** A domain of a service the owner holds, that this caller may change at Cloudflare. */
 async function ownedDomain(domainId: string, caller: CdnCaller) {
     const domain = await prisma.domain.findFirst({
-        where: {
-            id: domainId,
-            application: { environment: { project: { ownerId: caller.ownerId } } }
-        },
+        where: { id: domainId, application: { environment: { project: { ownerId: caller.ownerId } } } },
         select: { id: true, hostname: true, cdn: true, enabled: true, applicationId: true }
     });
     if (!domain) throw new CdnError("That domain is not there any more.");
@@ -96,9 +91,7 @@ async function requireStanding(hostname: string, caller: CdnCaller): Promise<voi
     const name = hostname.trim().toLowerCase().replace(/^\*\./, "");
     const own = [...(await dashboardHosts()), publicHostname(process.env.POLARIS_APP_URL)];
     if (own.includes(name)) {
-        throw new CdnError(
-            `${name} is this Polaris's own address, so it cannot be changed from a service.`
-        );
+        throw new CdnError(`${name} is this Polaris's own address, so it cannot be changed from a service.`);
     }
     if ((await deployZoneHosts()).some((zone) => name.endsWith(`.${zone}`))) return;
     const owners: DomainOwner[] = [
@@ -127,11 +120,7 @@ async function wildcardRecords(token: string, zone: CfZone, hostname: string) {
 }
 
 /** Put a service domain behind Cloudflare's proxy, or take it out. */
-export async function setDomainCdn(
-    domainId: string,
-    caller: CdnCaller,
-    enabled: boolean
-): Promise<void> {
+export async function setDomainCdn(domainId: string, caller: CdnCaller, enabled: boolean): Promise<void> {
     const domain = await ownedDomain(domainId, caller);
     const token = await cloudflareToken();
     const zone = await zoneFor(token, domain.hostname);
@@ -147,9 +136,7 @@ export async function setDomainCdn(
         if (records.length === 0) {
             const wildcard = await wildcardRecords(token, zone, domain.hostname);
             if (wildcard.length === 0) {
-                throw new CdnError(
-                    `${domain.hostname} has no DNS record in Cloudflare yet, so there is nothing to put behind its proxy.`
-                );
+                throw new CdnError(`${domain.hostname} has no DNS record in Cloudflare yet, so there is nothing to put behind its proxy.`);
             }
             for (const record of wildcard) {
                 await createAddressRecord(token, zone.id, {
@@ -166,8 +153,7 @@ export async function setDomainCdn(
         }
     } else {
         for (const record of records) {
-            if (record.proxied && !isTunnelRecord(record))
-                await setRecordProxied(token, zone.id, record.id, false);
+            if (record.proxied && !isTunnelRecord(record)) await setRecordProxied(token, zone.id, record.id, false);
         }
     }
     await prisma.domain.update({ where: { id: domain.id }, data: { cdn: enabled } });
@@ -191,9 +177,7 @@ async function purgeHostnames(hostnames: readonly string[], prefix?: string): Pr
                 await purgeCache(
                     token,
                     zoneId,
-                    prefix
-                        ? { prefixes: batch.map((name) => `${name}/${prefix}`) }
-                        : { hosts: batch }
+                    prefix ? { prefixes: batch.map((name) => `${name}/${prefix}`) } : { hosts: batch }
                 );
             } catch (caught) {
                 const said = caught instanceof Error ? caught.message : "";
@@ -208,16 +192,9 @@ async function purgeHostnames(hostnames: readonly string[], prefix?: string): Pr
 }
 
 /** The manual purge: one domain, whole or under a path. */
-export async function purgeDomainCache(
-    domainId: string,
-    caller: CdnCaller,
-    prefix?: string
-): Promise<void> {
+export async function purgeDomainCache(domainId: string, caller: CdnCaller, prefix?: string): Promise<void> {
     const domain = await ownedDomain(domainId, caller);
-    if (!domain.cdn)
-        throw new CdnError(
-            "This domain is not served through Cloudflare, so there is no cache to empty."
-        );
+    if (!domain.cdn) throw new CdnError("This domain is not served through Cloudflare, so there is no cache to empty.");
     await purgeHostnames([domain.hostname], prefix);
 }
 

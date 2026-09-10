@@ -59,19 +59,8 @@ describe("whose history a Deploy entry belongs to", () => {
     });
 
     it("stamps the entry, and lets an explicit organization win", async () => {
-        await recordDeployAudit({
-            actorId: "u",
-            action: "deploy.app.deploy",
-            targetType: "application",
-            targetId: "a"
-        });
-        await recordDeployAudit({
-            actorId: "u",
-            orgId: "org-before-delete",
-            action: "deploy.project.delete",
-            targetType: "project",
-            targetId: "p"
-        });
+        await recordDeployAudit({ actorId: "u", action: "deploy.app.deploy", targetType: "application", targetId: "a" });
+        await recordDeployAudit({ actorId: "u", orgId: "org-before-delete", action: "deploy.project.delete", targetType: "project", targetId: "p" });
         expect(recorded).toEqual([
             { orgId: "org-a", action: "deploy.app.deploy" },
             { orgId: "org-before-delete", action: "deploy.project.delete" }

@@ -10,16 +10,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-    Hash,
-    Loader2,
-    MessageCircle,
-    MessagesSquare,
-    Plus,
-    Send,
-    Slack,
-    type LucideIcon
-} from "lucide-react";
+import { Hash, Loader2, MessageCircle, MessagesSquare, Plus, Send, Slack, type LucideIcon } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { inboxStateAction } from "@/app/(app)/admin/inbox/actions";
 import type { ChannelView } from "@/lib/messaging-service";
@@ -64,8 +55,8 @@ export function MessagingBridgePanel() {
                     <div>
                         <p className="text-sm font-medium">Channels</p>
                         <p className="text-xs text-muted-foreground">
-                            Connect WhatsApp, Telegram, Discord or Slack. Each channel's token,
-                            phone number or QR is entered in the Inbox when you connect it.
+                            Connect WhatsApp, Telegram, Discord or Slack. Each channel's token, phone number or QR is
+                            entered in the Inbox when you connect it.
                         </p>
                     </div>
                     <Button asChild size="sm">
@@ -83,8 +74,7 @@ export function MessagingBridgePanel() {
                     <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border py-8 text-center">
                         <MessagesSquare className="size-6 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
-                            No channels connected yet. Connect one to start receiving and sending
-                            messages from the Inbox.
+                            No channels connected yet. Connect one to start receiving and sending messages from the Inbox.
                         </p>
                         <Button asChild size="sm" variant="secondary">
                             <Link href="/admin/inbox">Go to the Inbox</Link>
@@ -100,16 +90,10 @@ export function MessagingBridgePanel() {
                                         <Icon className="size-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">
-                                            {channel.name}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {platformLabel(channel)}
-                                        </p>
+                                        <p className="truncate text-sm font-medium">{channel.name}</p>
+                                        <p className="text-xs text-muted-foreground">{platformLabel(channel)}</p>
                                     </div>
-                                    <Badge className={cn(STATUS_TONE[channel.status])}>
-                                        {channel.status}
-                                    </Badge>
+                                    <Badge className={cn(STATUS_TONE[channel.status])}>{channel.status}</Badge>
                                 </li>
                             );
                         })}

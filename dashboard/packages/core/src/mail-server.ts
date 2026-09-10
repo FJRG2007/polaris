@@ -43,30 +43,10 @@ export const MAIL_REPORTS_NAME = "dmarc-reports";
  *  a mail client and another mail server expect these numbers and no others. */
 export const MAIL_SERVER_PORTS = [
     { port: 25, label: "SMTP", purpose: "Mail from other servers arrives here", required: true },
-    {
-        port: 465,
-        label: "Submission over TLS",
-        purpose: "Mail apps send through this",
-        required: true
-    },
-    {
-        port: 587,
-        label: "Submission",
-        purpose: "Mail apps send through this with STARTTLS",
-        required: false
-    },
-    {
-        port: 993,
-        label: "IMAP over TLS",
-        purpose: "Mail apps read mail through this",
-        required: true
-    },
-    {
-        port: 4190,
-        label: "ManageSieve",
-        purpose: "Mail apps edit filters through this",
-        required: false
-    }
+    { port: 465, label: "Submission over TLS", purpose: "Mail apps send through this", required: true },
+    { port: 587, label: "Submission", purpose: "Mail apps send through this with STARTTLS", required: false },
+    { port: 993, label: "IMAP over TLS", purpose: "Mail apps read mail through this", required: true },
+    { port: 4190, label: "ManageSieve", purpose: "Mail apps edit filters through this", required: false }
 ] as const;
 
 export type MailPort = (typeof MAIL_SERVER_PORTS)[number]["port"];
@@ -104,10 +84,7 @@ export function portVerdict(
         };
     }
     if (outcome === "refused") {
-        return {
-            verdict: "fail",
-            note: "The server answered that nothing is listening on this port."
-        };
+        return { verdict: "fail", note: "The server answered that nothing is listening on this port." };
     }
     if (port === 25) {
         return {
@@ -196,24 +173,15 @@ export const RELAY_PROVIDER_IDS = RELAY_PROVIDERS.map((provider) => provider.id)
 ];
 
 export function relayProvider(id: string): (typeof RELAY_PROVIDERS)[number] {
-    return (
-        RELAY_PROVIDERS.find((provider) => provider.id === id) ??
-        RELAY_PROVIDERS[RELAY_PROVIDERS.length - 1]!
-    );
+    return RELAY_PROVIDERS.find((provider) => provider.id === id) ?? RELAY_PROVIDERS[RELAY_PROVIDERS.length - 1]!;
 }
 
 /** The SMTP host a relay setting resolves to, or null when it cannot. */
-export function resolveRelayHost(input: {
-    provider: string;
-    host?: string;
-    region?: string;
-}): string | null {
+export function resolveRelayHost(input: { provider: string; host?: string; region?: string }): string | null {
     const spec = relayProvider(input.provider);
     if (spec.regional) {
         const region = input.region?.trim();
-        return region && /^[a-z0-9-]+$/.test(region)
-            ? spec.hostTemplate.replace("{region}", region)
-            : null;
+        return region && /^[a-z0-9-]+$/.test(region) ? spec.hostTemplate.replace("{region}", region) : null;
     }
     const explicit = input.host?.trim().toLowerCase();
     if (explicit) return explicit;
@@ -238,10 +206,7 @@ const localPart = z
     .toLowerCase()
     .min(1, "Enter the part before the @")
     .max(64)
-    .regex(
-        /^[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?$/,
-        "Use letters, digits, dots, dashes, underscores or plus"
-    );
+    .regex(/^[a-z0-9](?:[a-z0-9._+-]*[a-z0-9])?$/, "Use letters, digits, dots, dashes, underscores or plus");
 
 const address = z
     .string()
@@ -289,12 +254,7 @@ export const mailboxCreateSchema = z.object({
     description: z.string().trim().max(200).default(""),
     password: mailboxPassword,
     /** Megabytes; 0 for no quota. */
-    quotaMb: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(10 * 1024 * 1024)
-        .default(0),
+    quotaMb: z.coerce.number().int().min(0).max(10 * 1024 * 1024).default(0),
     /** Add it to the creator's own Mail app as well, with the same password. */
     addToMyMail: z.boolean().default(false)
 });
@@ -314,11 +274,7 @@ export const mailboxPasswordSchema = z.object({
 export const mailboxQuotaSchema = z.object({
     serverId: z.string().uuid(),
     accountId: z.string().trim().min(1).max(64),
-    quotaMb: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(10 * 1024 * 1024)
+    quotaMb: z.coerce.number().int().min(0).max(10 * 1024 * 1024)
 });
 
 export const mailAliasesSchema = z.object({
@@ -455,22 +411,17 @@ export function inboundRuleMatches(
 export function readInboundEvent(event: { type?: unknown; data?: unknown }): InboundEvent | null {
     const type = typeof event.type === "string" ? event.type : "";
     if (type !== "message-ingest.ham" && type !== "message-ingest.spam") return null;
-    const data =
-        event.data && typeof event.data === "object" ? (event.data as Record<string, unknown>) : {};
+    const data = event.data && typeof event.data === "object" ? (event.data as Record<string, unknown>) : {};
     const pick = (...keys: string[]): unknown => {
         for (const key of keys) if (data[key] !== undefined) return data[key];
         return undefined;
     };
-    const asText = (value: unknown): string =>
-        typeof value === "string" ? value.trim().toLowerCase() : "";
+    const asText = (value: unknown): string => (typeof value === "string" ? value.trim().toLowerCase() : "");
     const asList = (value: unknown): string[] =>
         Array.isArray(value)
             ? value.map(asText).filter(Boolean)
             : typeof value === "string"
-              ? value
-                    .split(",")
-                    .map((part) => part.trim().toLowerCase())
-                    .filter(Boolean)
+              ? value.split(",").map((part) => part.trim().toLowerCase()).filter(Boolean)
               : [];
     const autoSubmitted = asText(pick("autoSubmitted", "auto_submitted", "precedence"));
     return {

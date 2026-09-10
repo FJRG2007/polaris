@@ -18,9 +18,7 @@ import { requireDeploymentAccess } from "@/lib/deploy-project-access";
 
 const DEPLOY_PATH = "/apps/deploy";
 
-export async function deploymentDiagnosisAction(
-    deploymentId: string
-): Promise<{ diagnosis: Diagnosis | null }> {
+export async function deploymentDiagnosisAction(deploymentId: string): Promise<{ diagnosis: Diagnosis | null }> {
     const user = await requirePermission("deploy.read");
     try {
         const access = await requireDeploymentAccess(deploymentId, user.id, "logs.read");
@@ -52,11 +50,7 @@ export async function applyDeployFixAction(
             targetType: "deployment",
             targetId: deploymentId,
             // The kind and the name of what changed, never a variable's value.
-            metadata: {
-                kind: fix.kind,
-                ...(fix.kind === "add-variable" ? { variable: fix.name } : {}),
-                deploymentId: next
-            }
+            metadata: { kind: fix.kind, ...(fix.kind === "add-variable" ? { variable: fix.name } : {}), deploymentId: next }
         });
         revalidatePath(DEPLOY_PATH);
         return { deploymentId: next };

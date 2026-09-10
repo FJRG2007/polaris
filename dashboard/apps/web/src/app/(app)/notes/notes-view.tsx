@@ -23,30 +23,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
-import {
-    Archive,
-    ChevronRight,
-    Download,
-    Move,
-    Pin,
-    PinOff,
-    Plus,
-    Share2,
-    Trash2
-} from "lucide-react";
+import { Archive, ChevronRight, Download, Move, Pin, PinOff, Plus, Share2, Trash2 } from "lucide-react";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 
 /** How long a note sits untouched before it is written. Long enough not to
  *  write on every keystroke, short enough that closing the tab is safe. */
 const SAVE_AFTER = 800;
 
-export function NotesView({
-    shelves,
-    note
-}: {
-    shelves: readonly ShelfData[];
-    note: NoteView | null;
-}) {
+export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; note: NoteView | null }) {
     const router = useRouter();
     const [title, setTitle] = useState(note?.title ?? "");
     const [body, setBody] = useState(note?.body ?? "");
@@ -109,8 +93,8 @@ export function NotesView({
     const ancestors = useMemo(() => trail(everything, note?.id ?? null), [everything, note?.id]);
     const childCount = everything.filter((entry) => entry.parentId === note?.id).length;
     const shelfName =
-        shelves.find((shelf) => (shelf.space?.id ?? null) === (note?.spaceId ?? null))?.space
-            ?.name ?? "My notes";
+        shelves.find((shelf) => (shelf.space?.id ?? null) === (note?.spaceId ?? null))?.space?.name ??
+        "My notes";
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
@@ -123,8 +107,8 @@ export function NotesView({
                     setImporting({
                         ...where,
                         name:
-                            shelves.find((shelf) => (shelf.space?.id ?? null) === where.spaceId)
-                                ?.space?.name ?? "My notes"
+                            shelves.find((shelf) => (shelf.space?.id ?? null) === where.spaceId)?.space
+                                ?.name ?? "My notes"
                     })
                 }
                 onMoveNote={setMoving}
@@ -175,19 +159,12 @@ export function NotesView({
                                 title={note.pinned ? "Unpin" : "Pin to the top"}
                                 onClick={() =>
                                     void act(() =>
-                                        actions.updateNoteAction({
-                                            noteId: note.id,
-                                            pinned: !note.pinned
-                                        })
+                                        actions.updateNoteAction({ noteId: note.id, pinned: !note.pinned })
                                     )
                                 }
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
-                                {note.pinned ? (
-                                    <PinOff className="size-4" />
-                                ) : (
-                                    <Pin className="size-4" />
-                                )}
+                                {note.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
                             </button>
                             <button
                                 type="button"
@@ -212,9 +189,7 @@ export function NotesView({
                                 aria-label="Export this note as Markdown"
                                 title="Export"
                                 onClick={() =>
-                                    window.location.assign(
-                                        `/api/notes/export?scope=note&id=${note.id}`
-                                    )
+                                    window.location.assign(`/api/notes/export?scope=note&id=${note.id}`)
                                 }
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
@@ -262,10 +237,7 @@ export function NotesView({
                         </p>
 
                         {error && (
-                            <p
-                                role="alert"
-                                className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                            >
+                            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
                                 {error}
                             </p>
                         )}
@@ -355,10 +327,7 @@ function placeOf(shelves: readonly ShelfData[], noteId: string) {
 }
 
 /** The notes above this one, outermost first. Empty at the top level. */
-function trail(
-    notes: readonly NoteSummary[],
-    noteId: string | null
-): { id: string; title: string }[] {
+function trail(notes: readonly NoteSummary[], noteId: string | null): { id: string; title: string }[] {
     if (!noteId) return [];
     const byId = new Map(notes.map((entry) => [entry.id, entry]));
     const steps: { id: string; title: string }[] = [];

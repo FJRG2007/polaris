@@ -28,12 +28,7 @@ import * as dmarc from "@/lib/mail-server/dmarc-report";
 import { MailServerUnreachable } from "@/lib/mail-server/transport";
 import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
 import { reached, SETUP_STEP_LABELS, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
-import {
-    listServers,
-    MailServerAccessError,
-    requireServer,
-    type MailServerActor
-} from "@/lib/mail-server/access";
+import { listServers, MailServerAccessError, requireServer, type MailServerActor } from "@/lib/mail-server/access";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -96,17 +91,8 @@ export interface MailServerSummary {
 /** The names of the machines servers run on, by placement. */
 async function placementNames(placements: readonly string[]): Promise<Map<string, string>> {
     const ids = placements.filter((placement) => serverIdSchema.safeParse(placement).success);
-    const hosts =
-        ids.length > 0
-            ? await prisma.host.findMany({
-                  where: { id: { in: ids } },
-                  select: { id: true, name: true }
-              })
-            : [];
-    return new Map([
-        ["local", "This machine"],
-        ...hosts.map((host) => [host.id, host.name] as [string, string])
-    ]);
+    const hosts = ids.length > 0 ? await prisma.host.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
+    return new Map([["local", "This machine"], ...hosts.map((host) => [host.id, host.name] as [string, string])]);
 }
 
 export async function listServersAction(): Promise<Result<{ servers: MailServerSummary[] }>> {
@@ -135,11 +121,7 @@ export async function listServersAction(): Promise<Result<{ servers: MailServerS
 /** Where a new server can run: this machine and every server the person enrolled. */
 export async function listPlacementsAction(): Promise<{ id: string; name: string }[]> {
     const who = await actor();
-    const hosts = await prisma.host.findMany({
-        where: { ownerId: who.id },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" }
-    });
+    const hosts = await prisma.host.findMany({ where: { ownerId: who.id }, select: { id: true, name: true }, orderBy: { name: "asc" } });
     return [{ id: "local", name: "This machine" }, ...hosts];
 }
 
@@ -164,9 +146,7 @@ export interface MailServerDetail extends MailServerSummary {
     readonly steps: readonly { step: SetupStep; label: string; done: boolean }[];
 }
 
-export async function serverDetailAction(
-    serverId: string
-): Promise<Result<{ server: MailServerDetail }>> {
+export async function serverDetailAction(serverId: string): Promise<Result<{ server: MailServerDetail }>> {
     try {
         const { row } = await server(serverId);
         const names = await placementNames([row.placement]);
@@ -203,10 +183,7 @@ export async function serverDetailAction(
     }
 }
 
-const repairSchema = z.object({
-    serverId: z.string().uuid(),
-    from: z.enum(SETUP_STEPS).nullable()
-});
+const repairSchema = z.object({ serverId: z.string().uuid(), from: z.enum(SETUP_STEPS).nullable() });
 
 /** Resume setup where it stopped, or run it again from a chosen step. */
 export async function resumeSetupAction(input: unknown): Promise<Result> {
@@ -230,8 +207,7 @@ export async function resumeSetupAction(input: unknown): Promise<Result> {
 export async function removeServerAction(serverId: string): Promise<Result> {
     try {
         const { who, row } = await server(serverId);
-        if (setup.isRunning(row.id))
-            return { error: "Setup is still running. Wait for it to stop first." };
+        if (setup.isRunning(row.id)) return { error: "Setup is still running. Wait for it to stop first." };
         await prisma.mailServer.delete({ where: { id: row.id } });
         await recordAudit({
             actorId: who.id,
@@ -251,9 +227,7 @@ export async function removeServerAction(serverId: string): Promise<Result> {
 // Health
 // ---------------------------------------------------------------------------
 
-export async function healthAction(
-    serverId: string
-): Promise<Result<{ health: health.MailHealth }>> {
+export async function healthAction(serverId: string): Promise<Result<{ health: health.MailHealth }>> {
     try {
         const { row } = await server(serverId);
         return { health: await health.mailHealth(row) };
@@ -277,9 +251,7 @@ export async function storedHealthAction(
 // Domains and DNS
 // ---------------------------------------------------------------------------
 
-export async function listDomainsAction(
-    serverId: string
-): Promise<Result<{ domains: ops.MailDomainView[] }>> {
+export async function listDomainsAction(serverId: string): Promise<Result<{ domains: ops.MailDomainView[] }>> {
     try {
         const { row } = await server(serverId);
         return { domains: await ops.listDomains(row) };
@@ -301,10 +273,7 @@ export async function addDomainAction(input: unknown): Promise<Result<{ id: stri
     }
 }
 
-const domainRefSchema = z.object({
-    serverId: z.string().uuid(),
-    domainId: z.string().trim().min(1).max(64)
-});
+const domainRefSchema = z.object({ serverId: z.string().uuid(), domainId: z.string().trim().min(1).max(64) });
 
 export async function removeDomainAction(input: unknown): Promise<Result> {
     const parsed = domainRefSchema.safeParse(input);
@@ -332,9 +301,7 @@ export async function setCatchAllAction(input: unknown): Promise<Result> {
     }
 }
 
-export async function scanDnsAction(
-    serverId: string
-): Promise<Result<{ reports: dns.DomainDnsReport[]; at: string }>> {
+export async function scanDnsAction(serverId: string): Promise<Result<{ reports: dns.DomainDnsReport[]; at: string }>> {
     try {
         const { row } = await server(serverId);
         const reports = await dns.scanDns(row);
@@ -357,19 +324,12 @@ export async function planDnsAction(input: unknown): Promise<Result<{ plan: dns.
 
 const applySchema = domainRefSchema.extend({ replaceConflicts: z.boolean() });
 
-export async function applyDnsAction(
-    input: unknown
-): Promise<Result<{ results: dns.ApplyResult[] }>> {
+export async function applyDnsAction(input: unknown): Promise<Result<{ results: dns.ApplyResult[] }>> {
     const parsed = applySchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { who, row } = await server(parsed.data.serverId);
-        const results = await dns.applyDns(
-            who,
-            row,
-            parsed.data.domainId,
-            parsed.data.replaceConflicts
-        );
+        const results = await dns.applyDns(who, row, parsed.data.domainId, parsed.data.replaceConflicts);
         return { results };
     } catch (error) {
         return failed(error);
@@ -385,10 +345,7 @@ export async function listMailboxesAction(
 ): Promise<Result<{ mailboxes: ops.MailboxView[]; domains: ops.MailDomainView[] }>> {
     try {
         const { row } = await server(serverId);
-        const [mailboxes, domains] = await Promise.all([
-            ops.listMailboxes(row),
-            ops.listDomains(row)
-        ]);
+        const [mailboxes, domains] = await Promise.all([ops.listMailboxes(row), ops.listDomains(row)]);
         return { mailboxes, domains };
     } catch (error) {
         return failed(error);
@@ -401,9 +358,7 @@ export async function listMailboxesAction(
  * mailbox is made either way; a Mail app that could not connect yet (no
  * certificate, no DNS) is said as a warning, not a failure.
  */
-export async function createMailboxAction(
-    input: unknown
-): Promise<Result<{ id: string; address: string; warning: string | null }>> {
+export async function createMailboxAction(input: unknown): Promise<Result<{ id: string; address: string; warning: string | null }>> {
     const parsed = core.mailboxCreateSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -412,8 +367,7 @@ export async function createMailboxAction(
         let warning: string | null = null;
         if (parsed.data.addToMyMail) {
             if (!(await sessionCan(who.user, "mail.use"))) {
-                warning =
-                    "The mailbox was created. Your account cannot use Mail, so it was not added there.";
+                warning = "The mailbox was created. Your account cannot use Mail, so it was not added there.";
             } else {
                 const setupInput = core.mailAccountSetupSchema.safeParse({
                     address: created.address,
@@ -478,10 +432,7 @@ export async function setMailboxAliasesAction(input: unknown): Promise<Result> {
     }
 }
 
-const accountRefSchema = z.object({
-    serverId: z.string().uuid(),
-    accountId: z.string().trim().min(1).max(64)
-});
+const accountRefSchema = z.object({ serverId: z.string().uuid(), accountId: z.string().trim().min(1).max(64) });
 
 export async function deleteMailboxAction(input: unknown): Promise<Result> {
     const parsed = accountRefSchema.safeParse(input);
@@ -501,10 +452,7 @@ export async function listForwardsAction(
 ): Promise<Result<{ forwards: ops.ForwardView[]; domains: ops.MailDomainView[] }>> {
     try {
         const { row } = await server(serverId);
-        const [forwards, domains] = await Promise.all([
-            ops.listForwards(row),
-            ops.listDomains(row)
-        ]);
+        const [forwards, domains] = await Promise.all([ops.listForwards(row), ops.listDomains(row)]);
         return { forwards, domains };
     } catch (error) {
         return failed(error);
@@ -524,10 +472,7 @@ export async function createForwardAction(input: unknown): Promise<Result<{ id: 
     }
 }
 
-const forwardRefSchema = z.object({
-    serverId: z.string().uuid(),
-    forwardId: z.string().trim().min(1).max(64)
-});
+const forwardRefSchema = z.object({ serverId: z.string().uuid(), forwardId: z.string().trim().min(1).max(64) });
 
 export async function deleteForwardAction(input: unknown): Promise<Result> {
     const parsed = forwardRefSchema.safeParse(input);
@@ -546,9 +491,7 @@ export async function deleteForwardAction(input: unknown): Promise<Result> {
 // Sending
 // ---------------------------------------------------------------------------
 
-export async function relayAction(
-    serverId: string
-): Promise<Result<{ relay: relay.RelaySetting | null }>> {
+export async function relayAction(serverId: string): Promise<Result<{ relay: relay.RelaySetting | null }>> {
     try {
         const { row } = await server(serverId);
         return { relay: relay.storedRelay(row) };
@@ -574,9 +517,7 @@ export async function setRelayAction(input: unknown): Promise<Result> {
 // Rules on incoming mail
 // ---------------------------------------------------------------------------
 
-export async function listRulesAction(
-    serverId: string
-): Promise<Result<{ rules: inbound.InboundRuleView[] }>> {
+export async function listRulesAction(serverId: string): Promise<Result<{ rules: inbound.InboundRuleView[] }>> {
     try {
         const { row } = await server(serverId);
         return { rules: await inbound.listRules(row) };
@@ -585,9 +526,7 @@ export async function listRulesAction(
     }
 }
 
-export async function createRuleAction(
-    input: unknown
-): Promise<Result<{ rule: inbound.InboundRuleView }>> {
+export async function createRuleAction(input: unknown): Promise<Result<{ rule: inbound.InboundRuleView }>> {
     const parsed = core.mailInboundRuleSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -631,14 +570,9 @@ export async function deleteRuleAction(input: unknown): Promise<Result> {
 // DMARC reports and backups
 // ---------------------------------------------------------------------------
 
-const rangeSchema = z.object({
-    serverId: z.string().uuid(),
-    days: z.union([z.literal(7), z.literal(30), z.literal(90)])
-});
+const rangeSchema = z.object({ serverId: z.string().uuid(), days: z.union([z.literal(7), z.literal(30), z.literal(90)]) });
 
-export async function dmarcAction(
-    input: unknown
-): Promise<Result<{ overview: dmarc.DmarcOverview }>> {
+export async function dmarcAction(input: unknown): Promise<Result<{ overview: dmarc.DmarcOverview }>> {
     const parsed = rangeSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -650,16 +584,11 @@ export async function dmarcAction(
 }
 
 /** Read the report mailbox now rather than at the next scheduled pass. */
-export async function collectReportsAction(
-    serverId: string
-): Promise<Result<{ filed: number; messages: number }>> {
+export async function collectReportsAction(serverId: string): Promise<Result<{ filed: number; messages: number }>> {
     try {
         const { row } = await server(serverId);
         const result = await dmarc.collectReports(row);
-        const fresh = await prisma.mailServer.findUnique({
-            where: { id: row.id },
-            select: { reportsError: true }
-        });
+        const fresh = await prisma.mailServer.findUnique({ where: { id: row.id }, select: { reportsError: true } });
         if (fresh?.reportsError) return { error: fresh.reportsError };
         return { filed: result.filed, messages: result.messages };
     } catch (error) {
@@ -667,9 +596,7 @@ export async function collectReportsAction(
     }
 }
 
-export async function backupsAction(
-    serverId: string
-): Promise<Result<{ backups: backup.MailBackupView }>> {
+export async function backupsAction(serverId: string): Promise<Result<{ backups: backup.MailBackupView }>> {
     try {
         const { row } = await server(serverId);
         return { backups: await backup.mailBackups(row) };

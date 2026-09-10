@@ -131,10 +131,7 @@ vi.mock("@/lib/invite-service", () => ({
         options: { org?: { id: string; role: string } }
     ) => {
         state.created = { email: input.email, org: options.org };
-        return {
-            id: "instance-invite-1",
-            url: "https://polaris.example/oauth/accept-invite?token=t"
-        };
+        return { id: "instance-invite-1", url: "https://polaris.example/oauth/accept-invite?token=t" };
     }
 }));
 
@@ -192,7 +189,9 @@ describe("inviting somebody", () => {
 
     it("refuses somebody already on the roster", async () => {
         state.member = { id: "membership-1" };
-        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(OrgError);
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(
+            OrgError
+        );
     });
 
     it("refuses a role this organization does not have", async () => {
@@ -220,7 +219,9 @@ describe("inviting somebody", () => {
         // fourth person would be promising a place that does not exist.
         state.memberCount = 2;
         state.invitationCount = 1;
-        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(OrgError);
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(
+            OrgError
+        );
         expect(state.written).toEqual([]);
     });
 });
@@ -317,9 +318,7 @@ describe("inviting an address with no account", () => {
 
     it("lets whoever runs the people do it once an administrator allows it", async () => {
         state.policy = { ...state.policy, newPeople: "managers" };
-        await expect(
-            inviteToOrg("org-1", "new@example.com", "member", owner)
-        ).resolves.toMatchObject({
+        await expect(inviteToOrg("org-1", "new@example.com", "member", owner)).resolves.toMatchObject({
             kind: "email"
         });
     });

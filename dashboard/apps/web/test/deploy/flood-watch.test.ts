@@ -17,13 +17,8 @@ const { settings, syncAppRoutes, findMany, flooded } = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({ prisma: { application: { findMany } } }));
 vi.mock("@polaris/deploy", () => ({ parseHttpLogs: () => [] }));
-vi.mock("@/lib/deploy/quick-tunnel-service", () => ({
-    tunnelHostForApp: (id: string) => `${id}.tunnel.test`
-}));
-vi.mock("@/lib/edge-access-log", () => ({
-    EDGE_LOG_RECENT_WINDOW_BYTES: 1024,
-    readEdgeLogTail: async () => "log"
-}));
+vi.mock("@/lib/deploy/quick-tunnel-service", () => ({ tunnelHostForApp: (id: string) => `${id}.tunnel.test` }));
+vi.mock("@/lib/edge-access-log", () => ({ EDGE_LOG_RECENT_WINDOW_BYTES: 1024, readEdgeLogTail: async () => "log" }));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
     setSetting: async (key: string, value: string) => void settings.set(key, value)
