@@ -573,7 +573,7 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
                         {open === run.id && (
                             <div className="mt-2 flex flex-col gap-1">
                                 {run.error && <p className="text-xs text-danger">{run.error}</p>}
-                                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2 font-mono text-[0.6875rem]">
+                                <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md bg-muted/40 p-2 font-mono text-[0.6875rem]">
                                     {run.output || "It printed nothing."}
                                 </pre>
                             </div>
