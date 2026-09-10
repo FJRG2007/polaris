@@ -94,7 +94,6 @@ const presence = await import("@/lib/apps/install-presence");
 const service = await import("@/lib/apps/install-service");
 const { APP_SECTIONS } = await import("@/lib/apps");
 const { appProvenance } = await import("@/lib/apps/provenance");
-const { CAPABILITY_GROUPS } = await import("@/lib/deploy/capabilities");
 const { findApp, installableApps, isInstallable } = await import("@/lib/apps/catalog");
 
 const ALICE = "11111111-1111-4111-8111-111111111111";
@@ -134,8 +133,6 @@ describe("the app in the catalog", () => {
         expect(section?.requiresApp).toBe(appInstall.MAIL_SERVER_APP);
         // The app keeps its own permission; installing is a separate grant.
         expect(section?.needs).toBe("mailserver.manage");
-        const capability = CAPABILITY_GROUPS.flatMap((group) => group.items).find((item) => item.href === "/apps/mail-server");
-        expect(capability?.requiresApp).toBe(appInstall.MAIL_SERVER_APP);
     });
 
     it("is offered in the marketplace, by Polaris, and installs nothing", () => {

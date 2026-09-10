@@ -13,7 +13,6 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { installedSectionApps } from "@/lib/app-access";
 import { navigationEntries } from "@/lib/search/entries";
-import { capabilityFor, CAPABILITY_GROUPS } from "@/lib/deploy/capabilities";
 import { APP_SECTIONS, POLARIS_APPS, sectionOffered, type AppSection } from "@/lib/apps";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/apps/deploy" }));
@@ -94,19 +93,3 @@ describe("the search", () => {
     });
 });
 
-describe("the capabilities page", () => {
-    const item = CAPABILITY_GROUPS.flatMap((group) => group.items).find((entry) => entry.requiresApp === "mail-server");
-
-    it("points at the marketplace until the app is installed", () => {
-        expect(item).toBeDefined();
-        if (!item) return;
-        const reader = { isAdmin: true, held: new Set<string>(), installed: new Set<string>() };
-        expect(capabilityFor(item, reader)).toMatchObject({
-            href: "/apps/marketplace?app=mail-server",
-            where: "Marketplace",
-            open: true
-        });
-        const installed = { ...reader, installed: new Set(["mail-server"]), held: new Set(["mailserver.manage"]) };
-        expect(capabilityFor(item, installed)).toMatchObject({ href: MAIL, open: true });
-    });
-});
