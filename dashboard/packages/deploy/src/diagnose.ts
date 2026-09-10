@@ -122,6 +122,17 @@ const RULES: readonly Rule[] = [
         })
     },
     {
+        // MongoDB's own refusal, word for word (SERVER-121912). Seen running
+        // mongo:8 on a host with Linux 7.0 on 2026-09-11; mongo:7 starts there.
+        cause: "mongo-kernel-incompatible",
+        pattern: /MongoDB cannot start: Linux kernel versions 6\.19 and newer has a known incompatibility/,
+        diagnose: () => ({
+            title: "This MongoDB version cannot run on this server's Linux kernel",
+            detail: "MongoDB 8 refuses to start on Linux 6.19 or newer (MongoDB issue SERVER-121912). Use a MongoDB 7 image on this server until MongoDB ships a fix, or run it on a server with an older kernel.",
+            fix: null
+        })
+    },
+    {
         cause: "missing-start-script",
         pattern: /Missing script:\s*"?start"?|No start command could be found|missing script: start/i,
         diagnose: () => ({

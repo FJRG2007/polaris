@@ -1628,7 +1628,17 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
                     {!hosted && (
                         <>
-                            <Field label="Version">
+                            <Field
+                                label="Version"
+                                // MongoDB 8 itself refuses to start on Linux 6.19 or newer
+                                // (its issue SERVER-121912), which is what new distributions
+                                // ship; seen on a Linux 7.0 server, where 7 starts.
+                                hint={
+                                    engine === "mongo" && (version || info.versions[0]) === "8"
+                                        ? "MongoDB 8 does not start on Linux 6.19 or newer. On a server with a newer kernel, pick 7."
+                                        : undefined
+                                }
+                            >
                                 <Select
                                     value={version}
                                     onValueChange={setVersion}
