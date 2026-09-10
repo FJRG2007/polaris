@@ -80,6 +80,9 @@ export interface VerifiedApiKey {
     /** Which clients may present it. Returned unevaluated for the same reason
      *  the network rules are: the request is the caller's to read. */
     clients: UserAgentRules;
+    /** The Deploy project the key was minted from, or null for an account key.
+     *  Surfaces that reach projects narrow such a key to this one. */
+    projectId: string | null;
 }
 
 /** The public half of a key: "plk_" plus 8 URL-safe characters. */
@@ -316,7 +319,8 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
         clients: {
             allowedUserAgents: parseStringList(row.allowedUserAgents),
             deniedUserAgents: parseStringList(row.deniedUserAgents)
-        }
+        },
+        projectId: row.projectId
     };
 }
 

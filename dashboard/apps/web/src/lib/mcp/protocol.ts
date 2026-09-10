@@ -44,6 +44,12 @@ export interface McpCaller {
     /** What the presented key may do, already intersected with what its owner
      *  holds. A tool asks for one of these and gets it or does not run. */
     readonly scopes: readonly Permission[];
+    /** The key that is calling, for the audit trail of anything a tool changes.
+     *  Absent for a session's own token, which is not a key. */
+    readonly keyId?: string | null;
+    /** Set on a token minted from a Deploy project: the deploy tools reach that
+     *  project and no other. */
+    readonly projectId?: string | null;
 }
 
 /** What a tool gives back. Text because that is what a model reads; `structured`

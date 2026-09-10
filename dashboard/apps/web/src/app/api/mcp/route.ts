@@ -20,8 +20,8 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import type { Permission } from "@polaris/core";
 import { MCP_TOOLS } from "@/lib/mcp/tools";
+import type { Permission } from "@polaris/core";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import {
@@ -54,7 +54,10 @@ const SERVER: McpServerInfo = {
         "tasks_update as you go, and say what you found in tasks_comment when you finish -",
         "including anything you could not do. Statuses, spaces and lists are named the way",
         "the people using them named them, so pass the name rather than looking up an id.",
-        "Work you find that is out of scope belongs in tasks_create, not in this change."
+        "Work you find that is out of scope belongs in tasks_create, not in this change.",
+        "The deploy_ tools name a service as project/service or project/environment/service;",
+        "deploy_projects lists them. After deploy_start, read deploy_deployment until it finishes",
+        "and report a failure with the lines that explain it."
     ].join(" ")
 };
 
@@ -109,7 +112,13 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
             select: { isAdmin: true }
         });
         if (!user) return null;
-        return { userId: principal.userId, isAdmin: user.isAdmin, scopes: principal.scopes };
+        return {
+            userId: principal.userId,
+            isAdmin: user.isAdmin,
+            scopes: principal.scopes,
+            keyId: principal.keyId,
+            projectId: principal.projectId
+        };
     }
 
     const header = request.headers.get("authorization") ?? "";

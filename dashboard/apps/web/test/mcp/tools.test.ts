@@ -13,6 +13,9 @@ import { describe, expect, it, vi } from "vitest";
 import { toJsonSchema } from "@/lib/mcp/json-schema";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
+// The deploy tools reach the whole Deploy stack when they run, and this suite
+// only reads their schemas - so the operations they call are left out.
+vi.mock("@/lib/deploy/api/surface", () => ({}));
 
 const { MCP_TOOLS } = await import("@/lib/mcp/tools");
 const { describeTool } = await import("@/lib/mcp/protocol");

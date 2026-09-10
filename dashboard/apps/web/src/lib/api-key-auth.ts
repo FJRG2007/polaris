@@ -19,6 +19,9 @@ export interface ApiKeyPrincipal {
     keyId: string;
     userId: string;
     scopes: Permission[];
+    /** Set on a token minted from a Deploy project's settings. The Deploy API and
+     *  its MCP tools confine such a key to that project. */
+    projectId: string | null;
 }
 
 /** Extract the presented key, or null when the header is absent or malformed. */
@@ -54,7 +57,12 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     if (!userAgentAllowed(verified.clients, userAgent)) return null;
 
     await touchApiKey(verified.id, ip, userAgent);
-    return { keyId: verified.id, userId: verified.userId, scopes: verified.scopes };
+    return {
+        keyId: verified.id,
+        userId: verified.userId,
+        scopes: verified.scopes,
+        projectId: verified.projectId
+    };
 }
 
 /**
