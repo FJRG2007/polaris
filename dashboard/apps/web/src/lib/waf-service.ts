@@ -685,3 +685,29 @@ export async function setWafRule(
         update: data
     });
 }
+
+/**
+ * Give one scope exactly the rule another has, absence included, so a copied
+ * environment or service admits and refuses what its original does. The caller
+ * has already authorized both scopes.
+ */
+export async function copyWafRule(
+    scopeType: "environment" | "application",
+    fromId: string,
+    toId: string
+): Promise<void> {
+    const row = await prisma.wafRule.findUnique({
+        where: { scopeType_scopeId: { scopeType, scopeId: fromId } },
+        select: RULE_SELECT
+    });
+    if (!row) {
+        await prisma.wafRule.deleteMany({ where: { scopeType, scopeId: toId } });
+        return;
+    }
+    const data = { ...row, scopeType, scopeId: toId };
+    await prisma.wafRule.upsert({
+        where: { scopeType_scopeId: { scopeType, scopeId: toId } },
+        create: data,
+        update: data
+    });
+}

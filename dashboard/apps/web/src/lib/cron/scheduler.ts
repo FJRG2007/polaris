@@ -11,7 +11,9 @@
  * One interval for the lot of it, following the update watcher rather than the
  * one-timer-per-poller shape: six more timers would be six more things to reason
  * about, and each job knows how often it wants to run anyway. The tick is cheap -
- * it looks at six numbers and usually does nothing.
+ * it looks at six numbers and usually does nothing. The one exception is a job that
+ * asks for less than a tick - waking a sleeping service, which somebody is waiting
+ * on - and those few get a second, shorter interval of their own.
  *
  * Nothing here decides what the work is. Each job is a call into the service that
  * owns it; this file owns only when.
@@ -19,8 +21,12 @@
 
 import { runJobBody, SCHEDULED_JOBS, type ScheduledJob } from "./jobs";
 
-/** How often the table is looked at. The floor on any job's cadence. */
+/** How often the table is looked at. The floor on any job's cadence but the few
+ *  that ask for less, which are looked at on their own shorter interval. */
 const TICK_MS = Number(process.env.POLARIS_CRON_TICK_MS) || 60_000;
+
+/** The shortest that shorter interval may be, whatever a job asks for. */
+const QUICK_TICK_FLOOR_MS = 1_000;
 
 /** Long enough that boot is over. The first pass on a fresh instance can be the
  *  heaviest one it ever runs - everything is overdue at once - and competing with
@@ -51,9 +57,16 @@ const startedAt = new Map<string, number>();
  *  so this only ever fires for work that is not coming back. */
 const STUCK_AFTER_MS = 30 * 60 * 1000;
 
-function due(job: ScheduledJob, now: number): boolean {
-    const last = lastRunAt.get(job.key);
-    return last === undefined || now - last >= job.everyMs;
+/**
+ * Whether a job last finished at `last` is due on a tick at `now`.
+ *
+ * Half a tick of slack, because the clock is stamped when a pass finishes, which
+ * is always a little after the tick that started it: held to the full cadence, a
+ * job due every tick was only ever due on every other one, and a minute-grained
+ * schedule quietly ran every two.
+ */
+export function due(everyMs: number, last: number | undefined, now: number, tickMs: number): boolean {
+    return last === undefined || now - last >= everyMs - tickMs / 2;
 }
 
 /**
@@ -103,16 +116,26 @@ export function startScheduledWork(): void {
     if (started || process.env.POLARIS_CRON === "off") return;
     started = true;
 
-    const tick = (): void => {
+    const ticker = (jobs: readonly ScheduledJob[], tickMs: number) => (): void => {
         const now = Date.now();
-        for (const job of SCHEDULED_JOBS) {
-            if (!due(job, now)) continue;
+        for (const job of jobs) {
+            if (!due(job.everyMs, lastRunAt.get(job.key), now, tickMs)) continue;
             void run(job).catch((error: unknown) =>
                 console.error(`polaris: the ${job.key} pass failed:`, error)
             );
         }
     };
 
+    const tick = ticker(SCHEDULED_JOBS.filter((job) => job.everyMs >= TICK_MS), TICK_MS);
     setTimeout(tick, FIRST_PASS_MS).unref?.();
     setInterval(tick, TICK_MS).unref?.();
+
+    const quick = SCHEDULED_JOBS.filter((job) => job.everyMs < TICK_MS);
+    if (quick.length === 0) return;
+    const quickMs = Math.max(QUICK_TICK_FLOOR_MS, Math.min(...quick.map((job) => job.everyMs)));
+    const quickTick = ticker(quick, quickMs);
+    setTimeout(() => {
+        quickTick();
+        setInterval(quickTick, quickMs).unref?.();
+    }, FIRST_PASS_MS).unref?.();
 }

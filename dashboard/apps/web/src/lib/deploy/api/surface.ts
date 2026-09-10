@@ -15,7 +15,10 @@
  *
  * - A token minted from a project's settings is confined to that project. It is
  *   listed and revoked there, and handing a CI system the token for one project
- *   should not hand it every other project its owner can open.
+ *   should not hand it every other project its owner can open. Its owner is
+ *   whoever minted it, so every check below runs against what that person holds
+ *   on the project today - a member limited to staging mints a token limited to
+ *   staging, and one removed from the project leaves tokens that reach nothing.
  * - Secret values are never in a listing. Reading one is its own call, it needs
  *   the write scope as well as the capability to read variables, and it is
  *   written to the audit log with the key that asked.
@@ -30,6 +33,7 @@ import * as activity from "@/lib/activity/activity";
 import * as deployService from "@/lib/deploy-service";
 import type { ProjectCapability } from "@polaris/core";
 import { provisionHostnameDns } from "@/lib/domain-dns";
+import { redactSource } from "@/lib/deploy/redact-source";
 import { TERMINAL_DEPLOY_STATUSES } from "@/lib/deploy/status";
 import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import type { AddDomainInput, ImportVariablesInput, SetVariableInput } from "./schemas";
@@ -45,6 +49,7 @@ import {
     type EnvVarView
 } from "@/lib/env-var-service";
 import {
+    accessCan,
     accessInEnvironment,
     projectAccess,
     requireApplicationAccess,
@@ -355,14 +360,10 @@ export interface DomainLine {
 
 /** Only the source fields a caller needs to recognise the service by. The stored
  *  config is read field by field rather than passed through, so nothing that is
- *  ever added to it reaches a key by default. */
+ *  ever added to it reaches a key by default, and a repository URL comes without
+ *  the credentials it may carry. An unreadable config has none of these. */
 function sourceOf(sourceType: string, raw: string): ServiceDetail["source"] {
-    let source: Record<string, unknown> = {};
-    try {
-        source = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-        // An unreadable config is shown as having none of these, not as an error.
-    }
+    const source = redactSource(raw);
     const text = (key: string) => (typeof source[key] === "string" ? (source[key] as string) : null);
     const port = typeof source.port === "number" ? source.port : null;
     return {
@@ -733,9 +734,25 @@ export async function listVariables(caller: DeployCaller, scope: VariableScope):
     return listEnvVars(envScope, scopeId, access.ownerId);
 }
 
-/** After a change, the services it applies to pick it up the same way they do
- *  from the dashboard: those already deployed redeploy in the background. */
-function applyVariables(envScope: EnvScope, scopeId: string, ownerId: string): void {
+/**
+ * Refuse a redeploy the caller may not start, before anything is written - so a
+ * refusal leaves the variables as they were. Saving needs the right to edit
+ * variables; redeploying afterwards needs the right to deploy as well, exactly
+ * as the dashboard's Save and redeploy asks.
+ */
+function requireRedeploy(access: ProjectAccess, redeploy: boolean): void {
+    if (redeploy && !accessCan(access, "deploy.run")) {
+        throw new DeployApiRefusal(
+            403,
+            "Saving needs the right to edit variables, and redeploying needs the right to deploy too. Save without redeploying."
+        );
+    }
+}
+
+/** Once asked for, the services a change reaches pick it up the way they do from
+ *  the dashboard: those already deployed redeploy in the background. */
+function applyVariables(envScope: EnvScope, scopeId: string, ownerId: string, redeploy: boolean): void {
+    if (!redeploy) return;
     void deployService.redeployForEnvScope(envScope, scopeId, ownerId).catch(() => undefined);
 }
 
@@ -743,9 +760,10 @@ export async function setVariable(
     caller: DeployCaller,
     scope: VariableScope,
     input: SetVariableInput
-): Promise<void> {
+): Promise<{ redeployed: boolean }> {
     requireScope(caller, "deploy.manage");
     const { access, envScope, scopeId } = await variableScopeAccess(caller, scope, "variables.write");
+    requireRedeploy(access, input.redeploy);
     await setEnvVar(envScope, scopeId, access.ownerId, {
         key: input.key,
         value: input.value,
@@ -762,16 +780,18 @@ export async function setVariable(
             ? { activity: { applicationId: scopeId, action: "variable", to: input.key } }
             : {})
     });
-    applyVariables(envScope, scopeId, access.ownerId);
+    applyVariables(envScope, scopeId, access.ownerId, input.redeploy);
+    return { redeployed: input.redeploy };
 }
 
 export async function importVariables(
     caller: DeployCaller,
     scope: VariableScope,
     input: ImportVariablesInput
-): Promise<{ count: number }> {
+): Promise<{ count: number; redeployed: boolean }> {
     requireScope(caller, "deploy.manage");
     const { access, envScope, scopeId } = await variableScopeAccess(caller, scope, "variables.write");
+    requireRedeploy(access, input.redeploy);
     const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.secret }));
     if (parsed.length === 0) throw new DeployApiRefusal(422, "No KEY=value lines were found in that text.");
     const count = await setEnvVars(envScope, scopeId, access.ownerId, parsed);
@@ -784,8 +804,8 @@ export async function importVariables(
             ? { activity: { applicationId: scopeId, action: "variables-imported", to: String(count) } }
             : {})
     });
-    applyVariables(envScope, scopeId, access.ownerId);
-    return { count };
+    applyVariables(envScope, scopeId, access.ownerId, input.redeploy);
+    return { count, redeployed: input.redeploy };
 }
 
 /** Resolve the scope a variable id belongs to and authorize it. */
@@ -805,9 +825,14 @@ async function variableAccess(
     );
 }
 
-export async function deleteVariable(caller: DeployCaller, variableId: string): Promise<void> {
+export async function deleteVariable(
+    caller: DeployCaller,
+    variableId: string,
+    options: { redeploy: boolean } = { redeploy: false }
+): Promise<{ redeployed: boolean }> {
     requireScope(caller, "deploy.manage");
     const { access } = await variableAccess(caller, variableId, "variables.write");
+    requireRedeploy(access, options.redeploy);
     const removed = await deleteEnvVar(variableId, access.ownerId);
     if (!removed) throw new DeployApiRefusal(404, "Not found");
     await recordChange(caller, {
@@ -819,7 +844,8 @@ export async function deleteVariable(caller: DeployCaller, variableId: string): 
             ? { activity: { applicationId: removed.scopeId, action: "variable-removed" } }
             : {})
     });
-    applyVariables(removed.scope, removed.scopeId, access.ownerId);
+    applyVariables(removed.scope, removed.scopeId, access.ownerId, options.redeploy);
+    return { redeployed: options.redeploy };
 }
 
 /**

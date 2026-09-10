@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { ENV_VALUE_MAX, envValueMessage, hasControlCharacter } from "@polaris/core";
 
 /** What an environment variable may be called. */
 export const VARIABLE_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -42,7 +43,7 @@ export interface VariableDraft {
 export const EMPTY_DRAFT: VariableDraft = { edits: {}, added: [], removed: [] };
 
 const MAX_CHANGES = 500;
-const MAX_VALUE = 64 * 1024;
+const MAX_VALUE = ENV_VALUE_MAX;
 
 const trimmedId = z.string().trim().min(1).max(100);
 
@@ -66,12 +67,15 @@ export const variableChangesSchema = z
     })
     .superRefine((input, context) => {
         const seen = new Set<string>();
-        for (const item of input.set) {
+        input.set.forEach((item, index) => {
             if (seen.has(item.key)) {
                 context.addIssue({ code: "custom", message: `${item.key} is set twice`, path: ["set"] });
             }
+            if (hasControlCharacter(item.value)) {
+                context.addIssue({ code: "custom", message: envValueMessage(item.key), path: ["set", index, "value"] });
+            }
             seen.add(item.key);
-        }
+        });
     });
 
 export type VariableChanges = Omit<z.infer<typeof variableChangesSchema>, "scope" | "scopeId" | "redeploy">;
@@ -139,6 +143,7 @@ export function draftErrors(rows: readonly VariableRow[], draft: VariableDraft):
         else if (existing.has(key)) errors[item.tempId] = `${key} is already set - change it in its row`;
         else if (seen.has(key)) errors[item.tempId] = `${key} is listed twice`;
         else if (item.value.length > MAX_VALUE) errors[item.tempId] = "That value is too long";
+        else if (hasControlCharacter(item.value)) errors[item.tempId] = envValueMessage(key);
         seen.add(key);
     }
     return errors;

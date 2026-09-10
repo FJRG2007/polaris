@@ -35,6 +35,7 @@ export * from "./mail-server-jmap.js";
 export * from "./mail-dns.js";
 export * from "./dmarc.js";
 export * from "./deploy-references.js";
+export * from "./env-values.js";
 export * from "./cron.js";
 export * from "./scaling.js";
 export * from "./sleep.js";

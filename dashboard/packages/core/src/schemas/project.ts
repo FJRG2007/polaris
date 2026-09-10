@@ -87,7 +87,7 @@ export const PROJECT_FLAGS = [
         id: "previewEnvironments",
         label: "Preview environments",
         description:
-            "Every pull request gets its own copy of the default environment, with its own databases and address, deployed from the pull request's branch and removed when it closes. Pull requests from forks are skipped.",
+            "Every pull request gets its own copy of the default environment, with its own databases and address, deployed from the pull request's branch and removed when it closes. Secret variables are not copied into it, and pull requests from forks are skipped.",
         default: false
     },
     {

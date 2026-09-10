@@ -95,6 +95,8 @@ import {
     type NamedTunnelStatus
 } from "@/lib/deploy/named-tunnel-service";
 import {
+    accessCan,
+    accessInEnvironment,
     requireApplicationAccess,
     requireDatabaseAccess,
     requireDeploymentAccess,
@@ -228,6 +230,16 @@ export async function createEnvironmentAction(input: {
     const { name, cloneFrom, branch, deploy } = parsed.data;
     try {
         const access = await requireProjectAccess(input.projectId, user.id, "project.settings");
+        // A copy carries the original's variables and secrets, so it takes being
+        // allowed into the original; deploying it takes being allowed to deploy.
+        if (cloneFrom && !accessInEnvironment(access, cloneFrom)) {
+            return { error: "Environment not found" };
+        }
+        if (cloneFrom && deploy && !accessCan(access, "deploy.run")) {
+            return {
+                error: "You can create this environment, but not deploy it. Untick \"Deploy it once it is created\" and try again."
+            };
+        }
         const environment = cloneFrom
             ? await environments.cloneEnvironment(cloneFrom, access.ownerId, {
                   name,

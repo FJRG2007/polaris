@@ -21,15 +21,17 @@
  * name resolves to is the caller's to answer, because that needs the database.
  */
 
+import { ENV_VALUE_MAX } from "./env-values.js";
 import { objectStorageReferenceKeys, OBJECT_STORAGE_REGION } from "./schemas/object-storage.js";
 
 /** One `${{ name.KEY }}`. Names are service slugs or `shared`; keys are what an
  *  environment variable may be called. */
 const REFERENCE = /\$\{\{\s*([A-Za-z0-9][A-Za-z0-9_-]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
-/** How many rounds of references-inside-references are followed. A value that
- *  still has one after this is a cycle, or a chain nobody should be maintaining. */
-const MAX_DEPTH = 4;
+/** How many rounds of references-inside-references are followed, and so how many
+ *  rounds of names a caller has to load. A value that still has one after this is
+ *  a cycle, or a chain nobody should be maintaining. */
+export const REFERENCE_DEPTH = 4;
 
 export interface VariableReference {
     /** The service, the database, or `shared`. Lower-cased. */
@@ -71,6 +73,10 @@ export type ReferenceLookup = (name: string, key: string) => string | undefined;
  *
  * A reference to a value that itself holds references is followed, a few
  * levels deep. A cycle is left as it was and reported rather than looped on.
+ *
+ * Throws, naming the variable, when a value grows past `ENV_VALUE_MAX` - which
+ * is checked as it grows, since a value repeating a reference to itself would
+ * otherwise multiply in size with every round before anything looked.
  */
 export function resolveReferences(
     env: Readonly<Record<string, string>>,
@@ -80,16 +86,30 @@ export function resolveReferences(
     const unresolved = new Set<string>();
     for (const [key, value] of Object.entries(env)) {
         let current = value;
-        for (let depth = 0; depth < MAX_DEPTH && hasReferences(current); depth += 1) {
-            current = current.replace(REFERENCE, (written, name: string, referenced: string) => {
-                const found = lookup(name.toLowerCase(), referenced);
-                return found === undefined ? written : found;
-            });
+        for (let depth = 0; depth < REFERENCE_DEPTH && hasReferences(current); depth += 1) {
+            current = substitute(key, current, lookup);
         }
         for (const reference of referencesIn(current)) unresolved.add(reference.written);
         out[key] = current;
     }
     return { env: out, unresolved: [...unresolved] };
+}
+
+/** One round of substitution in one value, refused the moment it outgrows the limit. */
+function substitute(key: string, value: string, lookup: ReferenceLookup): string {
+    let out = "";
+    let from = 0;
+    for (const match of value.matchAll(REFERENCE)) {
+        const found = lookup((match[1] ?? "").toLowerCase(), match[2] ?? "");
+        out += value.slice(from, match.index) + (found ?? match[0]);
+        from = match.index + match[0].length;
+        if (out.length > ENV_VALUE_MAX) break;
+    }
+    out += value.slice(from);
+    if (out.length > ENV_VALUE_MAX) {
+        throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB once its references are filled in.`);
+    }
+    return out;
 }
 
 /**

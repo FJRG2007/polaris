@@ -13,8 +13,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { randomBytes } from "node:crypto";
 import { loadEnv } from "@polaris/config";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 
 /** What a recovery key starts with, so a pasted line is recognisable as one. */
@@ -127,18 +127,44 @@ export function parseRecoveryKey(text: string): { id: string; key: Buffer } | { 
     return { id: id.toLowerCase(), key };
 }
 
+/** The stored key when this instance's master key still unwraps it, null when it does not. */
+function unwrapped(row: { encryptedKey: Uint8Array; keyNonce: Uint8Array; keyKeyId: string }): Buffer | null {
+    try {
+        return unwrap(row);
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Bring a key from another Polaris onto this owner's ring, retired - it only opens
  * copies, it never seals new ones. Answers whether it was new here.
+ *
+ * A key already on the ring is only ever replaced when the stored one no longer
+ * unwraps. While it does, the pasted bytes have to be the same bytes: a typo in
+ * the encoded part still decodes to 32 bytes, and letting it overwrite the real
+ * key would leave every copy that key sealed unopenable.
  */
 export async function addRecoveryKey(ownerId: string, text: string): Promise<{ added: boolean }> {
     const parsed = parseRecoveryKey(text);
     if ("error" in parsed) throw new BackupKeyError(parsed.error);
-    const existing = await prisma.backupKey.findUnique({ where: { id: parsed.id }, select: { ownerId: true } });
+    const existing = await prisma.backupKey.findUnique({
+        where: { id: parsed.id },
+        select: { ownerId: true, encryptedKey: true, keyNonce: true, keyKeyId: true }
+    });
     if (existing) {
         if (existing.ownerId !== ownerId) throw new BackupKeyError("That key belongs to somebody else here");
-        // Stored again under this instance's master key, in case the one it had
-        // was wrapped under a master key that has since changed.
+        const stored = unwrapped(existing);
+        if (stored) {
+            if (stored.length !== parsed.key.length || !timingSafeEqual(stored, parsed.key)) {
+                throw new BackupKeyError(
+                    "That recovery key does not match the key already stored here under the same id. Check it for a typo."
+                );
+            }
+            return { added: false };
+        }
+        // Stored again under this instance's master key: the one it had was
+        // wrapped under a master key that has since changed.
         await prisma.backupKey.update({ where: { id: parsed.id }, data: wrap(parsed.key) });
         return { added: false };
     }

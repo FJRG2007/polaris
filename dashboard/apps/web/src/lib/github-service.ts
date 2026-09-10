@@ -1279,11 +1279,17 @@ export interface OpenPullRequest {
     readonly title: string;
     readonly headBranch: string;
     readonly headSha: string;
-    /** "owner/repo" the head branch lives in - another one for a fork. */
-    readonly headRepo: string;
+    /** "owner/repo" the head branch lives in - another one for a fork, and null
+     *  when GitHub no longer knows, as for a fork that was deleted. */
+    readonly headRepo: string | null;
+    /** When it was opened, as GitHub stamps it. */
+    readonly openedAt: string | null;
     readonly authorName: string | null;
     readonly authorAvatarUrl: string | null;
 }
+
+/** Pages of a hundred read before giving up on a repository's open pull requests. */
+const OPEN_PULL_PAGES = 10;
 
 /**
  * The repository's open pull requests, newest first, or null when GitHub would
@@ -1292,42 +1298,70 @@ export interface OpenPullRequest {
  * Null is not the same answer as an empty list, and the difference matters to
  * the one caller: previews are removed for pull requests that are no longer
  * open, and a failed request read as "none are open" would remove every one.
- * One page of a hundred, which is more open pull requests than any repository
- * wants a preview environment for each of.
+ * The same goes for a list read only in part, so a repository with more than a
+ * thousand open pull requests answers null rather than its first thousand.
  */
 export async function listOpenPullRequests(
     owner: string,
     repo: string,
     token: string | null
 ): Promise<OpenPullRequest[] | null> {
+    const pulls = new Map<number, OpenPullRequest>();
     try {
-        const res = await fetch(`${API}/repos/${owner}/${repo}/pulls?state=open&per_page=100`, {
+        for (let page = 1; page <= OPEN_PULL_PAGES; page += 1) {
+            const res = await fetch(`${API}/repos/${owner}/${repo}/pulls?state=open&per_page=100&page=${page}`, {
+                headers: optionalAuthHeaders(token),
+                cache: "no-store"
+            });
+            if (!res.ok) return null;
+            const data = (await res.json()) as Array<{
+                number?: number;
+                title?: string;
+                created_at?: string;
+                head?: { ref?: string; sha?: string; repo?: { full_name?: string } | null };
+                user?: { login?: string; avatar_url?: string } | null;
+            }>;
+            if (!Array.isArray(data)) return null;
+            for (const pull of data) {
+                if (typeof pull.number !== "number" || !pull.head?.ref || !pull.head.sha) continue;
+                pulls.set(pull.number, {
+                    number: pull.number,
+                    title: pull.title ?? "",
+                    headBranch: pull.head.ref,
+                    headSha: pull.head.sha,
+                    headRepo: pull.head.repo?.full_name || null,
+                    openedAt: pull.created_at ?? null,
+                    authorName: pull.user?.login ?? null,
+                    authorAvatarUrl: pull.user?.avatar_url ?? null
+                });
+            }
+            if (data.length < 100) return [...pulls.values()];
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Whether one pull request is still open, or null when GitHub would not say.
+ * Asked before a preview is removed: a pull request missing from a list read
+ * page by page may only have moved between two pages while it was read.
+ */
+export async function pullRequestIsOpen(
+    owner: string,
+    repo: string,
+    number: number,
+    token: string | null
+): Promise<boolean | null> {
+    try {
+        const res = await fetch(`${API}/repos/${owner}/${repo}/pulls/${number}`, {
             headers: optionalAuthHeaders(token),
             cache: "no-store"
         });
         if (!res.ok) return null;
-        const data = (await res.json()) as Array<{
-            number?: number;
-            title?: string;
-            head?: { ref?: string; sha?: string; repo?: { full_name?: string } | null };
-            user?: { login?: string; avatar_url?: string } | null;
-        }>;
-        if (!Array.isArray(data)) return null;
-        return data.flatMap((pull) =>
-            typeof pull.number === "number" && pull.head?.ref && pull.head.sha
-                ? [
-                      {
-                          number: pull.number,
-                          title: pull.title ?? "",
-                          headBranch: pull.head.ref,
-                          headSha: pull.head.sha,
-                          headRepo: pull.head.repo?.full_name ?? "",
-                          authorName: pull.user?.login ?? null,
-                          authorAvatarUrl: pull.user?.avatar_url ?? null
-                      }
-                  ]
-                : []
-        );
+        const data = (await res.json()) as { state?: string };
+        return data.state === "open" ? true : data.state === "closed" ? false : null;
     } catch {
         return null;
     }

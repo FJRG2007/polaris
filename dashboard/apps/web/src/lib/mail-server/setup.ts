@@ -25,11 +25,12 @@ import { randomBytes } from "node:crypto";
 import { appBaseUrl } from "@/lib/domain-service";
 import { recordAudit } from "@/lib/audit-service";
 import { prisma, type MailServer } from "@polaris/db";
+import { ensureReportsMailbox } from "./dmarc-report";
 import { createEmailChannel } from "@/lib/mail-service";
+import { requireMailDomainStanding } from "./dns-standing";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { deleteEnvVar, listEnvVars, setEnvVar } from "@/lib/env-var-service";
 import { RECOVERY_USERNAME, seal, unseal, type MailServerActor } from "./access";
-import { ensureReportsMailbox } from "./dmarc-report";
 import { endpointFor, MailServerUnreachable, type MailEndpoint } from "./transport";
 import { call, engineAnswers, forgetEndpoint, type StalwartCredentials } from "./stalwart";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
@@ -123,6 +124,7 @@ export async function startSetup(
     }
     const taken = await prisma.mailServer.findFirst({ where: { hostname: input.hostname }, select: { id: true } });
     if (taken) throw new MailSetupRefusal(`${input.hostname} already has a mail server here.`);
+    await requireMailDomainStanding(actor, shelfOrgId, input.domain);
 
     const admin = seal(generatedSecret());
     const hook = seal(generatedSecret());
@@ -510,7 +512,6 @@ const sender: StepRunner = async (server) => {
         );
     }
 };
-
 
 const done: StepRunner = async (server) => {
     await prisma.mailServer.update({ where: { id: server.id }, data: { status: "ready" } });

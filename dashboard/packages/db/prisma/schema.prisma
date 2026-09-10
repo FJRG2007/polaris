@@ -3150,14 +3150,19 @@ model AuditLog {
 // verification starts from the newest checkpoint instead of from nothing, and a
 // gap anywhere else is still a gap.
 model AuditCheckpoint {
-    id     String   @id @default(uuid(7)) @db.Uuid
+    id        String   @id @default(uuid(7)) @db.Uuid
     // The last entry removed, and its hash - what the first surviving entry's
     // `prevHash` has to equal.
-    seq    BigInt   @unique
-    hash   String
+    seq       BigInt   @unique
+    hash      String
     // How many entries this cut removed, for the integrity screen.
-    pruned Int      @default(0)
-    at     DateTime @default(now())
+    pruned    Int      @default(0)
+    at        DateTime @default(now())
+    // A keyed hash over the fields above, under the instance key. Verification
+    // only starts from a checkpoint whose signature holds, so a row written by
+    // hand cannot move where the chain begins. Null only on checkpoints written
+    // before signing existed, until the sealing pass adopts them once.
+    signature String?
 }
 
 model Setting {

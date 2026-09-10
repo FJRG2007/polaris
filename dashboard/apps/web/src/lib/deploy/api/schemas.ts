@@ -46,18 +46,39 @@ export const variableKeySchema = z
     )
     .max(256);
 
+/**
+ * Whether the services a variable change reaches redeploy to pick it up. Off
+ * unless asked for, as on the dashboard: five variables set one at a time are
+ * one redeploy afterwards, not five, and one set ahead of a migration is none
+ * yet. Asking for it needs the right to deploy as well as to edit.
+ */
+const redeploySchema = z
+    .boolean()
+    .default(false)
+    .describe("Redeploy the services this reaches so they pick it up now. Needs the right to deploy.");
+
 export const setVariableSchema = z.object({
     key: variableKeySchema,
     // Values are whatever the service needs, newlines included - a PEM key is a
     // variable. Bounded so one call cannot write a megabyte into every deploy.
     value: z.string().max(65_536),
-    secret: z.boolean().default(true)
+    secret: z.boolean().default(true),
+    redeploy: redeploySchema
 });
 
 export const importVariablesSchema = z.object({
     /** A `.env` file's contents: quotes, `export` and comments are handled. */
     text: z.string().min(1, "There is nothing to import").max(262_144),
-    secret: z.boolean().default(true)
+    secret: z.boolean().default(true),
+    redeploy: redeploySchema
+});
+
+/** `?redeploy=1` on a call that has no body to say it in. */
+export const redeployQuerySchema = z.object({
+    redeploy: z
+        .enum(["1", "true", "0", "false"], { message: "redeploy is 1 or 0" })
+        .optional()
+        .transform((value) => value === "1" || value === "true")
 });
 
 export const addDomainSchema = z.object({

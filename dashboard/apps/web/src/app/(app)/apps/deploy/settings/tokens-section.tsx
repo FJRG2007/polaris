@@ -3,10 +3,10 @@
 /**
  * Tokens: API access limited to this project.
  *
- * A token is issued against the project owner's account and narrowed twice - to
- * this project, and to reading unless it was asked to do more - so it can never
- * reach further than the person who minted it, and revoking their role shrinks
- * every token with it.
+ * A token is issued against the account of whoever minted it and narrowed twice -
+ * to this project, and to reading unless it was asked to do more - so it can
+ * never reach further than that person can on this project today, and changing
+ * or removing their access shrinks or stops every token they made with it.
  *
  * The secret is shown once. There is no way to recover it afterwards, which is
  * the point of storing only its hash, so the panel says so plainly rather than
@@ -100,7 +100,7 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
         <div className="flex flex-col gap-4">
             <SettingsCard
                 title="Project tokens"
-                description="Present one as `Authorization: Bearer ...`. It acts on this project only, with the permissions of whoever owns it."
+                description="Present one as `Authorization: Bearer ...`. It acts on this project only, with the access of whoever made it."
             >
                 {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -130,6 +130,7 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                                         <p className="truncate text-xs text-muted-foreground">
                                             <span className={status.className}>{status.label}</span>
                                             {token.scopes.includes("deploy.manage") ? " - can change" : " - read only"}
+                                            {` - made by ${token.madeBy}`}
                                             {token.expiresAt ? ` - expires ${display.date(token.expiresAt)}` : ""}
                                             {token.lastUsedAt ? ` - last used ${display.dateTime(token.lastUsedAt)}` : " - never used"}
                                         </p>
@@ -260,7 +261,7 @@ function CreateTokenDialog({
                         <span>
                             Allow changes
                             <span className="block text-xs text-muted-foreground">
-                                Without this the token can read the project but not deploy, edit, or delete anything in it.
+                                Without this the token can read the project but not deploy, edit, or delete anything in it. Either way it can only do what you can.
                             </span>
                         </span>
                     </label>

@@ -434,7 +434,11 @@ export async function setDomainCdnAction(input: z.input<typeof core.domainCdnSch
     try {
         const user = await requirePermission("deploy.manage");
         const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
-        await cdn.setDomainCdn(parsed.data.domainId, access.ownerId, parsed.data.enabled);
+        await cdn.setDomainCdn(
+            parsed.data.domainId,
+            { ownerId: access.ownerId, orgId: access.orgId, actorId: user.id, isAdmin: user.isAdmin },
+            parsed.data.enabled
+        );
         await recordDeployAudit({
             actorId: user.id,
             action: parsed.data.enabled ? "deploy.domain.cdn.on" : "deploy.domain.cdn.off",
@@ -454,7 +458,11 @@ export async function purgeDomainCacheAction(input: z.input<typeof core.cachePur
     try {
         const user = await requirePermission("deploy.manage");
         const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
-        await cdn.purgeDomainCache(parsed.data.domainId, access.ownerId, parsed.data.prefix || undefined);
+        await cdn.purgeDomainCache(
+            parsed.data.domainId,
+            { ownerId: access.ownerId, orgId: access.orgId, actorId: user.id, isAdmin: user.isAdmin },
+            parsed.data.prefix || undefined
+        );
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.domain.cdn.purge",

@@ -42,21 +42,32 @@ type Values = Map<string, Record<string, string>>;
  * Answers the variables with every reference it could resolve substituted, and
  * the ones it could not, as written - the deploy refuses on those rather than
  * starting a service with `${{...}}` in its connection string.
+ *
+ * Throws, naming the variable, on a value no container can be given: one that
+ * holds a control character, or grows past the limit once resolved. Checked
+ * here because this is the last point every variable of a deploy passes before
+ * the host daemon, which would otherwise refuse it in words of its own.
  */
 export async function resolveServiceReferences(
     env: Readonly<Record<string, string>>,
     scope: Scope
 ): Promise<{ env: Record<string, string>; unresolved: string[] }> {
-    if (!Object.values(env).some(core.hasReferences)) return { env: { ...env }, unresolved: [] };
+    if (!Object.values(env).some(core.hasReferences)) {
+        core.assertEnvValues(env);
+        return { env: { ...env }, unresolved: [] };
+    }
 
     const values: Values = new Map();
-    // Two rounds: the names this service uses, then any those values use in turn.
+    // As many rounds as substitution follows: the names this service uses, then
+    // any those values use in turn.
     let pending = namesIn(Object.values(env));
-    for (let round = 0; round < 3 && pending.size > 0; round += 1) {
+    for (let round = 0; round < core.REFERENCE_DEPTH && pending.size > 0; round += 1) {
         const loaded = await loadNames(pending, scope, values);
         pending = new Set([...namesIn(loaded)].filter((name) => !values.has(name)));
     }
-    return core.resolveReferences(env, (name, key) => values.get(name)?.[key]);
+    const resolved = core.resolveReferences(env, (name, key) => values.get(name)?.[key]);
+    core.assertEnvValues(resolved.env);
+    return resolved;
 }
 
 function namesIn(texts: Iterable<string>): Set<string> {

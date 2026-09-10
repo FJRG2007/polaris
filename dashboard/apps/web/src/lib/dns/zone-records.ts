@@ -87,6 +87,42 @@ async function zoneFor(scope: DnsScope): Promise<Zone> {
     return { token, id: zone.id, name: zone.name, within: row.domain };
 }
 
+/** The owners whose proven domains count for somebody acting on a name. */
+export interface TokenCaller {
+    readonly isAdmin: boolean;
+    readonly owners: readonly DomainOwner[];
+}
+
+/**
+ * The closest domain at or above `hostname` that one of these owners has proven,
+ * or null when there is none.
+ */
+export async function provenDomainOf(hostname: string, owners: readonly DomainOwner[]): Promise<string | null> {
+    const labels = normalizeHostname(hostname).replace(/^\*\./, "").split(".");
+    const candidates = labels.slice(0, -1).map((_, index) => labels.slice(index).join("."));
+    if (candidates.length === 0 || owners.length === 0) return null;
+    const rows = await prisma.ownerDomain.findMany({
+        where: {
+            domain: { in: candidates },
+            verifiedAt: { not: null },
+            OR: owners.map((owner) => (owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id }))
+        },
+        select: { domain: true }
+    });
+    return rows.map((row) => row.domain).sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+/**
+ * Whether the instance's connected token may write at `hostname` for this caller.
+ * The same line the editor draws between its two scopes: whoever runs this Polaris
+ * edits any zone the token reaches, and anybody else only names at or under a
+ * domain they - or the organization they act for - have proven.
+ */
+export async function instanceTokenAllowed(hostname: string, caller: TokenCaller): Promise<boolean> {
+    if (caller.isAdmin) return true;
+    return (await provenDomainOf(hostname, caller.owners)) !== null;
+}
+
 function inside(zone: Zone, name: string): boolean {
     const full = normalizeHostname(name);
     const bare = full.startsWith("*.") ? full.slice(2) : full;

@@ -100,7 +100,7 @@ async function handlePreviewEvent(payload: unknown): Promise<number> {
         title: pull.title,
         headBranch: pull.head.ref,
         headSha: pull.head.sha,
-        headRepo: pull.head.repo?.full_name ?? "",
+        headRepo: pull.head.repo?.full_name || null,
         authorName: pull.user?.login ?? null,
         authorAvatarUrl: pull.user?.avatar_url ?? null
     });

@@ -13,9 +13,19 @@
  * its address, only `proxied` is set. A name answered until now by a wildcard
  * gets a record of its own with the wildcard's address, so proxying one name
  * never proxies every other name under the same wildcard.
+ *
+ * The token reaches every zone on the operator's account, and a hostname typed on
+ * a service proves nothing about the zone it is in. So a name is only changed here
+ * when Polaris minted it in a deploy zone, when it is under a domain the caller
+ * has proven, or when the caller runs this Polaris - and never when it is one of
+ * the dashboard's own names.
  */
 
 import { prisma } from "@polaris/db";
+import { deployZoneHosts } from "@/lib/domain-zones";
+import type { DomainOwner } from "@/lib/owner-domains";
+import { instanceTokenAllowed } from "@/lib/dns/zone-records";
+import { dashboardHosts, publicHostname } from "@/lib/domain-edge";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 import {
     createAddressRecord,
@@ -58,14 +68,40 @@ async function zoneFor(token: string, hostname: string): Promise<CfZone> {
     }
 }
 
-/** A domain of a service the owner holds. */
-async function ownedDomain(domainId: string, ownerId: string) {
+/** Who is asking: the project the domain is in, and the person. */
+export interface CdnCaller {
+    readonly ownerId: string;
+    readonly orgId: string | null;
+    readonly actorId: string;
+    readonly isAdmin: boolean;
+}
+
+/** A domain of a service the owner holds, that this caller may change at Cloudflare. */
+async function ownedDomain(domainId: string, caller: CdnCaller) {
     const domain = await prisma.domain.findFirst({
-        where: { id: domainId, application: { environment: { project: { ownerId } } } },
+        where: { id: domainId, application: { environment: { project: { ownerId: caller.ownerId } } } },
         select: { id: true, hostname: true, cdn: true, enabled: true, applicationId: true }
     });
     if (!domain) throw new CdnError("That domain is not there any more.");
+    await requireStanding(domain.hostname, caller);
     return domain;
+}
+
+async function requireStanding(hostname: string, caller: CdnCaller): Promise<void> {
+    const name = hostname.trim().toLowerCase().replace(/^\*\./, "");
+    const own = [...(await dashboardHosts()), publicHostname(process.env.POLARIS_APP_URL)];
+    if (own.includes(name)) {
+        throw new CdnError(`${name} is this Polaris's own address, so it cannot be changed from a service.`);
+    }
+    if ((await deployZoneHosts()).some((zone) => name.endsWith(`.${zone}`))) return;
+    const owners: DomainOwner[] = [
+        caller.orgId ? { kind: "org", id: caller.orgId } : { kind: "user", id: caller.ownerId },
+        { kind: "user", id: caller.actorId }
+    ];
+    if (await instanceTokenAllowed(name, { isAdmin: caller.isAdmin, owners })) return;
+    throw new CdnError(
+        `${name} is not a name Polaris gave this service. Add its domain under Domains and verify it, then serve it through Cloudflare.`
+    );
 }
 
 /**
@@ -84,8 +120,8 @@ async function wildcardRecords(token: string, zone: CfZone, hostname: string) {
 }
 
 /** Put a service domain behind Cloudflare's proxy, or take it out. */
-export async function setDomainCdn(domainId: string, ownerId: string, enabled: boolean): Promise<void> {
-    const domain = await ownedDomain(domainId, ownerId);
+export async function setDomainCdn(domainId: string, caller: CdnCaller, enabled: boolean): Promise<void> {
+    const domain = await ownedDomain(domainId, caller);
     const token = await cloudflareToken();
     const zone = await zoneFor(token, domain.hostname);
     const records = await findAddressRecords(token, zone.id, domain.hostname);
@@ -156,8 +192,8 @@ async function purgeHostnames(hostnames: readonly string[], prefix?: string): Pr
 }
 
 /** The manual purge: one domain, whole or under a path. */
-export async function purgeDomainCache(domainId: string, ownerId: string, prefix?: string): Promise<void> {
-    const domain = await ownedDomain(domainId, ownerId);
+export async function purgeDomainCache(domainId: string, caller: CdnCaller, prefix?: string): Promise<void> {
+    const domain = await ownedDomain(domainId, caller);
     if (!domain.cdn) throw new CdnError("This domain is not served through Cloudflare, so there is no cache to empty.");
     await purgeHostnames([domain.hostname], prefix);
 }

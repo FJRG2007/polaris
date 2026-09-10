@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { envValueMessage, hasControlCharacter } from "../env-values.js";
 
 /** The runtime version a service builds on: "22", "3.12", "1.23.4". */
 export const runtimeVersionSchema = z
@@ -51,6 +52,11 @@ export const deployFixInputSchema = z.union([
         .refine((fix) => fix.generate || (fix.value !== null && fix.value.length > 0), {
             message: "Give the variable a value",
             path: ["value"]
+        })
+        .superRefine((fix, ctx) => {
+            if (!fix.generate && fix.value !== null && hasControlCharacter(fix.value)) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: envValueMessage(fix.name), path: ["value"] });
+            }
         }),
     z.object({ kind: z.literal("use-detected-build") })
 ]);

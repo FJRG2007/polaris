@@ -18,12 +18,13 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { relaySpfInclude } from "./relay";
 import { Resolver } from "node:dns/promises";
 import type { MailServer } from "@polaris/db";
-import { MailServerAccessError } from "./access";
-import { relaySpfInclude } from "./relay";
+import { publishWithin } from "./dns-standing";
 import { recordAudit } from "@/lib/audit-service";
 import { listDomains, type MailDomainView } from "./operations";
+import { MailServerAccessError, type MailServerActor } from "./access";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 import {
     createZoneRecord,
@@ -212,10 +213,21 @@ async function cloudflareToken(): Promise<string> {
     return token;
 }
 
-/** Compare one domain's expected records with its Cloudflare zone. */
-export async function planDns(server: MailServer, domainId: string): Promise<DnsPlan> {
+/** Whether a record's name is at or under a domain. */
+function atOrUnder(name: string, domain: string): boolean {
+    const bare = name.trim().toLowerCase().replace(/\.+$/, "");
+    return bare === domain || bare.endsWith(`.${domain}`);
+}
+
+/**
+ * Compare one domain's expected records with its Cloudflare zone. Only for a
+ * caller the operator's token may write for (see `dns-standing`), and only the
+ * records at or under the domain they verified.
+ */
+export async function planDns(actor: MailServerActor, server: MailServer, domainId: string): Promise<DnsPlan> {
     const domain = (await listDomains(server)).find((one) => one.id === domainId);
     if (!domain) throw new MailServerAccessError("That domain is not on this mail server.");
+    const within = await publishWithin(actor, server.orgId, domain.name);
     const token = await cloudflareToken();
     const zone = await resolveZoneForHostname(token, domain.name).catch(() => {
         throw new MailServerAccessError(`${domain.name} is not a zone in the Cloudflare account Polaris is connected to.`);
@@ -224,6 +236,10 @@ export async function planDns(server: MailServer, domainId: string): Promise<Dns
     for (const record of expectedFor(domain, relaySpfInclude(server))) {
         if (record.type === "TLSA") {
             planned.push({ record, action: "skip", value: record.value, existing: [], existingId: null, note: "Only meaningful on a zone signed with DNSSEC; publish it yourself if yours is." });
+            continue;
+        }
+        if (within && !atOrUnder(record.name, within)) {
+            planned.push({ record, action: "skip", value: record.value, existing: [], existingId: null, note: `Outside ${within}; add it at your DNS host.` });
             continue;
         }
         const existing = await listZoneRecords(token, zone.id, record.type, record.name);
@@ -288,12 +304,12 @@ export interface ApplyResult {
  * on its own: one Cloudflare refusal is reported and the rest still go.
  */
 export async function applyDns(
-    actorId: string,
+    actor: MailServerActor,
     server: MailServer,
     domainId: string,
     replaceConflicts: boolean
 ): Promise<ApplyResult[]> {
-    const plan = await planDns(server, domainId);
+    const plan = await planDns(actor, server, domainId);
     const token = await cloudflareToken();
     const results: ApplyResult[] = [];
     for (const entry of plan.records) {
@@ -319,7 +335,7 @@ export async function applyDns(
         }
     }
     await recordAudit({
-        actorId,
+        actorId: actor.id,
         action: "mailserver.dns.publish",
         targetType: "mail-server",
         targetId: server.id,

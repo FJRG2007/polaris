@@ -106,6 +106,40 @@ describe("the backup keyring", () => {
         expect(keyring.parseRecoveryKey(`${line}x`)).toHaveProperty("error");
         expect(keyring.parseRecoveryKey("hello")).toHaveProperty("error");
     });
+
+    it("refuses a mistyped recovery key for a key it already holds, and keeps the real one", async () => {
+        const { id, key } = await keyring.sealingKey(OWNER);
+        const line = await keyring.recoveryKey(OWNER, id);
+        const encoded = line.slice(line.lastIndexOf(":") + 1);
+        const swapped = encoded[5] === "A" ? "B" : "A";
+        const typo = `${line.slice(0, line.lastIndexOf(":") + 1)}${encoded.slice(0, 5)}${swapped}${encoded.slice(6)}`;
+        expect(keyring.parseRecoveryKey(typo)).not.toHaveProperty("error");
+
+        await expect(keyring.addRecoveryKey(OWNER, typo)).rejects.toThrow(/does not match/);
+        expect((await keyring.keyById(OWNER, id)).equals(key)).toBe(true);
+        expect(await keyring.addRecoveryKey(OWNER, line)).toEqual({ added: false });
+        expect((await keyring.keyById(OWNER, id)).equals(key)).toBe(true);
+    });
+
+    it("stores a held key again when the one on the ring no longer unwraps here", async () => {
+        const { encryptSecret } = await import("@polaris/storage");
+        const key = randomBytes(32);
+        const other = encryptSecret(key.toString("base64"), Buffer.alloc(32, 9).toString("base64"));
+        const id = "00000000-0000-7000-8000-00000000abcd";
+        rows.push({
+            id,
+            ownerId: OWNER,
+            encryptedKey: other.ciphertext,
+            keyNonce: other.nonce,
+            keyKeyId: other.keyId,
+            retiredAt: new Date(),
+            createdAt: new Date()
+        });
+        await expect(keyring.keyById(OWNER, id)).rejects.toThrow(/different master key/);
+        const line = `polaris-backup-key:${id}:${key.toString("base64url")}`;
+        expect(await keyring.addRecoveryKey(OWNER, line)).toEqual({ added: false });
+        expect((await keyring.keyById(OWNER, id)).equals(key)).toBe(true);
+    });
 });
 
 describe("a sealed copy", () => {

@@ -109,13 +109,26 @@ const configSchema = z.object({
     config: z.object({ Env: z.array(z.string()).optional() }).optional()
 });
 
+/** The names Docker Hub is written under, none of which serves the registry API
+ *  but the last. */
+const DOCKER_HUB = new Set(["docker.io", "index.docker.io", "registry-1.docker.io"]);
+
 /** Split "ghcr.io/owner/name" into its registry host and repository path. */
 function splitImage(image: string): { host: string; repository: string } {
     const [first, ...rest] = image.split("/");
     // A first segment carrying a dot or a port is a registry host; without one the
     // reference is a Docker Hub short name, which lives under library/.
-    if (first && rest.length > 0 && /[.:]/.test(first)) return { host: first, repository: rest.join("/") };
-    return { host: "registry-1.docker.io", repository: rest.length > 0 ? image : `library/${image}` };
+    const host = first && rest.length > 0 && /[.:]/.test(first) ? first.toLowerCase() : null;
+    if (host && !DOCKER_HUB.has(host)) return { host, repository: rest.join("/") };
+    const path = host ? rest : [first ?? "", ...rest];
+    return { host: "registry-1.docker.io", repository: path.length > 1 ? path.join("/") : `library/${path.join("/")}` };
+}
+
+/** One name for every way of writing the same image and tag - "nginx",
+ *  "library/nginx" and "docker.io/library/nginx" are one repository. */
+export function imageKey(image: string, tag: string): string {
+    const { host, repository } = splitImage(image);
+    return `${host}/${repository}:${tag}`;
 }
 
 /**
@@ -162,7 +175,7 @@ async function anonymousToken(
 }
 
 /**
- * GET a registry path, acquiring an anonymous pull token when challenged.
+ * GET (or HEAD) a registry path, acquiring an anonymous pull token when challenged.
  *
  * The token is offered up front when one has already been minted for this
  * repository, because the alternative is a guaranteed 401 on the first call of
@@ -175,11 +188,13 @@ async function registryGet(
     path: string,
     accept: string,
     token: { value: string | null },
-    scope: string
+    scope: string,
+    method: "GET" | "HEAD" = "GET"
 ): Promise<Response> {
     const url = `https://${host}${path}`;
     const send = (): Promise<Response> =>
         fetch(url, {
+            method,
             headers: {
                 accept,
                 "user-agent": "polaris-dashboard",
@@ -205,14 +220,25 @@ async function registryGet(
  * The manifest digest a tag points at right now, and nothing else - the one call
  * "has this tag moved" needs. Throws when the registry cannot be read, so a check
  * that could not ask is never mistaken for one that found nothing new.
+ *
+ * Asked with HEAD: Docker Hub counts every manifest GET against the anonymous pull
+ * limit of this machine's address, and a check that spends it leaves the next real
+ * deploy refused. Only a registry that leaves the digest off a HEAD is asked again
+ * in full.
  */
 export async function readTagDigest(image: string, tag: string): Promise<string | null> {
     const { host, repository } = splitImage(image);
     const scope = `${host}/${repository}`;
     const token = { value: cachedToken(scope) };
-    const head = await registryGet(host, `/v2/${repository}/manifests/${encodeURIComponent(tag)}`, ACCEPT, token, scope);
+    const path = `/v2/${repository}/manifests/${encodeURIComponent(tag)}`;
+    const head = await registryGet(host, path, ACCEPT, token, scope, "HEAD");
     if (!head.ok) throw new Error(`the registry answered ${head.status} for ${image}:${tag}`);
-    return head.headers.get("docker-content-digest");
+    const digest = head.headers.get("docker-content-digest");
+    if (digest) return digest;
+    const full = await registryGet(host, path, ACCEPT, token, scope);
+    if (!full.ok) throw new Error(`the registry answered ${full.status} for ${image}:${tag}`);
+    await full.body?.cancel();
+    return full.headers.get("docker-content-digest");
 }
 
 /**

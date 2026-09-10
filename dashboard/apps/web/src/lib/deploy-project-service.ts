@@ -10,13 +10,14 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getCapabilities, loadEnv } from "@polaris/config";
-import { linksOfLayout, slugify } from "@polaris/deploy";
-import { networkModeOf } from "@/lib/deploy/service-networks";
 import { createApiKey } from "@polaris/auth";
 import { contactLines } from "@/lib/privacy-service";
 import { readsOrgWhere } from "@/lib/orgs/org-service";
+import { linksOfLayout, slugify } from "@polaris/deploy";
+import { redactSource } from "@/lib/deploy/redact-source";
+import { getCapabilities, loadEnv } from "@polaris/config";
 import { sendWebhook } from "./notifications/webhook-sender";
+import { networkModeOf } from "@/lib/deploy/service-networks";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
     defaultProjectFlags,
@@ -490,6 +491,8 @@ export interface ProjectTokenView {
     name: string;
     prefix: string;
     scopes: string[];
+    /** Whose access the token acts with: the person who made it. */
+    madeBy: string;
     expiresAt: string | null;
     lastUsedAt: string | null;
     revokedAt: string | null;
@@ -508,7 +511,8 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
             expiresAt: true,
             lastUsedAt: true,
             revokedAt: true,
-            createdAt: true
+            createdAt: true,
+            user: { select: { name: true } }
         }
     });
     return rows.map((row) => ({
@@ -516,6 +520,7 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
         name: row.name,
         prefix: row.prefix,
         scopes: safeList(row.scopes),
+        madeBy: row.user.name,
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         revokedAt: row.revokedAt?.toISOString() ?? null,
@@ -536,18 +541,20 @@ function safeList(raw: string): string[] {
 
 /**
  * Mint a token that may only act on this project. It is issued against the
- * project owner's account, so it can never do more than they can - and it is
- * further narrowed to `deploy.read`, or `deploy.manage` when the operator asked
- * for a token that can change things.
+ * account of whoever minted it, so every call it makes is authorized against
+ * what that person holds on the project at the time - their capabilities and
+ * their environments - and never against the owner's. It is further narrowed to
+ * `deploy.read`, or `deploy.manage` when a token that can change things was
+ * asked for.
  *
  * The secret is returned once. There is no second chance to read it, which is
  * the point.
  */
 export async function createProjectToken(
-    input: ProjectTokenInput & { ownerId: string }
+    input: ProjectTokenInput & { minterId: string }
 ): Promise<{ secret: string; prefix: string }> {
     const days = TOKEN_LIFETIME_DAYS[input.lifetime];
-    const key = await createApiKey(input.ownerId, {
+    const key = await createApiKey(input.minterId, {
         name: input.name,
         description: "Minted from this app's settings.",
         // A deploy token is wired into something that runs on its own, which is
@@ -1044,27 +1051,4 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
             }))
         }))
     };
-}
-
-/** A service's source with anything credential-shaped taken out. A repo URL can
- *  carry a token in its userinfo, and that must not travel with the template. */
-function redactSource(raw: string): Record<string, unknown> {
-    let parsed: Record<string, unknown>;
-    try {
-        parsed = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-        return {};
-    }
-    const repoUrl = parsed.repoUrl;
-    if (typeof repoUrl === "string") {
-        try {
-            const url = new URL(repoUrl);
-            url.username = "";
-            url.password = "";
-            parsed.repoUrl = url.toString();
-        } catch {
-            // Not a URL (an SSH remote); nothing to strip from it.
-        }
-    }
-    return parsed;
 }

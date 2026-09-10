@@ -12,6 +12,7 @@
 
 import { ZodError } from "zod";
 import type { DeployCaller } from "./surface";
+import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { DeployApiRefusal, publicFailure } from "./refusal";
@@ -22,6 +23,10 @@ import { DeployApiRefusal, publicFailure } from "./refusal";
 const CALLS_PER_MINUTE = 240;
 const CHANGES_PER_MINUTE = 30;
 const WINDOW_MS = 60_000;
+
+/** The most a JSON body may be. The largest thing a route takes is a `.env`
+ *  import, and this holds the biggest one its schema allows once escaped. */
+const MAX_JSON_BODY = 2 * 1024 * 1024;
 
 export interface RouteContext {
     readonly caller: DeployCaller;
@@ -34,6 +39,29 @@ type Handler = (context: RouteContext) => Promise<Response>;
 
 function refusal(status: number, message: string, headers?: Record<string, string>): Response {
     return Response.json({ error: message }, { status, headers });
+}
+
+/**
+ * Count one call against a key's per-minute budgets: every call, and the
+ * stricter one when it changes something. Answers the seconds to wait when a
+ * budget is spent, or null when the call may go ahead. The MCP route spends the
+ * same budgets for its deploy tools, so a call costs the same whichever way it
+ * arrives.
+ */
+export async function throttleDeployKey(keyId: string, changes: boolean): Promise<number | null> {
+    for (const [bucket, limit] of [
+        [`deploy-api:${keyId}`, CALLS_PER_MINUTE],
+        ...(changes ? [[`deploy-api-change:${keyId}`, CHANGES_PER_MINUTE] as const] : [])
+    ] as const) {
+        const throttle = await rateLimit(bucket, limit, WINDOW_MS);
+        if (!throttle.ok) return Math.max(1, Math.ceil(throttle.retryAfterMs / 1000));
+    }
+    return null;
+}
+
+/** What a caller over its budget is told. */
+export function tooManyCalls(seconds: number): string {
+    return `Too many calls with this key. Try again in ${seconds}s.`;
 }
 
 /**
@@ -50,17 +78,9 @@ export function deployRoute(operation: string, changes: boolean, handler: Handle
         const principal = await authenticateApiKey(request);
         if (!principal) return refusal(401, "Unauthorized");
 
-        for (const [bucket, limit] of [
-            [`deploy-api:${principal.keyId}`, CALLS_PER_MINUTE],
-            ...(changes ? [[`deploy-api-change:${principal.keyId}`, CHANGES_PER_MINUTE] as const] : [])
-        ] as const) {
-            const throttle = await rateLimit(bucket, limit, WINDOW_MS);
-            if (!throttle.ok) {
-                const seconds = Math.max(1, Math.ceil(throttle.retryAfterMs / 1000));
-                return refusal(429, `Too many calls with this key. Try again in ${seconds}s.`, {
-                    "Retry-After": String(seconds)
-                });
-            }
+        const wait = await throttleDeployKey(principal.keyId, changes);
+        if (wait !== null) {
+            return refusal(429, tooManyCalls(wait), { "Retry-After": String(wait) });
         }
 
         const caller: DeployCaller = {
@@ -90,9 +110,15 @@ export function deployRoute(operation: string, changes: boolean, handler: Handle
 }
 
 /** The request body as JSON, or a refusal saying it was not. An empty body is an
- *  empty object, so a POST with nothing to say needs no `{}`. */
+ *  empty object, so a POST with nothing to say needs no `{}`. Read no further than
+ *  `MAX_JSON_BODY`, so a body is refused for its size before it is held. */
 export async function readBody(request: Request): Promise<unknown> {
-    const text = await request.text();
+    const tooLarge = `The request body is larger than ${MAX_JSON_BODY / 1024 ** 2} MB.`;
+    const declared = Number(request.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_JSON_BODY) throw new DeployApiRefusal(413, tooLarge);
+    const bytes = await readCappedBody(request, MAX_JSON_BODY);
+    if (!bytes) throw new DeployApiRefusal(413, tooLarge);
+    const text = new TextDecoder().decode(bytes);
     if (!text.trim()) return {};
     try {
         return JSON.parse(text) as unknown;

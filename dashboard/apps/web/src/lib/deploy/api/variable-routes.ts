@@ -19,7 +19,13 @@ import {
 
 type ScopeOf = (params: Readonly<Record<string, string>>) => VariableScope;
 
-/** GET lists the scope's variables, secrets withheld; POST sets one. */
+/** What the text form adds when the change is being redeployed. */
+export function redeploying(redeployed: boolean): string {
+    return redeployed ? ", redeploying" : "";
+}
+
+/** GET lists the scope's variables, secrets withheld; POST sets one, and
+ *  redeploys what it reaches only when `redeploy` is true. */
 export function variableRoutes(scopeOf: ScopeOf) {
     return {
         GET: deployRoute("list the variables", false, async ({ caller, url, params }) => {
@@ -34,8 +40,8 @@ export function variableRoutes(scopeOf: ScopeOf) {
         }),
         POST: deployRoute("save the variable", true, async ({ caller, request, url, params }) => {
             const input = setVariableSchema.parse(await readBody(request));
-            await setVariable(caller, scopeOf(params), input);
-            return respond(url, { saved: input.key }, () => `saved ${input.key}\n`);
+            const { redeployed } = await setVariable(caller, scopeOf(params), input);
+            return respond(url, { saved: input.key, redeployed }, () => `saved ${input.key}${redeploying(redeployed)}\n`);
         })
     };
 }
@@ -44,7 +50,7 @@ export function variableRoutes(scopeOf: ScopeOf) {
 export function importRoute(scopeOf: ScopeOf) {
     return deployRoute("import the variables", true, async ({ caller, request, url, params }) => {
         const input = importVariablesSchema.parse(await readBody(request));
-        const { count } = await importVariables(caller, scopeOf(params), input);
-        return respond(url, { count }, () => `imported ${count}\n`);
+        const { count, redeployed } = await importVariables(caller, scopeOf(params), input);
+        return respond(url, { count, redeployed }, () => `imported ${count}${redeploying(redeployed)}\n`);
     });
 }

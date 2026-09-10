@@ -35,7 +35,9 @@ import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { draftSaves, type DraftFields, type DraftSaves } from "./draft-saves";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
+import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
 import { useRef, useMemo, useState, useEffect, useCallback, useTransition } from "react";
 import {
     ChevronDown,
@@ -106,7 +108,6 @@ export function Composer() {
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<Attached[]>([]);
-    const [draftId, setDraftId] = useState<string | null>(null);
     const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");

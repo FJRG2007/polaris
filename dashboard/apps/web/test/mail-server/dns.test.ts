@@ -22,6 +22,7 @@ const created: unknown[] = [];
 const updated: { id: string; record: unknown }[] = [];
 let relayInclude: string | null = null;
 let failCreate = false;
+let proven: string | null = null;
 
 vi.mock("@polaris/db", () => ({ prisma: { mailServer: { update: vi.fn(async () => undefined) } } }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn(async () => undefined) }));
@@ -30,6 +31,7 @@ vi.mock("@/lib/mail-server/access", () => ({ MailServerAccessError: class extend
 vi.mock("@/lib/mail-server/operations", () => ({
     listDomains: vi.fn(async () => [{ id: "d1", name: "example.com", enabled: true, catchAll: null, primary: true, zoneFile: ZONE }])
 }));
+vi.mock("@/lib/dns/zone-records", () => ({ provenDomainOf: vi.fn(async () => proven) }));
 vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: vi.fn(async () => "token") }));
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     resolveZoneForHostname: vi.fn(async () => ({ id: "zone-1", name: "example.com" })),
@@ -45,6 +47,10 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
 
 const dns = await import("@/lib/mail-server/dns");
 const server = { id: "s1", orgId: null } as never;
+const admin = { id: "actor", isAdmin: true };
+const member = { id: "member", isAdmin: false };
+const cloudflare = await import("@/lib/integrations/cloudflare-api");
+const zones = await import("@/lib/dns/zone-records");
 
 beforeEach(() => {
     for (const key of Object.keys(zoneRecords)) delete zoneRecords[key];
@@ -52,6 +58,8 @@ beforeEach(() => {
     updated.length = 0;
     relayInclude = null;
     failCreate = false;
+    proven = null;
+    vi.mocked(cloudflare.listZoneRecords).mockClear();
     zoneRecords["TXT example.com"] = [{ id: "spf", type: "TXT", name: "example.com", content: "v=spf1 include:_spf.google.com ~all" }];
     zoneRecords["MX example.com"] = [{ id: "mx", type: "MX", name: "example.com", content: "aspmx.l.google.com" }];
     zoneRecords["TXT _dmarc.example.com"] = [{ id: "dmarc", type: "TXT", name: "_dmarc.example.com", content: "v=DMARC1; p=none" }];
@@ -59,7 +67,7 @@ beforeEach(() => {
 
 describe("the plan", () => {
     it("adds to an existing SPF, keeps an existing DMARC, and leaves another MX alone", async () => {
-        const plan = await dns.planDns(server, "d1");
+        const plan = await dns.planDns(admin, server, "d1");
         const by = (purpose: string) => plan.records.find((entry) => entry.record.purpose === purpose);
         expect(by("spf")).toMatchObject({ action: "update", value: "v=spf1 mx include:_spf.google.com ~all" });
         expect(by("dmarc")).toMatchObject({ action: "unchanged" });
@@ -70,7 +78,7 @@ describe("the plan", () => {
 
     it("puts the relay's provider in the SPF when mail goes out through one", async () => {
         relayInclude = "include:amazonses.com";
-        const plan = await dns.planDns(server, "d1");
+        const plan = await dns.planDns(admin, server, "d1");
         expect(plan.records.find((entry) => entry.record.purpose === "spf")?.value).toBe(
             // The engine's SPF with the relay merged in, then merged into the
             // record already published: what is missing goes in front.
@@ -79,9 +87,29 @@ describe("the plan", () => {
     });
 });
 
+describe("whose zone it is", () => {
+    it("refuses somebody who has not verified the domain, before the token reads the zone", async () => {
+        await expect(dns.planDns(member, server, "d1")).rejects.toThrow(/verified under Domains/);
+        await expect(dns.applyDns(member, server, "d1", true)).rejects.toThrow(/verified under Domains/);
+        expect(cloudflare.listZoneRecords).not.toHaveBeenCalled();
+        expect(created).toHaveLength(0);
+        expect(updated).toHaveLength(0);
+    });
+
+    it("plans for somebody who verified the domain, or the organization the server is on", async () => {
+        proven = "example.com";
+        const plan = await dns.planDns(member, { id: "s1", orgId: "org-1" } as never, "d1");
+        expect(plan.records.find((entry) => entry.record.purpose === "dkim")).toMatchObject({ action: "create" });
+        expect(zones.provenDomainOf).toHaveBeenCalledWith("example.com", [
+            { kind: "user", id: "member" },
+            { kind: "org", id: "org-1" }
+        ]);
+    });
+});
+
 describe("applying it", () => {
     it("creates and updates what the plan says, and leaves a conflict alone", async () => {
-        const results = await dns.applyDns("actor", server, "d1", false);
+        const results = await dns.applyDns(admin, server, "d1", false);
         expect(results.find((entry) => entry.type === "MX")?.outcome).toBe("left");
         expect(updated.map((entry) => entry.id)).toEqual(["spf"]);
         expect(created).toHaveLength(1);
@@ -89,13 +117,13 @@ describe("applying it", () => {
     });
 
     it("replaces a conflict only when asked", async () => {
-        await dns.applyDns("actor", server, "d1", true);
+        await dns.applyDns(admin, server, "d1", true);
         expect(updated.map((entry) => entry.id).sort()).toEqual(["mx", "spf"]);
     });
 
     it("reports a refusal as failed rather than done", async () => {
         failCreate = true;
-        const results = await dns.applyDns("actor", server, "d1", false);
+        const results = await dns.applyDns(admin, server, "d1", false);
         expect(results.find((entry) => entry.name.includes("_domainkey"))).toMatchObject({ outcome: "failed" });
     });
 });

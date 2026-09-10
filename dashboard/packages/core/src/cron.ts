@@ -147,6 +147,35 @@ function dayMatches(schedule: CronSchedule, wall: Wall): boolean {
 
 const MINUTE = 60_000;
 
+/** How far clocks go back in any zone in use: half an hour, an hour, or two. */
+const SETBACKS = [30, 60, 120];
+
+function sameDay(a: Wall, b: Wall): boolean {
+    return a.year === b.year && a.month === b.month && a.day === b.day;
+}
+
+function sameMinute(a: Wall, b: Wall): boolean {
+    return sameDay(a, b) && a.hour === b.hour && a.minute === b.minute;
+}
+
+/**
+ * The first instant of the day `at` falls on.
+ *
+ * Needed after skipping a day by its wall-clock length: a day the clocks went
+ * forward on is shorter than that, so the skip lands past the next midnight.
+ * Where midnight itself does not exist, `at` is already the day's first minute.
+ */
+function startOfDay(at: number, wall: Wall, timeZone: string): number {
+    const midnight = at - (wall.hour * 60 + wall.minute) * MINUTE;
+    return sameDay(wallClock(new Date(midnight), timeZone), wall) ? midnight : at;
+}
+
+/** Whether the wall clock already read this minute earlier, because the clocks
+ *  went back since. */
+function repeatedMinute(at: number, wall: Wall, timeZone: string): boolean {
+    return SETBACKS.some((minutes) => sameMinute(wallClock(new Date(at - minutes * MINUTE), timeZone), wall));
+}
+
 /**
  * The next time a schedule fires strictly after `after`, or null when it never
  * does within the next four years (a 30th of February, say).
@@ -154,21 +183,30 @@ const MINUTE = 60_000;
  * Walks forward in real time and reads the wall clock at each step, skipping a
  * whole day or hour at a time when that is what does not match - a few thousand
  * steps for the worst expression, rather than every minute of a year.
+ *
+ * A minute the clocks repeat fires only the first time, for a schedule that
+ * names its hours. One that runs every hour keeps running through the repeated
+ * hour, since it names no time of day that could happen twice.
  */
 export function nextCronRun(schedule: CronSchedule, after: Date, timeZone = "UTC"): Date | null {
     let at = Math.floor(after.getTime() / MINUTE) * MINUTE + MINUTE;
     const limit = after.getTime() + 4 * 366 * 24 * 60 * MINUTE;
+    const everyHour = schedule.hours.size === 24;
     while (at <= limit) {
         const wall = wallClock(new Date(at), timeZone);
         if (!dayMatches(schedule, wall)) {
-            at += ((23 - wall.hour) * 60 + (60 - wall.minute)) * MINUTE;
+            const next = at + ((23 - wall.hour) * 60 + (60 - wall.minute)) * MINUTE;
+            const landed = wallClock(new Date(next), timeZone);
+            at = sameDay(landed, wall) ? next : startOfDay(next, landed, timeZone);
             continue;
         }
         if (!schedule.hours.has(wall.hour)) {
             at += (60 - wall.minute) * MINUTE;
             continue;
         }
-        if (schedule.minutes.has(wall.minute)) return new Date(at);
+        if (schedule.minutes.has(wall.minute) && (everyHour || !repeatedMinute(at, wall, timeZone))) {
+            return new Date(at);
+        }
         at += MINUTE;
     }
     return null;

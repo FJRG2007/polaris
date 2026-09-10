@@ -6,11 +6,15 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-const { deployFreshness } = vi.hoisted(() => ({ deployFreshness: vi.fn() }));
-vi.mock("@polaris/db", () => ({ prisma: {} }));
+const { deployFreshness, findMany, update } = vi.hoisted(() => ({
+    deployFreshness: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(async () => undefined)
+}));
+vi.mock("@polaris/db", () => ({ prisma: { application: { findMany, update } } }));
 vi.mock("@/lib/deploy/freshness", () => ({ deployFreshness }));
 
-const { checkService, hasUpdate, splitImageRef } = await import("@/lib/deploy/update-scan");
+const { checkService, hasUpdate, scanServiceUpdates, splitImageRef } = await import("@/lib/deploy/update-scan");
 
 const NOW = new Date("2026-09-10T12:00:00Z");
 const image = (ref: string) => ({
@@ -64,6 +68,35 @@ describe("checking an image service", () => {
         });
         expect(check?.error).toBeTruthy();
         expect(hasUpdate(check)).toBe(false);
+    });
+});
+
+describe("a whole pass", () => {
+    it("asks the registry once per image and tag, however many services run it", async () => {
+        const row = (id: string, ref: string) => ({ ...image(ref), id, currentDeploymentId: `dep-${id}`, updateCheck: null });
+        findMany.mockResolvedValueOnce([
+            row("a", "nginx:1.27"),
+            row("b", "docker.io/library/nginx:1.27"),
+            row("c", "library/nginx:1.27"),
+            row("d", "nginx:1.28"),
+            row("e", "ghcr.io/acme/api:v2")
+        ]);
+        const readDigest = vi.fn(async (_image: string, tag: string) => `sha256:${tag}`);
+
+        await expect(scanServiceUpdates(NOW, readDigest)).resolves.toEqual({ checked: 5, updates: 0 });
+        expect(readDigest).toHaveBeenCalledTimes(3);
+        expect(update).toHaveBeenCalledTimes(5);
+    });
+
+    it("does not ask again in the same pass for an image the registry refused", async () => {
+        const row = (id: string) => ({ ...image("nginx:1.27"), id, currentDeploymentId: `dep-${id}`, updateCheck: null });
+        findMany.mockResolvedValueOnce([row("a"), row("b")]);
+        const readDigest = vi.fn(async () => {
+            throw new Error("toomanyrequests");
+        });
+
+        await scanServiceUpdates(NOW, readDigest);
+        expect(readDigest).toHaveBeenCalledTimes(1);
     });
 });
 

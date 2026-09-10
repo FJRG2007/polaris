@@ -43,6 +43,8 @@ export function describeServiceEvent(line: ActivityLine): string {
             return `${who} did not deploy it, because ${line.fromValue} did not come up: ${line.toValue}`;
         case "first-deploy-failed":
             return `${who} could not start its first deploy: ${line.toValue}`;
+        case "secrets-withheld":
+            return `${who} did not copy these secrets into the preview: ${line.toValue}`;
         default:
             return `${who} changed it`;
     }

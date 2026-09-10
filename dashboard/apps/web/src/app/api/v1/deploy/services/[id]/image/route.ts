@@ -7,7 +7,10 @@
  *      deployment id. `X-Polaris-Commit` and `X-Polaris-Message` (URI-encoded) say
  *      what it was built from.
  *
- * The body is streamed to disk, never held in memory, up to 16 GB.
+ * The body is streamed to disk, never held in memory, up to 16 GB - and only once
+ * the key has been shown to be allowed to deploy this service, so a key that may
+ * not cannot fill the data volume with an upload that was always going to be
+ * refused.
  */
 
 import { rm } from "node:fs/promises";
@@ -44,6 +47,7 @@ export const POST = deployRoute("deploy the uploaded image", true, async ({ call
         commitSha: request.headers.get("x-polaris-commit") ?? undefined,
         commitMessage: decoded(request.headers.get("x-polaris-message"))
     });
+    await uploadTarget(caller, params.id ?? "");
     const file = await stagedPath(".tar.gz");
     let handedOver = false;
     try {

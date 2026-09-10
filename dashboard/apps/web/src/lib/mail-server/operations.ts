@@ -16,11 +16,12 @@ import { call } from "./stalwart";
 import { reached } from "./steps";
 import * as core from "@polaris/core";
 import { endpointFor } from "./transport";
-import { recordAudit } from "@/lib/audit-service";
 import type { MailServer } from "@polaris/db";
+import { recordAudit } from "@/lib/audit-service";
 import { ensureReportsMailbox } from "./dmarc-report";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
-import { adminCredentials, MailServerAccessError } from "./access";
+import { requireMailDomainStanding } from "./dns-standing";
+import { adminCredentials, MailServerAccessError, type MailServerActor } from "./access";
 
 /** A server Polaris can manage, with the endpoint and credential to do it. */
 async function engine(server: MailServer) {
@@ -79,13 +80,14 @@ export async function listDomains(server: MailServer): Promise<MailDomainView[]>
         .sort((left, right) => Number(right.primary) - Number(left.primary) || left.name.localeCompare(right.name));
 }
 
-export async function addDomain(actorId: string, server: MailServer, name: string): Promise<string> {
+export async function addDomain(actor: MailServerActor, server: MailServer, name: string): Promise<string> {
     const existing = (await listDomains(server)).find((domain) => domain.name === name);
     if (existing) return existing.id;
+    await requireMailDomainStanding(actor, server.orgId, name);
     const id = core.createdId(await run(server, [core.domainCreateCall(name)]), "domain", "domain");
     // Its DMARC reports go to the report mailbox's alias at the new domain.
     if (reached(server.step, "reports")) await ensureReportsMailbox(server);
-    await audit(actorId, server, "domain.add");
+    await audit(actor.id, server, "domain.add");
     return id;
 }
 
@@ -177,7 +179,6 @@ function reservedAt(domain: MailDomainView, localPart: string): boolean {
     if (localPart === core.MAIL_REPORTS_NAME) return true;
     return domain.primary && (localPart === core.MAIL_ADMIN_NAME || localPart === core.MAIL_SENDER_NAME);
 }
-
 
 /**
  * Refuse a mailbox password that is the address back at itself, or one already

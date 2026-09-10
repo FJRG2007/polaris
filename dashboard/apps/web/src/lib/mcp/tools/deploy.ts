@@ -235,21 +235,23 @@ const setVariableInput = serviceInput.merge(setVariableSchema);
 const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
     name: "deploy_set_variable",
     description:
-        "Set one environment variable on a service (secret by default). A service that is already deployed redeploys to pick it up.",
+        "Set one environment variable on a service (secret by default). The running service keeps its old value until it is redeployed: pass redeploy to do that now, or deploy once after setting several.",
     input: setVariableInput,
     scope: "deploy.manage",
     readOnly: false,
     async run(input, caller) {
-        await attempt("save the variable", () =>
+        const { redeployed } = await attempt("save the variable", () =>
             surface.setVariable(
                 deployCaller(caller),
                 { kind: "service", ref: input.service },
-                { key: input.key, value: input.value, secret: input.secret }
+                { key: input.key, value: input.value, secret: input.secret, redeploy: input.redeploy }
             )
         );
         return {
-            text: `${input.key} is saved. The service redeploys to pick it up if it is running.`,
-            structured: { key: input.key }
+            text: redeployed
+                ? `${input.key} is saved. The service redeploys to pick it up if it is running.`
+                : `${input.key} is saved. The service picks it up on its next deploy.`,
+            structured: { key: input.key, redeployed }
         };
     }
 };

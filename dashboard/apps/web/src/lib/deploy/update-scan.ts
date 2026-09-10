@@ -17,7 +17,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { deployFreshness } from "./freshness";
-import { readTagDigest } from "@/lib/registry";
+import { imageKey, readTagDigest } from "@/lib/registry";
 
 export const updateCheckSchema = z.object({
     deploymentId: z.string(),
@@ -123,12 +123,31 @@ export async function checkService(
     });
 }
 
-/** Check every running service, one after another, and store what was found. */
-export async function scanServiceUpdates(now = new Date()): Promise<{ checked: number; updates: number }> {
+/**
+ * Check every running service, one after another, and store what was found.
+ *
+ * A registry is asked once per image and tag in a pass, however many services run
+ * it: every question counts against what the registry allows this machine, and a
+ * deploy is the thing that needs that allowance.
+ */
+export async function scanServiceUpdates(
+    now = new Date(),
+    readDigest: (image: string, tag: string) => Promise<string | null> = readTagDigest
+): Promise<{ checked: number; updates: number }> {
     const apps = await prisma.application.findMany({
         where: { currentDeploymentId: { not: null }, desiredState: "running" },
         select: { id: true, sourceType: true, sourceConfig: true, currentDeploymentId: true, updateCheck: true }
     });
+    const asked = new Map<string, Promise<string | null>>();
+    const readOnce = (image: string, tag: string): Promise<string | null> => {
+        const key = imageKey(image, tag);
+        let answer = asked.get(key);
+        if (!answer) {
+            answer = readDigest(image, tag);
+            asked.set(key, answer);
+        }
+        return answer;
+    };
     let checked = 0;
     let updates = 0;
     for (const app of apps) {
@@ -136,7 +155,8 @@ export async function scanServiceUpdates(now = new Date()): Promise<{ checked: n
         const next = await checkService(
             { ...app, currentDeploymentId: app.currentDeploymentId },
             parseUpdateCheck(app.updateCheck),
-            now
+            now,
+            readOnce
         ).catch(() => null);
         if (!next) continue;
         checked += 1;

@@ -2,7 +2,7 @@
  * GET  /api/v1/deploy/services/:id/variables - the service's own variables,
  *      with every secret value withheld.
  * POST /api/v1/deploy/services/:id/variables - set one: `{ key, value, secret }`.
- *      Services already deployed pick the change up with a redeploy.
+ *      `redeploy: true` redeploys the services already deployed to pick it up.
  */
 
 import { variableRoutes } from "@/lib/deploy/api/variable-routes";

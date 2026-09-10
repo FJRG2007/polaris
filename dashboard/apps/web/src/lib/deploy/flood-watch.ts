@@ -29,7 +29,11 @@ const HOLD_MS = 15 * 60 * 1000;
  * the tick can say something when it did - the edge is re-rendered only then.
  */
 export async function runFloodWatch(now = Date.now()): Promise<{ flooded: number; changed: boolean }> {
-    const before = await floodedServices(now);
+    // Every stored mark, lapsed ones included: a mark that lapsed since the last
+    // pass is still what the edge was last rendered with, so letting it go is a
+    // change like any other, and it is dropped from storage by the save below.
+    const stored = await floodedServices(0);
+    const before = new Map([...stored].filter(([, until]) => until > now));
     // A cheap pre-filter on the stored text, then the real answer from the parsed
     // config: the column is JSON written by `JSON.stringify`, so the pair appears
     // exactly like this in any row that has it.
@@ -59,7 +63,8 @@ export async function runFloodWatch(now = Date.now()): Promise<{ flooded: number
         }
     }
 
-    const changed = before.size !== after.size || [...after.keys()].some((id) => !before.has(id));
+    const changed =
+        stored.size !== before.size || before.size !== after.size || [...after.keys()].some((id) => !before.has(id));
     if (changed || [...after].some(([id, until]) => before.get(id) !== until)) {
         await saveFloodedServices(after);
     }

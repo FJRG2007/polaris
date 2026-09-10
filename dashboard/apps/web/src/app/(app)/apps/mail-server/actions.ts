@@ -265,7 +265,7 @@ export async function addDomainAction(input: unknown): Promise<Result<{ id: stri
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { who, row } = await server(parsed.data.serverId);
-        const id = await ops.addDomain(who.id, row, parsed.data.name);
+        const id = await ops.addDomain(who, row, parsed.data.name);
         refresh(row.id);
         return { id };
     } catch (error) {
@@ -315,8 +315,8 @@ export async function planDnsAction(input: unknown): Promise<Result<{ plan: dns.
     const parsed = domainRefSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
-        const { row } = await server(parsed.data.serverId);
-        return { plan: await dns.planDns(row, parsed.data.domainId) };
+        const { who, row } = await server(parsed.data.serverId);
+        return { plan: await dns.planDns(who, row, parsed.data.domainId) };
     } catch (error) {
         return failed(error);
     }
@@ -329,7 +329,7 @@ export async function applyDnsAction(input: unknown): Promise<Result<{ results: 
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { who, row } = await server(parsed.data.serverId);
-        const results = await dns.applyDns(who.id, row, parsed.data.domainId, parsed.data.replaceConflicts);
+        const results = await dns.applyDns(who, row, parsed.data.domainId, parsed.data.replaceConflicts);
         return { results };
     } catch (error) {
         return failed(error);

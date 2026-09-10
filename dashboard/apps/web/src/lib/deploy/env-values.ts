@@ -56,11 +56,15 @@ export async function scopeValues(
  * again: the key they were sealed under is the same master key, and a copy that
  * never holds the secret in the clear is one less place it can leak from.
  * Variables the destination already has are left alone.
+ *
+ * `secrets: false` leaves every secret behind and answers the keys it left, for
+ * a copy whose code is not trusted with them.
  */
 export async function copyScopeValues(
     from: { scopeType: "application" | "environment"; scopeId: string },
-    to: { scopeType: "application" | "environment"; scopeId: string }
-): Promise<number> {
+    to: { scopeType: "application" | "environment"; scopeId: string },
+    options: { secrets?: boolean } = {}
+): Promise<{ copied: number; withheld: string[] }> {
     const [rows, existing] = await Promise.all([
         prisma.envVar.findMany({ where: { scopeType: from.scopeType, scopeId: from.scopeId } }),
         prisma.envVar.findMany({
@@ -70,8 +74,13 @@ export async function copyScopeValues(
     ]);
     const taken = new Set(existing.map((row) => row.key));
     let copied = 0;
+    const withheld: string[] = [];
     for (const row of rows) {
         if (taken.has(row.key)) continue;
+        if (row.isSecret && options.secrets === false) {
+            withheld.push(row.key);
+            continue;
+        }
         await prisma.envVar.create({
             data: {
                 scopeType: to.scopeType,
@@ -86,5 +95,5 @@ export async function copyScopeValues(
         });
         copied += 1;
     }
-    return copied;
+    return { copied, withheld };
 }

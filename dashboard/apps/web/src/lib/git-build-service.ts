@@ -14,9 +14,10 @@
  */
 
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { constants } from "node:fs";
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { lstat, mkdtemp, open, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import {
     detectBuild,
     generateDockerfile,
@@ -87,17 +88,70 @@ export interface BuildCommands {
  *  file this size named like one is not something detection should hold. */
 const MANIFEST_LIMIT = 64 * 1024;
 
+/** The most of a package.json read. Larger than the others, because a package.json
+ *  is also where a project keeps the configuration of half its tools. */
+const PACKAGE_LIMIT = 1024 * 1024;
+
+/**
+ * Whether `path` is inside the checkout at `root` once every link on the way is
+ * followed. A repository can ship a symlink, and a service can name a directory
+ * with a "..", so a path joined under the checkout can still land anywhere on
+ * this machine.
+ */
+async function insideCheckout(root: string, path: string): Promise<boolean> {
+    try {
+        const [base, real] = await Promise.all([realpath(root), realpath(path)]);
+        const rest = relative(base, real);
+        return rest === "" || (rest !== ".." && !rest.startsWith(`..${sep}`) && !isAbsolute(rest));
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The text of a file the repository holds, or null when it is anything but a
+ * regular file inside the checkout of at most `limit` bytes. Never follows a
+ * link, and never reads more than the limit, so a manifest that is really
+ * /dev/zero or a file of this machine's is simply not there.
+ */
+async function readRepoFile(root: string, path: string, limit: number): Promise<string | null> {
+    try {
+        const info = await lstat(path);
+        if (!info.isFile() || info.size > limit || !(await insideCheckout(root, dirname(path)))) return null;
+        const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+        try {
+            const buffer = Buffer.alloc(info.size + 1);
+            const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+            return bytesRead > limit ? null : buffer.toString("utf8", 0, bytesRead);
+        } finally {
+            await handle.close();
+        }
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Write a file into the checkout as a new file. Whatever the repository had at
+ * that name goes first, and the write refuses to follow a link, so a symlink
+ * shipped under the name cannot aim the write at a file of this machine's.
+ */
+async function writeRepoFile(root: string, path: string, text: string): Promise<void> {
+    if (!(await insideCheckout(root, dirname(path)))) {
+        throw new Error(`${relative(root, path)} would be written outside the repository`);
+    }
+    await rm(path, { force: true });
+    await writeFile(path, text, { encoding: "utf8", flag: "wx" });
+}
+
 /** The text of the detection manifests present in a directory. */
-async function readTexts(directory: string, files: readonly string[]): Promise<Record<string, string>> {
+async function readTexts(root: string, directory: string, files: readonly string[]): Promise<Record<string, string>> {
     const texts: Record<string, string> = {};
     for (const name of LANGUAGE_FILES) {
         if (!files.includes(name)) continue;
-        try {
-            const text = await readFile(join(directory, name), "utf8");
-            if (text.length <= MANIFEST_LIMIT) texts[name] = text;
-        } catch {
-            // Unreadable is the same as absent here.
-        }
+        // Unreadable is the same as absent here.
+        const text = await readRepoFile(root, join(directory, name), MANIFEST_LIMIT);
+        if (text !== null) texts[name] = text;
     }
     return texts;
 }
@@ -138,17 +192,20 @@ export function isCloneableUrl(url: string): boolean {
 
 /** Parse a package.json, or undefined when it is missing or not JSON. A malformed
  *  manifest is the repository's problem to fix, not a reason to fail the clone. */
-async function readManifest(directory: string): Promise<PackageManifest | undefined> {
+async function readManifest(root: string, directory: string): Promise<PackageManifest | undefined> {
+    const text = await readRepoFile(root, join(directory, "package.json"), PACKAGE_LIMIT);
+    if (text === null) return undefined;
     try {
-        return JSON.parse(await readFile(join(directory, "package.json"), "utf8")) as PackageManifest;
+        return JSON.parse(text) as PackageManifest;
     } catch {
         return undefined;
     }
 }
 
-async function listDirectory(directory: string): Promise<string[]> {
+/** A directory's entries, or none when it is not a directory inside the checkout. */
+async function listDirectory(root: string, directory: string): Promise<string[]> {
     try {
-        return await readdir(directory);
+        return (await insideCheckout(root, directory)) ? await readdir(directory) : [];
     } catch {
         return [];
     }
@@ -166,10 +223,10 @@ async function snapshot(dir: string, rootDirectory: string | undefined): Promise
     const levels = await Promise.all(
         paths.map(async (path, at) => {
             const directory = path ? join(dir, path) : dir;
-            const [files, manifest] = await Promise.all([listDirectory(directory), readManifest(directory)]);
+            const [files, manifest] = await Promise.all([listDirectory(dir, directory), readManifest(dir, directory)]);
             // Only the service's own directory is read for the other languages'
             // manifests; the levels above it only matter to a JavaScript workspace.
-            const texts = at === paths.length - 1 ? await readTexts(directory, files) : undefined;
+            const texts = at === paths.length - 1 ? await readTexts(dir, directory, files) : undefined;
             return { path, files, manifest, texts };
         })
     );
@@ -216,16 +273,16 @@ export async function configureBuild(
                     ? commands.outputDirectory
                     : detected.image.staticDirectory
         };
-        await writeFile(
+        await writeRepoFile(
+            dir,
             join(dir, GENERATED_DOCKERFILE),
-            generateDockerfile({ ...detected.image, ...overridden, port: commands.port ?? 3000 }),
-            "utf8"
+            generateDockerfile({ ...detected.image, ...overridden, port: commands.port ?? 3000 })
         );
         log(`Building on ${detected.image.buildImage}.\n`);
         return { dockerfile: GENERATED_DOCKERFILE };
     }
 
-    const entries = await listDirectory(configDir);
+    const entries = await listDirectory(dir, configDir);
     if (entries.some((name) => name === "nixpacks.toml" || name === "nixpacks.json")) {
         log("Using the nixpacks configuration in the repository.\n");
         return { root: detected?.buildRoot };
@@ -251,7 +308,7 @@ export async function configureBuild(
     if (overridden.length > 0) log(`Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`);
     else if (!detected) log("No framework recognized; letting the builder work it out.\n");
 
-    if (config) await writeFile(join(configDir, "nixpacks.toml"), config, "utf8");
+    if (config) await writeRepoFile(dir, join(configDir, "nixpacks.toml"), config);
     return { root: detected?.buildRoot };
 }
 

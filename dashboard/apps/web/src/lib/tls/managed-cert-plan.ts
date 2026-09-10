@@ -115,3 +115,40 @@ export function covers(domain: string, hostname: string): boolean {
     if (!name.endsWith(`.${domain}`)) return false;
     return !name.slice(0, -(domain.length + 1)).includes(".");
 }
+
+/** Whose certificate it is: the owner domain it was proven through, or null for
+ *  one ordered on the instance's own token for whoever runs this Polaris. */
+export interface CertificateHolder {
+    readonly userId: string | null;
+    readonly orgId: string | null;
+}
+
+/** A name another server's edge answers for, with who holds the service and the
+ *  server. */
+export interface ServedNameFacts {
+    readonly hostname: string;
+    /** The project the service is in. */
+    readonly ownerId: string;
+    readonly orgId: string | null;
+    readonly ownerIsAdmin: boolean;
+    /** Who enrolled the server, and so who is root on it. */
+    readonly hostOwnerId: string;
+}
+
+/**
+ * Whether a server's edge may be handed a certificate - its private key with it -
+ * for a name it serves. Covering the name is not enough: anybody can put a name
+ * under somebody else's domain on a service of their own. The certificate's owner,
+ * the service's and the server's all have to be the same account or organization.
+ */
+export function mayHandCertificate(
+    certificate: { readonly domain: string; readonly holder: CertificateHolder | null },
+    name: ServedNameFacts
+): boolean {
+    if (!covers(certificate.domain, name.hostname)) return false;
+    if (name.hostOwnerId !== name.ownerId) return false;
+    const { holder } = certificate;
+    if (!holder) return name.ownerIsAdmin;
+    if (holder.orgId) return holder.orgId === name.orgId;
+    return holder.userId !== null && holder.userId === name.ownerId;
+}

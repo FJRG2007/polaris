@@ -9,6 +9,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { ENV_VALUE_MAX, envValueMessage, hasControlCharacter } from "@polaris/core";
 
 export interface EnvVarView {
     id: string;
@@ -108,6 +109,8 @@ export async function setEnvVar(
     const key = input.key.trim();
     if (!VALID_KEY.test(key))
         throw new Error("Key must be letters, digits and underscores, not starting with a digit");
+    if (hasControlCharacter(input.value)) throw new Error(envValueMessage(key));
+    if (input.value.length > ENV_VALUE_MAX) throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB.`);
 
     const existing = await prisma.envVar.findFirst({
         where: { scopeType: scope, scopeId, key }

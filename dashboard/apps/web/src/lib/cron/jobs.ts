@@ -24,11 +24,11 @@ import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
+import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepMailServers } from "@/lib/mail-server/health";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
-import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -424,7 +424,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
     },
     {
         key: "update-scan",
-        // Half-hourly: a registry is asked once per image service and GitHub once
+        // Half-hourly: a registry is asked once per image and tag and GitHub once
         // per repository service, and nothing published is urgent to the minute.
         // Unleased: two passes write the same answer.
         everyMs: 30 * MINUTE,

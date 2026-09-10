@@ -7,9 +7,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { ENV_VALUE_MAX } from "./env-values.js";
 import {
     databaseReferenceKeys,
     hasReferences,
+    REFERENCE_DEPTH,
     referencesIn,
     resolveReferences
 } from "./deploy-references.js";
@@ -67,6 +69,27 @@ describe("resolving them", () => {
             lookup({ "one.X": "${{two.X}}", "two.X": "${{one.X}}" })
         );
         expect(unresolved.length).toBe(1);
+    });
+
+    it("follows a chain as deep as REFERENCE_DEPTH", () => {
+        const { env, unresolved } = resolveReferences(
+            { A: "${{one.X}}" },
+            lookup({ "one.X": "${{two.X}}", "two.X": "${{three.X}}", "three.X": "${{four.X}}", "four.X": "end" })
+        );
+        expect(REFERENCE_DEPTH).toBe(4);
+        expect(env.A).toBe("end");
+        expect(unresolved).toEqual([]);
+    });
+
+    it("refuses a value that grows past the limit, naming it, before it grows further", () => {
+        const self = "${{shared.A}}".repeat(Math.floor(ENV_VALUE_MAX / "${{shared.A}}".length));
+        let lookups = 0;
+        const counting = (name: string, key: string) => {
+            lookups += 1;
+            return name === "shared" && key === "A" ? self : undefined;
+        };
+        expect(() => resolveReferences({ BIG: self }, counting)).toThrow(/^BIG is longer than 64 KB/);
+        expect(lookups).toBeLessThan(10);
     });
 });
 

@@ -25,7 +25,15 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { DNS01_PROVIDERS, dns01Provider, type Dns01ProviderKind } from "./dns01";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
-import { covers, isDue, plannedCertificates, retryDelayMs, type WantedCertificate } from "./managed-cert-plan";
+import {
+    isDue,
+    mayHandCertificate,
+    plannedCertificates,
+    retryDelayMs,
+    type CertificateHolder,
+    type ServedNameFacts,
+    type WantedCertificate
+} from "./managed-cert-plan";
 
 /** Every file this writes into the local edge's directory starts with this. */
 const PREFIX = "polaris-managed-";
@@ -284,15 +292,31 @@ export async function retryOwnerDomainCertificate(ownerDomainId: string): Promis
 // Publishing
 // ---------------------------------------------------------------------------
 
+interface Servable {
+    readonly id: string;
+    readonly domain: string;
+    readonly certPem: string;
+    readonly keyPem: string;
+    readonly holder: CertificateHolder | null;
+}
+
 /** The certificates worth serving right now: issued, readable, and not expired. */
-async function servable(): Promise<{ id: string; domain: string; certPem: string; keyPem: string }[]> {
+async function servable(): Promise<Servable[]> {
     const rows = await prisma.managedCertificate.findMany({
         where: { certPem: { not: null }, certKey: { not: null }, expiresAt: { gt: new Date() } },
-        select: { id: true, domain: true, certPem: true, certKey: true }
+        select: {
+            id: true,
+            domain: true,
+            certPem: true,
+            certKey: true,
+            ownerDomain: { select: { userId: true, orgId: true } }
+        }
     });
     return rows.flatMap((row) => {
         const keyPem = openText(row.certKey);
-        return row.certPem && keyPem ? [{ id: row.id, domain: row.domain, certPem: row.certPem, keyPem }] : [];
+        return row.certPem && keyPem
+            ? [{ id: row.id, domain: row.domain, certPem: row.certPem, keyPem, holder: row.ownerDomain ?? null }]
+            : [];
     });
 }
 
@@ -335,8 +359,9 @@ const pushedKey = (hostId: string): string => `tls.managed.pushed.${hostId}`;
 
 /**
  * Give each other server the certificates for the domains its own edge serves.
- * A server is handed only what covers a name it answers for, and a server that no
- * longer answers for any is given the empty set - which takes the files away.
+ * A server is handed only what covers a name it answers for and is its owner's to
+ * hold (see `mayHandCertificate`), and a server that no longer answers for any is
+ * given the empty set - which takes the files away.
  */
 async function pushRemoteCertificates(): Promise<void> {
     const [certificates, domains] = await Promise.all([
@@ -351,22 +376,30 @@ async function pushRemoteCertificates(): Promise<void> {
                 hostname: true,
                 application: {
                     select: {
-                        target: { select: { hostId: true } },
-                        environment: { select: { project: { select: { ownerId: true } } } }
+                        target: { select: { hostId: true, host: { select: { ownerId: true } } } },
+                        environment: {
+                            select: {
+                                project: { select: { ownerId: true, orgId: true, owner: { select: { isAdmin: true } } } }
+                            }
+                        }
                     }
                 }
             }
         })
     ]);
-    const hosts = new Map<string, { ownerId: string; hostnames: string[] }>();
+    const hosts = new Map<string, { ownerId: string; names: ServedNameFacts[] }>();
     for (const domain of domains) {
-        const hostId = domain.application.target.hostId;
-        if (!hostId) continue;
-        const held = hosts.get(hostId) ?? {
-            ownerId: domain.application.environment.project.ownerId,
-            hostnames: []
-        };
-        held.hostnames.push(domain.hostname);
+        const { hostId, host } = domain.application.target;
+        if (!hostId || !host) continue;
+        const project = domain.application.environment.project;
+        const held = hosts.get(hostId) ?? { ownerId: host.ownerId, names: [] };
+        held.names.push({
+            hostname: domain.hostname,
+            ownerId: project.ownerId,
+            orgId: project.orgId,
+            ownerIsAdmin: project.owner.isAdmin,
+            hostOwnerId: host.ownerId
+        });
         hosts.set(hostId, held);
     }
     if (hosts.size === 0) return;
@@ -375,9 +408,9 @@ async function pushRemoteCertificates(): Promise<void> {
         import("@/lib/host-service")
     ]);
     for (const [hostId, held] of hosts) {
-        const given = certificates.filter((certificate) =>
-            held.hostnames.some((hostname) => covers(certificate.domain, hostname))
-        );
+        const given = certificates
+            .filter((certificate) => held.names.some((name) => mayHandCertificate(certificate, name)))
+            .map(({ id, domain, certPem, keyPem }) => ({ id, domain, certPem, keyPem }));
         const fingerprint = createHash("sha256")
             .update(given.map((certificate) => `${certificate.id}:${certificate.certPem}`).join("\n"))
             .digest("hex");

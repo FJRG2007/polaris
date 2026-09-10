@@ -1,5 +1,5 @@
 /** POST /api/v1/deploy/environments/:id/variables/import - read a `.env` file's
- *  contents into the environment's shared variables: `{ text, secret }`. */
+ *  contents into the environment's shared variables: `{ text, secret, redeploy }`. */
 
 import { importRoute } from "@/lib/deploy/api/variable-routes";
 

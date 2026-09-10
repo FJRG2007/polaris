@@ -163,7 +163,7 @@ function fail(id: JsonRpcId, code: number, message: string, data?: unknown): Jso
  * have permission to move that task" is. Reporting the second as the first hides
  * it from the only party who can do anything about it.
  */
-function toolFailure(id: JsonRpcId, message: string): JsonRpcResponse {
+export function toolFailure(id: JsonRpcId, message: string): JsonRpcResponse {
     return ok(id, { content: [{ type: "text", text: message }], isError: true });
 }
 

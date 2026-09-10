@@ -87,7 +87,11 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
     const issueNumber = payload.issue?.number ?? prNumber;
     const branch = payload.pull_request?.base?.ref ?? null;
     const headRepo = payload.pull_request?.head?.repo?.full_name ?? null;
-    const fromFork = Boolean(headRepo && payload.repository?.full_name && headRepo !== payload.repository.full_name);
+    // A pull request whose head repository GitHub no longer knows - a deleted
+    // fork - is treated as a fork: nothing says the code is the repository's own.
+    const fromFork = payload.pull_request
+        ? !headRepo || headRepo.toLowerCase() !== (payload.repository?.full_name ?? "").toLowerCase()
+        : false;
     const base = { issueNumber, prNumber, actor, labels, branch, fromFork };
 
     // A comment or a review body is newly authored by definition: the event IS
