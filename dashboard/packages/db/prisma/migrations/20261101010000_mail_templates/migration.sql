@@ -20,6 +20,10 @@ CREATE INDEX IF NOT EXISTS "MailTemplate_accountId_idx" ON "MailTemplate"("accou
 
 CREATE UNIQUE INDEX IF NOT EXISTS "MailTemplate_userId_name_key" ON "MailTemplate"("userId", "name");
 
+-- A constraint has no conditional form, so each is dropped by name first: a
+-- second run of this migration then puts it back rather than failing.
+ALTER TABLE "MailTemplate" DROP CONSTRAINT IF EXISTS "MailTemplate_userId_fkey";
 ALTER TABLE "MailTemplate" ADD CONSTRAINT "MailTemplate_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+ALTER TABLE "MailTemplate" DROP CONSTRAINT IF EXISTS "MailTemplate_accountId_fkey";
 ALTER TABLE "MailTemplate" ADD CONSTRAINT "MailTemplate_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "MailAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
