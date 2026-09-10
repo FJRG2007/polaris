@@ -15,10 +15,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { parseHttpLogs } from "@polaris/deploy";
-import { tunnelHostForApp } from "./quick-tunnel-service";
-import { countsAsVisit, hostnameCovers, sleepDecision, sleepRefusal } from "@polaris/core";
-import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
+import { sleepDecision, sleepRefusal } from "@polaris/core";
+import { readEdgeVisits, serviceHostnames, visitTimes } from "./edge-visits";
 
 /** When this process started: a service is not known to have been idle before it. */
 const STARTED_AT = Date.now();
@@ -48,9 +46,7 @@ export async function runSleepPass(now = Date.now()): Promise<{ asleep: number; 
     });
     if (apps.length === 0) return { asleep: 0, woke: 0, slept: 0 };
 
-    const entries = parseHttpLogs(await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES));
-    const times = entries.map((entry) => (entry.time ? Date.parse(entry.time) : Number.NaN));
-    const windowStart = times.filter(Number.isFinite).reduce<number | null>((min, t) => (min === null || t < min ? t : min), null);
+    const log = await readEdgeVisits();
 
     const deployments = new Map(
         (
@@ -66,22 +62,17 @@ export async function runSleepPass(now = Date.now()): Promise<{ asleep: number; 
     let woke = 0;
     let slept = 0;
     for (const app of apps) {
-        const names = [...app.domains.map((domain) => domain.hostname.toLowerCase()), tunnelHostForApp(app.id).toLowerCase()];
         let lastVisit: number | null = null;
-        entries.forEach((entry, index) => {
-            const at = times[index];
-            if (at === undefined || !Number.isFinite(at) || !entry.host || !countsAsVisit(entry)) return;
-            const host = entry.host.toLowerCase().split(":")[0] ?? "";
-            if (!names.some((name) => hostnameCovers(name, host))) return;
+        for (const at of visitTimes(log, serviceHostnames(app))) {
             if (lastVisit === null || at > lastVisit) lastVisit = at;
-        });
+        }
         // Asleep but no longer allowed to be (moved, scaled out) wakes like a visit would.
         const sleeps = sleepRefusal(app) === null ? app.sleepAfterMinutes : null;
         const decision = sleepDecision({
             sleepAfterMinutes: sleeps,
             asleepSince: app.asleepSince?.getTime() ?? null,
             lastVisit,
-            windowStart,
+            windowStart: log.windowStart,
             awakeSince: Math.max(STARTED_AT, deployments.get(app.currentDeploymentId as string) ?? 0, wokenAt.get(app.id) ?? 0),
             now
         });
