@@ -20,6 +20,7 @@ import { relativeTime } from "@/lib/relative-time";
 import { DeployCallouts } from "./deploy-callouts";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
+import { VariablesEditor } from "./variables-editor";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { useParams, useRouter } from "next/navigation";
@@ -80,8 +81,6 @@ import {
     CircleStop,
     Download,
     ExternalLink,
-    Eye,
-    EyeOff,
     Globe,
     Loader2,
     MapPin,
@@ -1743,89 +1742,6 @@ function HttpLogsView({
 function VariablesTab({ app }: { app: ProjectApp }) {
     const can = useProjectCan();
     const [scope, setScope] = useState<"application" | "environment">("application");
-    const scopeId = scope === "application" ? app.id : app.environmentId;
-    const [items, setItems] = useState<Awaited<
-        ReturnType<typeof deployActions.listEnvVarsAction>
-    > | null>(null);
-    const [key, setKey] = useState("");
-    const [value, setValue] = useState("");
-    const [isSecret, setIsSecret] = useState(true);
-    // Revealed values, keyed by id: non-secrets use the listed value, secrets are
-    // decrypted on demand so a secret only reaches the client when the eye is clicked.
-    const [revealed, setRevealed] = useState<Record<string, string>>({});
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-    const [raw, setRaw] = useState("");
-    const [rawOpen, setRawOpen] = useState(false);
-    const [showAdd, setShowAdd] = useState(false);
-    const [note, setNote] = useState<string | null>(null);
-
-    function reload() {
-        setItems(null);
-        setRevealed({});
-        void deployActions.listEnvVarsAction(scope, scopeId).then(setItems);
-    }
-    useEffect(reload, [scope, scopeId]);
-
-    function toggleReveal(item: { id: string; isSecret: boolean; value: string | null }) {
-        if (item.id in revealed) {
-            setRevealed((prev) => {
-                const next = { ...prev };
-                delete next[item.id];
-                return next;
-            });
-            return;
-        }
-        if (!item.isSecret) {
-            setRevealed((prev) => ({ ...prev, [item.id]: item.value ?? "" }));
-            return;
-        }
-        void deployActions.revealEnvVarAction(item.id).then((result) => {
-            if (typeof result.value === "string")
-                setRevealed((prev) => ({ ...prev, [item.id]: result.value as string }));
-        });
-    }
-
-    function importRaw() {
-        setError(null);
-        setNote(null);
-        startTransition(async () => {
-            const result = await deployActions.importEnvVarsAction({
-                scope,
-                scopeId,
-                text: raw,
-                isSecret: true
-            });
-            if (result.error) setError(result.error);
-            else {
-                setRaw("");
-                setRawOpen(false);
-                setNote(`Imported ${result.count} variable${result.count === 1 ? "" : "s"}.`);
-                reload();
-            }
-        });
-    }
-
-    function add() {
-        setError(null);
-        startTransition(async () => {
-            const result = await deployActions.saveEnvVarAction({
-                scope,
-                scopeId,
-                key,
-                value,
-                isSecret
-            });
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setKey("");
-            setValue("");
-            reload();
-        });
-    }
-
     return (
         <div className="flex flex-col gap-4 py-2">
             <SegmentedControl
@@ -1838,158 +1754,13 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     { value: "environment", label: "Environment (shared)" }
                 ]}
             />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                    {items ? items.length : 0} {scope === "environment" ? "environment" : "service"}{" "}
-                    variable
-                    {items && items.length === 1 ? "" : "s"}
-                </span>
-                {can("variables.write") && (
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setRawOpen((open) => !open)}
-                        >
-                            {"{ } Raw Editor"}
-                        </Button>
-                        <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
-                            <Plus className="size-4" /> New Variable
-                        </Button>
-                    </div>
-                )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-                Point at another service instead of copying its value:{" "}
-                <code className="font-mono">{"${{postgres.DATABASE_URL}}"}</code> or{" "}
-                <code className="font-mono">{"${{shared.KEY}}"}</code>. References are read on every
-                deploy, and a copied environment resolves them to its own services.
-            </p>
-            {note && <p className="text-xs text-success">{note}</p>}
-            {rawOpen && (
-                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
-                    <span className="text-xs font-medium text-muted-foreground">
-                        Paste a .env - KEY=value per line. Quotes, spaces, `export` and # comments
-                        are handled.
-                    </span>
-                    <Textarea
-                        value={raw}
-                        onChange={(event) => setRaw(event.target.value)}
-                        rows={6}
-                        placeholder={
-                            'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'
-                        }
-                        className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs "
-                    />
-                    <div className="flex items-center justify-between gap-2">
-                        <label className="cursor-pointer text-xs text-primary hover:underline">
-                            Upload a .env file
-                            <input
-                                type="file"
-                                accept=".env,text/plain"
-                                className="hidden"
-                                onChange={(event) => {
-                                    const file = event.target.files?.[0];
-                                    if (file)
-                                        void file
-                                            .text()
-                                            .then((text) =>
-                                                setRaw((prev) => (prev ? `${prev}\n${text}` : text))
-                                            );
-                                }}
-                            />
-                        </label>
-                        <Button onClick={importRaw} disabled={pending || !raw.trim()}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Import
-                        </Button>
-                    </div>
-                </div>
-            )}
-            {showAdd && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
-                    <Input
-                        value={key}
-                        onChange={(event) => setKey(event.target.value)}
-                        placeholder="KEY"
-                        className="w-44 font-mono"
-                    />
-                    <Input
-                        value={value}
-                        onChange={(event) => setValue(event.target.value)}
-                        placeholder="value"
-                        className="min-w-0 flex-1"
-                    />
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Switch checked={isSecret} onChange={setIsSecret} aria-label="Secret" />{" "}
-                        secret
-                    </label>
-                    <Button onClick={add} disabled={pending || !key.trim()}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : "Add"}
-                    </Button>
-                </div>
-            )}
-            {items === null ? (
-                <Loading />
-            ) : items.length === 0 ? (
-                <Empty text="No variables yet. Add one or paste a .env." />
-            ) : (
-                <ul className="flex flex-col">
-                    {items.map((item) => {
-                        const shown = item.id in revealed;
-                        return (
-                            <li
-                                key={item.id}
-                                className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm"
-                            >
-                                <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
-                                <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">
-                                    {item.key}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                                    {shown ? (
-                                        revealed[item.id] || (
-                                            <span className="text-muted-foreground/50">
-                                                (empty)
-                                            </span>
-                                        )
-                                    ) : (
-                                        <SecretMask />
-                                    )}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => toggleReveal(item)}
-                                    className="text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
-                                    aria-label={shown ? "Hide value" : "Reveal value"}
-                                >
-                                    {shown ? (
-                                        <EyeOff className="size-3.5" />
-                                    ) : (
-                                        <Eye className="size-3.5" />
-                                    )}
-                                </button>
-                                {can("variables.write") && (
-                                    <button
-                                        type="button"
-                                        title="Remove"
-                                        aria-label={`Remove ${item.key}`}
-                                        onClick={() =>
-                                            startTransition(async () => {
-                                                await deployActions.deleteEnvVarAction(item.id);
-                                                reload();
-                                            })
-                                        }
-                                        className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </button>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-            {error && <p className="text-sm text-danger">{error}</p>}
+            <VariablesEditor
+                scope={scope}
+                scopeId={scope === "application" ? app.id : app.environmentId}
+                canWrite={can("variables.write")}
+                canDeploy={can("deploy.run")}
+                redeployTarget={scope === "application" ? "this service" : "every deployed service in this environment"}
+            />
         </div>
     );
 }
@@ -3776,15 +3547,4 @@ function Loading() {
 
 function Empty({ text }: { text: string }) {
     return <EmptyState bare title={text} />;
-}
-
-/** A masked value placeholder: fixed-width dots, so secrets never render as text. */
-function SecretMask() {
-    return (
-        <span className="inline-flex items-center gap-0.5 align-middle">
-            {Array.from({ length: 8 }).map((_, index) => (
-                <span key={index} className="size-1 rounded-full bg-muted-foreground/50" />
-            ))}
-        </span>
-    );
 }

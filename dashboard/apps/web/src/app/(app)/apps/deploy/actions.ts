@@ -76,13 +76,9 @@ import {
     type DbEngine
 } from "@/lib/database-service";
 import {
-    deleteEnvVar,
     envVarScope,
     listEnvVars,
-    parseDotEnv,
     revealEnvVar,
-    setEnvVar,
-    setEnvVars,
     type EnvScope,
     type EnvVarView
 } from "@/lib/env-var-service";
@@ -515,97 +511,6 @@ export async function listEnvVarsAction(scope: EnvScope, scopeId: string): Promi
     return listEnvVars(scope, scopeId, access.ownerId);
 }
 
-export async function saveEnvVarAction(input: {
-    scope: EnvScope;
-    scopeId: string;
-    key: string;
-    value: string;
-    isSecret: boolean;
-}): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        const access = await requireEnvScopeAccess(
-            input.scope,
-            input.scopeId,
-            user.id,
-            "variables.write"
-        );
-        await setEnvVar(input.scope, input.scopeId, access.ownerId, {
-            key: input.key,
-            value: input.value,
-            isSecret: input.isSecret
-        });
-        await recordVariableEvent(user.id, access.orgId, input.scope, input.scopeId, "deploy.variable.set", {
-            key: input.key.trim(),
-            secret: input.isSecret
-        });
-        if (input.scope === "application") {
-            await activity.record({
-                subjectType: "app",
-                subjectId: input.scopeId,
-                userId: user.id,
-                action: "variable",
-                toValue: input.key
-            });
-        }
-        void deployService
-            .redeployForEnvScope(input.scope, input.scopeId, access.ownerId)
-            .catch(() => undefined);
-        revalidatePath(DEPLOY_PATH);
-        return {};
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the variable" };
-    }
-}
-
-/** Import a pasted .env blob as variables (quotes/spaces/export handled). */
-export async function importEnvVarsAction(input: {
-    scope: EnvScope;
-    scopeId: string;
-    text: string;
-    isSecret: boolean;
-}): Promise<{ error?: string; count?: number }> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        const access = await requireEnvScopeAccess(
-            input.scope,
-            input.scopeId,
-            user.id,
-            "variables.write"
-        );
-        const parsed = parseDotEnv(input.text).map((item) => ({
-            ...item,
-            isSecret: input.isSecret
-        }));
-        if (parsed.length === 0) return { error: "No KEY=value lines found" };
-        const count = await setEnvVars(input.scope, input.scopeId, access.ownerId, parsed);
-        await recordVariableEvent(
-            user.id,
-            access.orgId,
-            input.scope,
-            input.scopeId,
-            "deploy.variable.import",
-            { keys: parsed.map((item) => item.key), saved: count, secret: input.isSecret }
-        );
-        if (input.scope === "application") {
-            await activity.record({
-                subjectType: "app",
-                subjectId: input.scopeId,
-                userId: user.id,
-                action: "variables-imported",
-                toValue: String(count)
-            });
-        }
-        void deployService
-            .redeployForEnvScope(input.scope, input.scopeId, access.ownerId)
-            .catch(() => undefined);
-        revalidatePath(DEPLOY_PATH);
-        return { count };
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not import variables" };
-    }
-}
-
 export async function revealEnvVarAction(
     id: string
 ): Promise<{ value?: string | null; error?: string }> {
@@ -630,43 +535,6 @@ export async function revealEnvVarAction(
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not reveal the variable"
-        };
-    }
-}
-
-export async function deleteEnvVarAction(id: string): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        const located = await envVarScope(id);
-        if (!located) return { error: "That variable no longer exists" };
-        const access = await requireEnvScopeAccess(
-            located.scope,
-            located.scopeId,
-            user.id,
-            "variables.write"
-        );
-        const scope = await deleteEnvVar(id, access.ownerId);
-        if (scope) {
-            await recordVariableEvent(user.id, access.orgId, scope.scope, scope.scopeId, "deploy.variable.remove", {
-                key: located.key
-            });
-            void deployService
-                .redeployForEnvScope(scope.scope, scope.scopeId, access.ownerId)
-                .catch(() => undefined);
-        }
-        if (scope?.scope === "application") {
-            await activity.record({
-                subjectType: "app",
-                subjectId: scope.scopeId,
-                userId: user.id,
-                action: "variable-removed"
-            });
-        }
-        revalidatePath(DEPLOY_PATH);
-        return {};
-    } catch (caught) {
-        return {
-            error: caught instanceof Error ? caught.message : "Could not remove the variable"
         };
     }
 }

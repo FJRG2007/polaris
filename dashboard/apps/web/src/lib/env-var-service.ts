@@ -146,33 +146,27 @@ export async function setEnvVar(
     }
 }
 
+/** Moved to a pure module so the browser can stage a paste; kept here for callers. */
+export { parseDotEnv } from "./deploy/dotenv";
+
 /**
- * Parse a pasted .env blob into key/value pairs. Tolerates `export`, comments,
- * blank lines, surrounding single/double quotes, and inline `#` comments on
- * unquoted values. Values keep internal spaces.
+ * Mark a variable secret or plain without its value leaving the server: a
+ * plain value is sealed where it stands, a secret is opened and stored as text.
+ * Nothing to do when it already is what was asked.
  */
-export function parseDotEnv(text: string): Array<{ key: string; value: string }> {
-    const out: Array<{ key: string; value: string }> = [];
-    for (const raw of text.split(/\r?\n/)) {
-        const line = raw.trim();
-        if (!line || line.startsWith("#")) continue;
-        const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-        if (!match || !match[1]) continue;
-        const key = match[1];
-        let value = (match[2] ?? "").trim();
-        if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-        ) {
-            value = value.slice(1, -1);
-        } else {
-            // Strip a trailing inline comment on an unquoted value.
-            const hash = value.indexOf(" #");
-            if (hash >= 0) value = value.slice(0, hash).trim();
-        }
-        out.push({ key, value });
+export async function setEnvVarSecrecy(id: string, ownerId: string, isSecret: boolean): Promise<void> {
+    const row = await prisma.envVar.findUnique({ where: { id } });
+    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) {
+        throw new Error("That variable no longer exists");
     }
-    return out;
+    await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    if (row.isSecret === isSecret) return;
+    const value = row.isSecret ? await revealEnvVar(id, ownerId) : row.value;
+    await setEnvVar(row.scopeType as EnvScope, row.scopeId, ownerId, {
+        key: row.key,
+        value: value ?? "",
+        isSecret
+    });
 }
 
 /** Set many variables at once (used by the .env paste import). */
