@@ -50,6 +50,12 @@ export interface ProjectEnvironmentView {
     isDefault: boolean;
     serviceCount: number;
     createdAt: string;
+    /** The branch its repository-built services follow, when it names one. */
+    branch: string | null;
+    /** The pull request it previews, when it is a preview. */
+    pullRequest: number | null;
+    /** "owner/repo" that pull request is on. */
+    previewRepo: string | null;
 }
 
 export interface ProjectSettingsView {
@@ -79,6 +85,9 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
                     slug: true,
                     isDefault: true,
                     createdAt: true,
+                    branch: true,
+                    pullRequest: true,
+                    previewRepo: true,
                     _count: { select: { applications: true, databases: true } }
                 }
             }
@@ -91,7 +100,10 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         slug: environment.slug,
         isDefault: environment.isDefault,
         serviceCount: environment._count.applications + environment._count.databases,
-        createdAt: environment.createdAt.toISOString()
+        createdAt: environment.createdAt.toISOString(),
+        branch: environment.branch,
+        pullRequest: environment.pullRequest,
+        previewRepo: environment.previewRepo
     }));
     return {
         id: project.id,

@@ -11,10 +11,10 @@
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
+import { useProjectCan } from "./access-context";
 import { LogViewer } from "@/components/log-viewer";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
-import { useProjectCan } from "./access-context";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
@@ -669,6 +669,12 @@ function DatabaseConnectionDialog({
                 )}
                 {connection && (
                     <div className="flex flex-col gap-3">
+                        <Field
+                            label="Reference"
+                            hint="Paste into a service's variable. It resolves to this database's address on every deploy, and to the copy's database in a copied environment."
+                        >
+                            <CopyRow value={connection.reference} />
+                        </Field>
                         <Field
                             label="Connection URI"
                             hint="Reachable by name from any service in this environment."

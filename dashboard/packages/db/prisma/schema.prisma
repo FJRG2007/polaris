@@ -3882,6 +3882,18 @@ model Environment {
     isDefault Boolean  @default(false)
     // Canvas layout as stringified JSON: { pos: {serviceId:{x,y}}, links: [{source,target}] }.
     layout    String   @default("{}")
+    // The git branch every repository-built service in this environment builds
+    // from and follows, overriding each service's own. Null means each service's
+    // own branch, which is what an environment made by hand has always meant.
+    branch        String?
+    // Set on an environment made for one pull request: its number, the
+    // repository it was opened on ("owner/repo"), the environment it was cloned
+    // from, and the head commit last deployed. Such an environment is removed
+    // when the pull request closes.
+    pullRequest   Int?
+    previewRepo   String?
+    previewOfId   String?  @db.Uuid
+    previewSha    String?
     createdAt DateTime @default(now())
 
     project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)

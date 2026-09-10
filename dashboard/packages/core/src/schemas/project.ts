@@ -84,6 +84,13 @@ export const PROJECT_FLAGS = [
         default: true
     },
     {
+        id: "previewEnvironments",
+        label: "Preview environments",
+        description:
+            "Every pull request gets its own copy of the default environment, with its own databases and address, deployed from the pull request's branch and removed when it closes. Pull requests from forks are skipped.",
+        default: false
+    },
+    {
         id: "wipeVolumesOnDelete",
         label: "Wipe volumes on delete",
         description:
@@ -205,6 +212,46 @@ export const environmentNameSchema = z.object({
     environmentId: z.string().uuid(),
     name: projectName
 });
+
+/**
+ * A git branch name, by the rules `git check-ref-format` holds it to: no spaces
+ * or control characters, none of `~ ^ : ? * [ \`, no `..` or `@{`, no empty
+ * component, and nothing that reads as an option. It reaches `git clone
+ * --branch`, so this is the line between a name and a flag.
+ */
+export function isGitBranchName(value: string): boolean {
+    return (
+        value.length > 0 &&
+        value.length <= 255 &&
+        !hasControlChar(value) &&
+        !value.includes(String.fromCharCode(0x7f)) &&
+        !/[\s~^:?*[\\]/.test(value) &&
+        !value.startsWith("-") &&
+        !value.startsWith("/") &&
+        !value.endsWith("/") &&
+        !value.endsWith(".") &&
+        !value.endsWith(".lock") &&
+        !value.includes("..") &&
+        !value.includes("@{") &&
+        !value.includes("//")
+    );
+}
+
+export const gitBranchName = z
+    .string()
+    .trim()
+    .refine(isGitBranchName, "That is not a branch name git accepts");
+
+/** A new environment: its name, and optionally what it starts as and follows. */
+export const environmentCreateSchema = z.object({
+    projectId: z.string().uuid(),
+    name: projectName,
+    cloneFrom: z.string().uuid().optional(),
+    branch: gitBranchName.optional().or(z.literal("").transform(() => undefined)),
+    deploy: z.boolean().default(false)
+});
+
+export type EnvironmentCreateInput = z.infer<typeof environmentCreateSchema>;
 
 /** The deploy events an endpoint can subscribe to. An empty selection means all
  *  of them, so a webhook added without a choice still reports something. */

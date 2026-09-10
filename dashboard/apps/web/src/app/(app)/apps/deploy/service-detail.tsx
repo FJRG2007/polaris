@@ -1834,6 +1834,12 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     </div>
                 )}
             </div>
+            <p className="text-xs text-muted-foreground">
+                Point at another service instead of copying its value:{" "}
+                <code className="font-mono">{"${{postgres.DATABASE_URL}}"}</code> or{" "}
+                <code className="font-mono">{"${{shared.KEY}}"}</code>. References are read on every
+                deploy, and a copied environment resolves them to its own services.
+            </p>
             {note && <p className="text-xs text-success">{note}</p>}
             {rawOpen && (
                 <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">

@@ -14,9 +14,9 @@
  */
 
 import Link from "next/link";
-import { createProjectAction } from "./actions";
 import { Plus } from "lucide-react";
 import { SECTIONS } from "./project-sections";
+import { createProjectAction } from "./actions";
 import { HeaderPortal } from "@/components/header-portal";
 import { useState, useTransition, type ReactNode } from "react";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
@@ -154,6 +154,7 @@ export function ProjectShell({
                 open={showNewEnv}
                 onOpenChange={setShowNewEnv}
                 onCreated={(id) => selectEnvironment(id)}
+                environments={project.environments}
             />
         </div>
         </StagedChangesProvider>

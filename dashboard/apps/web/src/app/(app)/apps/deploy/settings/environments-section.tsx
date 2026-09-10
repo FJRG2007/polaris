@@ -141,10 +141,28 @@ export function EnvironmentsSection({
                                                     Default
                                                 </span>
                                             )}
+                                            {environment.pullRequest !== null && environment.previewRepo && (
+                                                <a
+                                                    href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    title="Open the pull request this previews"
+                                                    className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
+                                                >
+                                                    Preview of #{environment.pullRequest}
+                                                </a>
+                                            )}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {environment.serviceCount}{" "}
-                                            {environment.serviceCount === 1 ? "service" : "services"} - created{" "}
+                                            {environment.serviceCount === 1 ? "service" : "services"}
+                                            {environment.branch ? (
+                                                <>
+                                                    {" - follows "}
+                                                    <span className="font-mono">{environment.branch}</span>
+                                                </>
+                                            ) : null}
+                                            {" - created "}
                                             {display.date(environment.createdAt)}
                                         </p>
                                     </div>
@@ -201,7 +219,12 @@ export function EnvironmentsSection({
                 )}
             </SettingsCard>
 
-            <NewEnvironmentDialog projectId={settings.id} open={creating} onOpenChange={setCreating} />
+            <NewEnvironmentDialog
+                projectId={settings.id}
+                open={creating}
+                onOpenChange={setCreating}
+                environments={settings.environments}
+            />
 
             <ConfirmDeleteDialog
                 open={deleting !== null}

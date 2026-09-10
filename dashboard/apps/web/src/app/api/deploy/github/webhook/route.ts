@@ -14,9 +14,11 @@
  * public domain; LAN-only installs fall back to polling on both counts.
  */
 
+import { z } from "zod";
 import { recordWorkflowJob } from "@/lib/runners/runner-demand";
 import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
 import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy-service";
+import { closePullRequestPreview, ensurePullRequestPreview } from "@/lib/deploy/environments";
 import { getGithubWebhookSecret, githubAppHandle, verifyWebhookSignature } from "@/lib/github-service";
 
 /** Events that concern the Agents app. Named rather than inferred so an event
@@ -62,6 +64,48 @@ interface WorkflowJobPayload {
     workflow_job?: { labels?: string[] };
 }
 
+/** The fields of a `pull_request` event a preview needs, validated rather than
+ *  trusted: a signed payload is GitHub's, but its shape is still its business. */
+const pullRequestEvent = z.object({
+    action: z.string(),
+    number: z.number().int().positive(),
+    repository: z.object({ full_name: z.string().min(3).max(200) }),
+    pull_request: z.object({
+        title: z.string().max(1000).default(""),
+        head: z.object({
+            ref: z.string().min(1).max(255),
+            sha: z.string().regex(/^[0-9a-f]{40}$/i),
+            repo: z.object({ full_name: z.string() }).nullable().optional()
+        }),
+        user: z.object({ login: z.string(), avatar_url: z.string().url() }).partial().nullable().optional()
+    })
+});
+
+/**
+ * Open or close a pull request's preview environments. Opened and reopened
+ * create one; closed - merged or not - removes it. A push to the branch is what
+ * keeps an open one current, through ordinary auto-deploy, so `synchronize` is
+ * deliberately not handled here: it arrives beside the push and would deploy the
+ * same commit twice.
+ */
+async function handlePreviewEvent(payload: unknown): Promise<number> {
+    const parsed = pullRequestEvent.safeParse(payload);
+    if (!parsed.success) return 0;
+    const { action, number, repository, pull_request: pull } = parsed.data;
+    if (action === "closed") return closePullRequestPreview(repository.full_name, number);
+    if (action !== "opened" && action !== "reopened") return 0;
+    return ensurePullRequestPreview({
+        repo: repository.full_name,
+        number,
+        title: pull.title,
+        headBranch: pull.head.ref,
+        headSha: pull.head.sha,
+        headRepo: pull.head.repo?.full_name ?? "",
+        authorName: pull.user?.login ?? null,
+        authorAvatarUrl: pull.user?.avatar_url ?? null
+    });
+}
+
 export async function POST(request: Request): Promise<Response> {
     const event = request.headers.get("x-github-event");
     const signature = request.headers.get("x-hub-signature-256") ?? "";
@@ -105,6 +149,16 @@ export async function POST(request: Request): Promise<Response> {
             payload = JSON.parse(raw);
         } catch {
             return new Response("bad payload", { status: 400 });
+        }
+        // A pull request also opens and closes its preview environments. Both
+        // concerns get the event; neither depends on the other going through.
+        // Not awaited: cloning and queueing a whole environment can outlast the
+        // ten seconds GitHub waits for an answer, and a delivery it gave up on is
+        // one it retries.
+        if (event === "pull_request") {
+            void handlePreviewEvent(payload).catch((error: unknown) => {
+                console.error("polaris: a preview environment could not be updated:", error);
+            });
         }
         const appHandle = await githubAppHandle();
         if (!appHandle) return Response.json({ ok: true });

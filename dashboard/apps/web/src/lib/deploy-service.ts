@@ -7,7 +7,6 @@
  */
 
 import { prisma } from "@polaris/db";
-import { loadEnv } from "@polaris/config";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
@@ -15,7 +14,7 @@ import { appBaseUrl } from "./domain-service";
 import * as activity from "./activity/activity";
 import * as comments from "./comments/comments";
 import { commitUrl } from "./deploy/commit-url";
-import { decryptSecret } from "@polaris/storage";
+import { trackedBranch } from "./deploy/branches";
 import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
 import { getLatestCommit } from "./github-service";
@@ -28,10 +27,12 @@ import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
+import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
+import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -283,15 +284,23 @@ export async function getProjectFull(projectId: string, ownerId: string) {
     });
 }
 
-/** Add an environment (e.g. "Development") to a project the owner owns. */
-export async function createEnvironment(projectId: string, ownerId: string, name: string) {
+/** Add an environment (e.g. "Development") to a project the owner owns. With a
+ *  branch, every repository-built service added to it builds from that branch. */
+export async function createEnvironment(
+    projectId: string,
+    ownerId: string,
+    name: string,
+    branch?: string | null
+) {
     const project = await prisma.project.findFirst({ where: { id: projectId, ownerId } });
     if (!project) throw new Error("Project not found");
     const slug = slugify(name);
     if (!slug) throw new Error("Environment name must contain letters or digits");
     const existing = await prisma.environment.findFirst({ where: { projectId, slug } });
     if (existing) throw new Error("An environment with that name already exists");
-    return prisma.environment.create({ data: { projectId, name, slug, isDefault: false } });
+    return prisma.environment.create({
+        data: { projectId, name, slug, isDefault: false, branch: branch?.trim() || null }
+    });
 }
 
 /** Persist an environment's canvas layout (node positions + links) as JSON. */
@@ -1799,20 +1808,12 @@ export async function duplicateApplication(
             keepReleases: app.keepReleases
         }
     });
-    const vars = await prisma.envVar.findMany({
-        where: { scopeType: "application", scopeId: app.id }
-    });
-    for (const variable of vars) {
-        await prisma.envVar.create({
-            data: {
-                scopeType: "application",
-                scopeId: created.id,
-                key: variable.key,
-                value: variable.value,
-                isSecret: variable.isSecret
-            }
-        });
-    }
+    // With their ciphertext: copying only `value` gave every secret on the copy
+    // an empty value, since a secret's plaintext column is empty by design.
+    await copyScopeValues(
+        { scopeType: "application", scopeId: app.id },
+        { scopeType: "application", scopeId: created.id }
+    );
     return created.id;
 }
 
@@ -1842,6 +1843,8 @@ async function buildAppPlan(
     gitSource?: GitSource;
     buildCommands?: BuildCommands;
     keepsHistory: boolean;
+    /** Variable references nothing in the environment answers, as written. */
+    unresolved: string[];
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -1860,7 +1863,16 @@ async function buildAppPlan(
     const ref = kept ? releaseRef(base, releaseMarker(release)) : base;
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
-    const env = await mergedEnv(app.environmentId, app.id);
+    // References to other services and databases are read here, inside this
+    // service's environment, so a cloned environment's copy finds the clone's
+    // database under the same name. What cannot be resolved goes back to the
+    // caller, which refuses to deploy on it.
+    const references = await resolveServiceReferences(await mergedEnv(app.environmentId, app.id), {
+        environmentId: app.environmentId,
+        applicationId: app.id,
+        ownerId
+    });
+    const env = references.env;
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
     // persisted), so a remote hub keeps the public URL from its stored env.
@@ -2046,7 +2058,10 @@ async function buildAppPlan(
     if (typeof source.repoUrl === "string" && source.repoUrl) {
         gitSource = {
             repoUrl: source.repoUrl,
-            branch: typeof source.branch === "string" ? source.branch : undefined
+            // A branch environment builds every service in it from its branch.
+            branch:
+                app.environment.branch ??
+                (typeof source.branch === "string" ? source.branch : undefined)
         };
         // GitHub-sourced repos clone with the project owner's own account so their
         // private repositories build, falling back to the App installation an
@@ -2086,7 +2101,14 @@ async function buildAppPlan(
                   startCommand: stringOrNull(build.startCommand)
               }
             : undefined;
-    return { plan, target: app.target, gitSource, buildCommands, keepsHistory: keepsReleases(app) };
+    return {
+        plan,
+        target: app.target,
+        gitSource,
+        buildCommands,
+        keepsHistory: keepsReleases(app),
+        unresolved: references.unresolved
+    };
 }
 
 /** A stored setting as a command, or null when it was never set. Blank is not an
@@ -2177,6 +2199,62 @@ async function telemetryEnv(environmentId: string): Promise<Record<string, strin
     }
 }
 
+/**
+ * What every service is told about where it runs, without anybody setting it.
+ *
+ * The names and addresses an application otherwise has to be told by hand, and
+ * gets wrong when it is copied: a preview that still says it is production in
+ * its own logs, a service that builds its callback URL from a hostname pasted in
+ * last year. Underneath everything the operator sets, like the telemetry
+ * address, so a value somebody chose always wins.
+ */
+async function systemEnv(
+    environmentId: string,
+    applicationId: string
+): Promise<Record<string, string>> {
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: {
+            id: true,
+            slug: true,
+            name: true,
+            currentDeploymentId: true,
+            environment: {
+                select: {
+                    id: true,
+                    name: true,
+                    branch: true,
+                    pullRequest: true,
+                    project: { select: { id: true, name: true, slug: true } }
+                }
+            },
+            domains: {
+                where: { enabled: true, deploymentId: null, kind: { not: "lan" } },
+                select: { hostname: true },
+                orderBy: { createdAt: "asc" },
+                take: 1
+            }
+        }
+    });
+    if (!app || app.environment.id !== environmentId) return {};
+    const release = await currentReleaseRef(app);
+    const domain = app.domains[0]?.hostname;
+    return {
+        POLARIS_PROJECT_ID: app.environment.project.id,
+        POLARIS_PROJECT_NAME: app.environment.project.name,
+        POLARIS_ENVIRONMENT_ID: app.environment.id,
+        POLARIS_ENVIRONMENT_NAME: app.environment.name,
+        POLARIS_SERVICE_ID: app.id,
+        POLARIS_SERVICE_NAME: app.name,
+        POLARIS_PRIVATE_DOMAIN: release.name,
+        ...(domain ? { POLARIS_PUBLIC_DOMAIN: domain } : {}),
+        ...(app.environment.branch ? { POLARIS_GIT_BRANCH: app.environment.branch } : {}),
+        ...(app.environment.pullRequest !== null
+            ? { POLARIS_PULL_REQUEST: String(app.environment.pullRequest) }
+            : {})
+    };
+}
+
 async function mergedEnv(
     environmentId: string,
     applicationId: string
@@ -2194,22 +2272,14 @@ async function mergedEnv(
         (a, b) =>
             (a.scopeType === "environment" ? -1 : 1) - (b.scopeType === "environment" ? -1 : 1)
     );
-    const masterKey = loadEnv().POLARIS_MASTER_KEY;
     // Underneath everything the operator set, so their own value wins.
-    const env: Record<string, string> = await telemetryEnv(environmentId);
+    const env: Record<string, string> = {
+        ...(await systemEnv(environmentId, applicationId)),
+        ...(await telemetryEnv(environmentId))
+    };
     for (const row of rows) {
-        if (row.isSecret && row.encryptedValue && row.valueNonce) {
-            env[row.key] = decryptSecret(
-                {
-                    ciphertext: Buffer.from(row.encryptedValue),
-                    nonce: Buffer.from(row.valueNonce),
-                    keyId: row.valueKeyId ?? ""
-                },
-                masterKey
-            );
-        } else if (row.value !== null) {
-            env[row.key] = row.value;
-        }
+        const value = decryptedValue(row);
+        if (value !== null) env[row.key] = value;
     }
     return env;
 }
@@ -2234,6 +2304,14 @@ export async function deployApplication(
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
     const { plan, target, buildCommands, keepsHistory } = built;
+    // A service started with `${{postgres.DATABASE_URL}}` as its literal
+    // connection string fails in words that name nothing Polaris could have told
+    // it, so the deploy is refused here instead, naming the reference.
+    if (built.unresolved.length > 0) {
+        throw new Error(
+            `${built.unresolved.join(", ")} ${built.unresolved.length === 1 ? "refers" : "refer"} to nothing in this environment. Check the name, or deploy the database it names first.`
+        );
+    }
     // A rollback runs an image that already exists, so there is no source to
     // reach and nothing to clone.
     const gitSource = rollback ? undefined : built.gitSource;
@@ -3043,9 +3121,7 @@ export async function triggerAutoDeploysForPush(input: {
             repoUrl.endsWith(`/${wanted}`) ||
             repoUrl.endsWith(`/${wanted}.git`);
         if (!matchesRepo) continue;
-        const configuredBranch = (
-            app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")
-        ).trim();
+        const configuredBranch = trackedBranch(app, app.environment);
         if (configuredBranch && configuredBranch !== input.branch) continue;
         if (!commitPassesFilter(input.commitMessage, app.commitFilter)) continue;
         // Several services can track the same repository. Without this every one of

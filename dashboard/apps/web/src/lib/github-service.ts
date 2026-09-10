@@ -1173,6 +1173,66 @@ export async function getChangedFiles(
     }
 }
 
+/** One open pull request, as much of it as a preview environment needs. */
+export interface OpenPullRequest {
+    readonly number: number;
+    readonly title: string;
+    readonly headBranch: string;
+    readonly headSha: string;
+    /** "owner/repo" the head branch lives in - another one for a fork. */
+    readonly headRepo: string;
+    readonly authorName: string | null;
+    readonly authorAvatarUrl: string | null;
+}
+
+/**
+ * The repository's open pull requests, newest first, or null when GitHub would
+ * not say.
+ *
+ * Null is not the same answer as an empty list, and the difference matters to
+ * the one caller: previews are removed for pull requests that are no longer
+ * open, and a failed request read as "none are open" would remove every one.
+ * One page of a hundred, which is more open pull requests than any repository
+ * wants a preview environment for each of.
+ */
+export async function listOpenPullRequests(
+    owner: string,
+    repo: string,
+    token: string | null
+): Promise<OpenPullRequest[] | null> {
+    try {
+        const res = await fetch(`${API}/repos/${owner}/${repo}/pulls?state=open&per_page=100`, {
+            headers: optionalAuthHeaders(token),
+            cache: "no-store"
+        });
+        if (!res.ok) return null;
+        const data = (await res.json()) as Array<{
+            number?: number;
+            title?: string;
+            head?: { ref?: string; sha?: string; repo?: { full_name?: string } | null };
+            user?: { login?: string; avatar_url?: string } | null;
+        }>;
+        if (!Array.isArray(data)) return null;
+        return data.flatMap((pull) =>
+            typeof pull.number === "number" && pull.head?.ref && pull.head.sha
+                ? [
+                      {
+                          number: pull.number,
+                          title: pull.title ?? "",
+                          headBranch: pull.head.ref,
+                          headSha: pull.head.sha,
+                          headRepo: pull.head.repo?.full_name ?? "",
+                          authorName: pull.user?.login ?? null,
+                          authorAvatarUrl: pull.user?.avatar_url ?? null
+                      }
+                  ]
+                : []
+        );
+    } catch {
+        return null;
+    }
+}
+
 // --- Deployments -----------------------------------------------------------
 //
 // The deployment box GitHub renders on a commit and on a pull request, with a

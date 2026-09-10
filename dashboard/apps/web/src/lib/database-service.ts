@@ -261,6 +261,9 @@ export interface DatabaseConnection {
     /** Set when the database is published on the host as well, so it can be
      *  reached from outside the proxy network. */
     readonly exposedPort: number | null;
+    /** What a service's variable says to point at this database by name, so a
+     *  copy of the environment points at the copy's database instead. */
+    readonly reference: string;
 }
 
 /**
@@ -301,7 +304,8 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
         username: creds.username,
         password: creds.password,
         uri,
-        exposedPort: (row.parent ? row.parent.exposePort : row.exposePort) ?? null
+        exposedPort: (row.parent ? row.parent.exposePort : row.exposePort) ?? null,
+        reference: `\${{${row.slug}.DATABASE_URL}}`
     };
 }
 

@@ -20,6 +20,7 @@ import * as deployService from "@/lib/deploy-service";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
+import * as environments from "@/lib/deploy/environments";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
@@ -105,6 +106,7 @@ import {
     canHostMount,
     subjectCommentSchema,
     databaseCreateSchema,
+    environmentCreateSchema,
     DB_ENGINES,
     normalizeRelPath,
     type DatabaseCreateInput,
@@ -205,17 +207,37 @@ export async function deleteProjectAction(projectId: string): Promise<{ error?: 
 export async function createEnvironmentAction(input: {
     projectId: string;
     name: string;
+    /** An environment of the same project to copy, instead of starting empty. */
+    cloneFrom?: string;
+    /** The branch every repository-built service in it follows. */
+    branch?: string;
+    /** Deploy the copy once it exists. */
+    deploy?: boolean;
 }): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
-    const name = input.name?.trim();
-    if (!name) return { error: "An environment name is required" };
+    const parsed = environmentCreateSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Check the environment's details" };
+    }
+    const { name, cloneFrom, branch, deploy } = parsed.data;
     try {
         const access = await requireProjectAccess(input.projectId, user.id, "project.settings");
-        const environment = await deployService.createEnvironment(
-            input.projectId,
-            access.ownerId,
-            name
-        );
+        const environment = cloneFrom
+            ? await environments.cloneEnvironment(cloneFrom, access.ownerId, {
+                  name,
+                  branch,
+                  projectId: input.projectId
+              })
+            : await deployService.createEnvironment(input.projectId, access.ownerId, name, branch);
+        if (cloneFrom && deploy) {
+            // Queued, not awaited: the caller lands on the environment and watches
+            // its services come up on the board.
+            void environments
+                .deployEnvironment(environment.id, access.ownerId, user.id)
+                .catch((error: unknown) => {
+                    console.error("polaris: a copied environment could not be deployed:", error);
+                });
+        }
         await recordAudit({
             actorId: user.id,
             action: "deploy.env.create",
