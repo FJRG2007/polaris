@@ -16,6 +16,7 @@ import { LogViewer } from "@/components/log-viewer";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
+import type { ServiceAttention } from "@/lib/deploy/attention";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
@@ -148,6 +149,8 @@ export interface ProjectSummary {
                 connectionName: string | null;
                 sizeLimit: string | null;
             }[];
+            /** What on it needs a look, for the dots on its tabs. */
+            attention?: ServiceAttention;
         }[];
         databases: {
             id: string;

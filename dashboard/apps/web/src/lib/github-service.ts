@@ -1134,6 +1134,41 @@ export async function getLatestCommit(
     }
 }
 
+/** How far `head` has moved on from `base`, as GitHub's compare reports it. */
+export interface CommitDistance {
+    /** Commits on `head` that `base` does not have. */
+    aheadBy: number;
+    /** GitHub's page showing those commits. */
+    htmlUrl: string | null;
+}
+
+/**
+ * How many commits `head` (a branch or a SHA) is ahead of `base`, or null when
+ * GitHub would not say - a SHA that no longer exists after a force-push, a
+ * repository the token cannot reach, the rate limit.
+ */
+export async function compareCommits(
+    owner: string,
+    repo: string,
+    base: string,
+    head: string,
+    token: string | null
+): Promise<CommitDistance | null> {
+    const headers = optionalAuthHeaders(token);
+    try {
+        const res = await fetch(
+            `${API}/repos/${owner}/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=1`,
+            { headers, cache: "no-store" }
+        );
+        if (!res.ok) return null;
+        const data = (await res.json()) as { ahead_by?: number; html_url?: string };
+        if (typeof data.ahead_by !== "number") return null;
+        return { aheadBy: data.ahead_by, htmlUrl: data.html_url ?? null };
+    } catch {
+        return null;
+    }
+}
+
 /**
  * The repository-relative paths that changed between two commits, for deciding which
  * services in a monorepo a push actually concerns.

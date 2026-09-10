@@ -76,6 +76,11 @@ export function ProjectDetail({
 
     const [view, setView] = useState<"canvas" | "list">("canvas");
     const [detailAppId, setDetailAppId] = useState<string | null>(openService ?? null);
+    // A link that names a service while the board is already open - the project
+    // summary's last deploy, say - opens it too, not only a fresh arrival.
+    useEffect(() => {
+        if (openService) setDetailAppId(openService);
+    }, [openService]);
 
     // Derived rather than stored, so refreshed data reaches the open panel (e.g.
     // after removing a domain) and a deleted service closes it instead of leaving

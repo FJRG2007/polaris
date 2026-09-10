@@ -44,6 +44,15 @@ function domainRank(domain: AppDomain): number {
     return 4;
 }
 
+/** Every domain worth offering, best first; disabled and per-release names are left out. */
+export function rankedDomains<T extends AppDomain>(domains: readonly T[]): T[] {
+    return domains
+        .map((domain, index) => ({ domain, index, rank: domainRank(domain) }))
+        .filter((entry) => entry.rank > 0)
+        .sort((a, b) => b.rank - a.rank || a.index - b.index)
+        .map((entry) => entry.domain);
+}
+
 /** The best domain to surface for an app (most stable + reachable), or null. */
 export function primaryDomain<T extends AppDomain>(domains: readonly T[]): T | null {
     let best: T | null = null;

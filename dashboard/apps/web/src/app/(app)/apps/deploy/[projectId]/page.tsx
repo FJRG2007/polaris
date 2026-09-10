@@ -6,6 +6,7 @@ import type { ProjectSummary } from "../deploy-view";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { projectAccess } from "@/lib/deploy-project-access";
+import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
@@ -89,7 +90,10 @@ export default async function DeployProjectPage({
     const appIds = project.environments.flatMap((environment) =>
         environment.applications.map((app) => app.id)
     );
-    const tunnelDomains = await listActiveTunnelDomains(appIds);
+    const [tunnelDomains, attention] = await Promise.all([
+        listActiveTunnelDomains(appIds),
+        serviceAttention(appIds)
+    ]);
     // A service that keeps its history is served by the release it currently points
     // at, which has a container name and a published port of its own - so the
     // terminal, the file browser and the direct IP:port link all have to follow it.
@@ -174,7 +178,8 @@ export default async function DeployProjectPage({
                     connectionId: volume.connectionId,
                     connectionName: volume.connection?.name ?? null,
                     sizeLimit: volume.sizeLimit
-                }))
+                })),
+                attention: attention.get(app.id)
             })),
             databases: environment.databases.map((database) => ({
                 id: database.id,

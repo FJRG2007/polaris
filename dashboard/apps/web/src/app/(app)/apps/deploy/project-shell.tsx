@@ -17,9 +17,12 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { SECTIONS } from "./project-sections";
 import { createProjectAction } from "./actions";
+import { TabAttentionDot } from "./attention-dot";
 import { HeaderPortal } from "@/components/header-portal";
 import { useState, useTransition, type ReactNode } from "react";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
+import type { EnvironmentGlance } from "@/lib/deploy/project-glance";
+import { ProjectGlanceBar, useProjectGlance } from "./project-glance-bar";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
@@ -38,7 +41,11 @@ export interface ShellProject {
     id: string;
     name: string;
     environments: ShellEnvironment[];
+    /** Each reachable environment's summary, keyed by its id. */
+    glance?: Record<string, EnvironmentGlance>;
 }
+
+const NO_GLANCE: Record<string, EnvironmentGlance> = {};
 
 export function ProjectShell({
     project,
@@ -67,12 +74,19 @@ export function ProjectShell({
 
     const [showNewProject, setShowNewProject] = useState(false);
     const [showNewEnv, setShowNewEnv] = useState(false);
+    const glanceByEnvironment = useProjectGlance(project.id, project.glance ?? NO_GLANCE);
+    const glance = active ? glanceByEnvironment[active.id] : undefined;
 
     /** Move to a section, carrying the environment so switching screen never
      *  silently puts the reader on a different one. */
     function sectionHref(path: string): string {
         const suffix = active && !active.isDefault ? `?env=${active.id}` : "";
         return `${base}${path}${suffix}`;
+    }
+
+    function serviceHref(applicationId: string): string {
+        const href = sectionHref("");
+        return `${href}${href.includes("?") ? "&" : "?"}service=${encodeURIComponent(applicationId)}`;
     }
 
     function selectEnvironment(id: string): void {
@@ -143,8 +157,15 @@ export function ProjectShell({
                 />
             )}
 
+            {active && <ProjectGlanceBar environmentId={active.id} glance={glance} serviceHref={serviceHref} />}
+
             <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-                <ProjectNav base={base} pathname={pathname} sectionHref={sectionHref} />
+                <ProjectNav
+                    base={base}
+                    pathname={pathname}
+                    sectionHref={sectionHref}
+                    attention={glance?.attention.length ?? 0}
+                />
                 <div className="min-w-0 flex-1">{children}</div>
             </div>
 
@@ -169,11 +190,14 @@ export function ProjectShell({
 function ProjectNav({
     base,
     pathname,
-    sectionHref
+    sectionHref,
+    attention
 }: {
     base: string;
     pathname: string;
     sectionHref: (path: string) => string;
+    /** Services in this environment that need a look - a dot on Architecture, where they are. */
+    attention: number;
 }) {
     function isActive(path: string): boolean {
         const target = `${base}${path}`;
@@ -201,6 +225,12 @@ function ProjectNav({
                             >
                                 <Icon className="size-4 shrink-0" />
                                 {section.label}
+                                {section.path === "" && attention > 0 && (
+                                    <TabAttentionDot
+                                        label={`${attention} ${attention === 1 ? "service needs" : "services need"} a look`}
+                                        className="ml-auto"
+                                    />
+                                )}
                             </Link>
                         </li>
                     );

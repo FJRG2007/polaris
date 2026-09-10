@@ -17,6 +17,7 @@ import { EdgeSettings } from "./edge-settings";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
+import { DeployCallouts } from "./deploy-callouts";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { Discussion } from "@/components/discussion";
@@ -31,6 +32,7 @@ import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
+import { TabAttentionDot, tabAttention } from "./attention-dot";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
@@ -176,6 +178,7 @@ export function ServiceDetail({
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const can = useProjectCan();
     const tabs = TABS.filter((name) => TAB_CAPABILITY[name].some(can));
+    const dots = tabAttention(app.attention);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -233,6 +236,9 @@ export function ServiceDetail({
                             }`}
                         >
                             {name}
+                            {dots[name] && (
+                                <TabAttentionDot label={dots[name]} className="mb-0.5 ml-1.5 align-middle" />
+                            )}
                         </button>
                     ))}
                     <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
@@ -712,6 +718,14 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                 <Empty text="No deployments yet. Click Deploy to ship the current source." />
             ) : (
                 <>
+                    <DeployCallouts
+                        applicationId={app.id}
+                        items={items}
+                        canDeploy={can("deploy.run")}
+                        busy={busy}
+                        onDeploy={deploy}
+                        onViewLog={setLogsFor}
+                    />
                     {active && (
                         <div className="overflow-hidden rounded-xl border border-success-edge bg-success/[0.06]">
                             <div className="flex items-center gap-3 p-3">
