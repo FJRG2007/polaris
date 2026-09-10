@@ -4186,6 +4186,33 @@ model ManagedDatabase {
     credentialNonce     Bytes?
     credentialKeyId     String?
     status              String   @default("provisioning")
+    // Redis: how it keeps what it holds - default | cache | persistent - and the
+    // memory ceiling in megabytes a cache evicts to stay under.
+    mode                String   @default("default")
+    maxMemoryMb         Int?
+    // MongoDB: run as a single-member replica set (change streams, transactions).
+    replicaSet          Boolean  @default(false)
+    // PostgreSQL: archive every WAL segment and take daily base backups, so the
+    // instance can be recovered to any moment inside the kept window.
+    pitr                Boolean  @default(false)
+    pitrKeepDays        Int      @default(7)
+    // A version change asked for: the version, when to run it (null is now), and
+    // how it went - scheduled | running | done | failed. The version, image and
+    // data volume it ran before stay recorded so a failed upgrade is undone by
+    // pointing back at them, and the old volume can be removed deliberately later.
+    upgradeTo           String?
+    upgradeAt           DateTime?
+    upgradeState        String   @default("")
+    upgradeError        String?
+    previousVersion     String?
+    previousImage       String?
+    previousVolumeName  String?
+    // Set on an instance created by a point-in-time recovery: the instance it was
+    // recovered from, the base backup it started from and the moment it stopped at.
+    // Its first start unpacks that base backup and replays the archive to there.
+    recoveredFromId     String?  @db.Uuid
+    recoveryBase        String?
+    recoveryTarget      DateTime?
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
@@ -4196,10 +4223,104 @@ model ManagedDatabase {
     parent      ManagedDatabase?  @relation("DatabaseInstance", fields: [parentId], references: [id], onDelete: Cascade)
     children    ManagedDatabase[] @relation("DatabaseInstance")
     dataConnections DataConnection[]
+    baseBackups DatabaseBaseBackup[]
+    operations  DatabaseOperation[]
+    buckets     ObjectBucket[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
     @@index([parentId])
+    @@index([upgradeState, upgradeAt])
+}
+
+// One PostgreSQL base backup in an instance's point-in-time archive. The files
+// live in the archive folder on the server; this row is what a recovery picks
+// from, and when it had finished is what decides whether it can reach a moment -
+// PostgreSQL cannot recover to a time inside a base backup.
+model DatabaseBaseBackup {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    databaseId  String   @db.Uuid
+    // The folder name under the archive's base/, a UTC timestamp.
+    label       String
+    startedAt   DateTime
+    finishedAt  DateTime
+    // The backup history file the server wrote into the archive when it ended,
+    // which is what the segment cleanup is given to keep what this backup needs.
+    historyFile String   @default("")
+
+    database ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+    @@unique([databaseId, label])
+    @@index([databaseId, finishedAt])
+}
+
+// Something done to a database that takes a while and that somebody watches:
+// a restore, an upgrade, a copy from elsewhere, a point-in-time recovery. The
+// row is written first and closed last, so one that died mid-way shows as never
+// having finished rather than as never having happened.
+model DatabaseOperation {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    databaseId  String    @db.Uuid
+    // restore | upgrade | copy | recover
+    kind        String
+    // running | succeeded | failed
+    status      String    @default("running")
+    // The step it is on, in the words the screen shows.
+    step        String    @default("")
+    // Bytes moved so far and the total when it is known, for a copy.
+    doneBytes   BigInt    @default(0)
+    totalBytes  BigInt?
+    error       String?
+    actorId     String?   @db.Uuid
+    startedAt   DateTime  @default(now())
+    finishedAt  DateTime?
+
+    database ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+    @@index([databaseId, startedAt])
+}
+
+// A bucket in an object store Polaris runs (a ManagedDatabase whose engine is
+// an object store). The bucket itself lives in the engine; this row is what the
+// screens list and what keys, expiry rules and replication hang off.
+model ObjectBucket {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    storeId    String   @db.Uuid
+    name       String
+    // Expiry rules as JSON: [{ prefix, days }]. Applied to the engine as path
+    // TTLs, which govern objects written after the rule is set.
+    lifecycle  String   @default("[]")
+    // Where every object written here is copied to: another bucket, in another
+    // store on the same server. Null when it is not replicated.
+    replicateToId String? @db.Uuid
+    // ok | failed | "" - how the replication process was last found.
+    replicationState String @default("")
+    replicationError String?
+    createdAt  DateTime @default(now())
+
+    store ManagedDatabase @relation(fields: [storeId], references: [id], onDelete: Cascade)
+    keys  ObjectBucketKey[]
+
+    @@unique([storeId, name])
+}
+
+// An access key limited to one bucket. The secret is envelope-encrypted and
+// shown once, when it is made; afterwards only its access key id is listed.
+model ObjectBucketKey {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    bucketId        String   @db.Uuid
+    name            String
+    // readwrite | readonly
+    access          String   @default("readwrite")
+    accessKey       String   @unique
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    createdAt       DateTime @default(now())
+
+    bucket ObjectBucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+
+    @@unique([bucketId, name])
 }
 
 // One deploy run: a status row plus a pointer to its streamed log file. The log
@@ -4303,6 +4424,10 @@ model Domain {
     // behind a router with nothing forwarded - and it makes this instance part of
     // the request path, so an outage here is an outage there.
     servedBy      String   @default("server")
+    // Served through Cloudflare's proxy, which caches static assets at its edge.
+    // Only possible for a hostname whose zone is on the connected Cloudflare
+    // account; the cache is purged for it after every successful deploy.
+    cdn           Boolean  @default(false)
     createdAt     DateTime @default(now())
     // Reachability, set by the health probe: up | down | unknown. So a free
     // subdomain that resolves but does not actually serve is flagged, not shown
