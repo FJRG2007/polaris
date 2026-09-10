@@ -26,12 +26,12 @@ import { prisma } from "@polaris/db";
 import { open } from "node:fs/promises";
 import { DeployApiRefusal } from "./refusal";
 import type { Permission } from "@polaris/core";
-import { recordAudit } from "@/lib/audit-service";
 import * as activity from "@/lib/activity/activity";
 import * as deployService from "@/lib/deploy-service";
 import type { ProjectCapability } from "@polaris/core";
 import { provisionHostnameDns } from "@/lib/domain-dns";
 import { TERMINAL_DEPLOY_STATUSES } from "@/lib/deploy/status";
+import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import type { AddDomainInput, ImportVariablesInput, SetVariableInput } from "./schemas";
 import {
     deleteEnvVar,
@@ -204,13 +204,18 @@ async function recordChange(
         targetId: string;
         activity?: { applicationId: string; action: string; to?: string | null };
         metadata?: Record<string, unknown>;
+        /** The organization, when the target is gone by the time this runs. */
+        orgId?: string | null;
     }
 ): Promise<void> {
-    await recordAudit({
+    // Through the Deploy writer, so a change made with a key lands in the
+    // organization's history exactly as the same change made on the screen does.
+    await recordDeployAudit({
         actorId: caller.userId,
         action: event.action,
         targetType: event.targetType,
         targetId: event.targetId,
+        ...(event.orgId ? { orgId: event.orgId } : {}),
         metadata: { via: caller.via, keyId: caller.keyId, ...event.metadata }
     });
     if (event.activity) {
@@ -914,10 +919,13 @@ export async function removeDomain(caller: DeployCaller, domainId: string): Prom
     requireScope(caller, "deploy.manage");
     const access = await guarded(() => requireDomainAccess(domainId, caller.userId, "domains.manage"));
     confine(caller, access);
+    // Read before the row goes: afterwards nothing names the organization.
+    const orgId = await deployTargetOrgId("domain", domainId).catch(() => null);
     await deployService.removeApplicationDomain(domainId, access.ownerId);
     await recordChange(caller, {
         action: "deploy.domain.remove",
         targetType: "domain",
-        targetId: domainId
+        targetId: domainId,
+        orgId
     });
 }

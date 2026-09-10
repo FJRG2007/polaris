@@ -12,8 +12,8 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
-import { recordAudit } from "@/lib/audit-service";
 import * as crons from "@/lib/deploy/service-cron";
+import { recordDeployAudit } from "@/lib/deploy-audit";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 
 const DEPLOY_PATH = "/apps/deploy";
@@ -44,7 +44,7 @@ export async function saveServiceCronAction(
     try {
         await requireApplicationAccess(applicationId, user.id, "console.use");
         const cron = await crons.saveServiceCron(applicationId, parsed.data, user.id);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: parsed.data.id ? "deploy.cron.update" : "deploy.cron.create",
             targetType: "application",
@@ -65,7 +65,7 @@ export async function deleteServiceCronAction(
     try {
         await requireApplicationAccess(applicationId, user.id, "console.use");
         await crons.deleteServiceCron(applicationId, cronId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.cron.delete",
             targetType: "application",
@@ -86,7 +86,7 @@ export async function runServiceCronAction(
     try {
         await requireApplicationAccess(applicationId, user.id, "console.use");
         const runId = await crons.runServiceCronNow(applicationId, cronId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.cron.run",
             targetType: "application",
