@@ -63,6 +63,9 @@ export interface EdgePageInput {
     readonly facts: readonly EdgePageFact[];
     /** The last footer item, which carries no value of its own. */
     readonly note: string;
+    /** A script the page runs, allowed by the nonce in the response's own CSP. Only
+     *  the challenge page has one; every other edge page is inert markup. */
+    readonly script?: { readonly nonce: string; readonly source: string };
 }
 
 /** Render one edge page. */
@@ -164,7 +167,7 @@ ${facts}
 <span>${input.note}</span>
 </footer>
 </main>
-</body>
+${input.script ? `<script nonce="${input.script.nonce}">${input.script.source}</script>\n` : ""}</body>
 </html>
 `;
 }

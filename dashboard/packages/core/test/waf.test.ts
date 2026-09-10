@@ -37,6 +37,7 @@ describe("guard rule codec", () => {
             sqlInjectionProtection: true,
             xssProtection: true,
             emailObfuscation: false,
+            challenge: false,
             presets: [],
             rules: [CUSTOM_RULE],
             managedRules: []
@@ -87,6 +88,7 @@ describe("guard rule codec", () => {
             sqlInjectionProtection: false,
             xssProtection: false,
             emailObfuscation: false,
+            challenge: false,
             presets: [],
             rules: [],
             managedRules: []
@@ -105,6 +107,7 @@ describe("guard rule codec", () => {
             sqlInjectionProtection: true,
             xssProtection: true,
             emailObfuscation: false,
+            challenge: false,
             presets: [],
             rules: [],
             managedRules: []
@@ -122,6 +125,7 @@ describe("guard rule codec", () => {
             sqlInjectionProtection: false,
             xssProtection: false,
             emailObfuscation: false,
+            challenge: false,
             presets: [],
             rules: [],
             managedRules: []
