@@ -35,6 +35,7 @@ import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
+import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -240,6 +241,29 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // zero. Nothing is written twice and nothing is lost.
         leaseMs: null,
         run: sweepRetention
+    },
+    {
+        key: "audit-seal",
+        // Every minute, so an entry is part of the chain within a minute of being
+        // written - the window in which deleting it leaves no trace. Free once
+        // there is nothing unsealed.
+        everyMs: MINUTE,
+        // Leased, and this one matters more than most: it is the chain's only
+        // writer, and two passes at once would hand out the same places twice.
+        leaseMs: 5 * MINUTE,
+        run: async () => ({ sealed: await sealAuditChain() })
+    },
+    {
+        key: "audit-verify",
+        // Daily. Verification walks the whole chain, which is the one expensive
+        // read here, and the answer is kept for the screen that shows it.
+        everyMs: 24 * HOUR,
+        // Longer than the gap between passes, as every lease here is.
+        leaseMs: 25 * HOUR,
+        run: async () => {
+            const result = await verifyAuditChain();
+            return { ok: result.ok, checked: result.checked };
+        }
     },
     {
         key: "telemetry-prune",

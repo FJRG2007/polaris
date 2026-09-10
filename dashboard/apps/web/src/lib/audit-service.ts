@@ -105,68 +105,6 @@ export async function recordAudit(event: AuditEvent): Promise<void> {
     }
 }
 
-/** Recent activity for the admin view, newest first. */
-export async function listActivity(limit = 100) {
-    return prisma.auditLog.findMany({
-        orderBy: { at: "desc" },
-        take: limit,
-        select: {
-            id: true,
-            actorId: true,
-            action: true,
-            targetType: true,
-            targetId: true,
-            metadata: true,
-            at: true
-        }
-    });
-}
-
-/** One row of the admin activity feed, ready to render. */
-export interface ActivityEntry {
-    id: string;
-    /** ISO 8601; the screen formats it with the reader's own preferences. */
-    at: string;
-    /** The account behind the action, "system" when Polaris acted on its own. */
-    actor: string;
-    action: string;
-    /** The raw metadata document, or "" when the entry carried none. */
-    metadata: string;
-}
-
-/**
- * Recent activity with its actors resolved, newest first. The log stores an id,
- * so the names come from one further query rather than a join per row - and an
- * actor who has since been deleted reads as "unknown" instead of dropping the
- * entry, which is the whole point of an audit trail.
- */
-export async function listActivityFeed(limit = 200): Promise<ActivityEntry[]> {
-    const events = await listActivity(limit);
-    const actorIds = [
-        ...new Set(events.map((event) => event.actorId).filter((id): id is string => Boolean(id)))
-    ];
-    const actors =
-        actorIds.length === 0
-            ? []
-            : await prisma.user.findMany({
-                  where: { id: { in: actorIds } },
-                  select: { id: true, name: true, username: true }
-              });
-    const nameById = new Map(
-        actors.map((actor) => [
-            actor.id,
-            actor.name || (actor.username ? `@${actor.username}` : "somebody")
-        ])
-    );
-    return events.map((event) => ({
-        id: event.id,
-        at: event.at.toISOString(),
-        actor: event.actorId ? (nameById.get(event.actorId) ?? "unknown") : "system",
-        action: event.action,
-        metadata: event.metadata ?? ""
-    }));
-}
-
 /** One row of a user's own history, ready to render. */
 export interface UserActivityEntry {
     id: string;
@@ -293,31 +231,6 @@ export async function listOrgActivity(
         action: row.action,
         metadata: row.metadata ?? ""
     }));
-}
-
-/** The people who appear in an organization's history, for the filter to offer.
- *  Grouped in the database because the feed is capped, and somebody whose entries
- *  have scrolled past the cap is exactly who a reader is looking for. */
-export async function listOrgActivityActors(
-    orgId: string
-): Promise<{ id: string; name: string }[]> {
-    const groups = await prisma.auditLog.groupBy({
-        by: ["actorId"],
-        where: { orgId },
-        _max: { at: true }
-    });
-    const ids = groups.map((group) => group.actorId).filter((id): id is string => Boolean(id));
-    if (ids.length === 0) return [];
-    const actors = await prisma.user.findMany({
-        where: { id: { in: ids } },
-        select: { id: true, name: true, username: true }
-    });
-    return actors
-        .map((actor) => ({
-            id: actor.id,
-            name: actor.name || (actor.username ? `@${actor.username}` : "somebody")
-        }))
-        .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 /**

@@ -68,6 +68,11 @@ describe("the work Polaris runs on a schedule", () => {
             // the same daemon call, and the one that loses fails on a container
             // the other already removed.
             "agent-sessions",
+            // The audit chain has exactly one writer, and two sealing passes
+            // would hand out the same places twice. Verification walks the whole
+            // chain and has no reason to do that twice at once.
+            "audit-seal",
+            "audit-verify",
             "backups",
             "chat-scheduled",
             "connection-health",

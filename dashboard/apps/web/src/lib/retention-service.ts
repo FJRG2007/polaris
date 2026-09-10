@@ -28,6 +28,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { pruneSealedAudit } from "@/lib/audit-chain";
 import { getSetting, setSetting } from "@/lib/setting-store";
 
 /** Where the policy is kept. One key holding all three, because they are read
@@ -132,20 +133,13 @@ export async function sweepRetention(now: Date = new Date()): Promise<RetentionS
     }
 
     if (auditCutoff) {
-        // `at` rather than `createdAt`: the audit table names its timestamp
-        // differently from the other two, and a sweep that guessed would delete
-        // nothing forever while reporting success.
-        const due = await prisma.auditLog.findMany({
-            where: { at: { lt: auditCutoff } },
-            orderBy: { at: "asc" },
-            take: BATCH,
-            select: { id: true }
-        });
-        audit = await removeAll(
-            due.map((row) => row.id),
-            (ids) => prisma.auditLog.deleteMany({ where: { id: { in: ids } } })
-        );
-        if (due.length === BATCH) more = true;
+        // Not a plain delete by age, as the other two are: the audit trail is a
+        // chain, and removing entries by timestamp would leave gaps in it that
+        // verification cannot tell from tampering. Only the oldest sealed run is
+        // removed, and where it was cut is recorded first - see `audit-chain`.
+        const pruned = await pruneSealedAudit(auditCutoff, BATCH);
+        audit = pruned.removed;
+        if (pruned.more) more = true;
     }
 
     return { notifications, activity, audit, more };

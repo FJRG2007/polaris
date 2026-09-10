@@ -142,6 +142,7 @@ export * from "./schemas/chat.js";
 export * from "./schemas/chat-rules.js";
 export * from "./schemas/privacy.js";
 export * from "./schemas/retention.js";
+export * from "./schemas/audit.js";
 export * from "./schemas/search.js";
 export * from "./schemas/overview.js";
 export * from "./schemas/organizations.js";

@@ -1,70 +1,40 @@
 "use client";
 
 /**
- * The activity table. The rows arrive from /api/admin/activity after the screen
- * has painted, so opening Activity never waits on the audit query - the header
- * and the table chrome are there immediately and only the rows are sketched.
+ * The deployment's audit trail, and whether it can still be trusted.
  *
- * A revisit paints the previous answer from the session cache while the fresh
- * one is on its way, and the feed keeps itself current without a reload.
+ * The rows arrive from /api/admin/activity after the screen has painted, so
+ * opening Activity never waits on the audit query - the header, the filters and
+ * the table chrome are there immediately and only the rows are sketched. The
+ * integrity panel reads its own route for the same reason.
  */
 
-import { RefreshCw } from "lucide-react";
-import { Button, PageHeader } from "@polaris/ui";
-import type { ActivityEntry } from "@/lib/audit-service";
-import { useLiveResource } from "@/components/use-live-resource";
-import { ActivityTable, type ActivityRow } from "@/components/activity-table";
-
-/** How often the feed re-reads. An audit trail is appended to, not edited, so
- *  this is gentle - the refresh control covers wanting it now. */
-const POLL_MS = 30_000;
+import { PageHeader } from "@polaris/ui";
+import { AuditIntegrity } from "./audit-integrity";
+import { AuditFeed } from "@/components/audit-feed";
 
 export function ActivityView() {
-    const { data, loading, error, stale, refreshing, refresh } = useLiveResource<ActivityEntry[]>({
-        url: "/api/admin/activity",
-        cacheKey: "admin.activity",
-        intervalMs: POLL_MS,
-        select: (body) => {
-            const items = (body as { items?: unknown }).items;
-            return Array.isArray(items) ? (items as ActivityEntry[]) : [];
-        }
-    });
-
-    const rows: ActivityRow[] | null =
-        data?.map((event) => ({
-            id: event.id,
-            at: event.at,
-            context: event.actor,
-            action: event.action,
-            metadata: event.metadata
-        })) ?? null;
-
     return (
         <>
             <PageHeader
                 title="Activity"
-                description="A global history of actions across Polaris - connections, reads, writes, and management."
-                actions={
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={refresh}
-                        disabled={refreshing}
-                        aria-label="Refresh"
-                        title="Refresh"
-                    >
-                        <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
-                    </Button>
-                }
+                description="Everything done across Polaris, by whom and from where. Sealed into a chain so an edited or deleted entry shows."
             />
-            {stale ? <p className="mb-3 text-sm text-warning">{stale}</p> : null}
-            <ActivityTable
-                rows={rows}
-                loading={loading}
-                error={error}
-                contextLabel="Who"
-                emptyLabel="No activity recorded yet."
-            />
+            <div className="flex flex-col gap-4">
+                <AuditIntegrity />
+                <AuditFeed
+                    endpoint="/api/admin/activity"
+                    exportEndpoint="/api/admin/activity/export"
+                    path="/admin/activity"
+                    cacheKey="admin.activity"
+                    contextLabel="Who"
+                    emptyLabel="No activity recorded yet."
+                    context={(entry) => entry.actorName}
+                    detail={(entry) =>
+                        entry.targetType ? [entry.targetType, entry.targetId].filter(Boolean).join(" ") : ""
+                    }
+                />
+            </div>
         </>
     );
 }

@@ -3,28 +3,19 @@
 /**
  * The account's own history, with a filter for the session it came from.
  *
- * The filter is a URL parameter rather than local state, so the session list can
- * link straight to one device's history and so a reader can hand that view to
- * themselves on another screen. Narrowing re-asks the server instead of hiding
- * rows already fetched: the feed is capped, and a session whose entries fall
- * past the cap is exactly the one somebody is looking for.
- *
- * The rows arrive after the screen has painted, so opening this never waits on
- * the audit query.
+ * The session filter is a URL parameter rather than local state, so the session
+ * list can link straight to one device's history and so a reader can hand that
+ * view to themselves on another screen. Everything else - the area, the phrase,
+ * the time range, the paging and the export - is the feed every audit screen
+ * shares; the session is this screen's own question.
  */
 
-import { RefreshCw } from "lucide-react";
-import { Button, Select } from "@polaris/ui";
+import { Select } from "@polaris/ui";
+import { useCallback, useState } from "react";
+import { AuditFeed } from "@/components/audit-feed";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { UserActivityEntry } from "@/lib/audit-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { sessionName, type DisplayFormat } from "@polaris/core";
-import { useLiveResource } from "@/components/use-live-resource";
-import { ActivityTable, type ActivityRow } from "@/components/activity-table";
-
-/** How often the feed re-reads. An audit trail is appended to, not edited, so
- *  this is gentle - the refresh control covers wanting it now. */
-const POLL_MS = 30_000;
 
 /** The filter value standing for no narrowing at all. Radix refuses an empty
  *  option value, so the "everything" choice is named rather than blank. */
@@ -33,17 +24,14 @@ const ALL = "all";
 /** The value the API answers to for the entries that came from no session. */
 const NO_SESSION = "none";
 
+const PATH = "/account/activity";
+
 interface ActivitySession {
     id: string;
     /** What the session is called, or null once it has ended and nothing names it. */
     label: string | null;
     current: boolean;
     lastAt: string | null;
-}
-
-interface ActivityPayload {
-    items: UserActivityEntry[];
-    sessions: ActivitySession[];
 }
 
 /**
@@ -74,44 +62,41 @@ export function ActivityView() {
     const params = useSearchParams();
     const format = useDisplayFormat();
     const selected = params.get("session") ?? ALL;
+    const [sessions, setSessions] = useState<ActivitySession[]>([]);
 
-    const { data, loading, error, stale, refreshing, refresh } = useLiveResource<ActivityPayload>({
-        url: `/api/account/activity${selected === ALL ? "" : `?session=${encodeURIComponent(selected)}`}`,
-        // Per filter, so switching back to one already read paints it at once.
-        cacheKey: `account.activity:${selected}`,
-        intervalMs: POLL_MS,
-        select: (body) => {
-            const payload = body as Partial<ActivityPayload>;
-            return {
-                items: Array.isArray(payload.items) ? payload.items : [],
-                sessions: Array.isArray(payload.sessions) ? payload.sessions : []
-            };
-        }
-    });
+    // The sessions ride on the first page, so the filter learns them from the
+    // same request that brings the rows rather than asking twice.
+    const onPage = useCallback((body: unknown) => {
+        const listed = (body as { sessions?: unknown }).sessions;
+        if (Array.isArray(listed)) setSessions(listed as ActivitySession[]);
+    }, []);
 
-    const sessions = data?.sessions ?? [];
     const names = new Map(sessions.map((session) => [session.id, sessionLabel(session, format)]));
-    const rows: ActivityRow[] | null =
-        data?.items.map((entry) => ({
-            id: entry.id,
-            at: entry.at,
-            context: names.get(entry.sessionId ?? NO_SESSION) ?? "Signed-out session",
-            action: entry.action,
-            detail: entry.target,
-            metadata: entry.metadata
-        })) ?? null;
 
     function filterBy(value: string) {
         const next = new URLSearchParams(params.toString());
         if (value === ALL) next.delete("session");
         else next.set("session", value);
         const query = next.toString();
-        router.replace(query ? `/account/activity?${query}` : "/account/activity", { scroll: false });
+        router.replace(query ? `${PATH}?${query}` : PATH, { scroll: false });
     }
 
     return (
-        <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+        <AuditFeed
+            endpoint="/api/account/activity"
+            exportEndpoint="/api/account/activity/export"
+            path={PATH}
+            cacheKey="account.activity"
+            contextLabel="Session"
+            emptyLabel={selected === ALL ? "Nothing recorded yet." : "Nothing recorded from this session yet."}
+            showActor={false}
+            context={(entry) => names.get(entry.sessionId ?? NO_SESSION) ?? "Signed-out session"}
+            detail={(entry) =>
+                entry.targetType ? [entry.targetType, entry.targetId].filter(Boolean).join(" ") : ""
+            }
+            extra={{ key: "session", value: selected === ALL ? null : selected }}
+            onPage={onPage}
+            ownFilter={
                 <Select
                     value={selected}
                     onValueChange={filterBy}
@@ -122,29 +107,7 @@ export function ActivityView() {
                         ...sessions.map((session) => ({ value: session.id, label: sessionLabel(session, format) }))
                     ]}
                 />
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={refresh}
-                    disabled={refreshing}
-                    aria-label="Refresh"
-                    title="Refresh"
-                >
-                    <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
-                </Button>
-            </div>
-
-            {stale ? <p className="text-sm text-warning">{stale}</p> : null}
-
-            <ActivityTable
-                rows={rows}
-                loading={loading}
-                error={error}
-                contextLabel="Session"
-                emptyLabel={
-                    selected === ALL ? "Nothing recorded yet." : "Nothing recorded from this session yet."
-                }
-            />
-        </div>
+            }
+        />
     );
 }

@@ -1016,10 +1016,19 @@ model Invite {
     pendingGrant      String?
     // Created by somebody who is not an administrator, under the sharing policy.
     delegated         Boolean @default(false)
+    // The organization this invite also joins, and the role it joins at, when it
+    // was sent from an organization's People screen to somebody with no account.
+    // The role is checked again when the invite is claimed, since the organization
+    // may have deleted it in the meantime. Not a foreign key: an organization
+    // deleted while the invite is out leaves an invite that makes an account and
+    // joins nothing, which is the honest outcome.
+    orgId             String? @db.Uuid
+    orgRole           String?
 
     invitedBy User @relation("InviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
     @@index([email])
+    @@index([orgId])
 }
 
 // ---------------------------------------------------------------------------
@@ -3109,6 +3118,15 @@ model AuditLog {
     // organization being deleted must not quietly erase the record of it.
     orgId      String?  @db.Uuid
     at         DateTime @default(now())
+    // The tamper-evident chain. Written by the sealing pass, never by the request
+    // that recorded the entry, so there is exactly one writer and the chain cannot
+    // fork: `seq` is the entry's place in the chain, `prevHash` is the hash of the
+    // entry before it, and `hash` is a keyed hash over this entry's own columns and
+    // `prevHash`. Editing, deleting or inserting a sealed entry breaks a link that
+    // only a holder of the instance key could forge. Null until sealed.
+    seq        BigInt?  @unique
+    prevHash   String?
+    hash       String?
 
     @@index([actorId])
     @@index([action])
@@ -3120,6 +3138,24 @@ model AuditLog {
     // And the retention sweep asks by age, which is the other whole-table
     // question this answers on a schedule.
     @@index([at])
+}
+
+// Where the audit chain was cut by retention.
+//
+// Retention deletes the oldest entries, and a chain whose first link points at a
+// row that no longer exists would read as broken for ever after. So before a
+// prefix is removed, the last removed entry's place and hash are written here;
+// verification starts from the newest checkpoint instead of from nothing, and a
+// gap anywhere else is still a gap.
+model AuditCheckpoint {
+    id     String   @id @default(uuid(7)) @db.Uuid
+    // The last entry removed, and its hash - what the first surviving entry's
+    // `prevHash` has to equal.
+    seq    BigInt   @unique
+    hash   String
+    // How many entries this cut removed, for the integrity screen.
+    pruned Int      @default(0)
+    at     DateTime @default(now())
 }
 
 model Setting {
@@ -4656,6 +4692,11 @@ model Organization {
     // choice entirely (`chat.orgIsolation`), and when it does, what was already
     // said here is folded back into the shared chat rather than hidden.
     chatIsolated Boolean @default(false)
+    // The role an invitation offers unless whoever sends it picks another. Starts
+    // as `member`, which is what every organization offered before this existed;
+    // an organization that wants newcomers to arrive with nothing until they are
+    // granted something sets it to `restricted`.
+    defaultInviteRole String @default("member")
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -4767,6 +4808,11 @@ model OrgRole {
     permissions String   @default("[]")
     // Seeded by Polaris. Cannot be deleted, and `admin` cannot be edited either.
     system      Boolean  @default(false)
+    // Holding it reaches nothing that was not granted to the person directly: not
+    // the roster, not the organization's shelf, not its internal work. Every other
+    // role carries `org.read` implicitly; this one does not. Only the seeded
+    // `restricted` role sets it.
+    restricted  Boolean  @default(false)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -4830,6 +4876,12 @@ model OrganizationMember {
     // the teams and the organization's spaces; only the owner can rename it,
     // transfer it, or delete it.
     role      String   @default("member")
+    // Mirrors the role's own `restricted`, written whenever the role is. Kept on
+    // the row because "every organization whose roster this person is on" is asked
+    // in a query by a dozen screens, and a role is a slug rather than a relation
+    // the query could follow. A restricted member is on the roster for the people
+    // running it and on nobody else's.
+    restricted Boolean @default(false)
     createdAt DateTime @default(now())
 
     org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
