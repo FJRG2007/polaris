@@ -54,6 +54,12 @@ export interface LiveResource<T> {
      */
     updatedAt: number | null;
     refresh: () => void;
+    /**
+     * Put a value on screen and in the kept copy without asking anything - an
+     * optimistic write, its rollback, or the answer the write came back with - so
+     * a revisit paints what the screen last showed rather than what it replaced.
+     */
+    replace: (value: T) => void;
 }
 
 /**
@@ -151,6 +157,17 @@ export function useLiveRead<T>({
         return () => controller.abort();
     }, [load, cacheKey]);
 
+    const replace = useCallback(
+        (value: T) => {
+            latest.current = value;
+            setData(value);
+            setUpdatedAt(Date.now());
+            setError(null);
+            writeSnapshot(cacheKey, value);
+        },
+        [cacheKey]
+    );
+
     // The read a subject needs to be on screen at all: once, and again whenever
     // the subject changes. Kept apart from the poll so pausing stops the refresh
     // without leaving a newly selected subject with nothing to show.
@@ -195,7 +212,8 @@ export function useLiveRead<T>({
         stale: data === null ? null : error,
         refreshing,
         updatedAt,
-        refresh
+        refresh,
+        replace
     };
 }
 
