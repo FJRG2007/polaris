@@ -540,6 +540,12 @@ export const mailAttachFromAddressSchema = z.object({
     url: z.string().trim().url().max(2048)
 });
 
+/** Carrying the files of a message being forwarded onto the forward. Whose the
+ *  message is, is decided on the server inside the query that finds it. */
+export const mailAttachFromMessageSchema = z.object({
+    messageId: z.string().uuid()
+});
+
 /** Refusing a sender. `junk` teaches the provider as well as filing the message,
  *  which is either what somebody wanted or more than they asked for - so it is
  *  chosen rather than assumed. */

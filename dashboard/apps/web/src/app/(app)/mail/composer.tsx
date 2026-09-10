@@ -28,18 +28,11 @@
 
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
-import { useMail, type ComposerSeed } from "./mail-shell";
 import { RecipientField } from "./recipient-field";
+import { useMail, type ComposerSeed } from "./mail-shell";
 import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
-import {
-    attachFromAddressAction,
-    attachFromDriveAction,
-    saveDraftAction,
-    sendAction,
-    undoSendAction
-} from "./actions";
-import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import type { PickedFile } from "@/components/file-picker/picked-file";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -54,6 +47,14 @@ import {
     Send,
     X
 } from "lucide-react";
+import {
+    attachFromAddressAction,
+    attachFromDriveAction,
+    attachFromMessageAction,
+    saveDraftAction,
+    sendAction,
+    undoSendAction
+} from "./actions";
 import {
     Button,
     Dialog,
@@ -128,6 +129,41 @@ export function Composer() {
         setProblem("");
         setPosture("docked");
     }, [composing, accounts, identities]);
+
+    /** Files being brought over from the message being forwarded, and the ones
+     *  that could not be. */
+    const [carrying, setCarrying] = useState(false);
+    const [notCarried, setNotCarried] = useState<string[]>([]);
+
+    // A forward brings the original's files with it. A reopened draft already
+    // has whatever survived of them, so only a fresh forward asks.
+    useEffect(() => {
+        setNotCarried([]);
+        if (!composing?.forward || !composing.inReplyToId || composing.draftId) {
+            setCarrying(false);
+            return;
+        }
+        let current = true;
+        setCarrying(true);
+        void (async () => {
+            const outcome = await attachFromMessageAction({ messageId: composing.inReplyToId });
+            if (!current) return;
+            setCarrying(false);
+            const said = refusalOf(outcome);
+            if (said) {
+                setNotCarried([said]);
+                return;
+            }
+            if ("uploads" in outcome) {
+                const carried = outcome.uploads as Attached[];
+                setFiles((held) => [...held, ...carried]);
+                setNotCarried(outcome.skipped);
+            }
+        })();
+        return () => {
+            current = false;
+        };
+    }, [composing]);
 
     const dirty = to.length > 0 || subject.trim() !== "" || body.trim() !== "" || files.length > 0;
 
@@ -464,10 +500,14 @@ export function Composer() {
                             />
                         </div>
 
-                        {composing.forward ? (
+                        {carrying ? (
+                            <p className="flex items-center gap-1.5 px-3 pb-2 text-[12px] text-foreground-subtle">
+                                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                                Bringing the files over from the original message
+                            </p>
+                        ) : notCarried.length > 0 ? (
                             <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
-                                Files on the message you are forwarding are not carried with it yet.
-                                Attach them again if they matter.
+                                Not carried over: {notCarried.join(", ")}. Attach again if needed.
                             </p>
                         ) : null}
 
@@ -697,7 +737,7 @@ function withSignature(
 
     // The two dashes and the space are the convention every client recognises,
     // and what lets the next one fold the signature away.
-    const block = `-- 
+    const block = `--
 ${signature}`;
     if (!body.trim())
         return `

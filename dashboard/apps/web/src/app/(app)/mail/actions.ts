@@ -20,27 +20,27 @@
  */
 
 import * as core from "@polaris/core";
+import * as spam from "@/lib/mailbox/spam";
 import { revalidatePath } from "next/cache";
 import * as rules from "@/lib/mailbox/rules";
+import * as prefs from "@/lib/mailbox/prefs";
 import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
-import * as prefs from "@/lib/mailbox/prefs";
 import * as reading from "@/lib/mailbox/reading";
-import * as blocking from "@/lib/mailbox/blocking";
-import * as subscriptions from "@/lib/mailbox/subscriptions";
-import * as attachFrom from "@/lib/mailbox/attach-from";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
+import * as blocking from "@/lib/mailbox/blocking";
 import * as accounts from "@/lib/mailbox/accounts";
-import * as spam from "@/lib/mailbox/spam";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
-import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
+import * as subscriptions from "@/lib/mailbox/subscriptions";
+import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import { MailAccessError, ownedAccount, ownedAccountIds } from "@/lib/mailbox/access";
 
 const MAIL_PATH = "/mail";
@@ -727,6 +727,19 @@ export async function attachFromAddressAction(input: unknown) {
     } catch (caught) {
         if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
         return failure(caught, "That file could not be attached.");
+    }
+}
+
+/** Carry the files of the message being forwarded onto the forward. Answers the
+ *  ones it carried and names the ones it could not. */
+export async function attachFromMessageAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailAttachFromMessageSchema.safeParse(input);
+    if (!parsed.success) return { error: "Those files could not be carried over." };
+    try {
+        return await attachFrom.attachFromMessage(userId, parsed.data.messageId);
+    } catch (caught) {
+        return failure(caught, "Those files could not be carried over.");
     }
 }
 
