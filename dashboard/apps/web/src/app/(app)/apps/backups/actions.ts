@@ -10,9 +10,11 @@
  * has painted.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import * as manage from "@/lib/backups/manage";
+import * as keyring from "@/lib/backups/keyring";
 import { recordAudit } from "@/lib/audit-service";
 import { runBackup } from "@/lib/backups/service";
 import { destinationSchema, planSchema, protectSchema, restoreSchema } from "@/lib/backups/schemas";
@@ -192,6 +194,68 @@ export async function testDestinationAction(
         // page stopped working", from the one button whose entire job is to find
         // out whether something is reachable.
         return { ok: false, ...failed(error) };
+    }
+}
+
+const keyIdSchema = z.string().uuid("That is not a backup key");
+const recoveryKeySchema = z
+    .string()
+    .trim()
+    .min(1, "Paste the recovery key")
+    .max(200, "A recovery key is shorter than that");
+
+/** The keys this account's backups are sealed under. */
+export async function listBackupKeysAction(): Promise<Result<{ keys: keyring.BackupKeyView[] }>> {
+    const user = await requireAdmin();
+    try {
+        return { keys: await keyring.listKeys(user.id) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Seal new copies under a fresh key; what the old one sealed still opens. */
+export async function rotateBackupKeyAction(): Promise<Result<{ id: string }>> {
+    const user = await requireAdmin();
+    try {
+        const created = await keyring.rotateKey(user.id);
+        await recordAudit({ actorId: user.id, action: "backup.key.rotate", targetType: "backup-key", targetId: created.id });
+        return created;
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/**
+ * One key as a recovery key, to keep somewhere this instance is not. It opens no
+ * more than the account can already download - every copy comes out decrypted to
+ * its owner - but it is the only thing that opens them once this database is gone,
+ * so reading it is recorded.
+ */
+export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ recoveryKey: string }>> {
+    const user = await requireAdmin();
+    const parsed = keyIdSchema.safeParse(keyId);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup key" };
+    try {
+        const recoveryKey = await keyring.recoveryKey(user.id, parsed.data);
+        await recordAudit({ actorId: user.id, action: "backup.key.reveal", targetType: "backup-key", targetId: parsed.data });
+        return { recoveryKey };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Bring a recovery key from another Polaris, so the copies it sealed open here. */
+export async function addRecoveryKeyAction(text: string): Promise<Result<{ added: boolean }>> {
+    const user = await requireAdmin();
+    const parsed = recoveryKeySchema.safeParse(text);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Paste the recovery key" };
+    try {
+        const outcome = await keyring.addRecoveryKey(user.id, parsed.data);
+        await recordAudit({ actorId: user.id, action: "backup.key.add", targetType: "backup-key" });
+        return outcome;
+    } catch (error) {
+        return failed(error);
     }
 }
 

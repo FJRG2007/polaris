@@ -19,7 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PointRow, ResourceDetail } from "../types";
 import { useDisplayFormat } from "@/components/display-format";
 import { backUpNowAction, deletePointAction, restoreAction } from "../actions";
-import { ArrowLeft, Download, HardDriveDownload, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, HardDriveDownload, Loader2, Lock, LockOpen, RotateCcw, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -212,6 +212,23 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                         >
                                                             {copy.destinationName}
                                                         </span>
+                                                        {copy.status === "available" ? (
+                                                            copy.sealed ? (
+                                                                <Lock
+                                                                    className="size-3.5 text-muted-foreground"
+                                                                    aria-label="Encrypted"
+                                                                >
+                                                                    <title>Encrypted with this account's backup key</title>
+                                                                </Lock>
+                                                            ) : (
+                                                                <LockOpen
+                                                                    className="size-3.5 text-muted-foreground"
+                                                                    aria-label="Not encrypted"
+                                                                >
+                                                                    <title>Not encrypted: kept on the disk it copies, or taken before backups were encrypted</title>
+                                                                </LockOpen>
+                                                            )
+                                                        ) : null}
                                                         {copy.status !== "available" ? (
                                                             <span className="text-danger" title={copy.error ?? ""}>
                                                                 {copy.status}

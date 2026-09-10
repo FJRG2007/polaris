@@ -295,6 +295,7 @@ model User {
     backupPlans         BackupPlan[]
     protectedResources  ProtectedResource[]
     backupJobs          BackupJob[]
+    backupKeys          BackupKey[]
     ownedVaults         VaultOrganization[]  @relation("VaultOwner")
     privacy             UserPrivacy?
     privacyLists        PrivacyList[]
@@ -7200,6 +7201,10 @@ model RecoveryPointCopy {
     // pending | available | failed | deleting
     status        String   @default("pending")
     error         String?
+    // The backup key this copy was sealed under (a BackupKey id); null for a copy
+    // written in the clear - one taken before sealing existed, or one kept on the
+    // disk of the thing it protects.
+    sealedWith    String?
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
@@ -10515,4 +10520,23 @@ model MailDmarcReport {
 
     @@unique([serverId, orgName, reportId])
     @@index([serverId, endAt])
+}
+
+// A key backups are sealed under, one ring per owner. The key itself is wrapped
+// under the master key like every other credential here; a copy names the key it
+// was sealed with, so retiring a key for new backups leaves the old ones readable.
+// A key brought in from elsewhere (a recovery key) arrives already retired.
+model BackupKey {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    ownerId      String    @db.Uuid
+    encryptedKey Bytes
+    keyNonce     Bytes
+    keyKeyId     String
+    // Set once a newer key takes over sealing; still used to open what it sealed.
+    retiredAt    DateTime?
+    createdAt    DateTime  @default(now())
+
+    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId, retiredAt])
 }

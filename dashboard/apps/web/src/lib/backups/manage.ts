@@ -20,6 +20,7 @@ import type { Prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { createReadStream } from "node:fs";
 import { sourceFor } from "./sources/registry";
+import { isSealedCopy, openSealed, plainName } from "./sealed-copies";
 import { refreshResourceCounters } from "./service";
 import { encryptCredentials } from "@polaris/storage";
 import { nextBackupAt, readPolicy, type RetentionPolicy } from "./policy";
@@ -250,6 +251,8 @@ export async function getResourceDetail(
                             status: true,
                             error: true,
                             sizeBytes: true,
+                            path: true,
+                            sealedWith: true,
                             destination: { select: { id: true, name: true, kind: true } }
                         }
                     }
@@ -306,6 +309,7 @@ export async function getResourceDetail(
                 status: copy.status,
                 error: copy.error,
                 sizeBytes: Number(copy.sizeBytes),
+                sealed: isSealedCopy(copy),
                 downloadable: copy.status === "available"
             }))
         })),
@@ -577,6 +581,7 @@ export async function openCopy(
             path: true,
             sizeBytes: true,
             status: true,
+            sealedWith: true,
             destination: {
                 select: {
                     id: true,
@@ -608,27 +613,24 @@ export async function openCopy(
     if (copy.status !== "available")
         throw new SourceUnavailableError("That copy did not finish being written");
 
-    const fileName = copy.path.split("/").pop() || "backup";
+    const stored = copy.path.split("/").pop() || "backup";
+    // A sealed copy is opened as it streams, so whoever reads it - a download, a
+    // restore - gets the source's own bytes and never has to know. Its length
+    // once opened is not the stored one, so none is claimed.
+    const sealed = isSealedCopy(copy);
+    const fileName = plainName(stored);
+    const reveal = (stream: ReadableStream<Uint8Array>) => (sealed ? openSealed(ownerId, stream) : stream);
+    const sizeBytes = sealed ? 0 : Number(copy.sizeBytes);
     if (isSourceLocal(copy.destination)) {
         const resource = toSourceResource(copy.point.resource);
         const source = sourceFor(resource.kind);
         if (!source.readInPlace) throw new SourceUnavailableError("That copy cannot be read back");
         const stream = await source.readInPlace(resource, copy.path);
-        return {
-            stream,
-            fileName,
-            sizeBytes: Number(copy.sizeBytes),
-            dispose: async () => undefined
-        };
+        return { stream: reveal(stream), fileName, sizeBytes, dispose: async () => undefined };
     }
     const handle = await openDestination(copy.destination, ownerId);
     const stream = await handle.get(copy.path);
-    return {
-        stream,
-        fileName,
-        sizeBytes: Number(copy.sizeBytes),
-        dispose: () => handle.dispose()
-    };
+    return { stream: reveal(stream), fileName, sizeBytes, dispose: () => handle.dispose() };
 }
 
 /**

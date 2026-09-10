@@ -18,6 +18,7 @@ import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
 import type { Prisma } from "@polaris/db";
 import { createReadStream } from "node:fs";
+import { sealArtifact } from "./sealed-copies";
 import { sourceFor, allSources } from "./sources/registry";
 import { createNotification } from "@/lib/notification-service";
 import { SourceUnavailableError, type SourceResource, type StagedArtifact } from "./sources/types";
@@ -257,6 +258,9 @@ async function produceAndReplicate(
     }
 
     let staged: StagedArtifact | null = null;
+    // What is actually written: the artifact sealed under the owner's backup key,
+    // so no destination ever holds it in the clear.
+    let sealed: { artifact: StagedArtifact; keyId: string } | null = null;
     if (remote.length > 0) {
         staged = await source.produce(resource);
         metadata = { ...staged.metadata, fileName: staged.fileName };
@@ -264,23 +268,26 @@ async function produceAndReplicate(
     }
 
     try {
+        if (staged) sealed = await sealArtifact(staged, row.ownerId);
         for (const destination of remote) {
-            if (!staged) break;
+            if (!sealed) break;
+            const upload = sealed.artifact;
             const copy = await prisma.recoveryPointCopy.create({
                 data: {
                     pointId,
                     destinationId: destination.id,
-                    path: `${resource.id}/${staged.fileName}`,
-                    sizeBytes: BigInt(staged.sizeBytes),
-                    status: "pending"
+                    path: `${resource.id}/${upload.fileName}`,
+                    sizeBytes: BigInt(upload.sizeBytes),
+                    status: "pending",
+                    sealedWith: sealed.keyId
                 },
                 select: { id: true, path: true }
             });
             let handle;
             try {
                 handle = await openDestination(destination, row.ownerId);
-                const body = Readable.toWeb(createReadStream(staged.path)) as ReadableStream<Uint8Array>;
-                const written = await handle.put(copy.path, body, BigInt(staged.sizeBytes));
+                const body = Readable.toWeb(createReadStream(upload.path)) as ReadableStream<Uint8Array>;
+                const written = await handle.put(copy.path, body, BigInt(upload.sizeBytes));
                 await prisma.recoveryPointCopy.update({
                     where: { id: copy.id },
                     data: { status: "available", sizeBytes: BigInt(written.sizeBytes) }
@@ -305,6 +312,7 @@ async function produceAndReplicate(
             }
         }
     } finally {
+        await sealed?.artifact.cleanup();
         await staged?.cleanup();
     }
 

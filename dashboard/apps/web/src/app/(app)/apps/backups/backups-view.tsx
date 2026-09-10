@@ -18,6 +18,7 @@
 
 import Link from "next/link";
 import { readJson } from "@/lib/read-json";
+import { KeysPanel } from "./keys-panel";
 import { PlansPanel } from "./plans-panel";
 import { formatBytes } from "@polaris/core";
 import { ProtectDialog } from "./protect-dialog";
@@ -63,12 +64,13 @@ const PAGE_SIZE = 50;
  *  re-query the same page on every tab switch. */
 const CACHE_MS = 30_000;
 
-type Tab = "protected" | "plans" | "destinations" | "activity";
+type Tab = "protected" | "plans" | "destinations" | "keys" | "activity";
 
 const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
     { id: "protected", label: "Protected" },
     { id: "plans", label: "Plans" },
     { id: "destinations", label: "Destinations" },
+    { id: "keys", label: "Encryption" },
     { id: "activity", label: "Activity" }
 ];
 
@@ -147,6 +149,7 @@ export function BackupsView() {
                     onChanged={loadOverview}
                 />
             ) : null}
+            {tab === "keys" ? <KeysPanel /> : null}
             {tab === "activity" ? <ActivityPanel /> : null}
         </div>
     );

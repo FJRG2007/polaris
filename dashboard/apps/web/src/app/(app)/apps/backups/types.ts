@@ -73,6 +73,8 @@ export interface CopyRow {
     status: string;
     error: string | null;
     sizeBytes: number;
+    /** Written sealed under a backup key, rather than in the clear. */
+    sealed: boolean;
     downloadable: boolean;
 }
 
