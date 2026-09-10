@@ -47,6 +47,10 @@ export interface ProjectAccess {
     readonly projectId: string;
     /** Whose resources this project's services live on. */
     readonly ownerId: string;
+    /** The organization whose shelf the project is on, or null for a personal
+     *  one. Carried so every audit entry about the project can name it - an
+     *  entry without it is one the organization's history never shows. */
+    readonly orgId: string | null;
     /** For display only. What is enforced is `capabilities`. */
     readonly role: EffectiveRole;
     readonly isOwner: boolean;
@@ -67,13 +71,14 @@ export function accessInEnvironment(access: ProjectAccess, environmentId: string
 
 /** Access built from a capability set, with its role named for display. */
 function fromCapabilities(
-    project: { id: string; ownerId: string },
+    project: { id: string; ownerId: string; orgId: string | null },
     capabilities: readonly ProjectCapability[],
     environmentIds: readonly string[] | null
 ): ProjectAccess {
     return {
         projectId: project.id,
         ownerId: project.ownerId,
+        orgId: project.orgId,
         role: projectRoleFor(capabilities) ?? "custom",
         isOwner: false,
         capabilities,
@@ -158,6 +163,7 @@ export async function projectAccess(
         return {
             projectId: project.id,
             ownerId: project.ownerId,
+            orgId: project.orgId,
             role: "owner",
             isOwner: true,
             capabilities: ALL_PROJECT_CAPABILITIES,

@@ -14,9 +14,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
-import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
 import * as staged from "@/lib/deploy-staged-changes";
+import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as projectService from "@/lib/deploy-project-service";
 import {
     deleteVolume,
@@ -116,7 +116,7 @@ export async function updateProjectGeneralAction(input: {
             name: parsed.data.name,
             description: parsed.data.description
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.update",
             targetType: "project",
@@ -137,7 +137,7 @@ export async function setProjectVisibilityAction(input: {
         if (!parsed.success) return { error: "Pick one of the offered visibilities" };
         await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.setProjectVisibility(parsed.data.projectId, parsed.data.visibility);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.visibility",
             targetType: "project",
@@ -252,7 +252,7 @@ export async function setProjectAccessAction(input: ProjectAccessInput): Promise
                 environmentIds: access.environmentIds
             }
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.member.add",
             targetType: "project",
@@ -284,7 +284,7 @@ export async function removeProjectMemberAction(input: {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "members.manage");
         await projectService.removeProjectMember(input.projectId, input.memberId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.member.remove",
             targetType: "project",
@@ -325,7 +325,7 @@ export async function createProjectTokenAction(
             ...parsed.data,
             ownerId: access.ownerId
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.token.create",
             targetType: "project",
@@ -344,7 +344,7 @@ export async function revokeProjectTokenAction(input: {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.revokeProjectToken(input.projectId, input.tokenId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.token.revoke",
             targetType: "project",
@@ -390,7 +390,7 @@ export async function createProjectWebhookAction(input: ProjectWebhookInput): Pr
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
         await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.createProjectWebhook(parsed.data);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.project.webhook.add",
             targetType: "project",
@@ -498,8 +498,9 @@ export async function stageServiceDeleteAction(input: {
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             await deployService.deleteApplication(input.applicationId, access.ownerId);
-            await recordAudit({
+            await recordDeployAudit({
                 actorId: user.id,
+                orgId: access.orgId ?? undefined,
                 action: "deploy.app.delete",
                 targetType: "application",
                 targetId: input.applicationId
@@ -537,8 +538,9 @@ export async function stageDatabaseDeleteAction(input: {
         if (!(await staged.projectStagesChanges(access.projectId))) {
             const { deleteDatabase } = await import("@/lib/database-service");
             await deleteDatabase(input.databaseId, access.ownerId);
-            await recordAudit({
+            await recordDeployAudit({
                 actorId: user.id,
+                orgId: access.orgId ?? undefined,
                 action: "deploy.db.delete",
                 targetType: "database",
                 targetId: input.databaseId
@@ -650,7 +652,7 @@ export async function applyStagedChangesAction(input: {
         if (access.projectId !== input.projectId)
             return { error: "That environment is not in this project" };
         const result = await staged.applyStagedChanges(input.environmentId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.changeset.apply",
             targetType: "environment",
@@ -723,7 +725,7 @@ export async function wipeVolumeAction(volumeId: string): Promise<Result> {
             "volumes.manage"
         );
         await wipeVolume(volumeId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.volume.wipe",
             targetType: "volume",

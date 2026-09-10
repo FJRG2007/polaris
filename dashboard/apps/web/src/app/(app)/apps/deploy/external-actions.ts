@@ -15,7 +15,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as migrate from "@/lib/deploy/migrate";
 import { requirePermission } from "@/lib/session";
-import { recordAudit } from "@/lib/audit-service";
+import { recordDeployAudit } from "@/lib/deploy-audit";
 import type { ProjectCapability } from "@polaris/core";
 import { listConnections } from "@/lib/connections/store";
 import * as external from "@/lib/deploy/external-services";
@@ -263,7 +263,7 @@ export async function moveOutAction(
         const result = await migrate.moveOut(user.id, projectId, service.data, parsed.data);
         // The one action here worth a trail: it decrypts every secret the service
         // runs with and hands them to a third party.
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.moveOut",
             targetType: "application",
@@ -344,7 +344,7 @@ export async function moveHomeAction(
             };
         }
         const result = await migrate.moveHome(user.id, projectId, service.data, parsed.data);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.moveHome",
             targetType: "application",

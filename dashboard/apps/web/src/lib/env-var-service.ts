@@ -41,16 +41,20 @@ async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string
  * Which scope one variable belongs to, so a caller holding only its id can
  * resolve who is allowed to touch it before it does. Null when the row is gone
  * or names a scope this module does not own.
+ *
+ * The key comes back too, for the audit entry the caller writes: a reveal or a
+ * removal recorded without the name of what was revealed or removed says only
+ * that something happened.
  */
 export async function envVarScope(
     id: string
-): Promise<{ scope: EnvScope; scopeId: string } | null> {
+): Promise<{ scope: EnvScope; scopeId: string; key: string } | null> {
     const row = await prisma.envVar.findUnique({
         where: { id },
-        select: { scopeId: true, scopeType: true }
+        select: { scopeId: true, scopeType: true, key: true }
     });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
-    return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
+    return { scope: row.scopeType as EnvScope, scopeId: row.scopeId, key: row.key };
 }
 
 /** List a scope's variables (secret values masked). Application scope is a service;

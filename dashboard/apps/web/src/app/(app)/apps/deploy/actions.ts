@@ -13,7 +13,6 @@ import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
 import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
-import { recordAudit } from "@/lib/audit-service";
 import * as activity from "@/lib/activity/activity";
 import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
@@ -27,6 +26,7 @@ import { listConnections, getDriver } from "@/lib/storage-service";
 import { resolveScope, scopeOrgIdFor } from "@/lib/workspace-scope";
 import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
+import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
@@ -135,7 +135,7 @@ async function recordServiceEvent(
     action: string,
     values?: { from?: string | null; to?: string | null }
 ): Promise<void> {
-    await recordAudit({
+    await recordDeployAudit({
         actorId,
         action: audit,
         targetType: "application",
@@ -170,7 +170,7 @@ export async function createProjectAction(input: {
             );
 
         const project = await deployService.createProject(user.id, name, orgId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             orgId: orgId ?? undefined,
             action: "deploy.project.create",
@@ -190,9 +190,12 @@ export async function deleteProjectAction(projectId: string): Promise<{ error?: 
         // Only the owner may delete a project. Being an admin *on* one is enough to
         // change everything inside it, and deliberately not enough to remove the
         // thing itself.
+        // Read before the delete: afterwards nothing is left to say whose it was.
+        const orgId = (await deployTargetOrgId("project", projectId)) ?? undefined;
         await deployService.deleteProject(projectId, user.id);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
+            orgId,
             action: "deploy.project.delete",
             targetType: "project",
             targetId: projectId
@@ -238,7 +241,7 @@ export async function createEnvironmentAction(input: {
                     console.error("polaris: a copied environment could not be deployed:", error);
                 });
         }
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.env.create",
             targetType: "environment",
@@ -287,8 +290,9 @@ export async function deleteEnvironmentAction(input: {
             "project.settings"
         );
         await deployService.deleteEnvironment(input.environmentId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
+            orgId: access.orgId ?? undefined,
             action: "deploy.env.delete",
             targetType: "environment",
             targetId: input.environmentId
@@ -405,7 +409,7 @@ export async function createApplicationAction(input: {
             deployBranch: isGit ? (branch ?? null) : null,
             keepReleases: flags.keepReleasesByDefault
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.create",
             targetType: "application",
@@ -427,7 +431,7 @@ export async function createApplicationAction(input: {
         let deploymentId: string | undefined;
         try {
             deploymentId = await deployService.deployApplication(app.id, owner, user.id);
-            await recordAudit({
+            await recordDeployAudit({
                 actorId: user.id,
                 action: "deploy.app.deploy",
                 targetType: "application",
@@ -474,6 +478,31 @@ export async function setAutoDeployAction(input: {
     }
 }
 
+/**
+ * A variable written, removed or revealed, in the audit trail.
+ *
+ * The name and whether it is a secret, never the value - the trail is read by
+ * administrators and by the organization's own history, and a secret copied
+ * into it would be a secret stored in the clear in a table built to be read.
+ */
+async function recordVariableEvent(
+    actorId: string,
+    orgId: string | null,
+    scope: EnvScope,
+    scopeId: string,
+    action: string,
+    metadata: Record<string, unknown>
+): Promise<void> {
+    await recordDeployAudit({
+        actorId,
+        orgId: orgId ?? undefined,
+        action,
+        targetType: scope === "application" ? "application" : "environment",
+        targetId: scopeId,
+        metadata
+    });
+}
+
 /** Env vars for a scope (application service or shared environment); secrets masked. */
 export async function listEnvVarsAction(scope: EnvScope, scopeId: string): Promise<EnvVarView[]> {
     const user = await requirePermission("deploy.read");
@@ -500,6 +529,10 @@ export async function saveEnvVarAction(input: {
             key: input.key,
             value: input.value,
             isSecret: input.isSecret
+        });
+        await recordVariableEvent(user.id, access.orgId, input.scope, input.scopeId, "deploy.variable.set", {
+            key: input.key.trim(),
+            secret: input.isSecret
         });
         if (input.scope === "application") {
             await activity.record({
@@ -541,6 +574,14 @@ export async function importEnvVarsAction(input: {
         }));
         if (parsed.length === 0) return { error: "No KEY=value lines found" };
         const count = await setEnvVars(input.scope, input.scopeId, access.ownerId, parsed);
+        await recordVariableEvent(
+            user.id,
+            access.orgId,
+            input.scope,
+            input.scopeId,
+            "deploy.variable.import",
+            { keys: parsed.map((item) => item.key), saved: count, secret: input.isSecret }
+        );
         if (input.scope === "application") {
             await activity.record({
                 subjectType: "app",
@@ -573,7 +614,14 @@ export async function revealEnvVarAction(
             user.id,
             "variables.read"
         );
-        return { value: await revealEnvVar(id, access.ownerId) };
+        const value = await revealEnvVar(id, access.ownerId);
+        // Written only once the value has actually been handed over: a reveal is
+        // the one read in Deploy that puts a secret on somebody's screen, and the
+        // question an incident asks first is who looked.
+        await recordVariableEvent(user.id, access.orgId, scope.scope, scope.scopeId, "deploy.variable.reveal", {
+            key: scope.key
+        });
+        return { value };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not reveal the variable"
@@ -594,6 +642,9 @@ export async function deleteEnvVarAction(id: string): Promise<{ error?: string }
         );
         const scope = await deleteEnvVar(id, access.ownerId);
         if (scope) {
+            await recordVariableEvent(user.id, access.orgId, scope.scope, scope.scopeId, "deploy.variable.remove", {
+                key: located.key
+            });
             void deployService
                 .redeployForEnvScope(scope.scope, scope.scopeId, access.ownerId)
                 .catch(() => undefined);
@@ -773,7 +824,7 @@ export async function cancelDeploymentAction(deploymentId: string): Promise<{ er
     try {
         const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
         await deployService.cancelDeployment(deploymentId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.cancel",
             targetType: "deployment",
@@ -827,7 +878,7 @@ export async function pinDeploymentAction(
     try {
         const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
         await deployService.setDeploymentPinned(deploymentId, access.ownerId, pinned);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: pinned ? "deploy.app.pin" : "deploy.app.unpin",
             targetType: "deployment",
@@ -903,7 +954,7 @@ export async function setAppServerAction(
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
         await deployService.setApplicationServer(applicationId, access.ownerId, serverId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.move",
             targetType: "application",
@@ -977,8 +1028,9 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.delete");
         await deployService.deleteApplication(applicationId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
+            orgId: access.orgId ?? undefined,
             action: "deploy.app.delete",
             targetType: "application",
             targetId: applicationId
@@ -1047,7 +1099,7 @@ export async function addDomainAction(input: {
                 subdomain: input.subdomain
             }
         );
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.domain.add",
             targetType: "application",
@@ -1105,7 +1157,7 @@ export async function autoExposeAction(input: {
             access.ownerId,
             { targetPort: port }
         );
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.domain.add",
             targetType: "application",
@@ -1248,7 +1300,7 @@ export async function setDomainCertificateAction(
         const access = await requireDomainAccess(domainId, user.id, "domains.manage");
         const result = await setDomainCertificate(domainId, access.ownerId, input);
         if (result.error) return result;
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: input ? "deploy.domain.cert.set" : "deploy.domain.cert.clear",
             targetType: "domain",
@@ -1294,7 +1346,7 @@ export async function setDomainEnabledAction(
     try {
         const access = await requireDomainAccess(domainId, user.id, "domains.manage");
         await deployService.setApplicationDomainEnabled(domainId, access.ownerId, enabled);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.domain.toggle",
             targetType: "domain",
@@ -1326,7 +1378,7 @@ export async function setServedByAction(
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await deployService.setApplicationServedBy(applicationId, access.ownerId, servedBy);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.domain.servedBy",
             targetType: "application",
@@ -1359,7 +1411,7 @@ export async function startQuickTunnelAction(
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         const status = await startQuickTunnel(applicationId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.tunnel.start",
             targetType: "application",
@@ -1377,7 +1429,7 @@ export async function stopQuickTunnelAction(applicationId: string): Promise<{ er
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await stopQuickTunnel(applicationId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.tunnel.stop",
             targetType: "application",
@@ -1407,7 +1459,7 @@ export async function startNgrokTunnelAction(
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         const status = await startNgrokTunnel(applicationId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.tunnel.start",
             targetType: "application",
@@ -1425,7 +1477,7 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await stopNgrokTunnel(applicationId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.tunnel.stop",
             targetType: "application",
@@ -1461,7 +1513,7 @@ export async function setNamedTunnelEnabledAction(input: {
             "domains.manage"
         );
         await setNamedTunnelEnabled(input.applicationId, access.ownerId, input.enabled);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: input.enabled ? "deploy.named-tunnel.start" : "deploy.named-tunnel.stop",
             targetType: "application",
@@ -1506,7 +1558,7 @@ export async function provisionNamedTunnelAction(input: {
         const status = await provisionNamedTunnel(input.applicationId, access.ownerId, {
             hostname: input.hostname
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.named-tunnel.provision",
             targetType: "application",
@@ -1535,7 +1587,7 @@ export async function startNamedTunnelAction(input: {
             token: input.token,
             hostname: input.hostname
         });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.named-tunnel.start",
             targetType: "application",
@@ -1553,7 +1605,7 @@ export async function stopNamedTunnelAction(applicationId: string): Promise<{ er
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await stopNamedTunnel(applicationId, access.ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.named-tunnel.stop",
             targetType: "application",
@@ -1591,7 +1643,7 @@ export async function createDatabaseAction(
             target = await getOrCreateLocalTarget(owner);
         }
         const database = await createDatabase(owner, { ...settings, targetId: target.id });
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.db.create",
             targetType: "database",
@@ -1642,7 +1694,7 @@ export async function deployDatabaseAction(
     try {
         const access = await requireDatabaseAccess(databaseId, user.id, "databases.manage");
         const deploymentId = await deployDatabase(databaseId, access.ownerId, user.id);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.db.deploy",
             targetType: "database",
@@ -1672,7 +1724,7 @@ export async function saveRegistryCredentialAction(input: {
     const user = await requirePermission("deploy.manage");
     try {
         await upsertRegistryCredential(user.id, input);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.registry.save",
             targetType: "registry",
@@ -1690,7 +1742,7 @@ export async function saveRegistryCredentialAction(input: {
 export async function deleteRegistryCredentialAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     await deleteRegistryCredential(id, user.id);
-    await recordAudit({
+    await recordDeployAudit({
         actorId: user.id,
         action: "deploy.registry.delete",
         targetType: "registry",
@@ -1771,7 +1823,7 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
             "volumes.manage"
         );
         await createVolume(access.ownerId, input);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.volume.add",
             targetType: "application",
@@ -1814,7 +1866,7 @@ export async function updateVolumeAction(
     try {
         const { ownerId, applicationId } = await volumeWriteAccess(input.id, user.id);
         await updateVolume(ownerId, input);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.volume.update",
             targetType: "application",
@@ -1838,7 +1890,7 @@ export async function deleteVolumeAction(input: {
     try {
         const { ownerId, applicationId } = await volumeWriteAccess(input.id, user.id);
         await deleteVolume(input.id, ownerId);
-        await recordAudit({
+        await recordDeployAudit({
             actorId: user.id,
             action: "deploy.volume.remove",
             targetType: "application",
