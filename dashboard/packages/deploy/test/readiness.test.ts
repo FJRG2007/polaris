@@ -143,9 +143,9 @@ describe("a release beside the one it replaces", () => {
         networks: ["polaris-proxy", "hub"]
     });
 
-    it("answers to the service's own name on the proxy network", () => {
+    it("answers to the service's own name on every network it joins", () => {
         const yaml = renderComposeYaml(service(["web"]), "/v", "/m");
-        expect(yaml).toContain('      polaris-proxy:\n        aliases:\n          - "web"\n      hub: {}');
+        expect(yaml).toContain('      polaris-proxy:\n        aliases:\n          - "web"\n      hub:\n        aliases:\n          - "web"');
     });
 
     it("keeps the plain network list when it carries no alias", () => {

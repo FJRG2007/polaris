@@ -394,7 +394,7 @@ export async function createZoneRecord(
 }
 
 /** One record as the zone holds it, for the record editor. */
-export interface CfDnsRecord {
+export interface CfEditableRecord {
     id: string;
     type: string;
     name: string;
@@ -413,8 +413,8 @@ const RECORDS_PER_PAGE = 100;
 const MAX_RECORD_PAGES = 50;
 
 /** Every record in a zone, page by page, in the order Cloudflare keeps them. */
-export async function listDnsRecords(token: string, zoneId: string): Promise<CfDnsRecord[]> {
-    const records: CfDnsRecord[] = [];
+export async function listDnsRecords(token: string, zoneId: string): Promise<CfEditableRecord[]> {
+    const records: CfEditableRecord[] = [];
     for (let page = 1; page <= MAX_RECORD_PAGES; page += 1) {
         const batch = await cf<unknown[]>(
             token,

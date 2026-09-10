@@ -74,7 +74,7 @@ export interface ComposeSpecService {
     readonly labels: Record<string, string>;
     readonly command?: string[];
     readonly networks: string[];
-    /** Other names the container answers to on its first network (see
+    /** Other names the container answers to on every network it joins (see
      *  `AppDeployPlan.alias`). */
     readonly aliases?: string[];
     /** Names this container can reach that DNS cannot answer, as `name:address`.
@@ -298,19 +298,24 @@ export function swarmDeployLines(service: Pick<ComposeSpecService, "replicas" | 
     return lines;
 }
 
-/** A service's `networks:` block: a plain list, or - when it carries aliases - the
- *  mapping form, with the aliases on its first network. The daemon renders the same. */
+/**
+ * A service's `networks:` block: a plain list, or - when it carries aliases - the
+ * mapping form, with the aliases on every network it joins. Every one, because
+ * whoever reaches the service by name may be on any of them: the edge on the proxy
+ * network, the services beside it on their environment's own. The daemon renders
+ * the same.
+ */
 export function serviceNetworkLines(service: Pick<ComposeSpecService, "networks" | "aliases">): string[] {
     if (service.networks.length === 0) return [];
     const aliases = service.aliases ?? [];
     if (aliases.length === 0) return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
-    const [first, ...rest] = service.networks;
     return [
         "    networks:",
-        `      ${first}:`,
-        "        aliases:",
-        ...aliases.map((alias) => `          - ${yamlQuote(alias)}`),
-        ...rest.map((net) => `      ${net}: {}`)
+        ...service.networks.flatMap((net) => [
+            `      ${net}:`,
+            "        aliases:",
+            ...aliases.map((alias) => `          - ${yamlQuote(alias)}`)
+        ])
     ];
 }
 

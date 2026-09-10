@@ -34,7 +34,7 @@ import {
     listZones,
     resolveZoneForHostname,
     updateDnsRecord,
-    type CfDnsRecord
+    type CfEditableRecord
 } from "@/lib/integrations/cloudflare-api";
 
 export type DnsScope =
@@ -115,7 +115,7 @@ function numberOf(value: unknown): string {
 }
 
 /** The form a stored record is edited in. */
-function draftOf(record: CfDnsRecord, zone: string): DnsRecordDraft | null {
+function draftOf(record: CfEditableRecord, zone: string): DnsRecordDraft | null {
     if (!(DNS_RECORD_TYPES as readonly string[]).includes(record.type)) return null;
     const type = record.type as DnsRecordType;
     const draft: DnsRecordDraft = {
@@ -147,7 +147,7 @@ function draftOf(record: CfDnsRecord, zone: string): DnsRecordDraft | null {
     }
 }
 
-function viewOf(record: CfDnsRecord, zone: string): DnsRecordView {
+function viewOf(record: CfEditableRecord, zone: string): DnsRecordView {
     return {
         id: record.id,
         type: record.type,
@@ -223,7 +223,7 @@ export async function deleteZoneRecord(scope: DnsScope, recordId: string): Promi
 /** The values a resolver should give for a record once the change has reached it,
  *  in the form it gives them - or null when there is nothing to expect: a proxied
  *  record answers with Cloudflare's own addresses rather than its content. */
-export function expectedValues(record: Pick<CfDnsRecord, "type" | "content" | "proxied" | "priority" | "data">): string[] | null {
+export function expectedValues(record: Pick<CfEditableRecord, "type" | "content" | "proxied" | "priority" | "data">): string[] | null {
     if (record.proxied) return null;
     switch (record.type) {
         case "MX":

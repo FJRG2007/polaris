@@ -61,7 +61,7 @@ pub struct ServiceSpec {
     pub command: Vec<String>,
     #[serde(default)]
     pub networks: Vec<String>,
-    /// Other names the container answers to on its first network: the service's
+    /// Other names the container answers to on every network it joins: the service's
     /// own, carried by a release running beside the one it replaces, so whatever
     /// reaches the service by that name keeps reaching it across the change.
     #[serde(default)]
@@ -360,15 +360,12 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
                 }
             } else {
                 // The mapping form, which is the only one that can carry aliases;
-                // they go on the first network, which is the proxy network.
-                for (index, net) in service.networks.iter().enumerate() {
-                    if index == 0 {
-                        out.push_str(&format!("      {net}:\n        aliases:\n"));
-                        for alias in &service.aliases {
-                            out.push_str(&format!("          - {}\n", yaml_quote(alias)));
-                        }
-                    } else {
-                        out.push_str(&format!("      {net}: {{}}\n"));
+                // they go on every network, since whoever reaches the service by
+                // name may be on any of them.
+                for net in &service.networks {
+                    out.push_str(&format!("      {net}:\n        aliases:\n"));
+                    for alias in &service.aliases {
+                        out.push_str(&format!("          - {}\n", yaml_quote(alias)));
                     }
                 }
             }
@@ -1153,10 +1150,10 @@ mod tests {
     }
 
     #[test]
-    fn an_alias_rides_on_the_first_network() {
+    fn an_alias_rides_on_every_network() {
         // A release standing beside the one it replaces answers to the service's
-        // own name too, and only on the proxy network; any other network is joined
-        // plainly. Without aliases the list form is unchanged.
+        // own name too, on every network it joins - the edge reaches it on one, the
+        // services beside it on another. Without aliases the list form is unchanged.
         let config = test_config();
         let aliased = spec(
             r#"{"project":"p","services":[{"name":"web-abc1234","image":"nginx","networks":["polaris-proxy","hub"],"aliases":["web"]}],"networks":["polaris-proxy","hub"]}"#,
@@ -1164,7 +1161,7 @@ mod tests {
         assert!(validate_spec(&aliased, &config).is_ok());
         let rendered = render_compose(&aliased, &config);
         assert!(rendered.contains("      polaris-proxy:\n        aliases:\n          - \"web\"\n"));
-        assert!(rendered.contains("      hub: {}\n"));
+        assert!(rendered.contains("      hub:\n        aliases:\n          - \"web\"\n"));
 
         let bad = spec(
             r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["polaris-proxy"],"aliases":["Not Valid"]}]}"#,
