@@ -33,7 +33,10 @@ export function createGuardServer(config: () => GuardConfig): Server {
             // What this guard can do, for a dashboard that has to know whether a
             // setting it writes will actually be enforced here: a guard too old to
             // challenge would read the flag and ignore it without a word.
-            res.writeHead(200, { "content-type": "text/plain", [GUARD_FEATURES_HEADER]: GUARD_FEATURES });
+            res.writeHead(200, {
+                "content-type": "text/plain",
+                [GUARD_FEATURES_HEADER]: GUARD_FEATURES
+            });
             res.end("ok");
             return;
         }

@@ -41,13 +41,17 @@ export function releaseImage(service: string, deploymentId: string): string {
  *  like one. Anchored and charset-bounded, because the answer decides whether a
  *  name is handed to an image removal. */
 export function isReleaseImage(reference: string | null | undefined): reference is string {
-    return typeof reference === "string" && /^polaris-release\/[a-z0-9][a-z0-9-]{0,99}:[a-f0-9]{12}$/.test(reference);
+    return (
+        typeof reference === "string" &&
+        /^polaris-release\/[a-z0-9][a-z0-9-]{0,99}:[a-f0-9]{12}$/.test(reference)
+    );
 }
 
 /** The Dockerfile that pins `from` as one deployment's release. The deployment id
  *  is a uuid, so it is written into the label as-is without escaping anything. */
 export function pinDockerfile(from: string, deploymentId: string): string {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._\/:@-]*$/.test(from)) throw new Error("not an image reference that can be pinned");
+    if (!/^[A-Za-z0-9][A-Za-z0-9._\/:@-]*$/.test(from))
+        throw new Error("not an image reference that can be pinned");
     if (!/^[A-Za-z0-9-]+$/.test(deploymentId)) throw new Error("not a deployment id");
     return `FROM ${from}\nLABEL ${RELEASE_LABEL}="${deploymentId}"\n`;
 }

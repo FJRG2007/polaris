@@ -18,7 +18,10 @@ import { orgActivityReader } from "@/lib/orgs/activity-access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ slug: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const orgId = await orgActivityReader(user, (await params).slug);

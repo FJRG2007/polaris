@@ -35,7 +35,9 @@ export interface AddedVariable {
 
 export interface VariableDraft {
     /** Per existing row: a value typed over it, or its secrecy flipped. */
-    readonly edits: Readonly<Record<string, { readonly value?: string; readonly isSecret?: boolean }>>;
+    readonly edits: Readonly<
+        Record<string, { readonly value?: string; readonly isSecret?: boolean }>
+    >;
     readonly added: readonly AddedVariable[];
     readonly removed: readonly string[];
 }
@@ -69,19 +71,34 @@ export const variableChangesSchema = z
         const seen = new Set<string>();
         input.set.forEach((item, index) => {
             if (seen.has(item.key)) {
-                context.addIssue({ code: "custom", message: `${item.key} is set twice`, path: ["set"] });
+                context.addIssue({
+                    code: "custom",
+                    message: `${item.key} is set twice`,
+                    path: ["set"]
+                });
             }
             if (hasControlCharacter(item.value)) {
-                context.addIssue({ code: "custom", message: envValueMessage(item.key), path: ["set", index, "value"] });
+                context.addIssue({
+                    code: "custom",
+                    message: envValueMessage(item.key),
+                    path: ["set", index, "value"]
+                });
             }
             seen.add(item.key);
         });
     });
 
-export type VariableChanges = Omit<z.infer<typeof variableChangesSchema>, "scope" | "scopeId" | "redeploy">;
+export type VariableChanges = Omit<
+    z.infer<typeof variableChangesSchema>,
+    "scope" | "scopeId" | "redeploy"
+>;
 
 /** How a secret the page never saw is left alone: its field was opened and left empty. */
-function secretUntouched(row: VariableRow, value: string, revealed: Readonly<Record<string, string>>): boolean {
+function secretUntouched(
+    row: VariableRow,
+    value: string,
+    revealed: Readonly<Record<string, string>>
+): boolean {
     return row.isSecret && revealed[row.id] === undefined && value === "";
 }
 
@@ -131,7 +148,10 @@ export function changeCount(changes: VariableChanges): number {
 }
 
 /** What is wrong with each new variable, by its temporary id; empty when nothing is. */
-export function draftErrors(rows: readonly VariableRow[], draft: VariableDraft): Record<string, string> {
+export function draftErrors(
+    rows: readonly VariableRow[],
+    draft: VariableDraft
+): Record<string, string> {
     const errors: Record<string, string> = {};
     const removed = new Set(draft.removed);
     const existing = new Set(rows.filter((row) => !removed.has(row.id)).map((row) => row.key));
@@ -140,7 +160,8 @@ export function draftErrors(rows: readonly VariableRow[], draft: VariableDraft):
         const key = item.key.trim();
         if (!key) errors[item.tempId] = "Give it a name";
         else if (!VARIABLE_KEY.test(key)) errors[item.tempId] = VARIABLE_KEY_MESSAGE;
-        else if (existing.has(key)) errors[item.tempId] = `${key} is already set - change it in its row`;
+        else if (existing.has(key))
+            errors[item.tempId] = `${key} is already set - change it in its row`;
         else if (seen.has(key)) errors[item.tempId] = `${key} is listed twice`;
         else if (item.value.length > MAX_VALUE) errors[item.tempId] = "That value is too long";
         else if (hasControlCharacter(item.value)) errors[item.tempId] = envValueMessage(key);

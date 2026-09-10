@@ -24,7 +24,12 @@ export type DeployFix =
     | { readonly kind: "set-build-command"; readonly suggestion: string | null }
     | { readonly kind: "set-root-directory"; readonly suggestion: string | null }
     | { readonly kind: "set-runtime-version"; readonly version: string }
-    | { readonly kind: "add-variable"; readonly name: string; readonly value: string | null; readonly generate: boolean }
+    | {
+          readonly kind: "add-variable";
+          readonly name: string;
+          readonly value: string | null;
+          readonly generate: boolean;
+      }
     | { readonly kind: "use-detected-build" };
 
 export interface Diagnosis {
@@ -66,7 +71,9 @@ function lineOf(log: string, index: number): string {
 /** The highest major version a requirement names, bounded to the Node lines an
  *  image is published for. `^18.18.0 || ^19.8.0 || >= 20.0.0` is 20. */
 function nodeMajorFor(requirement: string): string | null {
-    const majors = [...requirement.matchAll(/(\d+)(?:\.\d+)*/g)].map((match) => Number(match[1])).filter((major) => major >= 14 && major <= 30);
+    const majors = [...requirement.matchAll(/(\d+)(?:\.\d+)*/g)]
+        .map((match) => Number(match[1]))
+        .filter((major) => major >= 14 && major <= 30);
     if (majors.length === 0) return null;
     const highest = Math.max(...majors);
     return String(Math.max(18, highest));
@@ -80,7 +87,11 @@ function pythonMinimum(requirement: string): string | null {
 interface Rule {
     readonly cause: string;
     readonly pattern: RegExp;
-    readonly diagnose: (match: RegExpExecArray, context: DiagnoseContext, log: string) => Omit<Diagnosis, "cause" | "evidence"> | null;
+    readonly diagnose: (
+        match: RegExpExecArray,
+        context: DiagnoseContext,
+        log: string
+    ) => Omit<Diagnosis, "cause" | "evidence"> | null;
 }
 
 /** A variable the app refused to start without, by name. */
@@ -105,11 +116,17 @@ function missingSecret(name: string, framework: string): Omit<Diagnosis, "cause"
 const RULES: readonly Rule[] = [
     {
         cause: "heap-out-of-memory",
-        pattern: /JavaScript heap out of memory|Reached heap limit Allocation failed|Allocation failed - JavaScript heap/,
+        pattern:
+            /JavaScript heap out of memory|Reached heap limit Allocation failed|Allocation failed - JavaScript heap/,
         diagnose: () => ({
             title: "The build ran out of JavaScript memory",
             detail: "Node's default heap is too small for this build. Raising it with NODE_OPTIONS usually lets it finish.",
-            fix: { kind: "add-variable", name: "NODE_OPTIONS", value: "--max-old-space-size=4096", generate: false }
+            fix: {
+                kind: "add-variable",
+                name: "NODE_OPTIONS",
+                value: "--max-old-space-size=4096",
+                generate: false
+            }
         })
     },
     {
@@ -123,7 +140,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "missing-start-script",
-        pattern: /Missing script:\s*"?start"?|No start command could be found|missing script: start/i,
+        pattern:
+            /Missing script:\s*"?start"?|No start command could be found|missing script: start/i,
         diagnose: () => ({
             title: "Nothing says how to start this app",
             detail: "Its package.json has no start script. Set the command that starts it.",
@@ -141,7 +159,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "dockerfile-missing",
-        pattern: /failed to (?:read|solve)[^\n]*dockerfile[^\n]*no such file|open [^\s]*Dockerfile[^\s]*: no such file|Cannot locate specified Dockerfile|unable to prepare context: unable to evaluate symlinks in Dockerfile path/i,
+        pattern:
+            /failed to (?:read|solve)[^\n]*dockerfile[^\n]*no such file|open [^\s]*Dockerfile[^\s]*: no such file|Cannot locate specified Dockerfile|unable to prepare context: unable to evaluate symlinks in Dockerfile path/i,
         diagnose: () => ({
             title: "There is no Dockerfile where the service looks for one",
             detail: "Point it at the right path, or let Polaris work out how to build the repository instead.",
@@ -150,7 +169,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "wrong-root-directory",
-        pattern: /ENOENT: no such file or directory, open '[^']*package\.json'|Could not read package\.json|unable to generate a build plan|Nixpacks was unable to generate a build plan/i,
+        pattern:
+            /ENOENT: no such file or directory, open '[^']*package\.json'|Could not read package\.json|unable to generate a build plan|Nixpacks was unable to generate a build plan/i,
         diagnose: () => ({
             title: "The build found no project where it looked",
             detail: "In a repository holding several apps, the root directory has to name the one to deploy.",
@@ -175,7 +195,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "python-version",
-        pattern: /requires a different Python: [\d.]+ not in '([^']+)'|Requires-Python ([>=<~!^][^\s;]+)/,
+        pattern:
+            /requires a different Python: [\d.]+ not in '([^']+)'|Requires-Python ([>=<~!^][^\s;]+)/,
         diagnose: (match) => {
             const version = pythonMinimum(match[1] ?? match[2] ?? "");
             return version
@@ -213,7 +234,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "command-not-found",
-        pattern: /(?:^|\n)\s*(?:sh|bash|\/bin\/sh)(?:: \d+)?: ([A-Za-z0-9_.@/-]+): (?:command )?not found/,
+        pattern:
+            /(?:^|\n)\s*(?:sh|bash|\/bin\/sh)(?:: \d+)?: ([A-Za-z0-9_.@/-]+): (?:command )?not found/,
         diagnose: (match) => ({
             title: `The build ran ${match[1]}, which is not installed`,
             detail: `Either ${match[1]} is missing from the project's dependencies, or the build command names a tool this project does not use.`,
@@ -222,13 +244,16 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "missing-module",
-        pattern: /Error: Cannot find module '([^']+)'|ERR_MODULE_NOT_FOUND[^\n]*'([^']+)'|ModuleNotFoundError: No module named '([^']+)'/,
+        pattern:
+            /Error: Cannot find module '([^']+)'|ERR_MODULE_NOT_FOUND[^\n]*'([^']+)'|ModuleNotFoundError: No module named '([^']+)'/,
         diagnose: (match) => {
             const module = match[1] ?? match[2] ?? match[3] ?? "";
             // A path is the app's own build output; a name is a dependency.
             const builtFile = module.startsWith(".") || module.startsWith("/");
             return {
-                title: builtFile ? `The app looked for ${module}, which the build did not produce` : `The app needs ${module}, which is not installed`,
+                title: builtFile
+                    ? `The app looked for ${module}, which the build did not produce`
+                    : `The app needs ${module}, which is not installed`,
                 detail: builtFile
                     ? "The start command expects build output the build never wrote. Check the build command, or the start command's path."
                     : `Add ${module} to the project's dependencies - as a regular dependency, since development ones are not installed for production.`,
@@ -238,7 +263,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "lockfile-mismatch",
-        pattern: /ERR_PNPM_OUTDATED_LOCKFILE|`npm ci` can only install packages when your package\.json and package-lock\.json|The lockfile would have been modified by this install|Your lockfile needs to be updated/,
+        pattern:
+            /ERR_PNPM_OUTDATED_LOCKFILE|`npm ci` can only install packages when your package\.json and package-lock\.json|The lockfile would have been modified by this install|Your lockfile needs to be updated/,
         diagnose: (_match, _context, log) =>
             // The install falls back to the manifest by itself; when it did, the
             // lockfile is not what stopped this deploy.
@@ -252,7 +278,8 @@ const RULES: readonly Rule[] = [
     },
     {
         cause: "listening-on-localhost",
-        pattern: /(?:listening|running|started|serving|ready|server)[^\n]{0,40}?(?:on|at)\s+(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i,
+        pattern:
+            /(?:listening|running|started|serving|ready|server)[^\n]{0,40}?(?:on|at)\s+(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i,
         diagnose: () => ({
             title: "The app only listens inside its own container",
             detail: "It bound to localhost, which nothing outside the container can reach. Setting HOST to 0.0.0.0 makes most frameworks listen everywhere.",
@@ -264,7 +291,14 @@ const RULES: readonly Rule[] = [
         pattern: /(?:listening|running|started|serving|ready)[^\n]{0,40}?(?:port\s+|:)(\d{2,5})\b/i,
         diagnose: (match, context) => {
             const port = Number(match[1]);
-            if (!context.port || !Number.isInteger(port) || port === context.port || port < 80 || port > 65535) return null;
+            if (
+                !context.port ||
+                !Number.isInteger(port) ||
+                port === context.port ||
+                port < 80 ||
+                port > 65535
+            )
+                return null;
             return {
                 title: `The app listens on ${port}, not ${context.port}`,
                 detail: `Polaris sends its traffic to ${context.port}. Use ${port} instead.`,
@@ -281,7 +315,12 @@ export function diagnoseDeploy(log: string, context: DiagnoseContext = {}): Diag
         const match = rule.pattern.exec(text);
         if (!match) continue;
         const found = rule.diagnose(match, context, text);
-        if (found) return { cause: rule.cause, evidence: lineOf(text, match.index + (match[0].startsWith("\n") ? 1 : 0)), ...found };
+        if (found)
+            return {
+                cause: rule.cause,
+                evidence: lineOf(text, match.index + (match[0].startsWith("\n") ? 1 : 0)),
+                ...found
+            };
     }
     return null;
 }

@@ -32,7 +32,13 @@ const prisma = {
                 slug: "web",
                 currentDeploymentId: null,
                 targetId: "target-1",
-                target: { id: "target-1", kind: "local", hostId: null, runtime: "docker", proxyNetwork: "polaris" },
+                target: {
+                    id: "target-1",
+                    kind: "local",
+                    hostId: null,
+                    runtime: "docker",
+                    proxyNetwork: "polaris"
+                },
                 environment: { project: { slug: "shop", ownerId: "owner-1" } }
             }
         ])
@@ -62,12 +68,18 @@ const prisma = {
             return { count: data.length };
         }),
         deleteMany: vi.fn(
-            async ({ where }: { where: { at?: { lt: Date }; applicationId?: string; stamp?: { lte: string } } }) => {
+            async ({
+                where
+            }: {
+                where: { at?: { lt: Date }; applicationId?: string; stamp?: { lte: string } };
+            }) => {
                 const before = rows.length;
                 for (let index = rows.length - 1; index >= 0; index -= 1) {
                     const row = rows[index] as Row;
                     const old = where.at ? row.at < where.at.lt : true;
-                    const service = where.applicationId ? row.applicationId === where.applicationId : true;
+                    const service = where.applicationId
+                        ? row.applicationId === where.applicationId
+                        : true;
                     const upTo = where.stamp ? row.stamp <= where.stamp.lte : true;
                     if (old && service && upTo) rows.splice(index, 1);
                 }
@@ -76,8 +88,12 @@ const prisma = {
         ),
         groupBy: vi.fn(async () => {
             const counts = new Map<string, number>();
-            for (const row of rows) counts.set(row.applicationId, (counts.get(row.applicationId) ?? 0) + 1);
-            return [...counts].map(([applicationId, count]) => ({ applicationId, _count: { _all: count } }));
+            for (const row of rows)
+                counts.set(row.applicationId, (counts.get(row.applicationId) ?? 0) + 1);
+            return [...counts].map(([applicationId, count]) => ({
+                applicationId,
+                _count: { _all: count }
+            }));
         })
     }
 };
@@ -88,27 +104,32 @@ vi.mock("@polaris/db", () => ({ prisma }));
 const output = new Map<string, string[]>();
 const ports = {
     listContainers: vi.fn(async () => ["shop-web-1", "shop-web-2"]),
-    logs: vi.fn(async (container: string, sink: (chunk: Buffer) => void, options?: { tail?: number }) => {
-        const lines = output.get(container) ?? [];
-        const tail = options?.tail === undefined ? lines : lines.slice(-options.tail);
-        // Split mid-line on purpose: a pipe flushes wherever it likes.
-        const text = tail.map((line) => `${line}\n`).join("");
-        const cut = Math.floor(text.length / 2);
-        sink(Buffer.from(text.slice(0, cut)));
-        sink(Buffer.from(text.slice(cut)));
-    }),
+    logs: vi.fn(
+        async (container: string, sink: (chunk: Buffer) => void, options?: { tail?: number }) => {
+            const lines = output.get(container) ?? [];
+            const tail = options?.tail === undefined ? lines : lines.slice(-options.tail);
+            // Split mid-line on purpose: a pipe flushes wherever it likes.
+            const text = tail.map((line) => `${line}\n`).join("");
+            const cut = Math.floor(text.length / 2);
+            sink(Buffer.from(text.slice(0, cut)));
+            sink(Buffer.from(text.slice(cut)));
+        }
+    ),
     dispose: vi.fn(async () => undefined)
 };
 
 vi.mock("@/lib/deploy/runtime", () => ({ getPorts: vi.fn(async () => ports) }));
 vi.mock("@/lib/deploy/releases", () => ({
-    currentReleaseRef: vi.fn(async () => ({ name: "shop-web", project: "polaris-abc", portSubject: SERVICE }))
+    currentReleaseRef: vi.fn(async () => ({
+        name: "shop-web",
+        project: "polaris-abc",
+        portSubject: SERVICE
+    }))
 }));
 vi.mock("@/lib/deploy-project-access", () => ({ requireApplicationAccess: vi.fn() }));
 
-const { captureRuntimeLogs, pruneRuntimeLogs, decodeCursor, encodeCursor, RUNTIME_LOG_MAX_LINES } = await import(
-    "@/lib/deploy/runtime-logs"
-);
+const { captureRuntimeLogs, pruneRuntimeLogs, decodeCursor, encodeCursor, RUNTIME_LOG_MAX_LINES } =
+    await import("@/lib/deploy/runtime-logs");
 
 beforeEach(() => {
     rows.length = 0;

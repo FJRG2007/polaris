@@ -53,13 +53,22 @@ function Glyph({ state }: { state: DeployStepState }) {
 
 /** The full stepper, for the top of a build log. */
 export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
-    const last = steps.reduce((furthest, step, index) => (step.state !== "pending" ? index : furthest), 0);
+    const last = steps.reduce(
+        (furthest, step, index) => (step.state !== "pending" ? index : furthest),
+        0
+    );
     const progress = steps.length > 1 ? (last / (steps.length - 1)) * 100 : 0;
     return (
-        <ol className="relative flex items-start justify-between gap-1 px-1 pb-1 pt-1" aria-label="Deploy progress">
+        <ol
+            className="relative flex items-start justify-between gap-1 px-1 pb-1 pt-1"
+            aria-label="Deploy progress"
+        >
             {/* The track, behind the circles; each circle carries a ring the colour
                 of the card so the line stops cleanly at its edge. */}
-            <span className="absolute left-4 right-4 top-[0.9rem] h-0.5 rounded-full bg-border" aria-hidden />
+            <span
+                className="absolute left-4 right-4 top-[0.9rem] h-0.5 rounded-full bg-border"
+                aria-hidden
+            />
             <span
                 className="absolute left-4 top-[0.9rem] h-0.5 rounded-full bg-primary transition-[width] duration"
                 style={{ width: `calc((100% - 2rem) * ${progress / 100})` }}
@@ -92,7 +101,9 @@ export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
                         {step.label}
                     </span>
                     <span className="h-3.5 text-[0.625rem] tabular-nums text-foreground-subtle">
-                        {step.seconds !== undefined ? `${step.seconds < 10 ? step.seconds.toFixed(1) : Math.round(step.seconds)}s` : ""}
+                        {step.seconds !== undefined
+                            ? `${step.seconds < 10 ? step.seconds.toFixed(1) : Math.round(step.seconds)}s`
+                            : ""}
                     </span>
                 </li>
             ))}
@@ -107,11 +118,19 @@ export function DeployStepSegments({ steps }: { steps: readonly DeployStep[] }) 
         <span className="inline-flex min-w-0 items-center gap-2">
             <span className="flex w-24 shrink-0 gap-0.5" aria-hidden>
                 {steps.map((step) => (
-                    <span key={step.id} className={cn("h-1 flex-1 rounded-full", SEGMENT[step.state])} />
+                    <span
+                        key={step.id}
+                        className={cn("h-1 flex-1 rounded-full", SEGMENT[step.state])}
+                    />
                 ))}
             </span>
             {current && (
-                <span className={cn("truncate text-xs", current.state === "failed" ? "text-danger-ink" : "text-muted-foreground")}>
+                <span
+                    className={cn(
+                        "truncate text-xs",
+                        current.state === "failed" ? "text-danger-ink" : "text-muted-foreground"
+                    )}
+                >
                     {current.label}
                 </span>
             )}

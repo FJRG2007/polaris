@@ -269,7 +269,10 @@ function newExpiry(input: UpdateApiKeyInput): Date | null | undefined {
 
 /** Revoke a key the caller owns. The row is kept so the audit trail survives. */
 export async function revokeApiKey(userId: string, id: string): Promise<void> {
-    await prisma.apiKey.updateMany({ where: { id, userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    await prisma.apiKey.updateMany({
+        where: { id, userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+    });
 }
 
 /** Delete a key the caller owns, once they no longer want it listed. */
@@ -292,7 +295,13 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
         include: {
             groups: {
                 select: {
-                    group: { select: { allowedCidrs: true, allowedCountries: true, allowedContinents: true } }
+                    group: {
+                        select: {
+                            allowedCidrs: true,
+                            allowedCountries: true,
+                            allowedContinents: true
+                        }
+                    }
                 }
             },
             user: { select: { bannedAt: true, isAdmin: true } }
@@ -377,7 +386,9 @@ export async function touchApiKey(
         // The first call of a day is where the window is trimmed. Doing it on
         // every call would be a delete per request for nothing to delete.
         if (counted.calls === 1) {
-            const oldest = dayKey(new Date(now.getTime() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+            const oldest = dayKey(
+                new Date(now.getTime() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+            );
             await prisma.apiKeyUsage.deleteMany({ where: { apiKeyId: id, day: { lt: oldest } } });
         }
     } catch {

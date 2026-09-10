@@ -43,7 +43,12 @@ import { describeServiceEvent, unresolvedSetupFailure } from "./service-history"
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
-import { isTunnelHostname, runtimeVersionSchema, type DisplayFormat, type ProjectCapability } from "@polaris/core";
+import {
+    isTunnelHostname,
+    runtimeVersionSchema,
+    type DisplayFormat,
+    type ProjectCapability
+} from "@polaris/core";
 import {
     CONSUMPTION_METRICS,
     MetricsHistory,
@@ -241,7 +246,10 @@ export function ServiceDetail({
                         >
                             {name}
                             {dots[name] && (
-                                <TabAttentionDot label={dots[name]} className="mb-0.5 ml-1.5 align-middle" />
+                                <TabAttentionDot
+                                    label={dots[name]}
+                                    className="mb-0.5 ml-1.5 align-middle"
+                                />
                             )}
                         </button>
                     ))}
@@ -304,9 +312,15 @@ function depBadge(deployment: DepSummary): {
 } {
     if (deployment.isCurrent) return { label: "Active", variant: "success" };
     if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
-        return { label: deployment.status === "cancelled" ? "Cancelled" : "Failed", variant: "danger" };
+        return {
+            label: deployment.status === "cancelled" ? "Cancelled" : "Failed",
+            variant: "danger"
+        };
     if (["queued", "deploying"].includes(deployment.status))
-        return { label: deployment.status === "queued" ? "Queued" : "Deploying", variant: "warning" };
+        return {
+            label: deployment.status === "queued" ? "Queued" : "Deploying",
+            variant: "warning"
+        };
     return { label: "Removed", variant: "neutral" };
 }
 
@@ -370,12 +384,12 @@ function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: Display
             : deployment.trigger === "scale"
               ? " - scaled, not rebuilt"
               : deployment.trigger === "upload"
-              ? " - uploaded"
-              : deployment.trigger === "preview"
-              ? ` - pull request preview via ${sourceLabel(app)}`
-              : deployment.trigger === "push"
-                ? ` - pushed to ${sourceLabel(app)}`
-                : ` via ${sourceLabel(app)}`;
+                ? " - uploaded"
+                : deployment.trigger === "preview"
+                  ? ` - pull request preview via ${sourceLabel(app)}`
+                  : deployment.trigger === "push"
+                    ? ` - pushed to ${sourceLabel(app)}`
+                    : ` via ${sourceLabel(app)}`;
     const took = deployment.durationMs !== null ? ` - took ${duration(deployment.durationMs)}` : "";
     return `${relativeTime(deployment.createdAt, format)}${by}${via}${took}`;
 }
@@ -514,7 +528,10 @@ function DeploymentMenu({
         startTransition(async () => {
             const result = await deployActions
                 .rollbackDeploymentAction(deployment.id)
-                .catch(() => ({ error: "Could not roll back to that release", deploymentId: undefined }));
+                .catch(() => ({
+                    error: "Could not roll back to that release",
+                    deploymentId: undefined
+                }));
             setError(result.error ?? null);
             onAct();
             onChanged();
@@ -575,16 +592,26 @@ function DeploymentMenu({
                 {deployment.canTakeTraffic &&
                     (deployment.trafficPercent !== null ? (
                         <DropdownMenuItem
-                            onSelect={() => run(() => deployActions.setDeploymentTrafficAction(deployment.id, null))}
+                            onSelect={() =>
+                                run(() =>
+                                    deployActions.setDeploymentTrafficAction(deployment.id, null)
+                                )
+                            }
                         >
-                            <Split className="size-4" /> Stop sending {deployment.trafficPercent}% of traffic here
+                            <Split className="size-4" /> Stop sending {deployment.trafficPercent}%
+                            of traffic here
                         </DropdownMenuItem>
                     ) : (
                         [10, 50].map((percent) => (
                             <DropdownMenuItem
                                 key={percent}
                                 onSelect={() =>
-                                    run(() => deployActions.setDeploymentTrafficAction(deployment.id, percent))
+                                    run(() =>
+                                        deployActions.setDeploymentTrafficAction(
+                                            deployment.id,
+                                            percent
+                                        )
+                                    )
                                 }
                             >
                                 <Split className="size-4" /> Send {percent}% of traffic here
@@ -873,7 +900,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                         {deploySubtitle(deployment, app, format)}
                                                     </p>
                                                     {!isSettled(deployment) && (
-                                                        <InFlightSteps deploymentId={deployment.id} />
+                                                        <InFlightSteps
+                                                            deploymentId={deployment.id}
+                                                        />
                                                     )}
                                                 </div>
                                                 {deployment.commitSha && (
@@ -1062,7 +1091,13 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
  * rather than only inside the folded activity. A failed setup command can be run
  * again from here; a deploy that never started is fixed by deploying.
  */
-function SetupFailure({ applicationId, failure }: { applicationId: string; failure: ActivityLine }) {
+function SetupFailure({
+    applicationId,
+    failure
+}: {
+    applicationId: string;
+    failure: ActivityLine;
+}) {
     const can = useProjectCan();
     const [started, setStarted] = useState(false);
     const [error, setError] = useState("");
@@ -1088,10 +1123,16 @@ function SetupFailure({ applicationId, failure }: { applicationId: string; failu
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="min-w-0">
                     <span className="block text-sm font-medium">
-                        {failure.action === "setup-failed" ? "Setup did not finish" : "Not deployed"}
+                        {failure.action === "setup-failed"
+                            ? "Setup did not finish"
+                            : "Not deployed"}
                     </span>
-                    <span className="block text-xs text-muted-foreground">{describeServiceEvent(failure)}</span>
-                    {hint ? <span className="block text-xs text-muted-foreground">{hint}</span> : null}
+                    <span className="block text-xs text-muted-foreground">
+                        {describeServiceEvent(failure)}
+                    </span>
+                    {hint ? (
+                        <span className="block text-xs text-muted-foreground">{hint}</span>
+                    ) : null}
                 </span>
                 {rerunnable && !started ? (
                     <Button variant="secondary" size="sm" onClick={rerun} disabled={pending}>
@@ -1842,7 +1883,11 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                 scopeId={scope === "application" ? app.id : app.environmentId}
                 canWrite={can("variables.write")}
                 canDeploy={can("deploy.run")}
-                redeployTarget={scope === "application" ? "this service" : "every deployed service in this environment"}
+                redeployTarget={
+                    scope === "application"
+                        ? "this service"
+                        : "every deployed service in this environment"
+                }
             />
         </div>
     );
@@ -2342,8 +2387,12 @@ function dnsAdvice(
 ): { text: string; record?: { name: string; ip: string; conflict: boolean } } | null {
     if (!dns || dns.status === "unchanged") return null;
     if (dns.status === "created")
-        return { text: `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.` };
-    const record = dns.ip ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" } : undefined;
+        return {
+            text: `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`
+        };
+    const record = dns.ip
+        ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" }
+        : undefined;
     if (dns.status === "conflict") {
         return {
             text: `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`,
@@ -2351,7 +2400,10 @@ function dnsAdvice(
         };
     }
     const target = dns.ip ? ` at ${dns.ip}` : "";
-    return { text: `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`, record };
+    return {
+        text: `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`,
+        record
+    };
 }
 
 /**
@@ -2975,14 +3027,16 @@ function SettingsTab({
                                         supplied={domain.hasCertificate === true}
                                         onChanged={onChanged}
                                     />
-                                    {domain.cdn !== undefined && domain.kind !== "lan" && !domain.hostname.endsWith(".plr.local") && (
-                                        <DomainCdnButton
-                                            domainId={domain.id}
-                                            hostname={domain.hostname}
-                                            enabled={domain.cdn}
-                                            onChanged={onChanged}
-                                        />
-                                    )}
+                                    {domain.cdn !== undefined &&
+                                        domain.kind !== "lan" &&
+                                        !domain.hostname.endsWith(".plr.local") && (
+                                            <DomainCdnButton
+                                                domainId={domain.id}
+                                                hostname={domain.hostname}
+                                                enabled={domain.cdn}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
                                     <Switch
                                         checked={domain.enabled}
                                         onChange={(next) =>
@@ -3214,7 +3268,9 @@ function SettingsTab({
                                     )}
                                 </div>
                             )}
-                            {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote.text}</p>}
+                            {dnsNote && (
+                                <p className="text-xs text-muted-foreground">{dnsNote.text}</p>
+                            )}
                             {dnsNote?.record && (
                                 <DnsRecordCard
                                     type="A"
@@ -3343,7 +3399,8 @@ function SettingsTab({
                                 spellCheck={false}
                             />
                             <span className={runtimeVersionProblem ? "text-danger" : undefined}>
-                                {runtimeVersionProblem ?? "Node, Python, Go, Ruby, PHP or Java version to build on."}
+                                {runtimeVersionProblem ??
+                                    "Node, Python, Go, Ruby, PHP or Java version to build on."}
                             </span>
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -3442,11 +3499,15 @@ function SettingsTab({
                 </div>
             )}
 
-            {can("service.configure") && <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />}
+            {can("service.configure") && (
+                <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
+            )}
 
             {can("service.configure") && <BuildMachineSection applicationId={app.id} />}
 
-            {can("service.configure") && <ScalingSection applicationId={app.id} onChanged={onChanged} />}
+            {can("service.configure") && (
+                <ScalingSection applicationId={app.id} onChanged={onChanged} />
+            )}
 
             {can("service.create") && can("service.configure") && <MoveOutSection app={app} />}
 

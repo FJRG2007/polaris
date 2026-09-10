@@ -56,7 +56,8 @@ export function mergeStreamLines(
     // carry a line older than one already shown. Only then is a sort needed.
     const newestShown = lastStamp(existing);
     const oldestFresh = fresh.reduce<string | null>(
-        (oldest, line) => (line.stamp !== null && (oldest === null || line.stamp < oldest) ? line.stamp : oldest),
+        (oldest, line) =>
+            line.stamp !== null && (oldest === null || line.stamp < oldest) ? line.stamp : oldest,
         null
     );
     if (newestShown !== null && oldestFresh !== null && oldestFresh < newestShown) {
@@ -89,7 +90,8 @@ function stableSortByStamp(lines: StreamLine[]): void {
         return { line, index, stamp: line.stamp ?? carried };
     });
     keyed.sort((a, b) => (a.stamp < b.stamp ? -1 : a.stamp > b.stamp ? 1 : a.index - b.index));
-    for (let index = 0; index < keyed.length; index += 1) lines[index] = (keyed[index] as { line: StreamLine }).line;
+    for (let index = 0; index < keyed.length; index += 1)
+        lines[index] = (keyed[index] as { line: StreamLine }).line;
 }
 
 /**

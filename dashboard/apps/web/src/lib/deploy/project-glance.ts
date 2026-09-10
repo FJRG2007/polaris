@@ -33,13 +33,20 @@ export interface EnvironmentGlance {
     /** Every address of every service, unranked - the view picks the best. */
     addresses: GlanceAddress[];
     /** The newest deployment of any of its services. */
-    lastDeploy: { applicationId: string; service: string; status: string; createdAt: string } | null;
+    lastDeploy: {
+        applicationId: string;
+        service: string;
+        status: string;
+        createdAt: string;
+    } | null;
     /** Services that need a look, and why. */
     attention: { applicationId: string; service: string; reasons: string[] }[];
 }
 
 /** Whether each service needs a look (see `attention.ts`), three queries for all of them. */
-export async function serviceAttention(appIds: readonly string[]): Promise<Map<string, ServiceAttention>> {
+export async function serviceAttention(
+    appIds: readonly string[]
+): Promise<Map<string, ServiceAttention>> {
     const result = new Map<string, ServiceAttention>();
     if (appIds.length === 0) return result;
     const ids = [...appIds];
@@ -53,16 +60,26 @@ export async function serviceAttention(appIds: readonly string[]): Promise<Map<s
             select: { deployableId: true, status: true }
         }),
         prisma.domain.findMany({
-            where: { applicationId: { in: ids }, enabled: true, kind: { not: "release" }, healthStatus: "down" },
+            where: {
+                applicationId: { in: ids },
+                enabled: true,
+                kind: { not: "release" },
+                healthStatus: "down"
+            },
             select: { applicationId: true }
         }),
         prisma.serviceCron.findMany({
-            where: { applicationId: { in: ids }, enabled: true, lastStatus: { in: [...FAILED_CRON_STATUSES] } },
+            where: {
+                applicationId: { in: ids },
+                enabled: true,
+                lastStatus: { in: [...FAILED_CRON_STATUSES] }
+            },
             select: { applicationId: true }
         })
     ]);
 
-    for (const id of ids) result.set(id, { deployFailed: false, domainDown: false, cronFailing: false });
+    for (const id of ids)
+        result.set(id, { deployFailed: false, domainDown: false, cronFailing: false });
     for (const row of latest) {
         const entry = result.get(row.deployableId);
         if (entry && FAILED_DEPLOY_STATUSES.includes(row.status)) entry.deployFailed = true;
@@ -137,7 +154,8 @@ export async function projectGlance(
     ]);
 
     const glance: Record<string, EnvironmentGlance> = {};
-    for (const environment of environments) glance[environment.id] = { addresses: [], lastDeploy: null, attention: [] };
+    for (const environment of environments)
+        glance[environment.id] = { addresses: [], lastDeploy: null, attention: [] };
     const environmentOf = new Map(apps.map((app) => [app.id, app.environmentId]));
 
     for (const domain of domains) {
@@ -163,7 +181,8 @@ export async function projectGlance(
     for (const row of latest) {
         const target = glance[environmentOf.get(row.deployableId) ?? ""];
         if (!target) continue;
-        if (target.lastDeploy && target.lastDeploy.createdAt >= row.createdAt.toISOString()) continue;
+        if (target.lastDeploy && target.lastDeploy.createdAt >= row.createdAt.toISOString())
+            continue;
         target.lastDeploy = {
             applicationId: row.deployableId,
             service: names.get(row.deployableId) ?? "",
@@ -173,7 +192,12 @@ export async function projectGlance(
     }
     for (const app of apps) {
         const reasons = attentionReasons(attention.get(app.id));
-        if (reasons.length > 0) glance[app.environmentId]?.attention.push({ applicationId: app.id, service: app.name, reasons });
+        if (reasons.length > 0)
+            glance[app.environmentId]?.attention.push({
+                applicationId: app.id,
+                service: app.name,
+                reasons
+            });
     }
     return glance;
 }

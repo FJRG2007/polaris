@@ -35,7 +35,9 @@ export function sendChallenge(res: ServerResponse, ctx: ChallengeContext): void 
             "cache-control": "no-store",
             "x-content-type-options": "nosniff"
         });
-        res.end("This site is asking visitors to open it in a browser for a moment. Try again from a browser.\n");
+        res.end(
+            "This site is asking visitors to open it in a browser for a moment. Try again from a browser.\n"
+        );
         return;
     }
     const nonce = randomBytes(16).toString("base64");

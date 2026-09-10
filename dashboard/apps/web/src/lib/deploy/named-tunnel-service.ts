@@ -103,7 +103,11 @@ async function setSetting(key: string, value: string | null): Promise<void> {
         await prisma.setting.deleteMany({ where: { key } });
         return;
     }
-    await prisma.setting.upsert({ where: { key }, create: { key, value, scope: "global" }, update: { value } });
+    await prisma.setting.upsert({
+        where: { key },
+        create: { key, value, scope: "global" },
+        update: { value }
+    });
 }
 
 /** Load an app the caller owns, or throw. Named tunnels run a local sidecar, so
@@ -124,7 +128,11 @@ async function storeToken(appId: string, token: string): Promise<void> {
     const blob = encryptSecret(token, loadEnv().POLARIS_MASTER_KEY);
     await setSetting(
         tokenKey(appId),
-        JSON.stringify({ c: blob.ciphertext.toString("base64"), n: blob.nonce.toString("base64"), k: blob.keyId })
+        JSON.stringify({
+            c: blob.ciphertext.toString("base64"),
+            n: blob.nonce.toString("base64"),
+            k: blob.keyId
+        })
     );
 }
 
@@ -146,7 +154,12 @@ async function loadToken(appId: string): Promise<string | null> {
 /** The cloudflared sidecar spec running the named connector from its token. The
  *  token is passed via TUNNEL_TOKEN (env), and the ingress config is pulled from
  *  Cloudflare's edge, so no --url/origin is needed here. */
-function tunnelSpec(project: string, service: string, token: string, networks: string[]): ComposeSpec {
+function tunnelSpec(
+    project: string,
+    service: string,
+    token: string,
+    networks: string[]
+): ComposeSpec {
     return {
         project,
         services: [
@@ -189,7 +202,10 @@ export async function startNamedTunnel(
 ): Promise<NamedTunnelStatus> {
     await requireLocalApp(appId, ownerId);
     const token = input.token.trim();
-    const hostname = input.hostname.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    const hostname = input.hostname
+        .trim()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "");
     if (!token) throw new Error("Paste the tunnel connector token from Cloudflare");
     if (!hostname) throw new Error("Enter the hostname you mapped to this tunnel");
 
@@ -248,7 +264,12 @@ export async function provisionNamedTunnel(
     await setSetting(enabledKey(appId), null);
     await setSetting(
         managedKey(appId),
-        JSON.stringify({ tunnelId: tunnel.id, zoneId: zone.id, dnsId, accountId } satisfies ManagedRefs)
+        JSON.stringify({
+            tunnelId: tunnel.id,
+            zoneId: zone.id,
+            dnsId,
+            accountId
+        } satisfies ManagedRefs)
     );
 
     const { project } = names(appId);
@@ -274,9 +295,17 @@ export async function provisionNamedTunnel(
  * ingress at a placeholder (so the connector stays up and the hostname/DNS stay
  * reserved instead of disconnecting); a manual tunnel just stops its connector.
  */
-export async function setNamedTunnelEnabled(appId: string, ownerId: string, enabled: boolean): Promise<void> {
+export async function setNamedTunnelEnabled(
+    appId: string,
+    ownerId: string,
+    enabled: boolean
+): Promise<void> {
     await requireLocalApp(appId, ownerId);
-    const [hostname, token, managed] = await Promise.all([getSetting(hostKey(appId)), loadToken(appId), loadManaged(appId)]);
+    const [hostname, token, managed] = await Promise.all([
+        getSetting(hostKey(appId)),
+        loadToken(appId),
+        loadManaged(appId)
+    ]);
     if (!token || !hostname) throw new Error("This app has no named tunnel configured");
 
     const { project } = names(appId);
@@ -286,10 +315,22 @@ export async function setNamedTunnelEnabled(appId: string, ownerId: string, enab
             const account = await requireCloudflareAccount();
             if (enabled) {
                 const origin = await connectorOrigin(appId);
-                if (!origin) throw new Error("This server has no reachable IP to route the tunnel to");
-                await putTunnelIngress(account.token, account.accountId, managed.tunnelId, hostname, `http://${origin}`);
+                if (!origin)
+                    throw new Error("This server has no reachable IP to route the tunnel to");
+                await putTunnelIngress(
+                    account.token,
+                    account.accountId,
+                    managed.tunnelId,
+                    hostname,
+                    `http://${origin}`
+                );
             } else {
-                await putTunnelPlaceholder(account.token, account.accountId, managed.tunnelId, hostname);
+                await putTunnelPlaceholder(
+                    account.token,
+                    account.accountId,
+                    managed.tunnelId,
+                    hostname
+                );
             }
             // Keep the connector running either way so the hostname stays reserved.
             await ports.composeUp(await connectorSpec(appId, token));
@@ -321,7 +362,9 @@ export async function stopNamedTunnel(appId: string, ownerId: string): Promise<v
     }
 
     if (managed) {
-        const { token } = await requireCloudflareAccount().catch(() => ({ token: null as string | null }));
+        const { token } = await requireCloudflareAccount().catch(() => ({
+            token: null as string | null
+        }));
         if (token) {
             await deleteDnsRecord(token, managed.zoneId, managed.dnsId).catch(() => undefined);
             // The connector is down now, so the tunnel can be deleted.
@@ -337,7 +380,10 @@ export async function stopNamedTunnel(appId: string, ownerId: string): Promise<v
 
 /** Whether the named tunnel is configured, its hostname, and whether the sidecar
  *  is currently running. Best-effort: a hostd hiccup reports not-running. */
-export async function getNamedTunnelStatus(appId: string, ownerId: string): Promise<NamedTunnelStatus> {
+export async function getNamedTunnelStatus(
+    appId: string,
+    ownerId: string
+): Promise<NamedTunnelStatus> {
     const app = await prisma.application.findFirst({
         where: { id: appId, environment: { project: { ownerId } } },
         select: { id: true }
@@ -352,13 +398,20 @@ export async function getNamedTunnelStatus(appId: string, ownerId: string): Prom
     ]);
     const configured = Boolean(token);
     const isManaged = Boolean(managed);
-    if (!configured) return { running: false, hostname, configured: false, managed: isManaged, enabled };
+    if (!configured)
+        return { running: false, hostname, configured: false, managed: isManaged, enabled };
 
     const { service } = names(appId);
     const ports = new HostdPorts();
     try {
         const info = (await ports.inspect(service)) as { State?: { Running?: boolean } };
-        return { running: Boolean(info?.State?.Running), hostname, configured: true, managed: isManaged, enabled };
+        return {
+            running: Boolean(info?.State?.Running),
+            hostname,
+            configured: true,
+            managed: isManaged,
+            enabled
+        };
     } catch {
         return { running: false, hostname, configured: true, managed: isManaged, enabled };
     } finally {

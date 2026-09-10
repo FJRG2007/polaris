@@ -35,14 +35,28 @@ describe("variableChanges", () => {
     });
 
     it("sends a secret only when a new value was typed over it", () => {
-        const changes = variableChanges(ROWS, { ...EMPTY_DRAFT, edits: { s1: { value: "new-token" } } });
+        const changes = variableChanges(ROWS, {
+            ...EMPTY_DRAFT,
+            edits: { s1: { value: "new-token" } }
+        });
         expect(changes.set).toEqual([{ key: "API_TOKEN", value: "new-token", isSecret: true }]);
     });
 
     it("compares a revealed secret with what was revealed", () => {
         const revealed = { s1: "old-token" };
-        expect(changeCount(variableChanges(ROWS, { ...EMPTY_DRAFT, edits: { s1: { value: "old-token" } } }, revealed))).toBe(0);
-        expect(variableChanges(ROWS, { ...EMPTY_DRAFT, edits: { s1: { value: "rotated" } } }, revealed).set).toHaveLength(1);
+        expect(
+            changeCount(
+                variableChanges(
+                    ROWS,
+                    { ...EMPTY_DRAFT, edits: { s1: { value: "old-token" } } },
+                    revealed
+                )
+            )
+        ).toBe(0);
+        expect(
+            variableChanges(ROWS, { ...EMPTY_DRAFT, edits: { s1: { value: "rotated" } } }, revealed)
+                .set
+        ).toHaveLength(1);
     });
 
     it("flips secrecy without sending a value", () => {
@@ -58,7 +72,10 @@ describe("variableChanges", () => {
     });
 
     it("carries the new flag with a changed value rather than as a second change", () => {
-        const changes = variableChanges(ROWS, { ...EMPTY_DRAFT, edits: { p2: { value: "debug", isSecret: true } } });
+        const changes = variableChanges(ROWS, {
+            ...EMPTY_DRAFT,
+            edits: { p2: { value: "debug", isSecret: true } }
+        });
         expect(changes.set).toEqual([{ key: "LOG_LEVEL", value: "debug", isSecret: true }]);
         expect(changes.secrecy).toEqual([]);
     });
@@ -136,7 +153,12 @@ describe("variableChangesSchema", () => {
     const base = { scope: "application", scopeId: "app", secrecy: [], remove: [], redeploy: false };
 
     it("refuses a key the deploy could not use, and the same key twice", () => {
-        expect(variableChangesSchema.safeParse({ ...base, set: [{ key: "has space", value: "", isSecret: false }] }).success).toBe(false);
+        expect(
+            variableChangesSchema.safeParse({
+                ...base,
+                set: [{ key: "has space", value: "", isSecret: false }]
+            }).success
+        ).toBe(false);
         const twice = variableChangesSchema.safeParse({
             ...base,
             set: [
@@ -148,7 +170,10 @@ describe("variableChangesSchema", () => {
     });
 
     it("trims a key before checking it", () => {
-        const parsed = variableChangesSchema.safeParse({ ...base, set: [{ key: " PORT ", value: "1", isSecret: false }] });
+        const parsed = variableChangesSchema.safeParse({
+            ...base,
+            set: [{ key: " PORT ", value: "1", isSecret: false }]
+        });
         expect(parsed.success && parsed.data.set[0]?.key).toBe("PORT");
     });
 });

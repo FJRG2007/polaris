@@ -20,14 +20,18 @@ const MAX_UPLOAD = 10 * 1024 * 1024;
 
 const idSchema = z.string().uuid();
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function POST(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const user = await guardedUser();
     if (!user || !(await sessionCan(user, "mailserver.manage"))) {
         return NextResponse.json({ error: "You cannot manage mail servers." }, { status: 403 });
     }
     const { id } = await context.params;
     const serverId = idSchema.safeParse(id);
-    if (!serverId.success) return NextResponse.json({ error: "That mail server was not found." }, { status: 404 });
+    if (!serverId.success)
+        return NextResponse.json({ error: "That mail server was not found." }, { status: 404 });
     let server;
     try {
         server = await requireServer({ id: user.id, isAdmin: user.isAdmin }, serverId.data);
@@ -36,12 +40,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     const declared = Number(request.headers.get("content-length") ?? "0");
     if (Number.isFinite(declared) && declared > MAX_UPLOAD + 64 * 1024) {
-        return NextResponse.json({ error: "That file is larger than any real report." }, { status: 413 });
+        return NextResponse.json(
+            { error: "That file is larger than any real report." },
+            { status: 413 }
+        );
     }
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
-    if (!(file instanceof File)) return NextResponse.json({ error: "Choose a report file." }, { status: 400 });
-    if (file.size > MAX_UPLOAD) return NextResponse.json({ error: "That file is larger than any real report." }, { status: 413 });
+    if (!(file instanceof File))
+        return NextResponse.json({ error: "Choose a report file." }, { status: 400 });
+    if (file.size > MAX_UPLOAD)
+        return NextResponse.json(
+            { error: "That file is larger than any real report." },
+            { status: 413 }
+        );
     try {
         const result = await uploadReport(server, new Uint8Array(await file.arrayBuffer()));
         return NextResponse.json(result);

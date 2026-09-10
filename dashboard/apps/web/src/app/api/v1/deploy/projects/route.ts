@@ -23,7 +23,10 @@ export const GET = deployRoute("list the projects", false, async ({ caller, url 
                 )
             ),
             [
-                ["SERVICE", (row) => `${row.project.slug}/${row.environment.slug}/${row.service.slug}`],
+                [
+                    "SERVICE",
+                    (row) => `${row.project.slug}/${row.environment.slug}/${row.service.slug}`
+                ],
                 ["STATUS", (row) => row.service.status],
                 ["ID", (row) => row.service.id]
             ]

@@ -53,10 +53,7 @@ export async function backfillCategories(): Promise<number> {
         // both because they are the same job: work out what this message is with
         // what Polaris knows today.
         where: {
-            OR: [
-                { category: "" },
-                { categoryVersion: { lt: core.MAIL_CATEGORY_VERSION } }
-            ]
+            OR: [{ category: "" }, { categoryVersion: { lt: core.MAIL_CATEGORY_VERSION } }]
         },
         select: {
             id: true,

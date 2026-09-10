@@ -16,7 +16,14 @@ import { useEffect, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Circle, ExternalLink, Loader2, RefreshCw } from "lucide-react";
-import { Mono, PanelError, StatusBadge, usePanelData, VerdictBadge, forgetPanelData } from "../ui-bits";
+import {
+    Mono,
+    PanelError,
+    StatusBadge,
+    usePanelData,
+    VerdictBadge,
+    forgetPanelData
+} from "../ui-bits";
 import {
     healthAction,
     removeServerAction,
@@ -42,12 +49,15 @@ export function OverviewTab({ serverId }: { serverId: string }) {
         let stopped = false;
         let timer: ReturnType<typeof setTimeout> | null = null;
         const tick = async () => {
-            const answer = await serverDetailAction(serverId).catch(() => ({ error: "Polaris could not be reached." }));
+            const answer = await serverDetailAction(serverId).catch(() => ({
+                error: "Polaris could not be reached."
+            }));
             if (stopped) return;
             if ("server" in answer && answer.server) {
                 setDetail(answer.server);
                 setError(null);
-                if (answer.server.running || answer.server.status === "setting-up") timer = setTimeout(tick, 3000);
+                if (answer.server.running || answer.server.status === "setting-up")
+                    timer = setTimeout(tick, 3000);
             } else {
                 setError(answer.error ?? "That mail server was not found.");
             }
@@ -118,9 +128,15 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                 ) : null}
                 <ol className="flex flex-col gap-1.5">
                     {detail.steps.map((entry, index) => {
-                        const current = settingUp && !entry.done && (index === 0 || detail.steps[index - 1]?.done);
+                        const current =
+                            settingUp &&
+                            !entry.done &&
+                            (index === 0 || detail.steps[index - 1]?.done);
                         return (
-                            <li key={entry.step} className="flex items-center gap-2 text-[0.8125rem]">
+                            <li
+                                key={entry.step}
+                                className="flex items-center gap-2 text-[0.8125rem]"
+                            >
                                 {entry.done ? (
                                     <Check className="size-4 text-success" />
                                 ) : current ? (
@@ -128,7 +144,13 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                                 ) : (
                                     <Circle className="size-4 text-foreground-subtle" />
                                 )}
-                                <span className={entry.done ? "text-foreground" : "text-muted-foreground"}>{entry.label}</span>
+                                <span
+                                    className={
+                                        entry.done ? "text-foreground" : "text-muted-foreground"
+                                    }
+                                >
+                                    {entry.label}
+                                </span>
                             </li>
                         );
                     })}
@@ -140,31 +162,48 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                 ) : null}
                 {!settingUp ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Repair by running setup again from</span>
+                        <span className="text-xs text-muted-foreground">
+                            Repair by running setup again from
+                        </span>
                         <div className="w-64">
                             <Select
                                 aria-label="Step to repair from"
                                 value={repairFrom}
                                 onValueChange={setRepairFrom}
                                 placeholder="Choose a step"
-                                options={detail.steps.map((entry) => ({ value: entry.step, label: entry.label }))}
+                                options={detail.steps.map((entry) => ({
+                                    value: entry.step,
+                                    label: entry.label
+                                }))}
                             />
                         </div>
-                        <Button size="sm" variant="outline" disabled={!repairFrom || busy} onClick={() => void resume(repairFrom)}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!repairFrom || busy}
+                            onClick={() => void resume(repairFrom)}
+                        >
                             Repair
                         </Button>
                     </div>
                 ) : null}
             </section>
 
-            {detail.status === "ready" || detail.status === "down" ? <HealthSection serverId={serverId} /> : null}
+            {detail.status === "ready" || detail.status === "down" ? (
+                <HealthSection serverId={serverId} />
+            ) : null}
 
             <section className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <p className="max-w-xl text-xs text-muted-foreground">
-                    Removing it here stops Polaris managing it. The service, its volumes and the mail in them stay in Deploy until you
-                    delete them there.
+                    Removing it here stops Polaris managing it. The service, its volumes and the
+                    mail in them stay in Deploy until you delete them there.
                 </p>
-                <Button size="sm" variant="outline" onClick={() => setRemoving(true)} disabled={detail.running}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRemoving(true)}
+                    disabled={detail.running}
+                >
                     Remove from Polaris
                 </Button>
             </section>
@@ -207,7 +246,12 @@ function HealthSection({ serverId }: { serverId: string }) {
         <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-foreground">Health</h2>
-                <Button size="sm" variant="outline" onClick={() => void check()} disabled={checking}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void check()}
+                    disabled={checking}
+                >
                     <RefreshCw className={checking ? "animate-spin" : undefined} />
                     {checking ? "Checking..." : "Check now"}
                 </Button>
@@ -219,28 +263,52 @@ function HealthSection({ serverId }: { serverId: string }) {
                         <dt className="text-xs text-muted-foreground">Engine</dt>
                         <dd className="mt-1 flex items-center gap-2 text-[0.8125rem]">
                             <VerdictBadge
-                                verdict={health.engine.answers && health.engine.managed ? "pass" : "fail"}
-                                label={health.engine.answers ? (health.engine.managed ? "Answering" : "Not managed") : "Not answering"}
+                                verdict={
+                                    health.engine.answers && health.engine.managed ? "pass" : "fail"
+                                }
+                                label={
+                                    health.engine.answers
+                                        ? health.engine.managed
+                                            ? "Answering"
+                                            : "Not managed"
+                                        : "Not answering"
+                                }
                             />
                         </dd>
-                        {health.engine.note ? <p className="mt-1 text-xs text-muted-foreground">{health.engine.note}</p> : null}
+                        {health.engine.note ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {health.engine.note}
+                            </p>
+                        ) : null}
                     </div>
                     <div className="rounded-md border border-border p-3">
                         <dt className="text-xs text-muted-foreground">Waiting to go out</dt>
                         <dd className="mt-1 text-[0.8125rem] text-foreground">
-                            {health.engine.queued === null ? "Unknown" : `${health.engine.queued} message${health.engine.queued === 1 ? "" : "s"}`}
+                            {health.engine.queued === null
+                                ? "Unknown"
+                                : `${health.engine.queued} message${health.engine.queued === 1 ? "" : "s"}`}
                         </dd>
                     </div>
                     <div className="rounded-md border border-border p-3">
                         <dt className="text-xs text-muted-foreground">Certificate on 465</dt>
                         <dd className="mt-1 flex flex-wrap items-center gap-2 text-[0.8125rem]">
                             <VerdictBadge verdict={health.certificate.verdict} />
-                            {health.certificate.issuer ? <span className="text-muted-foreground">{health.certificate.issuer}</span> : null}
+                            {health.certificate.issuer ? (
+                                <span className="text-muted-foreground">
+                                    {health.certificate.issuer}
+                                </span>
+                            ) : null}
                         </dd>
                         {health.certificate.expiresAt ? (
-                            <p className="mt-1 text-xs text-muted-foreground">Expires {format.date(health.certificate.expiresAt)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Expires {format.date(health.certificate.expiresAt)}
+                            </p>
                         ) : null}
-                        {health.certificate.note ? <p className="mt-1 text-xs text-muted-foreground">{health.certificate.note}</p> : null}
+                        {health.certificate.note ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {health.certificate.note}
+                            </p>
+                        ) : null}
                     </div>
                 </dl>
             ) : null}
@@ -249,7 +317,8 @@ function HealthSection({ serverId }: { serverId: string }) {
                     <p className="text-xs text-muted-foreground">
                         {ports.address ? (
                             <>
-                                Ports knocked on at <Mono>{ports.address}</Mono>, from where Polaris runs
+                                Ports knocked on at <Mono>{ports.address}</Mono>, from where Polaris
+                                runs
                                 {ports.at ? `, ${format.dateTime(ports.at)}` : ""}.
                             </>
                         ) : (
@@ -270,13 +339,22 @@ function HealthSection({ serverId }: { serverId: string }) {
                                     {ports.results.map((result) => (
                                         <tr key={result.port}>
                                             <td className="py-2 pr-3 font-mono text-xs">
-                                                {result.port} <span className="text-muted-foreground">{result.label}</span>
+                                                {result.port}{" "}
+                                                <span className="text-muted-foreground">
+                                                    {result.label}
+                                                </span>
                                             </td>
-                                            <td className="py-2 pr-3 text-muted-foreground">{result.purpose}</td>
+                                            <td className="py-2 pr-3 text-muted-foreground">
+                                                {result.purpose}
+                                            </td>
                                             <td className="py-2 pr-3">
                                                 <div className="flex flex-col gap-1">
                                                     <VerdictBadge verdict={result.verdict} />
-                                                    {result.note ? <span className="text-xs text-muted-foreground">{result.note}</span> : null}
+                                                    {result.note ? (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {result.note}
+                                                        </span>
+                                                    ) : null}
                                                 </div>
                                             </td>
                                         </tr>

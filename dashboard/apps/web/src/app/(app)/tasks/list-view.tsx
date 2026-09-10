@@ -500,7 +500,13 @@ export function ListScreen({
         // Before the write rather than after, because this is what the reader
         // sees the instant they let go, and the round trip is not something they
         // should be watching.
-        settle(core.arrangeAround(visibleFacts.map((facts) => facts.id), taskId, position));
+        settle(
+            core.arrangeAround(
+                visibleFacts.map((facts) => facts.id),
+                taskId,
+                position
+            )
+        );
         // The column of tasks with no status is keyed by an empty string. Sent
         // as-is it fails validation and the drop silently does nothing, so it
         // becomes an explicit null: "put this back to having no status".
@@ -738,7 +744,10 @@ export function ListScreen({
         toast.show({
             key: "tasks-paste",
             title: report.created === 1 ? "Pasted one task" : `Pasted ${report.created} tasks`,
-            body: left.length > 0 ? `This space has no ${left.join(", no ")} to match, so that was left off.` : undefined
+            body:
+                left.length > 0
+                    ? `This space has no ${left.join(", no ")} to match, so that was left off.`
+                    : undefined
         });
         refresh();
     };
@@ -918,7 +927,10 @@ export function ListScreen({
         <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                    <h1 title={title} className="truncate text-[1.0625rem] font-semibold tracking-tight">
+                    <h1
+                        title={title}
+                        className="truncate text-[1.0625rem] font-semibold tracking-tight"
+                    >
                         {title}
                     </h1>
                     {subtitle && (
@@ -1044,7 +1056,10 @@ export function ListScreen({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}

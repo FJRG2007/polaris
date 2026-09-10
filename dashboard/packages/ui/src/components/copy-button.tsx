@@ -14,7 +14,15 @@ import { cn } from "../lib/cn";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-export function CopyButton({ value, label, className }: { value: string; label?: string; className?: string }) {
+export function CopyButton({
+    value,
+    label,
+    className
+}: {
+    value: string;
+    label?: string;
+    className?: string;
+}) {
     const [copied, setCopied] = useState(false);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,10 +52,17 @@ export function CopyButton({ value, label, className }: { value: string; label?:
             type="button"
             aria-label={`Copy ${label ?? value}`}
             title="Copy"
-            className={cn("text-muted-foreground transition-colors hover:text-foreground", className)}
+            className={cn(
+                "text-muted-foreground transition-colors hover:text-foreground",
+                className
+            )}
             onClick={() => void copy()}
         >
-            {copied ? <Check className="size-3.5 text-success-ink" /> : <Copy className="size-3.5" />}
+            {copied ? (
+                <Check className="size-3.5 text-success-ink" />
+            ) : (
+                <Copy className="size-3.5" />
+            )}
         </button>
     );
 }

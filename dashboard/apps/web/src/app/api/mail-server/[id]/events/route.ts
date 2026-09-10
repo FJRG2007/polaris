@@ -13,12 +13,16 @@ export const dynamic = "force-dynamic";
 
 const idSchema = z.string().uuid();
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function POST(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await context.params;
     const serverId = idSchema.safeParse(id);
     if (!serverId.success) return new Response(null, { status: 401 });
     const declared = Number(request.headers.get("content-length") ?? "0");
-    if (Number.isFinite(declared) && declared > MAX_EVENT_BODY) return new Response(null, { status: 413 });
+    if (Number.isFinite(declared) && declared > MAX_EVENT_BODY)
+        return new Response(null, { status: 413 });
     const raw = Buffer.from(await request.arrayBuffer());
     if (raw.length > MAX_EVENT_BODY) return new Response(null, { status: 413 });
     const status = await receiveEvents(serverId.data, raw, request.headers.get("x-signature"));

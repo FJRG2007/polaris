@@ -42,7 +42,11 @@ export async function sealArtifact(
     const dir = await stageDir();
     const fileName = `${staged.fileName}${SEALED_SUFFIX}`;
     const target = join(dir, fileName);
-    await pipeline(createReadStream(staged.path), sealStream(header, keyringFileKey(key, header)), createWriteStream(target));
+    await pipeline(
+        createReadStream(staged.path),
+        sealStream(header, keyringFileKey(key, header)),
+        createWriteStream(target)
+    );
     return { artifact: await stagedFrom(dir, target, fileName, staged.metadata), keyId: id };
 }
 
@@ -50,14 +54,22 @@ export async function sealArtifact(
  * Open a sealed copy as it streams. The key is the one its header names, looked
  * up on the owner's ring, so a copy sealed under a retired key opens the same way.
  */
-export function openSealed(ownerId: string, body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+export function openSealed(
+    ownerId: string,
+    body: ReadableStream<Uint8Array>
+): ReadableStream<Uint8Array> {
     const opener = openStream(async (header) => {
-        if (header.kdf !== "keyring") throw new SealError("That copy was sealed with a passphrase, not a backup key");
+        if (header.kdf !== "keyring")
+            throw new SealError("That copy was sealed with a passphrase, not a backup key");
         return keyringFileKey(await keyById(ownerId, header.keyId), header);
     });
     const out = new PassThrough();
     // A failure anywhere ends the output with that error, so a download or a
     // restore stops rather than carrying on with bytes that did not verify.
-    void pipeline(Readable.fromWeb(body as import("node:stream/web").ReadableStream), opener, out).catch(() => undefined);
+    void pipeline(
+        Readable.fromWeb(body as import("node:stream/web").ReadableStream),
+        opener,
+        out
+    ).catch(() => undefined);
     return Readable.toWeb(out) as ReadableStream<Uint8Array>;
 }

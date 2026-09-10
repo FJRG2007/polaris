@@ -100,7 +100,11 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef }) {
     const [loading, setLoading] = useState(zone === null);
     const [error, setError] = useState("");
     const [filter, setFilter] = useState("");
-    const [editing, setEditing] = useState<{ id: string | null; draft: DnsRecordDraft; original: string } | null>(null);
+    const [editing, setEditing] = useState<{
+        id: string | null;
+        draft: DnsRecordDraft;
+        original: string;
+    } | null>(null);
     const [checking, setChecking] = useState<string | null>(null);
     const [confirm, confirmElement] = useConfirm();
     const scopeRef = useRef(scope);
@@ -156,7 +160,9 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef }) {
         // Taken off the list at once, and put back if Cloudflare refuses.
         const before = zone;
         setZone({ ...zone, records: zone.records.filter((entry) => entry.id !== record.id) });
-        const result = await deleteDnsRecordAction(scope, record.id).catch(() => ({ error: "Could not remove the record" }));
+        const result = await deleteDnsRecordAction(scope, record.id).catch(() => ({
+            error: "Could not remove the record"
+        }));
         if (result.error) {
             setZone(before);
             setError(result.error);
@@ -200,7 +206,10 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef }) {
             </div>
 
             {error && (
-                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -219,7 +228,11 @@ export function DnsZoneEditor({ scope }: { scope: DnsScopeRef }) {
             ) : zone && records.length === 0 ? (
                 <EmptyState
                     title={filter ? "No record matches that" : "No records yet"}
-                    description={filter ? undefined : `Add the first record for ${zone.within ?? zone.zone.name}.`}
+                    description={
+                        filter
+                            ? undefined
+                            : `Add the first record for ${zone.within ?? zone.zone.name}.`
+                    }
                     action={
                         filter ? undefined : (
                             <Button size="sm" onClick={() => openEditor(null)}>
@@ -335,7 +348,11 @@ function RecordCard({
                 )}
                 <Field label="TTL" value={ttlLabel(record.ttl)} muted />
                 {record.proxiable && (
-                    <Field label="Proxy" value={record.proxied ? "Proxied through Cloudflare" : "DNS only"} muted />
+                    <Field
+                        label="Proxy"
+                        value={record.proxied ? "Proxied through Cloudflare" : "DNS only"}
+                        muted
+                    />
                 )}
             </dl>
             {checking && <PropagationPanel scope={scope} recordId={record.id} />}
@@ -362,7 +379,9 @@ function Field({
             <dt className="text-foreground-subtle pt-1 text-[0.6875rem] font-semibold uppercase tracking-wider">
                 {label}
             </dt>
-            <dd className={`flex min-w-0 items-start gap-2 rounded-md px-2 py-1 ${muted ? "" : "bg-surface"}`}>
+            <dd
+                className={`flex min-w-0 items-start gap-2 rounded-md px-2 py-1 ${muted ? "" : "bg-surface"}`}
+            >
                 <code
                     className={`min-w-0 flex-1 text-xs ${muted ? "text-muted-foreground" : "text-foreground"} ${
                         wrap ? "break-all" : "truncate"
@@ -371,7 +390,13 @@ function Field({
                 >
                     {value || "-"}
                 </code>
-                {copy && value ? <CopyButton value={value} label={`${label.toLowerCase()} ${value}`} className="mt-0.5 shrink-0" /> : null}
+                {copy && value ? (
+                    <CopyButton
+                        value={value}
+                        label={`${label.toLowerCase()} ${value}`}
+                        className="mt-0.5 shrink-0"
+                    />
+                ) : null}
             </dd>
         </div>
     );
@@ -445,21 +470,35 @@ function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; recordId: s
                             ? `Checked ${format.time(report.checkedAt)}.`
                             : ""}
                 </span>
-                <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void check()}>
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Check now
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto"
+                    disabled={busy}
+                    onClick={() => void check()}
+                >
+                    {busy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4" />
+                    )}{" "}
+                    Check now
                 </Button>
             </div>
             {error && <p className="text-danger text-xs">{error}</p>}
             {report && report.expected === null && (
                 <p className="text-muted-foreground text-xs">
-                    Proxied through Cloudflare, so resolvers answer with Cloudflare&rsquo;s addresses rather than the
-                    value here. Compared with each other instead.
+                    Proxied through Cloudflare, so resolvers answer with Cloudflare&rsquo;s
+                    addresses rather than the value here. Compared with each other instead.
                 </p>
             )}
             {report && (
                 <ul className="flex flex-col gap-1">
                     {report.resolvers.map((resolver) => (
-                        <li key={resolver.resolver} className="flex flex-wrap items-start gap-2 text-xs">
+                        <li
+                            key={resolver.resolver}
+                            className="flex flex-wrap items-start gap-2 text-xs"
+                        >
                             {resolver.agrees === true ? (
                                 <CheckCircle2 className="text-success mt-px size-3.5 shrink-0" />
                             ) : resolver.agrees === false ? (
@@ -484,8 +523,8 @@ function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; recordId: s
             {!busy && report && !report.settled && attempts >= PROPAGATION_ATTEMPTS && (
                 <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
                     <AlertTriangle className="mt-px size-3.5 shrink-0" />
-                    Stopped checking on its own. A resolver keeps an old answer until its cached copy expires, which
-                    can take as long as the old record&rsquo;s TTL.
+                    Stopped checking on its own. A resolver keeps an old answer until its cached
+                    copy expires, which can take as long as the old record&rsquo;s TTL.
                 </p>
             )}
         </div>
@@ -532,7 +571,8 @@ function RecordDialog({
             return next;
         });
     }
-    const leave = (field: keyof DnsRecordDraft) => setTouched((current) => new Set(current).add(field));
+    const leave = (field: keyof DnsRecordDraft) =>
+        setTouched((current) => new Set(current).add(field));
 
     async function save() {
         if (blocked) {
@@ -563,7 +603,9 @@ function RecordDialog({
             <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <DialogTitle>{editing.id ? "Edit record" : "Add record"}</DialogTitle>
-                    <DialogDescription>In {zone.zone.name}. Changes reach resolvers as their cached copies expire.</DialogDescription>
+                    <DialogDescription>
+                        In {zone.zone.name}. Changes reach resolvers as their cached copies expire.
+                    </DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-3"
@@ -579,14 +621,22 @@ function RecordDialog({
                                 disabled={editing.id !== null}
                                 onValueChange={(value) => {
                                     const next = value as DnsRecordType;
-                                    setDraft((current) => ({ ...emptyDraft(next), name: current.name, ttl: current.ttl }));
+                                    setDraft((current) => ({
+                                        ...emptyDraft(next),
+                                        name: current.name,
+                                        ttl: current.ttl
+                                    }));
                                     setTouched(new Set());
                                 }}
                                 options={TYPE_OPTIONS}
                                 aria-label="Record type"
                             />
                         </FormField>
-                        <FormField label="Name" problem={shown("name")} hint={`@ for ${root} itself. Full name: ${fullName}`}>
+                        <FormField
+                            label="Name"
+                            problem={shown("name")}
+                            hint={`@ for ${root} itself. Full name: ${fullName}`}
+                        >
                             <Input
                                 value={draft.name}
                                 placeholder={type === "SRV" ? "_service._tcp" : "@ or www"}
@@ -597,9 +647,21 @@ function RecordDialog({
                         </FormField>
                     </div>
 
-                    {(type === "A" || type === "AAAA" || type === "CNAME" || type === "TXT" || type === "MX") && (
+                    {(type === "A" ||
+                        type === "AAAA" ||
+                        type === "CNAME" ||
+                        type === "TXT" ||
+                        type === "MX") && (
                         <FormField
-                            label={type === "MX" ? "Mail server" : type === "CNAME" ? "Target" : type === "TXT" ? "Content" : "Address"}
+                            label={
+                                type === "MX"
+                                    ? "Mail server"
+                                    : type === "CNAME"
+                                      ? "Target"
+                                      : type === "TXT"
+                                        ? "Content"
+                                        : "Address"
+                            }
                             problem={shown("content")}
                             required
                         >
@@ -635,11 +697,32 @@ function RecordDialog({
 
                     {(type === "MX" || type === "SRV") && (
                         <div className="grid gap-3 sm:grid-cols-3">
-                            <NumberField label="Priority" field="priority" draft={draft} shown={shown} set={set} leave={leave} />
+                            <NumberField
+                                label="Priority"
+                                field="priority"
+                                draft={draft}
+                                shown={shown}
+                                set={set}
+                                leave={leave}
+                            />
                             {type === "SRV" && (
                                 <>
-                                    <NumberField label="Weight" field="weight" draft={draft} shown={shown} set={set} leave={leave} />
-                                    <NumberField label="Port" field="port" draft={draft} shown={shown} set={set} leave={leave} />
+                                    <NumberField
+                                        label="Weight"
+                                        field="weight"
+                                        draft={draft}
+                                        shown={shown}
+                                        set={set}
+                                        leave={leave}
+                                    />
+                                    <NumberField
+                                        label="Port"
+                                        field="port"
+                                        draft={draft}
+                                        shown={shown}
+                                        set={set}
+                                        leave={leave}
+                                    />
                                 </>
                             )}
                         </div>
@@ -647,7 +730,14 @@ function RecordDialog({
 
                     {type === "CAA" && (
                         <div className="grid gap-3 sm:grid-cols-[5rem_8rem_minmax(0,1fr)]">
-                            <NumberField label="Flags" field="flags" draft={draft} shown={shown} set={set} leave={leave} />
+                            <NumberField
+                                label="Flags"
+                                field="flags"
+                                draft={draft}
+                                shown={shown}
+                                set={set}
+                                leave={leave}
+                            />
                             <FormField label="Tag" problem={shown("tag")}>
                                 <Select
                                     value={draft.tag}
@@ -659,7 +749,11 @@ function RecordDialog({
                             <FormField label="Value" problem={shown("value")} required>
                                 <Input
                                     value={draft.value}
-                                    placeholder={draft.tag === "iodef" ? "mailto:security@example.com" : "letsencrypt.org"}
+                                    placeholder={
+                                        draft.tag === "iodef"
+                                            ? "mailto:security@example.com"
+                                            : "letsencrypt.org"
+                                    }
                                     aria-invalid={shown("value") ? true : undefined}
                                     onChange={(event) => set("value", event.target.value)}
                                     onBlur={() => leave("value")}
@@ -677,14 +771,19 @@ function RecordDialog({
                                 options={
                                     TTL_OPTIONS.some((option) => option.value === draft.ttl)
                                         ? TTL_OPTIONS
-                                        : [...TTL_OPTIONS, { value: draft.ttl, label: `${draft.ttl} s` }]
+                                        : [
+                                              ...TTL_OPTIONS,
+                                              { value: draft.ttl, label: `${draft.ttl} s` }
+                                          ]
                                 }
                                 aria-label="TTL"
                             />
                         </FormField>
                         {proxiable && (
                             <div className="flex flex-col gap-1.5">
-                                <span className="text-muted-foreground text-xs font-medium">Proxy</span>
+                                <span className="text-muted-foreground text-xs font-medium">
+                                    Proxy
+                                </span>
                                 <div className="flex h-8 items-center gap-2 text-sm">
                                     <Switch
                                         checked={draft.proxied}
@@ -706,8 +805,13 @@ function RecordDialog({
                         <Button type="button" variant="ghost" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button type="submit" aria-disabled={blocked} disabled={saving || unchanged}>
-                            {saving && <Loader2 className="size-4 animate-spin" />} {editing.id ? "Save" : "Add record"}
+                        <Button
+                            type="submit"
+                            aria-disabled={blocked}
+                            disabled={saving || unchanged}
+                        >
+                            {saving && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {editing.id ? "Save" : "Add record"}
                         </Button>
                     </DialogFooter>
                 </form>

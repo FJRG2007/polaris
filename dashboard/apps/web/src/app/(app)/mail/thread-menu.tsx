@@ -167,7 +167,11 @@ export function ThreadContextMenu({
 
                 <ContextMenuItem
                     onSelect={() =>
-                        onAct(unread ? "read" : "unread", ids, unread ? "Marked as read." : "Marked as unread.")
+                        onAct(
+                            unread ? "read" : "unread",
+                            ids,
+                            unread ? "Marked as read." : "Marked as unread."
+                        )
                     }
                 >
                     {unread ? (
@@ -258,7 +262,10 @@ export function ThreadContextMenu({
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         {SNOOZES.map((snooze) => (
-                            <ContextMenuItem key={snooze.label} onSelect={() => onSnooze(ids, snooze.when())}>
+                            <ContextMenuItem
+                                key={snooze.label}
+                                onSelect={() => onSnooze(ids, snooze.when())}
+                            >
                                 {snooze.label}
                             </ContextMenuItem>
                         ))}
@@ -273,7 +280,10 @@ export function ThreadContextMenu({
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                             {labels.map((label) => (
-                                <ContextMenuItem key={label.id} onSelect={() => onLabel(label.id, ids)}>
+                                <ContextMenuItem
+                                    key={label.id}
+                                    onSelect={() => onLabel(label.id, ids)}
+                                >
                                     <Tag
                                         className="size-3.5 shrink-0"
                                         style={{ color: label.color }}
@@ -298,7 +308,10 @@ export function ThreadContextMenu({
                 {/* The two that take mail away from somebody are drawn as what
                     they are. Spam is destructive twice over: it moves the
                     message AND teaches a provider about the sender. */}
-                <ContextMenuItem variant="danger" onSelect={() => onAct("junk", ids, "Moved to spam.")}>
+                <ContextMenuItem
+                    variant="danger"
+                    onSelect={() => onAct("junk", ids, "Moved to spam.")}
+                >
                     <Bug className="size-3.5 shrink-0" aria-hidden />
                     {said("Report as spam", (n) => `Report ${n} as spam`)}
                     <MenuShortcut keys={keyFor("junk")} />

@@ -14,7 +14,16 @@ import { Server } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { listDnsZonesAction } from "@/app/(app)/account/domains/dns-actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, EmptyState, Select, Skeleton } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    EmptyState,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 
 export function DnsRecordsCard() {
     const [zones, setZones] = useState<{ id: string; name: string }[] | null>(null);
@@ -55,8 +64,8 @@ export function DnsRecordsCard() {
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-muted-foreground text-sm">
-                    The zones this Polaris&rsquo;s Cloudflare token can edit. Check where a change has reached before
-                    relying on it.
+                    The zones this Polaris&rsquo;s Cloudflare token can edit. Check where a change
+                    has reached before relying on it.
                 </p>
                 {error ? (
                     <p role="alert" className="text-danger text-sm">

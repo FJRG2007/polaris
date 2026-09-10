@@ -21,7 +21,10 @@ describe("publicFailure", () => {
 
     it("answers every flavour of not found with the same 404", () => {
         for (const said of ["Project not found", "Application not found", "Deployment not found"]) {
-            expect(publicFailure(new Error(said), "deploy")).toEqual({ status: 404, message: "Not found" });
+            expect(publicFailure(new Error(said), "deploy")).toEqual({
+                status: 404,
+                message: "Not found"
+            });
         }
     });
 
@@ -31,7 +34,10 @@ describe("publicFailure", () => {
             message: "That deploy has already finished"
         });
         expect(
-            publicFailure(new Error("api.example.test is already in use by another service."), "add")
+            publicFailure(
+                new Error("api.example.test is already in use by another service."),
+                "add"
+            )
         ).toMatchObject({ status: 422 });
     });
 

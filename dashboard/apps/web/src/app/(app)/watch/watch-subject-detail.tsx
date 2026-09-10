@@ -18,7 +18,12 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ProjectWebhooks } from "@/components/project-webhooks";
 import type { BreakdownMetric } from "@/lib/watch/breakdown-shape";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { alarmUnit, describeThreshold, METRIC_LABEL, type AlarmMetric } from "@/lib/watch/alarm-metrics";
+import {
+    alarmUnit,
+    describeThreshold,
+    METRIC_LABEL,
+    type AlarmMetric
+} from "@/lib/watch/alarm-metrics";
 import {
     BREAKDOWN_LABELS,
     MetricBreakdownDialog,
@@ -62,10 +67,14 @@ export function WatchSubjectDetail({
     // A server's series is keyed by host id under a subject of its own; a service
     // reuses the endpoint the Deploy panel already reads.
     const endpoint =
-        kind === "server" ? `/api/watch/hosts/${id}/metrics/history` : `/api/deploy/apps/${id}/metrics/history`;
+        kind === "server"
+            ? `/api/watch/hosts/${id}/metrics/history`
+            : `/api/deploy/apps/${id}/metrics/history`;
     // The collector's word that there is something new to draw.
     const live =
-        kind === "server" ? `/api/watch/hosts/${id}/metrics/stream` : `/api/deploy/apps/${id}/metrics/stream`;
+        kind === "server"
+            ? `/api/watch/hosts/${id}/metrics/stream`
+            : `/api/deploy/apps/${id}/metrics/stream`;
 
     // The same four charts every consumption screen draws, with a way in under
     // the ones that have something behind them. The window comes from the chart
@@ -97,7 +106,10 @@ export function WatchSubjectDetail({
                     >
                         <ArrowLeft className="size-3" /> Watch
                     </Link>
-                    <h1 title={name} className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight">
+                    <h1
+                        title={name}
+                        className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight"
+                    >
                         {name}
                     </h1>
                     <p title={detail} className="truncate text-sm text-muted-foreground">
@@ -149,8 +161,8 @@ export function WatchSubjectDetail({
                         <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 px-4 py-10 text-center">
                             <Bell className="size-5 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground">
-                                Nothing is watching this yet. An alarm fires when a threshold holds for long enough to
-                                mean something.
+                                Nothing is watching this yet. An alarm fires when a threshold holds
+                                for long enough to mean something.
                             </p>
                             <Button asChild variant="secondary" size="sm">
                                 <Link href="/watch/alarms">Create an alarm</Link>
@@ -166,14 +178,16 @@ export function WatchSubjectDetail({
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-medium">{alarm.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {alarm.threshold != null && alarmUnit(alarm.metric, alarm.targetType)
+                                            {alarm.threshold != null &&
+                                            alarmUnit(alarm.metric, alarm.targetType)
                                                 ? describeThreshold(
                                                       alarm.metric,
                                                       alarm.targetType,
                                                       alarm.operator,
                                                       alarm.threshold
                                                   )
-                                                : (METRIC_LABEL[alarm.metric as AlarmMetric] ?? alarm.metric)}
+                                                : (METRIC_LABEL[alarm.metric as AlarmMetric] ??
+                                                  alarm.metric)}
                                             {alarm.lastEvaluatedAt
                                                 ? ` - checked ${display.dateTime(alarm.lastEvaluatedAt)}`
                                                 : " - not evaluated yet"}

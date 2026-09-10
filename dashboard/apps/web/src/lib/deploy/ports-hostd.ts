@@ -9,7 +9,17 @@ import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
 import { forCompose, isReleaseImage } from "@polaris/deploy";
-import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
+import type {
+    BuildRequest,
+    ComposeSpec,
+    ExecResult,
+    ExecSpec,
+    ExecStream,
+    LogOptions,
+    MountTarget,
+    OutputSink,
+    RuntimePorts
+} from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client: HostdClient;
@@ -102,7 +112,8 @@ export class HostdPorts implements RuntimePorts {
     /** A refusal before any bytes arrive is the daemon's sentence, read here so
      *  it is not mistaken for the start of an archive. */
     public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
-        if (!isReleaseImage(image)) throw new Error("only a kept release image can be sent to another machine");
+        if (!isReleaseImage(image))
+            throw new Error("only a kept release image can be sent to another machine");
         const response = await this.client.imageExport(image);
         const status = response.statusCode ?? 0;
         if (status < 200 || status >= 300) {
@@ -112,7 +123,11 @@ export class HostdPorts implements RuntimePorts {
         return response;
     }
 
-    public async importImage(archive: NodeJS.ReadableStream, size: number, onOutput?: OutputSink): Promise<void> {
+    public async importImage(
+        archive: NodeJS.ReadableStream,
+        size: number,
+        onOutput?: OutputSink
+    ): Promise<void> {
         const response = await this.client.imageImport(archive, size);
         await drain(response, onOutput);
     }
@@ -122,7 +137,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async inspect(ref: string): Promise<unknown> {
-        const response = await this.client.dockerRequest("GET", `/containers/${encodeURIComponent(ref)}/json`);
+        const response = await this.client.dockerRequest(
+            "GET",
+            `/containers/${encodeURIComponent(ref)}/json`
+        );
         if (response.status < 200 || response.status >= 300) {
             throw new Error(`inspect ${ref} failed (${response.status})`);
         }
@@ -145,7 +163,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
-        const response = await this.client.dockerRequest("POST", `/containers/${encodeURIComponent(ref)}/${action}`);
+        const response = await this.client.dockerRequest(
+            "POST",
+            `/containers/${encodeURIComponent(ref)}/${action}`
+        );
         // 204 = done, 304 = already in that state (start/stop a no-op) - both fine.
         if (response.status !== 204 && response.status !== 304) {
             throw new Error(`${action} ${ref} failed (${response.status})`);
@@ -169,9 +190,17 @@ export class HostdPorts implements RuntimePorts {
      */
     public async listContainers(project: string): Promise<string[]> {
         const names = new Set<string>();
-        for (const label of [`com.docker.compose.project=${project}`, `com.docker.stack.namespace=${project}`]) {
-            const filters = encodeURIComponent(JSON.stringify({ label: [label], status: ["running"] }));
-            const response = await this.client.dockerRequest("GET", `/containers/json?filters=${filters}`);
+        for (const label of [
+            `com.docker.compose.project=${project}`,
+            `com.docker.stack.namespace=${project}`
+        ]) {
+            const filters = encodeURIComponent(
+                JSON.stringify({ label: [label], status: ["running"] })
+            );
+            const response = await this.client.dockerRequest(
+                "GET",
+                `/containers/json?filters=${filters}`
+            );
             if (response.status < 200 || response.status >= 300) continue;
             for (const name of containerNames(response.body)) names.add(name);
         }

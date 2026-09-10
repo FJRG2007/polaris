@@ -17,7 +17,9 @@ describe("writing with no mailbox", () => {
         const shell = await readFile(new URL("mail-shell.tsx", SCREENS), "utf8");
         expect(shell).toContain('CONNECT_MAILBOX_HREF = "/mail/settings/accounts?connect=1"');
         // The one gate every caller goes through: Write, the shortcut, a reply.
-        expect(shell).toMatch(/if \(draft && !hasMailbox\) \{\s*router\.push\(CONNECT_MAILBOX_HREF\);/);
+        expect(shell).toMatch(
+            /if \(draft && !hasMailbox\) \{\s*router\.push\(CONNECT_MAILBOX_HREF\);/
+        );
         expect(shell).toContain('{hasMailbox ? "Write" : "Connect a mailbox"}');
         // Nothing hands the raw setter out any more.
         expect(shell).not.toContain("openComposer: setComposing");
@@ -31,7 +33,10 @@ describe("writing with no mailbox", () => {
     it("opens the connect dialog when it arrives", async () => {
         const page = await readFile(new URL("settings/accounts/page.tsx", SCREENS), "utf8");
         expect(page).toContain('connectNow={params.connect === "1"}');
-        const view = await readFile(new URL("settings/accounts/accounts-view.tsx", SCREENS), "utf8");
+        const view = await readFile(
+            new URL("settings/accounts/accounts-view.tsx", SCREENS),
+            "utf8"
+        );
         expect(view).toContain("useState(connectNow)");
     });
 

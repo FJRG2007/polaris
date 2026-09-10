@@ -1099,7 +1099,11 @@ export async function setApplicationEdgeConfig(
     // How traffic is spread over copies and releases is set from Scaling and from
     // the deployments, not from this screen, so what those saved is kept.
     const stored = parseAppEdgeConfig(app.edgeConfig);
-    const next = { ...appEdgeConfigSchema.parse(config), balancing: stored.balancing, canary: stored.canary };
+    const next = {
+        ...appEdgeConfigSchema.parse(config),
+        balancing: stored.balancing,
+        canary: stored.canary
+    };
     await prisma.application.update({
         where: { id: app.id },
         data: { edgeConfig: JSON.stringify(next) }
@@ -1248,13 +1252,20 @@ export async function syncAppRoutes(): Promise<void> {
     // The kept releases a share of traffic is sent to, and only while each is a
     // kept release still running: a canary that was retired, promoted or taken down
     // routes nothing, whatever the setting still says.
-    const canaryIds = [...edgeOf.values()].flatMap((fields) => (fields.edge?.canary ? [fields.edge.canary.deploymentId] : []));
+    const canaryIds = [...edgeOf.values()].flatMap((fields) =>
+        fields.edge?.canary ? [fields.edge.canary.deploymentId] : []
+    );
     const liveCanaries = new Set(
         canaryIds.length === 0
             ? []
             : (
                   await prisma.deployment.findMany({
-                      where: { id: { in: canaryIds }, status: "running", isolated: true, cutover: false },
+                      where: {
+                          id: { in: canaryIds },
+                          status: "running",
+                          isolated: true,
+                          cutover: false
+                      },
                       select: { id: true }
                   })
               ).map((row) => row.id)
@@ -1480,9 +1491,13 @@ function canaryRoute(
     current: string | null,
     localIp: string
 ): Pick<AppRoute, "canary"> {
-    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId)) return {};
+    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId))
+        return {};
     return {
-        canary: { upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`, percent: canary.percent }
+        canary: {
+            upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`,
+            percent: canary.percent
+        }
     };
 }
 
@@ -2018,7 +2033,11 @@ export async function setApplicationRunning(
  * `asleepSince` is what says why it is not. The container is stopped and started
  * as it is, so it wakes in seconds with the same release and variables.
  */
-export async function setApplicationAsleep(applicationId: string, ownerId: string, asleep: boolean): Promise<void> {
+export async function setApplicationAsleep(
+    applicationId: string,
+    ownerId: string,
+    asleep: boolean
+): Promise<void> {
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
@@ -2560,7 +2579,8 @@ async function buildAppPlan(
                   // Set on every service created since the other languages were
                   // detected, and on one that names its own runtime version. A
                   // service the builder already deploys stays on the builder.
-                  languages: build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
+                  languages:
+                      build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
               }
             : undefined;
     return {
@@ -2577,7 +2597,10 @@ async function buildAppPlan(
 }
 
 /** A service's or database's stored ceilings as a plan carries them. */
-export function limitsOf(row: { cpuLimit: number | null; memoryLimitMb: number | null }): AppDeployPlan["limits"] {
+export function limitsOf(row: {
+    cpuLimit: number | null;
+    memoryLimitMb: number | null;
+}): AppDeployPlan["limits"] {
     if (row.cpuLimit === null && row.memoryLimitMb === null) return undefined;
     return {
         ...(row.cpuLimit !== null ? { cpus: row.cpuLimit } : {}),
@@ -2800,7 +2823,9 @@ export async function deployApplication(
     const uploadArchive = rollback || prebuilt ? undefined : built.uploadArchive;
     const fromSource = plan.build.method === "dockerfile" || plan.build.method === "nixpacks";
     if (fromSource && !rollback && !prebuilt && !gitSource && !uploadArchive) {
-        throw new Error("This service has no source yet. Upload a folder or connect a repository first.");
+        throw new Error(
+            "This service has no source yet. Upload a folder or connect a repository first."
+        );
     }
     // Where a build from source runs, when that is not where the service does.
     const builder =
@@ -2865,7 +2890,9 @@ export async function deployApplication(
             // Only a rollback points back at the release it restored; a variable
             // change re-runs the live one and is not a step back.
             rollbackOfId:
-                rollback && (rollback.kind ?? "rollback") === "rollback" ? rollback.deploymentId : null,
+                rollback && (rollback.kind ?? "rollback") === "rollback"
+                    ? rollback.deploymentId
+                    : null,
             trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
         }
     });
@@ -3062,7 +3089,11 @@ export async function rollbackToDeployment(
         authorName: source.authorName,
         authorAvatarUrl: source.authorAvatarUrl
     });
-    return { deploymentId: started, applicationId: source.deployableId, commitSha: source.commitSha };
+    return {
+        deploymentId: started,
+        applicationId: source.deployableId,
+        commitSha: source.commitSha
+    };
 }
 
 /** Keep a release's image past the window, or let the window have it again. */
@@ -3110,16 +3141,22 @@ export async function setDeploymentCanary(
         if (edge.canary?.deploymentId !== deploymentId) return;
         edge.canary = null;
     } else {
-        if (deploymentId === app.currentDeploymentId) throw new Error("That is the release already serving everybody.");
+        if (deploymentId === app.currentDeploymentId)
+            throw new Error("That is the release already serving everybody.");
         if (deployment.status !== "running" || !deployment.isolated || deployment.cutover) {
-            throw new Error("Only a previous deployment that is kept running can take a share of the traffic.");
+            throw new Error(
+                "Only a previous deployment that is kept running can take a share of the traffic."
+            );
         }
         if (!Number.isInteger(percent) || percent < 1 || percent > 50) {
             throw new Error("A share of the traffic is between 1 and 50 percent.");
         }
         edge.canary = { deploymentId, percent };
     }
-    await prisma.application.update({ where: { id: app.id }, data: { edgeConfig: JSON.stringify(edge) } });
+    await prisma.application.update({
+        where: { id: app.id },
+        data: { edgeConfig: JSON.stringify(edge) }
+    });
     await syncAppRoutes();
 }
 
@@ -3144,7 +3181,11 @@ export const ROLLBACK_WINDOW = 5;
 async function pruneReleaseImages(applicationId: string): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
-        select: { currentDeploymentId: true, target: true, environment: { select: { project: { select: { ownerId: true } } } } }
+        select: {
+            currentDeploymentId: true,
+            target: true,
+            environment: { select: { project: { select: { ownerId: true } } } }
+        }
     });
     if (!app) return;
     const rows = await prisma.deployment.findMany({
@@ -3165,7 +3206,11 @@ async function pruneReleaseImages(applicationId: string): Promise<void> {
                 continue;
             }
             await prisma.deployment.updateMany({
-                where: { deployableType: "application", deployableId: applicationId, imageTag: image },
+                where: {
+                    deployableType: "application",
+                    deployableId: applicationId,
+                    imageTag: image
+                },
                 data: { imageKept: false, pinned: false }
             });
         }
@@ -3424,7 +3469,10 @@ export async function listDeployments(
                 ? row.finishedAt.getTime() - row.startedAt.getTime()
                 : null,
         canTakeTraffic:
-            row.status === "running" && row.isolated && !row.cutover && row.id !== app.currentDeploymentId,
+            row.status === "running" &&
+            row.isolated &&
+            !row.cutover &&
+            row.id !== app.currentDeploymentId,
         trafficPercent: canary?.deploymentId === row.id ? canary.percent : null
     }));
 }
@@ -3556,13 +3604,19 @@ export async function setApplicationSourcePaths(
     // this service is built, not where it is. Cleared back to undefined when blank,
     // which is what hands the phase back to detection.
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
-    for (const key of ["installCommand", "buildCommand", "startCommand", "runtimeVersion"] as const) {
+    for (const key of [
+        "installCommand",
+        "buildCommand",
+        "startCommand",
+        "runtimeVersion"
+    ] as const) {
         const value = paths[key];
         if (value !== undefined) build[key] = value?.trim() || undefined;
     }
     // Relative to the service's directory, like the root directory is to the
     // repository's, so it goes through the same normalizer.
-    if (paths.outputDirectory !== undefined) build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
+    if (paths.outputDirectory !== undefined)
+        build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
 
     await prisma.application.update({
         where: { id: app.id },
@@ -3828,7 +3882,8 @@ function runDeployment(
         builder
     ).finally(async () => {
         // An uploaded release is loaded onto its machine by now, or never will be.
-        if (plan.build.prebuilt) await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
+        if (plan.build.prebuilt)
+            await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
     });
 }
 
@@ -4307,7 +4362,12 @@ const CUTOVER_DRAIN_MS = 5_000;
  */
 async function retireReplaced(
     applicationId: string,
-    replaced: readonly { id: string; commitSha: string | null; isolated: boolean; cutover: boolean }[]
+    replaced: readonly {
+        id: string;
+        commitSha: string | null;
+        isolated: boolean;
+        cutover: boolean;
+    }[]
 ): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
@@ -4337,7 +4397,10 @@ async function retireReplaced(
         await ports.dispose().catch(() => undefined);
     }
     await prisma.deployment.updateMany({
-        where: { id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) }, status: "running" },
+        where: {
+            id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) },
+            status: "running"
+        },
         data: { status: "removed", finishedAt: new Date() }
     });
 }
@@ -4360,9 +4423,13 @@ async function abandonRelease(deploymentId: string, open?: RuntimePorts): Promis
         include: { environment: { include: { project: true } }, target: true }
     });
     if (!app) return;
-    const project = releaseRef(serviceRef(app.environment.project.slug, app.slug, app.id), markerOf(row)).project;
+    const project = releaseRef(
+        serviceRef(app.environment.project.slug, app.slug, app.id),
+        markerOf(row)
+    ).project;
     if (project === (await currentReleaseRef(app)).project) return;
-    const ports = open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
+    const ports =
+        open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
     try {
         await ports.composeDown(project).catch(() => undefined);
     } finally {

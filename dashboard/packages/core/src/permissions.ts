@@ -198,7 +198,10 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // server opens port 25 to the internet and sends as whole domains, and one
     // badly run can put the machine's address on every blocklist there is. That
     // is a decision about the instance, the way registering a server is.
-    "mailserver.manage": { area: "Mail", label: "Run a mail server, and manage its domains and mailboxes" },
+    "mailserver.manage": {
+        area: "Mail",
+        label: "Run a mail server, and manage its domains and mailboxes"
+    },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split
     // out because "has the chat" and "may start a server in it" are different

@@ -170,7 +170,10 @@ function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; f
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Protected" value={summary ? String(summary.protectedCount) : missing} />
             <Stat label="Copies" value={summary ? String(summary.copyCount) : missing} />
-            <Stat label="Stored" value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing} />
+            <Stat
+                label="Stored"
+                value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing}
+            />
             <Stat
                 label="Failed in 24h"
                 value={summary ? String(summary.failedRecently) : missing}
@@ -297,7 +300,9 @@ function ProtectedTable({
         if (result.error !== undefined) {
             setError(result.error);
         } else if (result.status === "partial") {
-            setError(`${row.name}: the copy landed in some destinations but not all. Open it to see which.`);
+            setError(
+                `${row.name}: the copy landed in some destinations but not all. Open it to see which.`
+            );
         }
         await refresh();
     }
@@ -376,7 +381,10 @@ function ProtectedTable({
                         <tbody>
                             {rows === null ? (
                                 Array.from({ length: 5 }, (_, index) => (
-                                    <tr key={index} className="border-b border-border last:border-0">
+                                    <tr
+                                        key={index}
+                                        className="border-b border-border last:border-0"
+                                    >
                                         <td colSpan={9} className="px-3 py-2.5">
                                             <Skeleton className="h-5 w-full" />
                                         </td>
@@ -384,7 +392,10 @@ function ProtectedTable({
                                 ))
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                                    <td
+                                        colSpan={9}
+                                        className="px-3 py-10 text-center text-sm text-muted-foreground"
+                                    >
                                         {query || kind
                                             ? "Nothing matches that."
                                             : "Nothing is being backed up yet. Add a resource to start."}
@@ -482,11 +493,17 @@ function ResourceLine({
             <ContextMenuTrigger asChild>
                 <tr className="border-b border-border last:border-0 hover:bg-muted/40">
                     <td className="px-3 py-2.5">
-                        <Link href={`/apps/backups/${row.id}`} className="font-medium hover:underline">
+                        <Link
+                            href={`/apps/backups/${row.id}`}
+                            className="font-medium hover:underline"
+                        >
                             {row.name}
                         </Link>
                         {row.lastStatus === "failed" || row.lastStatus === "partial" ? (
-                            <p className="truncate text-xs text-danger" title={row.lastError ?? undefined}>
+                            <p
+                                className="truncate text-xs text-danger"
+                                title={row.lastError ?? undefined}
+                            >
                                 {row.lastError ?? "The last copy did not land."}
                             </p>
                         ) : null}
@@ -545,7 +562,11 @@ function ResourceLine({
                                 disabled={busy}
                                 onClick={onTogglePause}
                             >
-                                {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                                {paused ? (
+                                    <Play className="size-4" />
+                                ) : (
+                                    <Pause className="size-4" />
+                                )}
                             </Button>
                         </div>
                     </td>

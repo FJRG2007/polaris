@@ -40,9 +40,21 @@ describe("serviceAttention", () => {
         domainFindMany.mockResolvedValue([{ applicationId: "api" }]);
         cronFindMany.mockResolvedValue([{ applicationId: "worker" }]);
         const result = await serviceAttention(["web", "api", "worker", "idle"]);
-        expect(result.get("web")).toEqual({ deployFailed: true, domainDown: false, cronFailing: false });
-        expect(result.get("api")).toEqual({ deployFailed: false, domainDown: true, cronFailing: false });
-        expect(result.get("worker")).toEqual({ deployFailed: false, domainDown: false, cronFailing: true });
+        expect(result.get("web")).toEqual({
+            deployFailed: true,
+            domainDown: false,
+            cronFailing: false
+        });
+        expect(result.get("api")).toEqual({
+            deployFailed: false,
+            domainDown: true,
+            cronFailing: false
+        });
+        expect(result.get("worker")).toEqual({
+            deployFailed: false,
+            domainDown: false,
+            cronFailing: true
+        });
         expect(needsAttention(result.get("idle"))).toBe(false);
     });
 
@@ -79,25 +91,60 @@ describe("projectGlance", () => {
             query.where.healthStatus === "down"
                 ? []
                 : [
-                      { id: "d1", applicationId: "web", hostname: "web.example.test", kind: "custom", enabled: true, healthStatus: "up" },
-                      { id: "d2", applicationId: "dev-web", hostname: "dev.example.test", kind: "auto", enabled: true, healthStatus: "unknown" }
+                      {
+                          id: "d1",
+                          applicationId: "web",
+                          hostname: "web.example.test",
+                          kind: "custom",
+                          enabled: true,
+                          healthStatus: "up"
+                      },
+                      {
+                          id: "d2",
+                          applicationId: "dev-web",
+                          hostname: "dev.example.test",
+                          kind: "auto",
+                          enabled: true,
+                          healthStatus: "unknown"
+                      }
                   ]
         );
         deploymentFindMany.mockResolvedValue([
             { deployableId: "api", status: "failed", createdAt: new Date("2026-09-10T10:00:00Z") },
             { deployableId: "web", status: "running", createdAt: new Date("2026-09-10T09:00:00Z") },
-            { deployableId: "dev-web", status: "deploying", createdAt: new Date("2026-09-10T08:00:00Z") }
+            {
+                deployableId: "dev-web",
+                status: "deploying",
+                createdAt: new Date("2026-09-10T08:00:00Z")
+            }
         ]);
 
         const glance = await projectGlance([
-            { id: "prod", applications: [{ id: "web", name: "Web" }, { id: "api", name: "API" }] },
+            {
+                id: "prod",
+                applications: [
+                    { id: "web", name: "Web" },
+                    { id: "api", name: "API" }
+                ]
+            },
             { id: "dev", applications: [{ id: "dev-web", name: "Web (dev)" }] }
         ]);
 
-        expect(glance.prod?.addresses.map((address) => address.hostname)).toEqual(["web.example.test"]);
-        expect(glance.dev?.addresses.map((address) => address.hostname)).toEqual(["dev.example.test"]);
-        expect(glance.prod?.lastDeploy).toMatchObject({ applicationId: "api", service: "API", status: "failed" });
-        expect(glance.dev?.lastDeploy).toMatchObject({ applicationId: "dev-web", status: "deploying" });
+        expect(glance.prod?.addresses.map((address) => address.hostname)).toEqual([
+            "web.example.test"
+        ]);
+        expect(glance.dev?.addresses.map((address) => address.hostname)).toEqual([
+            "dev.example.test"
+        ]);
+        expect(glance.prod?.lastDeploy).toMatchObject({
+            applicationId: "api",
+            service: "API",
+            status: "failed"
+        });
+        expect(glance.dev?.lastDeploy).toMatchObject({
+            applicationId: "dev-web",
+            status: "deploying"
+        });
         expect(glance.prod?.attention).toEqual([
             { applicationId: "api", service: "API", reasons: ["last deploy failed"] }
         ]);
@@ -107,8 +154,12 @@ describe("projectGlance", () => {
     it("adds a live tunnel's hostname once, beside the service's own names", async () => {
         domainFindMany.mockResolvedValue([]);
         deploymentFindMany.mockResolvedValue([]);
-        settingFindMany.mockResolvedValue([{ key: "deploy.ngrok.web", value: "https://abc.ngrok.example" }]);
-        const glance = await projectGlance([{ id: "prod", applications: [{ id: "web", name: "Web" }] }]);
+        settingFindMany.mockResolvedValue([
+            { key: "deploy.ngrok.web", value: "https://abc.ngrok.example" }
+        ]);
+        const glance = await projectGlance([
+            { id: "prod", applications: [{ id: "web", name: "Web" }] }
+        ]);
         expect(glance.prod?.addresses).toEqual([
             {
                 id: "ngrok:web",

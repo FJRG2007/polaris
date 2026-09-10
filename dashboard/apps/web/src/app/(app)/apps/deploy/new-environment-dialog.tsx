@@ -18,7 +18,15 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createEnvironmentAction } from "./actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
 
 export const NEW_ENVIRONMENT = "__new_environment__";
 
@@ -28,7 +36,13 @@ const EMPTY = "__empty__";
 /** The trailing "New environment" entry for an environment Select. */
 export function newEnvironmentOption(canManage: boolean) {
     return canManage
-        ? [{ value: NEW_ENVIRONMENT, label: "New environment", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
+        ? [
+              {
+                  value: NEW_ENVIRONMENT,
+                  label: "New environment",
+                  icon: <Plus className="size-3.5 text-muted-foreground" />
+              }
+          ]
         : [];
 }
 
@@ -104,7 +118,9 @@ export function NewEnvironmentDialog({
                     </label>
                     {environments.length > 0 && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">Start from</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Start from
+                            </span>
                             <Select
                                 value={from}
                                 onValueChange={setFrom}
@@ -119,7 +135,8 @@ export function NewEnvironmentDialog({
                             />
                             {cloning && (
                                 <span className="text-xs text-muted-foreground">
-                                    Services, variables and volumes are copied. Databases are created new and empty.
+                                    Services, variables and volumes are copied. Databases are
+                                    created new and empty.
                                 </span>
                             )}
                         </label>
@@ -134,7 +151,8 @@ export function NewEnvironmentDialog({
                             onKeyDown={(event) => event.key === "Enter" && submit()}
                         />
                         <span className="text-xs text-muted-foreground">
-                            Services built from a repository build from this branch and redeploy on its pushes.
+                            Services built from a repository build from this branch and redeploy on
+                            its pushes.
                         </span>
                     </label>
                     {cloning && (
@@ -153,7 +171,11 @@ export function NewEnvironmentDialog({
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button onClick={submit} disabled={pending || !name.trim()} aria-disabled={!name.trim()}>
+                        <Button
+                            onClick={submit}
+                            disabled={pending || !name.trim()}
+                            aria-disabled={!name.trim()}
+                        >
                             Create
                         </Button>
                     </div>

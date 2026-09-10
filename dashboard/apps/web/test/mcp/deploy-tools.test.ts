@@ -35,7 +35,12 @@ const { DeployApiRefusal } = await import("@/lib/deploy/api/refusal");
 
 const SERVER = { name: "polaris", version: "1", instructions: "" };
 
-function call(name: string, args: Record<string, unknown>, scopes: string[], projectId: string | null = null) {
+function call(
+    name: string,
+    args: Record<string, unknown>,
+    scopes: string[],
+    projectId: string | null = null
+) {
     return handleMcpMessage(
         { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } },
         MCP_TOOLS,
@@ -63,7 +68,9 @@ describe("the deploy tools", () => {
     });
 
     it("offer no way to read a secret's value", () => {
-        expect(DEPLOY_TOOLS.some((tool) => /reveal|secret_value|value/.test(tool.name))).toBe(false);
+        expect(DEPLOY_TOOLS.some((tool) => /reveal|secret_value|value/.test(tool.name))).toBe(
+            false
+        );
     });
 
     it("refuse a key without the scope before reading its arguments", async () => {
@@ -76,16 +83,29 @@ describe("the deploy tools", () => {
 
     it("hand the surface a caller that carries the key and its project", async () => {
         deploy.mockResolvedValue({ deploymentId: "dep-1" });
-        const answer = await call("deploy_start", { service: "shop/api" }, ["deploy.manage"], "project-1");
+        const answer = await call(
+            "deploy_start",
+            { service: "shop/api" },
+            ["deploy.manage"],
+            "project-1"
+        );
         expect(deploy).toHaveBeenCalledWith(
-            { userId: "user-1", scopes: ["deploy.manage"], keyId: "key-1", projectId: "project-1", via: "mcp" },
+            {
+                userId: "user-1",
+                scopes: ["deploy.manage"],
+                keyId: "key-1",
+                projectId: "project-1",
+                via: "mcp"
+            },
             "shop/api"
         );
         expect((answer?.result as ToolResult).structuredContent).toEqual({ deploymentId: "dep-1" });
     });
 
     it("pass a refusal to the model as written", async () => {
-        deploy.mockRejectedValue(new DeployApiRefusal(409, "shop/api names more than one service."));
+        deploy.mockRejectedValue(
+            new DeployApiRefusal(409, "shop/api names more than one service.")
+        );
         const result = (await call("deploy_start", { service: "shop/api" }, ["deploy.manage"]))
             ?.result as ToolResult;
         expect(result.isError).toBe(true);
@@ -94,7 +114,9 @@ describe("the deploy tools", () => {
 
     it("keep anything from beneath the service layer out of the answer", async () => {
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
-        deploy.mockRejectedValue(new Error("hostd docker proxy failed (502): /var/run/docker.sock"));
+        deploy.mockRejectedValue(
+            new Error("hostd docker proxy failed (502): /var/run/docker.sock")
+        );
         const result = (await call("deploy_start", { service: "shop/api" }, ["deploy.manage"]))
             ?.result as ToolResult;
         quiet.mockRestore();

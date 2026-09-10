@@ -40,19 +40,28 @@ describe("resolving them", () => {
             { DATABASE_URL: "${{postgres.DATABASE_URL}}?sslmode=disable", PLAIN: "x" },
             lookup({ "postgres.DATABASE_URL": "postgresql://u:p@db:5432/app" })
         );
-        expect(env).toEqual({ DATABASE_URL: "postgresql://u:p@db:5432/app?sslmode=disable", PLAIN: "x" });
+        expect(env).toEqual({
+            DATABASE_URL: "postgresql://u:p@db:5432/app?sslmode=disable",
+            PLAIN: "x"
+        });
         expect(unresolved).toEqual([]);
     });
 
     it("matches a service name in any case", () => {
-        const { env } = resolveReferences({ A: "${{Postgres.HOST}}" }, lookup({ "postgres.HOST": "db" }));
+        const { env } = resolveReferences(
+            { A: "${{Postgres.HOST}}" },
+            lookup({ "postgres.HOST": "db" })
+        );
         expect(env.A).toBe("db");
     });
 
     it("follows a reference to a value that is itself a reference", () => {
         const { env } = resolveReferences(
             { A: "${{api.PUBLIC_URL}}" },
-            lookup({ "api.PUBLIC_URL": "https://${{shared.DOMAIN}}", "shared.DOMAIN": "example.test" })
+            lookup({
+                "api.PUBLIC_URL": "https://${{shared.DOMAIN}}",
+                "shared.DOMAIN": "example.test"
+            })
         );
         expect(env.A).toBe("https://example.test");
     });
@@ -74,7 +83,12 @@ describe("resolving them", () => {
     it("follows a chain as deep as REFERENCE_DEPTH", () => {
         const { env, unresolved } = resolveReferences(
             { A: "${{one.X}}" },
-            lookup({ "one.X": "${{two.X}}", "two.X": "${{three.X}}", "three.X": "${{four.X}}", "four.X": "end" })
+            lookup({
+                "one.X": "${{two.X}}",
+                "two.X": "${{three.X}}",
+                "three.X": "${{four.X}}",
+                "four.X": "end"
+            })
         );
         expect(REFERENCE_DEPTH).toBe(4);
         expect(env.A).toBe("end");
@@ -88,7 +102,9 @@ describe("resolving them", () => {
             lookups += 1;
             return name === "shared" && key === "A" ? self : undefined;
         };
-        expect(() => resolveReferences({ BIG: self }, counting)).toThrow(/^BIG is longer than 64 KB/);
+        expect(() => resolveReferences({ BIG: self }, counting)).toThrow(
+            /^BIG is longer than 64 KB/
+        );
         expect(lookups).toBeLessThan(10);
     });
 });

@@ -53,16 +53,24 @@ export interface RuntimeLogEntry {
 }
 
 /** A service as the readers here need it loaded. */
-export type LoggedService = ReleaseSubject & { target: unknown; environment: { project: { slug: string; ownerId: string } } };
+export type LoggedService = ReleaseSubject & {
+    target: unknown;
+    environment: { project: { slug: string; ownerId: string } };
+};
 
 /**
  * The containers a service's output comes from: every running replica, found by
  * the labels its engine put on them, or its own container when the engine
  * lists none (or cannot be asked).
  */
-export async function serviceContainers(ports: RuntimePorts, app: ReleaseSubject): Promise<string[]> {
+export async function serviceContainers(
+    ports: RuntimePorts,
+    app: ReleaseSubject
+): Promise<string[]> {
     const release = await currentReleaseRef(app);
-    const listed = ports.listContainers ? await ports.listContainers(release.project).catch(() => []) : [];
+    const listed = ports.listContainers
+        ? await ports.listContainers(release.project).catch(() => [])
+        : [];
     return listed.length > 0 ? listed : [release.name];
 }
 
@@ -154,7 +162,10 @@ export async function captureRuntimeLogs(): Promise<{ services: number; lines: n
     return { services: captured, lines };
 }
 
-async function captureService(ports: RuntimePorts, service: LoggedService & { id: string }): Promise<number> {
+async function captureService(
+    ports: RuntimePorts,
+    service: LoggedService & { id: string }
+): Promise<number> {
     let stored = 0;
     for (const container of await serviceContainers(ports, service)) {
         const last = await prisma.runtimeLogLine.findFirst({
@@ -164,7 +175,9 @@ async function captureService(ports: RuntimePorts, service: LoggedService & { id
         });
         const splitter = new LineSplitter();
         const raw: string[] = [];
-        await ports.logs(container, (chunk) => raw.push(...splitter.push(chunk)), { tail: CAPTURE_TAIL });
+        await ports.logs(container, (chunk) => raw.push(...splitter.push(chunk)), {
+            tail: CAPTURE_TAIL
+        });
         raw.push(...splitter.flush());
         const fresh = linesAfter(raw.map(splitStamp), last?.stamp ?? null);
         for (let at = 0; at < fresh.length; at += INSERT_BATCH) {
@@ -196,7 +209,10 @@ export async function pruneRuntimeLogs(now = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - RUNTIME_LOG_RETENTION_DAYS * 24 * 3_600_000);
     let removed = (await prisma.runtimeLogLine.deleteMany({ where: { at: { lt: cutoff } } })).count;
 
-    const counts = await prisma.runtimeLogLine.groupBy({ by: ["applicationId"], _count: { _all: true } });
+    const counts = await prisma.runtimeLogLine.groupBy({
+        by: ["applicationId"],
+        _count: { _all: true }
+    });
     for (const row of counts) {
         if (row._count._all <= RUNTIME_LOG_MAX_LINES) continue;
         const edge = await prisma.runtimeLogLine.findFirst({
@@ -245,7 +261,9 @@ export function decodeCursor(cursor: string | undefined): { stamp: string; id: s
     if (at <= 0) return null;
     const stamp = cursor.slice(0, at);
     const id = cursor.slice(at + 1);
-    return /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(stamp) && /^[0-9a-f-]{36}$/i.test(id) ? { stamp, id } : null;
+    return /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(stamp) && /^[0-9a-f-]{36}$/i.test(id)
+        ? { stamp, id }
+        : null;
 }
 
 /**
@@ -260,10 +278,20 @@ export async function searchRuntimeLogs(query: RuntimeLogQuery): Promise<Runtime
             applicationId: { in: [...query.serviceIds] },
             ...(query.text ? { text: { contains: query.text, mode: "insensitive" as const } } : {}),
             ...(query.from || query.to
-                ? { at: { ...(query.from ? { gte: query.from } : {}), ...(query.to ? { lte: query.to } : {}) } }
+                ? {
+                      at: {
+                          ...(query.from ? { gte: query.from } : {}),
+                          ...(query.to ? { lte: query.to } : {})
+                      }
+                  }
                 : {}),
             ...(cursor
-                ? { OR: [{ stamp: { lt: cursor.stamp } }, { stamp: cursor.stamp, id: { lt: cursor.id } }] }
+                ? {
+                      OR: [
+                          { stamp: { lt: cursor.stamp } },
+                          { stamp: cursor.stamp, id: { lt: cursor.id } }
+                      ]
+                  }
                 : {})
         },
         orderBy: [{ stamp: "desc" }, { id: "desc" }],
@@ -316,7 +344,11 @@ export async function followRuntimeLogs(input: {
         try {
             // Tied to the reader's connection: when it goes, the far side stops
             // the follow, rather than leaving it running on the server.
-            ports = await getPorts(service.target as TargetRow, service.environment.project.ownerId, input.signal);
+            ports = await getPorts(
+                service.target as TargetRow,
+                service.environment.project.ownerId,
+                input.signal
+            );
             opened.push(ports);
         } catch {
             input.onEnded(service.id, "", "The server this service runs on could not be reached.");
@@ -331,12 +363,20 @@ export async function followRuntimeLogs(input: {
                     // The daemon's own note that the command failed, not output.
                     if (EXIT_TRAILER.test(line)) continue;
                     const parsed = splitStamp(line);
-                    pending.push({ serviceId: service.id, container, stamp: parsed.stamp, text: parsed.text });
+                    pending.push({
+                        serviceId: service.id,
+                        container,
+                        stamp: parsed.stamp,
+                        text: parsed.text
+                    });
                 }
             };
             follows.push(
                 ports
-                    .logs(container, (chunk) => push(splitter.push(chunk)), { tail: input.tail, follow: true })
+                    .logs(container, (chunk) => push(splitter.push(chunk)), {
+                        tail: input.tail,
+                        follow: true
+                    })
                     .then(
                         () => {
                             push(splitter.flush());
@@ -344,7 +384,11 @@ export async function followRuntimeLogs(input: {
                         },
                         () => {
                             if (!input.signal.aborted) {
-                                input.onEnded(service.id, container, "The output stopped. The container may have been replaced.");
+                                input.onEnded(
+                                    service.id,
+                                    container,
+                                    "The output stopped. The container may have been replaced."
+                                );
                             }
                         }
                     )

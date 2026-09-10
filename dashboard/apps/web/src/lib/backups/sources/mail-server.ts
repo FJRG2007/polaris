@@ -71,7 +71,8 @@ export function volumeAt(inspect: unknown, path: string): string | null {
     if (!Array.isArray(mounts)) return null;
     for (const mount of mounts) {
         const entry = mount as { Type?: unknown; Name?: unknown; Destination?: unknown };
-        if (entry.Type === "volume" && entry.Destination === path && typeof entry.Name === "string") return entry.Name;
+        if (entry.Type === "volume" && entry.Destination === path && typeof entry.Name === "string")
+            return entry.Name;
     }
     return null;
 }
@@ -86,12 +87,14 @@ function serverIdOf(resource: SourceResource): string {
 async function engineOf(serverId: string): Promise<Engine> {
     const server = await prisma.mailServer.findUnique({ where: { id: serverId } });
     if (!server) throw new SourceUnavailableError("That mail server no longer exists");
-    if (!server.applicationId) throw new SourceUnavailableError("That mail server has not finished setting up");
+    if (!server.applicationId)
+        throw new SourceUnavailableError("That mail server has not finished setting up");
     const app = await prisma.application.findUnique({
         where: { id: server.applicationId },
         include: { environment: { include: { project: true } }, target: true }
     });
-    if (!app?.currentDeploymentId) throw new SourceUnavailableError("That mail server's engine is not running");
+    if (!app?.currentDeploymentId)
+        throw new SourceUnavailableError("That mail server's engine is not running");
     const container = (await currentReleaseRef(app)).name;
     const ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
     try {
@@ -100,9 +103,19 @@ async function engineOf(serverId: string): Promise<Engine> {
         const configVolume = volumeAt(inspect, core.STALWART_CONFIG_PATH);
         const dataVolume = volumeAt(inspect, core.STALWART_DATA_PATH);
         if (typeof image !== "string" || !configVolume || !dataVolume) {
-            throw new SourceUnavailableError("The engine's volumes could not be found on its machine");
+            throw new SourceUnavailableError(
+                "The engine's volumes could not be found on its machine"
+            );
         }
-        return { serverId, hostname: server.hostname, container, image, configVolume, dataVolume, ports };
+        return {
+            serverId,
+            hostname: server.hostname,
+            container,
+            image,
+            configVolume,
+            dataVolume,
+            ports
+        };
     } catch (error) {
         await ports.dispose().catch(() => undefined);
         throw error;
@@ -126,7 +139,11 @@ export function maintenanceSpec(
                 env: {},
                 ports: [],
                 volumes: [
-                    { source: engine.configVolume, target: core.STALWART_CONFIG_PATH, kind: "volume" },
+                    {
+                        source: engine.configVolume,
+                        target: core.STALWART_CONFIG_PATH,
+                        kind: "volume"
+                    },
                     { source: engine.dataVolume, target: core.STALWART_DATA_PATH, kind: "volume" }
                 ],
                 labels: {},
@@ -143,7 +160,9 @@ export function maintenanceSpec(
 /** The last lines a finished maintenance container printed, for the reason. */
 async function lastWords(ports: RuntimePorts, container: string): Promise<string> {
     const parts: Buffer[] = [];
-    await ports.logs(container, (chunk) => void parts.push(Buffer.from(chunk)), { tail: 20 }).catch(() => undefined);
+    await ports
+        .logs(container, (chunk) => void parts.push(Buffer.from(chunk)), { tail: 20 })
+        .catch(() => undefined);
     return Buffer.concat(parts).toString("utf8").trim().slice(-600);
 }
 
@@ -151,7 +170,11 @@ async function lastWords(ports: RuntimePorts, container: string): Promise<string
  * Run the engine's program once, with the engine stopped, and start the engine
  * again whatever happened. Throws with what the program printed when it fails.
  */
-async function withEngineStopped(engine: Engine, run: { entrypoint?: string[]; command: string[] }, what: string): Promise<void> {
+async function withEngineStopped(
+    engine: Engine,
+    run: { entrypoint?: string[]; command: string[] },
+    what: string
+): Promise<void> {
     const spec = maintenanceSpec(engine, run);
     const task = spec.services[0]!.name;
     await engine.ports.container(engine.container, "stop");
@@ -166,7 +189,8 @@ async function withEngineStopped(engine: Engine, run: { entrypoint?: string[]; c
                 const said = await lastWords(engine.ports, task);
                 throw new SourceUnavailableError(`The ${what} failed${said ? `: ${said}` : ""}`);
             }
-            if (Date.now() > deadline) throw new SourceUnavailableError(`The ${what} did not finish in two hours`);
+            if (Date.now() > deadline)
+                throw new SourceUnavailableError(`The ${what} did not finish in two hours`);
             await new Promise((resolve) => setTimeout(resolve, POLL_MS));
         }
     } finally {
@@ -235,7 +259,9 @@ export const mailServerSource: BackupSource = {
                 `rm -rf ${shellQuote(EXPORT_DIR)} && mkdir -p ${shellQuote(EXPORT_DIR)}`
             ]);
             if (cleared.code !== 0) {
-                throw new SourceUnavailableError(`Preparing the export failed: ${cleared.output.trim().slice(0, 300)}`);
+                throw new SourceUnavailableError(
+                    `Preparing the export failed: ${cleared.output.trim().slice(0, 300)}`
+                );
             }
             await withEngineStopped(
                 engine,
@@ -256,7 +282,10 @@ export const mailServerSource: BackupSource = {
             const fileName = `mail-${engine.hostname.replace(/[^a-z0-9.-]/gi, "-")}-${stamp(at)}.tar.gz`;
             const target = join(dir, fileName);
             const bytes = await engine.ports.readFile(engine.container, inContainer);
-            await pipeline(Readable.fromWeb(bytes as import("node:stream/web").ReadableStream), createWriteStream(target));
+            await pipeline(
+                Readable.fromWeb(bytes as import("node:stream/web").ReadableStream),
+                createWriteStream(target)
+            );
             return stagedFrom(dir, target, fileName, {
                 format: MAIL_EXPORT_FORMAT,
                 image: engine.image,
@@ -270,7 +299,11 @@ export const mailServerSource: BackupSource = {
         }
     },
 
-    async restore(resource: SourceResource, body: ReadableStream<Uint8Array>, metadata: Record<string, unknown>) {
+    async restore(
+        resource: SourceResource,
+        body: ReadableStream<Uint8Array>,
+        metadata: Record<string, unknown>
+    ) {
         if (metadata.format !== MAIL_EXPORT_FORMAT) {
             throw new SourceUnavailableError("That copy is not an export of this mail server");
         }
@@ -279,7 +312,9 @@ export const mailServerSource: BackupSource = {
         const { runBackup } = await import("../service");
         const safety = await runBackup(resource.id, { trigger: "pre-restore" });
         if (safety.status === "failed") {
-            throw new SourceUnavailableError("A copy of the server as it is now could not be taken, so nothing was restored");
+            throw new SourceUnavailableError(
+                "A copy of the server as it is now could not be taken, so nothing was restored"
+            );
         }
 
         const engine = await engineOf(serverIdOf(resource));
@@ -287,7 +322,12 @@ export const mailServerSource: BackupSource = {
         try {
             const bytes = Buffer.from(await new Response(body).arrayBuffer());
             if (engine.ports.writeFile) {
-                await engine.ports.writeFile(engine.container, inContainer, Readable.from([bytes]), bytes.length);
+                await engine.ports.writeFile(
+                    engine.container,
+                    inContainer,
+                    Readable.from([bytes]),
+                    bytes.length
+                );
             } else {
                 await writeThroughShell(engine.ports, engine.container, inContainer, bytes);
             }
@@ -297,7 +337,9 @@ export const mailServerSource: BackupSource = {
                 `rm -rf ${shellQuote(IMPORT_DIR)} && mkdir -p ${shellQuote(IMPORT_DIR)} && tar -xzf ${shellQuote(inContainer)} -C ${shellQuote(IMPORT_DIR)}`
             ]);
             if (unpacked.code !== 0) {
-                throw new SourceUnavailableError(`Unpacking the export failed: ${unpacked.output.trim().slice(0, 400)}`);
+                throw new SourceUnavailableError(
+                    `Unpacking the export failed: ${unpacked.output.trim().slice(0, 400)}`
+                );
             }
             await withEngineStopped(
                 engine,

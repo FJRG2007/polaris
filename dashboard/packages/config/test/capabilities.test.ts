@@ -40,7 +40,10 @@ describe("deriveCapabilities", () => {
 
     it("keeps every service on the proxy network under a daemon that predates private networks", () => {
         expect(deriveCapabilities(fullHealth).privateNetworks).toBe(false);
-        const current = { ...fullHealth, capabilities: { ...fullHealth.capabilities, privateNetworks: true } };
+        const current = {
+            ...fullHealth,
+            capabilities: { ...fullHealth.capabilities, privateNetworks: true }
+        };
         expect(deriveCapabilities(current).privateNetworks).toBe(true);
     });
 });

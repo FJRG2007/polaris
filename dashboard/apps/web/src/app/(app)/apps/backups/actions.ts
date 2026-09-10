@@ -30,7 +30,8 @@ function failed(error: unknown): { error: string } {
 export async function protectAction(input: unknown): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = protectSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those details are not valid" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Those details are not valid" };
     try {
         const created = await manage.protectResource(user.id, parsed.data);
         await recordAudit({
@@ -130,10 +131,14 @@ export async function restoreAction(input: unknown): Promise<Result> {
     }
 }
 
-export async function savePlanAction(input: unknown, planId?: string): Promise<Result<{ id: string }>> {
+export async function savePlanAction(
+    input: unknown,
+    planId?: string
+): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = planSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those plan details are not valid" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Those plan details are not valid" };
     try {
         const saved = await manage.savePlan(user.id, parsed.data, planId);
         revalidatePath("/apps/backups");
@@ -158,7 +163,9 @@ export async function createDestinationAction(input: unknown): Promise<Result<{ 
     const user = await requireAdmin();
     const parsed = destinationSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those destination details are not valid" };
+        return {
+            error: parsed.error.issues[0]?.message ?? "Those destination details are not valid"
+        };
     }
     try {
         const created = await manage.createDestination(user.id, parsed.data);
@@ -219,7 +226,12 @@ export async function rotateBackupKeyAction(): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     try {
         const created = await keyring.rotateKey(user.id);
-        await recordAudit({ actorId: user.id, action: "backup.key.rotate", targetType: "backup-key", targetId: created.id });
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.key.rotate",
+            targetType: "backup-key",
+            targetId: created.id
+        });
         return created;
     } catch (error) {
         return failed(error);
@@ -232,13 +244,21 @@ export async function rotateBackupKeyAction(): Promise<Result<{ id: string }>> {
  * its owner - but it is the only thing that opens them once this database is gone,
  * so reading it is recorded.
  */
-export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ recoveryKey: string }>> {
+export async function revealRecoveryKeyAction(
+    keyId: string
+): Promise<Result<{ recoveryKey: string }>> {
     const user = await requireAdmin();
     const parsed = keyIdSchema.safeParse(keyId);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup key" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a backup key" };
     try {
         const recoveryKey = await keyring.recoveryKey(user.id, parsed.data);
-        await recordAudit({ actorId: user.id, action: "backup.key.reveal", targetType: "backup-key", targetId: parsed.data });
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.key.reveal",
+            targetType: "backup-key",
+            targetId: parsed.data
+        });
         return { recoveryKey };
     } catch (error) {
         return failed(error);
@@ -249,7 +269,8 @@ export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ r
 export async function addRecoveryKeyAction(text: string): Promise<Result<{ added: boolean }>> {
     const user = await requireAdmin();
     const parsed = recoveryKeySchema.safeParse(text);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Paste the recovery key" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Paste the recovery key" };
     try {
         const outcome = await keyring.addRecoveryKey(user.id, parsed.data);
         await recordAudit({ actorId: user.id, action: "backup.key.add", targetType: "backup-key" });

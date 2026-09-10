@@ -48,7 +48,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Preview environments",
-                description: "An environment for each open pull request, built from its branch and removed when it closes.",
+                description:
+                    "An environment for each open pull request, built from its branch and removed when it closes.",
                 where: "Project > Settings > Feature flags",
                 href: PROJECTS
             },
@@ -75,25 +76,29 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Deploy a folder",
-                description: "Drop a folder or a zip and it is built the way a repository would be.",
+                description:
+                    "Drop a folder or a zip and it is built the way a repository would be.",
                 where: "Project > New service",
                 href: PROJECTS
             },
             {
                 title: "Smart fixes",
-                description: "A failed deploy says what most likely went wrong and offers the change that fixes it, redeploying in one press.",
+                description:
+                    "A failed deploy says what most likely went wrong and offers the change that fixes it, redeploying in one press.",
                 where: "Service > Deployments",
                 href: PROJECTS
             },
             {
                 title: "Updates noticed",
-                description: "Says when a newer image is published behind a service's tag, or how far it is behind its branch.",
+                description:
+                    "Says when a newer image is published behind a service's tag, or how far it is behind its branch.",
                 where: "Service > Deployments",
                 href: PROJECTS
             },
             {
                 title: "Monorepos",
-                description: "Several services from one repository, each with its own root directory, Dockerfile and watch paths.",
+                description:
+                    "Several services from one repository, each with its own root directory, Dockerfile and watch paths.",
                 where: "Service > Settings",
                 href: PROJECTS
             },
@@ -105,19 +110,22 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Instant rollbacks",
-                description: "Recent releases keep their image, so putting one back live needs no rebuild. Pin a release to keep it longer.",
+                description:
+                    "Recent releases keep their image, so putting one back live needs no rebuild. Pin a release to keep it longer.",
                 where: "Service > Deployments",
                 href: PROJECTS
             },
             {
                 title: "Deploy progress",
-                description: "Each deploy shows its steps as it runs, with the build log under them and what failed if it did.",
+                description:
+                    "Each deploy shows its steps as it runs, with the build log under them and what failed if it did.",
                 where: "Service > Deployments",
                 href: PROJECTS
             },
             {
                 title: "Staged removals",
-                description: "Removing a service or a database is staged and reviewed with the rest before anything is torn down.",
+                description:
+                    "Removing a service or a database is staged and reviewed with the rest before anything is torn down.",
                 where: "Project > changes banner",
                 href: PROJECTS
             }
@@ -142,13 +150,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Logs",
-                description: "Every service's output in one live stream, kept for a week and searchable.",
+                description:
+                    "Every service's output in one live stream, kept for a week and searchable.",
                 where: "Project > Logs",
                 href: PROJECTS
             },
             {
                 title: "Scheduled jobs",
-                description: "Commands run inside a service on a schedule, with retries, timeouts and each run's output.",
+                description:
+                    "Commands run inside a service on a schedule, with retries, timeouts and each run's output.",
                 where: "Service > Cron",
                 href: PROJECTS
             },
@@ -166,14 +176,16 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Your own servers",
-                description: "Run services on this machine or any enrolled server, and move them between servers.",
+                description:
+                    "Run services on this machine or any enrolled server, and move them between servers.",
                 where: "Servers",
                 href: "/apps/servers",
                 needs: "system.manage"
             },
             {
                 title: "Health checks",
-                description: "Every address is checked, and one that stops answering is flagged on the service.",
+                description:
+                    "Every address is checked, and one that stops answering is flagged on the service.",
                 where: "Service > Settings",
                 href: PROJECTS
             },
@@ -193,13 +205,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Resource limits",
-                description: "Cap the CPU and memory each copy of a service, or a database, may use.",
+                description:
+                    "Cap the CPU and memory each copy of a service, or a database, may use.",
                 where: "Service > Settings > Scaling",
                 href: PROJECTS
             },
             {
                 title: "Sleep when idle",
-                description: "A service nobody visits sleeps after a set time and wakes on the next visit.",
+                description:
+                    "A service nobody visits sleeps after a set time and wakes on the next visit.",
                 where: "Service > Settings > Scaling",
                 href: PROJECTS
             }
@@ -212,19 +226,22 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         items: [
             {
                 title: "Free subdomains",
-                description: "Each service gets a hostname under the instance's domain, with a certificate.",
+                description:
+                    "Each service gets a hostname under the instance's domain, with a certificate.",
                 where: "Service > Settings",
                 href: PROJECTS
             },
             {
                 title: "Custom domains",
-                description: "Any hostname, with an automatic Let's Encrypt certificate or one you supply.",
+                description:
+                    "Any hostname, with an automatic Let's Encrypt certificate or one you supply.",
                 where: "Service > Settings",
                 href: PROJECTS
             },
             {
                 title: "DNS written for you",
-                description: "With a Cloudflare account connected, Polaris creates the records itself; without one it shows each record to add.",
+                description:
+                    "With a Cloudflare account connected, Polaris creates the records itself; without one it shows each record to add.",
                 where: "Management > Domains",
                 href: "/admin/domains",
                 adminOnly: true
@@ -250,20 +267,23 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Wildcard certificates",
-                description: "A domain you bring gets one certificate for itself and every name under it, renewed on its own.",
+                description:
+                    "A domain you bring gets one certificate for itself and every name under it, renewed on its own.",
                 where: "My account > Domains",
                 href: "/account/domains"
             },
             {
                 title: "DNS records",
-                description: "Add and change records in a Cloudflare zone, and watch the resolvers pick them up.",
+                description:
+                    "Add and change records in a Cloudflare zone, and watch the resolvers pick them up.",
                 where: "Management > Domains",
                 href: "/admin/domains",
                 adminOnly: true
             },
             {
                 title: "CDN",
-                description: "A domain served through Cloudflare, with its cache emptied after every deploy.",
+                description:
+                    "A domain served through Cloudflare, with its cache emptied after every deploy.",
                 where: "Service > Settings",
                 href: PROJECTS
             }
@@ -276,7 +296,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         items: [
             {
                 title: "Managed databases",
-                description: "PostgreSQL, MySQL, MariaDB, MongoDB and Redis, provisioned beside your services.",
+                description:
+                    "PostgreSQL, MySQL, MariaDB, MongoDB and Redis, provisioned beside your services.",
                 where: "Project > New service",
                 href: PROJECTS
             },
@@ -289,13 +310,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Object storage",
-                description: "S3-compatible buckets with keys of their own, signed links, expiry rules and replication.",
+                description:
+                    "S3-compatible buckets with keys of their own, signed links, expiry rules and replication.",
                 where: "Project > New service",
                 href: PROJECTS
             },
             {
                 title: "Mail server",
-                description: "A mail server of your own, with its DNS records written and checked, mailboxes, aliases and DMARC reports.",
+                description:
+                    "A mail server of your own, with its DNS records written and checked, mailboxes, aliases and DMARC reports.",
                 where: "Mail server",
                 href: "/apps/mail-server",
                 needs: "mailserver.manage"
@@ -308,7 +331,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Reference variables",
-                description: "${{postgres.DATABASE_URL}} points at another service's value, and follows it into a copied environment.",
+                description:
+                    "${{postgres.DATABASE_URL}} points at another service's value, and follows it into a copied environment.",
                 where: "Service > Variables",
                 href: PROJECTS
             },
@@ -320,7 +344,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Templates",
-                description: "Ghost, Gitea, Grafana, n8n, Umami, Vaultwarden and other well-known apps, with their volumes, secrets, database and first setup done.",
+                description:
+                    "Ghost, Gitea, Grafana, n8n, Umami, Vaultwarden and other well-known apps, with their volumes, secrets, database and first setup done.",
                 where: "Project > New service",
                 href: PROJECTS
             },
@@ -345,13 +370,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         items: [
             {
                 title: "Projects and environments",
-                description: "Services grouped into projects, each with as many environments as it needs, each on its own branch.",
+                description:
+                    "Services grouped into projects, each with as many environments as it needs, each on its own branch.",
                 where: "Deploy",
                 href: PROJECTS
             },
             {
                 title: "Desktop app",
-                description: "Polaris installed as an app with its own window and icon, on any computer or phone.",
+                description:
+                    "Polaris installed as an app with its own window and icon, on any computer or phone.",
                 where: "Account > Preferences",
                 href: "/account/preferences"
             },
@@ -363,19 +390,22 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Alarms",
-                description: "Alerts on health, spikes, outages, full disks and network traffic, for services and servers.",
+                description:
+                    "Alerts on health, spikes, outages, full disks and network traffic, for services and servers.",
                 where: "Watch > Alarms",
                 href: "/watch/alarms"
             },
             {
                 title: "Webhooks",
-                description: "Deploys and alerts reported to Discord, Slack, Microsoft Teams, Telegram or any endpoint.",
+                description:
+                    "Deploys and alerts reported to Discord, Slack, Microsoft Teams, Telegram or any endpoint.",
                 where: "Watch > Webhooks",
                 href: "/watch/webhooks"
             },
             {
                 title: "Error tracking",
-                description: "What your applications report when they break. Every service is handed a Sentry address.",
+                description:
+                    "What your applications report when they break. Every service is handed a Sentry address.",
                 where: "Telemetry",
                 href: "/apps/telemetry",
                 needs: "deploy.manage"
@@ -396,7 +426,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Move to another machine",
-                description: "The whole instance in one file sealed with a passphrase, imported on a new install.",
+                description:
+                    "The whole instance in one file sealed with a passphrase, imported on a new install.",
                 where: "Management > Updates & settings",
                 href: "/admin/settings",
                 adminOnly: true
@@ -424,20 +455,23 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Encrypted secrets",
-                description: "Secret variables are encrypted at rest and only revealed on request, and each reveal is recorded.",
+                description:
+                    "Secret variables are encrypted at rest and only revealed on request, and each reveal is recorded.",
                 where: "Service > Variables",
                 href: PROJECTS
             },
             {
                 title: "Encrypted backups",
-                description: "Every copy leaves encrypted, under a key you can keep elsewhere as a recovery key.",
+                description:
+                    "Every copy leaves encrypted, under a key you can keep elsewhere as a recovery key.",
                 where: "Backups > Encryption",
                 href: "/apps/backups",
                 adminOnly: true
             },
             {
                 title: "Project access",
-                description: "Give people a set of capabilities on a project, for some environments only, until a date.",
+                description:
+                    "Give people a set of capabilities on a project, for some environments only, until a date.",
                 where: "Project > Settings > Access",
                 href: PROJECTS
             },
@@ -475,13 +509,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Notes on services",
-                description: "What people write down about a service - why it was restarted, what not to touch.",
+                description:
+                    "What people write down about a service - why it was restarted, what not to touch.",
                 where: "Service > Notes",
                 href: PROJECTS
             },
             {
                 title: "Service history",
-                description: "What happened to a service: deploys, restarts, variables changed, and by whom.",
+                description:
+                    "What happened to a service: deploys, restarts, variables changed, and by whom.",
                 where: "Service > Deployments",
                 href: PROJECTS
             },
@@ -493,7 +529,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Deploys on GitHub",
-                description: "Each deploy is reported on its commit, so a pull request shows where it went live.",
+                description:
+                    "Each deploy is reported on its commit, so a pull request shows where it went live.",
                 where: "Your repository",
                 href: PROJECTS
             },
@@ -506,7 +543,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
             },
             {
                 title: "Coding agents",
-                description: "An agent in your repositories that reviews pull requests, answers issues and fixes failing checks.",
+                description:
+                    "An agent in your repositories that reviews pull requests, answers issues and fixes failing checks.",
                 where: "Agents",
                 href: "/apps/agents",
                 needs: "agents.read"

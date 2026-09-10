@@ -44,10 +44,18 @@ describe("private network names", () => {
         const environment = environmentNetwork("0192a0b1-0000-7000-8000-000000000001");
         expect(environment).toBe(environmentNetwork("0192a0b1-0000-7000-8000-000000000001"));
         expect(environment).toMatch(/^polaris-net-e[a-f0-9]{10}$/);
-        expect(serviceNetwork("0192a0b1-0000-7000-8000-000000000001")).toMatch(/^polaris-net-s[a-f0-9]{10}$/);
+        expect(serviceNetwork("0192a0b1-0000-7000-8000-000000000001")).toMatch(
+            /^polaris-net-s[a-f0-9]{10}$/
+        );
         expect(serviceNetwork("x")).not.toBe(environmentNetwork("x"));
         expect(isPrivateNetwork(environment)).toBe(true);
-        for (const other of [PROXY, "polaris-hub", "polaris-net-", "polaris-net-x0123456789", "polaris-net-eABCDEF0123"]) {
+        for (const other of [
+            PROXY,
+            "polaris-hub",
+            "polaris-net-",
+            "polaris-net-x0123456789",
+            "polaris-net-eABCDEF0123"
+        ]) {
             expect(isPrivateNetwork(other)).toBe(false);
         }
     });
@@ -73,7 +81,10 @@ describe("which networks a service joins", () => {
 
     it("puts an environment's services on its own network, and on the proxy only when the edge needs it", () => {
         const own = environmentNetwork("env-1");
-        expect(serviceNetworks({ ...base, mode: "environment", joinsProxy: true })).toEqual([PROXY, own]);
+        expect(serviceNetworks({ ...base, mode: "environment", joinsProxy: true })).toEqual([
+            PROXY,
+            own
+        ]);
         expect(serviceNetworks({ ...base, mode: "environment", joinsProxy: false })).toEqual([own]);
     });
 
@@ -86,17 +97,25 @@ describe("which networks a service joins", () => {
         ];
         const joined = serviceNetworks({ ...base, mode: "links", joinsProxy: false, links });
         expect(joined[0]).toBe(serviceNetwork("svc-a"));
-        expect(new Set(joined)).toEqual(new Set([serviceNetwork("svc-a"), serviceNetwork("db-1"), serviceNetwork("svc-b")]));
+        expect(new Set(joined)).toEqual(
+            new Set([serviceNetwork("svc-a"), serviceNetwork("db-1"), serviceNetwork("svc-b")])
+        );
         // svc-c links to svc-a, so it is svc-c that joins svc-a's network, not the reverse.
         expect(joined).not.toContain(serviceNetwork("svc-c"));
-        const database = serviceNetworks({ ...base, serviceId: "db-1", mode: "links", joinsProxy: false, links });
+        const database = serviceNetworks({
+            ...base,
+            serviceId: "db-1",
+            mode: "links",
+            joinsProxy: false,
+            links
+        });
         expect(database).toEqual([serviceNetwork("db-1")]);
     });
 
     it("reads links out of a stored canvas layout, and nothing out of a malformed one", () => {
-        expect(linksOfLayout('{"pos":{},"links":[{"source":"a","target":"b"},{"source":1},null]}')).toEqual([
-            { source: "a", target: "b" }
-        ]);
+        expect(
+            linksOfLayout('{"pos":{},"links":[{"source":"a","target":"b"},{"source":1},null]}')
+        ).toEqual([{ source: "a", target: "b" }]);
         expect(linksOfLayout("{")).toEqual([]);
         expect(linksOfLayout(null)).toEqual([]);
         expect(linksOfLayout('{"links":"no"}')).toEqual([]);
@@ -151,7 +170,11 @@ describe("the compose a private service is deployed with", () => {
 
     it("still adds the extra networks a plan asks for after the planned ones", () => {
         const own = environmentNetwork("env-1");
-        const spec = appComposeSpec(appPlan({ networks: [own], extraNetworks: ["polaris-hub", own] }), "img", PROXY);
+        const spec = appComposeSpec(
+            appPlan({ networks: [own], extraNetworks: ["polaris-hub", own] }),
+            "img",
+            PROXY
+        );
         expect(spec.services[0]?.networks).toEqual([own, "polaris-hub"]);
     });
 });
@@ -162,7 +185,9 @@ describe("making private networks on another server", () => {
         const script = ensurePrivateNetworksScript([PROXY, own, own, "polaris-hub"], false);
         expect(script).toHaveLength(2);
         expect(script[0]).toContain(`if ! docker network inspect ${own} >/dev/null 2>&1; then`);
-        expect(script[0]).toContain(`docker network create --label polaris.network=private --driver bridge ${own}`);
+        expect(script[0]).toContain(
+            `docker network create --label polaris.network=private --driver bridge ${own}`
+        );
         expect(script[0]).toContain(`--subnet "$s" ${own}`);
         expect(script[0]).toContain(fallbackSubnet(own, 0));
         expect(script[0]).toContain("exit 1");
@@ -186,6 +211,8 @@ describe("making private networks on another server", () => {
     it("rejoins the private networks when the edge is recreated", () => {
         const script = onboardingScript({ proxyNetwork: PROXY, acmeEmail: "ops@example.test" });
         expect(script).toContain("docker network ls -q --filter label=polaris.network=private");
-        expect(script.indexOf("label=polaris.network=private")).toBeGreaterThan(script.indexOf("docker run -d --name polaris-traefik"));
+        expect(script.indexOf("label=polaris.network=private")).toBeGreaterThan(
+            script.indexOf("docker run -d --name polaris-traefik")
+        );
     });
 });

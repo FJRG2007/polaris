@@ -19,8 +19,16 @@ describe("railway", () => {
         const config = importDeployConfig({
             "railway.json": JSON.stringify({
                 $schema: "https://railway.com/railway.schema.json",
-                build: { builder: "DOCKERFILE", dockerfilePath: "deploy/Dockerfile", buildCommand: "yarn build" },
-                deploy: { startCommand: "node dist/server.js", healthcheckPath: "/health", restartPolicyType: "ON_FAILURE" }
+                build: {
+                    builder: "DOCKERFILE",
+                    dockerfilePath: "deploy/Dockerfile",
+                    buildCommand: "yarn build"
+                },
+                deploy: {
+                    startCommand: "node dist/server.js",
+                    healthcheckPath: "/health",
+                    restartPolicyType: "ON_FAILURE"
+                }
             })
         });
         expect(picked(config, "buildCommand")).toBe("yarn build <- railway.json");
@@ -34,7 +42,7 @@ describe("railway", () => {
             "railway.toml": [
                 "[build]",
                 'builder = "RAILPACK"',
-                "buildCommand = \"pnpm build\" # the build",
+                'buildCommand = "pnpm build" # the build',
                 "",
                 "[deploy]",
                 "startCommand = 'pnpm start'",
@@ -51,7 +59,9 @@ describe("railway", () => {
     });
 
     it("leaves a build that changes into another directory alone, and says so", () => {
-        const config = importDeployConfig({ "railway.json": JSON.stringify({ build: { buildCommand: "cd web && npm run build" } }) });
+        const config = importDeployConfig({
+            "railway.json": JSON.stringify({ build: { buildCommand: "cd web && npm run build" } })
+        });
         expect(picked(config, "buildCommand")).toBeNull();
         expect(config.skipped[0]).toContain("another directory");
     });
@@ -68,7 +78,7 @@ describe("render", () => {
         "    runtime: node",
         "    rootDir: apps/web",
         "    buildCommand: npm install",
-        "    startCommand: \"npm start\"",
+        '    startCommand: "npm start"',
         "    healthCheckPath: /healthz",
         "    numInstances: 3",
         "    envVars:",
@@ -108,7 +118,15 @@ describe("render", () => {
 describe("netlify, vercel, Procfile and app.json", () => {
     it("reads netlify's base, publish, command and build environment", () => {
         const config = importDeployConfig({
-            "netlify.toml": ["[build]", '  base = "site/"', '  publish = "site/dist"', '  command = "npm run build"', "", "[build.environment]", '  NODE_VERSION = "20"'].join("\n")
+            "netlify.toml": [
+                "[build]",
+                '  base = "site/"',
+                '  publish = "site/dist"',
+                '  command = "npm run build"',
+                "",
+                "[build.environment]",
+                '  NODE_VERSION = "20"'
+            ].join("\n")
         });
         expect(picked(config, "rootDirectory")).toBe("site <- netlify.toml");
         expect(picked(config, "outputDirectory")).toBe("dist <- netlify.toml");
@@ -118,7 +136,12 @@ describe("netlify, vercel, Procfile and app.json", () => {
 
     it("reads vercel's install, build and output directory", () => {
         const config = importDeployConfig({
-            "vercel.json": JSON.stringify({ installCommand: "pnpm install", buildCommand: "pnpm build", outputDirectory: "./out/", framework: "nextjs" })
+            "vercel.json": JSON.stringify({
+                installCommand: "pnpm install",
+                buildCommand: "pnpm build",
+                outputDirectory: "./out/",
+                framework: "nextjs"
+            })
         });
         expect(picked(config, "installCommand")).toBe("pnpm install <- vercel.json");
         expect(picked(config, "outputDirectory")).toBe("out <- vercel.json");
@@ -137,7 +160,9 @@ describe("netlify, vercel, Procfile and app.json", () => {
                 formation: { web: { quantity: 2, size: "standard-1x" } }
             })
         });
-        expect(picked(config, "startCommand")).toBe("bundle exec puma -C config/puma.rb <- Procfile");
+        expect(picked(config, "startCommand")).toBe(
+            "bundle exec puma -C config/puma.rb <- Procfile"
+        );
         expect(picked(config, "replicas")).toBe("2 <- app.json");
         expect(config.variables).toEqual({ RAILS_ENV: "production" });
         expect(config.generate).toEqual(["SECRET_KEY_BASE"]);
@@ -157,7 +182,10 @@ describe("folding several files", () => {
     it("skips a file that is not what it says and reports nothing picked up from it", () => {
         const config = importDeployConfig({ "vercel.json": "{ not json", "app.json": "null" });
         expect(importedAnything(config)).toBe(false);
-        expect(config.skipped).toEqual(["vercel.json could not be read", "app.json could not be read"]);
+        expect(config.skipped).toEqual([
+            "vercel.json could not be read",
+            "app.json could not be read"
+        ]);
     });
 
     it("does not ask for a variable another file already gives a value", () => {

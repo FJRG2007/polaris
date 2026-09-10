@@ -19,7 +19,9 @@ export function TabAttentionDot({ label, className }: { label: string; className
 }
 
 /** Which of a service's tabs has something to show for it, and what. */
-export function tabAttention(attention: ServiceAttention | null | undefined): Partial<Record<string, string>> {
+export function tabAttention(
+    attention: ServiceAttention | null | undefined
+): Partial<Record<string, string>> {
     if (!attention) return {};
     return {
         ...(attention.deployFailed ? { Deployments: "The last deploy failed" } : {}),

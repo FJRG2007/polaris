@@ -12,7 +12,12 @@ export const domainCdnSchema = z.object({
 /** A path under a hostname to purge: relative, no query, no traversal. Empty
  *  purges the whole hostname. */
 export function isPurgePrefix(value: string): boolean {
-    return value === "" || (/^[A-Za-z0-9._~\/-]{1,512}$/.test(value) && !value.startsWith("/") && !value.split("/").includes(".."));
+    return (
+        value === "" ||
+        (/^[A-Za-z0-9._~\/-]{1,512}$/.test(value) &&
+            !value.startsWith("/") &&
+            !value.split("/").includes(".."))
+    );
 }
 
 export const cachePurgeSchema = z.object({

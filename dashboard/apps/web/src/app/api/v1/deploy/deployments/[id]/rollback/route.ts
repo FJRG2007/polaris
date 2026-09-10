@@ -12,7 +12,11 @@ import { deployRoute, respond } from "@/lib/deploy/api/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const POST = deployRoute("roll back to that deployment", true, async ({ caller, url, params }) => {
-    const { deploymentId } = await rollback(caller, idSchema.parse(params.id));
-    return respond(url, { deploymentId }, () => `${deploymentId}\n`, 202);
-});
+export const POST = deployRoute(
+    "roll back to that deployment",
+    true,
+    async ({ caller, url, params }) => {
+        const { deploymentId } = await rollback(caller, idSchema.parse(params.id));
+        return respond(url, { deploymentId }, () => `${deploymentId}\n`, 202);
+    }
+);

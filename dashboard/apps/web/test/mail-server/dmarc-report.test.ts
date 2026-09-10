@@ -46,14 +46,18 @@ describe("unpacking", () => {
         const gz = await dmarc.unpackAttachment(gzipSync(Buffer.from(REPORT)));
         const zip = new JSZip();
         zip.file("google.com!example.com!1756598400!1756684799.xml", REPORT);
-        const zipped = await dmarc.unpackAttachment(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
+        const zipped = await dmarc.unpackAttachment(
+            await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" })
+        );
         expect(bare).toEqual([REPORT]);
         expect(gz).toEqual([REPORT]);
         expect(zipped).toEqual([REPORT]);
     });
 
     it("passes over a part that is not a report", async () => {
-        expect(await dmarc.unpackAttachment(Buffer.from("Hello, this is a signature image."))).toEqual([]);
+        expect(
+            await dmarc.unpackAttachment(Buffer.from("Hello, this is a signature image."))
+        ).toEqual([]);
     });
 
     it("refuses a gzip that unpacks past any real report", async () => {
@@ -68,12 +72,18 @@ describe("reading", () => {
         expect(report.reportId).toBe("12345678901234567890");
         expect(report.domain).toBe("example.com");
         expect(report.rows).toHaveLength(2);
-        expect(report.rows[0]).toMatchObject({ sourceIp: "203.0.113.7", count: 4, dkim: "pass", spf: "fail" });
+        expect(report.rows[0]).toMatchObject({
+            sourceIp: "203.0.113.7",
+            count: 4,
+            dkim: "pass",
+            spf: "fail"
+        });
         expect(report.rows[1]?.authSpf[0]).toEqual({ domain: "spoof.test", result: "pass" });
     });
 
     it("refuses a document that declares entities", () => {
-        const hostile = '<?xml version="1.0"?><!DOCTYPE feedback [<!ENTITY a "aaaa">]><feedback>&a;</feedback>';
+        const hostile =
+            '<?xml version="1.0"?><!DOCTYPE feedback [<!ENTITY a "aaaa">]><feedback>&a;</feedback>';
         expect(() => dmarc.parseReportXml(hostile)).toThrow();
     });
 
@@ -105,6 +115,8 @@ describe("reading", () => {
     });
 
     it("says so when a file holds no report", async () => {
-        await expect(dmarc.reportsInUpload(Buffer.from("plain text"))).rejects.toThrow(dmarc.DmarcUploadError);
+        await expect(dmarc.reportsInUpload(Buffer.from("plain text"))).rejects.toThrow(
+            dmarc.DmarcUploadError
+        );
     });
 });

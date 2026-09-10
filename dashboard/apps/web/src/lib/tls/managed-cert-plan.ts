@@ -65,7 +65,11 @@ export function plannedCertificates(input: {
     const verified = input.ownerDomains.filter((entry) => entry.verified);
     for (const entry of verified) {
         if (entry.domain === deployBase) continue;
-        wanted.set(entry.domain, { domain: entry.domain, source: "owner", ownerDomainId: entry.id });
+        wanted.set(entry.domain, {
+            domain: entry.domain,
+            source: "owner",
+            ownerDomainId: entry.id
+        });
     }
     for (const host of input.wildcardHosts) {
         const hostname = host.hostname.trim().toLowerCase();
@@ -77,9 +81,15 @@ export function plannedCertificates(input: {
         const under = verified
             .filter((entry) => within(base, entry.domain))
             .sort((a, b) => b.domain.length - a.domain.length)[0];
-        const theirs = under !== undefined && (host.orgId ? under.orgId === host.orgId : under.userId === host.ownerId);
+        const theirs =
+            under !== undefined &&
+            (host.orgId ? under.orgId === host.orgId : under.userId === host.ownerId);
         if (!theirs && !host.ownerIsAdmin) continue;
-        wanted.set(base, { domain: base, source: "hostname", ownerDomainId: theirs ? under.id : null });
+        wanted.set(base, {
+            domain: base,
+            source: "hostname",
+            ownerDomainId: theirs ? under.id : null
+        });
     }
     return [...wanted.values()];
 }

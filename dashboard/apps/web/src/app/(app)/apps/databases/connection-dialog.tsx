@@ -106,7 +106,9 @@ export function ConnectionDialog({
                 actions.saveConnectionAction({
                     id: connection?.id ?? null,
                     name: name.trim(),
-                    engine: (kind === "managed" ? (chosenManaged?.engine ?? engine) : engine) as never,
+                    engine: (kind === "managed"
+                        ? (chosenManaged?.engine ?? engine)
+                        : engine) as never,
                     managedDatabaseId: kind === "managed" ? managedId : null,
                     host: kind === "manual" ? host.trim() : null,
                     port: kind === "manual" ? Number(port) : null,
@@ -257,7 +259,10 @@ export function ConnectionDialog({
                     />
 
                     {error && (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     )}

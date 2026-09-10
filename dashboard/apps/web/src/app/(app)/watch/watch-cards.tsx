@@ -77,7 +77,12 @@ function Sparkline({ points, tone }: { points: { t: number; v: number | null }[]
     if (current.length > 1) runs.push(current.join(" "));
 
     return (
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-10 w-full" aria-hidden="true">
+        <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="h-10 w-full"
+            aria-hidden="true"
+        >
             {runs.map((path, index) => (
                 <path
                     key={index}
@@ -161,7 +166,10 @@ export function WatchCardList({
                         onValueChange={(value) => setOrder(value as ConsumptionOrder)}
                         aria-label={`Sort ${label} by`}
                         className="w-32"
-                        options={ORDERS.map((option) => ({ value: option, label: ORDER_LABELS[option] }))}
+                        options={ORDERS.map((option) => ({
+                            value: option,
+                            label: ORDER_LABELS[option]
+                        }))}
                     />
                 </div>
             ) : null}
@@ -189,9 +197,16 @@ export function WatchCardGrid({ cards, empty }: { cards: WatchCard[]; empty: str
 
 function WatchSubjectCard({ card }: { card: WatchCard }) {
     const Icon = KIND_ICON[card.kind];
-    const dot = card.state === "up" ? "bg-success" : card.state === "down" ? "bg-danger" : "bg-muted-foreground";
+    const dot =
+        card.state === "up"
+            ? "bg-success"
+            : card.state === "down"
+              ? "bg-danger"
+              : "bg-muted-foreground";
     const memShare =
-        card.memUsedBytes != null && card.memTotalBytes ? (card.memUsedBytes / card.memTotalBytes) * 100 : null;
+        card.memUsedBytes != null && card.memTotalBytes
+            ? (card.memUsedBytes / card.memTotalBytes) * 100
+            : null;
 
     return (
         <Link
@@ -204,7 +219,9 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                         <Icon className="size-3.5" />
                     </span>
                     <div className="min-w-0">
-                        <p className="truncate text-sm font-medium group-hover:text-primary">{card.name}</p>
+                        <p className="truncate text-sm font-medium group-hover:text-primary">
+                            {card.name}
+                        </p>
                         <p className="truncate text-xs text-muted-foreground">{card.detail}</p>
                     </div>
                 </div>
@@ -219,7 +236,12 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
 
             <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                    <p className={cn("text-lg font-medium tabular-nums", loadTone(card.cpuPercent))}>
+                    <p
+                        className={cn(
+                            "text-lg font-medium tabular-nums",
+                            loadTone(card.cpuPercent)
+                        )}
+                    >
                         {card.cpuPercent == null ? "-" : `${card.cpuPercent}%`}
                         <span className="ml-1 text-xs font-normal text-muted-foreground">CPU</span>
                     </p>

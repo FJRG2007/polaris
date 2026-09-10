@@ -22,7 +22,11 @@ import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WorldView } from "@/lib/apps/minecraft/world-service";
-import { BACKUP_EVERY_OPTIONS, MAX_KEEP_LAST, type BackupEvery } from "@/lib/apps/minecraft/backup-policy";
+import {
+    BACKUP_EVERY_OPTIONS,
+    MAX_KEEP_LAST,
+    type BackupEvery
+} from "@/lib/apps/minecraft/backup-policy";
 import {
     Archive,
     CalendarClock,
@@ -109,8 +113,18 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
                 container, so a server that cannot be reached is one fact about the
                 page rather than the same sentence printed twice. */}
             <WorldMessage view={view} />
-            <WorldsCard installedAppId={installedAppId} view={view} error={error} onChanged={reload} />
-            <GameServerBackups installedAppId={installedAppId} serverName={name} view={view} onChanged={reload} />
+            <WorldsCard
+                installedAppId={installedAppId}
+                view={view}
+                error={error}
+                onChanged={reload}
+            />
+            <GameServerBackups
+                installedAppId={installedAppId}
+                serverName={name}
+                view={view}
+                onChanged={reload}
+            />
             <BackupScheduleCard installedAppId={installedAppId} view={view} onChanged={reload} />
         </div>
     );
@@ -175,7 +189,12 @@ function WorldsCard({
                         <Sprout className="size-4 text-primary" />
                         World
                     </CardTitle>
-                    <Button size="sm" variant="secondary" onClick={() => setCreating(true)} disabled={view === null}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setCreating(true)}
+                        disabled={view === null}
+                    >
                         New world
                     </Button>
                 </div>
@@ -187,7 +206,9 @@ function WorldsCard({
                     <dl className="flex flex-col gap-1 text-sm">
                         <div className="flex items-baseline justify-between gap-3">
                             <dt className="text-muted-foreground">Playing on</dt>
-                            <dd className="truncate font-mono" title={view.level}>{view.level}</dd>
+                            <dd className="truncate font-mono" title={view.level}>
+                                {view.level}
+                            </dd>
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
                             <dt className="text-muted-foreground">Seed</dt>
@@ -220,7 +241,9 @@ function WorldsCard({
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
                             <dt className="text-muted-foreground">Size</dt>
-                            <dd>{current?.sizeBytes != null ? formatBytes(current.sizeBytes) : "-"}</dd>
+                            <dd>
+                                {current?.sizeBytes != null ? formatBytes(current.sizeBytes) : "-"}
+                            </dd>
                         </div>
                     </dl>
                 )}
@@ -238,9 +261,13 @@ function WorldsCard({
                                 className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
                             >
                                 <div className="min-w-0">
-                                    <p className="truncate font-mono" title={entry.level}>{entry.level}</p>
+                                    <p className="truncate font-mono" title={entry.level}>
+                                        {entry.level}
+                                    </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {entry.sizeBytes != null ? formatBytes(entry.sizeBytes) : "Size unknown"}
+                                        {entry.sizeBytes != null
+                                            ? formatBytes(entry.sizeBytes)
+                                            : "Size unknown"}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -371,7 +398,10 @@ function NewWorldDialog({
                                 }))}
                             />
                             <span className="text-xs text-muted-foreground">
-                                {world.LEVEL_TYPES.find((entry) => entry.value === levelType)?.detail}
+                                {
+                                    world.LEVEL_TYPES.find((entry) => entry.value === levelType)
+                                        ?.detail
+                                }
                             </span>
                         </label>
                     )}
@@ -382,10 +412,14 @@ function NewWorldDialog({
                             <Select
                                 value={biome}
                                 onValueChange={setBiome}
-                                options={world.BIOMES.map((entry) => ({ value: entry.value, label: entry.label }))}
+                                options={world.BIOMES.map((entry) => ({
+                                    value: entry.value,
+                                    label: entry.label
+                                }))}
                             />
                             <span className="text-xs text-muted-foreground">
-                                The whole overworld is this one biome. The Nether and the End are unchanged.
+                                The whole overworld is this one biome. The Nether and the End are
+                                unchanged.
                             </span>
                         </label>
                     )}
@@ -415,8 +449,8 @@ function NewWorldDialog({
                     <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span className="text-muted-foreground">
-                            The server restarts to generate it, so anybody playing is disconnected. The map it is on now
-                            is kept and you can switch back to it.
+                            The server restarts to generate it, so anybody playing is disconnected.
+                            The map it is on now is kept and you can switch back to it.
                         </span>
                     </p>
 
@@ -515,16 +549,23 @@ export function GameServerBackups({
                             <Badge variant="neutral">{view.backups.length}</Badge>
                         )}
                     </CardTitle>
-                    <Button size="sm" onClick={() => void backUp()} disabled={busy !== null || view === null}>
-                        <HardDriveDownload className={cn("size-4", busy === "new" && "animate-pulse")} />
+                    <Button
+                        size="sm"
+                        onClick={() => void backUp()}
+                        disabled={busy !== null || view === null}
+                    >
+                        <HardDriveDownload
+                            className={cn("size-4", busy === "new" && "animate-pulse")}
+                        />
                         {busy === "new" ? "Backing up..." : "Back up now"}
                     </Button>
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    A copy of the world kept on the server&apos;s own disk, taken with saving paused so it is not caught
-                    mid-write. That covers a mistake, not a dead disk - download the ones that matter.
+                    A copy of the world kept on the server&apos;s own disk, taken with saving paused
+                    so it is not caught mid-write. That covers a mistake, not a dead disk - download
+                    the ones that matter.
                 </p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
@@ -544,13 +585,23 @@ export function GameServerBackups({
                                 className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
                             >
                                 <div className="min-w-0">
-                                    <p className="truncate" title={format.dateTime(backup.createdAt)}>
+                                    <p
+                                        className="truncate"
+                                        title={format.dateTime(backup.createdAt)}
+                                    >
                                         {format.dateTime(backup.createdAt)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{formatBytes(backup.sizeBytes)}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {formatBytes(backup.sizeBytes)}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <Button size="icon" variant="ghost" asChild aria-label="Download this backup">
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        asChild
+                                        aria-label="Download this backup"
+                                    >
                                         <Link
                                             href={`/api/apps/installed/${installedAppId}/minecraft/world/${encodeURIComponent(backup.name)}`}
                                             title="Download this backup"
@@ -636,8 +687,9 @@ function RestoreDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <p className="text-sm text-muted-foreground">
-                        {serverName} restarts onto the world in this backup, so anybody playing is disconnected. The map
-                        it is on now is kept as it is - if this was the wrong backup, switch back to it under World.
+                        {serverName} restarts onto the world in this backup, so anybody playing is
+                        disconnected. The map it is on now is kept as it is - if this was the wrong
+                        backup, switch back to it under World.
                     </p>
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
@@ -759,7 +811,9 @@ function BackupScheduleCard({
                                     min={0}
                                     max={MAX_KEEP_LAST}
                                     value={keepLast}
-                                    onChange={(event) => setKeepLast(Math.max(0, Number(event.target.value) || 0))}
+                                    onChange={(event) =>
+                                        setKeepLast(Math.max(0, Number(event.target.value) || 0))
+                                    }
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     {keepLast > 0
@@ -777,7 +831,12 @@ function BackupScheduleCard({
                                 placeholder="No limit"
                                 inputMode="decimal"
                             />
-                            <span className={cn("text-xs", budgetError ? "text-danger" : "text-muted-foreground")}>
+                            <span
+                                className={cn(
+                                    "text-xs",
+                                    budgetError ? "text-danger" : "text-muted-foreground"
+                                )}
+                            >
                                 {budgetError ??
                                     `In gigabytes. The oldest go as the total approaches it${
                                         view.backups.length > 0
@@ -796,8 +855,8 @@ function BackupScheduleCard({
                             <span className="flex flex-col gap-0.5">
                                 <span className="font-medium">Tell me if one fails</span>
                                 <span className="text-xs text-muted-foreground">
-                                    A notification when a scheduled copy could not be taken. A server that is simply
-                                    stopped is skipped quietly.
+                                    A notification when a scheduled copy could not be taken. A
+                                    server that is simply stopped is skipped quietly.
                                 </span>
                             </span>
                         </label>

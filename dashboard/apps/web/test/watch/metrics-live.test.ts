@@ -8,13 +8,21 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { metricTickStream, publishMetricTick, subjectKey, subscribeMetricTicks } from "@/lib/metrics-live";
+import {
+    metricTickStream,
+    publishMetricTick,
+    subjectKey,
+    subscribeMetricTicks
+} from "@/lib/metrics-live";
 
 const APP = "0192f6a0-0000-7000-8000-0000000000bb";
 const OTHER = "0192f6a0-0000-7000-8000-0000000000cc";
 const VOLUME = "0192f6a0-0000-7000-8000-0000000000dd";
 
-async function readSome(reader: ReadableStreamDefaultReader<Uint8Array>, until: string): Promise<string> {
+async function readSome(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    until: string
+): Promise<string> {
     const decoder = new TextDecoder();
     let text = "";
     while (!text.includes(until)) {
@@ -60,10 +68,10 @@ describe("the metric bus", () => {
 describe("a chart's stream", () => {
     it("says ready, then tick for its own subjects and nothing for others", async () => {
         const abort = new AbortController();
-        const response = metricTickStream(new Request("http://polaris.test/stream", { signal: abort.signal }), [
-            subjectKey("app", APP),
-            subjectKey("volume", VOLUME)
-        ]);
+        const response = metricTickStream(
+            new Request("http://polaris.test/stream", { signal: abort.signal }),
+            [subjectKey("app", APP), subjectKey("volume", VOLUME)]
+        );
         expect(response.headers.get("content-type")).toContain("text/event-stream");
         const reader = (response.body as ReadableStream<Uint8Array>).getReader();
         expect(await readSome(reader, "event: ready")).toContain("event: ready");

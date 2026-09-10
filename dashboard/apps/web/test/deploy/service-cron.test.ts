@@ -54,7 +54,8 @@ const matches = (row: Record<string, unknown>, where: Record<string, unknown>): 
             if (cond.lte) return value instanceof Date && value <= cond.lte;
             if (cond.gt) return value instanceof Date && value > cond.gt;
         }
-        if (wanted instanceof Date) return value instanceof Date && value.getTime() === wanted.getTime();
+        if (wanted instanceof Date)
+            return value instanceof Date && value.getTime() === wanted.getTime();
         return value === wanted;
     });
 
@@ -63,7 +64,13 @@ vi.mock("@polaris/db", () => ({
         serviceCron: {
             findMany: async ({ where }: { where: { OR: Record<string, unknown>[] } }) =>
                 crons.filter((row) => where.OR.some((one) => matches(row as never, one))),
-            updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<CronRow> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Partial<CronRow>;
+            }) => {
                 const hit = crons.filter((row) => matches(row as never, where));
                 for (const row of hit) Object.assign(row, data);
                 return { count: hit.length };
@@ -115,7 +122,9 @@ vi.mock("@polaris/db", () => ({
                             currentDeploymentId: appRunning ? "d1" : null,
                             desiredState: "running",
                             target: { kind: "local" },
-                            environment: { project: { id: "p1", name: "Shop", slug: "shop", ownerId: "u1" } }
+                            environment: {
+                                project: { id: "p1", name: "Shop", slug: "shop", ownerId: "u1" }
+                            }
                         }
                     }
                 };
@@ -130,7 +139,9 @@ vi.mock("@/lib/deploy/runtime", () => ({
         dispose: async () => undefined
     })
 }));
-vi.mock("@/lib/deploy/releases", () => ({ currentReleaseRef: async () => ({ name: "shop-web-1a2b" }) }));
+vi.mock("@/lib/deploy/releases", () => ({
+    currentReleaseRef: async () => ({ name: "shop-web-1a2b" })
+}));
 vi.mock("@/lib/notifications/dispatch", () => ({
     notify: async (input: { title: string }) => {
         notified.push(input.title);
@@ -200,7 +211,10 @@ describe("a due job", () => {
                 finishedAt: null
             }
         ];
-        expect(await tickServiceCrons(new Date("2026-09-10T10:00:30Z"))).toEqual({ started: 0, skipped: 1 });
+        expect(await tickServiceCrons(new Date("2026-09-10T10:00:30Z"))).toEqual({
+            started: 0,
+            skipped: 1
+        });
         expect(runs.at(-1)).toMatchObject({ status: "skipped" });
     });
 });

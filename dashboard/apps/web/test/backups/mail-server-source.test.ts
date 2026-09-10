@@ -23,8 +23,16 @@ const { calls, ports, exitCode } = vi.hoisted(() => {
                 ? {
                       Config: { Image: "stalwartlabs/stalwart:v0.16" },
                       Mounts: [
-                          { Type: "volume", Name: "polaris-abc_stalwart-config", Destination: "/etc/stalwart" },
-                          { Type: "volume", Name: "polaris-abc_stalwart-data", Destination: "/var/lib/stalwart" }
+                          {
+                              Type: "volume",
+                              Name: "polaris-abc_stalwart-config",
+                              Destination: "/etc/stalwart"
+                          },
+                          {
+                              Type: "volume",
+                              Name: "polaris-abc_stalwart-data",
+                              Destination: "/var/lib/stalwart"
+                          }
                       ]
                   }
                 : { State: { Status: "exited", ExitCode: exitCode.value } }
@@ -33,11 +41,22 @@ const { calls, ports, exitCode } = vi.hoisted(() => {
             calls.push(`runIn ${argv.join(" ").slice(0, 40)}`);
             return { code: 0, output: "" };
         }),
-        container: vi.fn(async (ref: string, action: string) => void calls.push(`${action} ${ref}`)),
-        composeUp: vi.fn(async (spec: { project: string }) => void calls.push(`up ${spec.project}`)),
+        container: vi.fn(
+            async (ref: string, action: string) => void calls.push(`${action} ${ref}`)
+        ),
+        composeUp: vi.fn(
+            async (spec: { project: string }) => void calls.push(`up ${spec.project}`)
+        ),
         composeDown: vi.fn(async (project: string) => void calls.push(`down ${project}`)),
-        logs: vi.fn(async (_ref: string, onData: (chunk: Buffer) => void) => onData(Buffer.from("store is locked"))),
-        readFile: vi.fn(async () => Readable.toWeb(Readable.from([Buffer.from("tar bytes")])) as ReadableStream<Uint8Array>),
+        logs: vi.fn(async (_ref: string, onData: (chunk: Buffer) => void) =>
+            onData(Buffer.from("store is locked"))
+        ),
+        readFile: vi.fn(
+            async () =>
+                Readable.toWeb(
+                    Readable.from([Buffer.from("tar bytes")])
+                ) as ReadableStream<Uint8Array>
+        ),
         dispose: vi.fn(async () => undefined)
     };
     return { calls, ports, exitCode };
@@ -46,7 +65,11 @@ const { calls, ports, exitCode } = vi.hoisted(() => {
 vi.mock("@polaris/db", () => ({
     prisma: {
         mailServer: {
-            findUnique: async () => ({ id: SERVER, hostname: "mail.example.com", applicationId: APP })
+            findUnique: async () => ({
+                id: SERVER,
+                hostname: "mail.example.com",
+                applicationId: APP
+            })
         },
         application: {
             findUnique: async () => ({
@@ -58,7 +81,9 @@ vi.mock("@polaris/db", () => ({
         }
     }
 }));
-vi.mock("@/lib/deploy/releases", () => ({ currentReleaseRef: async () => ({ name: "mail-engine" }) }));
+vi.mock("@/lib/deploy/releases", () => ({
+    currentReleaseRef: async () => ({ name: "mail-engine" })
+}));
 vi.mock("@/lib/deploy/runtime", () => ({ getPorts: async () => ports }));
 
 const source = await import("@/lib/backups/sources/mail-server");
@@ -86,8 +111,13 @@ describe("the mail server's copy", () => {
         expect(stop).toBeGreaterThan(-1);
         expect(up).toBeGreaterThan(stop);
         expect(start).toBeGreaterThan(up);
-        const spec = ports.composeUp.mock.calls[0]?.[0] as ReturnType<typeof source.maintenanceSpec>;
-        expect(spec.externalVolumes).toEqual(["polaris-abc_stalwart-config", "polaris-abc_stalwart-data"]);
+        const spec = ports.composeUp.mock.calls[0]?.[0] as ReturnType<
+            typeof source.maintenanceSpec
+        >;
+        expect(spec.externalVolumes).toEqual([
+            "polaris-abc_stalwart-config",
+            "polaris-abc_stalwart-data"
+        ]);
         expect(spec.services[0]?.command).toEqual([
             "--config",
             "/etc/stalwart/config.json",
@@ -106,7 +136,9 @@ describe("the mail server's copy", () => {
     });
 
     it("refuses to restore something that is not an export", async () => {
-        const body = Readable.toWeb(Readable.from([Buffer.from("x")])) as ReadableStream<Uint8Array>;
+        const body = Readable.toWeb(
+            Readable.from([Buffer.from("x")])
+        ) as ReadableStream<Uint8Array>;
         await expect(
             source.mailServerSource.restore!(resource, body, { format: "tar" }, "actor")
         ).rejects.toThrow(/not an export/);
@@ -115,7 +147,12 @@ describe("the mail server's copy", () => {
 
 describe("the pieces", () => {
     it("finds a volume by where it is mounted", () => {
-        const inspect = { Mounts: [{ Type: "bind", Name: "x", Destination: "/data" }, { Type: "volume", Name: "v", Destination: "/data" }] };
+        const inspect = {
+            Mounts: [
+                { Type: "bind", Name: "x", Destination: "/data" },
+                { Type: "volume", Name: "v", Destination: "/data" }
+            ]
+        };
         expect(source.volumeAt(inspect, "/data")).toBe("v");
         expect(source.volumeAt(inspect, "/other")).toBeNull();
         expect(source.volumeAt(null, "/data")).toBeNull();
@@ -125,7 +162,9 @@ describe("the pieces", () => {
         const script = source.restoreScript();
         expect(script).toContain("--import '/var/lib/stalwart/.polaris-import'");
         expect(script).toMatch(/then rm -rf \.polaris-before-restore; exit 0; fi/);
-        expect(script).toContain("find .polaris-before-restore -mindepth 1 -maxdepth 1 -exec mv -t . -- {} +");
+        expect(script).toContain(
+            "find .polaris-before-restore -mindepth 1 -maxdepth 1 -exec mv -t . -- {} +"
+        );
         expect(script.split("\n").at(-1)).toBe("exit 1");
     });
 });

@@ -32,7 +32,10 @@ describe("a database's extra mounts", () => {
     });
 
     it("binds an archive folder under the volume root without declaring it a volume", () => {
-        const spec = dbComposeSpec(plan([{ source: "pitr/db-1", target: "/polaris-pitr", kind: "bind" }]), NETWORK);
+        const spec = dbComposeSpec(
+            plan([{ source: "pitr/db-1", target: "/polaris-pitr", kind: "bind" }]),
+            NETWORK
+        );
         expect(spec.volumes).toEqual(["postgres-data-abcd1234"]);
         const yaml = renderComposeYaml(spec, "/var/lib/polaris/volumes", "/mnt");
         expect(yaml).toContain("/var/lib/polaris/volumes/pitr/db-1:/polaris-pitr");
@@ -40,7 +43,10 @@ describe("a database's extra mounts", () => {
     });
 
     it("declares an extra named volume so compose creates it", () => {
-        const spec = dbComposeSpec(plan([{ source: "cache-data", target: "/cache", kind: "volume" }]), NETWORK);
+        const spec = dbComposeSpec(
+            plan([{ source: "cache-data", target: "/cache", kind: "volume" }]),
+            NETWORK
+        );
         expect(spec.volumes).toEqual(["postgres-data-abcd1234", "cache-data"]);
     });
 });

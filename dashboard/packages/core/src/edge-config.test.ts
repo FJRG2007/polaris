@@ -25,7 +25,15 @@ describe("hostnames a service can be reached on", () => {
     });
 
     it("refuses anything that could break the rule it is written into", () => {
-        for (const bad of ["app`.example.com", 'a".example.com', "a b.example.com", "-a.example.com", "*.com", "a.*.example.com", ""]) {
+        for (const bad of [
+            "app`.example.com",
+            'a".example.com',
+            "a b.example.com",
+            "-a.example.com",
+            "*.com",
+            "a.*.example.com",
+            ""
+        ]) {
             expect(normalizeDeployHostname(bad), bad).toBeNull();
         }
     });
@@ -53,7 +61,10 @@ describe("the stored edge config", () => {
                     { average: -1, burst: 5 },
                     { path: "no-slash", average: 5, burst: 5 }
                 ],
-                redirects: [{ kind: "regex", regex: "^http://(.*)$", replacement: "https://${1}" }, { kind: "regex", regex: "(?=x)", replacement: "y" }],
+                redirects: [
+                    { kind: "regex", regex: "^http://(.*)$", replacement: "https://${1}" },
+                    { kind: "regex", regex: "(?=x)", replacement: "y" }
+                ],
                 challenge: "sometimes"
             })
         );
@@ -64,20 +75,26 @@ describe("the stored edge config", () => {
 
     it("refuses a header value that could close the quoted string it is written into", () => {
         const config = parseAppEdgeConfig(
-            JSON.stringify({ headers: { preset: "off", custom: [{ name: "X-Test", value: 'a"b' }] } })
+            JSON.stringify({
+                headers: { preset: "off", custom: [{ name: "X-Test", value: 'a"b' }] }
+            })
         );
         expect(config.headers.custom).toEqual([]);
     });
 
     it("refuses Go-incompatible patterns, which the edge would fail to load", () => {
         const config = parseAppEdgeConfig(
-            JSON.stringify({ rewrites: [{ kind: "replace-path", regex: "^/(a)\\1", replacement: "/b" }] })
+            JSON.stringify({
+                rewrites: [{ kind: "replace-path", regex: "^/(a)\\1", replacement: "/b" }]
+            })
         );
         expect(config.rewrites).toEqual([]);
     });
 
     it("needs a header to count by before a token limit is kept", () => {
-        const config = parseAppEdgeConfig(JSON.stringify({ rateLimits: [{ average: 5, burst: 5, key: "header" }] }));
+        const config = parseAppEdgeConfig(
+            JSON.stringify({ rateLimits: [{ average: 5, burst: 5, key: "header" }] })
+        );
         expect(config.rateLimits).toEqual([]);
     });
 });
@@ -99,14 +116,20 @@ describe("security headers", () => {
 
     it("sends the isolation set when strict", () => {
         const headers = securityHeaderMap({ preset: "strict", custom: [] });
-        expect(headers["Strict-Transport-Security"]).toBe("max-age=63072000; includeSubDomains; preload");
+        expect(headers["Strict-Transport-Security"]).toBe(
+            "max-age=63072000; includeSubDomains; preload"
+        );
         expect(headers["Cross-Origin-Opener-Policy"]).toBe("same-origin");
         expect(headers["Cross-Origin-Embedder-Policy"]).toBe("require-corp");
         expect(headers["Content-Security-Policy"]).toContain("default-src 'self'");
     });
 
     it("lets one header be switched off without losing the preset", () => {
-        const headers = securityHeaderMap({ preset: "strict", crossOriginEmbedderPolicy: "", custom: [] });
+        const headers = securityHeaderMap({
+            preset: "strict",
+            crossOriginEmbedderPolicy: "",
+            custom: []
+        });
         expect(headers["Cross-Origin-Embedder-Policy"]).toBeUndefined();
         expect(headers["Cross-Origin-Opener-Policy"]).toBe("same-origin");
     });
@@ -122,9 +145,14 @@ describe("security headers", () => {
 
 describe("telling a flood from a busy day", () => {
     const now = Date.parse("2026-09-10T12:00:00Z");
-    const at = (msAgo: number, host: string) => ({ time: new Date(now - msAgo).toISOString(), host });
+    const at = (msAgo: number, host: string) => ({
+        time: new Date(now - msAgo).toISOString(),
+        host
+    });
     const minute = (count: number, minutesAgo: number, host: string) =>
-        Array.from({ length: count }, (_, index) => at(minutesAgo * 60_000 + 1000 + (index % 50) * 100, host));
+        Array.from({ length: count }, (_, index) =>
+            at(minutesAgo * 60_000 + 1000 + (index % 50) * 100, host)
+        );
 
     it("flags a host whose last minute dwarfs its usual one", () => {
         const entries = [

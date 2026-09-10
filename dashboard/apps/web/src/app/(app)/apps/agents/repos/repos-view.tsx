@@ -51,7 +51,8 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
             {repos.length === 0 ? (
                 <Card>
                     <CardBody className="py-10 text-sm text-muted-foreground">
-                        No repositories yet. Add one and the agent starts answering when it is mentioned there.
+                        No repositories yet. Add one and the agent starts answering when it is
+                        mentioned there.
                     </CardBody>
                 </Card>
             ) : (
@@ -60,9 +61,15 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
-                                    <th className="w-full max-w-0 px-4 py-2 font-medium">Repository</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">Runs on</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">Model</th>
+                                    <th className="w-full max-w-0 px-4 py-2 font-medium">
+                                        Repository
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        Runs on
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        Model
+                                    </th>
                                     <th className="px-4 py-2" />
                                 </tr>
                             </thead>
@@ -85,7 +92,11 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     </Badge>
                                                 ) : null}
                                             </div>
-                                            {repo.error ? <p className="mt-1 text-xs text-danger">{repo.error}</p> : null}
+                                            {repo.error ? (
+                                                <p className="mt-1 text-xs text-danger">
+                                                    {repo.error}
+                                                </p>
+                                            ) : null}
                                         </td>
                                         <td
                                             className="whitespace-nowrap px-4 py-3 text-muted-foreground"
@@ -93,7 +104,9 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                         >
                                             {AGENT_EXECUTION_LABELS[repo.execution]}
                                             {repo.poolName ? (
-                                                <span className="ml-1 text-xs">({repo.poolName})</span>
+                                                <span className="ml-1 text-xs">
+                                                    ({repo.poolName})
+                                                </span>
                                             ) : null}
                                             {/* The two GitHub-scheduled executions need a file in the
                                                 repository, and whether it is there is the difference
@@ -120,13 +133,19 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                 </a>
                                             ) : null}
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{repo.model}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                                            {repo.model}
+                                        </td>
                                         <td className="whitespace-nowrap px-4 py-3">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Switch
                                                     checked={repo.enabled}
                                                     onChange={(next: boolean) => toggle(repo, next)}
-                                                    aria-label={repo.enabled ? "Turn the agent off" : "Turn the agent on"}
+                                                    aria-label={
+                                                        repo.enabled
+                                                            ? "Turn the agent off"
+                                                            : "Turn the agent on"
+                                                    }
                                                 />
                                                 <Button
                                                     variant="ghost"

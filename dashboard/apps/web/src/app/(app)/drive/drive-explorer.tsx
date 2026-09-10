@@ -330,7 +330,8 @@ export function DriveExplorer({
      *  is not something anybody can act on: what has to be fixed depends on which
      *  address was tried. */
     const downEndpoint =
-        (connectionId && reachability?.find((entry) => entry.id === connectionId)?.endpoint) || null;
+        (connectionId && reachability?.find((entry) => entry.id === connectionId)?.endpoint) ||
+        null;
     const unreachable = downReason(connectionId);
     /** Whether the source being looked at is the machine Polaris runs on. It
      *  changes what the failure means and what is worth offering about it. */
@@ -984,9 +985,7 @@ export function DriveExplorer({
                             <p className="text-xs text-muted-foreground">
                                 {driveJobSummary({ ...job, startedAt: job.startedAt }, tick)}
                             </p>
-                            {job.error ? (
-                                <p className="text-xs text-danger">{job.error}</p>
-                            ) : null}
+                            {job.error ? <p className="text-xs text-danger">{job.error}</p> : null}
                         </div>
                     ))}
                 </div>
@@ -1478,7 +1477,9 @@ function UnreachableServer({
                         different answer, and saying the first sends somebody to
                         check a machine that is plainly fine. */}
                     <h3 className="text-sm font-medium">
-                        {local ? `Polaris cannot reach ${name} from inside itself` : `${name} is not answering`}
+                        {local
+                            ? `Polaris cannot reach ${name} from inside itself`
+                            : `${name} is not answering`}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                         {local

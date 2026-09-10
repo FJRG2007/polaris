@@ -95,12 +95,17 @@ export function KeysPanel() {
             return;
         }
         setPasted("");
-        setNote(result.added ? "Added. Copies sealed with it now open here." : "That key was already here.");
+        setNote(
+            result.added
+                ? "Added. Copies sealed with it now open here."
+                : "That key was already here."
+        );
         await load();
     }
 
     const trimmed = pasted.trim();
-    const pastedProblem = trimmed && !RECOVERY_SHAPE.test(trimmed) ? "That does not look like a recovery key" : null;
+    const pastedProblem =
+        trimmed && !RECOVERY_SHAPE.test(trimmed) ? "That does not look like a recovery key" : null;
 
     return (
         <div className="flex flex-col gap-3">
@@ -108,11 +113,17 @@ export function KeysPanel() {
                 <CardBody className="flex flex-col gap-3 text-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <p className="max-w-prose text-muted-foreground">
-                            Copies are encrypted before they leave, with this account&apos;s backup key. Keep each
-                            key&apos;s recovery key somewhere other than this Polaris: without it, the copies cannot
-                            be opened once this Polaris is gone.
+                            Copies are encrypted before they leave, with this account&apos;s backup
+                            key. Keep each key&apos;s recovery key somewhere other than this
+                            Polaris: without it, the copies cannot be opened once this Polaris is
+                            gone.
                         </p>
-                        <Button size="sm" variant="secondary" onClick={() => setRotating(true)} disabled={keys === null}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setRotating(true)}
+                            disabled={keys === null}
+                        >
                             <RefreshCw className="size-4" /> New key
                         </Button>
                     </div>
@@ -122,11 +133,16 @@ export function KeysPanel() {
                             <Skeleton className="h-10 w-full" />
                         </div>
                     ) : keys.length === 0 ? (
-                        <p className="text-muted-foreground">No key yet. One is made with the first backup.</p>
+                        <p className="text-muted-foreground">
+                            No key yet. One is made with the first backup.
+                        </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {keys.map((key) => (
-                                <li key={key.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                                <li
+                                    key={key.id}
+                                    className="flex flex-wrap items-center gap-2 px-3 py-2"
+                                >
                                     <KeyRound className="size-4 text-muted-foreground" />
                                     <code className="text-xs">{key.id.slice(0, 8)}</code>
                                     {key.retiredAt ? (
@@ -145,8 +161,10 @@ export function KeysPanel() {
                                         disabled={revealing !== null}
                                         onClick={() => void reveal(key.id)}
                                     >
-                                        {revealing === key.id && <Loader2 className="size-4 animate-spin" />} Recovery
-                                        key
+                                        {revealing === key.id && (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        )}{" "}
+                                        Recovery key
                                     </Button>
                                 </li>
                             ))}
@@ -205,13 +223,19 @@ export function KeysPanel() {
                     <DialogHeader>
                         <DialogTitle>Recovery key</DialogTitle>
                         <DialogDescription>
-                            Opens every copy this key sealed. Keep it in a password manager, not on this machine.
+                            Opens every copy this key sealed. Keep it in a password manager, not on
+                            this machine.
                         </DialogDescription>
                     </DialogHeader>
                     {revealed && (
                         <div className="flex items-center gap-2 rounded-md border border-border p-2">
-                            <code className="min-w-0 flex-1 break-all text-xs">{revealed.recoveryKey}</code>
-                            <CopyButton value={revealed.recoveryKey} label="Copy the recovery key" />
+                            <code className="min-w-0 flex-1 break-all text-xs">
+                                {revealed.recoveryKey}
+                            </code>
+                            <CopyButton
+                                value={revealed.recoveryKey}
+                                label="Copy the recovery key"
+                            />
                         </div>
                     )}
                 </DialogContent>

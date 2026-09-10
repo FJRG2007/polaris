@@ -62,7 +62,9 @@ function defaultPresets(scopeType: WafScopeType): string[] {
 function parseList(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((v): v is string => typeof v === "string")
+            : [];
     } catch {
         return [];
     }
@@ -240,7 +242,9 @@ const DEFAULT_POLARIS_ROW: RuleRow = {
 /** The rows to merge, standing in the instance defaults when the global scope has
  *  never been written. An existing row always wins, empty packs included. */
 function withInstanceDefaults(rows: readonly RuleRow[]): RuleRow[] {
-    return rows.some((row) => row.scopeType === "global") ? [...rows] : [DEFAULT_GLOBAL_ROW, ...rows];
+    return rows.some((row) => row.scopeType === "global")
+        ? [...rows]
+        : [DEFAULT_GLOBAL_ROW, ...rows];
 }
 
 /**
@@ -318,9 +322,13 @@ export async function resolvePolarisWaf(): Promise<ResolvedWaf> {
  * on instances with many domains. Every id in the input maps to a decision - an
  * unknown id gets the empty decision, so lookups never miss.
  */
-export async function resolveWafBatch(applicationIds: readonly string[]): Promise<Map<string, ResolvedWaf>> {
+export async function resolveWafBatch(
+    applicationIds: readonly string[]
+): Promise<Map<string, ResolvedWaf>> {
     const ids = [...new Set(applicationIds)];
-    const result = new Map<string, ResolvedWaf>(ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF]));
+    const result = new Map<string, ResolvedWaf>(
+        ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF])
+    );
     if (ids.length === 0) return result;
     const apps = await prisma.application.findMany({
         where: { id: { in: ids } },
@@ -368,7 +376,11 @@ export async function resolveWafBatch(applicationIds: readonly string[]): Promis
         const hostId = app.target?.hostId ?? null;
         const applicable = [
             ...globalRows,
-            ...(hostId ? (groupsByHost.get(hostId) ?? []).flatMap((id) => byScope.get(`server-group:${id}`) ?? []) : []),
+            ...(hostId
+                ? (groupsByHost.get(hostId) ?? []).flatMap(
+                      (id) => byScope.get(`server-group:${id}`) ?? []
+                  )
+                : []),
             ...(hostId ? (byScope.get(`server:${hostId}`) ?? []) : []),
             ...(byScope.get(`project:${app.environment.projectId}`) ?? []),
             ...(byScope.get(`environment:${app.environmentId}`) ?? []),
@@ -403,7 +415,11 @@ export interface WafRuleView {
  * `system.manage` (not the member-held `deploy.manage`) - so ownership always passes
  * here for them.
  */
-async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeId: string): Promise<void> {
+async function assertScopeOwner(
+    ownerId: string,
+    scopeType: WafScopeType,
+    scopeId: string
+): Promise<void> {
     if (scopeType === "global" || scopeType === "polaris") return;
     if (scopeType === "project") {
         if ((await prisma.project.count({ where: { id: scopeId, ownerId } })) === 0) {
@@ -412,7 +428,9 @@ async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeI
         return;
     }
     if (scopeType === "environment") {
-        if ((await prisma.environment.count({ where: { id: scopeId, project: { ownerId } } })) === 0) {
+        if (
+            (await prisma.environment.count({ where: { id: scopeId, project: { ownerId } } })) === 0
+        ) {
             throw new Error("Environment not found");
         }
         return;
@@ -429,7 +447,11 @@ async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeI
         }
         return;
     }
-    if ((await prisma.application.count({ where: { id: scopeId, environment: { project: { ownerId } } } })) === 0) {
+    if (
+        (await prisma.application.count({
+            where: { id: scopeId, environment: { project: { ownerId } } }
+        })) === 0
+    ) {
         throw new Error("Service not found");
     }
 }

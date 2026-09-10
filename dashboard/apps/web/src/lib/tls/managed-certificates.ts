@@ -95,7 +95,13 @@ async function syncWanted(): Promise<void> {
                     select: {
                         environment: {
                             select: {
-                                project: { select: { ownerId: true, orgId: true, owner: { select: { isAdmin: true } } } }
+                                project: {
+                                    select: {
+                                        ownerId: true,
+                                        orgId: true,
+                                        owner: { select: { isAdmin: true } }
+                                    }
+                                }
                             }
                         }
                     }
@@ -126,12 +132,17 @@ async function syncWanted(): Promise<void> {
     });
     const byDomain = new Map(wanted.map((entry) => [entry.domain, entry]));
     const gone = existing.filter((row) => !byDomain.has(row.domain)).map((row) => row.id);
-    if (gone.length > 0) await prisma.managedCertificate.deleteMany({ where: { id: { in: gone } } });
+    if (gone.length > 0)
+        await prisma.managedCertificate.deleteMany({ where: { id: { in: gone } } });
     for (const entry of wanted) {
         const row = existing.find((candidate) => candidate.domain === entry.domain);
         if (!row) {
             await prisma.managedCertificate.create({
-                data: { domain: entry.domain, source: entry.source, ownerDomainId: entry.ownerDomainId }
+                data: {
+                    domain: entry.domain,
+                    source: entry.source,
+                    ownerDomainId: entry.ownerDomainId
+                }
             });
         } else if (row.source !== entry.source || row.ownerDomainId !== entry.ownerDomainId) {
             await prisma.managedCertificate.update({
@@ -284,7 +295,10 @@ export function requestManagedCertificates(): void {
 
 /** Clear the wait on an owner domain's certificate, so the next pass orders it. */
 export async function retryOwnerDomainCertificate(ownerDomainId: string): Promise<void> {
-    await prisma.managedCertificate.updateMany({ where: { ownerDomainId }, data: { nextAttemptAt: null } });
+    await prisma.managedCertificate.updateMany({
+        where: { ownerDomainId },
+        data: { nextAttemptAt: null }
+    });
     requestManagedCertificates();
 }
 
@@ -315,7 +329,15 @@ async function servable(): Promise<Servable[]> {
     return rows.flatMap((row) => {
         const keyPem = openText(row.certKey);
         return row.certPem && keyPem
-            ? [{ id: row.id, domain: row.domain, certPem: row.certPem, keyPem, holder: row.ownerDomain ?? null }]
+            ? [
+                  {
+                      id: row.id,
+                      domain: row.domain,
+                      certPem: row.certPem,
+                      keyPem,
+                      holder: row.ownerDomain ?? null
+                  }
+              ]
             : [];
     });
 }
@@ -379,7 +401,13 @@ async function pushRemoteCertificates(): Promise<void> {
                         target: { select: { hostId: true, host: { select: { ownerId: true } } } },
                         environment: {
                             select: {
-                                project: { select: { ownerId: true, orgId: true, owner: { select: { isAdmin: true } } } }
+                                project: {
+                                    select: {
+                                        ownerId: true,
+                                        orgId: true,
+                                        owner: { select: { isAdmin: true } }
+                                    }
+                                }
                             }
                         }
                     }
@@ -409,10 +437,14 @@ async function pushRemoteCertificates(): Promise<void> {
     ]);
     for (const [hostId, held] of hosts) {
         const given = certificates
-            .filter((certificate) => held.names.some((name) => mayHandCertificate(certificate, name)))
+            .filter((certificate) =>
+                held.names.some((name) => mayHandCertificate(certificate, name))
+            )
             .map(({ id, domain, certPem, keyPem }) => ({ id, domain, certPem, keyPem }));
         const fingerprint = createHash("sha256")
-            .update(given.map((certificate) => `${certificate.id}:${certificate.certPem}`).join("\n"))
+            .update(
+                given.map((certificate) => `${certificate.id}:${certificate.certPem}`).join("\n")
+            )
             .digest("hex");
         if ((await getSetting(pushedKey(hostId))) === fingerprint) continue;
         try {
@@ -445,11 +477,19 @@ export interface ManagedCertificateView {
 }
 
 /** The certificate each of these owner domains has, by owner domain id. */
-export async function ownerDomainCertificates(ids: readonly string[]): Promise<Map<string, ManagedCertificateView>> {
+export async function ownerDomainCertificates(
+    ids: readonly string[]
+): Promise<Map<string, ManagedCertificateView>> {
     if (ids.length === 0) return new Map();
     const rows = await prisma.managedCertificate.findMany({
         where: { ownerDomainId: { in: [...ids] }, source: "owner" },
-        select: { ownerDomainId: true, status: true, expiresAt: true, nextAttemptAt: true, detail: true }
+        select: {
+            ownerDomainId: true,
+            status: true,
+            expiresAt: true,
+            nextAttemptAt: true,
+            detail: true
+        }
     });
     return new Map(
         rows.flatMap((row) =>

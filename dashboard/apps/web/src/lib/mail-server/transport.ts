@@ -45,7 +45,8 @@ export async function endpointFor(applicationId: string): Promise<MailEndpoint> 
     const port = hostPortForApp(app.id);
     if (app.target.kind === "local" || !app.target.hostId) {
         const host = await localDialHost();
-        if (!host) throw new MailServerUnreachable("Polaris does not know this machine's address yet.");
+        if (!host)
+            throw new MailServerUnreachable("Polaris does not know this machine's address yet.");
         return { kind: "local", host, port };
     }
     return { kind: "remote", hostId: app.target.hostId, port };
@@ -89,7 +90,9 @@ export async function send(endpoint: MailEndpoint, request: MailRequest): Promis
         auth: connection.auth,
         pinnedHostKey: connection.hostKey
     }).catch(() => {
-        throw new MailServerUnreachable("Polaris could not reach the server the mail server runs on.");
+        throw new MailServerUnreachable(
+            "Polaris could not reach the server the mail server runs on."
+        );
     });
     try {
         const channel = await forwardOut(lease.client, "127.0.0.1", endpoint.port).catch(() => {

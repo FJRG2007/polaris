@@ -51,7 +51,11 @@ function parse(draft: Draft) {
     const input = {
         replicas: Number(draft.replicas),
         autoscale: draft.autoscale
-            ? { min: Number(draft.min), max: Number(draft.max), cpuPercent: Number(draft.cpuPercent) }
+            ? {
+                  min: Number(draft.min),
+                  max: Number(draft.max),
+                  cpuPercent: Number(draft.cpuPercent)
+              }
             : null,
         balancing: { sticky: draft.sticky, healthPath: draft.healthPath.trim() || null },
         // Blank is no limit, not zero.
@@ -73,7 +77,13 @@ function parse(draft: Draft) {
         : { input: null, problem: parsed.error.issues[0]?.message ?? "Check these settings" };
 }
 
-export function ScalingSection({ applicationId, onChanged }: { applicationId: string; onChanged: () => void }) {
+export function ScalingSection({
+    applicationId,
+    onChanged
+}: {
+    applicationId: string;
+    onChanged: () => void;
+}) {
     const [view, setView] = useState<ServiceScalingView | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -95,7 +105,8 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
     }, [applicationId]);
 
     const checked = useMemo(() => (draft ? parse(draft) : null), [draft]);
-    const set = (patch: Partial<Draft>) => setDraft((current) => (current ? { ...current, ...patch } : current));
+    const set = (patch: Partial<Draft>) =>
+        setDraft((current) => (current ? { ...current, ...patch } : current));
     const copies = Number(draft?.autoscale ? draft.max : draft?.replicas) || 1;
 
     function save() {
@@ -109,7 +120,11 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                 setError(result.error);
                 return;
             }
-            setNote(result.redeployed ? "Saved. The service is being started again with the new settings." : "Saved.");
+            setNote(
+                result.redeployed
+                    ? "Saved. The service is being started again with the new settings."
+                    : "Saved."
+            );
             onChanged();
         });
     }
@@ -138,8 +153,8 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                             className="w-28"
                         />
                         <span className="text-xs text-muted-foreground">
-                            How many copies of the service run at once, up to {core.REPLICAS_MAX}. The edge
-                            spreads requests over them.
+                            How many copies of the service run at once, up to {core.REPLICAS_MAX}.
+                            The edge spreads requests over them.
                         </span>
                     </label>
 
@@ -147,10 +162,12 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                         <span>
                             <span className="font-medium">Scale by itself</span>
                             <span className="block text-xs text-muted-foreground">
-                                Add a copy when the average CPU of each stays above the target for three
-                                minutes, and take one away after ten quiet ones. CPU is each copy&apos;s
-                                share of the machine, the same figure the Metrics tab shows.
-                                {view.engine === "swarm" && " Not on a swarm machine, which keeps its own count."}
+                                Add a copy when the average CPU of each stays above the target for
+                                three minutes, and take one away after ten quiet ones. CPU is each
+                                copy&apos;s share of the machine, the same figure the Metrics tab
+                                shows.
+                                {view.engine === "swarm" &&
+                                    " Not on a swarm machine, which keeps its own count."}
                             </span>
                         </span>
                         <Switch
@@ -185,7 +202,9 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">CPU target (%)</span>
+                                <span className="text-xs text-muted-foreground">
+                                    CPU target (%)
+                                </span>
                                 <Input
                                     type="number"
                                     min={5}
@@ -202,8 +221,9 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                         <span>
                             <span className="font-medium">Sleep when nobody visits</span>
                             <span className="block text-xs text-muted-foreground">
-                                Stop the service after a stretch with no visits, and start it on the next one. The
-                                first visitor sees a page saying it is waking up for the few seconds that takes.
+                                Stop the service after a stretch with no visits, and start it on the
+                                next one. The first visitor sees a page saying it is waking up for
+                                the few seconds that takes.
                                 {view.asleep && " It is asleep now."}
                                 {view.sleepBlocked && ` ${view.sleepBlocked}`}
                             </span>
@@ -217,7 +237,9 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                     </div>
                     {draft.sleeps && (
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">After (minutes without a visit)</span>
+                            <span className="text-xs text-muted-foreground">
+                                After (minutes without a visit)
+                            </span>
                             <Input
                                 type="number"
                                 min={core.SLEEP_AFTER_MIN_MINUTES}
@@ -258,8 +280,8 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                             </label>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                            A copy past its memory is stopped and started again; one past its CPU is slowed.
-                            Blank = no limit.
+                            A copy past its memory is stopped and started again; one past its CPU is
+                            slowed. Blank = no limit.
                         </span>
                     </div>
 
@@ -267,8 +289,8 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                         <span>
                             <span className="font-medium">Keep each visitor on one copy</span>
                             <span className="block text-xs text-muted-foreground">
-                                For WebSockets and sessions kept in memory. A cookie pins the visitor to
-                                the copy that answered them first.
+                                For WebSockets and sessions kept in memory. A cookie pins the
+                                visitor to the copy that answered them first.
                             </span>
                         </span>
                         <Switch
@@ -289,14 +311,14 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                             className="max-w-xs"
                         />
                         <span className="text-xs text-muted-foreground">
-                            Asked of every copy every 10 seconds. One that stops answering is left out until
-                            it answers again. Blank = no check.
+                            Asked of every copy every 10 seconds. One that stops answering is left
+                            out until it answers again. Blank = no check.
                         </span>
                     </label>
                     {copies > 1 && (
                         <p className="text-xs text-muted-foreground">
-                            With more than one copy the edge balances between them itself, so email addresses
-                            in its pages are not hidden from scrapers.
+                            With more than one copy the edge balances between them itself, so email
+                            addresses in its pages are not hidden from scrapers.
                         </p>
                     )}
 

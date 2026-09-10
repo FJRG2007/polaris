@@ -36,7 +36,8 @@ export function AuditIntegrity() {
         startChecking(async () => {
             const outcome = await verifyAuditChainAction();
             if (outcome.error) toast.show({ title: outcome.error });
-            else if (outcome.result?.ok) toast.show({ title: `Chain intact across ${outcome.result.checked} entries.` });
+            else if (outcome.result?.ok)
+                toast.show({ title: `Chain intact across ${outcome.result.checked} entries.` });
             else toast.show({ title: "The chain is broken. The panel says where." });
             refresh();
         });
@@ -57,7 +58,10 @@ export function AuditIntegrity() {
                     : "flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"
             }
         >
-            <Icon className={broken ? "size-4 shrink-0 text-danger" : "size-4 shrink-0 text-success"} aria-hidden />
+            <Icon
+                className={broken ? "size-4 shrink-0 text-danger" : "size-4 shrink-0 text-success"}
+                aria-hidden
+            />
             <div className="min-w-0 flex-1">
                 {broken ? (
                     <p className="font-medium text-danger">
@@ -69,12 +73,17 @@ export function AuditIntegrity() {
                         {data.sealed} entries sealed
                         {data.pending > 0 ? `, ${data.pending} waiting to be` : ""}.{" "}
                         <span className="text-muted-foreground">
-                            {last ? `Last checked ${format.dateTime(last.at)}.` : "Not checked yet."}
+                            {last
+                                ? `Last checked ${format.dateTime(last.at)}.`
+                                : "Not checked yet."}
                         </span>
                     </p>
                 )}
                 {data.head ? (
-                    <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={data.head.hash}>
+                    <p
+                        className="mt-0.5 truncate font-mono text-xs text-muted-foreground"
+                        title={data.head.hash}
+                    >
                         Head #{data.head.seq} {data.head.hash.slice(0, 16)}
                     </p>
                 ) : null}

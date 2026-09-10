@@ -26,7 +26,10 @@ import {
 
 /** Remove all history for a subject - called when the app/connection is deleted
  *  so orphaned series do not linger until retention sweeps them. */
-export async function deleteMetricsForSubject(subjectType: MetricSubjectType, subjectId: string): Promise<void> {
+export async function deleteMetricsForSubject(
+    subjectType: MetricSubjectType,
+    subjectId: string
+): Promise<void> {
     await prisma.metricSample.deleteMany({ where: { subjectType, subjectId } });
     await prisma.metricRollup.deleteMany({ where: { subjectType, subjectId } });
 }
@@ -49,7 +52,10 @@ export async function subjectBelongsToOwner(
         // "local" is the box Polaris itself runs on, which belongs to whoever is
         // asking - there is no Host row behind it to check ownership against.
         if (subjectId === LOCAL_HOST_SUBJECT) return true;
-        const host = await prisma.host.findFirst({ where: { id: subjectId, ownerId }, select: { id: true } });
+        const host = await prisma.host.findFirst({
+            where: { id: subjectId, ownerId },
+            select: { id: true }
+        });
         return host != null;
     }
     if (subjectType === "volume") {
@@ -122,15 +128,17 @@ export async function getMetricSeries(input: {
     from: Date;
     to: Date;
 }): Promise<MetricPoint[] | null> {
-    if (!(await subjectBelongsToOwner(input.subjectType, input.subjectId, input.ownerId))) return null;
+    if (!(await subjectBelongsToOwner(input.subjectType, input.subjectId, input.ownerId)))
+        return null;
 
     const spanMs = input.to.getTime() - input.from.getTime();
-    const points =
-        spanMs <= RAW_MAX_SPAN_MS ? await rawSeries(input) : await rollupSeries(input);
+    const points = spanMs <= RAW_MAX_SPAN_MS ? await rawSeries(input) : await rollupSeries(input);
     // What a service is actually storing lives on the volumes it mounts, and they
     // are measured as their own subjects. Only for a service: a volume asked about
     // directly already is that series, and a host reports its own disk.
-    return input.subjectType === "app" ? withVolumeDisk(input.subjectId, points, input.from, input.to) : points;
+    return input.subjectType === "app"
+        ? withVolumeDisk(input.subjectId, points, input.from, input.to)
+        : points;
 }
 
 /** Full-resolution samples, with the counters differenced into rates. */
@@ -141,7 +149,11 @@ async function rawSeries(input: {
     to: Date;
 }): Promise<MetricPoint[]> {
     const rows = await prisma.metricSample.findMany({
-        where: { subjectType: input.subjectType, subjectId: input.subjectId, ts: { gte: input.from, lte: input.to } },
+        where: {
+            subjectType: input.subjectType,
+            subjectId: input.subjectId,
+            ts: { gte: input.from, lte: input.to }
+        },
         orderBy: { ts: "asc" }
     });
     const points = rows.map<MetricPoint>((row, index) => {
@@ -212,7 +224,10 @@ async function withVolumeDisk(
     to: Date
 ): Promise<MetricPoint[]> {
     if (points.length === 0) return points;
-    const volumes = await prisma.volume.findMany({ where: { applicationId }, select: { id: true } });
+    const volumes = await prisma.volume.findMany({
+        where: { applicationId },
+        select: { id: true }
+    });
     if (volumes.length === 0) return points;
     const ids = volumes.map((volume) => volume.id);
 
@@ -229,15 +244,28 @@ async function withVolumeDisk(
     const rows =
         to.getTime() - from.getTime() <= RAW_MAX_SPAN_MS
             ? await prisma.metricSample.findMany({
-                  where: { subjectType: "volume", subjectId: { in: ids }, ts: { gte: since, lte: to } },
+                  where: {
+                      subjectType: "volume",
+                      subjectId: { in: ids },
+                      ts: { gte: since, lte: to }
+                  },
                   orderBy: { ts: "asc" },
                   select: { subjectId: true, ts: true, diskUsedBytes: true, diskTotalBytes: true }
               })
             : (
                   await prisma.metricRollup.findMany({
-                      where: { subjectType: "volume", subjectId: { in: ids }, bucket: { gte: since, lte: to } },
+                      where: {
+                          subjectType: "volume",
+                          subjectId: { in: ids },
+                          bucket: { gte: since, lte: to }
+                      },
                       orderBy: { bucket: "asc" },
-                      select: { subjectId: true, bucket: true, diskUsedBytesAvg: true, diskTotalBytesAvg: true }
+                      select: {
+                          subjectId: true,
+                          bucket: true,
+                          diskUsedBytesAvg: true,
+                          diskTotalBytesAvg: true
+                      }
                   })
               ).map((row) => ({
                   subjectId: row.subjectId,

@@ -56,35 +56,61 @@ describe("at creation", () => {
     });
 
     it("never overrides a root directory the creator typed", () => {
-        expect(importedCreate(render, { builder: "nixpacks", rootDirectory: "services/web" }).rootDirectory).toBeUndefined();
+        expect(
+            importedCreate(render, { builder: "nixpacks", rootDirectory: "services/web" })
+                .rootDirectory
+        ).toBeUndefined();
     });
 
     it("builds a new service on its language's image even with no deploy files", () => {
-        expect(importedCreate(null, { builder: "nixpacks" }).buildConfig).toEqual({ languageImages: true });
+        expect(importedCreate(null, { builder: "nixpacks" }).buildConfig).toEqual({
+            languageImages: true
+        });
         expect(importedCreate(null, { builder: "dockerfile" }).buildConfig).toEqual({});
     });
 
     it("only puts a Dockerfile path onto a Dockerfile build left at the default", () => {
         const withDockerfile = importDeployConfig({
-            "railway.json": JSON.stringify({ build: { builder: "DOCKERFILE", dockerfilePath: "ops/Dockerfile" } })
+            "railway.json": JSON.stringify({
+                build: { builder: "DOCKERFILE", dockerfilePath: "ops/Dockerfile" }
+            })
         });
-        expect(importedCreate(withDockerfile, { builder: "dockerfile", dockerfilePath: "Dockerfile" }).dockerfilePath).toBe("ops/Dockerfile");
-        expect(importedCreate(withDockerfile, { builder: "dockerfile", dockerfilePath: "docker/Custom" }).dockerfilePath).toBeUndefined();
-        expect(importedCreate(withDockerfile, { builder: "nixpacks" }).dockerfilePath).toBeUndefined();
+        expect(
+            importedCreate(withDockerfile, { builder: "dockerfile", dockerfilePath: "Dockerfile" })
+                .dockerfilePath
+        ).toBe("ops/Dockerfile");
+        expect(
+            importedCreate(withDockerfile, {
+                builder: "dockerfile",
+                dockerfilePath: "docker/Custom"
+            }).dockerfilePath
+        ).toBeUndefined();
+        expect(
+            importedCreate(withDockerfile, { builder: "nixpacks" }).dockerfilePath
+        ).toBeUndefined();
     });
 });
 
 describe("after creation", () => {
     it("sets plain variables, generates secrets, keeps the health path and answers what is still needed", async () => {
         const needs = await applyImportedAfterCreate("app-1", "owner-1", render);
-        expect(setEnvVars).toHaveBeenCalledWith("application", "app-1", "owner-1", [{ key: "MODE", value: "production", isSecret: false }]);
+        expect(setEnvVars).toHaveBeenCalledWith("application", "app-1", "owner-1", [
+            { key: "MODE", value: "production", isSecret: false }
+        ]);
         expect(setEnvVar).toHaveBeenCalledWith(
             "application",
             "app-1",
             "owner-1",
-            expect.objectContaining({ key: "TOKEN_SECRET", isSecret: true, value: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) })
+            expect.objectContaining({
+                key: "TOKEN_SECRET",
+                isSecret: true,
+                value: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/)
+            })
         );
-        const written = JSON.parse((update.mock.calls[0] as unknown as [{ data: { edgeConfig: string } }])[0].data.edgeConfig);
+        const written = JSON.parse(
+            (update.mock.calls[0] as unknown as [{ data: { edgeConfig: string } }])[0].data
+                .edgeConfig
+        );
         expect(written.balancing).toEqual({ sticky: false, healthPath: "/healthz" });
         expect(needs).toEqual(["STRIPE_KEY"]);
     });

@@ -16,7 +16,12 @@ const QuerySchema = z
     .object({
         services: z
             .string()
-            .transform((raw) => raw.split(",").map((id) => id.trim()).filter(Boolean))
+            .transform((raw) =>
+                raw
+                    .split(",")
+                    .map((id) => id.trim())
+                    .filter(Boolean)
+            )
             .pipe(z.array(z.string().uuid()).min(1).max(50)),
         q: z
             .string()
@@ -46,11 +51,15 @@ export async function GET(request: Request): Promise<Response> {
         limit: params.get("limit") ?? undefined
     });
     if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid search" }, { status: 400 });
+        return NextResponse.json(
+            { error: parsed.error.issues[0]?.message ?? "Invalid search" },
+            { status: 400 }
+        );
     }
 
     const services = await readableServices(user.id, parsed.data.services);
-    if (services.length === 0) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    if (services.length === 0)
+        return NextResponse.json({ error: "Service not found" }, { status: 404 });
 
     const page = await searchRuntimeLogs({
         serviceIds: services.map((service) => service.id),

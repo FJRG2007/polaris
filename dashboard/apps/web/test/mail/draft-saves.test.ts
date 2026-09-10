@@ -137,7 +137,8 @@ describe("a send", () => {
 
     it("after() runs once every save already asked for has settled, with the id they left", async () => {
         const firstWrite = deferred<string>();
-        const write: DraftWriter = (_fields, id) => (id === null ? firstWrite.promise : Promise.resolve(id));
+        const write: DraftWriter = (_fields, id) =>
+            id === null ? firstWrite.promise : Promise.resolve(id);
         const saves = draftSaves(SEED, null, write);
 
         const pending = saves.save(withBody("Still typing"));

@@ -55,7 +55,9 @@ export const variableKeySchema = z
 const redeploySchema = z
     .boolean()
     .default(false)
-    .describe("Redeploy the services this reaches so they pick it up now. Needs the right to deploy.");
+    .describe(
+        "Redeploy the services this reaches so they pick it up now. Needs the right to deploy."
+    );
 
 export const setVariableSchema = z.object({
     key: variableKeySchema,

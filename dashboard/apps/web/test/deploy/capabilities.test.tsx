@@ -37,7 +37,9 @@ describe("the capabilities list", () => {
 
     it("is itself a route, and in the Apps rail", () => {
         expect(existsSync(join(APP_ROUTES, "apps/capabilities/page.tsx"))).toBe(true);
-        expect(APP_SECTIONS.apps?.some((section) => section.href === "/apps/capabilities")).toBe(true);
+        expect(APP_SECTIONS.apps?.some((section) => section.href === "/apps/capabilities")).toBe(
+            true
+        );
     });
 });
 

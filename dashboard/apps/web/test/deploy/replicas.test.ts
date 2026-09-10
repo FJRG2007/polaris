@@ -49,7 +49,12 @@ describe("routing a service with several copies", () => {
 
     it("lists every copy by name, pins visitors and checks health", () => {
         const config = renderDynamicConfig([
-            { ...route, dialHosts: ["web", "web-r2", "web-r3"], sticky: true, healthPath: "/healthz" }
+            {
+                ...route,
+                dialHosts: ["web", "web-r2", "web-r3"],
+                sticky: true,
+                healthPath: "/healthz"
+            }
         ]);
         const lb = service(config, "polaris-app-d1");
         expect(lb).toContain('- url: "http://web:3000"');
@@ -71,7 +76,11 @@ describe("routing a service with several copies", () => {
 
 describe("copiesOf", () => {
     it("names every copy on plain compose", () => {
-        expect(copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")).toEqual(["web", "web-r2", "web-r3"]);
+        expect(copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")).toEqual([
+            "web",
+            "web-r2",
+            "web-r3"
+        ]);
     });
 
     it("leaves swarm and a single copy to the ordinary route", () => {
@@ -82,7 +91,9 @@ describe("copiesOf", () => {
 
 describe("balancedOver", () => {
     it("carries the service's balancing only when there is something to balance", () => {
-        const edge = parseAppEdgeConfig(JSON.stringify({ balancing: { sticky: true, healthPath: "/up" } }));
+        const edge = parseAppEdgeConfig(
+            JSON.stringify({ balancing: { sticky: true, healthPath: "/up" } })
+        );
         expect(balancedOver(["web", "web-r2"], edge)).toEqual({
             dialHosts: ["web", "web-r2"],
             sticky: true,
@@ -109,7 +120,9 @@ describe("singleCopyReason", () => {
 
 describe("the balancing setting", () => {
     it("refuses a health path that is not a path", () => {
-        const stored = parseAppEdgeConfig(JSON.stringify({ balancing: { sticky: true, healthPath: "healthz" } }));
+        const stored = parseAppEdgeConfig(
+            JSON.stringify({ balancing: { sticky: true, healthPath: "healthz" } })
+        );
         expect(stored.balancing).toEqual({ sticky: false, healthPath: null });
     });
 
@@ -119,31 +132,51 @@ describe("the balancing setting", () => {
 });
 
 describe("a share of the traffic sent to a kept release", () => {
-    const route = { id: "d1", hostname: "shop.example.com", certResolver: "le", dialHost: "10.0.0.2", dialPort: 21000 };
+    const route = {
+        id: "d1",
+        hostname: "shop.example.com",
+        certResolver: "le",
+        dialHost: "10.0.0.2",
+        dialPort: 21000
+    };
 
     it("splits the service by weight, pinning each visitor to one version", () => {
-        const config = renderDynamicConfig([{ ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 10 } }]);
+        const config = renderDynamicConfig([
+            { ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 10 } }
+        ]);
         const split = service(config, "polaris-app-d1");
         expect(split).toContain("weighted:");
         expect(split).toContain("- name: polaris-app-d1-current\n            weight: 90");
         expect(split).toContain("- name: polaris-app-d1-canary\n            weight: 10");
         expect(split).toContain("name: polaris_release");
-        expect(service(config, "polaris-app-d1-canary")).toContain('- url: "http://10.0.0.2:23456"');
-        expect(service(config, "polaris-app-d1-current")).toContain('- url: "http://10.0.0.2:21000"');
+        expect(service(config, "polaris-app-d1-canary")).toContain(
+            '- url: "http://10.0.0.2:23456"'
+        );
+        expect(service(config, "polaris-app-d1-current")).toContain(
+            '- url: "http://10.0.0.2:21000"'
+        );
     });
 
     it("never sends more than half", () => {
-        const config = renderDynamicConfig([{ ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 90 } }]);
-        expect(service(config, "polaris-app-d1")).toContain("- name: polaris-app-d1-canary\n            weight: 50");
+        const config = renderDynamicConfig([
+            { ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 90 } }
+        ]);
+        expect(service(config, "polaris-app-d1")).toContain(
+            "- name: polaris-app-d1-canary\n            weight: 50"
+        );
     });
 
     it("keeps the canary only while it validates, and reads an old config as none", () => {
         const id = "019f9000-1111-7000-8000-222233334444";
-        expect(parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 10 } })).canary).toEqual({
+        expect(
+            parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 10 } })).canary
+        ).toEqual({
             deploymentId: id,
             percent: 10
         });
-        expect(parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 80 } })).canary).toBeNull();
+        expect(
+            parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 80 } })).canary
+        ).toBeNull();
         expect(parseAppEdgeConfig("{}").canary).toBeNull();
     });
 });

@@ -71,7 +71,11 @@ const dateField = z
  */
 export const auditFilterSchema = z
     .object({
-        actor: z.string().uuid().optional().or(z.literal("").transform(() => undefined)),
+        actor: z
+            .string()
+            .uuid()
+            .optional()
+            .or(z.literal("").transform(() => undefined)),
         area: z
             .string()
             .trim()

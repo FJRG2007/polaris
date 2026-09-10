@@ -27,7 +27,14 @@ const BUILD_LOG = [
 describe("a build from a repository", () => {
     it("is all done once it is running, with how long each step took", () => {
         const steps = deploySteps("running", BUILD_LOG);
-        expect(steps.map((step) => step.state)).toEqual(["done", "done", "done", "done", "done", "done"]);
+        expect(steps.map((step) => step.state)).toEqual([
+            "done",
+            "done",
+            "done",
+            "done",
+            "done",
+            "done"
+        ]);
         expect(steps.find((step) => step.id === "build")?.seconds).toBe(48);
         expect(steps.find((step) => step.id === "source")?.label).toBe("Clone");
     });
@@ -44,25 +51,45 @@ describe("a build from a repository", () => {
     });
 
     it("puts a failure on the step that was running", () => {
-        const failedBuild = "==> Fetching the source...\n==> Fetching the source: 1.0s\n==> Building the image...\n==> Failed: the image would not build\n";
-        expect(states("failed", failedBuild)).toMatchObject({ source: "done", build: "failed", start: "pending" });
+        const failedBuild =
+            "==> Fetching the source...\n==> Fetching the source: 1.0s\n==> Building the image...\n==> Failed: the image would not build\n";
+        expect(states("failed", failedBuild)).toMatchObject({
+            source: "done",
+            build: "failed",
+            start: "pending"
+        });
     });
 });
 
 describe("an image, and a rollback", () => {
     it("skips the build for a pulled image", () => {
-        const log = "==> Pulling ghcr.io/acme/web:1.2...\n==> Pulling ghcr.io/acme/web:1.2: 4.5s\n==> Starting the containers...\n==> Starting the containers: 1.0s\n";
-        expect(states("running", log)).toMatchObject({ source: "done", build: "skipped", start: "done", live: "done" });
-        expect(deploySteps("running", log).find((step) => step.id === "source")?.label).toBe("Pull");
+        const log =
+            "==> Pulling ghcr.io/acme/web:1.2...\n==> Pulling ghcr.io/acme/web:1.2: 4.5s\n==> Starting the containers...\n==> Starting the containers: 1.0s\n";
+        expect(states("running", log)).toMatchObject({
+            source: "done",
+            build: "skipped",
+            start: "done",
+            live: "done"
+        });
+        expect(deploySteps("running", log).find((step) => step.id === "source")?.label).toBe(
+            "Pull"
+        );
     });
 
     it("draws a rollback as a kept image with nothing built", () => {
-        const log = "Rolling back to the kept image polaris-release/web:0123456789ab - nothing is fetched or built.\n==> Starting the containers...\n";
-        expect(states("deploying", log)).toMatchObject({ source: "done", build: "skipped", keep: "done", start: "current" });
+        const log =
+            "Rolling back to the kept image polaris-release/web:0123456789ab - nothing is fetched or built.\n==> Starting the containers...\n";
+        expect(states("deploying", log)).toMatchObject({
+            source: "done",
+            build: "skipped",
+            keep: "done",
+            start: "current"
+        });
     });
 
     it("warns when the release could not be kept", () => {
-        const log = "==> Pulling nginx:alpine...\n==> Pulling nginx:alpine: 1.0s\n[warn] This release could not be kept for an instant rollback (no builder). It is deployed all the same.\n==> Starting the containers...\n==> Starting the containers: 1.0s\n";
+        const log =
+            "==> Pulling nginx:alpine...\n==> Pulling nginx:alpine: 1.0s\n[warn] This release could not be kept for an instant rollback (no builder). It is deployed all the same.\n==> Starting the containers...\n==> Starting the containers: 1.0s\n";
         expect(states("running", log).keep).toBe("warning");
     });
 });
@@ -70,7 +97,14 @@ describe("an image, and a rollback", () => {
 describe("a deploy with no step lines", () => {
     it("is drawn from its status alone", () => {
         expect(states("queued", "")).toMatchObject({ queued: "current", live: "pending" });
-        expect(Object.values(states("running", ""))).toEqual(["done", "done", "done", "done", "done", "done"]);
+        expect(Object.values(states("running", ""))).toEqual([
+            "done",
+            "done",
+            "done",
+            "done",
+            "done",
+            "done"
+        ]);
         expect(states("failed", "")).toMatchObject({ queued: "done", source: "failed" });
     });
 });

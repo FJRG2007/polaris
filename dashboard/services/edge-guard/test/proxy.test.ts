@@ -42,7 +42,10 @@ let proxyUrl = "";
 beforeAll(async () => {
     origin = createServer((req, res) => {
         const next = respond(req.url ?? "/");
-        res.writeHead(next.status ?? 200, { "content-type": "text/html; charset=utf-8", ...next.headers });
+        res.writeHead(next.status ?? 200, {
+            "content-type": "text/html; charset=utf-8",
+            ...next.headers
+        });
         res.end(next.body);
     });
     await new Promise<void>((done) => origin.listen(0, "127.0.0.1", done));
@@ -87,7 +90,9 @@ describe("rewriting", () => {
     });
 
     it("produces a token the decoder can read back", async () => {
-        respond = () => ({ body: '<html><body><a href="mailto:hola@ejemplo.com">c</a></body></html>' });
+        respond = () => ({
+            body: '<html><body><a href="mailto:hola@ejemplo.com">c</a></body></html>'
+        });
 
         const token = /#([0-9a-f]+)"/.exec((await get("/")).body)?.[1] ?? "";
 
@@ -154,7 +159,10 @@ describe("what it passes straight through", () => {
     });
 
     it("preserves the upstream's own headers", async () => {
-        respond = () => ({ headers: { "x-app-header": "kept" }, body: "<html><body>hola@ejemplo.com</body></html>" });
+        respond = () => ({
+            headers: { "x-app-header": "kept" },
+            body: "<html><body>hola@ejemplo.com</body></html>"
+        });
 
         expect((await get("/")).headers.get("x-app-header")).toBe("kept");
     });
@@ -262,7 +270,11 @@ describe("the firewall still applies", () => {
                 "x-forwarded-for": "203.0.113.5",
                 "x-forwarded-host": "app.example.com",
                 accept,
-                "x-polaris-waf": encodeGuardRule({ deny: ["203.0.113.0/24"], requireLogin: false, rules: [] })
+                "x-polaris-waf": encodeGuardRule({
+                    deny: ["203.0.113.0/24"],
+                    requireLogin: false,
+                    rules: []
+                })
             }
         });
     }
@@ -293,7 +305,12 @@ describe("the login handoff", () => {
                 [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
                 "x-forwarded-proto": "https",
                 "x-forwarded-host": "app.example.com",
-                "x-polaris-waf": encodeGuardRule({ deny: [], requireLogin: true, emailObfuscation: true, rules: [] })
+                "x-polaris-waf": encodeGuardRule({
+                    deny: [],
+                    requireLogin: true,
+                    emailObfuscation: true,
+                    rules: []
+                })
             }
         });
 

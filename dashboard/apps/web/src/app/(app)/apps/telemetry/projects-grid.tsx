@@ -61,10 +61,16 @@ function ProjectCard({ project, href }: { project: GridProject; href: string }) 
                         <span
                             className={cn(
                                 "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
-                                failing ? "bg-danger-soft text-danger-ink" : "bg-muted text-muted-foreground"
+                                failing
+                                    ? "bg-danger-soft text-danger-ink"
+                                    : "bg-muted text-muted-foreground"
                             )}
                         >
-                            {failing ? <Bug className="size-4" /> : <CircleCheck className="size-4" />}
+                            {failing ? (
+                                <Bug className="size-4" />
+                            ) : (
+                                <CircleCheck className="size-4" />
+                            )}
                         </span>
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium" title={project.name}>
@@ -86,7 +92,11 @@ function ProjectCard({ project, href }: { project: GridProject; href: string }) 
                     </div>
 
                     <div className="mt-auto flex items-baseline justify-between gap-2 text-xs">
-                        <span className={cn(failing ? "font-medium text-danger" : "text-muted-foreground")}>
+                        <span
+                            className={cn(
+                                failing ? "font-medium text-danger" : "text-muted-foreground"
+                            )}
+                        >
                             {failing
                                 ? `${project.openIssues} ${project.openIssues === 1 ? "fault" : "faults"} open`
                                 : "Nothing open"}

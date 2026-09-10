@@ -581,7 +581,8 @@ function lookupSentence(
  */
 export function serverProblem(host: string, port: string): string | null {
     const hostCheck = mailHost.safeParse(host);
-    if (!hostCheck.success) return hostCheck.error.issues[0]?.message ?? "That is not a server name";
+    if (!hostCheck.success)
+        return hostCheck.error.issues[0]?.message ?? "That is not a server name";
     if (!mailPort.safeParse(port).success) return "The port is a number from 1 to 65535";
     return null;
 }

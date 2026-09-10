@@ -20,7 +20,17 @@ import { useState, useTransition } from "react";
 import { setForkApprovalAction, setRepoPolicyAction } from "./actions";
 import type { RunnerRepoView } from "@/lib/runners/runner-repo-config";
 import { Github, Globe, Lock, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Switch, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Checkbox,
+    Switch,
+    cn
+} from "@polaris/ui";
 import {
     RUNNER_EVENTS,
     RUNNER_EVENT_LABELS,
@@ -44,8 +54,8 @@ export function ReposView({ pools }: { pools: PoolRepos[] }) {
                 <CardBody className="flex flex-col items-start gap-2">
                     <p className="text-sm">No pool is serving a repository yet.</p>
                     <p className="max-w-lg text-xs text-muted-foreground">
-                        A pool decides which machine runs jobs and how many at once. Once one exists, every repository
-                        it serves shows up here with its own settings.
+                        A pool decides which machine runs jobs and how many at once. Once one
+                        exists, every repository it serves shows up here with its own settings.
                     </p>
                     <Button asChild size="sm" variant="ghost">
                         <Link href="/apps/runners">Add a pool</Link>
@@ -124,13 +134,20 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
                     <CardTitle className="flex items-center gap-2">
                         <Github className="size-4 text-muted-foreground" />
                         <span className="truncate">{repo.key}</span>
-                        {repo.kind === "org" ? <Badge variant="neutral">Whole organization</Badge> : null}
+                        {repo.kind === "org" ? (
+                            <Badge variant="neutral">Whole organization</Badge>
+                        ) : null}
                     </CardTitle>
                     <Visibility repo={repo} />
                 </div>
                 {dirty ? (
                     <div className="flex shrink-0 items-center gap-1">
-                        <Button size="sm" variant="ghost" disabled={pending} onClick={() => setDraft(repo.policy)}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => setDraft(repo.policy)}
+                        >
                             Cancel
                         </Button>
                         <Button size="sm" disabled={pending} onClick={save}>
@@ -151,8 +168,9 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
 
                 {repo.kind === "org" ? (
                     <p className="text-xs text-muted-foreground">
-                        This pool registers one runner for the whole organization, so what is set here applies to every
-                        repository in it. Serve repositories one at a time if they need to differ.
+                        This pool registers one runner for the whole organization, so what is set
+                        here applies to every repository in it. Serve repositories one at a time if
+                        they need to differ.
                     </p>
                 ) : null}
 
@@ -169,7 +187,9 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
                             />
                             <span className="flex flex-col">
                                 <span>{RUNNER_EVENT_LABELS[event]}</span>
-                                <span className="text-xs text-muted-foreground">{RUNNER_EVENT_NOTES[event]}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {RUNNER_EVENT_NOTES[event]}
+                                </span>
                             </span>
                         </label>
                     ))}
@@ -232,7 +252,11 @@ function Visibility({ repo }: { repo: RunnerRepoView }) {
             </span>
         );
     }
-    return <span className="text-xs text-muted-foreground">Polaris has not been able to read this one yet</span>;
+    return (
+        <span className="text-xs text-muted-foreground">
+            Polaris has not been able to read this one yet
+        </span>
+    );
 }
 
 /**
@@ -256,8 +280,8 @@ function ForkApproval({ repo }: { repo: RunnerRepoView }) {
             <p className="flex items-start gap-2 text-xs">
                 <ShieldCheck className="size-4 text-muted-foreground" />
                 <span>
-                    On GitHub, only contributors new to GitHub need approval before their pull request runs a workflow
-                    here. Anybody with an older account does not.
+                    On GitHub, only contributors new to GitHub need approval before their pull
+                    request runs a workflow here. Anybody with an older account does not.
                 </span>
             </p>
             {error ? <p className="text-xs text-danger">{error}</p> : null}

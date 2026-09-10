@@ -45,7 +45,12 @@ async function failedApplicationDeployment(deploymentId: string, ownerId: string
         where: { id: deploymentId },
         select: { id: true, status: true, error: true, deployableType: true, deployableId: true }
     });
-    if (!deployment || deployment.deployableType !== "application" || !FAILED.has(deployment.status)) return null;
+    if (
+        !deployment ||
+        deployment.deployableType !== "application" ||
+        !FAILED.has(deployment.status)
+    )
+        return null;
     const app = await prisma.application.findFirst({
         where: { id: deployment.deployableId, environment: { project: { ownerId } } },
         select: {
@@ -60,16 +65,23 @@ async function failedApplicationDeployment(deploymentId: string, ownerId: string
 }
 
 /** Why this failed deploy failed, when its log says; null when it does not. */
-export async function diagnoseDeployment(deploymentId: string, ownerId: string): Promise<Diagnosis | null> {
+export async function diagnoseDeployment(
+    deploymentId: string,
+    ownerId: string
+): Promise<Diagnosis | null> {
     const found = await failedApplicationDeployment(deploymentId, ownerId);
     if (!found) return null;
     const log = await logTail(deploymentId);
-    return diagnoseDeploy(`${log}\n${found.deployment.error ?? ""}`, { port: containerPortOf(found.app) });
+    return diagnoseDeploy(`${log}\n${found.deployment.error ?? ""}`, {
+        port: containerPortOf(found.app)
+    });
 }
 
 /** A secret a framework accepts. Laravel's key has a shape of its own. */
 function generatedSecret(name: string): string {
-    return name === "APP_KEY" ? `base64:${randomBytes(32).toString("base64")}` : randomBytes(32).toString("base64url");
+    return name === "APP_KEY"
+        ? `base64:${randomBytes(32).toString("base64")}`
+        : randomBytes(32).toString("base64url");
 }
 
 /**

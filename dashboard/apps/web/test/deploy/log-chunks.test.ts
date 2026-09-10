@@ -7,7 +7,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { LineSplitter, linesAfter, normalizeStamp, splitStamp, stampDate } from "@/lib/deploy/log-chunks";
+import {
+    LineSplitter,
+    linesAfter,
+    normalizeStamp,
+    splitStamp,
+    stampDate
+} from "@/lib/deploy/log-chunks";
 
 describe("splitting chunks into lines", () => {
     it("holds a partial line until the rest of it arrives", () => {
@@ -40,7 +46,10 @@ describe("reading the stamp", () => {
         expect(normalizeStamp("2026-09-10T10:00:00.5Z")).toBe("2026-09-10T10:00:00.500000000Z");
         expect(normalizeStamp("2026-09-10T10:00:00Z")).toBe("2026-09-10T10:00:00.000000000Z");
         // Without padding ".5" sorts after ".123456789" as text and before it as time.
-        expect(normalizeStamp("2026-09-10T10:00:00.5Z") > normalizeStamp("2026-09-10T10:00:00.123456789Z")).toBe(true);
+        expect(
+            normalizeStamp("2026-09-10T10:00:00.5Z") >
+                normalizeStamp("2026-09-10T10:00:00.123456789Z")
+        ).toBe(true);
     });
 
     it("keeps the message and drops a carriage return", () => {
@@ -51,7 +60,9 @@ describe("reading the stamp", () => {
         expect(splitStamp("plain output")).toEqual({ stamp: null, text: "plain output" });
         // A NUL byte would fail the whole insert, every capture, until it left the tail.
         expect(splitStamp(`a${String.fromCharCode(0)}b`).text).toBe("ab");
-        expect(stampDate("2026-09-10T10:00:00.123456789Z").toISOString()).toBe("2026-09-10T10:00:00.123Z");
+        expect(stampDate("2026-09-10T10:00:00.123456789Z").toISOString()).toBe(
+            "2026-09-10T10:00:00.123Z"
+        );
     });
 });
 

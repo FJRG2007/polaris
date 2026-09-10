@@ -48,17 +48,23 @@ export function importedCreate(
     }
     const output = normalizeRoot(setting(imported, "outputDirectory"));
     if (output) buildConfig.outputDirectory = output;
-    const root = typed.rootDirectory?.trim() ? undefined : normalizeRoot(setting(imported, "rootDirectory"));
+    const root = typed.rootDirectory?.trim()
+        ? undefined
+        : normalizeRoot(setting(imported, "rootDirectory"));
     const dockerfile = setting(imported, "dockerfilePath");
     const copies = Number(setting(imported, "replicas"));
     return {
         buildConfig,
         ...(root ? { rootDirectory: root } : {}),
         // Only onto a Dockerfile build whose path was left as the default.
-        ...(dockerfile && typed.builder === "dockerfile" && (!typed.dockerfilePath || typed.dockerfilePath === "Dockerfile")
+        ...(dockerfile &&
+        typed.builder === "dockerfile" &&
+        (!typed.dockerfilePath || typed.dockerfilePath === "Dockerfile")
             ? { dockerfilePath: dockerfile }
             : {}),
-        ...(Number.isInteger(copies) && copies > 1 ? { replicas: Math.min(MAX_IMPORTED_REPLICAS, copies) } : {})
+        ...(Number.isInteger(copies) && copies > 1
+            ? { replicas: Math.min(MAX_IMPORTED_REPLICAS, copies) }
+            : {})
     };
 }
 
@@ -72,7 +78,11 @@ export async function applyImportedAfterCreate(
     imported: ImportedConfig | null
 ): Promise<string[]> {
     if (!imported) return [];
-    const plain = Object.entries(imported.variables).map(([key, value]) => ({ key, value, isSecret: false }));
+    const plain = Object.entries(imported.variables).map(([key, value]) => ({
+        key,
+        value,
+        isSecret: false
+    }));
     if (plain.length > 0) await setEnvVars("application", applicationId, ownerId, plain);
     for (const key of imported.generate) {
         // 32 random bytes, which is what every framework asking for one accepts.
@@ -84,7 +94,10 @@ export async function applyImportedAfterCreate(
     }
     const healthPath = setting(imported, "healthPath");
     if (healthPath) {
-        const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { edgeConfig: true } });
+        const app = await prisma.application.findUnique({
+            where: { id: applicationId },
+            select: { edgeConfig: true }
+        });
         const edge = parseAppEdgeConfig(app?.edgeConfig);
         // Held to the same rule the Scaling settings apply to a typed one.
         const balancing = edgeBalancingSchema.safeParse({ ...edge.balancing, healthPath });

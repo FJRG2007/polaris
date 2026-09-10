@@ -164,7 +164,10 @@ const sqlIdentifier = z
     .trim()
     .min(1)
     .max(63)
-    .regex(/^[A-Za-z][A-Za-z0-9_]*$/, "Use letters, digits and underscores, starting with a letter");
+    .regex(
+        /^[A-Za-z][A-Za-z0-9_]*$/,
+        "Use letters, digits and underscores, starting with a letter"
+    );
 
 /**
  * A password we are willing to put in a statement. Quotes and backslashes are
@@ -177,7 +180,10 @@ const dbPassword = z
     .min(12, "Use at least 12 characters")
     .max(128)
     .regex(/^[\x21-\x7e]+$/u, "Use printable characters with no spaces")
-    .refine((value) => !/["'`\\]/.test(value), "Quotes and backslashes are not allowed in a database password");
+    .refine(
+        (value) => !/["'`\\]/.test(value),
+        "Quotes and backslashes are not allowed in a database password"
+    );
 
 /** A host port a database may be published on. Below 1024 is refused: those are
  *  the ports the host's own services claim, and a database is not one of them. */
@@ -234,7 +240,8 @@ export const databaseCreateSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["exposePort"],
-                message: "A database on an existing instance is reached through that instance's port"
+                message:
+                    "A database on an existing instance is reached through that instance's port"
             });
         }
         if (value.instanceId && value.version) {

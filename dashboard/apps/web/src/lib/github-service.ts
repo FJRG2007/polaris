@@ -13,7 +13,11 @@
  */
 
 import { createHmac, createSign, timingSafeEqual } from "node:crypto";
-import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "./integration-service";
+import {
+    getIntegrationSecret,
+    getIntegrationState,
+    upsertIntegration
+} from "./integration-service";
 import {
     CONFIG_FILES,
     detectBuild,
@@ -108,7 +112,9 @@ function appJwt(appId: string, pem: string): string {
     const now = Math.floor(Date.now() / 1000);
     const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
     // iat backdated 60s to tolerate clock skew; GitHub caps exp at 10 minutes.
-    const payload = Buffer.from(JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId })).toString("base64url");
+    const payload = Buffer.from(
+        JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId })
+    ).toString("base64url");
     const data = `${header}.${payload}`;
     const signature = createSign("RSA-SHA256").update(data).sign(pem).toString("base64url");
     return `${data}.${signature}`;
@@ -128,11 +134,20 @@ async function getAppSecrets(): Promise<AppSecrets | null> {
     }
     const appId = String(state.config.appId ?? "");
     if (!parsed.pem || !appId) return null;
-    return { appId, pem: parsed.pem, clientSecret: parsed.clientSecret, webhookSecret: parsed.webhookSecret };
+    return {
+        appId,
+        pem: parsed.pem,
+        clientSecret: parsed.clientSecret,
+        webhookSecret: parsed.webhookSecret
+    };
 }
 
 /** Mint a short-lived installation access token used to reach that installation's repos. */
-async function installationToken(installationId: number, appId: string, pem: string): Promise<string> {
+async function installationToken(
+    installationId: number,
+    appId: string,
+    pem: string
+): Promise<string> {
     const res = await fetch(`${API}/app/installations/${installationId}/access_tokens`, {
         method: "POST",
         headers: apiHeaders(appJwt(appId, pem)),
@@ -150,7 +165,8 @@ async function fetchInstallations(appId: string, pem: string): Promise<Installat
         headers: apiHeaders(appJwt(appId, pem)),
         cache: "no-store"
     });
-    if (res.status === 401) throw new Error("GitHub rejected the app credentials (check the App ID and private key)");
+    if (res.status === 401)
+        throw new Error("GitHub rejected the app credentials (check the App ID and private key)");
     if (!res.ok) throw new Error(`GitHub returned ${res.status} listing installations`);
     const body = (await res.json()) as Array<{
         id: number;
@@ -181,9 +197,15 @@ async function fetchInstallations(appId: string, pem: string): Promise<Installat
  * and sent people to a page with no Review request on it, every few minutes,
  * forever. Reading this is what tells the two apart.
  */
-async function fetchAppPermissions(appId: string, pem: string): Promise<Record<string, string> | null> {
+async function fetchAppPermissions(
+    appId: string,
+    pem: string
+): Promise<Record<string, string> | null> {
     try {
-        const res = await fetch(`${API}/app`, { headers: apiHeaders(appJwt(appId, pem)), cache: "no-store" });
+        const res = await fetch(`${API}/app`, {
+            headers: apiHeaders(appJwt(appId, pem)),
+            cache: "no-store"
+        });
         if (!res.ok) return null;
         const body = (await res.json()) as { permissions?: Record<string, string> };
         return body.permissions ?? null;
@@ -249,7 +271,10 @@ export function buildAppManifest(input: {
         url: publicUrl ?? origin,
         callback_urls: callbacks,
         ...(publicUrl
-            ? { hook_attributes: { url: githubWebhookUrl(publicUrl), active: true }, default_events: [...APP_EVENTS] }
+            ? {
+                  hook_attributes: { url: githubWebhookUrl(publicUrl), active: true },
+                  default_events: [...APP_EVENTS]
+              }
             : {}),
         redirect_url: `${origin}/api/integrations/github/callback`,
         setup_url: `${origin}/api/integrations/github/callback`,
@@ -347,7 +372,11 @@ export const GITHUB_APP_NEW_URL = "https://github.com/settings/apps/new";
 export async function exchangeManifestCode(code: string): Promise<{ htmlUrl: string }> {
     const res = await fetch(`${API}/app-manifests/${encodeURIComponent(code)}/conversions`, {
         method: "POST",
-        headers: { Accept: "application/vnd.github+json", "User-Agent": "polaris", "X-GitHub-Api-Version": "2022-11-28" },
+        headers: {
+            Accept: "application/vnd.github+json",
+            "User-Agent": "polaris",
+            "X-GitHub-Api-Version": "2022-11-28"
+        },
         cache: "no-store"
     });
     if (!res.ok) throw new Error(`GitHub returned ${res.status} creating the app`);
@@ -405,7 +434,11 @@ export async function connectGithubApp(input: {
             clientId: input.clientId?.trim() || undefined,
             installations
         },
-        secret: JSON.stringify({ pem, clientSecret: input.clientSecret, webhookSecret: input.webhookSecret })
+        secret: JSON.stringify({
+            pem,
+            clientSecret: input.clientSecret,
+            webhookSecret: input.webhookSecret
+        })
     });
     return { installations: installations.length };
 }
@@ -419,7 +452,10 @@ export async function connectGithubApp(input: {
  * connected with nothing but an id and a private key can act on repositories but
  * cannot ask anybody who they are.
  */
-export async function getGithubUserAuth(): Promise<{ clientId: string; clientSecret: string } | null> {
+export async function getGithubUserAuth(): Promise<{
+    clientId: string;
+    clientSecret: string;
+} | null> {
     const state = await getIntegrationState(PROVIDER);
     if (state?.config.method !== "app") return null;
     const clientId = typeof state.config.clientId === "string" ? state.config.clientId : "";
@@ -490,13 +526,22 @@ export async function readGithubAccount(token: string): Promise<GithubAccount> {
     const res = await fetch(`${API}/user`, { headers: apiHeaders(token), cache: "no-store" });
     if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
     if (!res.ok) throw new Error(`GitHub returned ${res.status} reading the account`);
-    const body = (await res.json()) as { id?: number; login?: string; avatar_url?: string; email?: string | null };
-    if (typeof body.id !== "number" || !body.login) throw new Error("GitHub did not return an account");
+    const body = (await res.json()) as {
+        id?: number;
+        login?: string;
+        avatar_url?: string;
+        email?: string | null;
+    };
+    if (typeof body.id !== "number" || !body.login)
+        throw new Error("GitHub did not return an account");
     return {
         id: body.id,
         login: body.login,
         avatarUrl: body.avatar_url ?? null,
-        email: typeof body.email === "string" && body.email.includes("@") ? body.email.trim().toLowerCase() : null
+        email:
+            typeof body.email === "string" && body.email.includes("@")
+                ? body.email.trim().toLowerCase()
+                : null
     };
 }
 
@@ -506,8 +551,16 @@ async function exchangeUserToken(
 ): Promise<GithubUserToken> {
     const exchange = await fetch("https://github.com/login/oauth/access_token", {
         method: "POST",
-        headers: { Accept: "application/json", "content-type": "application/json", "User-Agent": "polaris" },
-        body: JSON.stringify({ ...fields, client_id: auth.clientId, client_secret: auth.clientSecret }),
+        headers: {
+            Accept: "application/json",
+            "content-type": "application/json",
+            "User-Agent": "polaris"
+        },
+        body: JSON.stringify({
+            ...fields,
+            client_id: auth.clientId,
+            client_secret: auth.clientSecret
+        }),
         cache: "no-store"
     });
     if (!exchange.ok) throw new Error(`GitHub returned ${exchange.status} verifying the account`);
@@ -520,14 +573,18 @@ async function exchangeUserToken(
         error?: string;
     };
     if (!granted.access_token) {
-        throw new Error(granted.error_description ?? granted.error ?? "GitHub declined the authorization");
+        throw new Error(
+            granted.error_description ?? granted.error ?? "GitHub declined the authorization"
+        );
     }
     return {
         accessToken: granted.access_token,
         refreshToken: granted.refresh_token,
         // A minute of headroom, so a token is never spent on the request that
         // discovers it has just expired.
-        ...(granted.expires_in ? { expiresAt: Date.now() + granted.expires_in * 1000 - 60_000 } : {}),
+        ...(granted.expires_in
+            ? { expiresAt: Date.now() + granted.expires_in * 1000 - 60_000 }
+            : {}),
         scope: granted.scope ?? ""
     };
 }
@@ -558,9 +615,12 @@ export async function refreshInstallations(): Promise<void> {
 /** Public connection state for the UI (never exposes secrets). */
 export async function getGithubStatus(): Promise<GithubStatus> {
     const state = await getIntegrationState(PROVIDER);
-    if (!state?.hasSecret) return { connected: false, method: null, login: null, installations: [], htmlUrl: null };
+    if (!state?.hasSecret)
+        return { connected: false, method: null, login: null, installations: [], htmlUrl: null };
     if (state.config.method === "app") {
-        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+        const installs = Array.isArray(state.config.installations)
+            ? (state.config.installations as Installation[])
+            : [];
         return {
             connected: true,
             method: "app",
@@ -589,7 +649,9 @@ export async function listGithubInstallations(): Promise<
 > {
     const state = await getIntegrationState(PROVIDER);
     if (state?.config.method !== "app") return [];
-    const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+    const installs = Array.isArray(state.config.installations)
+        ? (state.config.installations as Installation[])
+        : [];
     return installs.map((install) => ({
         login: install.login,
         accountType: install.accountType,
@@ -635,7 +697,10 @@ export interface GithubPermissionGap {
  * and the installation lives in the account's settings - which is a different
  * path for a user and for an organization.
  */
-function installationSettingsUrl(installation: Installation, htmlUrl: string | null): string | null {
+function installationSettingsUrl(
+    installation: Installation,
+    htmlUrl: string | null
+): string | null {
     if (installation.accountType === "Organization") {
         return `https://github.com/organizations/${installation.login}/settings/installations/${installation.id}`;
     }
@@ -681,7 +746,9 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
     if (state?.config.method !== "app") {
         return { installations: [], reviewUrl: null, appMissing: [], appPermissionsUrl: null };
     }
-    const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+    const installs = Array.isArray(state.config.installations)
+        ? (state.config.installations as Installation[])
+        : [];
     const htmlUrl = appPageUrl(state.config);
     const gaps = installs
         .map((install) => ({
@@ -759,7 +826,11 @@ function dedupeRepos(repos: GithubRepo[]): GithubRepo[] {
 }
 
 function toRepo(row: { full_name: string; default_branch: string; private: boolean }): GithubRepo {
-    return { fullName: row.full_name, defaultBranch: row.default_branch || "main", private: row.private };
+    return {
+        fullName: row.full_name,
+        defaultBranch: row.default_branch || "main",
+        private: row.private
+    };
 }
 
 /**
@@ -771,7 +842,11 @@ export async function listReposForPat(token: string): Promise<GithubRepo[]> {
     const url = `${API}/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member`;
     const res = await fetch(url, { headers: apiHeaders(token), cache: "no-store" });
     if (!res.ok) throw new Error(`GitHub returned ${res.status} listing repositories`);
-    const body = (await res.json()) as Array<{ full_name: string; default_branch: string; private: boolean }>;
+    const body = (await res.json()) as Array<{
+        full_name: string;
+        default_branch: string;
+        private: boolean;
+    }>;
     return body.map(toRepo);
 }
 
@@ -795,10 +870,13 @@ export async function listReposForUserToken(token: string): Promise<GithubRepo[]
 
     const repos: GithubRepo[] = [];
     for (const install of body.installations ?? []) {
-        const page = await fetch(`${API}/user/installations/${install.id}/repositories?per_page=100`, {
-            headers: apiHeaders(token),
-            cache: "no-store"
-        });
+        const page = await fetch(
+            `${API}/user/installations/${install.id}/repositories?per_page=100`,
+            {
+                headers: apiHeaders(token),
+                cache: "no-store"
+            }
+        );
         if (!page.ok) continue;
         const listed = (await page.json()) as {
             repositories?: Array<{ full_name: string; default_branch: string; private: boolean }>;
@@ -823,14 +901,20 @@ export async function listReposForUserToken(token: string): Promise<GithubRepo[]
  * one: their own account is the most accurate answer for "their repositories",
  * and it is used before the installation's.
  */
-export async function listReposForOwner(login: string, limit = 100, asToken?: string | null): Promise<GithubRepo[]> {
+export async function listReposForOwner(
+    login: string,
+    limit = 100,
+    asToken?: string | null
+): Promise<GithubRepo[]> {
     const owner = login.trim();
     if (!owner) return [];
 
     if (asToken) {
         const mine = await listReposForUserToken(asToken).catch(() => null);
         if (mine) {
-            const theirs = mine.filter((repo) => repo.fullName.split("/")[0]?.toLowerCase() === owner.toLowerCase());
+            const theirs = mine.filter(
+                (repo) => repo.fullName.split("/")[0]?.toLowerCase() === owner.toLowerCase()
+            );
             if (theirs.length > 0) return theirs.slice(0, limit);
         }
     }
@@ -839,7 +923,9 @@ export async function listReposForOwner(login: string, limit = 100, asToken?: st
 
     if (state?.config.method === "app") {
         const secrets = await getAppSecrets();
-        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+        const installs = Array.isArray(state.config.installations)
+            ? (state.config.installations as Installation[])
+            : [];
         const install = installs.find((row) => row.login.toLowerCase() === owner.toLowerCase());
         if (secrets && install) {
             const token = await installationToken(install.id, secrets.appId, secrets.pem);
@@ -849,10 +935,17 @@ export async function listReposForOwner(login: string, limit = 100, asToken?: st
             });
             if (res.ok) {
                 const body = (await res.json()) as {
-                    repositories?: Array<{ full_name: string; default_branch: string; private: boolean }>;
+                    repositories?: Array<{
+                        full_name: string;
+                        default_branch: string;
+                        private: boolean;
+                    }>;
                 };
                 return (body.repositories ?? [])
-                    .filter((repo) => repo.full_name.split("/")[0]?.toLowerCase() === owner.toLowerCase())
+                    .filter(
+                        (repo) =>
+                            repo.full_name.split("/")[0]?.toLowerCase() === owner.toLowerCase()
+                    )
                     .slice(0, limit)
                     .map((repo) => ({
                         fullName: repo.full_name,
@@ -893,11 +986,19 @@ export async function listReposForOwner(login: string, limit = 100, asToken?: st
  * credentials would confirm the existence of a private repository to somebody who
  * cannot reach it, and then let them deploy it.
  */
-export async function resolveGithubRepo(owner: string, repo: string, token: string | null): Promise<GithubRepo | null> {
+export async function resolveGithubRepo(
+    owner: string,
+    repo: string,
+    token: string | null
+): Promise<GithubRepo | null> {
     const url = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
     const res = await fetch(url, { headers: optionalAuthHeaders(token), cache: "no-store" });
     if (!res.ok) return null;
-    const body = (await res.json()) as { full_name: string; default_branch: string; private: boolean };
+    const body = (await res.json()) as {
+        full_name: string;
+        default_branch: string;
+        private: boolean;
+    };
     return {
         fullName: body.full_name,
         defaultBranch: body.default_branch || "main",
@@ -912,7 +1013,12 @@ export async function resolveGithubRepo(owner: string, repo: string, token: stri
  * go and do and the clone failure that prompts the question looks identical for
  * all of them: git asks for a username, is refused a terminal, and stops.
  */
-export type RepoAccess = "reachable" | "token-refused" | "out-of-reach" | "sso-required" | "unknown";
+export type RepoAccess =
+    | "reachable"
+    | "token-refused"
+    | "out-of-reach"
+    | "sso-required"
+    | "unknown";
 
 /**
  * Ask GitHub about `owner/repo` as this token, and report which of the four it
@@ -923,7 +1029,11 @@ export type RepoAccess = "reachable" | "token-refused" | "out-of-reach" | "sso-r
  * confirm that private repositories exist - so "not there" and "not yours" are
  * one answer here, and the sentence built from it has to name both.
  */
-export async function repoAccessFor(owner: string, repo: string, token: string): Promise<RepoAccess> {
+export async function repoAccessFor(
+    owner: string,
+    repo: string,
+    token: string
+): Promise<RepoAccess> {
     const url = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
     let res: Response;
     try {
@@ -935,7 +1045,8 @@ export async function repoAccessFor(owner: string, repo: string, token: string):
     if (res.status === 401) return "token-refused";
     // An organization with SAML on it names that in a header rather than in
     // anything the body says, and it is the one 403 with an answer of its own.
-    if (res.status === 403) return res.headers.get("x-github-sso") ? "sso-required" : "out-of-reach";
+    if (res.status === 403)
+        return res.headers.get("x-github-sso") ? "sso-required" : "out-of-reach";
     if (res.status === 404) return "out-of-reach";
     return "unknown";
 }
@@ -946,7 +1057,11 @@ export async function repoAccessFor(owner: string, repo: string, token: string):
  * ones are reached through the caller's own list instead; a token is still passed
  * because it triples the searches allowed per minute.
  */
-export async function searchGithubRepos(query: string, token: string | null, limit = 8): Promise<GithubRepo[]> {
+export async function searchGithubRepos(
+    query: string,
+    token: string | null,
+    limit = 8
+): Promise<GithubRepo[]> {
     const term = query.trim();
     if (term.length < 2) return [];
     const url = `${API}/search/repositories?q=${encodeURIComponent(term)}&per_page=${limit}`;
@@ -984,8 +1099,12 @@ export async function githubAppInstallationToken(owner?: string): Promise<string
     if (!state?.hasSecret || state.config.method !== "app") return null;
     const secrets = await getAppSecrets();
     if (!secrets) return null;
-    const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
-    const inst = (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
+    const installs = Array.isArray(state.config.installations)
+        ? (state.config.installations as Installation[])
+        : [];
+    const inst =
+        (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) ||
+        installs[0];
     if (!inst) return null;
     return installationToken(inst.id, secrets.appId, secrets.pem);
 }
@@ -1013,17 +1132,26 @@ export interface RepoInspection {
 const REPO_FILE_LIMIT = 64 * 1024;
 
 /** Every file and directory in a branch, by path. Empty on any API hiccup. */
-async function repoTree(owner: string, repo: string, branch: string, headers: HeadersInit): Promise<Map<string, "blob" | "tree">> {
+async function repoTree(
+    owner: string,
+    repo: string,
+    branch: string,
+    headers: HeadersInit
+): Promise<Map<string, "blob" | "tree">> {
     const entries = new Map<string, "blob" | "tree">();
     try {
-        const res = await fetch(`${API}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
-            headers,
-            cache: "no-store"
-        });
+        const res = await fetch(
+            `${API}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+            {
+                headers,
+                cache: "no-store"
+            }
+        );
         if (!res.ok) return entries;
         const body = (await res.json()) as { tree?: Array<{ path?: string; type?: string }> };
         for (const entry of body.tree ?? []) {
-            if (entry.path && (entry.type === "blob" || entry.type === "tree")) entries.set(entry.path, entry.type);
+            if (entry.path && (entry.type === "blob" || entry.type === "tree"))
+                entries.set(entry.path, entry.type);
         }
     } catch {
         // Nothing known about the tree.
@@ -1033,7 +1161,13 @@ async function repoTree(owner: string, repo: string, branch: string, headers: He
 
 /** One file's text, or undefined when it cannot be read or is too big to be a
  *  manifest. */
-async function repoText(owner: string, repo: string, branch: string, path: string, headers: HeadersInit): Promise<string | undefined> {
+async function repoText(
+    owner: string,
+    repo: string,
+    branch: string,
+    path: string,
+    headers: HeadersInit
+): Promise<string | undefined> {
     try {
         const res = await fetch(
             `${API}/repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(branch)}`,
@@ -1051,7 +1185,9 @@ async function repoText(owner: string, repo: string, branch: string, path: strin
 /** The files and folders directly inside one directory of the tree. */
 function namesIn(tree: Map<string, "blob" | "tree">, directory: string): string[] {
     const prefix = directory ? `${directory}/` : "";
-    return [...tree.keys()].filter((path) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/")).map((path) => path.slice(prefix.length));
+    return [...tree.keys()]
+        .filter((path) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/"))
+        .map((path) => path.slice(prefix.length));
 }
 
 /** What a repository says about deploying it, read at the repository root and at
@@ -1076,10 +1212,19 @@ async function readRepoSetupFrom(
     let serviceTexts: Record<string, string> = {};
     for (const directory of directories) {
         const found: Record<string, string> = {};
-        const present = namesIn(tree, directory).filter((name) => wanted.has(name) && tree.get(directory ? `${directory}/${name}` : name) === "blob");
+        const present = namesIn(tree, directory).filter(
+            (name) =>
+                wanted.has(name) && tree.get(directory ? `${directory}/${name}` : name) === "blob"
+        );
         await Promise.all(
             present.map(async (name) => {
-                const text = await repoText(owner, repo, branch, directory ? `${directory}/${name}` : name, headers);
+                const text = await repoText(
+                    owner,
+                    repo,
+                    branch,
+                    directory ? `${directory}/${name}` : name,
+                    headers
+                );
                 if (text !== undefined) found[name] = text;
             })
         );
@@ -1088,12 +1233,23 @@ async function readRepoSetupFrom(
     }
     let manifest: PackageManifest | undefined;
     try {
-        manifest = serviceTexts["package.json"] ? (JSON.parse(serviceTexts["package.json"]) as PackageManifest) : undefined;
+        manifest = serviceTexts["package.json"]
+            ? (JSON.parse(serviceTexts["package.json"]) as PackageManifest)
+            : undefined;
     } catch {
         manifest = undefined;
     }
     const detected = detectBuild(
-        { levels: [{ path: rootDirectory, files: namesIn(tree, rootDirectory), manifest, texts: serviceTexts }] },
+        {
+            levels: [
+                {
+                    path: rootDirectory,
+                    files: namesIn(tree, rootDirectory),
+                    manifest,
+                    texts: serviceTexts
+                }
+            ]
+        },
         { languages: true }
     );
     return {
@@ -1133,8 +1289,12 @@ export async function inspectGithubRepo(
     const headers = optionalAuthHeaders(token);
     const tree = await repoTree(owner, repo, branch, headers);
     const paths = [...tree].filter(([, type]) => type === "blob").map(([path]) => path);
-    const dockerfile = paths.find((p) => p === "Dockerfile") ?? paths.find((p) => p.endsWith("/Dockerfile")) ?? null;
-    const setup = tree.size > 0 ? await readRepoSetupFrom(owner, repo, branch, "", tree, headers) : null;
+    const dockerfile =
+        paths.find((p) => p === "Dockerfile") ??
+        paths.find((p) => p.endsWith("/Dockerfile")) ??
+        null;
+    const setup =
+        tree.size > 0 ? await readRepoSetupFrom(owner, repo, branch, "", tree, headers) : null;
     return {
         dockerfile,
         framework: setup?.framework ?? null,
@@ -1177,10 +1337,13 @@ export async function getLatestCommit(
 ): Promise<CommitInfo | null> {
     const headers = optionalAuthHeaders(token);
     try {
-        const res = await fetch(`${API}/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`, {
-            headers,
-            cache: "no-store"
-        });
+        const res = await fetch(
+            `${API}/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`,
+            {
+                headers,
+                cache: "no-store"
+            }
+        );
         if (!res.ok) return null;
         const data = (await res.json()) as {
             sha?: string;
@@ -1260,13 +1423,17 @@ export async function getChangedFiles(
             { headers, cache: "no-store" }
         );
         if (!res.ok) return [];
-        const data = (await res.json()) as { files?: Array<{ filename?: string; previous_filename?: string }> };
+        const data = (await res.json()) as {
+            files?: Array<{ filename?: string; previous_filename?: string }>;
+        };
         const files = data.files ?? [];
         if (files.length >= 300) return [];
         return files.flatMap((file) =>
             // A rename touches both sides: a service watching the path a file moved out
             // of has as much reason to rebuild as the one it moved into.
-            [file.filename, file.previous_filename].filter((path): path is string => typeof path === "string")
+            [file.filename, file.previous_filename].filter(
+                (path): path is string => typeof path === "string"
+            )
         );
     } catch {
         return [];
@@ -1309,10 +1476,13 @@ export async function listOpenPullRequests(
     const pulls = new Map<number, OpenPullRequest>();
     try {
         for (let page = 1; page <= OPEN_PULL_PAGES; page += 1) {
-            const res = await fetch(`${API}/repos/${owner}/${repo}/pulls?state=open&per_page=100&page=${page}`, {
-                headers: optionalAuthHeaders(token),
-                cache: "no-store"
-            });
+            const res = await fetch(
+                `${API}/repos/${owner}/${repo}/pulls?state=open&per_page=100&page=${page}`,
+                {
+                    headers: optionalAuthHeaders(token),
+                    cache: "no-store"
+                }
+            );
             if (!res.ok) return null;
             const data = (await res.json()) as Array<{
                 number?: number;
@@ -1380,7 +1550,13 @@ export async function pullRequestIsOpen(
 
 /** The states GitHub accepts for a deployment. `error` is the one a cancel lands
  *  on: there is no cancelled state, and leaving it in progress is worse. */
-export type DeploymentState = "queued" | "in_progress" | "success" | "failure" | "error" | "inactive";
+export type DeploymentState =
+    | "queued"
+    | "in_progress"
+    | "success"
+    | "failure"
+    | "error"
+    | "inactive";
 
 /**
  * What GitHub did with an announcement.
@@ -1400,7 +1576,11 @@ export interface AnnounceResult {
 
 /** GitHub truncates a longer description; trimming here keeps what it shows ours. */
 function shortDescription(text: string): string {
-    const line = text.split("\n").map((part) => part.trim()).find((part) => part.length > 0) ?? "";
+    const line =
+        text
+            .split("\n")
+            .map((part) => part.trim())
+            .find((part) => part.length > 0) ?? "";
     return line.length > 140 ? `${line.slice(0, 137)}...` : line;
 }
 
@@ -1538,7 +1718,10 @@ export async function publishCheck(input: {
             head_sha: input.sha,
             status: input.status,
             ...(input.status === "completed"
-                ? { conclusion: input.conclusion ?? "success", completed_at: new Date().toISOString() }
+                ? {
+                      conclusion: input.conclusion ?? "success",
+                      completed_at: new Date().toISOString()
+                  }
                 : { started_at: new Date().toISOString() }),
             ...(input.detailsUrl ? { details_url: input.detailsUrl } : {}),
             output: { title: shortDescription(input.summary), summary: input.summary }
@@ -1575,7 +1758,11 @@ export async function getGithubWebhookSecret(): Promise<string | null> {
 }
 
 /** Constant-time verification of a GitHub webhook signature ("sha256=<hex>"). */
-export function verifyWebhookSignature(secret: string, payload: string, signature: string): boolean {
+export function verifyWebhookSignature(
+    secret: string,
+    payload: string,
+    signature: string
+): boolean {
     const expected = `sha256=${createHmac("sha256", secret).update(payload).digest("hex")}`;
     const a = Buffer.from(signature);
     const b = Buffer.from(expected);

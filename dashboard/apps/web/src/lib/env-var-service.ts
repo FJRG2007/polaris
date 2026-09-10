@@ -110,7 +110,8 @@ export async function setEnvVar(
     if (!VALID_KEY.test(key))
         throw new Error("Key must be letters, digits and underscores, not starting with a digit");
     if (hasControlCharacter(input.value)) throw new Error(envValueMessage(key));
-    if (input.value.length > ENV_VALUE_MAX) throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB.`);
+    if (input.value.length > ENV_VALUE_MAX)
+        throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB.`);
 
     const existing = await prisma.envVar.findFirst({
         where: { scopeType: scope, scopeId, key }
@@ -157,7 +158,11 @@ export { parseDotEnv } from "./deploy/dotenv";
  * plain value is sealed where it stands, a secret is opened and stored as text.
  * Nothing to do when it already is what was asked.
  */
-export async function setEnvVarSecrecy(id: string, ownerId: string, isSecret: boolean): Promise<void> {
+export async function setEnvVarSecrecy(
+    id: string,
+    ownerId: string,
+    isSecret: boolean
+): Promise<void> {
     const row = await prisma.envVar.findUnique({ where: { id } });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) {
         throw new Error("That variable no longer exists");

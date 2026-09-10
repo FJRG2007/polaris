@@ -13,7 +13,9 @@ import { ScrollRow } from "@polaris/ui";
 import { ArrowRight } from "lucide-react";
 import type { Capability, CapabilityGroup } from "@/lib/deploy/capabilities";
 
-export type ReachableGroup = Omit<CapabilityGroup, "items"> & { items: (Capability & { open: boolean })[] };
+export type ReachableGroup = Omit<CapabilityGroup, "items"> & {
+    items: (Capability & { open: boolean })[];
+};
 
 function number(index: number): string {
     return String(index + 1).padStart(2, "0");
@@ -26,8 +28,8 @@ export function CapabilitiesView({ groups }: { groups: readonly ReachableGroup[]
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">Capabilities</h1>
                 <p className="text-sm text-muted-foreground">
-                    What Polaris does for what you deploy - {total} things in {groups.length} groups - and where
-                    each one is.
+                    What Polaris does for what you deploy - {total} things in {groups.length} groups
+                    - and where each one is.
                 </p>
             </div>
 
@@ -57,16 +59,26 @@ export function CapabilitiesView({ groups }: { groups: readonly ReachableGroup[]
                     className="grid scroll-mt-4 gap-4 border-t border-border pt-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8"
                 >
                     <header className="lg:sticky lg:top-4 lg:self-start">
-                        <span className="font-mono text-xs tabular-nums text-foreground-subtle">{number(index)}</span>
-                        <h2 id={`${group.id}-title`} className="mt-1 text-base font-semibold tracking-tight">
+                        <span className="font-mono text-xs tabular-nums text-foreground-subtle">
+                            {number(index)}
+                        </span>
+                        <h2
+                            id={`${group.id}-title`}
+                            className="mt-1 text-base font-semibold tracking-tight"
+                        >
                             {group.title}
                         </h2>
                         <p className="mt-1 text-sm text-muted-foreground">{group.summary}</p>
                     </header>
                     <ul className="grid gap-3 sm:grid-cols-2">
                         {group.items.map((item) => (
-                            <li key={item.title} className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
-                                <h3 className="text-sm font-medium text-foreground">{item.title}</h3>
+                            <li
+                                key={item.title}
+                                className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4"
+                            >
+                                <h3 className="text-sm font-medium text-foreground">
+                                    {item.title}
+                                </h3>
                                 <p className="flex-1 text-[0.8125rem] leading-relaxed text-muted-foreground">
                                     {item.description}
                                 </p>
@@ -79,7 +91,9 @@ export function CapabilitiesView({ groups }: { groups: readonly ReachableGroup[]
                                         <ArrowRight className="size-3" />
                                     </Link>
                                 ) : (
-                                    <span className="text-xs text-foreground-subtle">{item.where} - not open to you</span>
+                                    <span className="text-xs text-foreground-subtle">
+                                        {item.where} - not open to you
+                                    </span>
                                 )}
                             </li>
                         ))}

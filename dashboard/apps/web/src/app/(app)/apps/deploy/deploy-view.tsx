@@ -871,7 +871,6 @@ export function NewServiceDialog({
                     <NewUploadForm environmentId={environmentId} onDone={done} />
                 ) : view === "template" ? (
                     <NewTemplateForm environmentId={environmentId} onDone={done} />
-
                 ) : (
                     <NewImageForm environmentId={environmentId} onDone={done} />
                 )}
@@ -1059,7 +1058,12 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                                     </span>
                                 )}
                             </span>
-                            <span className="block truncate text-xs text-muted-foreground" title={template.description}>{template.description}</span>
+                            <span
+                                className="block truncate text-xs text-muted-foreground"
+                                title={template.description}
+                            >
+                                {template.description}
+                            </span>
                         </span>
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
@@ -1074,19 +1078,24 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                 {picked.description} <span className="font-mono text-xs">{picked.image}</span>
             </p>
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={picked.name} />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={picked.name}
+                />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {picked.database && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named after the
-                    service. Its variables point at the database, so no password is copied.
+                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named
+                    after the service. Its variables point at the database, so no password is
+                    copied.
                 </p>
             )}
             {picked.companion && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a second service beside it for the {picked.companion.label}, reachable only from
-                    this environment.
+                    Creates a second service beside it for the {picked.companion.label}, reachable
+                    only from this environment.
                 </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -1409,7 +1418,13 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         </Field>
                     )}
                     <ServerField servers={servers} value={serverId} onChange={setServerId} />
-                    {imported && <RepoConfigPreview imported={imported} use={useRepoConfig} onUse={setUseRepoConfig} />}
+                    {imported && (
+                        <RepoConfigPreview
+                            imported={imported}
+                            use={useRepoConfig}
+                            onUse={setUseRepoConfig}
+                        />
+                    )}
                 </>
             )}
 

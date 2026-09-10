@@ -16,7 +16,12 @@ const NETWORK = "polaris-proxy";
 function appPlan(command?: readonly string[]): AppDeployPlan {
     return {
         ref: { name: "storage", project: "polaris-abcd1234" },
-        build: { method: "image", name: "storage", contextPath: "/ctx", imageRef: "minio/minio:latest" },
+        build: {
+            method: "image",
+            name: "storage",
+            contextPath: "/ctx",
+            imageRef: "minio/minio:latest"
+        },
         env: {},
         replicas: 1,
         domains: [],
@@ -27,8 +32,17 @@ function appPlan(command?: readonly string[]): AppDeployPlan {
 
 describe("an application's command", () => {
     it("is handed to the container as its arguments, one word each", () => {
-        const spec = appComposeSpec(appPlan(["server", "/data", "--console-address", ":9001"]), "minio/minio:latest", NETWORK);
-        expect(spec.services[0]!.command).toEqual(["server", "/data", "--console-address", ":9001"]);
+        const spec = appComposeSpec(
+            appPlan(["server", "/data", "--console-address", ":9001"]),
+            "minio/minio:latest",
+            NETWORK
+        );
+        expect(spec.services[0]!.command).toEqual([
+            "server",
+            "/data",
+            "--console-address",
+            ":9001"
+        ]);
 
         const yaml = renderComposeYaml(forCompose(spec), "/vol", "/mnt");
         expect(yaml).toContain("command: [");
@@ -36,7 +50,11 @@ describe("an application's command", () => {
     });
 
     it("leaves the image's own command alone when none is set", () => {
-        expect(appComposeSpec(appPlan(), "nginx:1.27", NETWORK).services[0]!.command).toBeUndefined();
-        expect(appComposeSpec(appPlan([]), "nginx:1.27", NETWORK).services[0]!.command).toBeUndefined();
+        expect(
+            appComposeSpec(appPlan(), "nginx:1.27", NETWORK).services[0]!.command
+        ).toBeUndefined();
+        expect(
+            appComposeSpec(appPlan([]), "nginx:1.27", NETWORK).services[0]!.command
+        ).toBeUndefined();
     });
 });

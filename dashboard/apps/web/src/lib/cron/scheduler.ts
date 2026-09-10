@@ -65,7 +65,12 @@ const STUCK_AFTER_MS = 30 * 60 * 1000;
  * job due every tick was only ever due on every other one, and a minute-grained
  * schedule quietly ran every two.
  */
-export function due(everyMs: number, last: number | undefined, now: number, tickMs: number): boolean {
+export function due(
+    everyMs: number,
+    last: number | undefined,
+    now: number,
+    tickMs: number
+): boolean {
     return last === undefined || now - last >= everyMs - tickMs / 2;
 }
 
@@ -90,7 +95,9 @@ async function run(job: ScheduledJob): Promise<unknown> {
     const now = Date.now();
     if (since !== undefined && now - since < STUCK_AFTER_MS) return null;
     if (since !== undefined) {
-        console.error(`polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`);
+        console.error(
+            `polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`
+        );
     }
     startedAt.set(job.key, now);
     try {
@@ -126,7 +133,10 @@ export function startScheduledWork(): void {
         }
     };
 
-    const tick = ticker(SCHEDULED_JOBS.filter((job) => job.everyMs >= TICK_MS), TICK_MS);
+    const tick = ticker(
+        SCHEDULED_JOBS.filter((job) => job.everyMs >= TICK_MS),
+        TICK_MS
+    );
     setTimeout(tick, FIRST_PASS_MS).unref?.();
     setInterval(tick, TICK_MS).unref?.();
 

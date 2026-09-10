@@ -15,7 +15,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { DeployFreshness } from "@/lib/deploy/freshness";
 import type { DeploymentSummary } from "@/lib/deploy-service";
 import { FAILED_DEPLOY_STATUSES } from "@/lib/deploy/attention";
-import { ArrowUpRight, CircleAlert, GitCommitHorizontal, Loader2, PackageCheck } from "lucide-react";
+import {
+    ArrowUpRight,
+    CircleAlert,
+    GitCommitHorizontal,
+    Loader2,
+    PackageCheck
+} from "lucide-react";
 
 /** The first line of an error that says something, for a callout that has one line. */
 function firstErrorLine(error: string | null): string | null {
@@ -62,7 +68,10 @@ function useFreshness(applicationId: string, sha: string | null): DeployFreshnes
 
 /** Whether the updates scan found a newer image for this release. Read once per
  *  release shown, since the scan only runs every half hour. */
-function useImageUpdate(applicationId: string, deploymentId: string | null): { image: string } | null {
+function useImageUpdate(
+    applicationId: string,
+    deploymentId: string | null
+): { image: string } | null {
     const [value, setValue] = useState<{ image: string } | null>(null);
     useEffect(() => {
         if (!deploymentId) {
@@ -103,7 +112,12 @@ function Callout({
                 tone === "danger" ? "border-danger-edge bg-danger-soft" : "border-border bg-card"
             )}
         >
-            <span className={cn("flex size-4 self-start pt-0.5", tone === "danger" ? "text-danger-ink" : "text-primary")}>
+            <span
+                className={cn(
+                    "flex size-4 self-start pt-0.5",
+                    tone === "danger" ? "text-danger-ink" : "text-primary"
+                )}
+            >
                 {icon}
             </span>
             <div className="min-w-0 flex-1 basis-48">
@@ -172,11 +186,16 @@ export function DeployCallouts({
                     detail={
                         <>
                             {errorLine && (
-                                <span className="line-clamp-2 break-words font-mono text-danger-ink" title={errorLine}>
+                                <span
+                                    className="line-clamp-2 break-words font-mono text-danger-ink"
+                                    title={errorLine}
+                                >
                                     {errorLine}
                                 </span>
                             )}
-                            {active && active.id !== failed.id && <span>The release before it is still live.</span>}
+                            {active && active.id !== failed.id && (
+                                <span>The release before it is still live.</span>
+                            )}
                         </>
                     }
                 >
@@ -202,7 +221,8 @@ export function DeployCallouts({
                     detail={
                         active?.commitSha ? (
                             <span>
-                                Live is <span className="font-mono">{active.commitSha.slice(0, 7)}</span>.
+                                Live is{" "}
+                                <span className="font-mono">{active.commitSha.slice(0, 7)}</span>.
                             </span>
                         ) : undefined
                     }

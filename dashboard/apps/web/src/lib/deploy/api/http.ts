@@ -101,7 +101,10 @@ export function deployRoute(operation: string, changes: boolean, handler: Handle
             if (caught instanceof ZodError) {
                 const first = caught.issues[0];
                 const where = first?.path.join(".");
-                return refusal(400, where ? `${where}: ${first?.message}` : (first?.message ?? "Bad request"));
+                return refusal(
+                    400,
+                    where ? `${where}: ${first?.message}` : (first?.message ?? "Bad request")
+                );
             }
             const failure = publicFailure(caught, operation);
             return refusal(failure.status, failure.message);
@@ -115,7 +118,8 @@ export function deployRoute(operation: string, changes: boolean, handler: Handle
 export async function readBody(request: Request): Promise<unknown> {
     const tooLarge = `The request body is larger than ${MAX_JSON_BODY / 1024 ** 2} MB.`;
     const declared = Number(request.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > MAX_JSON_BODY) throw new DeployApiRefusal(413, tooLarge);
+    if (Number.isFinite(declared) && declared > MAX_JSON_BODY)
+        throw new DeployApiRefusal(413, tooLarge);
     const bytes = await readCappedBody(request, MAX_JSON_BODY);
     if (!bytes) throw new DeployApiRefusal(413, tooLarge);
     const text = new TextDecoder().decode(bytes);

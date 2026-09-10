@@ -137,10 +137,7 @@ export function TeamPanel({
                                     >
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate text-sm">
-                                                <PersonName
-                                                    id={member.userId}
-                                                    name={member.name}
-                                                >
+                                                <PersonName id={member.userId} name={member.name}>
                                                     {member.userId === currentUserId ? (
                                                         <span className="text-muted-foreground">
                                                             {" "}

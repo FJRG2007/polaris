@@ -27,7 +27,12 @@ function inputFor(fix: DeployFix, typed: string): unknown {
         case "set-root-directory":
             return { kind: fix.kind, value: typed };
         case "add-variable":
-            return { kind: fix.kind, name: fix.name, value: fix.generate ? null : (fix.value ?? typed), generate: fix.generate };
+            return {
+                kind: fix.kind,
+                name: fix.name,
+                value: fix.generate ? null : (fix.value ?? typed),
+                generate: fix.generate
+            };
         default:
             return fix;
     }
@@ -43,7 +48,9 @@ function asks(fix: DeployFix): { label: string; placeholder: string } | null {
         case "set-root-directory":
             return { label: "Root directory", placeholder: "apps/web" };
         case "add-variable":
-            return fix.generate || fix.value !== null ? null : { label: `Value for ${fix.name}`, placeholder: "" };
+            return fix.generate || fix.value !== null
+                ? null
+                : { label: `Value for ${fix.name}`, placeholder: "" };
         default:
             return null;
     }
@@ -57,7 +64,9 @@ function pressLabel(fix: DeployFix): string {
         case "set-runtime-version":
             return `Build on ${fix.version} and redeploy`;
         case "add-variable":
-            return fix.generate ? `Generate ${fix.name} and redeploy` : `Set ${fix.name} and redeploy`;
+            return fix.generate
+                ? `Generate ${fix.name} and redeploy`
+                : `Set ${fix.name} and redeploy`;
         case "use-detected-build":
             return "Build without the Dockerfile";
         default:
@@ -78,7 +87,9 @@ export function LikelyCause({
     canSetVariables: boolean;
     onFixed: () => void;
 }) {
-    const [diagnosis, setDiagnosis] = useState<Diagnosis | null | undefined>(() => answers.get(deploymentId));
+    const [diagnosis, setDiagnosis] = useState<Diagnosis | null | undefined>(() =>
+        answers.get(deploymentId)
+    );
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -130,9 +141,14 @@ export function LikelyCause({
             <div className="flex items-start gap-2">
                 <Lightbulb className="mt-0.5 size-4 text-primary" />
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">Likely cause: {diagnosis.title}</p>
+                    <p className="text-sm font-medium text-foreground">
+                        Likely cause: {diagnosis.title}
+                    </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{diagnosis.detail}</p>
-                    <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={diagnosis.evidence}>
+                    <p
+                        className="mt-1 truncate font-mono text-xs text-muted-foreground"
+                        title={diagnosis.evidence}
+                    >
                         {diagnosis.evidence}
                     </p>
                 </div>
@@ -154,8 +170,13 @@ export function LikelyCause({
                             />
                         </label>
                     )}
-                    <Button size="sm" disabled={pending || !ready || problem !== null} onClick={apply}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} {prompt ? "Save and redeploy" : pressLabel(fix)}
+                    <Button
+                        size="sm"
+                        disabled={pending || !ready || problem !== null}
+                        onClick={apply}
+                    >
+                        {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                        {prompt ? "Save and redeploy" : pressLabel(fix)}
                     </Button>
                 </div>
             )}

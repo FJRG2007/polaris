@@ -87,7 +87,8 @@ export async function ownerDomainPolicy(): Promise<OwnerDomainPolicy> {
 
 export async function setOwnerDomainPolicy(input: unknown): Promise<OwnerDomainPolicy> {
     const parsed = ownerDomainPolicySchema.safeParse(input);
-    if (!parsed.success) throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the settings");
+    if (!parsed.success)
+        throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the settings");
     await setSetting(POLICY_KEY, JSON.stringify(parsed.data));
     return parsed.data;
 }
@@ -150,7 +151,9 @@ function parseStringList(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -163,7 +166,9 @@ function parseStringList(raw: string | null): string[] {
 /** Whose domain it is. Exactly one, always - a domain belongs to one account or
  *  to one organization, and the service is the only writer of these rows, which
  *  is what makes that hold. */
-export type DomainOwner = { readonly kind: "user"; readonly id: string } | { readonly kind: "org"; readonly id: string };
+export type DomainOwner =
+    | { readonly kind: "user"; readonly id: string }
+    | { readonly kind: "org"; readonly id: string };
 
 function ownerWhere(owner: DomainOwner) {
     return owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id };
@@ -250,7 +255,9 @@ function toView(
 export async function listOwnerDomains(owner: DomainOwner): Promise<OwnerDomainView[]> {
     const mine = ownerWhere(owner);
     const granted =
-        owner.kind === "user" ? (await grantedResourceIds(owner.id, "domain", "deploy.manage")).ids : [];
+        owner.kind === "user"
+            ? (await grantedResourceIds(owner.id, "domain", "deploy.manage")).ids
+            : [];
     const rows = await prisma.ownerDomain.findMany({
         where: granted.length > 0 ? { OR: [mine, { id: { in: granted } }] } : mine,
         orderBy: { createdAt: "asc" }
@@ -286,14 +293,18 @@ export async function canAddOwnerDomain(
     isAdmin: boolean
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
     const policy = await ownerDomainPolicy();
-    if (policy.mode === "off") return { ok: false, reason: "This Polaris does not take domains of your own" };
+    if (policy.mode === "off")
+        return { ok: false, reason: "This Polaris does not take domains of your own" };
     if (policy.mode === "admins" && !isAdmin) {
         return { ok: false, reason: "Only an administrator can add a domain on this Polaris" };
     }
     if (policy.maxPerOwner > 0) {
         const held = await prisma.ownerDomain.count({ where: ownerWhere(owner) });
         if (held >= policy.maxPerOwner) {
-            return { ok: false, reason: `This Polaris allows ${policy.maxPerOwner} domains per owner` };
+            return {
+                ok: false,
+                reason: `This Polaris allows ${policy.maxPerOwner} domains per owner`
+            };
         }
     }
     return { ok: true };
@@ -308,9 +319,16 @@ export async function canAddOwnerDomain(
  * gets a new one, so a TXT record left behind at the registrar cannot re-verify a
  * claim somebody else has since made.
  */
-export async function addOwnerDomain(owner: DomainOwner, input: unknown, isAdmin: boolean): Promise<OwnerDomainView> {
+export async function addOwnerDomain(
+    owner: DomainOwner,
+    input: unknown,
+    isAdmin: boolean
+): Promise<OwnerDomainView> {
     const parsed = ownerDomainInputSchema.safeParse(input);
-    if (!parsed.success) throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Enter a domain like example.com");
+    if (!parsed.success)
+        throw new OwnerDomainError(
+            parsed.error.issues[0]?.message ?? "Enter a domain like example.com"
+        );
 
     const allowed = await canAddOwnerDomain(owner, isAdmin);
     if (!allowed.ok) throw new OwnerDomainError(allowed.reason);
@@ -395,7 +413,8 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
     // Without a known public IP the record can only be confirmed to exist, not
     // compared - which is still the useful half of the answer, and better than
     // refusing a domain because this box cannot work out its own address.
-    const pointsHere = wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
+    const pointsHere =
+        wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
 
     const detail = !owns
         ? `No ${OWNER_DOMAIN_TXT_LABEL}.${row.domain} TXT record with that value yet. Records can take a few minutes to appear.`
@@ -430,7 +449,10 @@ export const ownerDomainDnsTokenSchema = z.object({
     token: z
         .string()
         .transform((value) => value.trim())
-        .refine((value) => value === "" || /^[A-Za-z0-9_-]{20,200}$/.test(value), "That does not look like an API token")
+        .refine(
+            (value) => value === "" || /^[A-Za-z0-9_-]{20,200}$/.test(value),
+            "That does not look like an API token"
+        )
 });
 
 /**
@@ -438,9 +460,14 @@ export const ownerDomainDnsTokenSchema = z.object({
  * away. Checked before it is kept: the token has to be live and has to reach the
  * zone the domain is in, or it would sit here failing every renewal quietly.
  */
-export async function setOwnerDomainDnsToken(owner: DomainOwner, id: string, input: unknown): Promise<OwnerDomainView> {
+export async function setOwnerDomainDnsToken(
+    owner: DomainOwner,
+    id: string,
+    input: unknown
+): Promise<OwnerDomainView> {
     const parsed = ownerDomainDnsTokenSchema.safeParse(input);
-    if (!parsed.success) throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the token");
+    if (!parsed.success)
+        throw new OwnerDomainError(parsed.error.issues[0]?.message ?? "Check the token");
     const row = await prisma.ownerDomain.findFirst({ where: { id, ...ownerWhere(owner) } });
     if (!row) throw new OwnerDomainError("That domain is not one of yours");
 
@@ -457,7 +484,9 @@ export async function setOwnerDomainDnsToken(owner: DomainOwner, id: string, inp
     }
     const updated = await prisma.ownerDomain.update({
         where: { id: row.id },
-        data: token ? { dnsProvider: "cloudflare", dnsToken: sealText(token) } : { dnsProvider: null, dnsToken: null }
+        data: token
+            ? { dnsProvider: "cloudflare", dnsToken: sealText(token) }
+            : { dnsProvider: null, dnsToken: null }
     });
     await retryOwnerDomainCertificate(row.id);
     return toView(updated, (await ownerDomainCertificates([updated.id])).get(updated.id) ?? null);
@@ -472,8 +501,14 @@ export async function getOwnerDomain(owner: DomainOwner, id: string): Promise<Ow
 }
 
 /** Order a domain's certificate now instead of waiting out a failed attempt. */
-export async function retryOwnerDomainCertificateFor(owner: DomainOwner, id: string): Promise<void> {
-    const row = await prisma.ownerDomain.findFirst({ where: { id, ...ownerWhere(owner) }, select: { id: true } });
+export async function retryOwnerDomainCertificateFor(
+    owner: DomainOwner,
+    id: string
+): Promise<void> {
+    const row = await prisma.ownerDomain.findFirst({
+        where: { id, ...ownerWhere(owner) },
+        select: { id: true }
+    });
     if (!row) throw new OwnerDomainError("That domain is not one of yours");
     await retryOwnerDomainCertificate(row.id);
 }

@@ -10,12 +10,7 @@
 import { textTable } from "./text";
 import { deployRoute, readBody, respond } from "./http";
 import { importVariablesSchema, setVariableSchema } from "./schemas";
-import {
-    importVariables,
-    listVariables,
-    setVariable,
-    type VariableScope
-} from "./surface";
+import { importVariables, listVariables, setVariable, type VariableScope } from "./surface";
 
 type ScopeOf = (params: Readonly<Record<string, string>>) => VariableScope;
 
@@ -41,7 +36,11 @@ export function variableRoutes(scopeOf: ScopeOf) {
         POST: deployRoute("save the variable", true, async ({ caller, request, url, params }) => {
             const input = setVariableSchema.parse(await readBody(request));
             const { redeployed } = await setVariable(caller, scopeOf(params), input);
-            return respond(url, { saved: input.key, redeployed }, () => `saved ${input.key}${redeploying(redeployed)}\n`);
+            return respond(
+                url,
+                { saved: input.key, redeployed },
+                () => `saved ${input.key}${redeploying(redeployed)}\n`
+            );
         })
     };
 }
@@ -51,6 +50,10 @@ export function importRoute(scopeOf: ScopeOf) {
     return deployRoute("import the variables", true, async ({ caller, request, url, params }) => {
         const input = importVariablesSchema.parse(await readBody(request));
         const { count, redeployed } = await importVariables(caller, scopeOf(params), input);
-        return respond(url, { count, redeployed }, () => `imported ${count}${redeploying(redeployed)}\n`);
+        return respond(
+            url,
+            { count, redeployed },
+            () => `imported ${count}${redeploying(redeployed)}\n`
+        );
     });
 }

@@ -50,10 +50,17 @@ export async function shipImage(
     image: string,
     from: RuntimePorts,
     to: RuntimePorts,
-    options: { readonly stageDir: string; readonly log: OutputSink; readonly fromName: string; readonly toName: string }
+    options: {
+        readonly stageDir: string;
+        readonly log: OutputSink;
+        readonly fromName: string;
+        readonly toName: string;
+    }
 ): Promise<void> {
-    if (!from.exportImage) throw new Error(`${options.fromName} cannot hand an image to another machine`);
-    if (!to.importImage) throw new Error(`${options.toName} cannot take an image from another machine`);
+    if (!from.exportImage)
+        throw new Error(`${options.fromName} cannot hand an image to another machine`);
+    if (!to.importImage)
+        throw new Error(`${options.toName} cannot take an image from another machine`);
     const say = (line: string): void => options.log(Buffer.from(line));
     await mkdir(options.stageDir, { recursive: true });
     const file = join(options.stageDir, `${randomUUID()}.tar.gz`);
@@ -76,7 +83,8 @@ export async function shipImage(
             }
         });
         await pipeline(await from.exportImage(image), counted, createWriteStream(file));
-        if (bytes < SMALLEST_ARCHIVE) throw new Error(`${image} could not be read on ${options.fromName}`);
+        if (bytes < SMALLEST_ARCHIVE)
+            throw new Error(`${image} could not be read on ${options.fromName}`);
         say(`==> Loading it on ${options.toName} (${megabytes(bytes)})...\n`);
         await to.importImage(createReadStream(file), bytes, options.log);
     } finally {
@@ -92,12 +100,20 @@ export async function shipImage(
  * nothing else. From here it is the same as a rollback - a kept image already on
  * the machine, run as it is.
  */
-export async function loadPrebuilt(plan: AppDeployPlan, ctx: RuntimeContext): Promise<string | null> {
+export async function loadPrebuilt(
+    plan: AppDeployPlan,
+    ctx: RuntimeContext
+): Promise<string | null> {
     const prebuilt = plan.build.prebuilt;
     if (!prebuilt) return null;
-    if (!isReleaseImage(prebuilt.image)) throw new Error("the uploaded image is not a kept release image");
+    if (!isReleaseImage(prebuilt.image))
+        throw new Error("the uploaded image is not a kept release image");
     if (!ctx.ports.importImage) throw new Error("this machine cannot take an uploaded image");
-    ctx.log(Buffer.from(`==> Loading the uploaded image ${prebuilt.image} (${megabytes(prebuilt.bytes)})...\n`));
+    ctx.log(
+        Buffer.from(
+            `==> Loading the uploaded image ${prebuilt.image} (${megabytes(prebuilt.bytes)})...\n`
+        )
+    );
     await ctx.ports.importImage(createReadStream(prebuilt.archive), prebuilt.bytes, ctx.log);
     return prebuilt.image;
 }
@@ -108,7 +124,11 @@ export async function loadPrebuilt(plan: AppDeployPlan, ctx: RuntimeContext): Pr
  * here in words; the copy on the build machine is removed once it has arrived,
  * since nothing ever runs it there.
  */
-export async function shipRelease(image: string, plan: AppDeployPlan, ctx: RuntimeContext): Promise<string> {
+export async function shipRelease(
+    image: string,
+    plan: AppDeployPlan,
+    ctx: RuntimeContext
+): Promise<string> {
     const builder = ctx.builder;
     if (!builder) return image;
     if (!isReleaseImage(image) || !plan.build.release) {

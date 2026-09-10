@@ -24,13 +24,16 @@ describe("Python", () => {
         });
         expect(plan?.framework).toBe("Django");
         expect(plan?.image?.buildImage).toBe("python:3.12-slim");
-        expect(plan?.image?.install).toBe("pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir gunicorn");
+        expect(plan?.image?.install).toBe(
+            "pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir gunicorn"
+        );
         expect(plan?.image?.start).toBe("gunicorn mysite.wsgi:application --bind 0.0.0.0:$PORT");
     });
 
     it("runs FastAPI with uvicorn from main.py, installed with uv", () => {
         const plan = at(["pyproject.toml", "uv.lock", "main.py"], {
-            "pyproject.toml": '[project]\nname = "api"\nrequires-python = ">=3.13"\ndependencies = ["fastapi>=0.110", "uvicorn[standard]"]\n'
+            "pyproject.toml":
+                '[project]\nname = "api"\nrequires-python = ">=3.13"\ndependencies = ["fastapi>=0.110", "uvicorn[standard]"]\n'
         });
         expect(plan?.framework).toBe("FastAPI");
         expect(plan?.image?.buildImage).toBe("python:3.13-slim");
@@ -47,15 +50,22 @@ describe("Python", () => {
         });
         expect(plan?.framework).toBe("Flask");
         expect(plan?.image?.buildImage).toBe("python:3.11-slim");
-        expect(plan?.image?.install).toContain("poetry install --no-interaction --no-root --only main");
+        expect(plan?.image?.install).toContain(
+            "poetry install --no-interaction --no-root --only main"
+        );
         expect(plan?.image?.start).toBe("gunicorn app:app --bind 0.0.0.0:$PORT");
     });
 
     it("takes the Procfile's web process over any guess, and the service's own version over the file's", () => {
-        const plan = at(["requirements.txt", "Procfile", "main.py"], {
-            "requirements.txt": "flask\n",
-            Procfile: "release: python migrate.py\nweb: gunicorn wsgi:app --workers 3 --bind 0.0.0.0:$PORT\n"
-        }, "3.10");
+        const plan = at(
+            ["requirements.txt", "Procfile", "main.py"],
+            {
+                "requirements.txt": "flask\n",
+                Procfile:
+                    "release: python migrate.py\nweb: gunicorn wsgi:app --workers 3 --bind 0.0.0.0:$PORT\n"
+            },
+            "3.10"
+        );
         expect(plan?.image?.start).toBe("gunicorn wsgi:app --workers 3 --bind 0.0.0.0:$PORT");
         expect(plan?.image?.buildImage).toBe("python:3.10-slim");
     });
@@ -70,7 +80,8 @@ describe("Python", () => {
 describe("Go", () => {
     it("builds on the version go.mod names, and runs the one binary", () => {
         const plan = at(["go.mod", "go.sum", "main.go"], {
-            "go.mod": "module example.com/api\n\ngo 1.23.2\n\nrequire github.com/gin-gonic/gin v1.10.0\n"
+            "go.mod":
+                "module example.com/api\n\ngo 1.23.2\n\nrequire github.com/gin-gonic/gin v1.10.0\n"
         });
         expect(plan?.framework).toBe("Gin");
         expect(plan?.image?.buildImage).toBe("golang:1.23");
@@ -88,7 +99,8 @@ describe("Go", () => {
 describe("Rust", () => {
     it("runs the binary Cargo builds, by the name it will have", () => {
         const plan = at(["Cargo.toml", "Cargo.lock", "src"], {
-            "Cargo.toml": '[package]\nname = "server"\nversion = "0.1.0"\n\n[dependencies]\naxum = "0.7"\n'
+            "Cargo.toml":
+                '[package]\nname = "server"\nversion = "0.1.0"\n\n[dependencies]\naxum = "0.7"\n'
         });
         expect(plan?.framework).toBe("Axum");
         expect(plan?.image?.buildImage).toBe("rust:1-slim");
@@ -97,10 +109,13 @@ describe("Rust", () => {
 
     it("prefers an explicit [[bin]], and refuses a bare workspace", () => {
         const bin = at(["Cargo.toml", "src"], {
-            "Cargo.toml": '[package]\nname = "lib-and-bin"\n\n[[bin]]\nname = "web"\npath = "src/main.rs"\n'
+            "Cargo.toml":
+                '[package]\nname = "lib-and-bin"\n\n[[bin]]\nname = "web"\npath = "src/main.rs"\n'
         });
         expect(bin?.image?.start).toBe("./target/release/web");
-        const workspace = at(["Cargo.toml", "crates"], { "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n' });
+        const workspace = at(["Cargo.toml", "crates"], {
+            "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\n'
+        });
         expect(workspace?.image).toBeNull();
     });
 });
@@ -108,7 +123,9 @@ describe("Rust", () => {
 describe("PHP, Ruby, Java, Elixir", () => {
     it("serves Laravel's public/ with FrankenPHP and says APP_KEY is needed", () => {
         const plan = at(["composer.json", "composer.lock", "artisan", "public"], {
-            "composer.json": JSON.stringify({ require: { php: "^8.2", "laravel/framework": "^11.0" } })
+            "composer.json": JSON.stringify({
+                require: { php: "^8.2", "laravel/framework": "^11.0" }
+            })
         });
         expect(plan?.framework).toBe("Laravel");
         expect(plan?.image?.buildImage).toBe("dunglas/frankenphp:1-php8.4-bookworm");
@@ -119,33 +136,43 @@ describe("PHP, Ruby, Java, Elixir", () => {
 
     it("runs Rails in production on the Ruby version the project pins", () => {
         const plan = at(["Gemfile", "Gemfile.lock", ".ruby-version", "config.ru"], {
-            Gemfile: 'source "https://rubygems.org"\nruby "3.2.2"\ngem "rails", "~> 7.1"\ngem "propshaft"\n',
+            Gemfile:
+                'source "https://rubygems.org"\nruby "3.2.2"\ngem "rails", "~> 7.1"\ngem "propshaft"\n',
             ".ruby-version": "3.2.2"
         });
         expect(plan?.framework).toBe("Ruby on Rails");
         expect(plan?.image?.buildImage).toBe("ruby:3.2-slim");
         expect(plan?.image?.build).toContain("assets:precompile");
-        expect(plan?.image?.start).toBe("bundle exec rails server -b 0.0.0.0 -p $PORT -e production");
+        expect(plan?.image?.start).toBe(
+            "bundle exec rails server -b 0.0.0.0 -p $PORT -e production"
+        );
     });
 
     it("runs Spring Boot on the port the service publishes, with the JDK the pom asks for", () => {
         const plan = at(["pom.xml", "mvnw", "src"], {
-            "pom.xml": "<project><parent><artifactId>spring-boot-starter-parent</artifactId></parent><properties><java.version>17</java.version></properties></project>"
+            "pom.xml":
+                "<project><parent><artifactId>spring-boot-starter-parent</artifactId></parent><properties><java.version>17</java.version></properties></project>"
         });
         expect(plan?.framework).toBe("Spring Boot");
         expect(plan?.image?.buildImage).toBe("maven:3.9-eclipse-temurin-17");
         expect(plan?.image?.build).toBe("chmod +x mvnw && ./mvnw -B -DskipTests package");
-        expect(plan?.image?.start).toBe("java -Dserver.port=$PORT -jar $(ls target/*.jar | head -n 1)");
+        expect(plan?.image?.start).toBe(
+            "java -Dserver.port=$PORT -jar $(ls target/*.jar | head -n 1)"
+        );
     });
 
     it("builds Gradle with its wrapper and skips the jar that cannot run", () => {
-        const plan = at(["build.gradle.kts", "gradlew", "src"], { "build.gradle.kts": 'plugins { kotlin("jvm") }' });
+        const plan = at(["build.gradle.kts", "gradlew", "src"], {
+            "build.gradle.kts": 'plugins { kotlin("jvm") }'
+        });
         expect(plan?.image?.buildImage).toBe("eclipse-temurin:21-jdk");
         expect(plan?.image?.start).toContain("grep -v -- '-plain.jar'");
     });
 
     it("starts Phoenix as a server", () => {
-        const plan = at(["mix.exs", "mix.lock"], { "mix.exs": 'defp deps do\n  [{:phoenix, "~> 1.7"}]\nend\nelixir: "~> 1.15"' });
+        const plan = at(["mix.exs", "mix.lock"], {
+            "mix.exs": 'defp deps do\n  [{:phoenix, "~> 1.7"}]\nend\nelixir: "~> 1.15"'
+        });
         expect(plan?.framework).toBe("Phoenix");
         expect(plan?.image?.start).toBe("MIX_ENV=prod PHX_SERVER=true mix phx.server");
     });
@@ -168,7 +195,11 @@ describe("a static site", () => {
 
 describe("what stays the builder's", () => {
     it("says nothing about another language unless asked", () => {
-        const level: DirectorySnapshot = { path: "", files: ["requirements.txt", "main.py"], texts: { "requirements.txt": "flask\n" } };
+        const level: DirectorySnapshot = {
+            path: "",
+            files: ["requirements.txt", "main.py"],
+            texts: { "requirements.txt": "flask\n" }
+        };
         expect(detectBuild({ levels: [level] })).toBeNull();
     });
 

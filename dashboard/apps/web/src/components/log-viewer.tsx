@@ -191,7 +191,12 @@ export function LogViewer({
                             </p>
                         )}
                         {filtered.map((entry, index) => (
-                            <LogRow key={index} entry={entry} gutter={hasTimes} withDates={withDates} />
+                            <LogRow
+                                key={index}
+                                entry={entry}
+                                gutter={hasTimes}
+                                withDates={withDates}
+                            />
                         ))}
                     </>
                 )}
@@ -200,7 +205,15 @@ export function LogViewer({
     );
 }
 
-function LogRow({ entry, gutter, withDates }: { entry: LogEntry; gutter: boolean; withDates: boolean }) {
+function LogRow({
+    entry,
+    gutter,
+    withDates
+}: {
+    entry: LogEntry;
+    gutter: boolean;
+    withDates: boolean;
+}) {
     const [copied, setCopied] = useState(false);
     const format = useDisplayFormat();
     const time = entry.time ? formatLogTime(entry.time, format, withDates) : null;

@@ -86,7 +86,9 @@ export function auditWhere(scope: AuditScope, filter: core.AuditFilter): Prisma.
     }
     if (filter.resource) and.push({ targetType: filter.resource });
     if (filter.q) {
-        and.push({ OR: [{ action: { contains: filter.q } }, { metadata: { contains: filter.q } }] });
+        and.push({
+            OR: [{ action: { contains: filter.q } }, { metadata: { contains: filter.q } }]
+        });
     }
     if (filter.from) and.push({ at: { gte: filter.from } });
     if (filter.to) and.push({ at: { lte: filter.to } });
@@ -179,7 +181,8 @@ export async function queryAudit(
     const last = page.at(-1);
     return {
         items: page.map((row) => drawn(row, names)),
-        nextCursor: rows.length > filter.limit && last ? core.encodeAuditCursor(last.at, last.id) : null
+        nextCursor:
+            rows.length > filter.limit && last ? core.encodeAuditCursor(last.at, last.id) : null
     };
 }
 
@@ -251,24 +254,26 @@ const CSV_COLUMNS = [
 ] as const;
 
 function csvLine(entry: AuditEntry): string {
-    return [
-        entry.id,
-        entry.at,
-        entry.seq ?? "",
-        entry.actorId ?? "",
-        entry.actorName,
-        entry.action,
-        entry.targetType ?? "",
-        entry.targetId ?? "",
-        entry.orgId ?? "",
-        entry.sessionId ?? "",
-        entry.metadata,
-        entry.hash ?? ""
-    ]
-        // Guarded against formula injection: an action's metadata carries names
-        // people typed, and a cell starting with `=` is a formula to a spreadsheet.
-        .map(core.csvField)
-        .join(",");
+    return (
+        [
+            entry.id,
+            entry.at,
+            entry.seq ?? "",
+            entry.actorId ?? "",
+            entry.actorName,
+            entry.action,
+            entry.targetType ?? "",
+            entry.targetId ?? "",
+            entry.orgId ?? "",
+            entry.sessionId ?? "",
+            entry.metadata,
+            entry.hash ?? ""
+        ]
+            // Guarded against formula injection: an action's metadata carries names
+            // people typed, and a cell starting with `=` is a formula to a spreadsheet.
+            .map(core.csvField)
+            .join(",")
+    );
 }
 
 /** What an export says about itself, at the top of a JSON file. */
@@ -280,7 +285,10 @@ export interface AuditExportMeta {
 
 /** How many entries an export of this scope and narrowing would carry, so the
  *  response can say before the first byte whether it will be cut short. */
-export async function auditExportCount(scope: AuditScope, filter: core.AuditFilter): Promise<number> {
+export async function auditExportCount(
+    scope: AuditScope,
+    filter: core.AuditFilter
+): Promise<number> {
     return prisma.auditLog.count({ where: auditWhere(scope, { ...filter, cursor: undefined }) });
 }
 
@@ -370,6 +378,10 @@ export function streamAuditExport(
 /** The name an export is saved under: what it is of, and when. */
 export function auditExportFilename(label: string, format: core.AuditExportFormat): string {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    const safe = label.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "activity";
+    const safe =
+        label
+            .replace(/[^a-z0-9-]+/gi, "-")
+            .replace(/^-+|-+$/g, "")
+            .toLowerCase() || "activity";
     return `${safe}-audit-${stamp}.${format}`;
 }

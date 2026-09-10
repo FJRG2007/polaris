@@ -20,7 +20,12 @@ import { dbEngineLabel } from "@polaris/core";
 import { dbTone, StatusPill } from "./deploy-view";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { Activity, ChevronDown, Layers } from "lucide-react";
-import { CONSUMPTION_METRICS, MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
+import {
+    CONSUMPTION_METRICS,
+    MetricsHistory,
+    percent,
+    type MetricSpec
+} from "@/components/metrics-history";
 
 interface ServiceRef {
     id: string;
@@ -101,7 +106,9 @@ export function ObservabilityView({
 }) {
     // The first running service starts open, because a screen of ten collapsed
     // rows answers nothing - and a stopped one has no chart to show.
-    const [open, setOpen] = useState<string | null>(services.find((service) => service.running)?.id ?? null);
+    const [open, setOpen] = useState<string | null>(
+        services.find((service) => service.running)?.id ?? null
+    );
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -109,7 +116,8 @@ export function ObservabilityView({
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">Observability</h1>
                     <p className="text-sm text-muted-foreground">
-                        Consumption and traffic across {environmentName}. Up to 30 days of history per service.
+                        Consumption and traffic across {environmentName}. Up to 30 days of history
+                        per service.
                     </p>
                 </div>
                 <Button asChild variant="ghost" size="sm">
@@ -140,8 +148,8 @@ export function ObservabilityView({
                         <section className="rounded-lg border border-border/60 p-4">
                             <h2 className="text-sm font-medium">Databases</h2>
                             <p className="mb-2 text-xs text-muted-foreground">
-                                Managed databases report their state rather than a series - their containers are not
-                                sampled the way services are.
+                                Managed databases report their state rather than a series - their
+                                containers are not sampled the way services are.
                             </p>
                             <div className="overflow-hidden rounded-md border border-border/60">
                                 {databases.map((database) => (
@@ -150,13 +158,21 @@ export function ObservabilityView({
                                         className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 last:border-0"
                                     >
                                         <span className="flex min-w-0 items-center gap-2">
-                                            <DbEngineIcon engine={database.engine} className="size-5" />
-                                            <span className="truncate text-sm">{database.name}</span>
+                                            <DbEngineIcon
+                                                engine={database.engine}
+                                                className="size-5"
+                                            />
+                                            <span className="truncate text-sm">
+                                                {database.name}
+                                            </span>
                                             <span className="shrink-0 text-xs text-muted-foreground">
                                                 {dbEngineLabel(database.engine)}
                                             </span>
                                         </span>
-                                        <StatusPill tone={dbTone(database.status)} label={database.status} />
+                                        <StatusPill
+                                            tone={dbTone(database.status)}
+                                            label={database.status}
+                                        />
                                     </div>
                                 ))}
                             </div>
@@ -188,10 +204,15 @@ function ServicePanel({
                 <Layers className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{service.name}</span>
                 <span
-                    className={cn("size-1.5 shrink-0 rounded-full", service.running ? "bg-success-solid" : "bg-muted-foreground")}
+                    className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        service.running ? "bg-success-solid" : "bg-muted-foreground"
+                    )}
                     title={service.running ? "Running" : "Not running"}
                 />
-                <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
+                <ChevronDown
+                    className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")}
+                />
             </button>
 
             {open && (
@@ -215,8 +236,8 @@ function ServicePanel({
                             metrics={TRAFFIC}
                         />
                         <p className="mt-1 text-xs text-muted-foreground">
-                            Derived from the container&apos;s own access logs, so a service that does not log requests
-                            shows nothing here.
+                            Derived from the container&apos;s own access logs, so a service that
+                            does not log requests shows nothing here.
                         </p>
                     </div>
                 </div>

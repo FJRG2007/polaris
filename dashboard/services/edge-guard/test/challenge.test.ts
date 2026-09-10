@@ -26,7 +26,10 @@ const cfg: GuardConfig = {
 const HOST = "shop.example.com";
 const IP = "203.0.113.9";
 
-function request(rule: Parameters<typeof encodeGuardRule>[0], extra: Partial<GuardRequest> = {}): GuardRequest {
+function request(
+    rule: Parameters<typeof encodeGuardRule>[0],
+    extra: Partial<GuardRequest> = {}
+): GuardRequest {
     return {
         wafHeader: encodeGuardRule(rule),
         forwardedFor: IP,
@@ -57,7 +60,10 @@ describe("deciding", () => {
         const first = evaluate(request(CHALLENGED), cfg);
         if (first.status !== 503) throw new Error("expected a challenge");
         const pass = `${first.challenge}.${solve(first.challenge, first.bits)}`;
-        const second = evaluate(request(CHALLENGED, { cookie: `${EDGE_PASS_COOKIE}=${pass}` }), cfg);
+        const second = evaluate(
+            request(CHALLENGED, { cookie: `${EDGE_PASS_COOKIE}=${pass}` }),
+            cfg
+        );
         expect(second.status).toBe(200);
     });
 
@@ -66,7 +72,10 @@ describe("deciding", () => {
         if (first.status !== 503) throw new Error("expected a challenge");
         const pass = `${first.challenge}.${solve(first.challenge, first.bits)}`;
         const elsewhere = evaluate(
-            request(CHALLENGED, { cookie: `${EDGE_PASS_COOKIE}=${pass}`, forwardedFor: "198.51.100.2" }),
+            request(CHALLENGED, {
+                cookie: `${EDGE_PASS_COOKIE}=${pass}`,
+                forwardedFor: "198.51.100.2"
+            }),
             cfg
         );
         expect(elsewhere.status).toBe(503);
@@ -88,7 +97,9 @@ describe("deciding", () => {
                             enabled: true,
                             action: "skip",
                             skip: ["challenge"],
-                            conditions: [{ field: "path", operator: "starts_with", values: ["/hooks"] }]
+                            conditions: [
+                                { field: "path", operator: "starts_with", values: ["/hooks"] }
+                            ]
                         }
                     ]
                 },
@@ -100,7 +111,11 @@ describe("deciding", () => {
     });
 
     it("challenges with a key of its own when no shared secret was given", () => {
-        const decision = evaluate(request(CHALLENGED), { ...cfg, secret: "", challengeSecret: "process-key" });
+        const decision = evaluate(request(CHALLENGED), {
+            ...cfg,
+            secret: "",
+            challengeSecret: "process-key"
+        });
         expect(decision.status).toBe(503);
     });
 });

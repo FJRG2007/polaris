@@ -148,7 +148,10 @@ export interface InviteOrg {
  * escapes them - an organization called `<a href=...>` must not become a link in
  * somebody's inbox.
  */
-function orgInviteMessage(url: string, org: InviteOrg): { subject: string; text: string; html: string } {
+function orgInviteMessage(
+    url: string,
+    org: InviteOrg
+): { subject: string; text: string; html: string } {
     const subject = `${org.inviter} invited you to ${org.name} on Polaris`;
     const text = [
         `${org.inviter} invited you to join ${org.name} on Polaris.`,
@@ -199,7 +202,8 @@ async function inviteRefusal(email: string): Promise<string | null> {
         where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
         select: { id: true }
     });
-    if (open) return "There is already an open invite for that address. Revoke it before sending another.";
+    if (open)
+        return "There is already an open invite for that address. Revoke it before sending another.";
     return null;
 }
 
@@ -215,7 +219,10 @@ export async function createInvite(
 
     // Roles are rows an operator can add to, so an unknown name is a mistake to
     // report rather than an invite that quietly hands out nothing.
-    const role = await prisma.role.findUnique({ where: { name: input.role }, select: { id: true } });
+    const role = await prisma.role.findUnique({
+        where: { name: input.role },
+        select: { id: true }
+    });
     if (!role) return { id: "", error: "That role no longer exists." };
     const token = generateToken();
     // Only the groups the inviting administrator owns; a foreign id is dropped
@@ -231,7 +238,9 @@ export async function createInvite(
             email,
             tokenHash: hashToken(token),
             codeHash: code ? hashToken(code) : null,
-            passwordHash: input.oneTimePassword ? await hashLinkPassword(input.oneTimePassword) : null,
+            passwordHash: input.oneTimePassword
+                ? await hashLinkPassword(input.oneTimePassword)
+                : null,
             method: input.method,
             roleId: role.id,
             invitedById,
@@ -270,14 +279,23 @@ function inviteRules(invite: InviteRow): EffectiveAccessRules {
 }
 
 /** Look an invite up by whichever credential the recipient presented. */
-async function findInvite(credential: { token?: string; code?: string }): Promise<InviteRow | null> {
+async function findInvite(credential: {
+    token?: string;
+    code?: string;
+}): Promise<InviteRow | null> {
     if (credential.token) {
-        return prisma.invite.findUnique({ where: { tokenHash: hashToken(credential.token) }, select: INVITE_FIELDS });
+        return prisma.invite.findUnique({
+            where: { tokenHash: hashToken(credential.token) },
+            select: INVITE_FIELDS
+        });
     }
     if (credential.code) {
         const normalized = normalizeInviteCode(credential.code);
         if (normalized.length !== INVITE_CODE_LENGTH) return null;
-        return prisma.invite.findUnique({ where: { codeHash: hashToken(normalized) }, select: INVITE_FIELDS });
+        return prisma.invite.findUnique({
+            where: { codeHash: hashToken(normalized) },
+            select: INVITE_FIELDS
+        });
     }
     return null;
 }
@@ -323,7 +341,10 @@ export async function resolveInvite(
     const decision = await evaluateNetworkRules(inviteRules(invite), ip);
     if (!decision.allowed) return { refusal: "location" };
     const org = invite.orgId
-        ? await prisma.organization.findUnique({ where: { id: invite.orgId }, select: { name: true } })
+        ? await prisma.organization.findUnique({
+              where: { id: invite.orgId },
+              select: { name: true }
+          })
         : null;
     return {
         invite: {
@@ -421,7 +442,9 @@ export interface ClaimInput {
  * submitting it the invite may have been revoked, expired, claimed by somebody
  * else, or carried to another network.
  */
-export async function claimInvite(input: ClaimInput): Promise<{ email?: string; refusal?: InviteRefusal; error?: string }> {
+export async function claimInvite(
+    input: ClaimInput
+): Promise<{ email?: string; refusal?: InviteRefusal; error?: string }> {
     if (!(await claimAttemptAllowed(input.ip))) return { refusal: "throttled" };
 
     const invite = await findInvite({ token: input.token, code: input.code });
@@ -450,7 +473,10 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
     }
 
     if (invite.roleId) {
-        const role = await prisma.role.findUnique({ where: { id: invite.roleId }, select: { name: true } });
+        const role = await prisma.role.findUnique({
+            where: { id: invite.roleId },
+            select: { name: true }
+        });
         if (role) await assignRole(user.id, role.name);
     }
 
@@ -531,7 +557,9 @@ export async function listInvites(): Promise<InviteListItem[]> {
     // The invite keeps only the role id (the row it points at is not its own), so
     // the names are resolved in one query rather than one per invite.
     const roles = await prisma.role.findMany({
-        where: { id: { in: rows.map((row) => row.roleId).filter((id): id is string => id !== null) } },
+        where: {
+            id: { in: rows.map((row) => row.roleId).filter((id): id is string => id !== null) }
+        },
         select: { id: true, name: true }
     });
     const roleName = new Map(roles.map((role) => [role.id, role.name]));

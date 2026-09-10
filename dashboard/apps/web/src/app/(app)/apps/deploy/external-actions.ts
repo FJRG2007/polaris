@@ -77,7 +77,8 @@ export async function addExternalServiceAction(
 ): Promise<{ service?: external.ExternalServiceView; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = addSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         await requireProjectAccess(projectId, user.id, "service.create");
         const service = await external.addExternalService(user.id, projectId, parsed.data);
@@ -133,7 +134,9 @@ export async function renameExternalServiceAction(
     if (!named.success) return { error: named.error.issues[0]?.message ?? "Give it a name" };
     try {
         await requireProjectAccess(projectId, user.id, "service.configure");
-        return { service: await external.renameExternalService(projectId, parsed.data, named.data) };
+        return {
+            service: await external.renameExternalService(projectId, parsed.data, named.data)
+        };
     } catch (caught) {
         return { error: refusal(caught) };
     }
@@ -242,7 +245,8 @@ export async function moveOutAction(
     const service = idSchema.safeParse(applicationId);
     if (!service.success) return { error: "Unknown service" };
     const parsed = moveOutSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         // Reached through the environment the row lands in rather than through
         // the project, so an access limited to development cannot put one in
@@ -324,7 +328,8 @@ export async function moveHomeAction(
     const service = idSchema.safeParse(serviceId);
     if (!service.success) return { error: "Unknown service" };
     const parsed = moveHomeSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         // The environment is where the new service is created, and it arrives on
         // a form. Authorized through itself rather than through the project:

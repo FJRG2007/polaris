@@ -234,12 +234,18 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
         }
         if let Some(cpus) = service.cpus {
             if !cpus.is_finite() || !CPU_LIMIT_RANGE.contains(&cpus) {
-                return Err(format!("cpu limit for {} must be between 0.05 and 256", service.name));
+                return Err(format!(
+                    "cpu limit for {} must be between 0.05 and 256",
+                    service.name
+                ));
             }
         }
         if let Some(memory) = service.memory_mb {
             if !MEMORY_LIMIT_RANGE.contains(&memory) {
-                return Err(format!("memory limit for {} must be between 16 and 4194304 MB", service.name));
+                return Err(format!(
+                    "memory limit for {} must be between 16 and 4194304 MB",
+                    service.name
+                ));
             }
         }
     }
@@ -253,7 +259,11 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
             return Err(format!("invalid volume name: {vol}"));
         }
     }
-    if spec.external_volumes.iter().any(|vol| spec.volumes.contains(vol)) {
+    if spec
+        .external_volumes
+        .iter()
+        .any(|vol| spec.volumes.contains(vol))
+    {
         return Err("a volume cannot be both owned and external".into());
     }
     Ok(())
@@ -318,7 +328,10 @@ fn deploy_block(service: &ServiceSpec) -> String {
         out.push_str("      resources:\n        limits:\n");
         if let Some(cpus) = service.cpus {
             // Validated finite and in range; written as a quoted decimal.
-            out.push_str(&format!("          cpus: \"{}\"\n", (cpus * 100.0).round() / 100.0));
+            out.push_str(&format!(
+                "          cpus: \"{}\"\n",
+                (cpus * 100.0).round() / 100.0
+            ));
         }
         if let Some(memory) = service.memory_mb {
             out.push_str(&format!("          memory: {memory}M\n"));
@@ -1376,9 +1389,11 @@ mod tests {
         assert!(rendered.contains("    deploy:\n      resources:\n        limits:\n          cpus: \"0.5\"\n          memory: 512M\n"));
         assert!(!rendered.contains("mode: replicated"));
 
-        let too_small = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","memoryMb":4}]}"#);
+        let too_small =
+            spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","memoryMb":4}]}"#);
         assert!(validate_spec(&too_small, &config).is_err());
-        let too_many = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":1000.0}]}"#);
+        let too_many =
+            spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":1000.0}]}"#);
         assert!(validate_spec(&too_many, &config).is_err());
     }
 

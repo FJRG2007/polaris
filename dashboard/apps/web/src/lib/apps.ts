@@ -548,7 +548,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Capabilities",
             href: "/apps/capabilities",
             icon: Sparkles,
-            keywords: ["features", "what can it do", "overview", "rollbacks", "previews", "domains", "databases"]
+            keywords: [
+                "features",
+                "what can it do",
+                "overview",
+                "rollbacks",
+                "previews",
+                "domains",
+                "databases"
+            ]
         },
         {
             label: "Marketplace",

@@ -10,4 +10,7 @@ import { variableRoutes } from "@/lib/deploy/api/variable-routes";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const { GET, POST } = variableRoutes((params) => ({ kind: "service", ref: params.id ?? "" }));
+export const { GET, POST } = variableRoutes((params) => ({
+    kind: "service",
+    ref: params.id ?? ""
+}));

@@ -56,7 +56,10 @@ function slackBody(payload: WebhookPayload): unknown {
     const blocks: unknown[] = [
         {
             type: "section",
-            text: { type: "mrkdwn", text: `*${payload.title}*${payload.body ? `\n${payload.body}` : ""}` }
+            text: {
+                type: "mrkdwn",
+                text: `*${payload.title}*${payload.body ? `\n${payload.body}` : ""}`
+            }
         }
     ];
     if (payload.url) {
@@ -65,7 +68,10 @@ function slackBody(payload: WebhookPayload): unknown {
             elements: [{ type: "mrkdwn", text: `<${payload.url}|Open in Polaris>` }]
         });
     }
-    return { text: payload.title, attachments: [{ color: `#${COLORS[payload.level].toString(16).padStart(6, "0")}`, blocks }] };
+    return {
+        text: payload.title,
+        attachments: [{ color: `#${COLORS[payload.level].toString(16).padStart(6, "0")}`, blocks }]
+    };
 }
 
 /**
@@ -89,7 +95,15 @@ function teamsBody(payload: WebhookPayload): unknown {
                     version: "1.2",
                     body,
                     ...(payload.url
-                        ? { actions: [{ type: "Action.OpenUrl", title: "Open in Polaris", url: payload.url }] }
+                        ? {
+                              actions: [
+                                  {
+                                      type: "Action.OpenUrl",
+                                      title: "Open in Polaris",
+                                      url: payload.url
+                                  }
+                              ]
+                          }
                         : {})
                 }
             }
@@ -121,7 +135,8 @@ export async function sendWebhook(
     // Telegram is addressed by the chat in the URL it was given, and posted to the
     // method itself with the chat in the body.
     const telegram = format === "telegram" ? telegramTarget(url) : null;
-    if (format === "telegram" && !telegram) return { error: "That is not a Telegram sendMessage URL with a chat_id." };
+    if (format === "telegram" && !telegram)
+        return { error: "That is not a Telegram sendMessage URL with a chat_id." };
     let res: Response;
     try {
         res = await fetch(telegram ? telegram.endpoint : url, {
@@ -130,18 +145,28 @@ export async function sendWebhook(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(
                 telegram
-                    ? { chat_id: telegram.chatId, text: telegramText(payload), disable_web_page_preview: true }
+                    ? {
+                          chat_id: telegram.chatId,
+                          text: telegramText(payload),
+                          disable_web_page_preview: true
+                      }
                     : bodyFor(format, payload)
             ),
             signal: AbortSignal.timeout(TIMEOUT_MS)
         });
     } catch (caught) {
         const timedOut = caught instanceof Error && caught.name === "TimeoutError";
-        return { error: timedOut ? "The endpoint did not answer in time." : "The endpoint could not be reached." };
+        return {
+            error: timedOut
+                ? "The endpoint did not answer in time."
+                : "The endpoint could not be reached."
+        };
     }
     if (res.ok) return {};
-    if (res.status === 404) return { error: "The endpoint is gone (404). It was probably deleted." };
-    if (res.status === 401 || res.status === 403) return { error: "The endpoint refused the message (unauthorized)." };
+    if (res.status === 404)
+        return { error: "The endpoint is gone (404). It was probably deleted." };
+    if (res.status === 401 || res.status === 403)
+        return { error: "The endpoint refused the message (unauthorized)." };
     if (res.status === 429) return { error: "The endpoint is rate limiting Polaris (429)." };
     return { error: `The endpoint answered HTTP ${res.status}.` };
 }

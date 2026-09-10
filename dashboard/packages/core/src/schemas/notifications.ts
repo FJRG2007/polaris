@@ -61,7 +61,8 @@ export function telegramTarget(url: string): { endpoint: string; chatId: string 
     } catch {
         return null;
     }
-    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== TELEGRAM_HOST) return null;
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== TELEGRAM_HOST)
+        return null;
     if (!/^\/bot\d+:[A-Za-z0-9_-]+\/sendMessage$/.test(parsed.pathname)) return null;
     const chatId = parsed.searchParams.get("chat_id")?.trim() ?? "";
     if (!/^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(chatId)) return null;

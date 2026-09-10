@@ -36,7 +36,9 @@ function envelope(over: Partial<MailEnvelope> = {}): MailEnvelope {
 
 describe("subjects", () => {
     it("strips every reply prefix, in any language, however many are stacked", () => {
-        expect(mailbox.normalizeSubject("Re: AW: Re: Fwd: Quarterly report")).toBe("quarterly report");
+        expect(mailbox.normalizeSubject("Re: AW: Re: Fwd: Quarterly report")).toBe(
+            "quarterly report"
+        );
         expect(mailbox.normalizeSubject("SV: Rapport")).toBe("rapport");
         expect(mailbox.normalizeSubject("RE[2]: Invoice")).toBe("invoice");
     });
@@ -64,7 +66,12 @@ describe("threading", () => {
 
     it("joins a conversation by an id it names", () => {
         const found = mailbox.threadFor(envelope({ messageId: "b@x", inReplyTo: "a@x" }), [
-            { id: "t1", messageIds: ["a@x"], subjectKey: null, lastMessageAt: new Date("2026-05-01T09:00:00Z") }
+            {
+                id: "t1",
+                messageIds: ["a@x"],
+                subjectKey: null,
+                lastMessageAt: new Date("2026-05-01T09:00:00Z")
+            }
         ]);
         expect(found?.id).toBe("t1");
     });
@@ -107,7 +114,9 @@ describe("threading", () => {
 
 describe("addresses", () => {
     it("quotes a name that would otherwise split the header", () => {
-        expect(mailbox.formatAddress({ name: "Doe, Jane", address: "j@x.com" })).toBe('"Doe, Jane" <j@x.com>');
+        expect(mailbox.formatAddress({ name: "Doe, Jane", address: "j@x.com" })).toBe(
+            '"Doe, Jane" <j@x.com>'
+        );
         expect(mailbox.formatAddress({ name: "Jane", address: "j@x.com" })).toBe("Jane <j@x.com>");
         expect(mailbox.formatAddress({ name: "", address: "j@x.com" })).toBe("j@x.com");
     });
@@ -148,15 +157,17 @@ describe("addresses", () => {
             ...envelope({ from: [{ name: "", address: "noreply@x.com" }] }),
             replyTo: [{ name: "List", address: "list@x.com" }]
         };
-        expect(mailbox.replyRecipients(message, ["me@x.com"], false).to[0]?.address).toBe("list@x.com");
+        expect(mailbox.replyRecipients(message, ["me@x.com"], false).to[0]?.address).toBe(
+            "list@x.com"
+        );
     });
 });
 
 describe("what the list shows", () => {
     it("drops the quoted history out of a snippet", () => {
-        expect(mailbox.snippetFrom("Thanks, that works.\n> On Monday you wrote:\n> the old thing")).toBe(
-            "Thanks, that works."
-        );
+        expect(
+            mailbox.snippetFrom("Thanks, that works.\n> On Monday you wrote:\n> the old thing")
+        ).toBe("Thanks, that works.");
     });
 
     it("cuts a long one rather than returning a paragraph", () => {
@@ -165,7 +176,9 @@ describe("what the list shows", () => {
 
     it("undoes the encoding a message travelled in", () => {
         // Straight out of a real thread. Every one of these was on screen.
-        expect(mailbox.snippetFrom("Hola Mar=C3=ADa, =C2=BFqu=C3=A9 tal?")).toBe("Hola María, ¿qué tal?");
+        expect(mailbox.snippetFrom("Hola Mar=C3=ADa, =C2=BFqu=C3=A9 tal?")).toBe(
+            "Hola María, ¿qué tal?"
+        );
         expect(mailbox.snippetFrom("primera=0Asegunda")).toBe("primera segunda");
     });
 
@@ -260,15 +273,35 @@ describe("rules", () => {
     };
 
     it("matches on a field, whatever case either side was written in", () => {
-        expect(mailbox.mailConditionHolds({ field: "from", operator: "contains", value: "INVOICES@" }, message)).toBe(true);
-        expect(mailbox.mailConditionHolds({ field: "subject", operator: "starts-with", value: "invoice" }, message)).toBe(true);
-        expect(mailbox.mailConditionHolds({ field: "size", operator: "greater-than", value: "1000" }, message)).toBe(true);
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "from", operator: "contains", value: "INVOICES@" },
+                message
+            )
+        ).toBe(true);
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "subject", operator: "starts-with", value: "invoice" },
+                message
+            )
+        ).toBe(true);
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "size", operator: "greater-than", value: "1000" },
+                message
+            )
+        ).toBe(true);
     });
 
     it("treats a broken pattern as no match rather than throwing", () => {
         // A rule that never fires is a bad rule; a rule that throws stops every
         // other rule filing anything.
-        expect(mailbox.mailConditionHolds({ field: "subject", operator: "matches", value: "([" }, message)).toBe(false);
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "subject", operator: "matches", value: "([" },
+                message
+            )
+        ).toBe(false);
     });
 
     it("collects the actions of every matching rule, and stops where told", () => {
@@ -306,7 +339,9 @@ describe("rules", () => {
             stop: false
         };
         expect(mailbox.mailActionsFor([off], message)).toEqual([]);
-        expect(mailbox.mailActionsFor([{ ...off, enabled: true, conditions: [] }], message)).toEqual([]);
+        expect(
+            mailbox.mailActionsFor([{ ...off, enabled: true, conditions: [] }], message)
+        ).toEqual([]);
     });
 });
 
@@ -325,17 +360,21 @@ describe("privacy", () => {
     });
 
     it("names the company behind a tracker, and calls an unnamed pixel a tracker anyway", () => {
-        const found = mailbox.trackersIn(mailbox.remoteResourcesIn(`
+        const found = mailbox.trackersIn(
+            mailbox.remoteResourcesIn(`
             <img src="https://list-manage.com/open.gif">
             <img src="https://nobody-has-heard-of.example/x.gif" width="1" height="1">
             <img src="https://cdn.example/hero.jpg" width="600" height="300">
-        `));
+        `)
+        );
         expect(found).toHaveLength(2);
         expect(mailbox.trackerVendors(found)).toEqual(["Mailchimp"]);
     });
 
     it("holds every outside address without throwing it away", () => {
-        const held = mailbox.holdRemoteContent('<img src="https://x.example/a.png" srcset="https://x.example/b.png 2x">');
+        const held = mailbox.holdRemoteContent(
+            '<img src="https://x.example/a.png" srcset="https://x.example/b.png 2x">'
+        );
         expect(held).not.toContain(' src="https://');
         expect(held).toContain('data-remote-src="https://x.example/a.png"');
         expect(held).toContain('data-remote-srcset="https://x.example/b.png 2x"');
@@ -375,7 +414,9 @@ describe("privacy", () => {
     });
 
     it("numbers a srcset, and hands over the candidate it kept", () => {
-        const { html, urls } = proxied('<img src="https://a.ex/1.png" srcset="https://a.ex/2.png 2x, https://a.ex/3.png 3x">');
+        const { html, urls } = proxied(
+            '<img src="https://a.ex/1.png" srcset="https://a.ex/2.png 2x, https://a.ex/3.png 3x">'
+        );
         expect(html).toBe('<img src="#0" srcset="#1">');
         expect(urls).toEqual(["https://a.ex/1.png", "https://a.ex/2.png"]);
     });
@@ -388,7 +429,9 @@ describe("privacy", () => {
     });
 
     it("reads a background attribute where it actually sits", () => {
-        const { html, urls } = proxied('<td background="https://bg.ex/b.png"><img src="https://a.ex/1.png"></td>');
+        const { html, urls } = proxied(
+            '<td background="https://bg.ex/b.png"><img src="https://a.ex/1.png"></td>'
+        );
         expect(html).toBe('<td background="#0"><img src="#1"></td>');
         expect(urls).toEqual(["https://bg.ex/b.png", "https://a.ex/1.png"]);
     });
@@ -434,7 +477,9 @@ describe("privacy", () => {
         expect(mailbox.cleanLink("https://shop.example/item?id=7&utm_source=news&fbclid=abc")).toBe(
             "https://shop.example/item?id=7"
         );
-        expect(mailbox.cleanLink("https://shop.example/item?id=7")).toBe("https://shop.example/item?id=7");
+        expect(mailbox.cleanLink("https://shop.example/item?id=7")).toBe(
+            "https://shop.example/item?id=7"
+        );
         expect(mailbox.cleanLink("mailto:someone@example.com")).toBe("mailto:someone@example.com");
         expect(mailbox.cleanLink("not a url")).toBe("not a url");
     });
@@ -445,11 +490,17 @@ describe("working out where a domain's mail lives", () => {
         // The real records for a domain this was built against: nothing else
         // about it says where its mail is, so this is the only thing that can
         // answer.
-        expect(providers.serviceForExchangers(["mx00.ionos.es", "mx01.ionos.es"])?.slug).toBe("ionos-es");
+        expect(providers.serviceForExchangers(["mx00.ionos.es", "mx01.ionos.es"])?.slug).toBe(
+            "ionos-es"
+        );
         expect(providers.serviceForExchangers(["mx00.kundenserver.de"])?.slug).toBe("ionos-de");
         expect(providers.serviceForExchangers(["mx01.perfora.net"])?.slug).toBe("ionos");
-        expect(providers.serviceForExchangers(["aspmx.l.google.com"])?.slug).toBe("google-workspace");
-        expect(providers.serviceForExchangers(["acme-com.mail.protection.outlook.com"])?.slug).toBe("office365");
+        expect(providers.serviceForExchangers(["aspmx.l.google.com"])?.slug).toBe(
+            "google-workspace"
+        );
+        expect(providers.serviceForExchangers(["acme-com.mail.protection.outlook.com"])?.slug).toBe(
+            "office365"
+        );
     });
 
     it("matches on a label boundary, so a domain that merely ends in one is not it", () => {
@@ -484,7 +535,7 @@ describe("a plain-text message, drawn", () => {
 
     it("escapes before it links, so a message cannot write its own anchor", () => {
         const out = mailbox.textToHtml('<a href="https://evil.example">click</a>');
-        expect(out).not.toContain("<a href=\"https://evil.example\">click</a>");
+        expect(out).not.toContain('<a href="https://evil.example">click</a>');
         expect(out).toContain("&lt;a href=");
     });
 

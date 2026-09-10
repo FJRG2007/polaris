@@ -67,7 +67,9 @@ export interface MetricSpec<T = Point> {
     };
 }
 
-type Window = { kind: "preset"; preset: RangePreset } | { kind: "custom"; from: number; to: number };
+type Window =
+    | { kind: "preset"; preset: RangePreset }
+    | { kind: "custom"; from: number; to: number };
 
 function queryFor(window: Window): string {
     if (window.kind === "preset") return `range=${window.preset}`;
@@ -86,7 +88,9 @@ function queryFor(window: Window): string {
 const KEPT_MAX_AGE_MS = 24 * 3_600_000;
 
 function keptWindowLimit(window: Window): number {
-    return window.kind === "custom" ? KEPT_MAX_AGE_MS : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
+    return window.kind === "custom"
+        ? KEPT_MAX_AGE_MS
+        : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
 }
 
 /** "YYYY-MM-DDTHH:mm" in local time, for a datetime-local input default. */
@@ -141,7 +145,10 @@ export function MetricsHistory<T extends { t: number } = Point>({
             const controller = new AbortController();
             const at = Date.now();
             lastLoad.current = at;
-            void fetch(`${endpoint}${separator}${queryFor(window)}`, { cache: "no-store", signal: controller.signal })
+            void fetch(`${endpoint}${separator}${queryFor(window)}`, {
+                cache: "no-store",
+                signal: controller.signal
+            })
                 .then((res) => (res.ok ? res.json() : null))
                 .then((body) => {
                     const fetched = (body?.points ?? []) as T[];
@@ -267,7 +274,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
     // would not say which day it belongs to.
     const stampOf = useCallback(
         (at: number): string =>
-            to - from > 36 * 3_600_000 ? `${display.date(at)} ${display.time(at)}` : display.time(at),
+            to - from > 36 * 3_600_000
+                ? `${display.date(at)} ${display.time(at)}`
+                : display.time(at),
         [display, from, to]
     );
 
@@ -286,7 +295,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             }}
                             className={cn(
                                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                active
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             )}
                         >
                             {preset}
@@ -298,7 +309,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     onClick={() => setCustomOpen((value) => !value)}
                     className={cn(
                         "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                        window.kind === "custom" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        window.kind === "custom"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                 >
                     Custom
@@ -310,7 +323,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             : ""}
                     </span>
                 )}
-                {loading && <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />}
+                {loading && (
+                    <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />
+                )}
             </div>
 
             {customOpen && (
@@ -447,7 +462,14 @@ export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[]
  * a zero: a service with no volume is not a service storing nothing.
  */
 export const CONSUMPTION_METRICS: MetricSpec[] = [
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    {
+        key: "cpu",
+        label: "CPU",
+        value: (point) => point.cpuPercent,
+        format: percent,
+        tone: "primary",
+        max: 100
+    },
     {
         key: "mem",
         label: "Memory",

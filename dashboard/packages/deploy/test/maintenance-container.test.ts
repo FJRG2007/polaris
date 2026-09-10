@@ -18,7 +18,9 @@ const spec: ComposeSpec = {
             command: ["echo $HOME"],
             env: {},
             ports: [],
-            volumes: [{ source: "polaris-abc_stalwart-data", target: "/var/lib/stalwart", kind: "volume" }],
+            volumes: [
+                { source: "polaris-abc_stalwart-data", target: "/var/lib/stalwart", kind: "volume" }
+            ],
             labels: {},
             networks: [],
             restart: "no"

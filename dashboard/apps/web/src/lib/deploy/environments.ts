@@ -69,7 +69,8 @@ export function remapLayout(raw: string, ids: ReadonlyMap<string, string>): stri
     }
     if (Array.isArray(layout.links)) {
         next.links = layout.links.flatMap((link: unknown) => {
-            const entry = link && typeof link === "object" ? (link as Record<string, unknown>) : null;
+            const entry =
+                link && typeof link === "object" ? (link as Record<string, unknown>) : null;
             const source = typeof entry?.source === "string" ? ids.get(entry.source) : undefined;
             const target = typeof entry?.target === "string" ? ids.get(entry.target) : undefined;
             return entry && source && target ? [{ ...entry, source, target }] : [];
@@ -154,7 +155,9 @@ export async function cloneEnvironment(
         // Databases first, instances before the databases hosted inside them, so a
         // hosted one can be pointed at its clone's instance.
         const { createDatabase } = await import("@/lib/database-service");
-        const ordered = [...source.databases].sort((a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId)));
+        const ordered = [...source.databases].sort(
+            (a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId))
+        );
         for (const database of ordered) {
             const instanceId = database.parentId ? ids.get(database.parentId) : undefined;
             if (database.parentId && !instanceId) continue;
@@ -164,7 +167,9 @@ export async function cloneEnvironment(
                 name: database.name,
                 engine: database.engine as Parameters<typeof createDatabase>[1]["engine"],
                 version: database.version,
-                privileges: database.privileges as Parameters<typeof createDatabase>[1]["privileges"],
+                privileges: database.privileges as Parameters<
+                    typeof createDatabase
+                >[1]["privileges"],
                 ...(instanceId ? { instanceId } : {})
             });
             ids.set(database.id, created.id);
@@ -175,7 +180,8 @@ export async function cloneEnvironment(
         const { createVolume } = await import("@/lib/deploy-volume-service");
         const withheldByService: { applicationId: string; keys: string[] }[] = [];
         for (const application of source.applications) {
-            const repositoryBuilt = application.sourceType === "dockerfile" || application.sourceType === "nixpacks";
+            const repositoryBuilt =
+                application.sourceType === "dockerfile" || application.sourceType === "nixpacks";
             const created = await createApplication(ownerId, {
                 environmentId: environment.id,
                 targetId: application.targetId,
@@ -240,12 +246,21 @@ export async function cloneEnvironment(
             data: { layout: remapLayout(source.layout, ids) }
         });
 
-        const withheld = [...new Set([...shared.withheld, ...withheldByService.flatMap((one) => one.keys)])];
+        const withheld = [
+            ...new Set([...shared.withheld, ...withheldByService.flatMap((one) => one.keys)])
+        ];
         await activity.recordMany(
             withheldByService.flatMap((one) => {
                 const keys = [...new Set([...shared.withheld, ...one.keys])];
                 return keys.length > 0
-                    ? [{ subjectType: "app" as const, subjectId: one.applicationId, action: "secrets-withheld", toValue: keys.join(", ") }]
+                    ? [
+                          {
+                              subjectType: "app" as const,
+                              subjectId: one.applicationId,
+                              action: "secrets-withheld",
+                              toValue: keys.join(", ")
+                          }
+                      ]
                     : [];
             })
         );
@@ -262,8 +277,13 @@ export async function cloneEnvironment(
  */
 async function discardClone(environmentId: string, ownerId: string): Promise<void> {
     try {
-        const applications = await prisma.application.findMany({ where: { environmentId }, select: { id: true } });
-        await prisma.envVar.deleteMany({ where: { scopeType: "environment", scopeId: environmentId } });
+        const applications = await prisma.application.findMany({
+            where: { environmentId },
+            select: { id: true }
+        });
+        await prisma.envVar.deleteMany({
+            where: { scopeType: "environment", scopeId: environmentId }
+        });
         await prisma.wafRule.deleteMany({
             where: {
                 OR: [
@@ -292,7 +312,12 @@ export async function deployEnvironment(
     environmentId: string,
     ownerId: string,
     userId: string,
-    commit?: { sha: string; message?: string; authorName?: string | null; authorAvatarUrl?: string | null },
+    commit?: {
+        sha: string;
+        message?: string;
+        authorName?: string | null;
+        authorAvatarUrl?: string | null;
+    },
     trigger: "manual" | "preview" = "manual"
 ): Promise<{ started: number; failed: string[] }> {
     const [databases, applications] = await Promise.all([
@@ -312,18 +337,25 @@ export async function deployEnvironment(
     let started = 0;
     // Instances before the databases inside them: a hosted database is created
     // by statements run in its instance's container.
-    for (const database of [...databases].sort((a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId)))) {
+    for (const database of [...databases].sort(
+        (a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId))
+    )) {
         try {
             await deployDatabase(database.id, ownerId, userId);
             started += 1;
         } catch (error) {
-            failed.push(`${database.name}: ${error instanceof Error ? error.message : "could not start"}`);
+            failed.push(
+                `${database.name}: ${error instanceof Error ? error.message : "could not start"}`
+            );
         }
     }
     for (const application of applications) {
         try {
-            await deployService.ensureApplicationDomain(application.id, ownerId).catch(() => undefined);
-            const repositoryBuilt = application.sourceType === "dockerfile" || application.sourceType === "nixpacks";
+            await deployService
+                .ensureApplicationDomain(application.id, ownerId)
+                .catch(() => undefined);
+            const repositoryBuilt =
+                application.sourceType === "dockerfile" || application.sourceType === "nixpacks";
             await deployService.deployApplication(
                 application.id,
                 ownerId,
@@ -340,11 +372,16 @@ export async function deployEnvironment(
             );
             if (repositoryBuilt && commit) {
                 // The poller would otherwise see a new head and deploy it again.
-                await prisma.application.update({ where: { id: application.id }, data: { lastDeployedSha: commit.sha } });
+                await prisma.application.update({
+                    where: { id: application.id },
+                    data: { lastDeployedSha: commit.sha }
+                });
             }
             started += 1;
         } catch (error) {
-            failed.push(`${application.name}: ${error instanceof Error ? error.message : "could not start"}`);
+            failed.push(
+                `${application.name}: ${error instanceof Error ? error.message : "could not start"}`
+            );
         }
     }
     return { started, failed };
@@ -385,7 +422,9 @@ async function projectsPreviewing(repo: string) {
         const base = project.environments[0];
         if (!base) return [];
         const builds = base.applications.some((one) => repositoryOf(one.sourceConfig) === wanted);
-        return builds ? [{ projectId: project.id, ownerId: project.ownerId, baseEnvironmentId: base.id }] : [];
+        return builds
+            ? [{ projectId: project.id, ownerId: project.ownerId, baseEnvironmentId: base.id }]
+            : [];
     });
 }
 
@@ -476,18 +515,27 @@ export async function ensurePullRequestPreview(
                 "preview"
             );
             if (result.failed.length > 0) {
-                console.warn(`polaris: preview for ${repo}#${pull.number}: ${result.failed.join("; ")}`);
+                console.warn(
+                    `polaris: preview for ${repo}#${pull.number}: ${result.failed.join("; ")}`
+                );
             }
             created += 1;
         } catch (error) {
-            console.error(`polaris: could not create the preview for ${repo}#${pull.number}:`, error);
+            console.error(
+                `polaris: could not create the preview for ${repo}#${pull.number}:`,
+                error
+            );
         }
     }
     return created;
 }
 
 /** Remove one preview environment. False when it could not be. */
-async function removePreview(environmentId: string, ownerId: string, label: string): Promise<boolean> {
+async function removePreview(
+    environmentId: string,
+    ownerId: string,
+    label: string
+): Promise<boolean> {
     const { deleteEnvironment } = await import("@/lib/deploy-service");
     try {
         await deleteEnvironment(environmentId, ownerId);
@@ -509,7 +557,8 @@ export async function closePullRequestPreview(repo: string, number: number): Pro
     });
     let removed = 0;
     for (const environment of environments) {
-        if (await removePreview(environment.id, environment.project.ownerId, `${repo}#${number}`)) removed += 1;
+        if (await removePreview(environment.id, environment.project.ownerId, `${repo}#${number}`))
+            removed += 1;
     }
     return removed;
 }
@@ -585,7 +634,11 @@ export async function reconcilePullRequestPreviews(): Promise<void> {
         // stopped building from that repository, are cleaned up on the same pass.
         for (const preview of previews) {
             if (!enabled || !repos.has(preview.repo)) {
-                await removePreview(preview.id, project.ownerId, `${preview.repo}#${preview.pullRequest}`);
+                await removePreview(
+                    preview.id,
+                    project.ownerId,
+                    `${preview.repo}#${preview.pullRequest}`
+                );
             }
         }
         // And so is the moment it started previewing, so switching back on later
@@ -609,18 +662,24 @@ export async function reconcilePullRequestPreviews(): Promise<void> {
             const [owner, name] = repo.split("/") as [string, string];
             const token = await githubTokenForOwner(project.ownerId, owner);
             const key = `${project.ownerId}:${repo}`;
-            if (!openByRepo.has(key)) openByRepo.set(key, await listOpenPullRequests(owner, name, token));
+            if (!openByRepo.has(key))
+                openByRepo.set(key, await listOpenPullRequests(owner, name, token));
             const open = openByRepo.get(key);
             if (!open) continue;
             const numbers = new Set(open.map((pull) => pull.number));
             for (const preview of previews) {
                 if (preview.repo !== repo || numbers.has(preview.pullRequest)) continue;
                 if ((await pullRequestIsOpen(owner, name, preview.pullRequest, token)) === false) {
-                    await removePreview(preview.id, project.ownerId, `${repo}#${preview.pullRequest}`);
+                    await removePreview(
+                        preview.id,
+                        project.ownerId,
+                        `${repo}#${preview.pullRequest}`
+                    );
                 }
             }
             for (const pull of open) {
-                if (previews.some((one) => one.repo === repo && one.pullRequest === pull.number)) continue;
+                if (previews.some((one) => one.repo === repo && one.pullRequest === pull.number))
+                    continue;
                 if (!openedSince(pull.openedAt, since)) continue;
                 await ensurePullRequestPreview({ repo, ...pull }, project.id);
             }

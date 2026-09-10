@@ -42,7 +42,9 @@ export interface Dns01Order {
 }
 
 /** Order a certificate, returning it and its private key as PEM. */
-export async function orderDns01Certificate(order: Dns01Order): Promise<{ certificate: string; key: string }> {
+export async function orderDns01Certificate(
+    order: Dns01Order
+): Promise<{ certificate: string; key: string }> {
     // Imported here rather than at module load: this is a heavy dependency used by a
     // scheduled job, and nothing else that imports this file should pay for it.
     const acme = await import("acme-client");
@@ -62,8 +64,12 @@ export async function orderDns01Certificate(order: Dns01Order): Promise<{ certif
         termsOfServiceAgreed: true,
         challengePriority: ["dns-01"],
         challengeCreateFn: async (authz, challenge, keyAuthorization) => {
-            if (challenge.type !== "dns-01") throw new Error("only the DNS challenge can issue this certificate");
-            const handle = await order.provider.present(challengeRecordName(authz.identifier.value), keyAuthorization);
+            if (challenge.type !== "dns-01")
+                throw new Error("only the DNS challenge can issue this certificate");
+            const handle = await order.provider.present(
+                challengeRecordName(authz.identifier.value),
+                keyAuthorization
+            );
             published.set(`${authz.identifier.value} ${keyAuthorization}`, handle);
             await new Promise((resolve) => setTimeout(resolve, settle));
         },

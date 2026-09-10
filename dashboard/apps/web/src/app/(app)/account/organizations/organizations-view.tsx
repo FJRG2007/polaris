@@ -270,45 +270,48 @@ export function OrganizationsView({
                             {org.restricted ? (
                                 <RestrictedOrgRow org={org} />
                             ) : (
-                            <Link
-                                // A successor is not on the roster, so the
-                                // overview is not theirs to open; their row goes
-                                // straight to the one screen that is.
-                                href={`/account/organizations/${org.slug}${org.role === "successor" ? "/admin/settings" : ""}`}
-                                className="border-border hover:bg-muted flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
-                            >
-                                <OrgAvatar org={org} size={36} />
-                                <span className="min-w-0 flex-1">
-                                    <span className="flex items-center gap-2">
-                                        <span
-                                            className="truncate text-sm font-medium"
-                                            title={org.name}
-                                        >
-                                            {org.name}
+                                <Link
+                                    // A successor is not on the roster, so the
+                                    // overview is not theirs to open; their row goes
+                                    // straight to the one screen that is.
+                                    href={`/account/organizations/${org.slug}${org.role === "successor" ? "/admin/settings" : ""}`}
+                                    className="border-border hover:bg-muted flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
+                                >
+                                    <OrgAvatar org={org} size={36} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center gap-2">
+                                            <span
+                                                className="truncate text-sm font-medium"
+                                                title={org.name}
+                                            >
+                                                {org.name}
+                                            </span>
+                                            <Badge
+                                                variant={
+                                                    org.role === "owner" ? "primary" : "neutral"
+                                                }
+                                            >
+                                                {org.roleName}
+                                            </Badge>
                                         </span>
-                                        <Badge
-                                            variant={org.role === "owner" ? "primary" : "neutral"}
-                                        >
-                                            {org.roleName}
-                                        </Badge>
+                                        <span className="text-muted-foreground block truncate text-xs">
+                                            @{org.slug}
+                                            {org.description ? ` - ${org.description}` : ""}
+                                        </span>
                                     </span>
-                                    <span className="text-muted-foreground block truncate text-xs">
-                                        @{org.slug}
-                                        {org.description ? ` - ${org.description}` : ""}
+                                    <span className="text-muted-foreground hidden shrink-0 items-center gap-3 text-xs sm:flex">
+                                        <span className="flex items-center gap-1">
+                                            <Users className="size-3.5 shrink-0" />{" "}
+                                            {org.memberCount}
+                                        </span>
+                                        <span>
+                                            {org.teamCount} team{org.teamCount === 1 ? "" : "s"}
+                                        </span>
+                                        <span>
+                                            {org.spaceCount} space{org.spaceCount === 1 ? "" : "s"}
+                                        </span>
                                     </span>
-                                </span>
-                                <span className="text-muted-foreground hidden shrink-0 items-center gap-3 text-xs sm:flex">
-                                    <span className="flex items-center gap-1">
-                                        <Users className="size-3.5 shrink-0" /> {org.memberCount}
-                                    </span>
-                                    <span>
-                                        {org.teamCount} team{org.teamCount === 1 ? "" : "s"}
-                                    </span>
-                                    <span>
-                                        {org.spaceCount} space{org.spaceCount === 1 ? "" : "s"}
-                                    </span>
-                                </span>
-                            </Link>
+                                </Link>
                             )}
                         </li>
                     ))}

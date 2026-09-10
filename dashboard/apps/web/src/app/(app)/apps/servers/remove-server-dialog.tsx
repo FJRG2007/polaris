@@ -16,7 +16,11 @@ import { useEffect, useState, useTransition } from "react";
 import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Loader2, Server, TriangleAlert } from "lucide-react";
 import { removeServerAction, serverRemovalPlanAction } from "./actions";
-import type { RemoveServerResult, ServerRemovalMode, ServerRemovalPlan } from "@/lib/server-removal-service";
+import type {
+    RemoveServerResult,
+    ServerRemovalMode,
+    ServerRemovalPlan
+} from "@/lib/server-removal-service";
 
 interface Choice {
     readonly mode: ServerRemovalMode;
@@ -143,7 +147,9 @@ export function RemoveServerDialog({
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
                                 {choice.label}
-                                {mode === choice.mode ? <Check className="size-3.5 text-primary" /> : null}
+                                {mode === choice.mode ? (
+                                    <Check className="size-3.5 text-primary" />
+                                ) : null}
                             </span>
                             <span className="text-xs text-muted-foreground">{choice.summary}</span>
                         </button>
@@ -157,13 +163,18 @@ export function RemoveServerDialog({
                             value={destination}
                             onValueChange={setDestination}
                             disabled={pending}
-                            options={plan.destinations.map((entry) => ({ value: entry.id, label: entry.name }))}
+                            options={plan.destinations.map((entry) => ({
+                                value: entry.id,
+                                label: entry.name
+                            }))}
                         />
                         {plan.localVolumes > 0 ? (
                             <span className="text-xs text-warning">
-                                {plan.localVolumes === 1 ? "One volume" : `${plan.localVolumes} volumes`} on this
-                                machine {plan.localVolumes === 1 ? "is" : "are"} re-created empty on the new server.
-                                Copy anything you need off it first.
+                                {plan.localVolumes === 1
+                                    ? "One volume"
+                                    : `${plan.localVolumes} volumes`}{" "}
+                                on this machine {plan.localVolumes === 1 ? "is" : "are"} re-created
+                                empty on the new server. Copy anything you need off it first.
                             </span>
                         ) : null}
                     </label>
@@ -172,7 +183,8 @@ export function RemoveServerDialog({
                 {pending && mode === "move" ? (
                     <p className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="size-3.5 animate-spin" />
-                        Moving the services. Each one is a full deploy, so this takes a few minutes - leave this open.
+                        Moving the services. Each one is a full deploy, so this takes a few minutes
+                        - leave this open.
                     </p>
                 ) : null}
             </div>
@@ -211,7 +223,8 @@ function Inventory({
                     ) : null}{" "}
                     {plan.runnerPools > 0 ? (
                         <>
-                            {plan.runnerPools} {plan.runnerPools === 1 ? "runner pool" : "runner pools"} lose the
+                            {plan.runnerPools}{" "}
+                            {plan.runnerPools === 1 ? "runner pool" : "runner pools"} lose the
                             machine they run on.
                         </>
                     ) : null}

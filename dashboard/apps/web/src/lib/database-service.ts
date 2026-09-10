@@ -236,7 +236,9 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     const parent = parsed.instanceId ? await instanceFor(parsed.instanceId, ownerId) : null;
     if (parsed.instanceId && !parent) throw new Error("The selected instance was not found");
     if (parent && parent.engine !== parsed.engine) {
-        throw new Error(`That instance runs ${DB_ENGINE_INFO[parent.engine as DbEngine]?.label ?? parent.engine}`);
+        throw new Error(
+            `That instance runs ${DB_ENGINE_INFO[parent.engine as DbEngine]?.label ?? parent.engine}`
+        );
     }
     if (parent?.parentId) throw new Error("That database is itself hosted on an instance");
 
@@ -280,7 +282,14 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
 async function instanceFor(id: string, ownerId: string) {
     return prisma.managedDatabase.findFirst({
         where: { id, environment: { project: { ownerId } } },
-        select: { id: true, engine: true, version: true, targetId: true, parentId: true, containerName: true }
+        select: {
+            id: true,
+            engine: true,
+            version: true,
+            targetId: true,
+            parentId: true,
+            containerName: true
+        }
     });
 }
 
@@ -289,7 +298,11 @@ async function instanceFor(id: string, ownerId: string) {
  * inside: same engine, already provisioned (a container that was never deployed
  * has nothing to run a statement in), and not themselves hosted on another.
  */
-export async function listDatabaseInstances(environmentId: string, engine: DbEngine, ownerId: string) {
+export async function listDatabaseInstances(
+    environmentId: string,
+    engine: DbEngine,
+    ownerId: string
+) {
     if (!DB_ENGINE_INFO[engine].namedDatabases) return [];
     const rows = await prisma.managedDatabase.findMany({
         where: {
@@ -300,7 +313,13 @@ export async function listDatabaseInstances(environmentId: string, engine: DbEng
             environment: { project: { ownerId } }
         },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, version: true, status: true, _count: { select: { children: true } } }
+        select: {
+            id: true,
+            name: true,
+            version: true,
+            status: true,
+            _count: { select: { children: true } }
+        }
     });
     return rows.map((row) => ({
         id: row.id,
@@ -312,11 +331,15 @@ export async function listDatabaseInstances(environmentId: string, engine: DbEng
 }
 
 /** Decrypt a database's stored credentials (for a connection string display). */
-export async function databaseCredentials(databaseId: string, ownerId: string): Promise<DbCredentials> {
+export async function databaseCredentials(
+    databaseId: string,
+    ownerId: string
+): Promise<DbCredentials> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } }
     });
-    if (!row || !row.encryptedCredential || !row.credentialNonce) throw new Error("Database not found");
+    if (!row || !row.encryptedCredential || !row.credentialNonce)
+        throw new Error("Database not found");
     return decryptCredentials<DbCredentials>(
         {
             ciphertext: Buffer.from(row.encryptedCredential),
@@ -352,7 +375,10 @@ export interface DatabaseConnection {
  * This is the thing anyone who just created a database needs next, so it is
  * served as one value rather than leaving five fields to be assembled by hand.
  */
-export async function databaseConnection(databaseId: string, ownerId: string): Promise<DatabaseConnection> {
+export async function databaseConnection(
+    databaseId: string,
+    ownerId: string
+): Promise<DatabaseConnection> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         include: { parent: { select: { containerName: true, exposePort: true, replicaSet: true } } }
@@ -372,7 +398,9 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
     // both, which a dedicated instance's own account could not sign in with.
     const mongoParams = [
         `authSource=${row.parent ? creds.database : "admin"}`,
-        ...((row.parent ? row.parent.replicaSet : row.replicaSet) ? [`replicaSet=${MONGO_REPLICA_SET}`] : [])
+        ...((row.parent ? row.parent.replicaSet : row.replicaSet)
+            ? [`replicaSet=${MONGO_REPLICA_SET}`]
+            : [])
     ].join("&");
     const uri =
         engine === "seaweedfs"
@@ -425,7 +453,11 @@ export async function provisionInInstance(databaseId: string, ownerId: string): 
 
     const ports = await getPorts(db.parent.target as TargetRow, ownerId);
     try {
-        await runCommands(ports, db.parent.containerName, createDatabaseCommands(db.engine as DbEngine, grant));
+        await runCommands(
+            ports,
+            db.parent.containerName,
+            createDatabaseCommands(db.engine as DbEngine, grant)
+        );
     } finally {
         await ports.dispose();
     }
@@ -441,13 +473,19 @@ async function runCommands(
         const result = await ports.runIn(container, command.argv);
         if (result.code !== 0) {
             const reason = result.output.trim().split("\n").filter(Boolean).at(-1);
-            throw new Error(`${command.describe} failed: ${reason ?? `exit status ${result.code}`}`);
+            throw new Error(
+                `${command.describe} failed: ${reason ?? `exit status ${result.code}`}`
+            );
         }
     }
 }
 
 /** Provision (or re-provision) a managed database. */
-export async function deployDatabase(databaseId: string, ownerId: string, userId: string): Promise<string> {
+export async function deployDatabase(
+    databaseId: string,
+    ownerId: string,
+    userId: string
+): Promise<string> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true }
@@ -469,11 +507,23 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         });
         try {
             await provisionInInstance(db.id, ownerId);
-            await prisma.deployment.update({ where: { id: deployment.id }, data: { status: "running" } });
-            await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: "running" } });
+            await prisma.deployment.update({
+                where: { id: deployment.id },
+                data: { status: "running" }
+            });
+            await prisma.managedDatabase.update({
+                where: { id: db.id },
+                data: { status: "running" }
+            });
         } catch (error) {
-            await prisma.deployment.update({ where: { id: deployment.id }, data: { status: "failed" } });
-            await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: "failed" } });
+            await prisma.deployment.update({
+                where: { id: deployment.id },
+                data: { status: "failed" }
+            });
+            await prisma.managedDatabase.update({
+                where: { id: db.id },
+                data: { status: "failed" }
+            });
             throw error;
         }
         return deployment.id;
@@ -507,7 +557,17 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
         dataPath: databaseDataPath(db.engine, db.version),
         exposePort: db.exposePort ?? undefined,
         limits: limitsOf(db),
-        ...(archiveOf ? { extraVolumes: [{ source: pitrHostFolder(archiveOf), target: PITR_MOUNT, kind: "bind" as const }] } : {}),
+        ...(archiveOf
+            ? {
+                  extraVolumes: [
+                      {
+                          source: pitrHostFolder(archiveOf),
+                          target: PITR_MOUNT,
+                          kind: "bind" as const
+                      }
+                  ]
+              }
+            : {}),
         // Nothing routes to a database, so in an isolated environment it leaves the
         // proxy network entirely: the services beside it reach it on their own
         // network, and the daemon attaches the dashboard there for the data browser.
@@ -539,7 +599,10 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
             undefined,
             plan.image ? [plan.image] : []
         );
-        const final = await prisma.deployment.findUnique({ where: { id: deployment.id }, select: { status: true } });
+        const final = await prisma.deployment.findUnique({
+            where: { id: deployment.id },
+            select: { status: true }
+        });
         const running = final?.status === "running";
         await prisma.managedDatabase.update({
             where: { id: db.id },
@@ -591,7 +654,9 @@ export async function deployDatabaseAndWait(
             select: { status: true, error: true }
         });
         if (row && !["queued", "deploying", "building"].includes(row.status)) {
-            return row.status === "running" ? null : (row.error ?? `the deploy ended ${row.status}`);
+            return row.status === "running"
+                ? null
+                : (row.error ?? `the deploy ended ${row.status}`);
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
     }
@@ -610,7 +675,11 @@ export async function deployDatabaseAndWait(
 export async function deleteDatabase(databaseId: string, ownerId: string): Promise<void> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true, parent: { include: { target: true } } }
+        include: {
+            environment: { include: { project: true } },
+            target: true,
+            parent: { include: { target: true } }
+        }
     });
     if (!db) throw new Error("Database not found");
 
@@ -644,7 +713,9 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
                 }
             }
         }
-        await prisma.deployment.deleteMany({ where: { deployableType: "database", deployableId: databaseId } });
+        await prisma.deployment.deleteMany({
+            where: { deployableType: "database", deployableId: databaseId }
+        });
         await prisma.managedDatabase.delete({ where: { id: databaseId } });
         return;
     }
@@ -663,6 +734,8 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
         await ports.dispose();
     }
 
-    await prisma.deployment.deleteMany({ where: { deployableType: "database", deployableId: databaseId } });
+    await prisma.deployment.deleteMany({
+        where: { deployableType: "database", deployableId: databaseId }
+    });
     await prisma.managedDatabase.delete({ where: { id: databaseId } });
 }

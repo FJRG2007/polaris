@@ -103,8 +103,16 @@ export class HostdClient {
         if (response.status !== 201) {
             throw new Error(daemonMessage("mount", response));
         }
-        const parsed = JSON.parse(response.body) as { id: string; mountpoint?: string; created?: boolean };
-        return { id: parsed.id, mountPath: parsed.mountpoint ?? "", created: parsed.created ?? false };
+        const parsed = JSON.parse(response.body) as {
+            id: string;
+            mountpoint?: string;
+            created?: boolean;
+        };
+        return {
+            id: parsed.id,
+            mountPath: parsed.mountpoint ?? "",
+            created: parsed.created ?? false
+        };
     }
 
     /** Release a mount previously created through createMount. */
@@ -193,10 +201,18 @@ export class HostdClient {
      * Polaris's own containers are attached to each one kept (a recreated edge
      * comes back without them), and any the set no longer names is removed.
      */
-    public async reconcilePrivateNetworks(keep: readonly string[]): Promise<{ kept: number; removed: number }> {
-        const response = await this.call("POST", "/v1/deploy/networks/reconcile", JSON.stringify({ keep }));
+    public async reconcilePrivateNetworks(
+        keep: readonly string[]
+    ): Promise<{ kept: number; removed: number }> {
+        const response = await this.call(
+            "POST",
+            "/v1/deploy/networks/reconcile",
+            JSON.stringify({ keep })
+        );
         if (response.status !== 200) {
-            throw new Error(`hostd network reconcile failed (${response.status}): ${response.body}`);
+            throw new Error(
+                `hostd network reconcile failed (${response.status}): ${response.body}`
+            );
         }
         const parsed = JSON.parse(response.body) as { kept?: unknown; removed?: unknown };
         return {
@@ -262,7 +278,11 @@ export class HostdClient {
     }
 
     /** Write a file inside a container by streaming its content. */
-    public async fsWrite(container: string, path: string, content: Buffer): Promise<IncomingMessage> {
+    public async fsWrite(
+        container: string,
+        path: string,
+        content: Buffer
+    ): Promise<IncomingMessage> {
         return this.callStream("POST", "/v1/deploy/fs/write", content, {
             "content-type": "application/octet-stream",
             "x-polaris-container": container,
@@ -303,7 +323,9 @@ export class HostdClient {
      * what the load printed. The daemon refuses an archive naming anything else.
      */
     public async imageImport(body: NodeJS.ReadableStream, size: number): Promise<IncomingMessage> {
-        return this.upload("/v1/deploy/image/import", body, size, { "content-type": "application/gzip" });
+        return this.upload("/v1/deploy/image/import", body, size, {
+            "content-type": "application/gzip"
+        });
     }
 
     /** Stream a body of known length to a route: the daemon reads exactly `size`
@@ -336,18 +358,33 @@ export class HostdClient {
 
     /** Empty a volume's mount point inside a container, keeping the directory. */
     public async volumeWipe(container: string, path: string): Promise<IncomingMessage> {
-        return this.callStream("POST", "/v1/deploy/volume/wipe", JSON.stringify({ container, path }));
+        return this.callStream(
+            "POST",
+            "/v1/deploy/volume/wipe",
+            JSON.stringify({ container, path })
+        );
     }
 
     /** Run a command inside a container to completion, resolving its exit code
      *  and combined output. For work whose result the caller has to act on -
      *  unlike the interactive exec below, which only streams. */
-    public async execRun(container: string, argv: string[]): Promise<{ code: number; output: string }> {
-        const response = await this.call("POST", "/v1/deploy/exec/run", JSON.stringify({ container, argv }));
+    public async execRun(
+        container: string,
+        argv: string[]
+    ): Promise<{ code: number; output: string }> {
+        const response = await this.call(
+            "POST",
+            "/v1/deploy/exec/run",
+            JSON.stringify({ container, argv })
+        );
         if (response.status !== 200) throw new Error(daemonMessage("exec", response));
         const parsed = JSON.parse(response.body) as { code?: unknown; output?: unknown };
-        if (typeof parsed.code !== "number") throw new Error("the host daemon returned no exit status");
-        return { code: parsed.code, output: typeof parsed.output === "string" ? parsed.output : "" };
+        if (typeof parsed.code !== "number")
+            throw new Error("the host daemon returned no exit status");
+        return {
+            code: parsed.code,
+            output: typeof parsed.output === "string" ? parsed.output : ""
+        };
     }
 
     /** Create an interactive exec in a container; returns the exec id. */
@@ -438,7 +475,10 @@ export class HostdClient {
         extraHeaders?: Record<string, string>
     ): Promise<IncomingMessage> {
         const token = await this.token();
-        const headers: Record<string, string> = { authorization: `Bearer ${token}`, ...extraHeaders };
+        const headers: Record<string, string> = {
+            authorization: `Bearer ${token}`,
+            ...extraHeaders
+        };
         if (body !== undefined) {
             if (!headers["content-type"]) headers["content-type"] = "application/json";
             headers["content-length"] = String(Buffer.byteLength(body));
@@ -472,7 +512,10 @@ export class HostdClient {
                 const chunks: Buffer[] = [];
                 res.on("data", (chunk: Buffer) => chunks.push(chunk));
                 res.on("end", () =>
-                    resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") })
+                    resolve({
+                        status: res.statusCode ?? 0,
+                        body: Buffer.concat(chunks).toString("utf8")
+                    })
                 );
             });
             req.on("error", reject);
@@ -502,7 +545,12 @@ function isHealth(value: unknown): value is HostdHealth {
     const caps = record.capabilities;
     if (typeof caps !== "object" || caps === null) return false;
     const flags = caps as Record<string, unknown>;
-    return ["hostFilesystem", "nativeMounts", "docker", "kubernetes", "systemd", "autoUpdate"].every(
-        (key) => typeof flags[key] === "boolean"
-    );
+    return [
+        "hostFilesystem",
+        "nativeMounts",
+        "docker",
+        "kubernetes",
+        "systemd",
+        "autoUpdate"
+    ].every((key) => typeof flags[key] === "boolean");
 }

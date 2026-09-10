@@ -40,7 +40,10 @@ const IMPLICIT_TLS_PORT = 465;
 const CONNECT_TIMEOUT_MS = 20_000;
 const SOCKET_TIMEOUT_MS = 60_000;
 
-function transportFor(account: MailSendSource, credential: Awaited<ReturnType<typeof mailCredential>>) {
+function transportFor(
+    account: MailSendSource,
+    credential: Awaited<ReturnType<typeof mailCredential>>
+) {
     return createTransport({
         host: account.smtpHost,
         port: account.smtpPort,
@@ -48,7 +51,11 @@ function transportFor(account: MailSendSource, credential: Awaited<ReturnType<ty
         auth:
             credential.kind === "password"
                 ? { user: credential.user, pass: credential.pass }
-                : { type: "OAuth2" as const, user: credential.user, accessToken: credential.accessToken },
+                : {
+                      type: "OAuth2" as const,
+                      user: credential.user,
+                      accessToken: credential.accessToken
+                  },
         // A server that offers STARTTLS is taken up on it: without this a
         // downgrade would put the credential on a plain socket.
         requireTLS: account.smtpSecurity !== "tls" && account.smtpPort !== IMPLICIT_TLS_PORT,

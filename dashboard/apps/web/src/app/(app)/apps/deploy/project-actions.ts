@@ -53,7 +53,11 @@ import {
 const DEPLOY_PATH = "/apps/deploy";
 
 /** What a token that may change things can do through the Deploy API. */
-const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = ["deploy.run", "variables.write", "domains.manage"];
+const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = [
+    "deploy.run",
+    "variables.write",
+    "domains.manage"
+];
 
 /** The one shape every action here answers with, so a caller never has to guess
  *  whether a missing `error` means success or a field it forgot to read. */
@@ -226,7 +230,9 @@ export async function setEnvironmentNetworkModeAction(input: {
             "project.settings"
         );
         if (parsed.data.apply && !accessCan(access, "deploy.run")) {
-            return { error: "You can change this setting, but not deploy the services in this environment." };
+            return {
+                error: "You can change this setting, but not deploy the services in this environment."
+            };
         }
         const { previous } = await deployService.setEnvironmentNetworkMode(
             parsed.data.environmentId,
@@ -370,7 +376,10 @@ export async function createProjectTokenAction(
         );
         // A token acts with its minter's access and never more, so one that may
         // change things is only minted by somebody who can change something here.
-        if (parsed.data.canManage && !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))) {
+        if (
+            parsed.data.canManage &&
+            !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))
+        ) {
             return {
                 error: "You cannot deploy, change variables or manage domains in this project, so a token you make could not either. Make a read-only token, or ask the project's owner for one."
             };

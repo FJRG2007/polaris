@@ -50,10 +50,19 @@ const DAY = 24 * 3_600_000;
 async function pitrInstance(databaseId: string, ownerId: string) {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        select: { id: true, engine: true, parentId: true, pitr: true, pitrKeepDays: true, status: true, name: true }
+        select: {
+            id: true,
+            engine: true,
+            parentId: true,
+            pitr: true,
+            pitrKeepDays: true,
+            status: true,
+            name: true
+        }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    if (row.engine !== "postgres") throw new DatabaseOperationError("Point-in-time recovery is for PostgreSQL.");
+    if (row.engine !== "postgres")
+        throw new DatabaseOperationError("Point-in-time recovery is for PostgreSQL.");
     if (row.parentId) {
         throw new DatabaseOperationError(
             "This database lives inside another instance; turn point-in-time recovery on for that instance."
@@ -79,7 +88,10 @@ export async function setPitr(
         throw new DatabaseOperationError("Pick one of the offered windows.");
     }
     if (row.pitr === input.enabled) {
-        await prisma.managedDatabase.update({ where: { id: row.id }, data: { pitrKeepDays: input.keepDays } });
+        await prisma.managedDatabase.update({
+            where: { id: row.id },
+            data: { pitrKeepDays: input.keepDays }
+        });
         return { deploymentId: null };
     }
     if (!input.enabled) {
@@ -88,7 +100,13 @@ export async function setPitr(
         const context = await instanceContext(row.id, ownerId).catch(() => null);
         if (context) {
             await withPorts(context, (ports) =>
-                ports.runIn(context.container, ["sh", "-c", 'rm -rf "$1/wal" "$1/base"', "polaris", PITR_MOUNT])
+                ports.runIn(context.container, [
+                    "sh",
+                    "-c",
+                    'rm -rf "$1/wal" "$1/base"',
+                    "polaris",
+                    PITR_MOUNT
+                ])
             ).catch(() => undefined);
         }
         await prisma.databaseBaseBackup.deleteMany({ where: { databaseId: row.id } });
@@ -105,7 +123,11 @@ export async function setPitr(
  * base backup when there is none - until one exists there is nothing to
  * recover from.
  */
-export async function preparePitr(databaseId: string, ownerId: string, options: { baseBackup: boolean }): Promise<void> {
+export async function preparePitr(
+    databaseId: string,
+    ownerId: string,
+    options: { baseBackup: boolean }
+): Promise<void> {
     const context = await instanceContext(databaseId, ownerId);
     await withPorts(context, async (ports) => {
         await waitReady(ports, context);
@@ -122,9 +144,12 @@ export async function takeBaseBackup(context: InstanceContext): Promise<void> {
     const label = pitrLabel(startedAt);
     await withPorts(context, async (ports) => {
         await runStep(ports, context.container, pitrPrepareCommand());
-        await runStep(ports, context.container, pitrBaseBackupCommand(label, context.own.username), [
-            context.own.password
-        ]);
+        await runStep(
+            ports,
+            context.container,
+            pitrBaseBackupCommand(label, context.own.username),
+            [context.own.password]
+        );
         const history = await runStep(ports, context.container, pitrNewestHistoryCommand());
         await prisma.databaseBaseBackup.create({
             data: {
@@ -153,7 +178,10 @@ export async function pitrWindow(databaseId: string, ownerId: string) {
         enabled: row.pitr,
         keepDays: row.pitrKeepDays,
         from: bases[0]?.finishedAt.toISOString() ?? null,
-        baseBackups: bases.map((base) => ({ label: base.label, finishedAt: base.finishedAt.toISOString() }))
+        baseBackups: bases.map((base) => ({
+            label: base.label,
+            finishedAt: base.finishedAt.toISOString()
+        }))
     };
 }
 
@@ -167,9 +195,19 @@ export async function pitrWindow(databaseId: string, ownerId: string) {
  * the oldest kept backup are then removed by `pg_archivecleanup`, which is what
  * the manual gives that job to.
  */
-export async function sweepArchives(): Promise<{ instances: number; backups: number; failed: number }> {
+export async function sweepArchives(): Promise<{
+    instances: number;
+    backups: number;
+    failed: number;
+}> {
     const rows = await prisma.managedDatabase.findMany({
-        where: { engine: "postgres", pitr: true, parentId: null, status: "running", upgradeState: { not: "running" } },
+        where: {
+            engine: "postgres",
+            pitr: true,
+            parentId: null,
+            status: "running",
+            upgradeState: { not: "running" }
+        },
         select: {
             id: true,
             pitrKeepDays: true,
@@ -193,10 +231,21 @@ export async function sweepArchives(): Promise<{ instances: number; backups: num
             await pruneArchive(context, row.pitrKeepDays);
         } catch (error) {
             failed += 1;
-            const reason = error instanceof DatabaseOperationError ? error.message : "The archive pass failed.";
-            if (!(error instanceof DatabaseOperationError)) console.error(`database: archive pass on ${row.id} failed:`, error);
+            const reason =
+                error instanceof DatabaseOperationError
+                    ? error.message
+                    : "The archive pass failed.";
+            if (!(error instanceof DatabaseOperationError))
+                console.error(`database: archive pass on ${row.id} failed:`, error);
             await prisma.databaseOperation.create({
-                data: { databaseId: row.id, kind: "archive", status: "failed", step: "Daily base backup", error: reason, finishedAt: new Date() }
+                data: {
+                    databaseId: row.id,
+                    kind: "archive",
+                    status: "failed",
+                    step: "Daily base backup",
+                    error: reason,
+                    finishedAt: new Date()
+                }
             });
         }
     }
@@ -223,7 +272,9 @@ async function pruneArchive(context: InstanceContext, keepDays: number): Promise
             await runStep(ports, context.container, command);
         }
     });
-    await prisma.databaseBaseBackup.deleteMany({ where: { id: { in: removed.map((base) => base.id) } } });
+    await prisma.databaseBaseBackup.deleteMany({
+        where: { id: { in: removed.map((base) => base.id) } }
+    });
 }
 
 /**
@@ -265,16 +316,22 @@ export async function recoverToTime(
     });
     if (!source) throw new DatabaseOperationError("That database is not there any more.");
     await pitrInstance(databaseId, ownerId);
-    if (!source.pitr) throw new DatabaseOperationError("Point-in-time recovery is not on for this instance.");
+    if (!source.pitr)
+        throw new DatabaseOperationError("Point-in-time recovery is not on for this instance.");
     if (source.status !== "running") {
-        throw new DatabaseOperationError("The instance has to be running: the last minute of its log is still inside it.");
+        throw new DatabaseOperationError(
+            "The instance has to be running: the last minute of its log is still inside it."
+        );
     }
     const target = input.target;
-    if (target.getTime() > Date.now()) throw new DatabaseOperationError("That moment has not happened yet.");
+    if (target.getTime() > Date.now())
+        throw new DatabaseOperationError("That moment has not happened yet.");
     const bases = await prisma.databaseBaseBackup.findMany({ where: { databaseId } });
     const base = pitrBaseFor(bases, target);
     if (!base) {
-        const oldest = [...bases].sort((a, b) => a.finishedAt.getTime() - b.finishedAt.getTime())[0];
+        const oldest = [...bases].sort(
+            (a, b) => a.finishedAt.getTime() - b.finishedAt.getTime()
+        )[0];
         throw new DatabaseOperationError(
             oldest
                 ? `The archive reaches back to ${oldest.finishedAt.toISOString()}; pick a moment after that.`
@@ -287,7 +344,10 @@ export async function recoverToTime(
         where: { environmentId: source.environmentId, slug },
         select: { name: true }
     });
-    if (clash) throw new DatabaseOperationError(`This environment already has a database called ${clash.name}.`);
+    if (clash)
+        throw new DatabaseOperationError(
+            `This environment already has a database called ${clash.name}.`
+        );
 
     // The recovered instance starts from the source's own files, so it keeps the
     // source's accounts: its stored credentials are the source's, copied.
@@ -317,15 +377,22 @@ export async function recoverToTime(
         try {
             await operation.step("Closing the log up to now");
             await sealArchive(await instanceContext(source.id, ownerId));
-            await operation.step(`Starting from the base backup of ${base.finishedAt.toISOString()}`);
+            await operation.step(
+                `Starting from the base backup of ${base.finishedAt.toISOString()}`
+            );
             const failure = await deployDatabaseAndWait(created.id, ownerId, userId);
-            if (failure) throw new DatabaseOperationError(`The recovered instance did not start: ${failure}`);
+            if (failure)
+                throw new DatabaseOperationError(
+                    `The recovered instance did not start: ${failure}`
+                );
             await operation.step("Replaying the log to the moment asked for");
             await waitForPromotion(await instanceContext(created.id, ownerId));
             await operation.succeed();
         } catch (error) {
             await operation.fail(error);
-            await prisma.managedDatabase.update({ where: { id: created.id }, data: { status: "failed" } }).catch(() => undefined);
+            await prisma.managedDatabase
+                .update({ where: { id: created.id }, data: { status: "failed" } })
+                .catch(() => undefined);
         }
     })();
     return { databaseId: created.id };
@@ -357,24 +424,37 @@ async function sealArchive(context: InstanceContext): Promise<void> {
             "-c",
             sql
         ];
-        await runStep(ports, context.container, { argv: psql("SELECT txid_current()"), describe: "Committing a marker" }, [
-            context.own.password
-        ]);
+        await runStep(
+            ports,
+            context.container,
+            { argv: psql("SELECT txid_current()"), describe: "Committing a marker" },
+            [context.own.password]
+        );
         const switched = await runStep(
             ports,
             context.container,
-            { argv: psql("SELECT pg_walfile_name(pg_switch_wal())"), describe: "Closing the current log segment" },
+            {
+                argv: psql("SELECT pg_walfile_name(pg_switch_wal())"),
+                describe: "Closing the current log segment"
+            },
             [context.own.password]
         );
         const segment = lastLine(switched);
-        if (!/^[0-9A-F]{24}$/.test(segment)) throw new DatabaseOperationError("PostgreSQL did not name the segment it closed.");
+        if (!/^[0-9A-F]{24}$/.test(segment))
+            throw new DatabaseOperationError("PostgreSQL did not name the segment it closed.");
         const deadline = Date.now() + 5 * 60_000;
         while (Date.now() < deadline) {
-            const found = await ports.runIn(context.container, ["test", "-f", `${PITR_MOUNT}/wal/${segment}`]);
+            const found = await ports.runIn(context.container, [
+                "test",
+                "-f",
+                `${PITR_MOUNT}/wal/${segment}`
+            ]);
             if (found.code === 0) return;
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
-        throw new DatabaseOperationError("The last log segment did not reach the archive in five minutes.");
+        throw new DatabaseOperationError(
+            "The last log segment did not reach the archive in five minutes."
+        );
     });
 }
 
@@ -403,6 +483,8 @@ async function waitForPromotion(context: InstanceContext): Promise<void> {
             if (result) said = lastLine(result.output, [context.own.password]);
             await new Promise((resolve) => setTimeout(resolve, 5000));
         }
-        throw new DatabaseOperationError(`The recovery did not finish in two hours${said ? `: ${said}` : ""}.`);
+        throw new DatabaseOperationError(
+            `The recovery did not finish in two hours${said ? `: ${said}` : ""}.`
+        );
     });
 }

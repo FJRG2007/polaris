@@ -46,8 +46,14 @@ export function RepoConfigPreview({
                     {imported.settings.map((entry) => (
                         <div key={entry.setting} className="contents">
                             <dt className="text-muted-foreground">{LABELS[entry.setting]}</dt>
-                            <dd className="min-w-0 truncate font-mono" title={`${entry.value} - from ${entry.from}`}>
-                                {entry.value} <span className="font-sans text-muted-foreground">({entry.from})</span>
+                            <dd
+                                className="min-w-0 truncate font-mono"
+                                title={`${entry.value} - from ${entry.from}`}
+                            >
+                                {entry.value}{" "}
+                                <span className="font-sans text-muted-foreground">
+                                    ({entry.from})
+                                </span>
                             </dd>
                         </div>
                     ))}
@@ -62,7 +68,10 @@ export function RepoConfigPreview({
                     {imported.generate.length > 0 && (
                         <div className="contents">
                             <dt className="text-muted-foreground">Generated</dt>
-                            <dd className="min-w-0 truncate font-mono" title={imported.generate.join(", ")}>
+                            <dd
+                                className="min-w-0 truncate font-mono"
+                                title={imported.generate.join(", ")}
+                            >
                                 {imported.generate.join(", ")}
                             </dd>
                         </div>
@@ -71,8 +80,8 @@ export function RepoConfigPreview({
                         <div className="contents">
                             <dt className="text-warning-ink">Needs a value</dt>
                             <dd className="min-w-0 text-warning-ink">
-                                <span className="font-mono">{imported.needs.join(", ")}</span> - add under Variables
-                                once it is created.
+                                <span className="font-mono">{imported.needs.join(", ")}</span> - add
+                                under Variables once it is created.
                             </dd>
                         </div>
                     )}

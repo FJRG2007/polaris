@@ -41,7 +41,11 @@ describe("event catalogue", () => {
 
 describe("rule resolution", () => {
     it("falls back to the catalogue default for an event never configured", () => {
-        expect(resolveRule({}, "watch.alarm")).toEqual({ inapp: true, email: true, destinations: [] });
+        expect(resolveRule({}, "watch.alarm")).toEqual({
+            inapp: true,
+            email: true,
+            destinations: []
+        });
     });
 
     it("takes what the account saved over the default", () => {
@@ -75,37 +79,52 @@ describe("rule resolution", () => {
 describe("stored preferences", () => {
     it("round-trips", () => {
         const rules = { "deploy.failed": { inapp: true, email: false, destinations: [] } };
-        expect(parseNotificationPreferences(stringifyNotificationPreferences(rules))).toEqual(rules);
+        expect(parseNotificationPreferences(stringifyNotificationPreferences(rules))).toEqual(
+            rules
+        );
     });
 
     it("survives a null column, malformed JSON, and a rule for a dropped event", () => {
         expect(parseNotificationPreferences(null)).toEqual({});
         expect(parseNotificationPreferences("{not json")).toEqual({});
-        expect(parseNotificationPreferences('{"gone.event":{"inapp":true,"email":false,"destinations":[]}}')).toEqual(
-            {}
-        );
+        expect(
+            parseNotificationPreferences(
+                '{"gone.event":{"inapp":true,"email":false,"destinations":[]}}'
+            )
+        ).toEqual({});
     });
 });
 
 describe("webhook targets", () => {
     it("recognises the platforms whose body shape it knows", () => {
         expect(detectWebhookFormat("https://discord.com/api/webhooks/1/abc")).toBe("discord");
-        expect(detectWebhookFormat("https://canary.discord.com/api/webhooks/1/abc")).toBe("discord");
+        expect(detectWebhookFormat("https://canary.discord.com/api/webhooks/1/abc")).toBe(
+            "discord"
+        );
         expect(detectWebhookFormat("https://hooks.slack.com/services/T/B/x")).toBe("slack");
         expect(detectWebhookFormat("https://example.com/hook")).toBe("generic");
         expect(detectWebhookFormat("not a url")).toBe("generic");
     });
 
     it("recognises Teams connectors and workflows, and Telegram's Bot API", () => {
-        expect(detectWebhookFormat("https://contoso.webhook.office.com/webhookb2/a/IncomingWebhook/b/c")).toBe("teams");
-        expect(detectWebhookFormat("https://prod-01.westus.logic.azure.com/workflows/x/triggers/manual/paths/invoke")).toBe(
-            "teams"
-        );
-        expect(detectWebhookFormat("https://api.telegram.org/bot123:abc/sendMessage?chat_id=42")).toBe("telegram");
+        expect(
+            detectWebhookFormat(
+                "https://contoso.webhook.office.com/webhookb2/a/IncomingWebhook/b/c"
+            )
+        ).toBe("teams");
+        expect(
+            detectWebhookFormat(
+                "https://prod-01.westus.logic.azure.com/workflows/x/triggers/manual/paths/invoke"
+            )
+        ).toBe("teams");
+        expect(
+            detectWebhookFormat("https://api.telegram.org/bot123:abc/sendMessage?chat_id=42")
+        ).toBe("telegram");
     });
 
     it("reads a Telegram URL as its method and chat, and never prints the bot token", () => {
-        const url = "https://api.telegram.org/bot123456:SECRET-token_x/sendMessage?chat_id=-1001234";
+        const url =
+            "https://api.telegram.org/bot123456:SECRET-token_x/sendMessage?chat_id=-1001234";
         expect(notifications.telegramTarget(url)).toEqual({
             endpoint: "https://api.telegram.org/bot123456:SECRET-token_x/sendMessage",
             chatId: "-1001234"
@@ -122,7 +141,9 @@ describe("webhook targets", () => {
             format: "auto"
         });
         expect(result.success).toBe(false);
-        expect(notifications.telegramTarget("https://api.telegram.org/bot123:abc/getUpdates?chat_id=1")).toBeNull();
+        expect(
+            notifications.telegramTarget("https://api.telegram.org/bot123:abc/getUpdates?chat_id=1")
+        ).toBeNull();
     });
 
     it("masks the part of the URL that is the credential", () => {
@@ -143,11 +164,13 @@ describe("webhook targets", () => {
 
     it("takes a number only in international form", () => {
         expect(
-            destinationInputSchema.safeParse({ kind: "sms", label: "Phone", phone: "+34600111222" }).success
+            destinationInputSchema.safeParse({ kind: "sms", label: "Phone", phone: "+34600111222" })
+                .success
         ).toBe(true);
-        expect(destinationInputSchema.safeParse({ kind: "sms", label: "Phone", phone: "600111222" }).success).toBe(
-            false
-        );
+        expect(
+            destinationInputSchema.safeParse({ kind: "sms", label: "Phone", phone: "600111222" })
+                .success
+        ).toBe(false);
     });
 });
 
@@ -162,6 +185,8 @@ describe("sms sender configuration", () => {
 
     it("rejects an unknown provider and a malformed sid", () => {
         expect(parseSmsConfig("nexmo", {}).ok).toBe(false);
-        expect(parseSmsConfig("twilio", { accountSid: "AC123", from: "+15550001111" }).ok).toBe(false);
+        expect(parseSmsConfig("twilio", { accountSid: "AC123", from: "+15550001111" }).ok).toBe(
+            false
+        );
     });
 });

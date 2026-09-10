@@ -44,7 +44,9 @@ export interface Tally {
 }
 
 /** The models whose two-factor columns the sign-in library seals. */
-const AUTH_SEALED: Readonly<Record<string, readonly string[]>> = { TwoFactor: ["secret", "backupCodes"] };
+const AUTH_SEALED: Readonly<Record<string, readonly string[]>> = {
+    TwoFactor: ["secret", "backupCodes"]
+};
 
 /** Columns worked out from a secret, reset on arrival rather than carried. */
 const DERIVED_FROM_SECRET = new Set(["secretFingerprint"]);
@@ -64,8 +66,14 @@ export function envelopeTriples(model: Pick<SchemaModel, "fields">): Triple[] {
         const base = field.name.slice(0, -"Nonce".length);
         const keyId = `${base}KeyId`;
         const prefixed = `encrypted${base.charAt(0).toUpperCase()}${base.slice(1)}`;
-        const ciphertext = byName.get(prefixed)?.type === "Bytes" ? prefixed : byName.get(base)?.type === "Bytes" ? base : null;
-        if (ciphertext && byName.get(keyId)?.type === "String") triples.push({ ciphertext, nonce: field.name, keyId });
+        const ciphertext =
+            byName.get(prefixed)?.type === "Bytes"
+                ? prefixed
+                : byName.get(base)?.type === "Bytes"
+                  ? base
+                  : null;
+        if (ciphertext && byName.get(keyId)?.type === "String")
+            triples.push({ ciphertext, nonce: field.name, keyId });
     }
     return triples;
 }
@@ -77,7 +85,12 @@ function sealedText(value: string): { c: string; n: string; k: string } | null {
         const parsed = JSON.parse(value) as Record<string, unknown>;
         const keys = Object.keys(parsed).sort().join(",");
         if (keys !== "c,k,n") return null;
-        if (typeof parsed.c !== "string" || typeof parsed.n !== "string" || typeof parsed.k !== "string") return null;
+        if (
+            typeof parsed.c !== "string" ||
+            typeof parsed.n !== "string" ||
+            typeof parsed.k !== "string"
+        )
+            return null;
         return parsed as { c: string; n: string; k: string };
     } catch {
         return null;
@@ -86,7 +99,8 @@ function sealedText(value: string): { c: string; n: string; k: string } | null {
 
 function encodeScalar(field: SchemaField, value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    if (field.isList && Array.isArray(value)) return value.map((item) => encodeScalar({ ...field, isList: false }, item));
+    if (field.isList && Array.isArray(value))
+        return value.map((item) => encodeScalar({ ...field, isList: false }, item));
     switch (field.type) {
         case "DateTime":
             return { $date: (value as Date).toISOString() };
@@ -103,7 +117,8 @@ function encodeScalar(field: SchemaField, value: unknown): unknown {
 
 function decodeScalar(field: SchemaField, value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    if (field.isList && Array.isArray(value)) return value.map((item) => decodeScalar({ ...field, isList: false }, item));
+    if (field.isList && Array.isArray(value))
+        return value.map((item) => decodeScalar({ ...field, isList: false }, item));
     const tagged = value as Record<string, unknown>;
     switch (field.type) {
         case "DateTime":
@@ -149,7 +164,11 @@ export async function encodeRow(
             if (plain === null) {
                 tally.unreadable += 1;
                 out[field.name] = {
-                    $sealed: { c: blob.ciphertext.toString("base64"), n: blob.nonce.toString("base64"), k: blob.keyId }
+                    $sealed: {
+                        c: blob.ciphertext.toString("base64"),
+                        n: blob.nonce.toString("base64"),
+                        k: blob.keyId
+                    }
                 };
             } else {
                 tally.carried += 1;
@@ -203,7 +222,10 @@ export async function decodeRow(
         const value = encoded[field.name];
         const triple = cipherColumns.get(field.name);
         if (triple) {
-            const tagged = (value ?? null) as { $secret?: string; $sealed?: { c: string; n: string; k: string } } | null;
+            const tagged = (value ?? null) as {
+                $secret?: string;
+                $sealed?: { c: string; n: string; k: string };
+            } | null;
             if (tagged === null) {
                 out[field.name] = null;
                 out[triple.nonce] = null;
@@ -221,7 +243,12 @@ export async function decodeRow(
             continue;
         }
         // A text column only ever carries a plain string or one of these two.
-        if (field.type === "String" && value && typeof value === "object" && !Array.isArray(value)) {
+        if (
+            field.type === "String" &&
+            value &&
+            typeof value === "object" &&
+            !Array.isArray(value)
+        ) {
             const tagged = value as { $auth?: unknown; $sealedText?: unknown };
             if (typeof tagged.$auth === "string") {
                 out[field.name] = await codec.sealAuth(tagged.$auth);

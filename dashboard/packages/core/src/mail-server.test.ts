@@ -23,7 +23,11 @@ describe("the requests the engine is sent", () => {
     });
 
     it("declares the management capability on every request", () => {
-        expect(jmap.jmapRequest([jmap.bootstrapCall({ hostname: "mail.example.com", domain: "example.com" })])).toEqual({
+        expect(
+            jmap.jmapRequest([
+                jmap.bootstrapCall({ hostname: "mail.example.com", domain: "example.com" })
+            ])
+        ).toEqual({
             using: ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
             methodCalls: [
                 [
@@ -70,15 +74,23 @@ describe("the requests the engine is sent", () => {
         });
         const account = (args.create as Record<string, Record<string, unknown>>).account!;
         expect(account["@type"]).toBe("User");
-        expect(account.credentials).toEqual({ "0": { "@type": "Password", secret: "correct horse battery" } });
+        expect(account.credentials).toEqual({
+            "0": { "@type": "Password", secret: "correct horse battery" }
+        });
         expect(account.quotas).toEqual({ maxDiskQuota: 5242880 });
         expect(account.roles).toEqual({ "@type": "User" });
     });
 
     it("makes a forward a mailing list of its recipients", () => {
-        const [name, args] = jmap.forwardCreateCall({ name: "sales", domainId: "d1", recipients: ["a@x.test", "b@y.test"] });
+        const [name, args] = jmap.forwardCreateCall({
+            name: "sales",
+            domainId: "d1",
+            recipients: ["a@x.test", "b@y.test"]
+        });
         expect(name).toBe("x:MailingList/set");
-        expect((args.create as Record<string, Record<string, unknown>>).forward!.recipients).toEqual({
+        expect(
+            (args.create as Record<string, Record<string, unknown>>).forward!.recipients
+        ).toEqual({
             "a@x.test": true,
             "b@y.test": true
         });
@@ -89,7 +101,13 @@ describe("the requests the engine is sent", () => {
             update: { singleton: { route: { else: "'polaris-relay'" } } }
         });
         expect(() => jmap.outboundRouteCall("x' || 'y")).toThrow();
-        const [, args] = jmap.relayRouteCreateCall({ host: "smtp.sendgrid.net", port: 587, implicitTls: false, username: "apikey", secret: "k" });
+        const [, args] = jmap.relayRouteCreateCall({
+            host: "smtp.sendgrid.net",
+            port: 587,
+            implicitTls: false,
+            username: "apikey",
+            secret: "k"
+        });
         expect((args.create as Record<string, Record<string, unknown>>).relay).toMatchObject({
             "@type": "Relay",
             address: "smtp.sendgrid.net",
@@ -98,37 +116,66 @@ describe("the requests the engine is sent", () => {
     });
 
     it("reads created ids, and turns a refusal into the engine's own words", () => {
-        const ok = { methodResponses: [["x:Domain/set", { created: { domain: { id: "d7" } } }, "domain"]] };
+        const ok = {
+            methodResponses: [["x:Domain/set", { created: { domain: { id: "d7" } } }, "domain"]]
+        };
         expect(jmap.createdId(ok, "domain", "domain")).toBe("d7");
         const refused = {
             methodResponses: [
-                ["x:Domain/set", { notCreated: { domain: { type: "alreadyExists", description: "Domain exists" } } }, "domain"]
+                [
+                    "x:Domain/set",
+                    {
+                        notCreated: {
+                            domain: { type: "alreadyExists", description: "Domain exists" }
+                        }
+                    },
+                    "domain"
+                ]
             ]
         };
         expect(() => jmap.createdId(refused, "domain", "domain")).toThrow("Domain exists");
-        const error = { methodResponses: [["error", { type: "forbidden", description: "No permission" }, "x"]] };
+        const error = {
+            methodResponses: [["error", { type: "forbidden", description: "No permission" }, "x"]]
+        };
         expect(() => jmap.answerOf(error, "x")).toThrow(jmap.StalwartRefusal);
     });
 
     it("reads the report mailbox the standard way, and points a domain's reports at it", () => {
-        expect(jmap.jmapMailRequest([]).using).toEqual(["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"]);
+        expect(jmap.jmapMailRequest([]).using).toEqual([
+            "urn:ietf:params:jmap:core",
+            "urn:ietf:params:jmap:mail"
+        ]);
         const [query, get] = jmap.unreadWithAttachmentsCalls("a1", 25);
-        expect(query?.[1]).toMatchObject({ accountId: "a1", filter: { notKeyword: "$seen" }, limit: 25 });
-        expect(get?.[1]).toMatchObject({ "#ids": { resultOf: "q", name: "Email/query", path: "/ids" } });
-        expect(jmap.markSeenCall("a1", ["m1"])[1]).toEqual({ accountId: "a1", update: { m1: { "keywords/$seen": true } } });
+        expect(query?.[1]).toMatchObject({
+            accountId: "a1",
+            filter: { notKeyword: "$seen" },
+            limit: 25
+        });
+        expect(get?.[1]).toMatchObject({
+            "#ids": { resultOf: "q", name: "Email/query", path: "/ids" }
+        });
+        expect(jmap.markSeenCall("a1", ["m1"])[1]).toEqual({
+            accountId: "a1",
+            update: { m1: { "keywords/$seen": true } }
+        });
         expect(jmap.domainReportAddressCall("d1", "dmarc-reports@example.com")[1]).toEqual({
             update: { d1: { reportAddressUri: "mailto:dmarc-reports@example.com" } }
         });
     });
 
     it("fills the session's download template, encoded, and keeps only its path", () => {
-        const path = jmap.downloadPath("https://mail.example.com/jmap/download/{accountId}/{blobId}/{name}?accept={type}", {
-            accountId: "a1",
-            blobId: "b/2",
-            type: "application/gzip",
-            name: "google.com!example.com.xml.gz"
-        });
-        expect(path).toBe("/jmap/download/a1/b%2F2/google.com!example.com.xml.gz?accept=application%2Fgzip");
+        const path = jmap.downloadPath(
+            "https://mail.example.com/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+            {
+                accountId: "a1",
+                blobId: "b/2",
+                type: "application/gzip",
+                name: "google.com!example.com.xml.gz"
+            }
+        );
+        expect(path).toBe(
+            "/jmap/download/a1/b%2F2/google.com!example.com.xml.gz?accept=application%2Fgzip"
+        );
     });
 });
 
@@ -156,7 +203,9 @@ describe("the zone the engine publishes", () => {
         });
         const dkim = records.find((record) => record.name === "202609e._domainkey.example.com");
         expect(dkim?.value).toBe("v=DKIM1; k=ed25519; p=MCowBQYDK2VwAyEA");
-        expect(records.find((record) => record.type === "SRV")?.value).toBe("0 1 993 mail.example.com");
+        expect(records.find((record) => record.type === "SRV")?.value).toBe(
+            "0 1 993 mail.example.com"
+        );
     });
 
     it("says what each record is for and which ones mail depends on", () => {
@@ -169,20 +218,30 @@ describe("the zone the engine publishes", () => {
     });
 
     it("grades SPF by what it covers, and fails two of them", () => {
-        const spf = dns.expectedMailRecords(dns.parseZoneFile(zone)).find((record) => record.purpose === "spf")!;
+        const spf = dns
+            .expectedMailRecords(dns.parseZoneFile(zone))
+            .find((record) => record.purpose === "spf")!;
         expect(dns.gradeRecord(spf, ["v=spf1 mx -all"]).verdict).toBe("pass");
-        expect(dns.gradeRecord(spf, ["v=spf1 mx include:_spf.google.com ~all"]).verdict).toBe("warn");
+        expect(dns.gradeRecord(spf, ["v=spf1 mx include:_spf.google.com ~all"]).verdict).toBe(
+            "warn"
+        );
         expect(dns.gradeRecord(spf, ["v=spf1 include:_spf.google.com ~all"]).verdict).toBe("fail");
         expect(dns.gradeRecord(spf, ["v=spf1 mx -all", "v=spf1 a -all"]).verdict).toBe("fail");
         expect(dns.gradeRecord(spf, []).verdict).toBe("fail");
     });
 
     it("warns rather than fails for an optional record that is missing", () => {
-        const tlsRpt = dns.expectedMailRecords(dns.parseZoneFile(zone)).find((record) => record.purpose === "tls-rpt")!;
+        const tlsRpt = dns
+            .expectedMailRecords(dns.parseZoneFile(zone))
+            .find((record) => record.purpose === "tls-rpt")!;
         expect(dns.gradeRecord(tlsRpt, []).verdict).toBe("warn");
-        const dkim = dns.expectedMailRecords(dns.parseZoneFile(zone)).find((record) => record.purpose === "dkim")!;
+        const dkim = dns
+            .expectedMailRecords(dns.parseZoneFile(zone))
+            .find((record) => record.purpose === "dkim")!;
         expect(dns.gradeRecord(dkim, []).verdict).toBe("fail");
-        expect(dns.gradeRecord(dkim, ["v=DKIM1; k=ed25519; p=MCowBQYDK2VwAyEA"]).verdict).toBe("pass");
+        expect(dns.gradeRecord(dkim, ["v=DKIM1; k=ed25519; p=MCowBQYDK2VwAyEA"]).verdict).toBe(
+            "pass"
+        );
     });
 
     it("adds the server to an existing SPF without dropping its other senders", () => {
@@ -205,12 +264,23 @@ describe("DMARC aggregate reports", () => {
             policy_published: { domain: "example.com", p: "reject", sp: "reject", pct: "100" },
             record: [
                 {
-                    row: { source_ip: "203.0.113.9", count: "12", policy_evaluated: { disposition: "none", dkim: "pass", spf: "pass" } },
+                    row: {
+                        source_ip: "203.0.113.9",
+                        count: "12",
+                        policy_evaluated: { disposition: "none", dkim: "pass", spf: "pass" }
+                    },
                     identifiers: { header_from: "example.com" },
-                    auth_results: { dkim: { domain: "example.com", result: "pass", selector: "202609e" }, spf: { domain: "example.com", result: "pass" } }
+                    auth_results: {
+                        dkim: { domain: "example.com", result: "pass", selector: "202609e" },
+                        spf: { domain: "example.com", result: "pass" }
+                    }
                 },
                 {
-                    row: { source_ip: "198.51.100.7", count: "3", policy_evaluated: { disposition: "reject", dkim: "fail", spf: "fail" } },
+                    row: {
+                        source_ip: "198.51.100.7",
+                        count: "3",
+                        policy_evaluated: { disposition: "reject", dkim: "fail", spf: "fail" }
+                    },
                     identifiers: { header_from: "example.com" },
                     auth_results: { spf: { domain: "spoofer.test", result: "pass" } }
                 },
@@ -250,25 +320,48 @@ describe("ports, relays and mailboxes", () => {
     });
 
     it("derives a regional relay host and refuses one without a region", () => {
-        expect(server.resolveRelayHost({ provider: "ses", region: "eu-west-1" })).toBe("email-smtp.eu-west-1.amazonaws.com");
+        expect(server.resolveRelayHost({ provider: "ses", region: "eu-west-1" })).toBe(
+            "email-smtp.eu-west-1.amazonaws.com"
+        );
         expect(server.resolveRelayHost({ provider: "ses" })).toBeNull();
         expect(server.resolveRelayHost({ provider: "sendgrid" })).toBe("smtp.sendgrid.net");
-        expect(server.mailRelaySchema.safeParse({ serverId: crypto.randomUUID(), provider: "custom" }).success).toBe(false);
+        expect(
+            server.mailRelaySchema.safeParse({ serverId: crypto.randomUUID(), provider: "custom" })
+                .success
+        ).toBe(false);
     });
 
     it("takes a quota in megabytes and a password nobody pasted a newline into", () => {
         expect(server.quotaBytes(0)).toBeNull();
         expect(server.quotaBytes(2)).toBe(2097152);
         const base = { serverId: crypto.randomUUID(), domainId: "d1", localPart: "alice" };
-        expect(server.mailboxCreateSchema.safeParse({ ...base, password: "short" }).success).toBe(false);
-        expect(server.mailboxCreateSchema.safeParse({ ...base, password: "long enough pass\nword" }).success).toBe(false);
-        expect(server.mailboxCreateSchema.safeParse({ ...base, password: "long enough password" }).success).toBe(true);
+        expect(server.mailboxCreateSchema.safeParse({ ...base, password: "short" }).success).toBe(
+            false
+        );
+        expect(
+            server.mailboxCreateSchema.safeParse({ ...base, password: "long enough pass\nword" })
+                .success
+        ).toBe(false);
+        expect(
+            server.mailboxCreateSchema.safeParse({ ...base, password: "long enough password" })
+                .success
+        ).toBe(true);
     });
 });
 
 describe("rules on incoming mail", () => {
-    const rule = { recipient: "billing@*", sender: "*@bank.example", includeSpam: false, enabled: true };
-    const event = { spam: false, from: "alerts@bank.example", to: ["billing@example.com"], autoSubmitted: false };
+    const rule = {
+        recipient: "billing@*",
+        sender: "*@bank.example",
+        includeSpam: false,
+        enabled: true
+    };
+    const event = {
+        spam: false,
+        from: "alerts@bank.example",
+        to: ["billing@example.com"],
+        autoSubmitted: false
+    };
 
     it("matches wildcards, case aside", () => {
         expect(server.wildcardMatches("*@Bank.example", "ALERTS@bank.example")).toBe(true);
@@ -279,7 +372,12 @@ describe("rules on incoming mail", () => {
     it("guards against the three ways a rule becomes a flood", () => {
         expect(server.inboundRuleMatches(rule, { ...event, spam: true })).toBe(false);
         expect(server.inboundRuleMatches(rule, { ...event, autoSubmitted: true })).toBe(false);
-        expect(server.inboundRuleMatches({ ...rule, sender: "" }, { ...event, from: "mailer-daemon@example.com" })).toBe(false);
+        expect(
+            server.inboundRuleMatches(
+                { ...rule, sender: "" },
+                { ...event, from: "mailer-daemon@example.com" }
+            )
+        ).toBe(false);
     });
 
     it("fails closed when the event does not say who a message was for", () => {
@@ -288,7 +386,12 @@ describe("rules on incoming mail", () => {
 
     it("reads only the two ingest events, and whatever keys name the message", () => {
         expect(server.readInboundEvent({ type: "auth.success", data: {} })).toBeNull();
-        expect(server.readInboundEvent({ type: "message-ingest.spam", data: { from: "X@Y.test", rcptTo: ["a@b.test"] } })).toEqual({
+        expect(
+            server.readInboundEvent({
+                type: "message-ingest.spam",
+                data: { from: "X@Y.test", rcptTo: ["a@b.test"] }
+            })
+        ).toEqual({
             spam: true,
             from: "x@y.test",
             to: ["a@b.test"],

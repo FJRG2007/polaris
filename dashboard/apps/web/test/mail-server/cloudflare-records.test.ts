@@ -10,8 +10,12 @@ import { unquoteTxt } from "@/lib/integrations/cloudflare-api";
 
 describe("a TXT record's value", () => {
     it("joins the quoted character-strings it is stored as", () => {
-        expect(unquoteTxt('"v=spf1 mx include:_spf.google.com ~all"')).toBe("v=spf1 mx include:_spf.google.com ~all");
-        expect(unquoteTxt('"v=DKIM1; k=rsa; " "p=MIIBIjANBgkq"')).toBe("v=DKIM1; k=rsa; p=MIIBIjANBgkq");
+        expect(unquoteTxt('"v=spf1 mx include:_spf.google.com ~all"')).toBe(
+            "v=spf1 mx include:_spf.google.com ~all"
+        );
+        expect(unquoteTxt('"v=DKIM1; k=rsa; " "p=MIIBIjANBgkq"')).toBe(
+            "v=DKIM1; k=rsa; p=MIIBIjANBgkq"
+        );
         expect(unquoteTxt('"a \\"quoted\\" word"')).toBe('a "quoted" word');
     });
 

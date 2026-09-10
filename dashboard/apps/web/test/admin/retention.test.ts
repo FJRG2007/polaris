@@ -28,7 +28,13 @@ let stored: string | null = null;
 
 function table(name: "notification" | "activity" | "auditLog", column: "createdAt" | "at") {
     return {
-        findMany: async ({ where, take }: { where: Record<string, { lt: Date }>; take: number }) => {
+        findMany: async ({
+            where,
+            take
+        }: {
+            where: Record<string, { lt: Date }>;
+            take: number;
+        }) => {
             queried[name]?.push(where);
             const cutoff = where[column]?.lt;
             if (!cutoff) return [];
@@ -46,7 +52,9 @@ function table(name: "notification" | "activity" | "auditLog", column: "createdA
         },
         count: async (args?: { where?: Record<string, { lt: Date }> }) => {
             const cutoff = args?.where?.[column]?.lt;
-            return cutoff ? rows[name].filter((row) => row.when < cutoff).length : rows[name].length;
+            return cutoff
+                ? rows[name].filter((row) => row.when < cutoff).length
+                : rows[name].length;
         }
     };
 }

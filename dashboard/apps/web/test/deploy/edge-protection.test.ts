@@ -59,22 +59,30 @@ describe("ranks", () => {
     });
 
     it("keeps the pushed rank on a remote edge", () => {
-        expect(block(renderDynamicConfig([route()], { routePriority: 100 }), "polaris-app-d1")).toContain(
-            "priority: 100"
-        );
+        expect(
+            block(renderDynamicConfig([route()], { routePriority: 100 }), "polaris-app-d1")
+        ).toContain("priority: 100");
     });
 });
 
 describe("hostnames and paths", () => {
     it("routes a wildcard with a one-label pattern and the edge's own certificate", () => {
-        const router = block(renderDynamicConfig([route({ hostname: "*.example.com" })]), "polaris-app-d1");
-        expect(router).toContain("HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]example[.]com$`)");
+        const router = block(
+            renderDynamicConfig([route({ hostname: "*.example.com" })]),
+            "polaris-app-d1"
+        );
+        expect(router).toContain(
+            "HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]example[.]com$`)"
+        );
         expect(router).toContain("tls: {}");
         expect(router).not.toContain("certResolver");
     });
 
     it("honours a path prefix in the file, as the labels already did", () => {
-        const router = block(renderDynamicConfig([route({ pathPrefix: "/api" })]), "polaris-app-d1");
+        const router = block(
+            renderDynamicConfig([route({ pathPrefix: "/api" })]),
+            "polaris-app-d1"
+        );
         expect(router).toContain("Host(`shop.example.com`) && PathPrefix(`/api`)");
     });
 
@@ -146,7 +154,9 @@ describe("security headers", () => {
             route({ edge: parseAppEdgeConfig(JSON.stringify({ headers: { preset: "strict" } })) })
         ]);
         const headers = block(config, "polaris-app-d1-headers");
-        expect(headers).toContain('"Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload"');
+        expect(headers).toContain(
+            '"Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload"'
+        );
         expect(headers).toContain('"Cross-Origin-Embedder-Policy": "require-corp"');
         expect(block(config, "polaris-app-d1")).toContain("polaris-app-d1-headers");
         expect(block(config, "polaris-app-d1-http")).not.toContain("polaris-app-d1-headers");
@@ -157,18 +167,38 @@ describe("security headers", () => {
 describe("redirects and rewrites", () => {
     const edge = parseAppEdgeConfig(
         JSON.stringify({
-            redirects: [{ kind: "www-to-apex" }, { kind: "regex", regex: "^https://shop\\.example\\.com/old/(.*)", replacement: "https://shop.example.com/new/${1}", permanent: false }],
+            redirects: [
+                { kind: "www-to-apex" },
+                {
+                    kind: "regex",
+                    regex: "^https://shop\\.example\\.com/old/(.*)",
+                    replacement: "https://shop.example.com/new/${1}",
+                    permanent: false
+                }
+            ],
             rewrites: [{ kind: "strip-prefix", prefix: "/api" }]
         })
     );
 
     it("sends www to the apex only when the apex is routed too", () => {
         const both = renderDynamicConfig([
-            route({ id: "www", hostname: "www.example.com", edge, appHostnames: ["www.example.com", "example.com"] })
+            route({
+                id: "www",
+                hostname: "www.example.com",
+                edge,
+                appHostnames: ["www.example.com", "example.com"]
+            })
         ]);
-        expect(block(both, "polaris-app-www-redirect-0")).toContain('replacement: "${1}://${2}${3}"');
+        expect(block(both, "polaris-app-www-redirect-0")).toContain(
+            'replacement: "${1}://${2}${3}"'
+        );
         const alone = renderDynamicConfig([
-            route({ id: "www", hostname: "www.example.com", edge, appHostnames: ["www.example.com"] })
+            route({
+                id: "www",
+                hostname: "www.example.com",
+                edge,
+                appHostnames: ["www.example.com"]
+            })
         ]);
         expect(alone).not.toContain("polaris-app-www-redirect-0:");
     });

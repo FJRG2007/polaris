@@ -32,7 +32,9 @@ import {
 
 /** The stored mode, or "shared" for anything that is not one of the three. */
 export function networkModeOf(stored: string | null | undefined): NetworkMode {
-    return (NETWORK_MODES as readonly string[]).includes(stored ?? "") ? (stored as NetworkMode) : "shared";
+    return (NETWORK_MODES as readonly string[]).includes(stored ?? "")
+        ? (stored as NetworkMode)
+        : "shared";
 }
 
 interface TargetFacts {
@@ -55,7 +57,11 @@ export function privateNetworksOn(target: Pick<TargetFacts, "kind" | "hostId">):
 }
 
 export interface ServiceNetworkFacts {
-    readonly environment: { readonly id: string; readonly networkMode: string; readonly layout: string };
+    readonly environment: {
+        readonly id: string;
+        readonly networkMode: string;
+        readonly layout: string;
+    };
     readonly serviceId: string;
     readonly target: TargetFacts;
     /** Whether the service publishes a port on the host. Always false for a
@@ -89,13 +95,19 @@ export async function hasTunnel(applicationId: string): Promise<boolean> {
 
 /** The networks one service joins on its next deploy. */
 export function networksForService(facts: ServiceNetworkFacts): string[] {
-    const mode = privateNetworksOn(facts.target) ? networkModeOf(facts.environment.networkMode) : "shared";
+    const mode = privateNetworksOn(facts.target)
+        ? networkModeOf(facts.environment.networkMode)
+        : "shared";
     return serviceNetworks({
         mode,
         proxyNetwork: facts.target.proxyNetwork,
         environmentId: facts.environment.id,
         serviceId: facts.serviceId,
-        joinsProxy: joinsProxy({ local: isLocal(facts.target), published: facts.published, routed: facts.routed }),
+        joinsProxy: joinsProxy({
+            local: isLocal(facts.target),
+            published: facts.published,
+            routed: facts.routed
+        }),
         links: linksOfLayout(facts.environment.layout)
     });
 }
@@ -131,7 +143,10 @@ export async function privateNetworksOfApp(applicationId: string): Promise<strin
 /** The networks a tunnel's connector for this application joins: the proxy
  *  network it always had, and the application's private ones, so a service with
  *  its port closed is still reached by name once it has left the proxy network. */
-export async function connectorNetworks(applicationId: string, proxyNetwork: string): Promise<string[]> {
+export async function connectorNetworks(
+    applicationId: string,
+    proxyNetwork: string
+): Promise<string[]> {
     return [...new Set([proxyNetwork, ...(await privateNetworksOfApp(applicationId))])];
 }
 
@@ -169,7 +184,10 @@ export async function wantedPrivateNetworks(): Promise<string[]> {
  * is never removed - the daemon checks - so an environment switched back to
  * shared keeps working until its services are deployed onto the new setting.
  */
-export async function reconcilePrivateNetworks(): Promise<{ kept: number; removed: number } | null> {
+export async function reconcilePrivateNetworks(): Promise<{
+    kept: number;
+    removed: number;
+} | null> {
     if (!getCapabilities().privateNetworks) return null;
     return new HostdClient().reconcilePrivateNetworks(await wantedPrivateNetworks());
 }

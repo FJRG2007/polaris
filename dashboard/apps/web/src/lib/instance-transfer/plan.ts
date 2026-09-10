@@ -49,7 +49,8 @@ function referencesOf(model: SchemaModel) {
         .map((field) => {
             const columns = [...(field.relationFromFields ?? [])];
             const required = columns.every(
-                (column) => model.fields.find((candidate) => candidate.name === column)?.isRequired ?? false
+                (column) =>
+                    model.fields.find((candidate) => candidate.name === column)?.isRequired ?? false
             );
             return { target: field.type, columns, required };
         });
@@ -61,7 +62,11 @@ export function writePlan(models: readonly SchemaModel[]): WritePlan {
     for (const model of models) {
         const required = new Set<string>();
         for (const reference of referencesOf(model)) {
-            if (reference.required && reference.target !== model.name && names.has(reference.target)) {
+            if (
+                reference.required &&
+                reference.target !== model.name &&
+                names.has(reference.target)
+            ) {
                 required.add(reference.target);
             }
         }
@@ -74,11 +79,17 @@ export function writePlan(models: readonly SchemaModel[]): WritePlan {
     const placed = new Set<string>();
     while (order.length < models.length) {
         const ready = models.find(
-            (model) => !placed.has(model.name) && [...(needs.get(model.name) ?? [])].every((need) => placed.has(need))
+            (model) =>
+                !placed.has(model.name) &&
+                [...(needs.get(model.name) ?? [])].every((need) => placed.has(need))
         );
         if (!ready) {
-            const stuck = models.filter((model) => !placed.has(model.name)).map((model) => model.name);
-            throw new Error(`These tables require each other and cannot be written back: ${stuck.join(", ")}`);
+            const stuck = models
+                .filter((model) => !placed.has(model.name))
+                .map((model) => model.name);
+            throw new Error(
+                `These tables require each other and cannot be written back: ${stuck.join(", ")}`
+            );
         }
         order.push(ready.name);
         placed.add(ready.name);
@@ -90,14 +101,20 @@ export function writePlan(models: readonly SchemaModel[]): WritePlan {
         for (const reference of referencesOf(model)) {
             if (reference.required) {
                 if (reference.target === model.name) {
-                    throw new Error(`${model.name} requires a row of its own kind, which cannot be written back`);
+                    throw new Error(
+                        `${model.name} requires a row of its own kind, which cannot be written back`
+                    );
                 }
                 continue;
             }
             const forward =
                 reference.target === model.name ||
                 (position.get(reference.target) ?? -1) > (position.get(model.name) ?? -1);
-            if (forward) deferred.set(model.name, [...(deferred.get(model.name) ?? []), ...reference.columns]);
+            if (forward)
+                deferred.set(model.name, [
+                    ...(deferred.get(model.name) ?? []),
+                    ...reference.columns
+                ]);
         }
     }
     return { order, deferred };

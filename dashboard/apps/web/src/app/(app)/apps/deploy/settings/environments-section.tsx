@@ -109,7 +109,8 @@ export function EnvironmentsSection({
                                             value={draft}
                                             onChange={(event) => setDraft(event.target.value)}
                                             onKeyDown={(event) => {
-                                                if (event.key === "Enter") commitRename(environment);
+                                                if (event.key === "Enter")
+                                                    commitRename(environment);
                                                 if (event.key === "Escape") setRenaming(null);
                                             }}
                                             className="h-8 max-w-56"
@@ -143,25 +144,30 @@ export function EnvironmentsSection({
                                                     Default
                                                 </span>
                                             )}
-                                            {environment.pullRequest !== null && environment.previewRepo && (
-                                                <a
-                                                    href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    title="Open the pull request this previews"
-                                                    className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
-                                                >
-                                                    Preview of #{environment.pullRequest}
-                                                </a>
-                                            )}
+                                            {environment.pullRequest !== null &&
+                                                environment.previewRepo && (
+                                                    <a
+                                                        href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        title="Open the pull request this previews"
+                                                        className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        Preview of #{environment.pullRequest}
+                                                    </a>
+                                                )}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {environment.serviceCount}{" "}
-                                            {environment.serviceCount === 1 ? "service" : "services"}
+                                            {environment.serviceCount === 1
+                                                ? "service"
+                                                : "services"}
                                             {environment.branch ? (
                                                 <>
                                                     {" - follows "}
-                                                    <span className="font-mono">{environment.branch}</span>
+                                                    <span className="font-mono">
+                                                        {environment.branch}
+                                                    </span>
                                                 </>
                                             ) : null}
                                             {" - created "}
@@ -188,9 +194,15 @@ export function EnvironmentsSection({
                                         disabled={environment.isDefault || pending}
                                         onClick={() => makeDefault(environment)}
                                         aria-label={`Make ${environment.name} the default`}
-                                        title={environment.isDefault ? "Already the default" : "Make default"}
+                                        title={
+                                            environment.isDefault
+                                                ? "Already the default"
+                                                : "Make default"
+                                        }
                                     >
-                                        <Star className={`size-4 ${environment.isDefault ? "fill-current" : ""}`} />
+                                        <Star
+                                            className={`size-4 ${environment.isDefault ? "fill-current" : ""}`}
+                                        />
                                     </Button>
                                     <Button
                                         variant="ghost"

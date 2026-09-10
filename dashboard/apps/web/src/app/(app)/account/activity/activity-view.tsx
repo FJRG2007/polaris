@@ -51,7 +51,9 @@ function sessionLabel(session: ActivitySession, format: DisplayFormat): string {
     // live, which is how somebody recognises it here - but it cannot stand on its
     // own, or a session that is gone reads exactly like one still signed in.
     if (!session.label) {
-        return session.lastAt ? `${name} - signed out ${format.date(session.lastAt)}` : `${name} - signed out`;
+        return session.lastAt
+            ? `${name} - signed out ${format.date(session.lastAt)}`
+            : `${name} - signed out`;
     }
     const named = `${name} - ${session.label}`;
     return session.current ? `${named} (this device)` : named;
@@ -88,7 +90,11 @@ export function ActivityView() {
             path={PATH}
             cacheKey="account.activity"
             contextLabel="Session"
-            emptyLabel={selected === ALL ? "Nothing recorded yet." : "Nothing recorded from this session yet."}
+            emptyLabel={
+                selected === ALL
+                    ? "Nothing recorded yet."
+                    : "Nothing recorded from this session yet."
+            }
             showActor={false}
             context={(entry) => names.get(entry.sessionId ?? NO_SESSION) ?? "Signed-out session"}
             detail={(entry) =>
@@ -104,7 +110,10 @@ export function ActivityView() {
                     className="h-8 w-full sm:w-72"
                     options={[
                         { value: ALL, label: "All sessions" },
-                        ...sessions.map((session) => ({ value: session.id, label: sessionLabel(session, format) }))
+                        ...sessions.map((session) => ({
+                            value: session.id,
+                            label: sessionLabel(session, format)
+                        }))
                     ]}
                 />
             }

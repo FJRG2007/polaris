@@ -22,7 +22,10 @@ const states = new Map<string, AutoscaleState>();
 
 /** Average CPU over the copies that answered, or null when none did. */
 async function averageCpu(
-    app: { target: { kind: string; hostId: string | null }; environment: { project: { ownerId: string } } },
+    app: {
+        target: { kind: string; hostId: string | null };
+        environment: { project: { ownerId: string } };
+    },
     names: readonly string[]
 ): Promise<number | null> {
     const driver =
@@ -35,7 +38,9 @@ async function averageCpu(
             const stats = samples.get(name);
             return stats ? [stats.cpuPercent] : [];
         });
-        return readings.length > 0 ? readings.reduce((sum, value) => sum + value, 0) / readings.length : null;
+        return readings.length > 0
+            ? readings.reduce((sum, value) => sum + value, 0) / readings.length
+            : null;
     } finally {
         await driver.dispose().catch(() => undefined);
     }
@@ -43,7 +48,11 @@ async function averageCpu(
 
 export async function runAutoscale(now = Date.now()): Promise<{ checked: number; scaled: number }> {
     const apps = await prisma.application.findMany({
-        where: { autoscale: { not: null }, currentDeploymentId: { not: null }, desiredState: "running" },
+        where: {
+            autoscale: { not: null },
+            currentDeploymentId: { not: null },
+            desiredState: "running"
+        },
         include: {
             environment: { include: { project: true } },
             target: true,
@@ -71,7 +80,13 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
         const cpu = primary
             ? await averageCpu(app, replicaNames(primary, app.replicas)).catch(() => null)
             : null;
-        const step = autoscaleStep(config, app.replicas, cpu, states.get(app.id) ?? AUTOSCALE_IDLE, now);
+        const step = autoscaleStep(
+            config,
+            app.replicas,
+            cpu,
+            states.get(app.id) ?? AUTOSCALE_IDLE,
+            now
+        );
         states.set(app.id, step.state);
         if (step.replicas === app.replicas) continue;
         try {

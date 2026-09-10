@@ -49,19 +49,18 @@ export function normalizeDeployHostname(value: string): string | null {
     return trimmed;
 }
 
-export const deployHostnameSchema = z
-    .string()
-    .transform((value, ctx) => {
-        const normalized = normalizeDeployHostname(value);
-        if (!normalized) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Use a domain like app.example.com, or *.example.com for every subdomain of it."
-            });
-            return z.NEVER;
-        }
-        return normalized;
-    });
+export const deployHostnameSchema = z.string().transform((value, ctx) => {
+    const normalized = normalizeDeployHostname(value);
+    if (!normalized) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+                "Use a domain like app.example.com, or *.example.com for every subdomain of it."
+        });
+        return z.NEVER;
+    }
+    return normalized;
+});
 
 /** Whether a stored hostname covers every subdomain of its base (`*.example.com`). */
 export function isWildcardHostname(hostname: string): boolean {
@@ -111,7 +110,10 @@ const headerName = z
 const headerValue = z
     .string()
     .max(2048)
-    .regex(/^[\x20-\x21\x23-\x5b\x5d-\x7e]*$/, "Use plain characters, without double quotes or backslashes");
+    .regex(
+        /^[\x20-\x21\x23-\x5b\x5d-\x7e]*$/,
+        "Use plain characters, without double quotes or backslashes"
+    );
 
 /** An absolute request path prefix. */
 const pathPrefix = z
@@ -134,7 +136,10 @@ const edgeRegex = z
     .min(1)
     .max(512)
     .regex(/^[\x20-\x21\x23-\x7e]*$/, "Use plain characters, without double quotes")
-    .refine((value) => !/\(\?<?[=!]/.test(value), "Lookahead and lookbehind are not supported at the edge")
+    .refine(
+        (value) => !/\(\?<?[=!]/.test(value),
+        "Lookahead and lookbehind are not supported at the edge"
+    )
     .refine((value) => !/\\[1-9]/.test(value), "Backreferences are not supported at the edge")
     .refine((value) => {
         try {
@@ -151,7 +156,10 @@ const edgeReplacement = z
     .string()
     .min(1)
     .max(512)
-    .regex(/^[\x20-\x21\x23-\x5b\x5d-\x7e]*$/, "Use plain characters, without double quotes or backslashes");
+    .regex(
+        /^[\x20-\x21\x23-\x5b\x5d-\x7e]*$/,
+        "Use plain characters, without double quotes or backslashes"
+    );
 
 export const EDGE_RATE_LIMITS_MAX = 8;
 export const EDGE_REDIRECTS_MAX = 8;
@@ -213,8 +221,12 @@ export const edgeHeadersSchema = z.object({
         ])
         .optional(),
     permissionsPolicy: headerValue.optional(),
-    crossOriginOpenerPolicy: z.enum(["", "unsafe-none", "same-origin-allow-popups", "same-origin"]).optional(),
-    crossOriginEmbedderPolicy: z.enum(["", "unsafe-none", "require-corp", "credentialless"]).optional(),
+    crossOriginOpenerPolicy: z
+        .enum(["", "unsafe-none", "same-origin-allow-popups", "same-origin"])
+        .optional(),
+    crossOriginEmbedderPolicy: z
+        .enum(["", "unsafe-none", "require-corp", "credentialless"])
+        .optional(),
     crossOriginResourcePolicy: z.enum(["", "same-site", "same-origin", "cross-origin"]).optional(),
     contentTypeNosniff: z.boolean().optional(),
     custom: z
@@ -258,7 +270,11 @@ export const edgeRewriteSchema = z
     })
     .superRefine((value, ctx) => {
         if ((value.kind === "strip-prefix" || value.kind === "add-prefix") && !value.prefix) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["prefix"], message: "Name the path prefix" });
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["prefix"],
+                message: "Name the path prefix"
+            });
         }
         if (value.kind === "replace-path" && (!value.regex || !value.replacement)) {
             ctx.addIssue({
@@ -346,7 +362,11 @@ export function parseAppEdgeConfig(raw: string | null | undefined): AppEdgeConfi
     }
     if (!value || typeof value !== "object" || Array.isArray(value)) return EMPTY_EDGE_CONFIG;
     const obj = value as Record<string, unknown>;
-    const each = <T>(list: unknown, schema: z.ZodType<T, z.ZodTypeDef, unknown>, max: number): T[] =>
+    const each = <T>(
+        list: unknown,
+        schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+        max: number
+    ): T[] =>
         (Array.isArray(list) ? list : [])
             .map((entry) => schema.safeParse(entry))
             .flatMap((parsed) => (parsed.success ? [parsed.data] : []))

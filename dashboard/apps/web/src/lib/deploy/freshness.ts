@@ -78,7 +78,8 @@ export async function deployFreshness(applicationId: string): Promise<DeployFres
     // Keyed by who asks as well as what: a repository one owner reaches and
     // another does not must not answer from a cache filled for the first.
     const ownerId = app.environment.project.ownerId;
-    const key = `${ownerId}:${repo.owner}/${repo.repo}@${branch}:${current.commitSha}`.toLowerCase();
+    const key =
+        `${ownerId}:${repo.owner}/${repo.repo}@${branch}:${current.commitSha}`.toLowerCase();
     const distance = await cachedCompare(key, async () => {
         const token = await githubTokenForOwner(ownerId, repo.owner);
         return compareCommits(repo.owner, repo.repo, current.commitSha as string, branch, token);

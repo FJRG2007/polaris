@@ -26,7 +26,9 @@ const POLARIS_HOST = "the Polaris host";
 /** The stored choice, or "" when there is none or it no longer reads as one. */
 export function storedBuildOn(buildConfig: string | null | undefined): BuildOn {
     try {
-        const parsed = buildOnSchema.safeParse((JSON.parse(buildConfig || "{}") as { buildOn?: unknown }).buildOn ?? "");
+        const parsed = buildOnSchema.safeParse(
+            (JSON.parse(buildConfig || "{}") as { buildOn?: unknown }).buildOn ?? ""
+        );
         return parsed.success ? parsed.data : "";
     } catch {
         return "";
@@ -65,18 +67,35 @@ export async function resolveBuildMachine(
     if (choice === "local") {
         if (local) return null;
         return {
-            target: { id: "build:local", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "" },
+            target: {
+                id: "build:local",
+                kind: "local",
+                hostId: null,
+                runtime: "compose",
+                proxyNetwork: ""
+            },
             name: POLARIS_HOST,
             runsOn
         };
     }
     if (!local && app.target.hostId === choice) return null;
-    const host = await prisma.host.findFirst({ where: { id: choice, ownerId }, select: { id: true, name: true } });
+    const host = await prisma.host.findFirst({
+        where: { id: choice, ownerId },
+        select: { id: true, name: true }
+    });
     if (!host) {
-        throw new Error("The server this service builds on is no longer connected. Choose another under its settings.");
+        throw new Error(
+            "The server this service builds on is no longer connected. Choose another under its settings."
+        );
     }
     return {
-        target: { id: `build:${host.id}`, kind: "host", hostId: host.id, runtime: "compose", proxyNetwork: "" },
+        target: {
+            id: `build:${host.id}`,
+            kind: "host",
+            hostId: host.id,
+            runtime: "compose",
+            proxyNetwork: ""
+        },
         name: host.name,
         runsOn
     };
@@ -90,7 +109,10 @@ export interface BuildMachineView {
 }
 
 /** What a service builds on now, and every machine it could build on. */
-export async function buildMachineOptions(applicationId: string, ownerId: string): Promise<BuildMachineView> {
+export async function buildMachineOptions(
+    applicationId: string,
+    ownerId: string
+): Promise<BuildMachineView> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: {
@@ -106,7 +128,9 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
         orderBy: { name: "asc" }
     });
     const local = runsLocally(app.target);
-    const options: { value: BuildOn; label: string }[] = [{ value: "", label: "The server it runs on" }];
+    const options: { value: BuildOn; label: string }[] = [
+        { value: "", label: "The server it runs on" }
+    ];
     if (!local) options.push({ value: "local", label: "The Polaris host" });
     for (const host of hosts) {
         if (!local && host.id === app.target.hostId) continue;
@@ -121,14 +145,21 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
 }
 
 /** Choose where a service builds. The next deploy uses it. */
-export async function setBuildMachine(applicationId: string, ownerId: string, value: BuildOn): Promise<void> {
+export async function setBuildMachine(
+    applicationId: string,
+    ownerId: string,
+    value: BuildOn
+): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { buildConfig: true }
     });
     if (!app) throw new Error("Application not found");
     if (value && value !== "local") {
-        const host = await prisma.host.findFirst({ where: { id: value, ownerId }, select: { id: true } });
+        const host = await prisma.host.findFirst({
+            where: { id: value, ownerId },
+            select: { id: true }
+        });
         if (!host) throw new Error("That server is not connected");
     }
     let build: Record<string, unknown> = {};

@@ -19,7 +19,9 @@ export function copiesOf(
     app: { replicas: number; target: { runtime: string } },
     name: string
 ): string[] | undefined {
-    return app.replicas > 1 && app.target.runtime !== "swarm" ? replicaNames(name, app.replicas) : undefined;
+    return app.replicas > 1 && app.target.runtime !== "swarm"
+        ? replicaNames(name, app.replicas)
+        : undefined;
 }
 
 /** The route fields that spread a service over its copies, with the balancing it

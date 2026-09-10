@@ -126,7 +126,9 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                                         ? undefined
                                         : "Connect one of your WhatsApp channels first - the code is sent through it."
                                 }
-                                onClick={() => void run(sendPhoneCodeAction, "Code sent on WhatsApp.")}
+                                onClick={() =>
+                                    void run(sendPhoneCodeAction, "Code sent on WhatsApp.")
+                                }
                             >
                                 Send code
                             </Button>
@@ -198,7 +200,9 @@ function SetPhoneDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{current ? "Change your number" : "Add a phone number"}</DialogTitle>
+                    <DialogTitle>
+                        {current ? "Change your number" : "Add a phone number"}
+                    </DialogTitle>
                     <DialogDescription>
                         It starts unconfirmed. Confirm it before it can carry a sign-in code.
                     </DialogDescription>
@@ -220,7 +224,12 @@ function SetPhoneDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Current password
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                        />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
@@ -275,7 +284,12 @@ function RemovePhoneDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         Current password
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                        />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">

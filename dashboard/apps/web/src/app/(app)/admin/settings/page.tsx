@@ -36,7 +36,10 @@ export default async function SettingsPage() {
         // Narrow page: centre the column in the content area, header included, and
         // keep it at the top so it does not shift as the update card grows.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader title="Settings" description="General configuration for this Polaris deployment." />
+            <PageHeader
+                title="Settings"
+                description="General configuration for this Polaris deployment."
+            />
             <SettingsView
                 initialPolicy={policy}
                 initialSource={source}

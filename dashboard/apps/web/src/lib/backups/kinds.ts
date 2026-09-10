@@ -89,7 +89,8 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
     "mail-server": {
         kind: "mail-server",
         label: "Mail server",
-        summary: "A mail server's mailboxes, queue and keys, exported with the engine stopped so the copy is whole.",
+        summary:
+            "A mail server's mailboxes, queue and keys, exported with the engine stopped so the copy is whole.",
         canRestore: true,
         supportsSourceLocal: false,
         discoverable: true

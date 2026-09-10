@@ -29,7 +29,13 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { keyFields, writePlan, type SchemaModel } from "./plan";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { decodeRow, encodeRow, type SecretCodec, type Tally } from "./codec";
-import { newHeader, openStream, passphraseFileKey, SealError, sealStream } from "@/lib/backups/sealing";
+import {
+    newHeader,
+    openStream,
+    passphraseFileKey,
+    SealError,
+    sealStream
+} from "@/lib/backups/sealing";
 
 export const TRANSFER_FORMAT = "polaris-instance";
 const TRANSFER_VERSION = 1;
@@ -87,7 +93,9 @@ type Delegate = {
 };
 
 function delegateOf(client: unknown, model: string): Delegate {
-    return (client as Record<string, Delegate>)[`${model.charAt(0).toLowerCase()}${model.slice(1)}`]!;
+    return (client as Record<string, Delegate>)[
+        `${model.charAt(0).toLowerCase()}${model.slice(1)}`
+    ]!;
 }
 
 /** Secrets as this instance opens and seals them. */
@@ -129,7 +137,11 @@ export async function exportInstance(passphrase: string, target: string): Promis
     const byName = new Map(all.map((model) => [model.name, model]));
     const header = newHeader("passphrase");
     const gzip = createGzip();
-    const done = pipeline(gzip, sealStream(header, passphraseFileKey(passphrase, header)), createWriteStream(target));
+    const done = pipeline(
+        gzip,
+        sealStream(header, passphraseFileKey(passphrase, header)),
+        createWriteStream(target)
+    );
     const codec = instanceCodec();
     const tally: Tally = { carried: 0, unreadable: 0 };
     const tables: { name: string; rows: number }[] = [];
@@ -143,7 +155,11 @@ export async function exportInstance(passphrase: string, target: string): Promis
             let rows = 0;
             for (let skip = 0; ; skip += PAGE) {
                 const page = await delegateOf(prisma, name).findMany({ orderBy, skip, take: PAGE });
-                for (const row of page) await writeLine(gzip, { m: name, r: await encodeRow(model, row, codec, tally) });
+                for (const row of page)
+                    await writeLine(gzip, {
+                        m: name,
+                        r: await encodeRow(model, row, codec, tally)
+                    });
                 rows += page.length;
                 if (page.length < PAGE) break;
             }
@@ -170,7 +186,8 @@ export async function exportInstance(passphrase: string, target: string): Promis
 /** Every line of a transfer file, opened with `passphrase`. */
 async function* linesOf(path: string, passphrase: string): AsyncGenerator<Record<string, unknown>> {
     const opener = openStream((header) => {
-        if (header.kdf !== "passphrase") throw new TransferError("That is not a Polaris transfer file");
+        if (header.kdf !== "passphrase")
+            throw new TransferError("That is not a Polaris transfer file");
         return passphraseFileKey(passphrase, header);
     });
     const gunzip = createGunzip();
@@ -195,7 +212,8 @@ async function* linesOf(path: string, passphrase: string): AsyncGenerator<Record
         await piped;
         if (carry.trim()) yield JSON.parse(carry) as Record<string, unknown>;
     } catch (error) {
-        if (error instanceof SealError) throw new TransferError("The passphrase is wrong, or the file has been changed");
+        if (error instanceof SealError)
+            throw new TransferError("The passphrase is wrong, or the file has been changed");
         if (error instanceof TransferError) throw error;
         throw new TransferError("That file could not be read as a Polaris transfer file");
     }
@@ -209,8 +227,10 @@ export async function previewTransfer(path: string, passphrase: string): Promise
     const counted = new Map<string, number>();
     for await (const line of linesOf(path, passphrase)) {
         if (!header) {
-            if (line.format !== TRANSFER_FORMAT) throw new TransferError("That is not a Polaris transfer file");
-            if (line.version !== TRANSFER_VERSION) throw new TransferError("That file was written by a different version of Polaris");
+            if (line.format !== TRANSFER_FORMAT)
+                throw new TransferError("That is not a Polaris transfer file");
+            if (line.version !== TRANSFER_VERSION)
+                throw new TransferError("That file was written by a different version of Polaris");
             header = line;
             continue;
         }
@@ -220,7 +240,10 @@ export async function previewTransfer(path: string, passphrase: string): Promise
         }
         if (typeof line.m === "string") counted.set(line.m, (counted.get(line.m) ?? 0) + 1);
     }
-    if (!header || !trailer) throw new TransferError("That file ends before it should - it may not have finished downloading");
+    if (!header || !trailer)
+        throw new TransferError(
+            "That file ends before it should - it may not have finished downloading"
+        );
     return {
         exportedAt: String(header.exportedAt),
         tables: [...counted.entries()].map(([name, rows]) => ({ name, rows })),
@@ -238,7 +261,8 @@ export async function notFreshReason(): Promise<string | null> {
         prisma.host.count()
     ]);
     if (users > 1) return "This Polaris already has other accounts. Import onto a fresh install.";
-    if (projects > 0 || servers > 0) return "This Polaris already has projects or servers. Import onto a fresh install.";
+    if (projects > 0 || servers > 0)
+        return "This Polaris already has projects or servers. Import onto a fresh install.";
     return null;
 }
 
@@ -264,11 +288,19 @@ export async function applyTransfer(path: string, passphrase: string): Promise<T
                 await tx.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE`);
             } else {
                 await tx.$executeRawUnsafe("PRAGMA defer_foreign_keys = ON");
-                for (const name of [...plan.order].reverse()) await delegateOf(tx, name).deleteMany();
+                for (const name of [...plan.order].reverse())
+                    await delegateOf(tx, name).deleteMany();
             }
 
-            const pending: { name: string; rows: Record<string, unknown>[] } = { name: "", rows: [] };
-            const later: { name: string; where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
+            const pending: { name: string; rows: Record<string, unknown>[] } = {
+                name: "",
+                rows: []
+            };
+            const later: {
+                name: string;
+                where: Record<string, unknown>;
+                data: Record<string, unknown>;
+            }[] = [];
             const flush = async () => {
                 if (pending.rows.length === 0) return;
                 await delegateOf(tx, pending.name).createMany({ data: pending.rows });
@@ -286,7 +318,11 @@ export async function applyTransfer(path: string, passphrase: string): Promise<T
                 const row = await decodeRow(model, line.r as Record<string, unknown>, codec);
                 // A JSON column's empty value has to be said the database's way.
                 for (const field of model.fields) {
-                    if (field.type === "Json" && field.kind === "scalar" && row[field.name] === null) {
+                    if (
+                        field.type === "Json" &&
+                        field.kind === "scalar" &&
+                        row[field.name] === null
+                    ) {
                         row[field.name] = Prisma.DbNull;
                     }
                 }
@@ -296,12 +332,18 @@ export async function applyTransfer(path: string, passphrase: string): Promise<T
                     row.hash = null;
                 }
                 const deferred = plan.deferred.get(model.name) ?? [];
-                const setLater = Object.fromEntries(deferred.filter((column) => row[column] != null).map((column) => [column, row[column]]));
+                const setLater = Object.fromEntries(
+                    deferred
+                        .filter((column) => row[column] != null)
+                        .map((column) => [column, row[column]])
+                );
                 if (Object.keys(setLater).length > 0) {
                     for (const column of deferred) row[column] = null;
                     later.push({
                         name: model.name,
-                        where: Object.fromEntries(keyFields(model).map((field) => [field, row[field]])),
+                        where: Object.fromEntries(
+                            keyFields(model).map((field) => [field, row[field]])
+                        ),
                         data: setLater
                     });
                 }
@@ -312,7 +354,10 @@ export async function applyTransfer(path: string, passphrase: string): Promise<T
             }
             await flush();
             for (const update of later) {
-                const where = keyFields(byName.get(update.name)!).length > 1 ? compositeWhere(byName.get(update.name)!, update.where) : update.where;
+                const where =
+                    keyFields(byName.get(update.name)!).length > 1
+                        ? compositeWhere(byName.get(update.name)!, update.where)
+                        : update.where;
                 await delegateOf(tx, update.name).update({ where, data: update.data });
             }
         },

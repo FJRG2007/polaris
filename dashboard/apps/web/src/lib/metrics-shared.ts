@@ -95,7 +95,11 @@ export function counterAdvance(values: (bigint | null)[]): bigint | null {
  * means the container restarted and began counting again, so the reading itself
  * is what it has moved since - which is the honest floor, and never negative.
  */
-export function counterRate(previous: bigint | null, current: bigint | null, elapsedMs: number): number | null {
+export function counterRate(
+    previous: bigint | null,
+    current: bigint | null,
+    elapsedMs: number
+): number | null {
     if (current == null || previous == null || elapsedMs <= 0) return null;
     const moved = current >= previous ? current - previous : current;
     return Math.round(Number(moved) / (elapsedMs / 1000));

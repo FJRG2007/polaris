@@ -16,7 +16,10 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-const ROOTS = [resolve(import.meta.dirname, "../../src"), resolve(import.meta.dirname, "../../../../packages/ui/src")];
+const ROOTS = [
+    resolve(import.meta.dirname, "../../src"),
+    resolve(import.meta.dirname, "../../../../packages/ui/src")
+];
 
 /** Where a hue is an identity: file types and the colours a user can give an item. */
 const IDENTITY_FILES = new Set(["file-icons.ts", "item-icons.ts"]);
@@ -35,7 +38,8 @@ const RULES: { name: string; pattern: RegExp; allow?: (match: RegExpMatchArray) 
     },
     {
         name: "a raw hue mixed as a chip (use the status tokens)",
-        pattern: /\b(bg|border|ring)-(red|rose|emerald|green|lime|amber|yellow|orange)-\d{2,3}\/\d+\b/g
+        pattern:
+            /\b(bg|border|ring)-(red|rose|emerald|green|lime|amber|yellow|orange)-\d{2,3}\/\d+\b/g
     },
     {
         name: "a raw red for an error (use text-danger)",

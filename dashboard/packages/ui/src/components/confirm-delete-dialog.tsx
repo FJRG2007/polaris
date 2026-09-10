@@ -119,14 +119,16 @@ export function ConfirmDeleteDialog({
                         <p className="text-sm text-muted-foreground">
                             {question ?? (
                                 <>
-                                    Delete <span className="font-medium text-foreground">{name}</span>?
+                                    Delete{" "}
+                                    <span className="font-medium text-foreground">{name}</span>?
                                 </>
                             )}
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1.5" htmlFor={fieldId}>
                             <span className="text-xs text-muted-foreground">
-                                Type <span className="font-medium text-foreground">{name}</span> to confirm.
+                                Type <span className="font-medium text-foreground">{name}</span> to
+                                confirm.
                             </span>
                             <Input
                                 id={fieldId}
@@ -145,7 +147,11 @@ export function ConfirmDeleteDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             Cancel
                         </Button>
                         <Button variant="danger" onClick={onConfirm} disabled={!ready}>

@@ -56,7 +56,12 @@ function tokenize(line: string): string[] {
             continue;
         }
         let value = "";
-        while (index < line.length && line[index] !== " " && line[index] !== "\t" && line[index] !== ";") {
+        while (
+            index < line.length &&
+            line[index] !== " " &&
+            line[index] !== "\t" &&
+            line[index] !== ";"
+        ) {
             value += line[index];
             index += 1;
         }
@@ -183,7 +188,13 @@ export function parseZoneFile(text: string, defaultOrigin = ""): ZoneRecord[] {
             continue;
         }
         if (type === "CNAME" || type === "NS" || type === "PTR") {
-            records.push({ name: owner, type, ttl, value: absolute(data[0] ?? "", origin), priority: null });
+            records.push({
+                name: owner,
+                type,
+                ttl,
+                value: absolute(data[0] ?? "", origin),
+                priority: null
+            });
             continue;
         }
         if (type === "SRV") {
@@ -252,7 +263,8 @@ export function purposeOf(record: ZoneRecord): MailRecordPurpose {
     if (record.type === "TXT" && record.name.startsWith("_smtp._tls.")) return "tls-rpt";
     if (record.type === "CNAME" && record.name.startsWith("mta-sts.")) return "mta-sts";
     if (record.type === "SRV") return "service";
-    if (record.type === "CNAME" && /^(autoconfig|autodiscover)\./.test(record.name)) return "autoconfig";
+    if (record.type === "CNAME" && /^(autoconfig|autodiscover)\./.test(record.name))
+        return "autoconfig";
     if (record.type === "CAA") return "caa";
     if (record.type === "TLSA") return "tlsa";
     if (record.type === "A" || record.type === "AAAA") return "address";
@@ -297,7 +309,10 @@ function comparable(type: string, value: string): string {
  * that also includes the operator's other senders). A missing record fails only
  * when mail depends on it; an optional one warns.
  */
-export function gradeRecord(record: ExpectedMailRecord, published: readonly string[]): GradedRecord {
+export function gradeRecord(
+    record: ExpectedMailRecord,
+    published: readonly string[]
+): GradedRecord {
     const want = comparable(record.type, record.value);
     const have = published.map((value) => comparable(record.type, value));
     const found = (verdict: RecordVerdict, note: string | null): GradedRecord => ({
@@ -309,20 +324,29 @@ export function gradeRecord(record: ExpectedMailRecord, published: readonly stri
 
     if (record.purpose === "spf") {
         const spf = have.filter((value) => value.startsWith("v=spf1"));
-        if (spf.length > 1) return found("fail", "There are two SPF records, which makes both invalid. Keep one.");
+        if (spf.length > 1)
+            return found("fail", "There are two SPF records, which makes both invalid. Keep one.");
         if (spf.length === 0) return found("fail", "No SPF record is published.");
         if (spf[0] === want) return found("pass", null);
-        const mechanisms = want.split(" ").filter((part) => part !== "v=spf1" && !/^[~?+-]all$/.test(part));
+        const mechanisms = want
+            .split(" ")
+            .filter((part) => part !== "v=spf1" && !/^[~?+-]all$/.test(part));
         const covered = mechanisms.every((mechanism) => spf[0]?.split(" ").includes(mechanism));
         return covered
-            ? found("warn", "An SPF record is published with more in it than this server needs. Mail still passes.")
+            ? found(
+                  "warn",
+                  "An SPF record is published with more in it than this server needs. Mail still passes."
+              )
             : found("fail", "The published SPF record does not include this server.");
     }
     if (record.purpose === "dmarc") {
         const dmarc = have.filter((value) => value.startsWith("v=dmarc1"));
         if (dmarc.length === 0) return found("fail", "No DMARC policy is published.");
         if (dmarc.includes(want)) return found("pass", null);
-        return found("warn", "A different DMARC policy is published. It is valid; reports may go elsewhere.");
+        return found(
+            "warn",
+            "A different DMARC policy is published. It is valid; reports may go elsewhere."
+        );
     }
     if (have.includes(want)) return found("pass", null);
     if (have.length === 0) {
@@ -351,10 +375,16 @@ export function mergeSpf(existing: string, ours: string): string | null {
         .trim()
         .split(/\s+/)
         .filter((part) => part.toLowerCase() !== "v=spf1" && !/^[~?+-]?all$/i.test(part));
-    const missing = want.filter((part) => !have.some((present) => present.toLowerCase() === part.toLowerCase()));
+    const missing = want.filter(
+        (part) => !have.some((present) => present.toLowerCase() === part.toLowerCase())
+    );
     if (missing.length === 0) return null;
     const [version, ...rest] = have;
-    return [version && version.toLowerCase() === "v=spf1" ? version : "v=spf1", ...missing, ...rest].join(" ");
+    return [
+        version && version.toLowerCase() === "v=spf1" ? version : "v=spf1",
+        ...missing,
+        ...rest
+    ].join(" ");
 }
 
 /** The worst verdict in a set, for the one badge a domain gets. */

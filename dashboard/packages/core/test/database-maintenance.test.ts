@@ -58,7 +58,9 @@ describe("restoreCommands", () => {
         expect(steps[3]!.argv).toContain("PGPASSWORD=adminSecret-456");
         const grant = steps.at(-1)!;
         expect(grant.describe).toBe("Granting readonly to shop_app again");
-        expect(grant.argv.join(" ")).toContain('GRANT SELECT ON ALL TABLES IN SCHEMA public TO "shop_app"');
+        expect(grant.argv.join(" ")).toContain(
+            'GRANT SELECT ON ALL TABLES IN SCHEMA public TO "shop_app"'
+        );
     });
 
     it("works from template1 when the database being restored is postgres itself", () => {
@@ -82,7 +84,11 @@ describe("restoreCommands", () => {
     });
 
     it("renames a MongoDB dump taken from a database of another name", () => {
-        const [load] = core.restoreCommands({ ...POSTGRES, engine: "mongo", sourceDatabase: "legacy" });
+        const [load] = core.restoreCommands({
+            ...POSTGRES,
+            engine: "mongo",
+            sourceDatabase: "legacy"
+        });
         expect(load!.argv).toContain("--nsInclude=legacy.*");
         expect(load!.argv).toContain("--nsFrom=legacy.*");
         expect(load!.argv).toContain("--nsTo=shop.*");
@@ -92,27 +98,32 @@ describe("restoreCommands", () => {
 
 describe("readinessCommand", () => {
     it("asks each engine its own way, with the password out of the argv where the client allows", () => {
-        expect(core.readinessCommand({ engine: "postgres", username: "u", password: "p" }).argv).toEqual(["pg_isready", "-U", "u"]);
-        expect(core.readinessCommand({ engine: "redis", username: "", password: "p" }).argv).toEqual([
-            "env",
-            "REDISCLI_AUTH=p",
-            "redis-cli",
-            "ping"
-        ]);
-        expect(core.readinessCommand({ engine: "seaweedfs", username: "", password: "" }).argv).toContain(
-            "http://127.0.0.1:9333/cluster/status"
-        );
+        expect(
+            core.readinessCommand({ engine: "postgres", username: "u", password: "p" }).argv
+        ).toEqual(["pg_isready", "-U", "u"]);
+        expect(
+            core.readinessCommand({ engine: "redis", username: "", password: "p" }).argv
+        ).toEqual(["env", "REDISCLI_AUTH=p", "redis-cli", "ping"]);
+        expect(
+            core.readinessCommand({ engine: "seaweedfs", username: "", password: "" }).argv
+        ).toContain("http://127.0.0.1:9333/cluster/status");
     });
 });
 
 describe("Redis", () => {
     it("keeps an existing instance's command unchanged in default mode", () => {
-        expect(core.redisServerCommand("pw", "default")).toEqual(["redis-server", "--requirepass", "pw"]);
+        expect(core.redisServerCommand("pw", "default")).toEqual([
+            "redis-server",
+            "--requirepass",
+            "pw"
+        ]);
     });
 
     it("turns persistence off and eviction on in cache mode", () => {
         const command = core.redisServerCommand("pw", "cache", 512);
-        expect(command).toEqual(expect.arrayContaining(["--save", "", "--appendonly", "no", "--maxmemory", "512mb"]));
+        expect(command).toEqual(
+            expect.arrayContaining(["--save", "", "--appendonly", "no", "--maxmemory", "512mb"])
+        );
         expect(command).toContain("allkeys-lru");
     });
 
@@ -124,16 +135,38 @@ describe("Redis", () => {
 
     it("needs a memory limit for a cache, from the offered sizes", () => {
         const id = "00000000-0000-4000-8000-000000000000";
-        expect(core.redisModeSchema.safeParse({ databaseId: id, mode: "cache" }).success).toBe(false);
-        expect(core.redisModeSchema.safeParse({ databaseId: id, mode: "cache", maxMemoryMb: 300 }).success).toBe(false);
-        expect(core.redisModeSchema.safeParse({ databaseId: id, mode: "cache", maxMemoryMb: 256 }).success).toBe(true);
-        expect(core.redisModeSchema.safeParse({ databaseId: id, mode: "persistent" }).success).toBe(true);
+        expect(core.redisModeSchema.safeParse({ databaseId: id, mode: "cache" }).success).toBe(
+            false
+        );
+        expect(
+            core.redisModeSchema.safeParse({ databaseId: id, mode: "cache", maxMemoryMb: 300 })
+                .success
+        ).toBe(false);
+        expect(
+            core.redisModeSchema.safeParse({ databaseId: id, mode: "cache", maxMemoryMb: 256 })
+                .success
+        ).toBe(true);
+        expect(core.redisModeSchema.safeParse({ databaseId: id, mode: "persistent" }).success).toBe(
+            true
+        );
     });
 
     it("reads a replica's synchronisation as finished only once the link is up and nothing is loading", () => {
-        expect(core.redisSyncDone("role:slave\r\nmaster_link_status:up\r\nmaster_sync_in_progress:0\r\n")).toBe(true);
-        expect(core.redisSyncDone("role:slave\r\nmaster_link_status:up\r\nmaster_sync_in_progress:1\r\n")).toBe(false);
-        expect(core.redisSyncDone("role:slave\r\nmaster_link_status:down\r\nmaster_sync_in_progress:0\r\n")).toBe(false);
+        expect(
+            core.redisSyncDone(
+                "role:slave\r\nmaster_link_status:up\r\nmaster_sync_in_progress:0\r\n"
+            )
+        ).toBe(true);
+        expect(
+            core.redisSyncDone(
+                "role:slave\r\nmaster_link_status:up\r\nmaster_sync_in_progress:1\r\n"
+            )
+        ).toBe(false);
+        expect(
+            core.redisSyncDone(
+                "role:slave\r\nmaster_link_status:down\r\nmaster_sync_in_progress:0\r\n"
+            )
+        ).toBe(false);
         expect(core.redisSyncDone("role:master\r\n")).toBe(false);
     });
 });
@@ -142,7 +175,9 @@ describe("MongoDB replica set", () => {
     it("creates the key file before handing over to the image's entrypoint", () => {
         const [, , script] = core.mongoReplicaSetCommand();
         expect(script).toContain("chmod 400");
-        expect(script).toContain("exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile");
+        expect(script).toContain(
+            "exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile"
+        );
     });
 
     it("initiates once, tolerating a set somebody else initiated first", () => {
@@ -152,7 +187,9 @@ describe("MongoDB replica set", () => {
     });
 
     it("refuses a member host that is not a container name", () => {
-        expect(() => core.mongoInitiateCommand("root", "pw", 'x" }); db.dropDatabase(); ({"')).toThrow();
+        expect(() =>
+            core.mongoInitiateCommand("root", "pw", 'x" }); db.dropDatabase(); ({"')
+        ).toThrow();
     });
 });
 
@@ -160,7 +197,9 @@ describe("point-in-time recovery", () => {
     it("archives with the command the manual gives, into the mounted archive", () => {
         const command = core.pitrServerCommand();
         expect(command).toContain("archive_mode=on");
-        expect(command).toContain("archive_command=test ! -f /polaris-pitr/wal/%f && cp %p /polaris-pitr/wal/%f");
+        expect(command).toContain(
+            "archive_command=test ! -f /polaris-pitr/wal/%f && cp %p /polaris-pitr/wal/%f"
+        );
     });
 
     it("labels a base backup with a timestamp safe in a path", () => {
@@ -185,9 +224,15 @@ describe("point-in-time recovery", () => {
 
     it("cleans up by a backup history file name and nothing else", () => {
         expect(() => core.pitrCleanupCommands("; rm -rf /", [])).toThrow();
-        const commands = core.pitrCleanupCommands("000000010000000000000003.00000028.backup", ["2026-09-01T00-00-00Z"]);
+        const commands = core.pitrCleanupCommands("000000010000000000000003.00000028.backup", [
+            "2026-09-01T00-00-00Z"
+        ]);
         expect(commands.map((command) => command.argv[0])).toEqual(["rm", "pg_archivecleanup"]);
-        expect(commands[1]!.argv).toEqual(["pg_archivecleanup", "/polaris-pitr/wal", "000000010000000000000003.00000028.backup"]);
+        expect(commands[1]!.argv).toEqual([
+            "pg_archivecleanup",
+            "/polaris-pitr/wal",
+            "000000010000000000000003.00000028.backup"
+        ]);
     });
 
     it("recovers to the target as a positional argument, in the form PostgreSQL reads", () => {
@@ -206,8 +251,14 @@ describe("point-in-time recovery", () => {
 
     it("offers only the listed windows", () => {
         const id = "00000000-0000-4000-8000-000000000000";
-        expect(core.pitrSettingsSchema.safeParse({ databaseId: id, enabled: true, keepDays: 7 }).success).toBe(true);
-        expect(core.pitrSettingsSchema.safeParse({ databaseId: id, enabled: true, keepDays: 5 }).success).toBe(false);
+        expect(
+            core.pitrSettingsSchema.safeParse({ databaseId: id, enabled: true, keepDays: 7 })
+                .success
+        ).toBe(true);
+        expect(
+            core.pitrSettingsSchema.safeParse({ databaseId: id, enabled: true, keepDays: 5 })
+                .success
+        ).toBe(false);
     });
 });
 
@@ -241,13 +292,20 @@ describe("versions", () => {
             "legacy"
         ].join("\n");
         expect(core.unknownNames("mysql", listed, ["shop"])).toEqual(["legacy"]);
-        expect(core.listDatabasesCommand("postgres", "polaris", "pw").argv).toContain("PGPASSWORD=pw");
+        expect(core.listDatabasesCommand("postgres", "polaris", "pw").argv).toContain(
+            "PGPASSWORD=pw"
+        );
     });
 });
 
 describe("copying from elsewhere", () => {
     it("reads a PostgreSQL URL into its parts", () => {
-        expect(core.parseExternalSource("postgresql://app:p%40ss@db.example.com:6543/shop?sslmode=require", "postgres")).toEqual({
+        expect(
+            core.parseExternalSource(
+                "postgresql://app:p%40ss@db.example.com:6543/shop?sslmode=require",
+                "postgres"
+            )
+        ).toEqual({
             engine: "postgres",
             host: "db.example.com",
             port: 6543,
@@ -264,8 +322,13 @@ describe("copying from elsewhere", () => {
     });
 
     it("keeps MongoDB's authSource and ignores Redis' numbered database", () => {
-        expect(core.parseExternalSource("mongodb://u:p@h/app?authSource=app", "mongo")?.authSource).toBe("app");
-        expect(core.parseExternalSource("redis://:p@h:6380/2", "redis")).toMatchObject({ database: "", port: 6380 });
+        expect(
+            core.parseExternalSource("mongodb://u:p@h/app?authSource=app", "mongo")?.authSource
+        ).toBe("app");
+        expect(core.parseExternalSource("redis://:p@h:6380/2", "redis")).toMatchObject({
+            database: "",
+            port: 6380
+        });
     });
 
     it("refuses what cannot be passed safely to a dump tool", () => {
@@ -276,10 +339,16 @@ describe("copying from elsewhere", () => {
     });
 
     it("keeps the source's password out of the script text", () => {
-        const postgres = core.externalDumpCommand(core.parseExternalSource("postgresql://u:hunter22@h/db", "postgres")!, "/tmp/x");
+        const postgres = core.externalDumpCommand(
+            core.parseExternalSource("postgresql://u:hunter22@h/db", "postgres")!,
+            "/tmp/x"
+        );
         expect(postgres.argv).toContain("PGPASSWORD=hunter22");
         expect(postgres.argv.find((part) => part.includes("pg_dump"))).not.toContain("hunter22");
-        const mysql = core.externalDumpCommand(core.parseExternalSource("mysql://u:hunter22@h/db", "mysql")!, "/tmp/x");
+        const mysql = core.externalDumpCommand(
+            core.parseExternalSource("mysql://u:hunter22@h/db", "mysql")!,
+            "/tmp/x"
+        );
         expect(mysql.argv[2]).not.toContain("hunter22");
         expect(mysql.argv.at(-1)).toBe("hunter22");
         expect(mysql.describe).not.toContain("hunter22");

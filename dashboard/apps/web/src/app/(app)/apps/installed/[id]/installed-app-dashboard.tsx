@@ -22,7 +22,15 @@ import { MessagingBridgePanel } from "./messaging-bridge-panel";
 import { gameForCatalogId, isGameServersApp } from "@/lib/apps/games-catalog";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, PageHeader, cn } from "@polaris/ui";
-import { ArrowLeft, ChevronDown, ChevronRight, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import {
+    ArrowLeft,
+    ChevronDown,
+    ChevronRight,
+    Play,
+    RefreshCw,
+    Square,
+    Trash2
+} from "lucide-react";
 import {
     redeployInstalledAppAction,
     setInstalledAppRunningAction,
@@ -66,10 +74,12 @@ function adaptedPanelFor(
             return (
                 <Card>
                     <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
-                        <p className="text-sm font-medium">Your servers live on the Game servers page</p>
+                        <p className="text-sm font-medium">
+                            Your servers live on the Game servers page
+                        </p>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Create as many as you want, of any game Polaris knows, each with its own address, console,
-                            players and settings. The app itself runs nothing.
+                            Create as many as you want, of any game Polaris knows, each with its own
+                            address, console, players and settings. The app itself runs nothing.
                         </p>
                         <Link href="/apps/games">
                             <Button size="sm">Open Game servers</Button>
@@ -196,9 +206,12 @@ export function InstalledAppDashboard({
                     <div className="flex items-center gap-2">
                         <Badge
                             className={cn(
-                                (app.applicationStatus === "failed" || liveStatus === "Not running") &&
+                                (app.applicationStatus === "failed" ||
+                                    liveStatus === "Not running") &&
                                     "border-danger-edge text-danger",
-                                running && liveStatus !== "Not running" && "border-success-edge text-success"
+                                running &&
+                                    liveStatus !== "Not running" &&
+                                    "border-success-edge text-success"
                             )}
                         >
                             {liveStatus ??
@@ -211,10 +224,16 @@ export function InstalledAppDashboard({
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => run(() => setInstalledAppRunningAction(app.id, !running))}
+                                    onClick={() =>
+                                        run(() => setInstalledAppRunningAction(app.id, !running))
+                                    }
                                     disabled={pending || !applicationId}
                                 >
-                                    {running ? <Square className="size-4" /> : <Play className="size-4" />}
+                                    {running ? (
+                                        <Square className="size-4" />
+                                    ) : (
+                                        <Play className="size-4" />
+                                    )}
                                     {running ? "Stop" : "Start"}
                                 </Button>
                                 <Button
@@ -253,11 +272,20 @@ export function InstalledAppDashboard({
                             onClick={() => setShowLogs((value) => !value)}
                             className="flex items-center gap-1 text-sm font-medium hover:text-foreground"
                         >
-                            {showLogs ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                            {showLogs ? (
+                                <ChevronDown className="size-4" />
+                            ) : (
+                                <ChevronRight className="size-4" />
+                            )}
                             Runtime logs
                         </button>
                         {showLogs && (
-                            <Button size="sm" variant="ghost" onClick={() => void loadLog()} disabled={!applicationId}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void loadLog()}
+                                disabled={!applicationId}
+                            >
                                 <RefreshCw className="size-4" /> Refresh
                             </Button>
                         )}
@@ -267,7 +295,9 @@ export function InstalledAppDashboard({
                             log={log}
                             name={app.name}
                             searchable
-                            emptyText={running ? "Waiting for output..." : "The app is not running."}
+                            emptyText={
+                                running ? "Waiting for output..." : "The app is not running."
+                            }
                             className="h-80"
                         />
                     )}

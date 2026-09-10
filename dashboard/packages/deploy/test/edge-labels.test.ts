@@ -11,10 +11,19 @@ import { forCompose, renderComposeYaml, type ComposeSpec } from "../src/compose-
 
 const edge = parseAppEdgeConfig(
     JSON.stringify({
-        rateLimits: [{ average: 20, burst: 40 }, { path: "/login", average: 5, burst: 5 }],
+        rateLimits: [
+            { average: 20, burst: 40 },
+            { path: "/login", average: 5, burst: 5 }
+        ],
         concurrency: 10,
         headers: { preset: "recommended" },
-        redirects: [{ kind: "regex", regex: "^https://a\\.example\\.com/(.*)", replacement: "https://b.example.com/${1}" }],
+        redirects: [
+            {
+                kind: "regex",
+                regex: "^https://a\\.example\\.com/(.*)",
+                replacement: "https://b.example.com/${1}"
+            }
+        ],
         rewrites: [{ kind: "strip-prefix", prefix: "/api" }]
     })
 );
@@ -35,17 +44,25 @@ describe("edge labels", () => {
 
     it("writes the limits and the headers", () => {
         expect(labels["traefik.http.middlewares.web-rate-0.ratelimit.average"]).toBe("20");
-        expect(labels["traefik.http.middlewares.web-rate-0.ratelimit.sourcecriterion.ipstrategy.depth"]).toBe("0");
+        expect(
+            labels["traefik.http.middlewares.web-rate-0.ratelimit.sourcecriterion.ipstrategy.depth"]
+        ).toBe("0");
         expect(labels["traefik.http.middlewares.web-inflight.inflightreq.amount"]).toBe("10");
-        expect(labels["traefik.http.middlewares.web-headers.headers.customresponseheaders.X-Content-Type-Options"]).toBe(
-            "nosniff"
-        );
+        expect(
+            labels[
+                "traefik.http.middlewares.web-headers.headers.customresponseheaders.X-Content-Type-Options"
+            ]
+        ).toBe("nosniff");
     });
 
     it("gives a path limit its own router over that path", () => {
-        expect(labels["traefik.http.routers.web-path-0.rule"]).toBe("Host(`shop.example.com`) && PathPrefix(`/login`)");
+        expect(labels["traefik.http.routers.web-path-0.rule"]).toBe(
+            "Host(`shop.example.com`) && PathPrefix(`/login`)"
+        );
         expect(labels["traefik.http.routers.web-path-0.priority"]).toBe("41");
-        expect(labels["traefik.http.routers.web-path-0.middlewares"]).toContain("web-rate-1@docker");
+        expect(labels["traefik.http.routers.web-path-0.middlewares"]).toContain(
+            "web-rate-1@docker"
+        );
     });
 
     it("states a rank on every router", () => {
@@ -78,7 +95,9 @@ describe("values on their way into a compose file", () => {
                 env: { PASSWORD: "pa$word", PLAIN: "x" },
                 ports: [],
                 volumes: [],
-                labels: { "traefik.http.middlewares.r.redirectregex.replacement": "https://b/${1}" },
+                labels: {
+                    "traefik.http.middlewares.r.redirectregex.replacement": "https://b/${1}"
+                },
                 command: ["sh", "-c", "echo $HOME"],
                 networks: ["polaris-proxy"]
             }
@@ -91,8 +110,12 @@ describe("values on their way into a compose file", () => {
         const escaped = forCompose(spec).services[0]!;
         expect(escaped.env.PASSWORD).toBe("pa$$word");
         expect(escaped.env.PLAIN).toBe("x");
-        expect(escaped.labels["traefik.http.middlewares.r.redirectregex.replacement"]).toBe("https://b/$${1}");
+        expect(escaped.labels["traefik.http.middlewares.r.redirectregex.replacement"]).toBe(
+            "https://b/$${1}"
+        );
         expect(escaped.command).toEqual(["sh", "-c", "echo $$HOME"]);
-        expect(renderComposeYaml(forCompose(spec), "/vol", "/mnt")).toContain('"PASSWORD=pa$$word"');
+        expect(renderComposeYaml(forCompose(spec), "/vol", "/mnt")).toContain(
+            '"PASSWORD=pa$$word"'
+        );
     });
 });

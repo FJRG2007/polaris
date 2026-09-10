@@ -266,7 +266,9 @@ function polarisAddress(): DataAddress | null {
         database,
         username: decodeURIComponent(url.username) || null,
         password: decodeURIComponent(url.password) || null,
-        tls: (url.searchParams.get("sslmode") ?? "") !== "" && url.searchParams.get("sslmode") !== "disable",
+        tls:
+            (url.searchParams.get("sslmode") ?? "") !== "" &&
+            url.searchParams.get("sslmode") !== "disable",
         readOnly: true
     };
 }
@@ -342,7 +344,8 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
 
 export async function deleteConnection(userId: string, id: string): Promise<void> {
     const deleted = await prisma.dataConnection.deleteMany({ where: { id, ownerId: userId } });
-    if (deleted.count === 0) throw new DataConnectionError("That connection is not there any more.");
+    if (deleted.count === 0)
+        throw new DataConnectionError("That connection is not there any more.");
 }
 
 /**
@@ -425,7 +428,9 @@ export async function managedAddress(
     });
     if (!row) throw new DataConnectionError("That database is not there any more.");
     if (!core.isDbEngine(row.engine)) {
-        throw new DataConnectionError("An object store is browsed from its Buckets panel, not as a database.");
+        throw new DataConnectionError(
+            "An object store is browsed from its Buckets panel, not as a database."
+        );
     }
 
     const credentials = await databaseCredentials(databaseId, userId);
@@ -514,7 +519,9 @@ function validate(input: SaveConnectionInput): {
     // A hostname or an address, not a URL: pasting a whole connection string in
     // here silently produces a host nothing resolves.
     if (/[\s/@]/.test(host)) {
-        throw new DataConnectionError("Enter a hostname or an IP address, without the rest of a URL.");
+        throw new DataConnectionError(
+            "Enter a hostname or an IP address, without the rest of a URL."
+        );
     }
 
     const port = Number(input.port ?? core.DB_ENGINE_INFO[engine].port);

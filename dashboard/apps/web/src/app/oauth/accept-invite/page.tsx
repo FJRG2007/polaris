@@ -29,8 +29,13 @@ export default async function AcceptInvitePage({
                         <CardTitle>Invite unavailable</CardTitle>
                     </CardHeader>
                     <CardBody>
-                        <p className="text-sm text-muted-foreground">{INVITE_REFUSALS[refusal ?? "unavailable"]}</p>
-                        <a href="/oauth/login" className="mt-4 block text-center text-sm text-primary hover:underline">
+                        <p className="text-sm text-muted-foreground">
+                            {INVITE_REFUSALS[refusal ?? "unavailable"]}
+                        </p>
+                        <a
+                            href="/oauth/login"
+                            className="mt-4 block text-center text-sm text-primary hover:underline"
+                        >
                             Go to sign in
                         </a>
                     </CardBody>

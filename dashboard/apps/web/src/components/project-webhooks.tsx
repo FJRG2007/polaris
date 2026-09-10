@@ -18,7 +18,12 @@ import { useEffect, useState, useTransition } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ProjectWebhookView } from "@/lib/deploy-project-service";
 import { Button, Checkbox, Input, Select, Switch, ConfirmDeleteDialog } from "@polaris/ui";
-import { PROJECT_WEBHOOK_EVENTS, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS, type WebhookFormat } from "@polaris/core";
+import {
+    PROJECT_WEBHOOK_EVENTS,
+    WEBHOOK_FORMAT_LABEL,
+    WEBHOOK_FORMATS,
+    type WebhookFormat
+} from "@polaris/core";
 import { CheckCircle2, CircleAlert, Loader2, Plus, Send, Trash2, Webhook } from "lucide-react";
 import {
     createProjectWebhookAction,
@@ -61,7 +66,11 @@ export function ProjectWebhooks({
 
     function toggle(hook: ProjectWebhookView, enabled: boolean) {
         startTransition(async () => {
-            const result = await setProjectWebhookEnabledAction({ projectId, id: hook.id, enabled });
+            const result = await setProjectWebhookEnabledAction({
+                projectId,
+                id: hook.id,
+                enabled
+            });
             if (result.error) setError(result.error);
             load();
         });
@@ -107,8 +116,8 @@ export function ProjectWebhooks({
                     <div className="flex flex-col items-center gap-1 px-3 py-8 text-center">
                         <Webhook className="size-5 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
-                            No endpoints. Deploys are still reported in the bell and by the account&apos;s own
-                            notification rules.
+                            No endpoints. Deploys are still reported in the bell and by the
+                            account&apos;s own notification rules.
                         </p>
                     </div>
                 ) : (
@@ -123,27 +132,38 @@ export function ProjectWebhooks({
                                     <span className="rounded border border-border/60 px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                                         {WEBHOOK_FORMAT_LABEL[hook.format]}
                                     </span>
-                                    {hook.status === "ok" && <CheckCircle2 className="size-3.5 shrink-0 text-success" />}
-                                    {hook.status === "error" && <CircleAlert className="size-3.5 shrink-0 text-danger" />}
+                                    {hook.status === "ok" && (
+                                        <CheckCircle2 className="size-3.5 shrink-0 text-success" />
+                                    )}
+                                    {hook.status === "error" && (
+                                        <CircleAlert className="size-3.5 shrink-0 text-danger" />
+                                    )}
                                 </p>
-                                <p className="truncate font-mono text-xs text-muted-foreground">{hook.targetHint}</p>
+                                <p className="truncate font-mono text-xs text-muted-foreground">
+                                    {hook.targetHint}
+                                </p>
                                 <p className="truncate text-xs text-muted-foreground">
                                     {hook.events.length === 0
                                         ? "Every deploy event"
                                         : hook.events
                                               .map(
                                                   (id) =>
-                                                      PROJECT_WEBHOOK_EVENTS.find((event) => event.id === id)?.label ??
-                                                      id
+                                                      PROJECT_WEBHOOK_EVENTS.find(
+                                                          (event) => event.id === id
+                                                      )?.label ?? id
                                               )
                                               .join(", ")}
-                                    {hook.lastUsedAt ? ` - last sent ${display.dateTime(hook.lastUsedAt)}` : ""}
+                                    {hook.lastUsedAt
+                                        ? ` - last sent ${display.dateTime(hook.lastUsedAt)}`
+                                        : ""}
                                 </p>
                                 {hook.status === "error" && hook.lastError && (
                                     <p className="truncate text-xs text-danger">{hook.lastError}</p>
                                 )}
                                 {testResult[hook.id] && (
-                                    <p className="truncate text-xs text-muted-foreground">{testResult[hook.id]}</p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {testResult[hook.id]}
+                                    </p>
                                 )}
                             </div>
                             {canManage && (
@@ -183,7 +203,10 @@ export function ProjectWebhooks({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
                         Personal alerts (email, phone, your own webhooks) are set in{" "}
-                        <Link href="/account/notifications" className="text-primary hover:underline">
+                        <Link
+                            href="/account/notifications"
+                            className="text-primary hover:underline"
+                        >
                             notification preferences
                         </Link>
                         .
@@ -263,7 +286,11 @@ function AddWebhookForm({
             <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Name</span>
-                    <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Team channel" />
+                    <Input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Team channel"
+                    />
                 </label>
                 <label className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Format</span>
@@ -272,7 +299,10 @@ function AddWebhookForm({
                         onValueChange={(value) => setFormat(value as WebhookFormat | "auto")}
                         options={[
                             { value: "auto", label: "Detect from the URL" },
-                            ...WEBHOOK_FORMATS.map((value) => ({ value, label: WEBHOOK_FORMAT_LABEL[value] }))
+                            ...WEBHOOK_FORMATS.map((value) => ({
+                                value,
+                                label: WEBHOOK_FORMAT_LABEL[value]
+                            }))
                         ]}
                         aria-label="Format"
                     />
@@ -303,7 +333,9 @@ function AddWebhookForm({
                         </label>
                     ))}
                 </div>
-                <span className="text-xs text-muted-foreground">Choosing none means every deploy event.</span>
+                <span className="text-xs text-muted-foreground">
+                    Choosing none means every deploy event.
+                </span>
             </fieldset>
 
             {error && <p className="text-sm text-danger">{error}</p>}

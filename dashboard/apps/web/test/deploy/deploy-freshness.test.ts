@@ -43,15 +43,23 @@ describe("deployFreshness", () => {
         vi.stubGlobal("fetch", fetchMock);
         deploymentFind.mockResolvedValue({ commitSha: LIVE });
         fetchMock.mockResolvedValue(
-            new Response(JSON.stringify({ ahead_by: 3, html_url: "https://github.com/acme/web/compare/x...main" }), {
-                status: 200
-            })
+            new Response(
+                JSON.stringify({
+                    ahead_by: 3,
+                    html_url: "https://github.com/acme/web/compare/x...main"
+                }),
+                {
+                    status: 200
+                }
+            )
         );
     });
     afterEach(() => vi.unstubAllGlobals());
 
     it("counts the commits on the tracked branch the live release does not have", async () => {
-        applicationFind.mockResolvedValue(gitApp({ environment: { branch: "main", project: { ownerId: "o-a" } } }));
+        applicationFind.mockResolvedValue(
+            gitApp({ environment: { branch: "main", project: { ownerId: "o-a" } } })
+        );
         const result = await deployFreshness("app-1");
         expect(result).toEqual({
             branch: "main",
@@ -63,7 +71,9 @@ describe("deployFreshness", () => {
     });
 
     it("asks GitHub once for the same release and branch within a minute", async () => {
-        applicationFind.mockResolvedValue(gitApp({ environment: { branch: "main", project: { ownerId: "o-b" } } }));
+        applicationFind.mockResolvedValue(
+            gitApp({ environment: { branch: "main", project: { ownerId: "o-b" } } })
+        );
         await deployFreshness("app-2");
         await deployFreshness("app-2");
         expect(fetchMock).toHaveBeenCalledTimes(1);

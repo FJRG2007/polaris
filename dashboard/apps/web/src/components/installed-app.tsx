@@ -84,8 +84,8 @@ export function InstallAppCard() {
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    Install Polaris to open it in its own window, with its own icon in the dock, taskbar or
-                    home screen. It updates with Polaris itself.
+                    Install Polaris to open it in its own window, with its own icon in the dock,
+                    taskbar or home screen. It updates with Polaris itself.
                 </p>
                 {installed ? (
                     <p className="text-sm">You are using the installed app.</p>
@@ -97,8 +97,9 @@ export function InstallAppCard() {
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        Your browser installs it from its own menu: Install Polaris in Chrome and Edge, Add to
-                        Dock in Safari, Add to Home Screen on a phone. It needs Polaris to be open over https.
+                        Your browser installs it from its own menu: Install Polaris in Chrome and
+                        Edge, Add to Dock in Safari, Add to Home Screen on a phone. It needs Polaris
+                        to be open over https.
                     </p>
                 )}
             </CardBody>

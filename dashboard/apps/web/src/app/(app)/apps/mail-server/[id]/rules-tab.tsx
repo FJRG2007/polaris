@@ -29,7 +29,10 @@ import {
     Switch
 } from "@polaris/ui";
 
-type Rule = Extract<Awaited<ReturnType<typeof listRulesAction>>, { rules: unknown }>["rules"][number];
+type Rule = Extract<
+    Awaited<ReturnType<typeof listRulesAction>>,
+    { rules: unknown }
+>["rules"][number];
 
 export function RulesTab({ serverId }: { serverId: string }) {
     const panel = usePanelData(`rules:${serverId}`, () => listRulesAction(serverId));
@@ -82,11 +85,18 @@ export function RulesTab({ serverId }: { serverId: string }) {
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                     {rules.map((rule) => (
                         <li key={rule.id} className="flex items-center gap-3 px-3 py-2">
-                            <Switch checked={rule.enabled} onChange={(value) => void toggle(rule, value)} aria-label={`Rule ${rule.name} on`} />
+                            <Switch
+                                checked={rule.enabled}
+                                onChange={(value) => void toggle(rule, value)}
+                                aria-label={`Rule ${rule.name} on`}
+                            />
                             <div className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate text-[0.8125rem] text-foreground">{rule.name}</span>
+                                <span className="truncate text-[0.8125rem] text-foreground">
+                                    {rule.name}
+                                </span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                    To {rule.recipient || "any address"}, from {rule.sender || "anybody"}
+                                    To {rule.recipient || "any address"}, from{" "}
+                                    {rule.sender || "anybody"}
                                     {rule.includeSpam ? ", spam included" : ""}
                                 </span>
                             </div>
@@ -95,7 +105,13 @@ export function RulesTab({ serverId }: { serverId: string }) {
                                     Last notified <RelativeTime iso={rule.lastFiredAt} />
                                 </span>
                             ) : null}
-                            <Button size="icon" variant="ghost" aria-label={`Edit ${rule.name}`} title={`Edit ${rule.name}`} onClick={() => setEditing(rule)}>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={`Edit ${rule.name}`}
+                                title={`Edit ${rule.name}`}
+                                onClick={() => setEditing(rule)}
+                            >
                                 <Pencil />
                             </Button>
                             <Button
@@ -149,7 +165,14 @@ function RuleDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const parsed = mailInboundRuleSchema.safeParse({ serverId, name, recipient, sender, includeSpam, enabled: rule?.enabled ?? true });
+    const parsed = mailInboundRuleSchema.safeParse({
+        serverId,
+        name,
+        recipient,
+        sender,
+        includeSpam,
+        enabled: rule?.enabled ?? true
+    });
     const unchanged =
         rule !== null &&
         name.trim() === rule.name &&
@@ -161,7 +184,9 @@ function RuleDialog({
         if (!parsed.success || pending || unchanged) return;
         setPending(true);
         setError(null);
-        const answer = rule ? await updateRuleAction({ ...parsed.data, ruleId: rule.id }) : await createRuleAction(parsed.data);
+        const answer = rule
+            ? await updateRuleAction({ ...parsed.data, ruleId: rule.id })
+            : await createRuleAction(parsed.data);
         setPending(false);
         if (answer.error) {
             setError(answer.error);
@@ -176,7 +201,10 @@ function RuleDialog({
             <DialogContent className="w-[min(30rem,95vw)] max-w-[min(30rem,95vw)]">
                 <DialogHeader>
                     <DialogTitle>{rule ? "Edit rule" : "New rule"}</DialogTitle>
-                    <DialogDescription>Use * for any run of characters, like *@bank.example. Empty matches everything.</DialogDescription>
+                    <DialogDescription>
+                        Use * for any run of characters, like *@bank.example. Empty matches
+                        everything.
+                    </DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-4"
@@ -186,16 +214,40 @@ function RuleDialog({
                     }}
                 >
                     <Field label="Name" required>
-                        {(id) => <Input id={id} value={name} onChange={(event) => setName(event.target.value)} placeholder="Invoices" />}
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="Invoices"
+                            />
+                        )}
                     </Field>
                     <Field label="Sent to">
-                        {(id) => <Input id={id} value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="billing@*" />}
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={recipient}
+                                onChange={(event) => setRecipient(event.target.value)}
+                                placeholder="billing@*"
+                            />
+                        )}
                     </Field>
                     <Field label="Sent from">
-                        {(id) => <Input id={id} value={sender} onChange={(event) => setSender(event.target.value)} placeholder="*@bank.example" />}
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={sender}
+                                onChange={(event) => setSender(event.target.value)}
+                                placeholder="*@bank.example"
+                            />
+                        )}
                     </Field>
                     <label className="flex items-center gap-2 text-[0.8125rem] text-foreground">
-                        <Checkbox checked={includeSpam} onChange={(event) => setIncludeSpam(event.target.checked)} />
+                        <Checkbox
+                            checked={includeSpam}
+                            onChange={(event) => setIncludeSpam(event.target.checked)}
+                        />
                         Also for mail the spam filter caught
                     </label>
                     {error ? <p className="text-xs text-danger">{error}</p> : null}

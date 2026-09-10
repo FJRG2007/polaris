@@ -619,7 +619,8 @@ export async function openCopy(
     // once opened is not the stored one, so none is claimed.
     const sealed = isSealedCopy(copy);
     const fileName = plainName(stored);
-    const reveal = (stream: ReadableStream<Uint8Array>) => (sealed ? openSealed(ownerId, stream) : stream);
+    const reveal = (stream: ReadableStream<Uint8Array>) =>
+        sealed ? openSealed(ownerId, stream) : stream;
     const sizeBytes = sealed ? 0 : Number(copy.sizeBytes);
     if (isSourceLocal(copy.destination)) {
         const resource = toSourceResource(copy.point.resource);

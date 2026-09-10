@@ -37,14 +37,7 @@ import * as registry from "@/lib/home/device-connections";
 import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceView } from "@/lib/home/device-kinds";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
-import {
-    Badge,
-    Button,
-    ConfirmDeleteDialog,
-    EmptyState,
-    Skeleton,
-    cn
-} from "@polaris/ui";
+import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 
 /** How often the list goes and asks again, while the tab is in front. Short
  *  enough that a door somebody else just used is right by the time the reader
@@ -159,14 +152,19 @@ export function DevicesView({
     /** Put a device back into both lists it can be in, so the row and the open
      *  panel never disagree about what a door is doing. */
     const settle = (device: DeviceView) => {
-        setDevices((current) => (current ?? []).map((entry) => (entry.id === device.id ? device : entry)));
+        setDevices((current) =>
+            (current ?? []).map((entry) => (entry.id === device.id ? device : entry))
+        );
         setOpened((current) => (current && current.id === device.id ? device : current));
     };
 
     const act = async (device: DeviceView, action: DeviceAction) => {
         setBusy({ id: device.id, action });
         setError("");
-        const result = await runAction(() => actions.operateDeviceAction(device.id, action), setError);
+        const result = await runAction(
+            () => actions.operateDeviceAction(device.id, action),
+            setError
+        );
         setBusy(null);
         if (!result) return;
         if (result.error) {
@@ -324,7 +322,10 @@ export function DevicesView({
                 ))}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -332,7 +333,8 @@ export function DevicesView({
             {devices.some((device) => device.placeId === null) && (
                 <p className="text-xs text-muted-foreground">
                     An account arrives knowing what it holds and not where any of it is, so anything
-                    marked not placed is on every place&apos;s list. Open one to say which it belongs to.
+                    marked not placed is on every place&apos;s list. Open one to say which it
+                    belongs to.
                 </p>
             )}
 
@@ -346,7 +348,9 @@ export function DevicesView({
                     {groups.map((group) => (
                         <section key={group.label} className="flex flex-col gap-2">
                             {groups.length > 1 && (
-                                <h2 className="text-xs font-medium text-muted-foreground">{group.label}</h2>
+                                <h2 className="text-xs font-medium text-muted-foreground">
+                                    {group.label}
+                                </h2>
                             )}
                             <ul className="flex flex-col gap-2">
                                 {group.devices.map((device) => (
@@ -364,16 +368,24 @@ export function DevicesView({
                                                     kind={device.kind}
                                                     className="size-4 shrink-0 text-muted-foreground"
                                                 />
-                                                <span className="truncate text-sm font-medium" title={device.name}>
+                                                <span
+                                                    className="truncate text-sm font-medium"
+                                                    title={device.name}
+                                                >
                                                     {device.name}
                                                 </span>
-                                                <Badge className={cn("shrink-0", stateClass(device))}>
+                                                <Badge
+                                                    className={cn("shrink-0", stateClass(device))}
+                                                >
                                                     {!device.online
                                                         ? "Not answering"
                                                         : kinds.deviceKind(device.kind) === "sensor"
                                                           ? kinds.readingLine(device.reading) ||
                                                             "Nothing read yet"
-                                                          : kinds.stateLabel(device.kind, device.state)}
+                                                          : kinds.stateLabel(
+                                                                device.kind,
+                                                                device.state
+                                                            )}
                                                 </Badge>
                                                 {device.batteryCritical && (
                                                     <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">

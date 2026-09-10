@@ -54,10 +54,15 @@ export const uploadedSourceSchema = z.object({
 export type UploadedSource = z.infer<typeof uploadedSourceSchema>;
 
 /** The uploaded source a service's stored settings name, if any. */
-export function uploadedSourceOf(sourceConfig: string | Record<string, unknown>): UploadedSource | null {
+export function uploadedSourceOf(
+    sourceConfig: string | Record<string, unknown>
+): UploadedSource | null {
     let source: Record<string, unknown>;
     try {
-        source = typeof sourceConfig === "string" ? (JSON.parse(sourceConfig) as Record<string, unknown>) : sourceConfig;
+        source =
+            typeof sourceConfig === "string"
+                ? (JSON.parse(sourceConfig) as Record<string, unknown>)
+                : sourceConfig;
     } catch {
         return null;
     }
@@ -85,9 +90,11 @@ export function safeEntryPath(raw: string): string | null {
     const unified = raw.replace(/\\/g, "/").replace(/^(\.\/)+/, "");
     if (!unified || unified.length > 1024) return null;
     if (unified.startsWith("/") || /^[a-zA-Z]:/.test(unified)) return null;
-    if ([...unified].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return null;
+    if ([...unified].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
+        return null;
     const segments = unified.split("/").filter((segment) => segment.length > 0);
-    if (segments.length === 0 || segments.some((segment) => segment === ".." || segment === ".")) return null;
+    if (segments.length === 0 || segments.some((segment) => segment === ".." || segment === "."))
+        return null;
     if (segments.some((segment) => SKIPPED_FOLDERS.has(segment))) return null;
     if (segments[segments.length - 1] === ".DS_Store") return null;
     return segments.join("/");
@@ -95,7 +102,10 @@ export function safeEntryPath(raw: string): string | null {
 
 /** Whether a zip entry is a symbolic link, by the unix mode it carries. */
 function isLink(entry: JSZip.JSZipObject): boolean {
-    const mode = typeof entry.unixPermissions === "string" ? Number.parseInt(entry.unixPermissions, 8) : entry.unixPermissions;
+    const mode =
+        typeof entry.unixPermissions === "string"
+            ? Number.parseInt(entry.unixPermissions, 8)
+            : entry.unixPermissions;
     return typeof mode === "number" && (mode & 0o170000) === 0o120000;
 }
 
@@ -119,7 +129,9 @@ function run(command: string, args: string[]): Promise<void> {
         });
         child.on("error", reject);
         child.on("close", (code) =>
-            code === 0 ? resolve() : reject(new Error(said.trim() || `${command} exited with code ${code ?? -1}`))
+            code === 0
+                ? resolve()
+                : reject(new Error(said.trim() || `${command} exited with code ${code ?? -1}`))
         );
     });
 }
@@ -128,7 +140,10 @@ function run(command: string, args: string[]): Promise<void> {
  * Unpack a zip into `dir`, checking every entry, and answer what was written.
  * Throws with the reason for the first thing that makes the upload unusable.
  */
-export async function unpackSourceZip(zip: Buffer, dir: string): Promise<{ files: number; bytes: number }> {
+export async function unpackSourceZip(
+    zip: Buffer,
+    dir: string
+): Promise<{ files: number; bytes: number }> {
     let archive: JSZip;
     try {
         archive = await JSZip.loadAsync(zip);
@@ -142,7 +157,8 @@ export async function unpackSourceZip(zip: Buffer, dir: string): Promise<{ files
         return path ? [{ entry, path }] : [];
     });
     if (named.length === 0) throw new SourceRefusal("The upload has no files in it.");
-    if (named.length > MAX_SOURCE_FILES) throw new SourceRefusal(`The upload has more than ${MAX_SOURCE_FILES} files.`);
+    if (named.length > MAX_SOURCE_FILES)
+        throw new SourceRefusal(`The upload has more than ${MAX_SOURCE_FILES} files.`);
     const prefix = sharedFolder(named.map((item) => item.path));
     let bytes = 0;
     for (const { entry, path } of named) {
@@ -154,7 +170,11 @@ export async function unpackSourceZip(zip: Buffer, dir: string): Promise<{ files
             transform(chunk: Buffer, _encoding, done) {
                 bytes += chunk.length;
                 if (bytes > MAX_SOURCE_BYTES) {
-                    done(new SourceRefusal(`The upload unpacks to more than ${MAX_SOURCE_BYTES / 1024 ** 3} GB.`));
+                    done(
+                        new SourceRefusal(
+                            `The upload unpacks to more than ${MAX_SOURCE_BYTES / 1024 ** 3} GB.`
+                        )
+                    );
                     return;
                 }
                 done(null, chunk);
@@ -189,17 +209,24 @@ export async function storeUploadedSource(
     });
     if (!app) throw new Error("Application not found");
     if (app.sourceType === "image" || app.sourceType === "compose") {
-        throw new SourceRefusal("This service runs an image. Create a new service for an uploaded folder.");
+        throw new SourceRefusal(
+            "This service runs an image. Create a new service for an uploaded folder."
+        );
     }
     const source = JSON.parse(app.sourceConfig || "{}") as Record<string, unknown>;
     if (typeof source.repoUrl === "string" && source.repoUrl) {
-        throw new SourceRefusal("This service builds from a repository. Create a new service for an uploaded folder.");
+        throw new SourceRefusal(
+            "This service builds from a repository. Create a new service for an uploaded folder."
+        );
     }
     const zip = await readFile(zipFile);
     const dir = await mkdtemp(join(tmpdir(), "polaris-upload-"));
     try {
         const counted = await unpackSourceZip(zip, dir);
-        const root = typeof source.rootDirectory === "string" ? source.rootDirectory.replace(/^\/+|\/+$/g, "") : "";
+        const root =
+            typeof source.rootDirectory === "string"
+                ? source.rootDirectory.replace(/^\/+|\/+$/g, "")
+                : "";
         const dockerfile = await hasDockerfile(dir, root);
         const upload: UploadedSource = {
             id: randomUUID(),
@@ -240,7 +267,9 @@ export function uploadedBuildContext(
 ): () => Promise<BuildContext> {
     return async () => {
         await stat(archive).catch(() => {
-            throw new SourceRefusal("The uploaded source is no longer on this server. Upload the folder again.");
+            throw new SourceRefusal(
+                "The uploaded source is no longer on this server. Upload the folder again."
+            );
         });
         const dir = await mkdtemp(join(tmpdir(), "polaris-build-"));
         onOutput(Buffer.from("Unpacking the uploaded source.\n"));
@@ -258,4 +287,3 @@ export function uploadedBuildContext(
 export async function forgetUploadedSources(applicationId: string): Promise<void> {
     await rm(sourcesDir(applicationId), { recursive: true, force: true });
 }
-

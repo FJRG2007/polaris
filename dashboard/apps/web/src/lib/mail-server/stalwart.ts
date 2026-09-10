@@ -25,7 +25,9 @@ const apiPaths = new Map<string, { path: string; at: number }>();
 const API_PATH_TTL_MS = 5 * 60_000;
 
 function endpointKey(endpoint: MailEndpoint): string {
-    return endpoint.kind === "local" ? `local:${endpoint.host}:${endpoint.port}` : `remote:${endpoint.hostId}:${endpoint.port}`;
+    return endpoint.kind === "local"
+        ? `local:${endpoint.host}:${endpoint.port}`
+        : `remote:${endpoint.hostId}:${endpoint.port}`;
 }
 
 function authHeader(credentials: StalwartCredentials): string {
@@ -35,7 +37,11 @@ function authHeader(credentials: StalwartCredentials): string {
 /** Whether the engine's HTTP listener answers at all, credentials aside. */
 export async function engineAnswers(endpoint: MailEndpoint): Promise<boolean> {
     try {
-        const answer = await send(endpoint, { method: "GET", path: "/.well-known/jmap", headers: {} });
+        const answer = await send(endpoint, {
+            method: "GET",
+            path: "/.well-known/jmap",
+            headers: {}
+        });
         // 401 is an answer: the listener is up and wants a credential.
         return answer.status > 0 && answer.status < 500;
     } catch {
@@ -56,7 +62,8 @@ async function apiPath(endpoint: MailEndpoint, credentials: StalwartCredentials)
     let path = "/jmap/";
     try {
         const session = JSON.parse(answer.body) as { apiUrl?: unknown };
-        if (typeof session.apiUrl === "string" && session.apiUrl) path = new URL(session.apiUrl, "http://engine").pathname;
+        if (typeof session.apiUrl === "string" && session.apiUrl)
+            path = new URL(session.apiUrl, "http://engine").pathname;
     } catch {
         // A session the engine did not describe falls back to its documented path.
     }
@@ -68,7 +75,8 @@ async function apiPath(endpoint: MailEndpoint, credentials: StalwartCredentials)
  *  repair, a mailbox's is that mailbox's password. */
 function refused(credentials: StalwartCredentials): core.StalwartRefusal {
     return new core.StalwartRefusal(
-        credentials.username.startsWith(`${core.MAIL_ADMIN_NAME}@`) || !credentials.username.includes("@")
+        credentials.username.startsWith(`${core.MAIL_ADMIN_NAME}@`) ||
+        !credentials.username.includes("@")
             ? "The mail server refused Polaris's administrator credential."
             : `The mail server refused the password Polaris holds for ${credentials.username}.`,
         "unauthorized"
@@ -85,7 +93,10 @@ export interface MailSession {
  * The JMAP session of a mailbox, as its own credential sees it: which account
  * holds its mail, and where blobs are downloaded from (RFC 8620 section 2).
  */
-export async function mailSession(endpoint: MailEndpoint, credentials: StalwartCredentials): Promise<MailSession> {
+export async function mailSession(
+    endpoint: MailEndpoint,
+    credentials: StalwartCredentials
+): Promise<MailSession> {
     const answer = await send(endpoint, {
         method: "GET",
         path: "/.well-known/jmap",
@@ -96,20 +107,33 @@ export async function mailSession(endpoint: MailEndpoint, credentials: StalwartC
     try {
         session = JSON.parse(answer.body) as typeof session;
     } catch {
-        throw new MailServerUnreachable("The mail server answered with something that is not a JMAP session.");
+        throw new MailServerUnreachable(
+            "The mail server answered with something that is not a JMAP session."
+        );
     }
     const accountId = session.primaryAccounts?.["urn:ietf:params:jmap:mail"];
     if (typeof accountId !== "string" || typeof session.downloadUrl !== "string") {
-        throw new MailServerUnreachable("The mail server's session does not offer this mailbox's mail.");
+        throw new MailServerUnreachable(
+            "The mail server's session does not offer this mailbox's mail."
+        );
     }
     return { accountId, downloadUrl: session.downloadUrl };
 }
 
 /** Download one blob, as bytes. */
-export async function download(endpoint: MailEndpoint, credentials: StalwartCredentials, path: string): Promise<Buffer> {
-    const answer = await send(endpoint, { method: "GET", path, headers: { authorization: authHeader(credentials) } });
+export async function download(
+    endpoint: MailEndpoint,
+    credentials: StalwartCredentials,
+    path: string
+): Promise<Buffer> {
+    const answer = await send(endpoint, {
+        method: "GET",
+        path,
+        headers: { authorization: authHeader(credentials) }
+    });
     if (answer.status === 401 || answer.status === 403) throw refused(credentials);
-    if (answer.status !== 200) throw new MailServerUnreachable("The mail server would not hand that attachment over.");
+    if (answer.status !== 200)
+        throw new MailServerUnreachable("The mail server would not hand that attachment over.");
     return answer.bytes;
 }
 
@@ -136,11 +160,14 @@ export async function call(
         body: JSON.stringify(request(calls))
     });
     if (answer.status === 401 || answer.status === 403) throw refused(credentials);
-    if (answer.status >= 500) throw new MailServerUnreachable("The mail server failed to answer that request.");
+    if (answer.status >= 500)
+        throw new MailServerUnreachable("The mail server failed to answer that request.");
     try {
         return JSON.parse(answer.body) as unknown;
     } catch {
-        throw new MailServerUnreachable("The mail server answered with something that is not JMAP.");
+        throw new MailServerUnreachable(
+            "The mail server answered with something that is not JMAP."
+        );
     }
 }
 

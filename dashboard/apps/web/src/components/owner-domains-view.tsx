@@ -21,7 +21,16 @@ import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, DnsRecordCard, Input } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    DnsRecordCard,
+    Input
+} from "@polaris/ui";
 import {
     AlertTriangle,
     CheckCircle2,
@@ -88,7 +97,8 @@ export function OwnerDomainsView({
     // to be a domain before there is any point asking whether it is one Polaris
     // already occupies.
     const malformed = domainProblem(value);
-    const reserved = !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
+    const reserved =
+        !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
     // What stops the Add button. A single letter is not a domain, and a button
     // that offers itself for input it will refuse has to be pressed before it
     // can be understood.
@@ -103,7 +113,10 @@ export function OwnerDomainsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -114,8 +127,8 @@ export function OwnerDomainsView({
                         <Globe className="text-muted-foreground size-6 shrink-0" />
                         <p className="text-sm font-medium">No domain of your own yet</p>
                         <p className="text-muted-foreground max-w-md text-sm">
-                            Add one you already own and Polaris will give services here hostnames under it. Until
-                            then they take this Polaris&rsquo;s own domains.
+                            Add one you already own and Polaris will give services here hostnames
+                            under it. Until then they take this Polaris&rsquo;s own domains.
                         </p>
                     </CardBody>
                 </Card>
@@ -128,7 +141,9 @@ export function OwnerDomainsView({
                         publicIp={publicIp}
                         confirm={confirm}
                         onChecked={replace}
-                        onRemoved={(id) => setDomains((current) => current.filter((row) => row.id !== id))}
+                        onRemoved={(id) =>
+                            setDomains((current) => current.filter((row) => row.id !== id))
+                        }
                         onError={setError}
                     />
                 ))
@@ -156,7 +171,8 @@ export function OwnerDomainsView({
                                     if (result?.error) setError(result.error);
                                     return;
                                 }
-                                if (result.domain) setDomains((current) => [...current, result.domain!]);
+                                if (result.domain)
+                                    setDomains((current) => [...current, result.domain!]);
                                 setValue("");
                             }}
                         >
@@ -186,7 +202,8 @@ export function OwnerDomainsView({
                             ) : (
                                 <p className="text-muted-foreground w-full text-xs">
                                     A domain or a subdomain you have delegated - `example.com` or
-                                    `apps.example.com`. Polaris will show you the two records to publish.
+                                    `apps.example.com`. Polaris will show you the two records to
+                                    publish.
                                 </p>
                             )}
                         </form>
@@ -262,7 +279,9 @@ function DomainCard({
                         title="Check DNS now"
                         onClick={() => void check()}
                     >
-                        <RefreshCw className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"} />
+                        <RefreshCw
+                            className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"}
+                        />
                         Check
                     </Button>
                     <Button
@@ -281,7 +300,10 @@ function DomainCard({
                             });
                             if (!ok) return;
                             setBusy(true);
-                            const result = await runAction(() => removeOwnerDomainAction(owner, domain.id), onError);
+                            const result = await runAction(
+                                () => removeOwnerDomainAction(owner, domain.id),
+                                onError
+                            );
                             setBusy(false);
                             if (result && !result.error) onRemoved(domain.id);
                             else if (result?.error) onError(result.error);
@@ -315,7 +337,12 @@ function DomainCard({
                 )}
 
                 {domain.verified && (
-                    <CertificatePanel owner={owner} domain={domain} onChanged={onChecked} onError={onError} />
+                    <CertificatePanel
+                        owner={owner}
+                        domain={domain}
+                        onChanged={onChecked}
+                        onError={onError}
+                    />
                 )}
 
                 {/* Editing records takes the domain's own token: this Polaris's
@@ -335,12 +362,18 @@ function DomainCard({
                             )}
                             DNS records
                         </button>
-                        {recordsOpen && <DnsZoneEditor scope={{ kind: "owner", ref: owner, domainId: domain.id }} />}
+                        {recordsOpen && (
+                            <DnsZoneEditor
+                                scope={{ kind: "owner", ref: owner, domainId: domain.id }}
+                            />
+                        )}
                     </div>
                 )}
 
                 <p className="text-muted-foreground text-xs" aria-live="polite">
-                    {domain.checkedAt ? `Last checked ${format.dateTime(domain.checkedAt)}.` : "Not checked yet."}
+                    {domain.checkedAt
+                        ? `Last checked ${format.dateTime(domain.checkedAt)}.`
+                        : "Not checked yet."}
                     {!ready && secondsLeft !== null && ` Checking again in ${secondsLeft}s.`}
                 </p>
             </CardBody>
@@ -417,7 +450,10 @@ function CertificatePanel({
     async function saveToken(value: string) {
         setSaving(true);
         onError("");
-        const result = await runAction(() => setOwnerDomainDnsTokenAction(owner, domain.id, value), onError);
+        const result = await runAction(
+            () => setOwnerDomainDnsTokenAction(owner, domain.id, value),
+            onError
+        );
         setSaving(false);
         if (result?.domain) {
             onChanged(result.domain);
@@ -428,7 +464,10 @@ function CertificatePanel({
     async function retry() {
         setSaving(true);
         onError("");
-        const result = await runAction(() => retryOwnerDomainCertificateAction(owner, domain.id), onError);
+        const result = await runAction(
+            () => retryOwnerDomainCertificateAction(owner, domain.id),
+            onError
+        );
         setSaving(false);
         if (result?.domain) onChanged(result.domain);
         else if (result?.error) onError(result.error);
@@ -454,7 +493,9 @@ function CertificatePanel({
                 ) : (
                     <Badge variant="neutral">{ordering ? "Ordering" : "Waiting"}</Badge>
                 )}
-                {ordering && <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />}
+                {ordering && (
+                    <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+                )}
             </div>
             <p className="text-muted-foreground text-xs">{summary}</p>
             {certificate?.detail && (
@@ -462,13 +503,19 @@ function CertificatePanel({
                     <AlertTriangle className="mt-px size-3.5 shrink-0" />
                     <span>
                         {certificate.detail}
-                        {certificate.nextAttemptAt && ` Next try ${format.dateTime(certificate.nextAttemptAt)}.`}
+                        {certificate.nextAttemptAt &&
+                            ` Next try ${format.dateTime(certificate.nextAttemptAt)}.`}
                     </span>
                 </p>
             )}
             {certificate?.nextAttemptAt && (
                 <div>
-                    <Button size="sm" variant="ghost" disabled={saving} onClick={() => void retry()}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={saving}
+                        onClick={() => void retry()}
+                    >
                         <RefreshCw className="size-4 shrink-0" /> Try now
                     </Button>
                 </div>
@@ -476,8 +523,15 @@ function CertificatePanel({
             {domain.hasDnsToken ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                     <KeyRound className="text-muted-foreground size-3.5 shrink-0" />
-                    <span className="text-muted-foreground">Ordered with this domain&rsquo;s own Cloudflare token.</span>
-                    <Button size="sm" variant="ghost" disabled={saving} onClick={() => void saveToken("")}>
+                    <span className="text-muted-foreground">
+                        Ordered with this domain&rsquo;s own Cloudflare token.
+                    </span>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={saving}
+                        onClick={() => void saveToken("")}
+                    >
                         Remove token
                     </Button>
                 </div>
@@ -500,12 +554,17 @@ function CertificatePanel({
                             onChange={(event) => setToken(event.target.value)}
                         />
                     </label>
-                    <Button type="submit" size="sm" variant="secondary" disabled={saving || !token.trim()}>
+                    <Button
+                        type="submit"
+                        size="sm"
+                        variant="secondary"
+                        disabled={saving || !token.trim()}
+                    >
                         {saving && <Loader2 className="size-4 shrink-0 animate-spin" />} Save token
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
-                        Needs Zone: DNS: Edit and Zone: Read on {domain.domain}. Without one, the token this Polaris has
-                        connected is used when it can edit this domain.
+                        Needs Zone: DNS: Edit and Zone: Read on {domain.domain}. Without one, the
+                        token this Polaris has connected is used when it can edit this domain.
                     </p>
                 </form>
             )}

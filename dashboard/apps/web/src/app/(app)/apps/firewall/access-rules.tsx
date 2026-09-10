@@ -64,12 +64,15 @@ export function AddressRulesPage({
                 <div className="grid gap-5 md:grid-cols-2">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                            <ShieldCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <ShieldCheck
+                                className="size-4 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                            />
                             Allowed
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            If any address is listed, only those get through. A narrower scope can shorten this list,
-                            never lengthen it.
+                            If any address is listed, only those get through. A narrower scope can
+                            shorten this list, never lengthen it.
                         </p>
                         <ChipList
                             entries={allow}
@@ -91,7 +94,10 @@ export function AddressRulesPage({
                     </div>
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                            <Ban className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <Ban
+                                className="size-4 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                            />
                             Blocked
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -109,12 +115,14 @@ export function AddressRulesPage({
                     </div>
                 </div>
 
-                {overlap ? <p className="text-xs text-danger">&quot;{overlap}&quot; is in both lists.</p> : null}
+                {overlap ? (
+                    <p className="text-xs text-danger">&quot;{overlap}&quot; is in both lists.</p>
+                ) : null}
                 {wouldLockOut ? (
                     <p className="flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
                         <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                        This allowlist does not include the address you are reading this over ({callerIp}). Saving it
-                        will shut you out of everything in this scope.
+                        This allowlist does not include the address you are reading this over (
+                        {callerIp}). Saving it will shut you out of everything in this scope.
                     </p>
                 ) : null}
 
@@ -169,12 +177,14 @@ export function LoginRulePage({
 
             <Section title="What it does">
                 <p className="text-sm text-muted-foreground">
-                    Visitors must sign in to Polaris to reach anything in this scope. Existing sessions keep working if
-                    the control plane is down; new sign-ins need it reachable.
+                    Visitors must sign in to Polaris to reach anything in this scope. Existing
+                    sessions keep working if the control plane is down; new sign-ins need it
+                    reachable.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">Across scopes:</span> a scope that requires a login
-                    cannot be overruled by a narrower one, and every scope that names who it admits gets a say.
+                    <span className="font-medium text-foreground">Across scopes:</span> a scope that
+                    requires a login cannot be overruled by a narrower one, and every scope that
+                    names who it admits gets a say.
                 </p>
             </Section>
 
@@ -186,12 +196,15 @@ export function LoginRulePage({
                         onChange={(next) => onChange({ requireLogin: next })}
                         aria-label={`${on ? "Stop requiring" : "Require"} a Polaris login`}
                     />
-                    <span className="text-sm">{on ? "A login is required" : "No login is required"}</span>
+                    <span className="text-sm">
+                        {on ? "A login is required" : "No login is required"}
+                    </span>
                 </div>
                 {requiredAbove ? (
                     <p className="text-xs text-muted-foreground">
-                        A scope above this one requires a login, and a narrower scope cannot waive it. The lists below
-                        still apply: every scope that names who it admits gets a say.
+                        A scope above this one requires a login, and a narrower scope cannot waive
+                        it. The lists below still apply: every scope that names who it admits gets a
+                        say.
                     </p>
                 ) : null}
             </Section>
@@ -200,8 +213,16 @@ export function LoginRulePage({
                 way, so switching the login off and back on comes back to the same
                 people rather than to everybody. */}
             {on ? (
-                <Section title="Who it admits" hint="Named nobody means anyone with a Polaris account.">
-                    <LoginPrincipals admitted={admitted} refused={refused} disabled={disabled} onChange={onChange} />
+                <Section
+                    title="Who it admits"
+                    hint="Named nobody means anyone with a Polaris account."
+                >
+                    <LoginPrincipals
+                        admitted={admitted}
+                        refused={refused}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
                 </Section>
             ) : null}
         </div>

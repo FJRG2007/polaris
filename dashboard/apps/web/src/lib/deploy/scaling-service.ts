@@ -69,11 +69,14 @@ const SCALABLE_SELECT = {
 } as const;
 
 /** Why a service cannot run more than one copy, or null when it can. */
-export function singleCopyReason(app: Pick<ScalableApp, "keepReleases" | "sourceType" | "_count">): string | null {
+export function singleCopyReason(
+    app: Pick<ScalableApp, "keepReleases" | "sourceType" | "_count">
+): string | null {
     if (app._count.volumes > 0) {
         return "A service with a volume runs one copy: two would write the same files at once.";
     }
-    if (app.sourceType === "compose") return "A service deployed from a compose file names its own containers.";
+    if (app.sourceType === "compose")
+        return "A service deployed from a compose file names its own containers.";
     if (app.keepReleases) {
         return "A service that keeps its previous deployments runs one copy of each. Turn that off to run more.";
     }
@@ -89,7 +92,10 @@ async function loadApp(applicationId: string, ownerId: string): Promise<Scalable
     return app;
 }
 
-export async function getServiceScaling(applicationId: string, ownerId: string): Promise<ServiceScalingView> {
+export async function getServiceScaling(
+    applicationId: string,
+    ownerId: string
+): Promise<ServiceScalingView> {
     const app = await loadApp(applicationId, ownerId);
     return {
         replicas: app.replicas,
@@ -115,7 +121,11 @@ export async function setServiceScaling(
     applicationId: string,
     ownerId: string,
     userId: string,
-    input: ServiceScaling & { balancing: EdgeBalancing; limits: ResourceLimitsInput; sleepAfterMinutes: number | null }
+    input: ServiceScaling & {
+        balancing: EdgeBalancing;
+        limits: ResourceLimitsInput;
+        sleepAfterMinutes: number | null;
+    }
 ): Promise<{ redeployed: boolean }> {
     const app = await loadApp(applicationId, ownerId);
     const single = singleCopyReason(app);
@@ -126,7 +136,10 @@ export async function setServiceScaling(
         ? Math.min(input.autoscale.max, Math.max(input.autoscale.min, input.replicas))
         : input.replicas;
     // Sleeping is for one copy on this machine, judged as the service will be set.
-    const sleepBlocked = input.sleepAfterMinutes === null ? null : sleepRefusal({ ...app, replicas, autoscale: input.autoscale ? "on" : null });
+    const sleepBlocked =
+        input.sleepAfterMinutes === null
+            ? null
+            : sleepRefusal({ ...app, replicas, autoscale: input.autoscale ? "on" : null });
     if (sleepBlocked) throw new Error(sleepBlocked);
     const edge = parseAppEdgeConfig(app.edgeConfig);
     await prisma.application.update({
@@ -141,9 +154,16 @@ export async function setServiceScaling(
         }
     });
     await syncAppRoutes().catch(() => undefined);
-    const limitsChanged = input.limits.cpus !== app.cpuLimit || input.limits.memoryMb !== app.memoryLimitMb;
-    if ((replicas === app.replicas && !limitsChanged) || !app.currentDeploymentId) return { redeployed: false };
-    await restartFromKeptImage(applicationId, ownerId, userId, replicas === app.replicas ? "settings" : "scale");
+    const limitsChanged =
+        input.limits.cpus !== app.cpuLimit || input.limits.memoryMb !== app.memoryLimitMb;
+    if ((replicas === app.replicas && !limitsChanged) || !app.currentDeploymentId)
+        return { redeployed: false };
+    await restartFromKeptImage(
+        applicationId,
+        ownerId,
+        userId,
+        replicas === app.replicas ? "settings" : "scale"
+    );
     return { redeployed: true };
 }
 

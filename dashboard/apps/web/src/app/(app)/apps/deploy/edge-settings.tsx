@@ -124,19 +124,31 @@ export function EdgeSettings({
 
     // Checked against the same schema the server applies, on every change, so what
     // Save would refuse is said beside the form rather than after pressing it.
-    const verdict = useMemo(() => (draft ? core.appEdgeConfigSchema.safeParse(draft) : null), [draft]);
-    const invalid = verdict && !verdict.success ? (verdict.error.issues[0]?.message ?? "Check the values") : null;
+    const verdict = useMemo(
+        () => (draft ? core.appEdgeConfigSchema.safeParse(draft) : null),
+        [draft]
+    );
+    const invalid =
+        verdict && !verdict.success
+            ? (verdict.error.issues[0]?.message ?? "Check the values")
+            : null;
     // Dirty means the values differ from what is saved, not that a field was touched.
     const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
     const preview = useMemo(() => (draft ? core.securityHeaderMap(draft.headers) : {}), [draft]);
 
     if (loadError) return <p className="text-xs text-danger">{loadError}</p>;
     if (!draft || !facts) {
-        return <div className="h-40 animate-pulse rounded-md bg-muted/40" aria-label="Loading the edge settings" />;
+        return (
+            <div
+                className="h-40 animate-pulse rounded-md bg-muted/40"
+                aria-label="Loading the edge settings"
+            />
+        );
     }
 
     const update = (next: Partial<Config>) => setDraft({ ...draft, ...next });
-    const updateHeaders = (next: Partial<Headers>) => update({ headers: { ...draft.headers, ...next } });
+    const updateHeaders = (next: Partial<Headers>) =>
+        update({ headers: { ...draft.headers, ...next } });
 
     function save() {
         if (!verdict?.success) return;
@@ -186,7 +198,9 @@ export function EdgeSettings({
                 <section className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <h3 className="text-sm font-medium">Reachable on the server&apos;s address</h3>
+                            <h3 className="text-sm font-medium">
+                                Reachable on the server&apos;s address
+                            </h3>
                             <p className="text-xs text-muted-foreground">
                                 {facts.publishPort
                                     ? "The container port is open on the server's own address, so anyone who can reach the server can reach the service without its domains."
@@ -221,16 +235,26 @@ export function EdgeSettings({
                 <div className="flex flex-col gap-2">
                     <span className="text-xs font-medium text-muted-foreground">Rate limits</span>
                     {draft.rateLimits.length === 0 && (
-                        <p className="text-xs text-foreground-subtle">No limit. Every request is let through.</p>
+                        <p className="text-xs text-foreground-subtle">
+                            No limit. Every request is let through.
+                        </p>
                     )}
                     {draft.rateLimits.map((limit, index) => (
-                        <div key={index} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                        <div
+                            key={index}
+                            className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2"
+                        >
                             <Input
                                 value={limit.path ?? ""}
                                 onChange={(event) =>
                                     update({
                                         rateLimits: draft.rateLimits.map((one, at) =>
-                                            at === index ? { ...one, path: event.target.value.trim() || undefined } : one
+                                            at === index
+                                                ? {
+                                                      ...one,
+                                                      path: event.target.value.trim() || undefined
+                                                  }
+                                                : one
                                         )
                                     })
                                 }
@@ -244,7 +268,12 @@ export function EdgeSettings({
                                 onChange={(event) =>
                                     update({
                                         rateLimits: draft.rateLimits.map((one, at) =>
-                                            at === index ? { ...one, average: Number(event.target.value) || 0 } : one
+                                            at === index
+                                                ? {
+                                                      ...one,
+                                                      average: Number(event.target.value) || 0
+                                                  }
+                                                : one
                                         )
                                     })
                                 }
@@ -258,7 +287,9 @@ export function EdgeSettings({
                                 onValueChange={(period) =>
                                     update({
                                         rateLimits: draft.rateLimits.map((one, at) =>
-                                            at === index ? { ...one, period: period as core.EdgeRatePeriod } : one
+                                            at === index
+                                                ? { ...one, period: period as core.EdgeRatePeriod }
+                                                : one
                                         )
                                     })
                                 }
@@ -274,7 +305,12 @@ export function EdgeSettings({
                                     onChange={(event) =>
                                         update({
                                             rateLimits: draft.rateLimits.map((one, at) =>
-                                                at === index ? { ...one, burst: Number(event.target.value) || 0 } : one
+                                                at === index
+                                                    ? {
+                                                          ...one,
+                                                          burst: Number(event.target.value) || 0
+                                                      }
+                                                    : one
                                             )
                                         })
                                     }
@@ -289,7 +325,9 @@ export function EdgeSettings({
                                 onValueChange={(key) =>
                                     update({
                                         rateLimits: draft.rateLimits.map((one, at) =>
-                                            at === index ? { ...one, key: key as core.EdgeRateKey } : one
+                                            at === index
+                                                ? { ...one, key: key as core.EdgeRateKey }
+                                                : one
                                         )
                                     })
                                 }
@@ -304,7 +342,13 @@ export function EdgeSettings({
                                     onChange={(event) =>
                                         update({
                                             rateLimits: draft.rateLimits.map((one, at) =>
-                                                at === index ? { ...one, header: event.target.value.trim() || undefined } : one
+                                                at === index
+                                                    ? {
+                                                          ...one,
+                                                          header:
+                                                              event.target.value.trim() || undefined
+                                                      }
+                                                    : one
                                             )
                                         })
                                     }
@@ -320,7 +364,13 @@ export function EdgeSettings({
                                     size="icon"
                                     aria-label="Remove this limit"
                                     title="Remove this limit"
-                                    onClick={() => update({ rateLimits: draft.rateLimits.filter((_, at) => at !== index) })}
+                                    onClick={() =>
+                                        update({
+                                            rateLimits: draft.rateLimits.filter(
+                                                (_, at) => at !== index
+                                            )
+                                        })
+                                    }
                                 >
                                     <Trash2 className="size-4 shrink-0" aria-hidden />
                                 </Button>
@@ -334,7 +384,10 @@ export function EdgeSettings({
                             className="w-fit"
                             onClick={() =>
                                 update({
-                                    rateLimits: [...draft.rateLimits, { average: 20, period: "1s", burst: 40, key: "ip" }]
+                                    rateLimits: [
+                                        ...draft.rateLimits,
+                                        { average: 20, period: "1s", burst: 40, key: "ip" }
+                                    ]
                                 })
                             }
                         >
@@ -344,10 +397,14 @@ export function EdgeSettings({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">Requests in progress at once</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                        Requests in progress at once
+                    </span>
                     <Input
                         value={draft.concurrency === 0 ? "" : String(draft.concurrency)}
-                        onChange={(event) => update({ concurrency: Number(event.target.value) || 0 })}
+                        onChange={(event) =>
+                            update({ concurrency: Number(event.target.value) || 0 })
+                        }
                         placeholder="No cap"
                         inputMode="numeric"
                         aria-label="Requests in progress at once"
@@ -380,9 +437,9 @@ export function EdgeSettings({
                         aria-label="Browser check"
                     />
                     <p className="text-xs text-foreground-subtle">
-                        Visitors&apos; browsers solve a short calculation before they get through, which scripts
-                        flooding the service cannot skip. Webhooks and APIs need a firewall rule that skips the
-                        browser check for their path.
+                        Visitors&apos; browsers solve a short calculation before they get through,
+                        which scripts flooding the service cannot skip. Webhooks and APIs need a
+                        firewall rule that skips the browser check for their path.
                     </p>
                     {draft.challenge === "auto" && facts.flooded && (
                         <p className="flex items-center gap-1.5 text-xs text-warning">
@@ -392,8 +449,8 @@ export function EdgeSettings({
                     )}
                     {draft.challenge !== "off" && facts.guardChallenge === false && (
                         <p className="text-xs text-danger">
-                            The firewall on this server is older than the browser check and will not run it. Update
-                            Polaris from Settings to switch it on.
+                            The firewall on this server is older than the browser check and will not
+                            run it. Update Polaris from Settings to switch it on.
                         </p>
                     )}
                 </div>
@@ -402,7 +459,9 @@ export function EdgeSettings({
             <section className="flex flex-col gap-3">
                 <div>
                     <h3 className="text-sm font-medium">Security headers</h3>
-                    <p className="text-xs text-muted-foreground">Sent with every answer the service gives.</p>
+                    <p className="text-xs text-muted-foreground">
+                        Sent with every answer the service gives.
+                    </p>
                 </div>
                 <SegmentedControl
                     size="sm"
@@ -410,8 +469,16 @@ export function EdgeSettings({
                     onValueChange={(preset) => updateHeaders({ preset })}
                     options={[
                         { value: "off", label: "Off" },
-                        { value: "recommended", label: "Recommended", title: "Safe in front of any app" },
-                        { value: "strict", label: "Strict", title: "Full isolation. Test the app with it first." }
+                        {
+                            value: "recommended",
+                            label: "Recommended",
+                            title: "Safe in front of any app"
+                        },
+                        {
+                            value: "strict",
+                            label: "Strict",
+                            title: "Full isolation. Test the app with it first."
+                        }
                     ]}
                     aria-label="Security headers"
                 />
@@ -421,7 +488,11 @@ export function EdgeSettings({
                         <Select
                             // Read back from what would actually be sent, so the preset's own
                             // lifetime shows until somebody picks another.
-                            value={/max-age=(\d+)/.exec(preview["Strict-Transport-Security"] ?? "")?.[1] ?? "0"}
+                            value={
+                                /max-age=(\d+)/.exec(
+                                    preview["Strict-Transport-Security"] ?? ""
+                                )?.[1] ?? "0"
+                            }
                             onValueChange={(value) => updateHeaders({ hstsMaxAge: Number(value) })}
                             options={HSTS_OPTIONS}
                             aria-label="HSTS lifetime"
@@ -431,8 +502,13 @@ export function EdgeSettings({
                     </label>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Switch
-                            checked={"Strict-Transport-Security" in preview && preview["Strict-Transport-Security"]!.includes("includeSubDomains")}
-                            onChange={(checked) => updateHeaders({ hstsIncludeSubdomains: checked })}
+                            checked={
+                                "Strict-Transport-Security" in preview &&
+                                preview["Strict-Transport-Security"]!.includes("includeSubDomains")
+                            }
+                            onChange={(checked) =>
+                                updateHeaders({ hstsIncludeSubdomains: checked })
+                            }
                             disabled={!canEdit}
                             aria-label="Include subdomains"
                         />
@@ -440,7 +516,10 @@ export function EdgeSettings({
                     </label>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Switch
-                            checked={"Strict-Transport-Security" in preview && preview["Strict-Transport-Security"]!.includes("preload")}
+                            checked={
+                                "Strict-Transport-Security" in preview &&
+                                preview["Strict-Transport-Security"]!.includes("preload")
+                            }
                             onChange={(checked) => updateHeaders({ hstsPreload: checked })}
                             disabled={!canEdit}
                             aria-label="Preload"
@@ -452,7 +531,11 @@ export function EdgeSettings({
                     Content Security Policy
                     <Textarea
                         value={draft.headers.contentSecurityPolicy ?? ""}
-                        onChange={(event) => updateHeaders({ contentSecurityPolicy: event.target.value || undefined })}
+                        onChange={(event) =>
+                            updateHeaders({
+                                contentSecurityPolicy: event.target.value || undefined
+                            })
+                        }
                         placeholder={preview["Content-Security-Policy"] ?? "Not sent"}
                         rows={2}
                         className="font-mono text-xs"
@@ -463,26 +546,41 @@ export function EdgeSettings({
                     <ul className="flex flex-col gap-1 rounded-md border border-border p-2">
                         {Object.entries(preview).map(([name, value]) => {
                             const preset = PRESET_FIELDS[name];
-                            const custom = draft.headers.custom.some((entry) => entry.name === name);
+                            const custom = draft.headers.custom.some(
+                                (entry) => entry.name === name
+                            );
                             return (
                                 <li key={name} className="group flex items-start gap-2 text-xs">
-                                    <code className="shrink-0 font-mono text-foreground">{name}</code>
-                                    <code className="min-w-0 flex-1 break-all font-mono text-muted-foreground">{value}</code>
-                                    {canEdit && (preset || custom) && name !== "Strict-Transport-Security" && (
-                                        <button
-                                            type="button"
-                                            aria-label={`Stop sending ${name}`}
-                                            title={`Stop sending ${name}`}
-                                            className="text-foreground-subtle hover:text-foreground"
-                                            onClick={() =>
-                                                custom
-                                                    ? updateHeaders({ custom: draft.headers.custom.filter((entry) => entry.name !== name) })
-                                                    : preset && updateHeaders({ [preset.key]: preset.off } as Partial<Headers>)
-                                            }
-                                        >
-                                            <Trash2 className="size-3.5 shrink-0" aria-hidden />
-                                        </button>
-                                    )}
+                                    <code className="shrink-0 font-mono text-foreground">
+                                        {name}
+                                    </code>
+                                    <code className="min-w-0 flex-1 break-all font-mono text-muted-foreground">
+                                        {value}
+                                    </code>
+                                    {canEdit &&
+                                        (preset || custom) &&
+                                        name !== "Strict-Transport-Security" && (
+                                            <button
+                                                type="button"
+                                                aria-label={`Stop sending ${name}`}
+                                                title={`Stop sending ${name}`}
+                                                className="text-foreground-subtle hover:text-foreground"
+                                                onClick={() =>
+                                                    custom
+                                                        ? updateHeaders({
+                                                              custom: draft.headers.custom.filter(
+                                                                  (entry) => entry.name !== name
+                                                              )
+                                                          })
+                                                        : preset &&
+                                                          updateHeaders({
+                                                              [preset.key]: preset.off
+                                                          } as Partial<Headers>)
+                                                }
+                                            >
+                                                <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                                            </button>
+                                        )}
                                 </li>
                             );
                         })}
@@ -507,12 +605,17 @@ export function EdgeSettings({
                         <Button
                             variant="outline"
                             size="sm"
-                            disabled={!headerName.trim() || draft.headers.custom.length >= core.EDGE_CUSTOM_HEADERS_MAX}
+                            disabled={
+                                !headerName.trim() ||
+                                draft.headers.custom.length >= core.EDGE_CUSTOM_HEADERS_MAX
+                            }
                             onClick={() => {
                                 const name = headerName.trim();
                                 updateHeaders({
                                     custom: [
-                                        ...draft.headers.custom.filter((entry) => entry.name !== name),
+                                        ...draft.headers.custom.filter(
+                                            (entry) => entry.name !== name
+                                        ),
                                         { name, value: headerValue.trim() }
                                     ]
                                 });
@@ -534,13 +637,18 @@ export function EdgeSettings({
                     </p>
                 </div>
                 {draft.redirects.map((redirect, index) => (
-                    <div key={`r${index}`} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                    <div
+                        key={`r${index}`}
+                        className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2"
+                    >
                         <Select
                             value={redirect.kind}
                             onValueChange={(kind) =>
                                 update({
                                     redirects: draft.redirects.map((one, at) =>
-                                        at === index ? { ...one, kind: kind as core.EdgeRedirectKind } : one
+                                        at === index
+                                            ? { ...one, kind: kind as core.EdgeRedirectKind }
+                                            : one
                                     )
                                 })
                             }
@@ -556,7 +664,12 @@ export function EdgeSettings({
                                     onChange={(event) =>
                                         update({
                                             redirects: draft.redirects.map((one, at) =>
-                                                at === index ? { ...one, regex: event.target.value || undefined } : one
+                                                at === index
+                                                    ? {
+                                                          ...one,
+                                                          regex: event.target.value || undefined
+                                                      }
+                                                    : one
                                             )
                                         })
                                     }
@@ -570,7 +683,13 @@ export function EdgeSettings({
                                     onChange={(event) =>
                                         update({
                                             redirects: draft.redirects.map((one, at) =>
-                                                at === index ? { ...one, replacement: event.target.value || undefined } : one
+                                                at === index
+                                                    ? {
+                                                          ...one,
+                                                          replacement:
+                                                              event.target.value || undefined
+                                                      }
+                                                    : one
                                             )
                                         })
                                     }
@@ -586,7 +705,9 @@ export function EdgeSettings({
                                 checked={redirect.permanent}
                                 onChange={(permanent) =>
                                     update({
-                                        redirects: draft.redirects.map((one, at) => (at === index ? { ...one, permanent } : one))
+                                        redirects: draft.redirects.map((one, at) =>
+                                            at === index ? { ...one, permanent } : one
+                                        )
                                     })
                                 }
                                 disabled={!canEdit}
@@ -600,7 +721,11 @@ export function EdgeSettings({
                                 size="icon"
                                 aria-label="Remove this redirect"
                                 title="Remove this redirect"
-                                onClick={() => update({ redirects: draft.redirects.filter((_, at) => at !== index) })}
+                                onClick={() =>
+                                    update({
+                                        redirects: draft.redirects.filter((_, at) => at !== index)
+                                    })
+                                }
                             >
                                 <Trash2 className="size-4 shrink-0" aria-hidden />
                             </Button>
@@ -608,13 +733,18 @@ export function EdgeSettings({
                     </div>
                 ))}
                 {draft.rewrites.map((rewrite, index) => (
-                    <div key={`w${index}`} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                    <div
+                        key={`w${index}`}
+                        className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2"
+                    >
                         <Select
                             value={rewrite.kind}
                             onValueChange={(kind) =>
                                 update({
                                     rewrites: draft.rewrites.map((one, at) =>
-                                        at === index ? { ...one, kind: kind as core.EdgeRewriteKind } : one
+                                        at === index
+                                            ? { ...one, kind: kind as core.EdgeRewriteKind }
+                                            : one
                                     )
                                 })
                             }
@@ -630,7 +760,12 @@ export function EdgeSettings({
                                     onChange={(event) =>
                                         update({
                                             rewrites: draft.rewrites.map((one, at) =>
-                                                at === index ? { ...one, regex: event.target.value || undefined } : one
+                                                at === index
+                                                    ? {
+                                                          ...one,
+                                                          regex: event.target.value || undefined
+                                                      }
+                                                    : one
                                             )
                                         })
                                     }
@@ -644,7 +779,13 @@ export function EdgeSettings({
                                     onChange={(event) =>
                                         update({
                                             rewrites: draft.rewrites.map((one, at) =>
-                                                at === index ? { ...one, replacement: event.target.value || undefined } : one
+                                                at === index
+                                                    ? {
+                                                          ...one,
+                                                          replacement:
+                                                              event.target.value || undefined
+                                                      }
+                                                    : one
                                             )
                                         })
                                     }
@@ -660,7 +801,12 @@ export function EdgeSettings({
                                 onChange={(event) =>
                                     update({
                                         rewrites: draft.rewrites.map((one, at) =>
-                                            at === index ? { ...one, prefix: event.target.value.trim() || undefined } : one
+                                            at === index
+                                                ? {
+                                                      ...one,
+                                                      prefix: event.target.value.trim() || undefined
+                                                  }
+                                                : one
                                         )
                                     })
                                 }
@@ -676,7 +822,11 @@ export function EdgeSettings({
                                 size="icon"
                                 aria-label="Remove this rewrite"
                                 title="Remove this rewrite"
-                                onClick={() => update({ rewrites: draft.rewrites.filter((_, at) => at !== index) })}
+                                onClick={() =>
+                                    update({
+                                        rewrites: draft.rewrites.filter((_, at) => at !== index)
+                                    })
+                                }
                             >
                                 <Trash2 className="size-4 shrink-0" aria-hidden />
                             </Button>
@@ -689,7 +839,14 @@ export function EdgeSettings({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => update({ redirects: [...draft.redirects, { kind: "www-to-apex", permanent: true }] })}
+                                onClick={() =>
+                                    update({
+                                        redirects: [
+                                            ...draft.redirects,
+                                            { kind: "www-to-apex", permanent: true }
+                                        ]
+                                    })
+                                }
                             >
                                 <Plus className="size-4 shrink-0" aria-hidden /> Add a redirect
                             </Button>
@@ -698,7 +855,11 @@ export function EdgeSettings({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => update({ rewrites: [...draft.rewrites, { kind: "strip-prefix" }] })}
+                                onClick={() =>
+                                    update({
+                                        rewrites: [...draft.rewrites, { kind: "strip-prefix" }]
+                                    })
+                                }
                             >
                                 <Plus className="size-4 shrink-0" aria-hidden /> Add a rewrite
                             </Button>
@@ -709,11 +870,21 @@ export function EdgeSettings({
 
             {canEdit && (
                 <div className="flex items-center gap-3">
-                    <Button size="sm" onClick={save} disabled={!dirty || Boolean(invalid) || pending} aria-disabled={!dirty || Boolean(invalid) || pending}>
+                    <Button
+                        size="sm"
+                        onClick={save}
+                        disabled={!dirty || Boolean(invalid) || pending}
+                        aria-disabled={!dirty || Boolean(invalid) || pending}
+                    >
                         {pending ? "Saving..." : "Save"}
                     </Button>
                     {dirty && (
-                        <Button variant="ghost" size="sm" onClick={() => setDraft(saved)} disabled={pending}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDraft(saved)}
+                            disabled={pending}
+                        >
                             Discard
                         </Button>
                     )}

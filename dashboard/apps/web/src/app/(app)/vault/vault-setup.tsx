@@ -153,9 +153,7 @@ export function VaultSetup({
                                 At least {MIN_LENGTH} characters. Longer is better than stranger.
                             </span>
                         </label>
-                        {tooShort || weak ? (
-                            <p className="text-sm text-danger">{weak}</p>
-                        ) : null}
+                        {tooShort || weak ? <p className="text-sm text-danger">{weak}</p> : null}
                         {unsafe ? <p className="text-sm text-danger">{unsafe}</p> : null}
 
                         <label className="flex flex-col gap-1 text-sm">

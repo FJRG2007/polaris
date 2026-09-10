@@ -35,7 +35,12 @@ import { endpointFor, MailServerUnreachable, type MailEndpoint } from "./transpo
 import { call, engineAnswers, forgetEndpoint, type StalwartCredentials } from "./stalwart";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { nextStep, reached, SETUP_STEP_LABELS, SETUP_STEPS, type SetupStep } from "./steps";
-import { addApplicationDomain, createApplication, createProject, deployAndWait } from "@/lib/deploy-service";
+import {
+    addApplicationDomain,
+    createApplication,
+    createProject,
+    deployAndWait
+} from "@/lib/deploy-service";
 
 /** A step that cannot go on, in words the operator can act on. */
 export class MailSetupRefusal extends Error {
@@ -63,7 +68,10 @@ function generatedSecret(): string {
 }
 
 async function appendLog(serverId: string, line: string): Promise<void> {
-    const row = await prisma.mailServer.findUnique({ where: { id: serverId }, select: { log: true } });
+    const row = await prisma.mailServer.findUnique({
+        where: { id: serverId },
+        select: { log: true }
+    });
     const stamped = `${new Date().toISOString().slice(11, 19)} ${line}\n`;
     await prisma.mailServer.update({
         where: { id: serverId },
@@ -87,7 +95,10 @@ async function waitUntil(ready: () => Promise<boolean>, failure: string): Promis
 
 /** Whether a credential is accepted for management, which is also how normal
  *  mode is told apart from bootstrap mode: a domain query only works in it. */
-async function managementWorks(endpoint: MailEndpoint, credentials: StalwartCredentials): Promise<boolean> {
+async function managementWorks(
+    endpoint: MailEndpoint,
+    credentials: StalwartCredentials
+): Promise<boolean> {
     forgetEndpoint(endpoint);
     const response = await call(endpoint, credentials, [["x:Domain/query", {}, "q"]]);
     core.answerOf(response, "q");
@@ -110,7 +121,10 @@ export async function startSetup(
     const ownerId = actor.id;
     const placement = input.serverId === "local" ? "local" : input.serverId;
     if (placement !== "local") {
-        const host = await prisma.host.findFirst({ where: { id: placement, ownerId }, select: { id: true } });
+        const host = await prisma.host.findFirst({
+            where: { id: placement, ownerId },
+            select: { id: true }
+        });
         if (!host) throw new MailSetupRefusal("That server was not found among yours.");
         const target = await prisma.deployTarget.findFirst({
             where: { ownerId, kind: "host", hostId: placement },
@@ -122,7 +136,10 @@ export async function startSetup(
             );
         }
     }
-    const taken = await prisma.mailServer.findFirst({ where: { hostname: input.hostname }, select: { id: true } });
+    const taken = await prisma.mailServer.findFirst({
+        where: { hostname: input.hostname },
+        select: { id: true }
+    });
     if (taken) throw new MailSetupRefusal(`${input.hostname} already has a mail server here.`);
     await requireMailDomainStanding(actor, shelfOrgId, input.domain);
 
@@ -159,10 +176,15 @@ export async function startSetup(
  * step, which puts the service back, redeploys it and checks every credential
  * and connection after it again.
  */
-export async function resumeSetup(actor: MailServerActor, server: MailServer, from?: SetupStep): Promise<void> {
+export async function resumeSetup(
+    actor: MailServerActor,
+    server: MailServer,
+    from?: SetupStep
+): Promise<void> {
     if (running.has(server.id)) return;
     const restartAt = from ? SETUP_STEPS.indexOf(from) : -1;
-    const recorded = restartAt > 0 ? SETUP_STEPS[restartAt - 1] : restartAt === 0 ? "" : server.step;
+    const recorded =
+        restartAt > 0 ? SETUP_STEPS[restartAt - 1] : restartAt === 0 ? "" : server.step;
     await prisma.mailServer.update({
         where: { id: server.id },
         data: { step: recorded, status: "setting-up", error: null }
@@ -191,7 +213,10 @@ async function runSetup(serverId: string, userId: string): Promise<void> {
             if (!server) return;
             const step = nextStep(server.step);
             if (step === "done" && reached(server.step, "reports")) {
-                await prisma.mailServer.update({ where: { id: serverId }, data: { step: "done", status: "ready" } });
+                await prisma.mailServer.update({
+                    where: { id: serverId },
+                    data: { step: "done", status: "ready" }
+                });
                 await appendLog(serverId, "The mail server is ready.");
                 return;
             }
@@ -201,11 +226,17 @@ async function runSetup(serverId: string, userId: string): Promise<void> {
         }
     } catch (error) {
         const said =
-            error instanceof MailSetupRefusal || error instanceof MailServerUnreachable || error instanceof core.StalwartRefusal
+            error instanceof MailSetupRefusal ||
+            error instanceof MailServerUnreachable ||
+            error instanceof core.StalwartRefusal
                 ? error.message
                 : "Setup stopped on something unexpected. Run it again to resume from here.";
-        if (!(error instanceof MailSetupRefusal)) console.error("polaris: mail server setup failed:", error);
-        await prisma.mailServer.update({ where: { id: serverId }, data: { status: "failed", error: said } });
+        if (!(error instanceof MailSetupRefusal))
+            console.error("polaris: mail server setup failed:", error);
+        await prisma.mailServer.update({
+            where: { id: serverId },
+            data: { status: "failed", error: said }
+        });
         await appendLog(serverId, `Stopped: ${said}`);
     } finally {
         running.delete(serverId);
@@ -220,13 +251,19 @@ type StepRunner = (server: MailServer, userId: string) => Promise<void>;
 
 function adminPassword(server: MailServer): string {
     const password = unseal(server.adminSecret, server.adminSecretNonce, server.adminSecretKeyId);
-    if (!password) throw new MailSetupRefusal("The administrator credential is missing. Remove this server and set it up again.");
+    if (!password)
+        throw new MailSetupRefusal(
+            "The administrator credential is missing. Remove this server and set it up again."
+        );
     return password;
 }
 
 /** The administrator account setup creates, by its address. */
 function ownCredentials(server: MailServer): StalwartCredentials {
-    return { username: `${core.MAIL_ADMIN_NAME}@${server.primaryDomain}`, password: adminPassword(server) };
+    return {
+        username: `${core.MAIL_ADMIN_NAME}@${server.primaryDomain}`,
+        password: adminPassword(server)
+    };
 }
 
 function recoveryCredentials(server: MailServer): StalwartCredentials {
@@ -234,7 +271,8 @@ function recoveryCredentials(server: MailServer): StalwartCredentials {
 }
 
 function requireService(server: MailServer): string {
-    if (!server.applicationId) throw new MailSetupRefusal("The mail server's service is missing. Repair from the start.");
+    if (!server.applicationId)
+        throw new MailSetupRefusal("The mail server's service is missing. Repair from the start.");
     return server.applicationId;
 }
 
@@ -243,7 +281,10 @@ function requireService(server: MailServer): string {
  *  credential and the web address. */
 const service: StepRunner = async (server) => {
     const existing = server.applicationId
-        ? await prisma.application.findUnique({ where: { id: server.applicationId }, select: { id: true } })
+        ? await prisma.application.findUnique({
+              where: { id: server.applicationId },
+              select: { id: true }
+          })
         : null;
     if (existing) {
         // A repair from the start: the setup credential goes back in, so the
@@ -262,11 +303,17 @@ const service: StepRunner = async (server) => {
     if (server.placement === "local") {
         target = await getOrCreateLocalTarget(ownerId);
     } else {
-        const host = await prisma.host.findFirst({ where: { id: server.placement, ownerId }, select: { id: true, name: true } });
-        if (!host) throw new MailSetupRefusal("The server this was to run on is no longer connected.");
+        const host = await prisma.host.findFirst({
+            where: { id: server.placement, ownerId },
+            select: { id: true, name: true }
+        });
+        if (!host)
+            throw new MailSetupRefusal("The server this was to run on is no longer connected.");
         target = await getOrCreateHostTarget(host.id, ownerId, host.name, "compose");
         if (target.runtime === "swarm") {
-            throw new MailSetupRefusal("That server deploys through a swarm, which a mail server cannot run behind.");
+            throw new MailSetupRefusal(
+                "That server deploys through a swarm, which a mail server cannot run behind."
+            );
         }
     }
 
@@ -283,7 +330,10 @@ const service: StepRunner = async (server) => {
             port: core.STALWART_HTTP_PORT,
             // Published as themselves: another mail server knocks on 25 and a
             // mail app on 465 and 993, and no other number would be found.
-            extraPorts: core.MAIL_SERVER_PORTS.map((entry) => ({ host: entry.port, container: entry.port }))
+            extraPorts: core.MAIL_SERVER_PORTS.map((entry) => ({
+                host: entry.port,
+                container: entry.port
+            }))
         },
         autoDeploy: false,
         keepReleases: false
@@ -320,7 +370,10 @@ const service: StepRunner = async (server) => {
         targetPort: core.STALWART_HTTP_PORT,
         cert: "le"
     }).catch(async (error: unknown) => {
-        await appendLog(server.id, `The web address was not routed: ${error instanceof Error ? error.message : "unknown"}`);
+        await appendLog(
+            server.id,
+            `The web address was not routed: ${error instanceof Error ? error.message : "unknown"}`
+        );
     });
 };
 
@@ -341,7 +394,10 @@ const bootstrap: StepRunner = async (server) => {
     forgetEndpoint(endpoint);
     let inBootstrap = true;
     try {
-        core.answerOf(await call(endpoint, credentials, [["x:Bootstrap/get", { ids: ["singleton"] }, "get"]]), "get");
+        core.answerOf(
+            await call(endpoint, credentials, [["x:Bootstrap/get", { ids: ["singleton"] }, "get"]]),
+            "get"
+        );
     } catch {
         // Only bootstrap mode serves the Bootstrap object: an engine that
         // refuses it has already been through this step.
@@ -366,7 +422,9 @@ const admin: StepRunner = async (server) => {
     const endpoint = await endpointFor(requireService(server));
     // The setup credential while it is in the container; Polaris's own account
     // on a repair that started after it was taken out.
-    const credentials = (await managementWorks(endpoint, recoveryCredentials(server)).catch(() => false))
+    const credentials = (await managementWorks(endpoint, recoveryCredentials(server)).catch(
+        () => false
+    ))
         ? recoveryCredentials(server)
         : ownCredentials(server);
     const domains = core.listOfAnswer<{ id: string; name: string }>(
@@ -385,10 +443,14 @@ const admin: StepRunner = async (server) => {
         await call(endpoint, credentials, core.accountListCalls()),
         "accounts"
     );
-    const existing = accounts.find((account) => account.name === core.MAIL_ADMIN_NAME && account.domainId === domainId);
+    const existing = accounts.find(
+        (account) => account.name === core.MAIL_ADMIN_NAME && account.domainId === domainId
+    );
     if (existing) {
         core.assertApplied(
-            await call(endpoint, credentials, [core.accountPasswordCall(existing.id, adminPassword(server))]),
+            await call(endpoint, credentials, [
+                core.accountPasswordCall(existing.id, adminPassword(server))
+            ]),
             "password",
             existing.id
         );
@@ -410,7 +472,10 @@ const admin: StepRunner = async (server) => {
     }
     // Proved before the setup credential is taken away in the next step.
     const own = ownCredentials(server);
-    await waitUntil(() => managementWorks(endpoint, own), "The mail server did not accept Polaris's administrator account.");
+    await waitUntil(
+        () => managementWorks(endpoint, own),
+        "The mail server did not accept Polaris's administrator account."
+    );
 };
 
 /** Take the setup credential back out of the container, restart, and prove the
@@ -451,13 +516,31 @@ const webhook: StepRunner = async (server) => {
     const url = `${(await appBaseUrl()).replace(/\/$/, "")}/api/mail-server/${server.id}/events`;
     const listed = await call(endpoint, credentials, [
         ["x:WebHook/query", {}, "q"],
-        ["x:WebHook/get", { "#ids": { resultOf: "q", name: "x:WebHook/query", path: "/ids" }, properties: ["id", "url"] }, "hooks"]
+        [
+            "x:WebHook/get",
+            {
+                "#ids": { resultOf: "q", name: "x:WebHook/query", path: "/ids" },
+                properties: ["id", "url"]
+            },
+            "hooks"
+        ]
     ]);
-    if (core.listOfAnswer<{ url?: string }>(listed, "hooks").some((hook) => hook.url === url)) return;
+    if (core.listOfAnswer<{ url?: string }>(listed, "hooks").some((hook) => hook.url === url))
+        return;
     const secret = unseal(server.hookSecret, server.hookSecretNonce, server.hookSecretKeyId);
-    if (!secret) throw new MailSetupRefusal("The event signing key is missing. Remove this server and set it up again.");
-    core.createdId(await call(endpoint, credentials, [core.webhookCreateCall(url, secret)]), "webhook", "hook");
-    if (server.placement !== "local" && /\/\/(?:localhost|127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(url)) {
+    if (!secret)
+        throw new MailSetupRefusal(
+            "The event signing key is missing. Remove this server and set it up again."
+        );
+    core.createdId(
+        await call(endpoint, credentials, [core.webhookCreateCall(url, secret)]),
+        "webhook",
+        "hook"
+    );
+    if (
+        server.placement !== "local" &&
+        /\/\/(?:localhost|127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(url)
+    ) {
         await appendLog(
             server.id,
             `Polaris is at ${url.split("/api/")[0]}, which the mail server's machine may not reach. Rules on incoming mail only fire once it can.`
@@ -467,20 +550,36 @@ const webhook: StepRunner = async (server) => {
 
 /** Polaris's own sending mailbox, and the email channel that sends through it. */
 const sender: StepRunner = async (server) => {
-    if (server.channelId && (await prisma.channel.findUnique({ where: { id: server.channelId }, select: { id: true } }))) return;
+    if (
+        server.channelId &&
+        (await prisma.channel.findUnique({ where: { id: server.channelId }, select: { id: true } }))
+    )
+        return;
     const endpoint = await endpointFor(requireService(server));
     const credentials = ownCredentials(server);
-    const domains = core.listOfAnswer<{ id: string; name: string }>(await call(endpoint, credentials, core.domainListCalls()), "domains");
+    const domains = core.listOfAnswer<{ id: string; name: string }>(
+        await call(endpoint, credentials, core.domainListCalls()),
+        "domains"
+    );
     const domainId = domains.find((domain) => domain.name === server.primaryDomain)?.id;
-    if (!domainId) throw new MailSetupRefusal(`${server.primaryDomain} is missing from the mail server. Repair from the start.`);
+    if (!domainId)
+        throw new MailSetupRefusal(
+            `${server.primaryDomain} is missing from the mail server. Repair from the start.`
+        );
     const accounts = core.listOfAnswer<{ id: string; name: string; domainId: string }>(
         await call(endpoint, credentials, core.accountListCalls()),
         "accounts"
     );
     const password = generatedSecret();
-    const existing = accounts.find((account) => account.name === core.MAIL_SENDER_NAME && account.domainId === domainId);
+    const existing = accounts.find(
+        (account) => account.name === core.MAIL_SENDER_NAME && account.domainId === domainId
+    );
     if (existing) {
-        core.assertApplied(await call(endpoint, credentials, [core.accountPasswordCall(existing.id, password)]), "password", existing.id);
+        core.assertApplied(
+            await call(endpoint, credentials, [core.accountPasswordCall(existing.id, password)]),
+            "password",
+            existing.id
+        );
     } else {
         core.createdId(
             await call(endpoint, credentials, [
@@ -501,10 +600,20 @@ const sender: StepRunner = async (server) => {
         provider: "smtp",
         name: server.hostname,
         secret: password,
-        settings: { host: server.hostname, port: 587, user: address, from: address, fromName: "Polaris" }
+        settings: {
+            host: server.hostname,
+            port: 587,
+            user: address,
+            from: address,
+            fromName: "Polaris"
+        }
     });
-    if (!created.channel) throw new MailSetupRefusal(created.error ?? "The email channel could not be created.");
-    await prisma.mailServer.update({ where: { id: server.id }, data: { channelId: created.channel.id } });
+    if (!created.channel)
+        throw new MailSetupRefusal(created.error ?? "The email channel could not be created.");
+    await prisma.mailServer.update({
+        where: { id: server.id },
+        data: { channelId: created.channel.id }
+    });
     if (created.channel.status !== "connected") {
         await appendLog(
             server.id,

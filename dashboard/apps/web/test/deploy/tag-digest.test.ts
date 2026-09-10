@@ -61,8 +61,14 @@ describe("reading a tag's digest", () => {
 
         const manifests = calls.filter((call) => call.url.includes("/manifests/"));
         expect(manifests.map((call) => call.method)).toEqual(["HEAD", "HEAD"]);
-        expect(manifests[0]?.url).toBe("https://registry-1.docker.io/v2/library/nginx/manifests/1.27");
-        expect(manifests.every((call) => call.accept.includes("application/vnd.oci.image.index.v1+json"))).toBe(true);
+        expect(manifests[0]?.url).toBe(
+            "https://registry-1.docker.io/v2/library/nginx/manifests/1.27"
+        );
+        expect(
+            manifests.every((call) =>
+                call.accept.includes("application/vnd.oci.image.index.v1+json")
+            )
+        ).toBe(true);
     });
 
     it("asks in full only when the registry leaves the digest off a HEAD", async () => {

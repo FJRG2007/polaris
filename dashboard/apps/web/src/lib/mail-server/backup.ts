@@ -35,17 +35,34 @@ export interface MailBackupView {
 /** How the server is protected. */
 export async function mailBackups(server: MailServer): Promise<MailBackupView> {
     const volumes = server.applicationId
-        ? await prisma.volume.findMany({ where: { applicationId: server.applicationId }, select: { id: true } })
+        ? await prisma.volume.findMany({
+              where: { applicationId: server.applicationId },
+              select: { id: true }
+          })
         : [];
     const [resource, volumeResources] = await Promise.all([
         prisma.protectedResource.findFirst({
-            where: { ownerId: server.ownerId, selector: targetSelector({ kind: "mail-server", serverId: server.id }) },
-            select: { id: true, status: true, lastBackupAt: true, lastStatus: true, lastError: true, copyCount: true }
+            where: {
+                ownerId: server.ownerId,
+                selector: targetSelector({ kind: "mail-server", serverId: server.id })
+            },
+            select: {
+                id: true,
+                status: true,
+                lastBackupAt: true,
+                lastStatus: true,
+                lastError: true,
+                copyCount: true
+            }
         }),
         prisma.protectedResource.findMany({
             where: {
                 ownerId: server.ownerId,
-                selector: { in: volumes.map((volume) => targetSelector({ kind: "deploy-volume", volumeId: volume.id })) }
+                selector: {
+                    in: volumes.map((volume) =>
+                        targetSelector({ kind: "deploy-volume", volumeId: volume.id })
+                    )
+                }
             },
             select: { id: true, name: true }
         })
@@ -65,7 +82,9 @@ export async function mailBackups(server: MailServer): Promise<MailBackupView> {
 /** Protect the server on the default plan. Protecting it twice is one row. */
 export async function protectMailServer(actorId: string, server: MailServer): Promise<string> {
     if (!server.applicationId) {
-        throw new MailServerAccessError("This mail server is not running yet. Finish setting it up first.");
+        throw new MailServerAccessError(
+            "This mail server is not running yet. Finish setting it up first."
+        );
     }
     const created = await protectResource(server.ownerId, {
         target: { kind: "mail-server", serverId: server.id },

@@ -93,7 +93,10 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                 className="flex flex-wrap items-center gap-2 px-3 py-2"
                             >
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[0.8125rem]" title={list.name}>
+                                    <span
+                                        className="block truncate text-[0.8125rem]"
+                                        title={list.name}
+                                    >
                                         {list.name}
                                     </span>
                                     <span className="block text-[0.6875rem] text-foreground-subtle">

@@ -39,7 +39,20 @@ const SHORTHANDS: Readonly<Record<string, string>> = {
     "@hourly": "0 * * * *"
 };
 
-const MONTH_NAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const MONTH_NAMES = [
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC"
+];
 const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 /** Why an expression could not be read, in the words shown beside the field. */
@@ -50,13 +63,19 @@ function field(text: string, min: number, max: number, names?: readonly string[]
     for (const part of text.split(",")) {
         const [range, stepText] = part.split("/");
         const step = stepText === undefined ? 1 : Number(stepText);
-        if (!Number.isInteger(step) || step < 1) throw new CronError(`"${part}" has a step that is not a whole number`);
+        if (!Number.isInteger(step) || step < 1)
+            throw new CronError(`"${part}" has a step that is not a whole number`);
         let low = min;
         let high = max;
         if (range !== "*") {
             const [from, to] = (range ?? "").split("-");
             low = value(from ?? "", min, max, names);
-            high = to === undefined ? (stepText === undefined ? low : max) : value(to, min, max, names);
+            high =
+                to === undefined
+                    ? stepText === undefined
+                        ? low
+                        : max
+                    : value(to, min, max, names);
             if (high < low) throw new CronError(`"${part}" runs backwards`);
         }
         for (let at = low; at <= high; at += step) values.add(at);
@@ -78,7 +97,8 @@ export function parseCron(expression: string): CronSchedule {
     const trimmed = expression.trim().toLowerCase();
     const expanded = SHORTHANDS[trimmed] ?? expression.trim();
     const parts = expanded.split(/\s+/);
-    if (parts.length !== 5) throw new CronError("A schedule has five fields: minute, hour, day, month and weekday");
+    if (parts.length !== 5)
+        throw new CronError("A schedule has five fields: minute, hour, day, month and weekday");
     const [minute, hour, day, month, weekday] = parts as [string, string, string, string, string];
     const weekdays = field(weekday, 0, 7, DAY_NAMES);
     // 7 is Sunday too, which is how half the people writing these count.
@@ -124,7 +144,9 @@ function wallClock(at: Date, timeZone: string): Wall {
         });
         formatters.set(timeZone, format);
     }
-    const parts = Object.fromEntries(format.formatToParts(at).map((part) => [part.type, part.value]));
+    const parts = Object.fromEntries(
+        format.formatToParts(at).map((part) => [part.type, part.value])
+    );
     return {
         year: Number(parts.year),
         month: Number(parts.month),
@@ -173,7 +195,9 @@ function startOfDay(at: number, wall: Wall, timeZone: string): number {
 /** Whether the wall clock already read this minute earlier, because the clocks
  *  went back since. */
 function repeatedMinute(at: number, wall: Wall, timeZone: string): boolean {
-    return SETBACKS.some((minutes) => sameMinute(wallClock(new Date(at - minutes * MINUTE), timeZone), wall));
+    return SETBACKS.some((minutes) =>
+        sameMinute(wallClock(new Date(at - minutes * MINUTE), timeZone), wall)
+    );
 }
 
 /**
@@ -204,7 +228,10 @@ export function nextCronRun(schedule: CronSchedule, after: Date, timeZone = "UTC
             at += (60 - wall.minute) * MINUTE;
             continue;
         }
-        if (schedule.minutes.has(wall.minute) && (everyHour || !repeatedMinute(at, wall, timeZone))) {
+        if (
+            schedule.minutes.has(wall.minute) &&
+            (everyHour || !repeatedMinute(at, wall, timeZone))
+        ) {
             return new Date(at);
         }
         at += MINUTE;
@@ -243,7 +270,11 @@ export function describeCron(expression: string): string {
  */
 export const serviceCronInputSchema = z.object({
     id: z.string().uuid().optional(),
-    name: z.string().trim().min(1, "A name is required").max(64, "Keep the name under 64 characters"),
+    name: z
+        .string()
+        .trim()
+        .min(1, "A name is required")
+        .max(64, "Keep the name under 64 characters"),
     schedule: z.lazy(() => cronExpression),
     timezone: z
         .string()
@@ -261,8 +292,16 @@ export const serviceCronInputSchema = z.object({
         .trim()
         .min(1, "A command is required")
         .max(4000, "Keep the command under 4000 characters")
-        .refine((value) => !value.includes(String.fromCharCode(0)), "The command cannot contain a NUL character"),
-    timeoutSeconds: z.number().int().min(10, "At least 10 seconds").max(86_400, "At most a day").default(900),
+        .refine(
+            (value) => !value.includes(String.fromCharCode(0)),
+            "The command cannot contain a NUL character"
+        ),
+    timeoutSeconds: z
+        .number()
+        .int()
+        .min(10, "At least 10 seconds")
+        .max(86_400, "At most a day")
+        .default(900),
     maxAttempts: z.number().int().min(1).max(10, "At most 10 tries").default(1),
     retryDelaySeconds: z.number().int().min(10, "At least 10 seconds").max(86_400).default(60),
     enabled: z.boolean().default(true)

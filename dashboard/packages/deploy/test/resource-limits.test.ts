@@ -4,7 +4,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { dbComposeSpec, deployBlockLines, expandReplicas, renderComposeYaml } from "../src/compose-spec.js";
+import {
+    dbComposeSpec,
+    deployBlockLines,
+    expandReplicas,
+    renderComposeYaml
+} from "../src/compose-spec.js";
 
 describe("resource limits", () => {
     it("render the CPU as a quoted decimal and the memory in MB", () => {
@@ -23,7 +28,11 @@ describe("resource limits", () => {
 
     it("sit beside a swarm update in the same block", () => {
         const lines = deployBlockLines({ rollingUpdate: true, memoryMb: 256 });
-        expect(lines.slice(0, 3)).toEqual(["    deploy:", "      mode: replicated", "      replicas: 1"]);
+        expect(lines.slice(0, 3)).toEqual([
+            "    deploy:",
+            "      mode: replicated",
+            "      replicas: 1"
+        ]);
         expect(lines).toContain("          memory: 256M");
         expect(lines).toContain("        order: start-first");
     });
@@ -40,14 +49,26 @@ describe("resource limits", () => {
             },
             "polaris-proxy"
         );
-        expect(renderComposeYaml(spec, "/v", "/m")).toContain('          cpus: "2"\n          memory: 1024M');
+        expect(renderComposeYaml(spec, "/v", "/m")).toContain(
+            '          cpus: "2"\n          memory: 1024M'
+        );
     });
 
     it("hold for every copy of a replicated service", () => {
         const expanded = expandReplicas({
             project: "p",
             services: [
-                { name: "web", image: "nginx", env: {}, ports: [], volumes: [], labels: {}, networks: ["n"], replicas: 2, cpus: 0.5 }
+                {
+                    name: "web",
+                    image: "nginx",
+                    env: {},
+                    ports: [],
+                    volumes: [],
+                    labels: {},
+                    networks: ["n"],
+                    replicas: 2,
+                    cpus: 0.5
+                }
             ],
             volumes: [],
             networks: ["n"]
