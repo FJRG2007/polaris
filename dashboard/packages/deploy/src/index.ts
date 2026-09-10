@@ -15,6 +15,8 @@ export {
     singleFileTar
 } from "./release-image.js";
 export { RELEASE_IMAGE_GONE } from "./runtime/release.js";
+export { MAX_SHIPPED_BYTES, shipImage } from "./runtime/ship.js";
+export { archiveImageTags, manifestTags } from "./image-archive.js";
 export { magicDomain, releaseDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
 export {
     defaultZones,

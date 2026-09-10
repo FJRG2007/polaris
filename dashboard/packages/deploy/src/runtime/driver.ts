@@ -36,6 +36,20 @@ export interface RuntimeContext {
      *  once the source is on disk: a workspace has to be built from the repository
      *  root, whatever the service's own root directory says. */
     readonly buildContext?: () => Promise<BuildContext>;
+    /**
+     * The machine a source build runs on, when it is not the one that runs the
+     * service. The image is built and kept there, then carried here (see `ship`).
+     * Absent builds where it runs, as every deploy did before.
+     */
+    readonly builder?: {
+        readonly ports: RuntimePorts;
+        /** The build machine, as the log names it. */
+        readonly name: string;
+        /** The machine that runs the service, as the log names it. */
+        readonly runsOn: string;
+        /** Where the archive waits on its way between the two. */
+        readonly stageDir: string;
+    };
 }
 
 export interface ServiceRef {

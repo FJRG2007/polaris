@@ -146,7 +146,7 @@ fn valid_volume_name(name: &str) -> bool {
 /// A kept release image's `<name>:<tag>` under the release repository: a lower-case
 /// service name and the twelve hex characters derived from the deployment. The same
 /// shape the dashboard produces (`isReleaseImage`), and nothing looser.
-fn valid_release_reference(reference: &str) -> bool {
+pub(crate) fn valid_release_reference(reference: &str) -> bool {
     let Some((name, tag)) = reference.split_once(':') else {
         return false;
     };

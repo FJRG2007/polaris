@@ -7,6 +7,7 @@
  */
 
 import type { Client } from "ssh2";
+import { PassThrough } from "node:stream";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
@@ -179,6 +180,64 @@ export class SshPorts implements RuntimePorts {
 
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
         await this.run(`docker pull ${quoteArg(image)}`, onOutput);
+    }
+
+    /**
+     * `docker save | gzip` on the server, as a stream. A save that fails writes
+     * to stderr and leaves gzip with nothing to compress; either ends the stream
+     * with an error rather than a valid, empty archive.
+     */
+    public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be sent to another machine");
+        const client = await this.connect();
+        return new Promise<NodeJS.ReadableStream>((resolve, reject) => {
+            client.exec(`docker save ${quoteArg(image)} | gzip -1`, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                const out = new PassThrough();
+                let said = "";
+                channel.stderr.on("data", (chunk: Buffer) => {
+                    if (said.length < 2000) said += chunk.toString("utf8");
+                });
+                channel.on("close", (code: number) => {
+                    if (code === 0 && !said.trim()) out.end();
+                    else out.destroy(new Error(`reading ${image} exited with code ${code}${said ? `: ${said.trim()}` : ""}`));
+                });
+                channel.on("error", (channelError: Error) => out.destroy(channelError));
+                channel.pipe(out, { end: false });
+                resolve(out);
+            });
+        });
+    }
+
+    /** `docker load` on the server, fed the archive on stdin. */
+    public async importImage(archive: NodeJS.ReadableStream, _size: number, onOutput?: OutputSink): Promise<void> {
+        const client = await this.connect();
+        await new Promise<void>((resolve, reject) => {
+            client.exec("docker load", (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let code: number | null = null;
+                channel.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.stderr.on("data", (chunk: Buffer) => onOutput?.(chunk));
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () =>
+                    code === 0 ? resolve() : reject(new Error(`loading the image exited with code ${code ?? -1}`))
+                );
+                channel.on("error", reject);
+                archive.on("error", (archiveError: Error) => {
+                    channel.close();
+                    reject(archiveError);
+                });
+                archive.pipe(channel);
+            });
+        });
     }
 
     public async inspectImage(image: string): Promise<number[]> {

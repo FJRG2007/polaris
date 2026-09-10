@@ -100,6 +100,12 @@ struct PullRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct ExportImageRequest {
+    image: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct InspectImageRequest {
     image: String,
 }
@@ -197,6 +203,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/stack/up") => deploy_stack_up(state, req, body),
         ("POST", "/v1/deploy/stack/down") => deploy_stack_down(state, req, body),
         ("POST", "/v1/deploy/pull") => deploy_pull(state, req, body),
+        ("POST", "/v1/deploy/image/export") => deploy_image_export(req, body),
+        ("POST", "/v1/deploy/image/import") => deploy_image_import(state, req, body),
         ("POST", "/v1/deploy/inspect") => deploy_inspect(req, body),
         ("POST", "/v1/deploy/login") => deploy_login(state, req, body),
         ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
@@ -470,6 +478,92 @@ fn deploy_pull<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Respo
     match deploy::pull(&request.image) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not pull the image"),
+    }
+}
+
+/// Hand out a kept release image as a gzipped archive, for a service that was
+/// built on this machine and runs on another. Only images under the release
+/// repository: nothing an operator pulled or built by hand leaves this way.
+fn deploy_image_export<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: ExportImageRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid export request"),
+    };
+    if !deploy::valid_release_image(&request.image) {
+        return Response::bad_request("only a kept release image can be exported");
+    }
+    match deploy::export_image(&request.image) {
+        Ok(reader) => {
+            Response::stream(200, "OK", reader).with_header("Content-Type", "application/gzip")
+        }
+        Err(_) => Response::text(502, "Bad Gateway", "could not export the image"),
+    }
+}
+
+/// A unique name for a staged upload, so two at once never share a file.
+fn staged_name(prefix: &str) -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "{prefix}-{}-{nanos}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+/// Take in a gzipped `docker save` archive of kept release images built on another
+/// machine, and load it. Staged to disk under the deploy root, bounded, and read
+/// for what it would load before anything is loaded: an archive naming any image
+/// outside the release repository is refused whole.
+fn deploy_image_import<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    const MAX_ARCHIVE: u64 = 16 * 1024 * 1024 * 1024;
+    if req.content_length == 0 {
+        return Response::bad_request("an image archive is required");
+    }
+    if req.content_length > MAX_ARCHIVE {
+        return Response::text(
+            413,
+            "Payload Too Large",
+            "the image archive is larger than 16 GB",
+        );
+    }
+    let dir = state.config.deploy_root.join("_images");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Response::server_error();
+    }
+    let staged = dir.join(format!("{}.tar.gz", staged_name("import")));
+    let mut file = match std::fs::File::create(&staged) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    let mut limited = body.take(req.content_length);
+    let copied = std::io::copy(&mut limited, &mut file);
+    drop(file);
+    if !matches!(copied, Ok(n) if n == req.content_length) {
+        let _ = std::fs::remove_file(&staged);
+        return Response::bad_request("the image archive arrived incomplete");
+    }
+    if !deploy::archive_is_release(&staged) {
+        let _ = std::fs::remove_file(&staged);
+        return Response::bad_request("the archive holds something other than kept release images");
+    }
+    let reopened = match std::fs::File::open(&staged) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    // The child holds its own descriptor, so the name can go now.
+    let _ = std::fs::remove_file(&staged);
+    match deploy::load_image(reopened) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not load the image"),
     }
 }
 

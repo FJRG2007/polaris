@@ -11,6 +11,7 @@ import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import { appComposeSpec, dbComposeSpec, forSwarm } from "../compose-spec.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
+import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -33,7 +34,7 @@ export class SwarmRuntime implements RuntimeDriver {
         let imageTag: string;
         let kept: string | null;
         try {
-            kept = await rollbackImageOf(plan, ctx);
+            kept = (await loadPrebuilt(plan, ctx)) ?? (await rollbackImageOf(plan, ctx));
         } catch (error) {
             return { ok: false, error: error instanceof Error ? error.message : RELEASE_IMAGE_GONE };
         }
@@ -46,7 +47,7 @@ export class SwarmRuntime implements RuntimeDriver {
         } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const context = await ctx.buildContext();
-            await ctx.ports.build(
+            await buildPorts(ctx).build(
                 {
                     tag: imageTag,
                     // A Dockerfile Polaris generated wins - see the compose runtime.
@@ -62,8 +63,18 @@ export class SwarmRuntime implements RuntimeDriver {
         } else {
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the swarm runtime` };
         }
-        // Kept under the release's own name before it runs - see the compose runtime.
-        if (!kept) imageTag = await pinRelease(imageTag, plan, ctx);
+        // Kept under the release's own name before it runs - see the compose runtime,
+        // including for a build made on another machine and carried here.
+        if (!kept && plan.build.method !== "image" && ctx.builder) {
+            imageTag = await pinRelease(imageTag, plan, { ...ctx, ports: buildPorts(ctx) });
+            try {
+                imageTag = await shipRelease(imageTag, plan, ctx);
+            } catch (error) {
+                return { ok: false, error: error instanceof Error ? error.message : "the image could not be copied" };
+            }
+        } else if (!kept) {
+            imageTag = await pinRelease(imageTag, plan, ctx);
+        }
         const spec = forSwarm(appComposeSpec(plan, imageTag, ctx.target.proxyNetwork));
         try {
             await ctx.ports.stackUp(spec, sink);

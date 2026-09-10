@@ -48,6 +48,13 @@ export interface BuildInput {
      * Set for a rollback, whose whole point is that the image already exists.
      */
     readonly rollbackImage?: string;
+    /**
+     * A release built somewhere else - on somebody's own machine - and uploaded as
+     * a gzipped `docker save` archive of its kept image. Loaded onto the machine
+     * and run as it is: nothing is fetched, built or pinned. `archive` is a path
+     * on the machine Polaris runs on.
+     */
+    readonly prebuilt?: { readonly image: string; readonly archive: string; readonly bytes: number };
 }
 
 /** Normalized build description with the resolved image tag. */

@@ -283,17 +283,46 @@ export class HostdClient {
         body: NodeJS.ReadableStream,
         size: number
     ): Promise<IncomingMessage> {
+        return this.upload("/v1/deploy/fs/write", body, size, {
+            "content-type": "application/octet-stream",
+            "x-polaris-container": container,
+            "x-polaris-path": path
+        });
+    }
+
+    /**
+     * A kept release image as a gzipped `docker save` archive, streamed as the
+     * daemon produces it. The daemon hands out release images only.
+     */
+    public async imageExport(image: string): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/image/export", JSON.stringify({ image }));
+    }
+
+    /**
+     * Load a gzipped archive of kept release images, of known length, streaming
+     * what the load printed. The daemon refuses an archive naming anything else.
+     */
+    public async imageImport(body: NodeJS.ReadableStream, size: number): Promise<IncomingMessage> {
+        return this.upload("/v1/deploy/image/import", body, size, { "content-type": "application/gzip" });
+    }
+
+    /** Stream a body of known length to a route: the daemon reads exactly `size`
+     *  bytes, so the length is declared rather than chunked. */
+    private async upload(
+        path: string,
+        body: NodeJS.ReadableStream,
+        size: number,
+        extraHeaders: Record<string, string>
+    ): Promise<IncomingMessage> {
         const token = await this.token();
         const headers: Record<string, string> = {
             authorization: `Bearer ${token}`,
-            "content-type": "application/octet-stream",
             "content-length": String(size),
-            "x-polaris-container": container,
-            "x-polaris-path": path
+            ...extraHeaders
         };
         const options: RequestOptions = this.tcpUrl
-            ? { ...splitTcp(this.tcpUrl), path: "/v1/deploy/fs/write", method: "POST", headers, signal: this.signal }
-            : { socketPath: this.socketPath, path: "/v1/deploy/fs/write", method: "POST", headers, signal: this.signal };
+            ? { ...splitTcp(this.tcpUrl), path, method: "POST", headers, signal: this.signal }
+            : { socketPath: this.socketPath, path, method: "POST", headers, signal: this.signal };
         return new Promise<IncomingMessage>((resolve, reject) => {
             const req = httpRequest(options, (res) => resolve(res));
             req.on("error", reject);

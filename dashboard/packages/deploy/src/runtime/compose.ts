@@ -8,12 +8,13 @@
 
 import type { OutputSink } from "../ports.js";
 import { parseContainerState } from "./status.js";
+import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
 import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { tailIntoLog, waitUntilServing } from "./readiness.js";
-import { appComposeSpec, dbComposeSpec, expandReplicas } from "../compose-spec.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
+import { appComposeSpec, dbComposeSpec, expandReplicas } from "../compose-spec.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import type {
     AppDeployPlan,
@@ -204,7 +205,7 @@ export class ComposeRuntime implements RuntimeDriver {
         let imageTag: string;
         let kept: string | null;
         try {
-            kept = await rollbackImageOf(plan, ctx);
+            kept = (await loadPrebuilt(plan, ctx)) ?? (await rollbackImageOf(plan, ctx));
         } catch (error) {
             return fail(ctx, reasonOf(error, RELEASE_IMAGE_GONE));
         }
@@ -234,9 +235,9 @@ export class ComposeRuntime implements RuntimeDriver {
             const fetched = step("Fetching the source");
             const context = await ctx.buildContext();
             fetched();
-            const built = step("Building the image");
+            const built = step(ctx.builder ? `Building the image on ${ctx.builder.name}` : "Building the image");
             try {
-                await ctx.ports.build(
+                await buildPorts(ctx).build(
                     {
                         tag: imageTag,
                         // A Dockerfile Polaris generated wins: it exists precisely
@@ -267,8 +268,19 @@ export class ComposeRuntime implements RuntimeDriver {
         }
 
         // Kept under the release's own name before it runs, so the container is
-        // on the immutable image and a rollback later finds exactly this.
-        if (!kept) imageTag = await pinRelease(imageTag, plan, ctx);
+        // on the immutable image and a rollback later finds exactly this. Built
+        // on another machine, it is kept there and then carried here.
+        const builtElsewhere = !kept && plan.build.method !== "image" && ctx.builder !== undefined;
+        if (builtElsewhere) {
+            imageTag = await pinRelease(imageTag, plan, { ...ctx, ports: buildPorts(ctx) });
+            try {
+                imageTag = await shipRelease(imageTag, plan, ctx);
+            } catch (error) {
+                return fail(ctx, deployFailureReason(reasonOf(error, ""), "the image could not be copied"));
+            }
+        } else if (!kept) {
+            imageTag = await pinRelease(imageTag, plan, ctx);
+        }
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
         // One service per copy, since compose cannot scale a named container.

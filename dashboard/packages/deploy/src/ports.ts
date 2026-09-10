@@ -111,6 +111,18 @@ export interface RuntimePorts {
      *  kept image so a missing one is refused in words rather than by a failed
      *  pull of a name no registry has. Optional for the same reason as above. */
     hasImage?(image: string): Promise<boolean>;
+    /**
+     * A kept release image as a gzipped `docker save` archive, for a service built
+     * on this machine that runs on another. Streamed, never held whole. Only ever
+     * handed a name `isReleaseImage` accepts. Optional: a machine that cannot hand
+     * one out is not offered as a place to build.
+     */
+    exportImage?(image: string): Promise<NodeJS.ReadableStream>;
+    /**
+     * Load such an archive, `size` bytes long, streaming what the load printed.
+     * The local daemon refuses an archive naming anything but release images.
+     */
+    importImage?(archive: NodeJS.ReadableStream, size: number, onOutput?: OutputSink): Promise<void>;
     /** Authenticate to a private registry (`docker login`) so a following pull can
      *  access it. An empty registry targets Docker Hub. The password is sent out of
      *  band (stdin / request body), never on the command line. */

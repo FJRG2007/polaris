@@ -183,7 +183,10 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
             }
         }
         if !service.aliases.is_empty() && service.networks.is_empty() {
-            return Err(format!("aliases for {} need a network to answer on", service.name));
+            return Err(format!(
+                "aliases for {} need a network to answer on",
+                service.name
+            ));
         }
         for alias in &service.aliases {
             if !valid_name(alias) {
@@ -805,6 +808,101 @@ pub fn build(
     stream_command(cmd)
 }
 
+/// Whether a reference names a kept release image, `polaris-release/<name>:<12 hex>`:
+/// the only images this daemon hands out or takes in whole.
+pub fn valid_release_image(reference: &str) -> bool {
+    reference
+        .strip_prefix("polaris-release/")
+        .is_some_and(crate::docker::valid_release_reference)
+}
+
+/// A child's stdout read directly, so the reader's pace is the child's pace.
+///
+/// The channel-backed reader the other streams use queues whatever the child
+/// writes; for an image of several gigabytes read by a slower consumer that queue
+/// is the whole image in this daemon's memory. Reading the pipe itself blocks the
+/// child instead. Dropping it kills and reaps the child.
+struct PipeReader {
+    stdout: std::process::ChildStdout,
+    _child: ChildGuard,
+}
+
+impl Read for PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.stdout.read(buf)
+    }
+}
+
+/// A kept release image as a gzipped `docker save` archive, streamed raw: no
+/// exit trailer and no stderr, either of which would corrupt the archive. A
+/// save that fails yields an archive with no image in it, which the loading end
+/// refuses. The image is a positional argument, never part of the script.
+pub fn export_image(image: &str) -> io::Result<Box<dyn Read + Send>> {
+    let mut child = Command::new("sh")
+        .arg("-c")
+        .arg("docker save \"$1\" | gzip -1")
+        .arg("sh")
+        .arg(image)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let stdout = child.stdout.take().expect("stdout piped");
+    Ok(Box::new(PipeReader {
+        stdout,
+        _child: ChildGuard(child),
+    }))
+}
+
+/// The image names a `docker save` archive would load, from its `manifest.json`.
+/// None when it is not such an archive or names nothing.
+pub fn parse_manifest_tags(raw: &[u8]) -> Option<Vec<String>> {
+    #[derive(Deserialize)]
+    struct Entry {
+        #[serde(rename = "RepoTags", default)]
+        repo_tags: Option<Vec<String>>,
+    }
+    let entries: Vec<Entry> = serde_json::from_slice(raw).ok()?;
+    let tags: Vec<String> = entries
+        .into_iter()
+        .flat_map(|entry| entry.repo_tags.unwrap_or_default())
+        .collect();
+    if tags.is_empty() {
+        None
+    } else {
+        Some(tags)
+    }
+}
+
+/// Whether a staged gzipped archive holds kept release images and nothing else.
+///
+/// Asked before anything is loaded, because a load cannot be taken back: an
+/// archive naming `traefik:v3` would quietly replace the edge's own image on the
+/// next restart. The manifest is read with the system's gzip and tar, bounded.
+pub fn archive_is_release(path: &std::path::Path) -> bool {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg("gzip -dc \"$1\" | tar -xOf - manifest.json")
+        .arg("sh")
+        .arg(path)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output();
+    let Ok(output) = output else { return false };
+    if output.stdout.len() > 1024 * 1024 {
+        return false;
+    }
+    parse_manifest_tags(&output.stdout)
+        .is_some_and(|tags| tags.iter().all(|tag| valid_release_image(tag)))
+}
+
+/// `docker load` from a staged archive, streaming what it printed.
+pub fn load_image(archive: std::fs::File) -> io::Result<Box<dyn Read + Send>> {
+    let mut cmd = Command::new("docker");
+    cmd.arg("load").stdin(Stdio::from(archive));
+    stream_command(cmd)
+}
+
 /// `docker pull`, streaming progress.
 pub fn pull(image: &str) -> io::Result<Box<dyn Read + Send>> {
     let mut cmd = Command::new("docker");
@@ -1150,6 +1248,37 @@ mod tests {
     }
 
     #[test]
+    fn only_kept_release_images_travel_between_machines() {
+        assert!(valid_release_image("polaris-release/web:0123456789ab"));
+        assert!(!valid_release_image("polaris-release/web:latest"));
+        assert!(!valid_release_image("traefik:v3.6"));
+        assert!(!valid_release_image("polaris-release/../web:0123456789ab"));
+        assert!(!valid_release_image(
+            "other/polaris-release/web:0123456789ab"
+        ));
+    }
+
+    #[test]
+    fn an_archive_is_read_for_what_it_would_load() {
+        // What `docker save` writes as manifest.json: every tag the archive would
+        // create is listed, and the import refuses the archive if any is not a
+        // kept release image.
+        let one =
+            br#"[{"Config":"c.json","RepoTags":["polaris-release/web:0123456789ab"],"Layers":[]}]"#;
+        assert_eq!(
+            parse_manifest_tags(one),
+            Some(vec!["polaris-release/web:0123456789ab".to_string()])
+        );
+        let mixed =
+            br#"[{"RepoTags":["polaris-release/web:0123456789ab"]},{"RepoTags":["traefik:v3"]}]"#;
+        let tags = parse_manifest_tags(mixed).unwrap();
+        assert!(!tags.iter().all(|tag| valid_release_image(tag)));
+        // An untagged image, or not a manifest at all, names nothing to accept.
+        assert_eq!(parse_manifest_tags(br#"[{"RepoTags":null}]"#), None);
+        assert_eq!(parse_manifest_tags(b"not json"), None);
+    }
+
+    #[test]
     fn an_alias_rides_on_every_network() {
         // A release standing beside the one it replaces answers to the service's
         // own name too, on every network it joins - the edge reaches it on one, the
@@ -1167,7 +1296,9 @@ mod tests {
             r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["polaris-proxy"],"aliases":["Not Valid"]}]}"#,
         );
         assert!(validate_spec(&bad, &config).is_err());
-        let orphan = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","aliases":["web2"]}]}"#);
+        let orphan = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","aliases":["web2"]}]}"#,
+        );
         assert!(validate_spec(&orphan, &config).is_err());
     }
 

@@ -99,6 +99,24 @@ export class HostdPorts implements RuntimePorts {
         }
     }
 
+    /** A refusal before any bytes arrive is the daemon's sentence, read here so
+     *  it is not mistaken for the start of an archive. */
+    public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
+        if (!isReleaseImage(image)) throw new Error("only a kept release image can be sent to another machine");
+        const response = await this.client.imageExport(image);
+        const status = response.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+            const said = (await collect(response)).trim();
+            throw new Error(said || `the image could not be read (HTTP ${status})`);
+        }
+        return response;
+    }
+
+    public async importImage(archive: NodeJS.ReadableStream, size: number, onOutput?: OutputSink): Promise<void> {
+        const response = await this.client.imageImport(archive, size);
+        await drain(response, onOutput);
+    }
+
     public async login(registry: string, username: string, password: string): Promise<void> {
         await this.client.deployLogin(registry, username, password);
     }
