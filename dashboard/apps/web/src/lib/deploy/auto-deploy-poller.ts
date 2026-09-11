@@ -16,7 +16,7 @@ import { githubTokenForOwner } from "../github-access";
 import { reconcilePullRequestPreviews } from "./environments";
 import { getChangedFiles, getLatestCommit } from "../github-service";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
-import { commitPassesFilter, deployApplication } from "../deploy-service";
+import { commitPassesFilter, deployPushedCommit } from "./push-deploys";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
 let started = false;
@@ -79,16 +79,14 @@ export async function pollAutoDeploys(): Promise<void> {
         }
 
         try {
-            await deployApplication(app.id, ownerId, ownerId, {
+            await deployPushedCommit(app, ownerId, {
                 commitMessage: latest.message,
                 commitSha: latest.sha,
                 authorName: latest.authorName ?? undefined,
-                authorAvatarUrl: latest.authorAvatarUrl ?? undefined,
-                trigger: "push"
+                authorAvatarUrl: latest.authorAvatarUrl ?? undefined
             });
-            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
         } catch {
-            // Leave lastDeployedSha unchanged so the next tick retries this commit.
+            // The commit was handed back, so the next tick retries it.
         }
     }
 }

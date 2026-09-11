@@ -17,7 +17,7 @@
 import { z } from "zod";
 import { recordWorkflowJob } from "@/lib/runners/runner-demand";
 import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
-import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy-service";
+import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy/push-deploys";
 import { closePullRequestPreview, ensurePullRequestPreview } from "@/lib/deploy/environments";
 import { getGithubWebhookSecret, githubAppHandle, verifyWebhookSignature } from "@/lib/github-service";
 
