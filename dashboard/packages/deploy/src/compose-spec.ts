@@ -195,7 +195,11 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
             {
                 name: plan.ref.name,
                 image: imageTag,
-                pullPolicy: plan.build.method === "image" ? "always" : "never",
+                // Only the registry's own reference is worth asking the registry
+                // for. A release kept under `polaris-release/...` - every image
+                // deploy pins one, and a rollback runs one - exists on this
+                // machine alone, so asking for it again fails the deploy.
+                pullPolicy: plan.build.method === "image" && imageTag === plan.build.imageRef ? "always" : "never",
                 env: { ...plan.env },
                 // Publish a host port so the app is reachable over the host's IP
                 // (LAN/intranet) with no reverse proxy - bound on all interfaces,
