@@ -17,9 +17,7 @@ const { parseAppEdgeConfig } = await import("@polaris/core");
 const { expandReplicas, replicaNames } = await import("@polaris/deploy");
 const { restartFromKeptImage, syncAppRoutes } = await import("@/lib/deploy-service");
 const { balancedOver, copiesOf } = await import("@/lib/deploy/replicas");
-const { scaleService, setServiceScaling, singleCopyReason } = await import(
-    "@/lib/deploy/scaling-service"
-);
+const { scaleService, setServiceScaling, singleCopyReason } = await import("@/lib/deploy/scaling-service");
 const { renderDynamicConfig } = await import("@/lib/deploy/router");
 
 /** The block of text belonging to one router or service, by its name. */
@@ -56,12 +54,7 @@ describe("routing a service with several copies", () => {
 
     it("lists every copy by name, pins visitors and checks health", () => {
         const config = renderDynamicConfig([
-            {
-                ...route,
-                dialHosts: ["web", "web-r2", "web-r3"],
-                sticky: true,
-                healthPath: "/healthz"
-            }
+            { ...route, dialHosts: ["web", "web-r2", "web-r3"], sticky: true, healthPath: "/healthz" }
         ]);
         const lb = service(config, "polaris-app-d1");
         expect(lb).toContain('- url: "http://web:3000"');
@@ -83,11 +76,7 @@ describe("routing a service with several copies", () => {
 
 describe("copiesOf", () => {
     it("names every copy on plain compose", () => {
-        expect(copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")).toEqual([
-            "web",
-            "web-r2",
-            "web-r3"
-        ]);
+        expect(copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")).toEqual(["web", "web-r2", "web-r3"]);
     });
 
     it("leaves swarm and a single copy to the ordinary route", () => {
@@ -103,11 +92,7 @@ describe("copiesOf", () => {
         expect(copiesOf(app, "web", { replicas: 1 })).toBeUndefined();
         // A release from before the count was recorded reads as the setting.
         expect(copiesOf(app, "web", { replicas: null })).toHaveLength(5);
-        expect(copiesOf({ ...app, replicas: 1 }, "web", { replicas: 3 })).toEqual([
-            "web",
-            "web-r2",
-            "web-r3"
-        ]);
+        expect(copiesOf({ ...app, replicas: 1 }, "web", { replicas: 3 })).toEqual(["web", "web-r2", "web-r3"]);
     });
 });
 
@@ -139,23 +124,15 @@ describe("changing over a service with several copies", () => {
         ).services;
 
     /** Everything one container answers to on the proxy network. */
-    const answersTo = (copy: { name: string; aliases?: string[] }) => [
-        copy.name,
-        ...(copy.aliases ?? [])
-    ];
+    const answersTo = (copy: { name: string; aliases?: string[] }) => [copy.name, ...(copy.aliases ?? [])];
 
     it("reaches every copy of the new release on the names the edge already dials", () => {
         const route = copiesOf({ replicas: 3, target: { runtime: "compose" } }, "web")!;
         const copies = release("web", "abc1234", 3);
         // One new copy behind each name the route holds, so switching the edge is the
         // old copies going rather than a route being rewritten.
-        for (const [index, name] of route.entries())
-            expect(answersTo(copies[index]!)).toContain(name);
-        expect(copies.map((copy) => copy.name)).toEqual([
-            "web-abc1234",
-            "web-abc1234-r2",
-            "web-abc1234-r3"
-        ]);
+        for (const [index, name] of route.entries()) expect(answersTo(copies[index]!)).toContain(name);
+        expect(copies.map((copy) => copy.name)).toEqual(["web-abc1234", "web-abc1234-r2", "web-abc1234-r3"]);
         expect(copies[1]?.aliases).toEqual(["web", "web-abc1234", "web-r2"]);
     });
 
@@ -187,9 +164,7 @@ describe("changing over a service with several copies", () => {
         }
         expect(copies[0]?.aliases).toEqual(["web", "web-r3"]);
         // Down to one copy, which answers for all three.
-        expect(answersTo(release("web", "abc1234", 1, 3)[0]!)).toEqual(
-            expect.arrayContaining(route)
-        );
+        expect(answersTo(release("web", "abc1234", 1, 3)[0]!)).toEqual(expect.arrayContaining(route));
     });
 
     it("answers only its own names when the release it replaces ran no more copies", () => {
@@ -202,9 +177,7 @@ describe("changing over a service with several copies", () => {
 
 describe("balancedOver", () => {
     it("carries the service's balancing only when there is something to balance", () => {
-        const edge = parseAppEdgeConfig(
-            JSON.stringify({ balancing: { sticky: true, healthPath: "/up" } })
-        );
+        const edge = parseAppEdgeConfig(JSON.stringify({ balancing: { sticky: true, healthPath: "/up" } }));
         expect(balancedOver(["web", "web-r2"], edge)).toEqual({
             dialHosts: ["web", "web-r2"],
             sticky: true,
@@ -253,25 +226,18 @@ describe("saving a new count", () => {
     };
 
     beforeEach(() => {
-        Object.assign(prisma, {
-            application: { findFirst: async () => app, update: async () => app }
-        });
+        Object.assign(prisma, { application: { findFirst: async () => app, update: async () => app } });
         vi.mocked(syncAppRoutes).mockResolvedValue(undefined);
         vi.mocked(restartFromKeptImage).mockClear();
     });
 
     it("scales the release serving it rather than changing it over", async () => {
-        await expect(setServiceScaling("app-1", "owner-1", "user-1", input)).resolves.toEqual({
-            redeployed: true
-        });
+        await expect(setServiceScaling("app-1", "owner-1", "user-1", input)).resolves.toEqual({ redeployed: true });
         expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", "user-1", "scale");
     });
 
     it("changes over when new limits come with it, since every copy is recreated", async () => {
-        await setServiceScaling("app-1", "owner-1", "user-1", {
-            ...input,
-            limits: { cpus: 1, memoryMb: null }
-        });
+        await setServiceScaling("app-1", "owner-1", "user-1", { ...input, limits: { cpus: 1, memoryMb: null } });
         expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", "user-1", "settings");
     });
 
@@ -283,9 +249,7 @@ describe("saving a new count", () => {
 
 describe("the balancing setting", () => {
     it("refuses a health path that is not a path", () => {
-        const stored = parseAppEdgeConfig(
-            JSON.stringify({ balancing: { sticky: true, healthPath: "healthz" } })
-        );
+        const stored = parseAppEdgeConfig(JSON.stringify({ balancing: { sticky: true, healthPath: "healthz" } }));
         expect(stored.balancing).toEqual({ sticky: false, healthPath: null });
     });
 
@@ -295,51 +259,31 @@ describe("the balancing setting", () => {
 });
 
 describe("a share of the traffic sent to a kept release", () => {
-    const route = {
-        id: "d1",
-        hostname: "shop.example.com",
-        certResolver: "le",
-        dialHost: "10.0.0.2",
-        dialPort: 21000
-    };
+    const route = { id: "d1", hostname: "shop.example.com", certResolver: "le", dialHost: "10.0.0.2", dialPort: 21000 };
 
     it("splits the service by weight, pinning each visitor to one version", () => {
-        const config = renderDynamicConfig([
-            { ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 10 } }
-        ]);
+        const config = renderDynamicConfig([{ ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 10 } }]);
         const split = service(config, "polaris-app-d1");
         expect(split).toContain("weighted:");
         expect(split).toContain("- name: polaris-app-d1-current\n            weight: 90");
         expect(split).toContain("- name: polaris-app-d1-canary\n            weight: 10");
         expect(split).toContain("name: polaris_release");
-        expect(service(config, "polaris-app-d1-canary")).toContain(
-            '- url: "http://10.0.0.2:23456"'
-        );
-        expect(service(config, "polaris-app-d1-current")).toContain(
-            '- url: "http://10.0.0.2:21000"'
-        );
+        expect(service(config, "polaris-app-d1-canary")).toContain('- url: "http://10.0.0.2:23456"');
+        expect(service(config, "polaris-app-d1-current")).toContain('- url: "http://10.0.0.2:21000"');
     });
 
     it("never sends more than half", () => {
-        const config = renderDynamicConfig([
-            { ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 90 } }
-        ]);
-        expect(service(config, "polaris-app-d1")).toContain(
-            "- name: polaris-app-d1-canary\n            weight: 50"
-        );
+        const config = renderDynamicConfig([{ ...route, canary: { upstream: "http://10.0.0.2:23456", percent: 90 } }]);
+        expect(service(config, "polaris-app-d1")).toContain("- name: polaris-app-d1-canary\n            weight: 50");
     });
 
     it("keeps the canary only while it validates, and reads an old config as none", () => {
         const id = "019f9000-1111-7000-8000-222233334444";
-        expect(
-            parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 10 } })).canary
-        ).toEqual({
+        expect(parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 10 } })).canary).toEqual({
             deploymentId: id,
             percent: 10
         });
-        expect(
-            parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 80 } })).canary
-        ).toBeNull();
+        expect(parseAppEdgeConfig(JSON.stringify({ canary: { deploymentId: id, percent: 80 } })).canary).toBeNull();
         expect(parseAppEdgeConfig("{}").canary).toBeNull();
     });
 });

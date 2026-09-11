@@ -60,9 +60,7 @@ vi.mock("@/lib/deploy-service", () => ({
     getApplicationDeployStatuses: async () => ({})
 }));
 
-vi.mock("@/lib/audit-service", () => ({
-    recordAudit: (...args: unknown[]) => recordAudit(...args)
-}));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: (...args: unknown[]) => recordAudit(...args) }));
 vi.mock("@/lib/activity/activity", () => ({ record: async () => undefined }));
 vi.mock("@/lib/domain-dns", () => ({ provisionHostnameDns: async () => null }));
 vi.mock("@/lib/env-var-service", () => ({
@@ -81,13 +79,7 @@ const { DeployApiRefusal } = await import("@/lib/deploy/api/refusal");
 type Caller = Parameters<typeof surface.deploy>[0];
 
 function caller(scopes: string[], projectId: string | null = null): Caller {
-    return {
-        userId: USER,
-        scopes: scopes as Caller["scopes"],
-        keyId: "key-1",
-        projectId,
-        via: "api"
-    };
+    return { userId: USER, scopes: scopes as Caller["scopes"], keyId: "key-1", projectId, via: "api" };
 }
 
 async function refusedWith(run: () => Promise<unknown>): Promise<number> {
@@ -115,9 +107,7 @@ describe("the key's scope", () => {
     });
 
     it("refuses to reveal a secret to a key that may only read", async () => {
-        expect(
-            await refusedWith(() => surface.revealVariable(caller(["deploy.read"]), "var-1"))
-        ).toBe(403);
+        expect(await refusedWith(() => surface.revealVariable(caller(["deploy.read"]), "var-1"))).toBe(403);
         expect(revealEnvVar).not.toHaveBeenCalled();
     });
 });
@@ -139,9 +129,7 @@ describe("the project capability", () => {
 describe("a project token", () => {
     it("reaches nothing outside the project it was minted from", async () => {
         requireApplicationAccess.mockResolvedValue(access(PROJECT_B));
-        expect(
-            await refusedWith(() => surface.deploy(caller(["deploy.manage"], PROJECT_A), APP))
-        ).toBe(404);
+        expect(await refusedWith(() => surface.deploy(caller(["deploy.manage"], PROJECT_A), APP))).toBe(404);
         expect(deployApplication).not.toHaveBeenCalled();
     });
 
@@ -187,16 +175,12 @@ describe("naming a service", () => {
             row("app-1", "api", "production", true),
             { ...row("app-2", "worker", "production", true), name: "api" }
         ]);
-        expect(await refusedWith(() => surface.deploy(caller(["deploy.manage"]), "shop/api"))).toBe(
-            409
-        );
+        expect(await refusedWith(() => surface.deploy(caller(["deploy.manage"]), "shop/api"))).toBe(409);
         expect(deployApplication).not.toHaveBeenCalled();
     });
 
     it("says so when nothing this key can see has that name", async () => {
-        expect(await refusedWith(() => surface.deploy(caller(["deploy.manage"]), "shop/api"))).toBe(
-            404
-        );
+        expect(await refusedWith(() => surface.deploy(caller(["deploy.manage"]), "shop/api"))).toBe(404);
     });
 
     it("only searches the token's own project", async () => {
@@ -235,10 +219,7 @@ describe("what is recorded", () => {
         const revealed = await surface.revealVariable(caller(["deploy.manage"]), "var-1");
         expect(revealed.key).toBe("DATABASE_URL");
         expect(requireApplicationAccess).toHaveBeenCalledWith(APP, USER, "variables.read");
-        const event = recordAudit.mock.calls[0]?.[0] as {
-            action: string;
-            metadata: Record<string, unknown>;
-        };
+        const event = recordAudit.mock.calls[0]?.[0] as { action: string; metadata: Record<string, unknown> };
         expect(event.action).toBe("deploy.variable.reveal");
         expect(event.metadata.key).toBe("DATABASE_URL");
         expect(JSON.stringify(event)).not.toContain("postgres://");
@@ -257,24 +238,13 @@ describe("rolling back", () => {
             commitSha: "abcdef1234"
         });
         const result = await surface.rollback(caller(["deploy.manage"]), EARLIER);
-        expect(deployments.requireDeploymentAccess).toHaveBeenCalledWith(
-            EARLIER,
-            USER,
-            "deploy.run"
-        );
-        expect(rollbackToDeployment).toHaveBeenCalledWith(EARLIER, OWNER, USER, {
-            via: "api",
-            keyId: "key-1"
-        });
+        expect(deployments.requireDeploymentAccess).toHaveBeenCalledWith(EARLIER, USER, "deploy.run");
+        expect(rollbackToDeployment).toHaveBeenCalledWith(EARLIER, OWNER, USER, { via: "api", keyId: "key-1" });
         expect(result).toEqual({ deploymentId: "dep-2", commitSha: "abcdef1234" });
         expect(recordAudit).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: "deploy.app.rollback",
-                metadata: expect.objectContaining({
-                    from: EARLIER,
-                    deploymentId: "dep-2",
-                    keyId: "key-1"
-                })
+                metadata: expect.objectContaining({ from: EARLIER, deploymentId: "dep-2", keyId: "key-1" })
             })
         );
     });
@@ -289,9 +259,7 @@ describe("rolling back", () => {
     });
 
     it("refuses a key that may only read", async () => {
-        expect(await refusedWith(() => surface.rollback(caller(["deploy.read"]), EARLIER))).toBe(
-            403
-        );
+        expect(await refusedWith(() => surface.rollback(caller(["deploy.read"]), EARLIER))).toBe(403);
         expect(rollbackToDeployment).not.toHaveBeenCalled();
     });
 });
