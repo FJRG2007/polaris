@@ -338,7 +338,8 @@ export async function actOnAction(input: unknown) {
         const done = await messages.actOnMessages(
             userId,
             parsed.data.messageIds,
-            parsed.data.action
+            parsed.data.action,
+            { scope: parsed.data.scope }
         );
         refresh();
         return { done };

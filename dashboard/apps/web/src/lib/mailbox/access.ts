@@ -194,21 +194,43 @@ export async function ownedFolder(userId: string, folderId: string) {
     return folder;
 }
 
+/** The columns an action needs to do its work on a message. */
+const MESSAGE_COLUMNS = {
+    id: true,
+    uid: true,
+    accountId: true,
+    folderId: true,
+    threadId: true,
+    messageId: true,
+    seen: true,
+    flagged: true
+} as const;
+
 /** The messages out of a set that belong to this person, with what is needed to
  *  act on them. Silently drops any that do not, so one wrong id in a bulk
  *  action does not fail the other four hundred. */
 export function ownedMessages(userId: string, messageIds: readonly string[]) {
     return prisma.mailMessage.findMany({
         where: { id: { in: [...messageIds] }, account: { userId } },
-        select: {
-            id: true,
-            uid: true,
-            accountId: true,
-            folderId: true,
-            threadId: true,
-            messageId: true,
-            seen: true,
-            flagged: true
-        }
+        select: MESSAGE_COLUMNS
+    });
+}
+
+/**
+ * Every message of a set of conversations, of this person's mailboxes.
+ *
+ * What "read" means when it was aimed at a conversation rather than at a
+ * message. A screen lists conversations, so pressing Read on one and having it
+ * stay bold - because the newest message was the only one anybody marked, and
+ * the three under it were not - is the button not working. Every mail client
+ * anybody has used marks the whole conversation.
+ *
+ * Narrowed by the owner in the same query, exactly as `ownedMessages` is: a
+ * conversation id is guessable in the way a message id is.
+ */
+export function ownedThreadMessages(userId: string, threadIds: readonly string[]) {
+    return prisma.mailMessage.findMany({
+        where: { threadId: { in: [...threadIds] }, account: { userId } },
+        select: MESSAGE_COLUMNS
     });
 }

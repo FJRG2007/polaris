@@ -35,11 +35,11 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { mailShortcuts, useMailKeys } from "./use-mail-keys";
 import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
-import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
+import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
 import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
@@ -178,7 +178,28 @@ export function MailView({
      * and what a search should be called.
      */
     const live = useSearchParams();
-    const openThreadId = live.get("open") ?? openedWhenRendered;
+    const path = usePathname();
+    /**
+     * Which conversation is open, and why the prop is only a fallback on one
+     * route.
+     *
+     * On every list route `open` is a search parameter, and this screen changes
+     * it without asking the server for the page again - so the address is the
+     * only thing that knows. The prop is the server's reading of an OLDER
+     * address, and falling back to it whenever the parameter is absent meant a
+     * conversation could not be closed: anything that re-rendered the page while
+     * one was open (marking it read does) baked its id into the prop, and
+     * closing the pane then put it straight back. Deleting the message you were
+     * reading sat there until the next render - seconds, over somebody else's
+     * IMAP server - which is the bug this is.
+     *
+     * `/mail/t/<id>` is the exception and the reason the prop exists at all:
+     * there the conversation is named by the PATH, never by a parameter, so the
+     * server's reading is the only one there is. Closing from that route is a
+     * real navigation to `/mail` - see `closeOpen` - which drops the prop with
+     * it.
+     */
+    const openThreadId = live.get("open") ?? (path.startsWith("/mail/t/") ? openedWhenRendered : "");
     const category = categorised ? asCategory(live.get("tab")) : "";
     // A screen that IS one of the filters keeps its own narrowing whatever the
     // address says, exactly as the server decides it.
@@ -386,7 +407,24 @@ export function MailView({
         setPatched({});
     }, []);
     useEffect(() => {
-        setPatched(inFlight.current);
+        // An overlay saying a conversation has LEFT is needed exactly as long as
+        // the list still sends it, which is longer than the action takes.
+        //
+        // A list is not re-read from the server the moment one is asked for: the
+        // copy this tab already holds is painted first and the request lands
+        // behind it. So dropping the overlay when the mail server answered put
+        // the row somebody had just deleted back on screen - out of a list
+        // fetched before the delete - until the new one arrived. It came back,
+        // and then it went, which is the screen twice disagreeing with itself.
+        //
+        // Dropped per conversation rather than all at once, so a list that has
+        // stopped sending one is the end of hiding it and nothing else is.
+        const here = new Set(threads.map((thread) => thread.id));
+        const held = Object.fromEntries(
+            Object.entries(inFlight.current).filter(([id, over]) => !over.gone || here.has(id))
+        );
+        inFlight.current = held;
+        setPatched(held);
     }, [threads]);
 
     /**
@@ -647,6 +685,54 @@ export function MailView({
         [threads, selected]
     );
 
+    /**
+     * A conversation stops being unread the moment it is OPENED.
+     *
+     * It used to stop when its body finished arriving, because the mark lived on
+     * the message rows inside the reading pane and there are no rows until the
+     * conversation has been fetched. Opening one and going back before that
+     * landed - which is most of what triaging a mailbox is - left it bold, and
+     * "I opened it and it did not go read" is how that was reported.
+     *
+     * So it is marked from here, off the row the list already holds, in the same
+     * breath as the address changes. The pane still marks anything opened inside
+     * it: an older message somebody expands by hand is a message they have read,
+     * and `delay` waits on purpose. What this covers is the conversation itself.
+     *
+     * The whole conversation, not its newest message - see `scopeOf`.
+     */
+    const [readOnOpen, setReadOnOpen] = useState("");
+    // Whatever was marked belonged to the conversation that was open. Declared
+    // above the effect that marks, so on a change the two run in that order.
+    useEffect(() => setReadOnOpen(""), [openThreadId]);
+    useEffect(() => {
+        if (preferences.markRead !== "open" || !openThread) return;
+        const row = shown(openThread);
+        // Nothing to mark, already marked, or a conversation with no message to
+        // name it by - a row still being fetched.
+        if (readOnOpen === row.id || row.unreadCount === 0 || !row.leadMessageId) return;
+        setReadOnOpen(row.id);
+        // The row and the rail both stop saying unread now. The mail server is
+        // told in the same breath and nobody waits on it: a refusal leaves the
+        // message unread, which is the truth, and the next list brings the bold
+        // row back on its own.
+        nudgeUnread(unreadNudges([row]));
+        patch([row.id], { unreadCount: 0 });
+        void actOnAction({
+            messageIds: [row.leadMessageId],
+            action: "read",
+            scope: "conversation"
+        });
+    }, [
+        nudgeUnread,
+        openThread,
+        patch,
+        preferences.markRead,
+        readOnOpen,
+        shown,
+        unreadNudges
+    ]);
+
     const act = useCallback(
         (action: MailAction, messageIds: readonly string[], announce: string) => {
             if (messageIds.length === 0) return;
@@ -690,7 +776,11 @@ export function MailView({
             }
 
             startBusy(async () => {
-                const outcome = await actOnAction({ messageIds: [...messageIds], action });
+                const outcome = await actOnAction({
+                    messageIds: [...messageIds],
+                    action,
+                    scope: scopeOf(action)
+                });
                 // This mailbox has no folder for what was asked. Ask which one it
                 // is and do the action again once it is settled, so the answer
                 // costs one question rather than the action being lost.
@@ -712,11 +802,17 @@ export function MailView({
                     toast.show({ title: said });
                     return;
                 }
-                // Done. The overlay stops being something to carry across the
-                // next list: what comes back now is the server agreeing with it,
-                // and holding it past that is the screen disagreeing with the
-                // mailbox for ever.
-                inFlight.current = {};
+                // Done. A flag the server has now written stops being carried:
+                // what comes back next says it too, and holding it past that is
+                // the screen disagreeing with the mailbox for ever.
+                //
+                // A conversation that LEFT is the exception and keeps its
+                // overlay. The list on screen was fetched before this happened
+                // and still has the row in it - the effect on `threads` above is
+                // what lets it go, the first time a list comes back without it.
+                inFlight.current = Object.fromEntries(
+                    Object.entries(inFlight.current).filter(([, over]) => over.gone)
+                );
                 setSelected([]);
                 toast.show({ title: announce });
                 // Done from the list, but it may have been aimed at whatever is
@@ -880,7 +976,10 @@ export function MailView({
                       if (onRow) goShallow(mailAddress({ open: onRow.id }));
                   },
                   back: () => {
-                      if (openThread) goShallow(mailAddress({ open: null }));
+                      // Through `closeOpen` rather than by stripping the
+                      // parameter here: on `/mail/t/<id>` there is no parameter
+                      // to strip and the key did nothing at all.
+                      if (openThread) closeOpen();
                   },
                   archive: () => {
                       if (context.canArchive) act("archive", rowMessageIds, "Archived.");
@@ -1439,6 +1538,12 @@ export function MailView({
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
                         markRead={preferences.markRead}
+                        // Already marked, on the way in - see `readOnOpen`. Told
+                        // so rather than left to work it out, because the body it
+                        // is drawn from was fetched beside that mark and can
+                        // still say unread: without this every open cost a second
+                        // round trip to the mail server to mark what was read.
+                        readAlready={readOnOpen === openThread.id}
                         // Filed from its own header. The row goes from the list
                         // in the same breath as the pane closes, held until the
                         // mail server answers: without it the conversation
@@ -1458,11 +1563,15 @@ export function MailView({
                         }}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
-                        onBack={
-                            layout === "full"
-                                ? () => router.push(window.location.pathname, { scroll: false })
-                                : undefined
-                        }
+                        //
+                        // The same close the toolbar uses, and for the reason
+                        // this whole screen stopped navigating: `router.push`
+                        // asked the server to render the page again, so going
+                        // back to a list this tab was already holding waited on a
+                        // round trip. `closeOpen` changes the address and nothing
+                        // else - except on `/mail/t/<id>`, where the conversation
+                        // IS the page and leaving it is a real navigation.
+                        onBack={layout === "full" ? closeOpen : undefined}
                     />
                 ) : opened.loading ? (
                     // On its way. The shape of a message rather than a spinner,

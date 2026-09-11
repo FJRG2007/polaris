@@ -131,7 +131,34 @@ describe("the address stops naming what was moved", () => {
         expect(view).toContain("mailAddress({ open: threadId })");
     });
 
-    it("keeps the row hidden while the list it left comes back unchanged", async () => {
+    it("lets the address decide what is open, not the server's older reading of it", async () => {
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        // The prop is what the server made of the address when it rendered the
+        // page, and on a list route the screen changes `open` without asking for
+        // that page again. Falling back to the prop whenever the parameter was
+        // absent meant a conversation could not be CLOSED: anything that
+        // re-rendered while one was open - marking it read does - baked its id
+        // into the prop, and closing put it straight back. Deleting the message
+        // you were reading then sat there until the next render, over somebody
+        // else's IMAP server.
+        expect(view).toContain(
+            'const openThreadId = live.get("open") ?? (path.startsWith("/mail/t/") ? openedWhenRendered : "");'
+        );
+    });
+
+    it("goes back to the list without asking the server for the page", async () => {
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        // `router.push` rendered the page again to show a list this tab was
+        // already holding, which is the round trip this screen exists without.
+        // Both ways back - the button and the key - go through the one close,
+        // because `/mail/t/<id>` has no parameter to strip and stripping one
+        // there did nothing at all.
+        expect(view).toContain("onBack={layout === \"full\" ? closeOpen : undefined}");
+        expect(view).toContain("if (openThread) closeOpen();");
+        expect(view).not.toContain("router.push(window.location.pathname");
+    });
+
+    it("keeps the row hidden until a list comes back without it", async () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // Closing the pane is a navigation, and these routes are dynamic: a
         // fresh list arrives in a few tens of milliseconds with the row still in
@@ -139,11 +166,22 @@ describe("the address stops naming what was moved", () => {
         // overlay on a new list put the conversation somebody had just deleted
         // back on screen for as long as the delete took - which is the one
         // moment the overlay exists for.
-        expect(view).toContain("setPatched(inFlight.current);");
         expect(view).toContain("patchUntilAnswered(aimed, ahead)");
-        // And dropped as soon as the answer is in, either way, so the screen
-        // never disagrees with the mailbox for longer than the action takes.
-        expect(view).toContain("inFlight.current = {};");
+        // Nor when the mail server answers, which is the same bug one step
+        // later: the list on screen was fetched BEFORE the delete and is
+        // repainted from the copy this tab holds while the new one is asked
+        // for, so a row let go of at the answer comes back and then goes.
+        expect(view).toContain(
+            "Object.entries(inFlight.current).filter(([, over]) => over.gone)"
+        );
+        // What lets it go is the list itself, per conversation: the first one
+        // that no longer has the row.
+        expect(view).toContain("const here = new Set(threads.map((thread) => thread.id));");
+        expect(view).toContain("filter(([id, over]) => !over.gone || here.has(id))");
+        // A flag the server has written is still dropped at the answer: the next
+        // list says it too, and holding it would be the screen disagreeing with
+        // the mailbox for ever.
+        expect(view).toContain("inFlight.current = held;");
     });
 
     /**
@@ -174,20 +212,4 @@ describe("the address stops naming what was moved", () => {
             expect(inside, `${screen} must not refresh the router`).not.toContain("refresh()");
         }
     });
-
-    it("keeps the row hidden while the list it left comes back unchanged", async () => {
-        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
-        // Closing the pane is a navigation, and these routes are dynamic: a
-        // fresh list arrives in a few tens of milliseconds with the row still in
-        // it, seconds before the mail server has moved anything. Clearing every
-        // overlay on a new list put the conversation somebody had just deleted
-        // back on screen for as long as the delete took - which is the one
-        // moment the overlay exists for.
-        expect(view).toContain("setPatched(inFlight.current);");
-        expect(view).toContain("patchUntilAnswered(aimed, ahead)");
-        // And dropped as soon as the answer is in, either way, so the screen
-        // never disagrees with the mailbox for longer than the action takes.
-        expect(view).toContain("inFlight.current = {};");
-    });
-
 });

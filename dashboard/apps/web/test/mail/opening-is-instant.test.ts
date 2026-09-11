@@ -95,7 +95,7 @@ describe("marking it read", () => {
         // go read" reported as a mystery.
         const messages = await readFile(new URL("../../src/lib/mailbox/messages.ts", import.meta.url), "utf8");
         expect(messages).toContain("const flag = FLAG_ACTIONS[action];");
-        expect(messages).toContain("if (flag) return await setFlag(userId, messages, flag);");
+        expect(messages).toContain("return await setFlag(userId, whole, flag);");
         const set = messages.slice(messages.indexOf("async function setFlag("));
         const body = set.slice(0, set.indexOf("/** What one folder"));
         // The row and the conversation's counts first...

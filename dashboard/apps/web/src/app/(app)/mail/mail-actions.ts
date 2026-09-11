@@ -34,6 +34,24 @@ export function leavesTheView(action: MailAction): boolean {
 }
 
 /**
+ * What an action aimed at a row is aimed at: the conversation, or the one
+ * message the row was named by.
+ *
+ * The list draws conversations, so a row is a conversation - but it is handed to
+ * the server as the message that leads it, because that is what a mail server
+ * has a word for. For Read and Unread the difference is visible: marking a
+ * conversation of four read used to mark the newest of them, and the row stayed
+ * bold with three unread under it, which reads as the button not working.
+ *
+ * A move stays the message. A conversation lives in several folders at once and
+ * archiving "the conversation" would be a promise about mail the view is not
+ * showing - the reasoning above `leavesTheView`.
+ */
+export function scopeOf(action: MailAction): "message" | "conversation" {
+    return action === "read" || action === "unread" ? "conversation" : "message";
+}
+
+/**
  * The run of rows between the last one picked on its own and the one just
  * clicked, both included.
  *

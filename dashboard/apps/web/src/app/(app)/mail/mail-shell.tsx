@@ -26,6 +26,7 @@ import { useMailStream } from "./use-mail-stream";
 import { Menu, PenLine, Plus } from "lucide-react";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
+import { useNudgeMailUnread } from "@/components/mail-unread";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
@@ -182,6 +183,7 @@ export function MailShell({
     children: ReactNode;
 }) {
     const router = useRouter();
+    const nudgeBadge = useNudgeMailUnread();
     const pathname = usePathname();
     const search = useSearchParams();
     const [composing, setComposing] = useState<ComposerSeed | null>(null);
@@ -213,6 +215,16 @@ export function MailShell({
         (entries: readonly UnreadNudge[]) => {
             const wanted = entries.filter((entry) => entry.by !== 0);
             if (wanted.length === 0) return;
+            // The badge outside Mail counts inboxes across every shelf, which is
+            // the same question the mailbox badges here answer - so it moves on
+            // the same deltas rather than waiting for the mail server to be told
+            // and to announce it. See `useNudgeMailUnread`.
+            nudgeBadge(
+                wanted.reduce((sum, entry) => {
+                    const folder = folders.find((one) => one.id === entry.folderId);
+                    return folder?.role === "inbox" ? sum + entry.by : sum;
+                }, 0)
+            );
             setDrift((held) => {
                 const next = { ...held };
                 for (const entry of wanted) {
@@ -232,7 +244,7 @@ export function MailShell({
                 return next;
             });
         },
-        [folders]
+        [folders, nudgeBadge]
     );
 
     /** The counts as the reader should see them: the server's, with what they

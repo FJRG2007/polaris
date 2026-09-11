@@ -421,11 +421,22 @@ export const mailMessageAction = z.enum([
     "inbox"
 ]);
 
+/**
+ * What the messages named stand for.
+ *
+ * A screen that lists conversations names one by a message inside it, so an
+ * action from that screen has to say which of the two it meant. Read and Unread
+ * are the conversation; everything else is the messages themselves, because a
+ * conversation lives in several folders at once and a move is about a folder.
+ */
+export const mailActionScope = z.enum(["message", "conversation"]);
+
 /** Anything done to a set of messages at once. The list is capped because every
  *  one of them is a round trip to somebody's mail server. */
 export const mailActionSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),
-    action: mailMessageAction
+    action: mailMessageAction,
+    scope: mailActionScope.default("message")
 });
 
 /**

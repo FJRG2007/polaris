@@ -23,7 +23,7 @@ import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
-import { leavesTheView } from "./mail-actions";
+import { leavesTheView, scopeOf } from "./mail-actions";
 import { forwardSeed, replySeed } from "./answering";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
@@ -96,6 +96,7 @@ export function ThreadView({
     messages,
     context,
     markRead,
+    readAlready,
     onBack,
     onRead,
     onGone,
@@ -109,6 +110,12 @@ export function ThreadView({
      *  through a list with a reading pane: passing over a message is not reading
      *  it, and marking it read is how one is lost. */
     markRead: core.MailMarkRead;
+    /** Whether this conversation was already marked read when it was opened -
+     *  which is what happens under `open`, from the list, before this pane has
+     *  a body to draw. The messages here were fetched beside that mark and can
+     *  still say unread, so without being told this pane would ask the mail
+     *  server to mark read what is already read, once per open. */
+    readAlready?: boolean;
     /** Given when the list is not on screen beside this - reading one message at
      *  a time, or on a phone - because then this is the only way back to it. */
     onBack?: () => void;
@@ -170,7 +177,7 @@ export function ThreadView({
             const leaving = leavesTheView(action);
             if (leaving) onGone?.();
             startBusy(async () => {
-                const outcome = await actOnAction({ messageIds, action });
+                const outcome = await actOnAction({ messageIds, action, scope: scopeOf(action) });
                 const missing = missingFolderRole(outcome);
                 if (missing) {
                     // Back where they were, so the question is answered with the
@@ -430,6 +437,7 @@ export function ThreadView({
                                 key={entry.message.id}
                                 message={entry.message}
                                 markRead={markRead}
+                                readAlready={readAlready}
                                 onRead={onRead}
                                 open={open.includes(entry.message.id)}
                                 onToggle={() =>
@@ -642,12 +650,15 @@ function MessageCard({
     message,
     open,
     markRead,
+    readAlready,
     onToggle,
     onRead
 }: {
     message: MailMessageView;
     open: boolean;
     markRead: core.MailMarkRead;
+    /** The conversation was marked read on the way in - see `ThreadView`. */
+    readAlready?: boolean;
     onToggle: () => void;
     onRead?: () => void;
 }) {
@@ -689,7 +700,7 @@ function MessageCard({
      */
     const marked = useRef(false);
     useEffect(() => {
-        if (!open || message.seen || marked.current) return;
+        if (!open || message.seen || marked.current || readAlready) return;
         // Left to the toolbar, for somebody whose unread list is their to-do
         // list. Nothing here is a promise that it stays unread - marking it read
         // by hand still works - only that opening it does not do it for them.
@@ -720,7 +731,7 @@ function MessageCard({
         // wait is the whole difference between passing over and reading.
         const timer = setTimeout(mark, core.MAIL_MARK_READ_DELAY_MS);
         return () => clearTimeout(timer);
-    }, [open, markRead, message.id, message.seen, onRead, refresh]);
+    }, [open, markRead, message.id, message.seen, onRead, readAlready, refresh]);
 
     const sender = message.from[0];
 

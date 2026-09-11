@@ -31,7 +31,13 @@ import { recordSubscription } from "./subscriptions";
 import { catchUpFolder, refreshThreads } from "./sync";
 import { withImap, type MailConnectionSource } from "./imap";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
-import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
+import {
+    ACCOUNT_COLUMNS,
+    MailAccessError,
+    ownedAccount,
+    ownedMessages,
+    ownedThreadMessages
+} from "./access";
 
 /** What a message action is asked for as. */
 export type MailAction =
@@ -256,6 +262,20 @@ export interface MailActionOptions {
      * five hundred conversations per message is the sync taking minutes.
      */
     readonly settle?: boolean;
+    /**
+     * What the messages named stand for.
+     *
+     * `message` is the literal set. `conversation` means they were named by a
+     * screen that lists conversations - a row in the list, the header of the
+     * pane - and the action is meant for everything in them.
+     *
+     * Honoured for Read and Unread alone, and deliberately not for a move: a
+     * conversation lives in several folders at once, and archiving "the
+     * conversation" would be a promise about mail the screen is not showing.
+     * Read is the opposite - a conversation with one message left unread is a
+     * row that stays bold after somebody read it, which is the mark not working.
+     */
+    readonly scope?: "message" | "conversation";
 }
 
 /**
@@ -276,7 +296,18 @@ export async function actOnMessages(
 
     // A flag is not a move, and it used to be treated as one.
     const flag = FLAG_ACTIONS[action];
-    if (flag) return await setFlag(userId, messages, flag);
+    if (flag) {
+        // Aimed at conversations rather than at messages - see `scope`. The
+        // messages named are the screen's handle on them, and what has to change
+        // is everything in them.
+        const whole =
+            options.scope === "conversation" && (action === "read" || action === "unread")
+                ? await ownedThreadMessages(userId, [
+                      ...new Set(messages.map((message) => message.threadId))
+                  ])
+                : messages;
+        return await setFlag(userId, whole, flag);
+    }
 
     // What somebody just said about these messages, before they are moved.
     //

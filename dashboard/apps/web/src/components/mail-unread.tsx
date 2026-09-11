@@ -21,7 +21,16 @@ import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { canNotify, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode
+} from "react";
 
 export interface MailUnread {
     /** Unread messages across every mailbox in the merged views. */
@@ -35,10 +44,32 @@ const NOTHING: MailUnread = { messages: 0, mailboxes: 0 };
 
 const UnreadContext = createContext<MailUnread>(NOTHING);
 
+/**
+ * Tell the badge about mail somebody has just read, before the server says so.
+ *
+ * This count is the server's, asked for when the live channel says a mailbox
+ * moved - so reading a message moved the numbers inside Mail at once and left
+ * the badge on the app switcher standing at its old figure until the mail
+ * server had been told, had answered, and had announced it. Seconds, over
+ * somebody else's IMAP server, with the message plainly read on the screen
+ * beside it.
+ *
+ * Negative for mail that stopped being unread. Laid over the server's figure
+ * and dropped the moment that figure moves - the same overlay the rail inside
+ * Mail keeps, for the same reason and exactly as long.
+ */
+const NudgeContext = createContext<(by: number) => void>(() => {});
+
 /** What is waiting in Mail. Zero outside the provider, which is the honest
  *  answer for a screen mounted without one rather than a reason to throw. */
 export function useMailUnread(): MailUnread {
     return useContext(UnreadContext);
+}
+
+/** Move the badge by what this screen has just done - see `NudgeContext`. Does
+ *  nothing outside the provider. */
+export function useNudgeMailUnread(): (by: number) => void {
+    return useContext(NudgeContext);
 }
 
 const STREAM_PATH = "/api/mail/stream";
@@ -166,6 +197,24 @@ export function MailUnreadProvider({
     const scope = useSessionScope();
     const [unread, setUnread] = useState(initial);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** What this browser has already done that the server's count predates. */
+    const [drift, setDrift] = useState(0);
+    const nudge = useCallback((by: number) => {
+        if (by !== 0) setDrift((held) => held + by);
+    }, []);
+    // The server has spoken since. Whatever was laid over its count was either
+    // this, and is now counted twice, or was never true.
+    useEffect(() => {
+        setDrift((held) => (held === 0 ? held : 0));
+    }, [unread]);
+    const shown = useMemo<MailUnread>(() => {
+        if (drift === 0) return unread;
+        const messages = Math.max(0, unread.messages + drift);
+        // Never a mailbox with nothing waiting in it: the second number only
+        // exists to say "in two of your mailboxes", and saying that over a
+        // badge that has gone is the screen arguing with itself.
+        return { messages, mailboxes: messages === 0 ? 0 : unread.mailboxes };
+    }, [unread, drift]);
 
     const recount = useCallback(() => {
         void fetch(UNREAD_PATH, { cache: "no-store" })
@@ -222,5 +271,9 @@ export function MailUnreadProvider({
         };
     }, [enabled, scope, recount]);
 
-    return <UnreadContext.Provider value={unread}>{children}</UnreadContext.Provider>;
+    return (
+        <NudgeContext.Provider value={nudge}>
+            <UnreadContext.Provider value={shown}>{children}</UnreadContext.Provider>
+        </NudgeContext.Provider>
+    );
 }
