@@ -56,6 +56,20 @@ describe("what the project printed", () => {
         expect(found?.fix).toEqual({ kind: "set-runtime-version", version: "22" });
     });
 
+    it("reads Astro's refusal of the Node it was built on", () => {
+        // Verbatim from failed deploys on a live server (2026-09-11).
+        const found = diagnoseDeploy(
+            log(
+                "#12 0.504 > astro build",
+                "#12 0.546 Node.js v22.3.0 is not supported by Astro!",
+                '#12 0.546 Please upgrade Node.js to a supported version: ">=22.12.0"',
+                "#12 0.550  ELIFECYCLE  Command failed with exit code 1."
+            )
+        );
+        expect(found?.cause).toBe("node-version");
+        expect(found?.fix).toEqual({ kind: "set-runtime-version", version: "22" });
+    });
+
     it("builds on the Python version pip says the project needs", () => {
         const found = diagnoseDeploy(log("ERROR: Package 'api' requires a different Python: 3.9.18 not in '>=3.11'"));
         expect(found?.fix).toEqual({ kind: "set-runtime-version", version: "3.11" });

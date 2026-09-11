@@ -171,9 +171,9 @@ const RULES: readonly Rule[] = [
     {
         cause: "node-version",
         pattern:
-            /The engine "node" is incompatible with this module\. Expected version "([^"]+)"|Unsupported engine[^\n]*required: \{[^}]*node: '([^']+)'|Node\.js version "?([^"\n]+?)"? is required|requires Node\.js (?:version )?([>=^~]+\s*\d[^\s,.]*)/i,
+            /The engine "node" is incompatible with this module\. Expected version "([^"]+)"|Unsupported engine[^\n]*required: \{[^}]*node: '([^']+)'|Node\.js version "?([^"\n]+?)"? is required|requires Node\.js (?:version )?([>=^~]+\s*\d[^\s,.]*)|upgrade Node\.js to a supported version: "([^"]+)"/i,
         diagnose: (match) => {
-            const requirement = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
+            const requirement = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5] ?? "";
             const version = nodeMajorFor(requirement);
             return version
                 ? {
