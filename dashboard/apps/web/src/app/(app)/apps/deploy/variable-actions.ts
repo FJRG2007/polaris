@@ -19,7 +19,13 @@ import { redeployForEnvScope } from "@/lib/deploy-service";
 import { requireEnvScopeAccess } from "@/lib/deploy-project-access";
 import { variableChangesSchema } from "@/lib/deploy/variable-changes";
 import { variableLinks, type VariableLink } from "@/lib/deploy/variable-links";
-import { deleteEnvVar, envVarScope, setEnvVar, setEnvVarSecrecy, type EnvScope } from "@/lib/env-var-service";
+import {
+    deleteEnvVar,
+    envVarScope,
+    setEnvVar,
+    setEnvVarSecrecy,
+    type EnvScope
+} from "@/lib/env-var-service";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -77,9 +83,16 @@ export async function saveEnvVarChangesAction(
 
         for (const id of remove) {
             await deleteEnvVar(id, access.ownerId);
-            await audit(user.id, access.orgId, scope, scopeId, "deploy.variable.remove", { key: keys.get(id) });
+            await audit(user.id, access.orgId, scope, scopeId, "deploy.variable.remove", {
+                key: keys.get(id)
+            });
             if (scope === "application") {
-                await activity.record({ subjectType: "app", subjectId: scopeId, userId: user.id, action: "variable-removed" });
+                await activity.record({
+                    subjectType: "app",
+                    subjectId: scopeId,
+                    userId: user.id,
+                    action: "variable-removed"
+                });
             }
         }
         for (const item of secrecy) {
@@ -115,7 +128,10 @@ export async function saveEnvVarChangesAction(
             }
         }
 
-        if (redeploy) void redeployForEnvScope(scope, scopeId, access.ownerId).catch(() => undefined);
+        if (redeploy)
+            void redeployForEnvScope(scope, scopeId, access.ownerId, user.id).catch(
+                () => undefined
+            );
         revalidatePath(DEPLOY_PATH);
         return { saved: set.length + secrecy.length + remove.length, redeployed: redeploy };
     } catch (caught) {
@@ -129,8 +145,18 @@ export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: 
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return { error: "Nothing to redeploy" };
     try {
-        const access = await requireEnvScopeAccess(parsed.data.scope, parsed.data.scopeId, user.id, "deploy.run");
-        void redeployForEnvScope(parsed.data.scope, parsed.data.scopeId, access.ownerId).catch(() => undefined);
+        const access = await requireEnvScopeAccess(
+            parsed.data.scope,
+            parsed.data.scopeId,
+            user.id,
+            "deploy.run"
+        );
+        void redeployForEnvScope(
+            parsed.data.scope,
+            parsed.data.scopeId,
+            access.ownerId,
+            user.id
+        ).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -144,7 +170,12 @@ export async function variableLinksAction(input: unknown): Promise<Record<string
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return {};
     try {
-        await requireEnvScopeAccess(parsed.data.scope, parsed.data.scopeId, user.id, "variables.read");
+        await requireEnvScopeAccess(
+            parsed.data.scope,
+            parsed.data.scopeId,
+            user.id,
+            "variables.read"
+        );
         return await variableLinks(parsed.data.scope, parsed.data.scopeId);
     } catch {
         return {};

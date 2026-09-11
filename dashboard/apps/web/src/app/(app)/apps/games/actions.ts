@@ -29,7 +29,11 @@ import { isTemplateName, type ServerTemplateView } from "@/lib/apps/game-templat
 import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
-import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
+import {
+    GAME_BLUEPRINTS,
+    recommendedMemoryMb,
+    formatMemory
+} from "@/lib/apps/minecraft/blueprints";
 import {
     deleteServerTemplate,
     listServerTemplates,
@@ -73,10 +77,9 @@ export async function gameSetupAction(): Promise<GameSetup> {
     ]);
     return {
         machines,
-        domainSuffixes: Object.fromEntries(GAMES.map((game, index) => [game.id, suffixes[index] ?? null])) as Record<
-            GameId,
-            string | null
-        >,
+        domainSuffixes: Object.fromEntries(
+            GAMES.map((game, index) => [game.id, suffixes[index] ?? null])
+        ) as Record<GameId, string | null>,
         games,
         yourAddress: yourAddress ?? null
     };
@@ -112,7 +115,10 @@ async function installedGameIds(ownerId: string): Promise<GameId[]> {
 
 /** What memory a server for this many players would be given, so the dialog can
  *  say it before anything is created. */
-export async function suggestedMemoryAction(concurrentPlayers: number, blueprintId: string): Promise<string> {
+export async function suggestedMemoryAction(
+    concurrentPlayers: number,
+    blueprintId: string
+): Promise<string> {
     await requirePermission("games.read");
     const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
     return formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
@@ -168,12 +174,15 @@ export async function createGameServerAction(
 ): Promise<{ installedAppId?: string; hostname?: string | null; error?: string }> {
     const user = await requirePermission("games.manage");
     const parsed = createGameServerSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         // A saved server's settings, if this one is being built from one. Read here
         // rather than trusted from the form: what the browser sends is which
         // template, never what is in it.
-        const template = input.templateId ? await readServerTemplate(user.id, input.templateId) : null;
+        const template = input.templateId
+            ? await readServerTemplate(user.id, input.templateId)
+            : null;
         const created = await createGameServer(user.id, user.id, {
             ...parsed.data,
             ...(template ? { templateSettings: template.settings } : {})
@@ -212,7 +221,9 @@ function createMetadata(input: CreateGameServerInput): Record<string, unknown> {
 }
 
 /** Everything this person has saved, for the create dialog to offer. */
-export async function listServerTemplatesAction(game?: string): Promise<{ templates: ServerTemplateView[] }> {
+export async function listServerTemplatesAction(
+    game?: string
+): Promise<{ templates: ServerTemplateView[] }> {
     try {
         const user = await requirePermission("games.read");
         return { templates: await listServerTemplates(user.id, game) };
@@ -243,7 +254,9 @@ export async function saveServerAsTemplateAction(
         }
         return saved;
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save this as a template" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not save this as a template"
+        };
     }
 }
 
@@ -254,7 +267,9 @@ export async function deleteServerTemplateAction(id: string): Promise<{ error?: 
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete that template" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not delete that template"
+        };
     }
 }
 
@@ -295,7 +310,7 @@ export async function setGameServerRunningAction(
         // with, or at least worth another try. If it was not, the health sweep
         // writes the loop back within the minute.
         if (running) await clearCrashLoop(installedAppId);
-        await setApplicationRunning(access.install.applicationId, access.ownerId, running);
+        await setApplicationRunning(access.install.applicationId, access.ownerId, running, user.id);
         await recordAudit({
             actorId: user.id,
             action: running ? "games.start" : "games.stop",
@@ -310,7 +325,9 @@ export async function setGameServerRunningAction(
 }
 
 /** Deploy the server again, for a container that is wedged or out of date. */
-export async function redeployGameServerAction(installedAppId: string): Promise<{ error?: string }> {
+export async function redeployGameServerAction(
+    installedAppId: string
+): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
@@ -321,7 +338,9 @@ export async function redeployGameServerAction(installedAppId: string): Promise<
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not redeploy the server" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not redeploy the server"
+        };
     }
 }
 
@@ -380,6 +399,8 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not turn game servers on" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not turn game servers on"
+        };
     }
 }

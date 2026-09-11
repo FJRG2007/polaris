@@ -25,7 +25,14 @@ import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
-import { clusterNodeNames, dbPlanImages, serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
+import {
+    clusterNodeNames,
+    dbPlanImages,
+    serviceName,
+    shortHash,
+    slugify,
+    type DbDeployPlan
+} from "@polaris/deploy";
 import type {
     ContainerCommand,
     DatabaseCreate,
@@ -125,7 +132,8 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
             MONGO_INITDB_DATABASE: creds.database
         }),
         // A set of several members starts from `topologyMemberPlans` instead.
-        command: (_creds, row) => (row.replicaSet && row.topology === "single" ? core.mongoReplicaSetCommand() : undefined)
+        command: (_creds, row) =>
+            row.replicaSet && row.topology === "single" ? core.mongoReplicaSetCommand() : undefined
     },
     redis: {
         defaultVersion: "7",
@@ -137,7 +145,11 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
         // is what actually makes the stored password mean something.
         env: () => ({}),
         command: (creds, row) =>
-            core.redisServerCommand(creds.password, row.mode as RedisMode, row.maxMemoryMb ?? undefined)
+            core.redisServerCommand(
+                creds.password,
+                row.mode as RedisMode,
+                row.maxMemoryMb ?? undefined
+            )
     },
     seaweedfs: {
         defaultVersion: "4.46",
@@ -226,7 +238,10 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     // Re-validated here rather than trusted from the action: this is the last
     // place before the values reach a statement builder. The server has already
     // been resolved to a target by now, so it is dropped from what is checked.
-    const parsed: DatabaseCreate = core.databaseCreateSchema.parse({ ...input, serverId: undefined });
+    const parsed: DatabaseCreate = core.databaseCreateSchema.parse({
+        ...input,
+        serverId: undefined
+    });
     const topology = core.topologyOf(parsed);
 
     const environment = await prisma.environment.findFirst({
@@ -313,7 +328,14 @@ const SWARM_REFUSAL =
 async function instanceFor(id: string, ownerId: string) {
     return prisma.managedDatabase.findFirst({
         where: { id, environment: { project: { ownerId } } },
-        select: { id: true, engine: true, version: true, targetId: true, parentId: true, containerName: true }
+        select: {
+            id: true,
+            engine: true,
+            version: true,
+            targetId: true,
+            parentId: true,
+            containerName: true
+        }
     });
 }
 
@@ -322,7 +344,11 @@ async function instanceFor(id: string, ownerId: string) {
  * inside: same engine, already provisioned (a container that was never deployed
  * has nothing to run a statement in), and not themselves hosted on another.
  */
-export async function listDatabaseInstances(environmentId: string, engine: DbEngine, ownerId: string) {
+export async function listDatabaseInstances(
+    environmentId: string,
+    engine: DbEngine,
+    ownerId: string
+) {
     if (!core.DB_ENGINE_INFO[engine].namedDatabases) return [];
     const rows = await prisma.managedDatabase.findMany({
         where: {
@@ -333,7 +359,13 @@ export async function listDatabaseInstances(environmentId: string, engine: DbEng
             environment: { project: { ownerId } }
         },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, version: true, status: true, _count: { select: { children: true } } }
+        select: {
+            id: true,
+            name: true,
+            version: true,
+            status: true,
+            _count: { select: { children: true } }
+        }
     });
     return rows.map((row) => ({
         id: row.id,
@@ -345,11 +377,15 @@ export async function listDatabaseInstances(environmentId: string, engine: DbEng
 }
 
 /** Decrypt a database's stored credentials (for a connection string display). */
-export async function databaseCredentials(databaseId: string, ownerId: string): Promise<DbCredentials> {
+export async function databaseCredentials(
+    databaseId: string,
+    ownerId: string
+): Promise<DbCredentials> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } }
     });
-    if (!row || !row.encryptedCredential || !row.credentialNonce) throw new Error("Database not found");
+    if (!row || !row.encryptedCredential || !row.credentialNonce)
+        throw new Error("Database not found");
     return decryptCredentials<DbCredentials>(
         {
             ciphertext: Buffer.from(row.encryptedCredential),
@@ -401,7 +437,10 @@ export interface DatabaseConnection {
  * This is the thing anyone who just created a database needs next, so it is
  * served as one value rather than leaving five fields to be assembled by hand.
  */
-export async function databaseConnection(databaseId: string, ownerId: string): Promise<DatabaseConnection> {
+export async function databaseConnection(
+    databaseId: string,
+    ownerId: string
+): Promise<DatabaseConnection> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         include: {
@@ -436,10 +475,12 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
     // A replica set of several members is named with all of them, so a client
     // finds the primary wherever it is; a single-member set with its one.
     const replicaSet =
-        address.replicaSet ?? ((row.parent ? row.parent.replicaSet : row.replicaSet) ? core.MONGO_REPLICA_SET : null);
-    const mongoParams = [`authSource=${row.parent ? creds.database : "admin"}`, ...(replicaSet ? [`replicaSet=${replicaSet}`] : [])].join(
-        "&"
-    );
+        address.replicaSet ??
+        ((row.parent ? row.parent.replicaSet : row.replicaSet) ? core.MONGO_REPLICA_SET : null);
+    const mongoParams = [
+        `authSource=${row.parent ? creds.database : "admin"}`,
+        ...(replicaSet ? [`replicaSet=${replicaSet}`] : [])
+    ].join("&");
     const mongoHosts = address.hosts.map((one) => `${one}:${port}`).join(",");
     const uri =
         engine === "seaweedfs"
@@ -472,7 +513,9 @@ export async function databaseConnection(databaseId: string, ownerId: string): P
                 : null,
         hosts: engine === "mongo" ? address.hosts : [host],
         replicaSet: engine === "mongo" ? replicaSet : null,
-        readUri: address.readHost ? `mysql://${user}:${secret}@${address.readHost}:${port}/${creds.database}` : null
+        readUri: address.readHost
+            ? `mysql://${user}:${secret}@${address.readHost}:${port}/${creds.database}`
+            : null
     };
 }
 
@@ -504,7 +547,11 @@ export async function provisionInInstance(databaseId: string, ownerId: string): 
 
     const ports = await getPorts(db.parent.target as TargetRow, ownerId);
     try {
-        await runCommands(ports, db.parent.containerName, core.createDatabaseCommands(db.engine as DbEngine, grant));
+        await runCommands(
+            ports,
+            db.parent.containerName,
+            core.createDatabaseCommands(db.engine as DbEngine, grant)
+        );
     } finally {
         await ports.dispose();
     }
@@ -520,7 +567,9 @@ async function runCommands(
         const result = await ports.runIn(container, command.argv);
         if (result.code !== 0) {
             const reason = result.output.trim().split("\n").filter(Boolean).at(-1);
-            throw new Error(`${command.describe} failed: ${reason ?? `exit status ${result.code}`}`);
+            throw new Error(
+                `${command.describe} failed: ${reason ?? `exit status ${result.code}`}`
+            );
         }
     }
 }
@@ -532,11 +581,35 @@ export interface DeployDatabaseOptions {
     readonly memberImages?: Readonly<Record<string, string>>;
 }
 
+/**
+ * Every database deploy on the audit trail, whatever started it - the Deploy
+ * button, a settings change, a point-in-time recovery, an environment clone.
+ * Said here, where they all pass, rather than by each (most never did).
+ */
+async function auditDatabaseDeploy(
+    userId: string | null,
+    databaseId: string,
+    deploymentId: string
+): Promise<void> {
+    // Loaded when a deploy happens: the audit writer brings the sign-in stack
+    // with it, which nothing else in this module needs to have loaded.
+    const { recordDeployAudit } = await import("./deploy-audit");
+    await recordDeployAudit({
+        actorId: userId,
+        action: "deploy.db.deploy",
+        targetType: "database",
+        targetId: databaseId,
+        metadata: { deploymentId }
+    });
+}
+
 /** Provision (or re-provision) a managed database. */
 export async function deployDatabase(
     databaseId: string,
     ownerId: string,
-    userId: string,
+    /** Who asked for it, or null when nobody did - a maintenance window. The
+     *  history then names the owner, and the audit trail nobody. */
+    userId: string | null,
     options: DeployDatabaseOptions = {}
 ): Promise<string> {
     const db = await prisma.managedDatabase.findFirst({
@@ -555,16 +628,29 @@ export async function deployDatabase(
                 deployableType: "database",
                 deployableId: db.id,
                 status: "deploying",
-                triggeredById: userId
+                triggeredById: userId ?? ownerId
             }
         });
+        await auditDatabaseDeploy(userId, db.id, deployment.id);
         try {
             await provisionInInstance(db.id, ownerId);
-            await prisma.deployment.update({ where: { id: deployment.id }, data: { status: "running" } });
-            await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: "running" } });
+            await prisma.deployment.update({
+                where: { id: deployment.id },
+                data: { status: "running" }
+            });
+            await prisma.managedDatabase.update({
+                where: { id: db.id },
+                data: { status: "running" }
+            });
         } catch (error) {
-            await prisma.deployment.update({ where: { id: deployment.id }, data: { status: "failed" } });
-            await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: "failed" } });
+            await prisma.deployment.update({
+                where: { id: deployment.id },
+                data: { status: "failed" }
+            });
+            await prisma.managedDatabase.update({
+                where: { id: db.id },
+                data: { status: "failed" }
+            });
             throw error;
         }
         return deployment.id;
@@ -572,7 +658,10 @@ export async function deployDatabase(
 
     const spec = engineSpec(db.engine);
     const topology = core.resolveTopology(db);
-    if ((topology.kind !== "single" || (db.engine === "redis" && db.clusterMasters)) && db.target.runtime === "swarm") {
+    if (
+        (topology.kind !== "single" || (db.engine === "redis" && db.clusterMasters)) &&
+        db.target.runtime === "swarm"
+    ) {
         throw new Error(SWARM_REFUSAL);
     }
     const creds = await databaseCredentials(databaseId, ownerId);
@@ -620,7 +709,17 @@ export async function deployDatabase(
                   }))
               }
             : {}),
-        ...(archiveOf ? { extraVolumes: [{ source: core.pitrHostFolder(archiveOf), target: core.PITR_MOUNT, kind: "bind" as const }] } : {}),
+        ...(archiveOf
+            ? {
+                  extraVolumes: [
+                      {
+                          source: core.pitrHostFolder(archiveOf),
+                          target: core.PITR_MOUNT,
+                          kind: "bind" as const
+                      }
+                  ]
+              }
+            : {}),
         members: topologyMemberPlans({
             topology,
             name,
@@ -650,9 +749,10 @@ export async function deployDatabase(
             deployableType: "database",
             deployableId: db.id,
             status: "queued",
-            triggeredById: userId
+            triggeredById: userId ?? ownerId
         }
     });
+    await auditDatabaseDeploy(userId, db.id, deployment.id);
 
     enqueueOnTarget(db.targetId, async () => {
         await executeDeployment(
@@ -663,7 +763,10 @@ export async function deployDatabase(
             undefined,
             dbPlanImages(plan)
         );
-        const final = await prisma.deployment.findUnique({ where: { id: deployment.id }, select: { status: true } });
+        const final = await prisma.deployment.findUnique({
+            where: { id: deployment.id },
+            select: { status: true }
+        });
         const running = final?.status === "running";
         await prisma.managedDatabase.update({
             where: { id: db.id },
@@ -700,7 +803,7 @@ const DEPLOY_WAIT_MS = 20 * 60_000;
 export async function deployDatabaseAndWait(
     databaseId: string,
     ownerId: string,
-    userId: string,
+    userId: string | null,
     options: DeployDatabaseOptions = {}
 ): Promise<string | null> {
     let deploymentId: string;
@@ -716,7 +819,9 @@ export async function deployDatabaseAndWait(
             select: { status: true, error: true }
         });
         if (row && !["queued", "deploying", "building"].includes(row.status)) {
-            return row.status === "running" ? null : (row.error ?? `the deploy ended ${row.status}`);
+            return row.status === "running"
+                ? null
+                : (row.error ?? `the deploy ended ${row.status}`);
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
     }
@@ -735,7 +840,11 @@ export async function deployDatabaseAndWait(
 export async function deleteDatabase(databaseId: string, ownerId: string): Promise<void> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true, parent: { include: { target: true } } }
+        include: {
+            environment: { include: { project: true } },
+            target: true,
+            parent: { include: { target: true } }
+        }
     });
     if (!db) throw new Error("Database not found");
 
@@ -769,7 +878,9 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
                 }
             }
         }
-        await prisma.deployment.deleteMany({ where: { deployableType: "database", deployableId: databaseId } });
+        await prisma.deployment.deleteMany({
+            where: { deployableType: "database", deployableId: databaseId }
+        });
         await prisma.managedDatabase.delete({ where: { id: databaseId } });
         return;
     }
@@ -788,6 +899,8 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
         await ports.dispose();
     }
 
-    await prisma.deployment.deleteMany({ where: { deployableType: "database", deployableId: databaseId } });
+    await prisma.deployment.deleteMany({
+        where: { deployableType: "database", deployableId: databaseId }
+    });
     await prisma.managedDatabase.delete({ where: { id: databaseId } });
 }
