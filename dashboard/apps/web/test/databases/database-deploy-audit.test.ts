@@ -11,7 +11,10 @@ const DB = "0192f1e2-7b5c-7d3e-8f00-00000000000a";
 const OWNER = "0192f1e2-7b5c-7d3e-8f00-00000000000b";
 
 const { create, recordDeployAudit } = vi.hoisted(() => ({
-    create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "dep-1", ...data })),
+    create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: "dep-1",
+        ...data
+    })),
     recordDeployAudit: vi.fn(async () => undefined)
 }));
 
@@ -25,7 +28,11 @@ const row = {
     encryptedCredential: Buffer.from("x"),
     credentialNonce: Buffer.from("y"),
     credentialKeyId: "k",
-    parent: { id: "parent-1", containerName: "shop-pg-ab12", target: { id: "target-1", kind: "local" } }
+    parent: {
+        id: "parent-1",
+        containerName: "shop-pg-ab12",
+        target: { id: "target-1", kind: "local" }
+    }
 };
 
 vi.mock("@polaris/db", () => ({
@@ -40,7 +47,10 @@ vi.mock("@polaris/storage", () => ({
     decryptCredentials: () => ({ username: "shop", password: "secret", database: "shop" })
 }));
 vi.mock("@/lib/deploy/runtime", () => ({
-    getPorts: async () => ({ runIn: async () => ({ code: 0, output: "" }), dispose: async () => undefined })
+    getPorts: async () => ({
+        runIn: async () => ({ code: 0, output: "" }),
+        dispose: async () => undefined
+    })
 }));
 vi.mock("@/lib/deploy-service", () => ({
     deployLogPath: vi.fn(),
@@ -69,12 +79,16 @@ describe("the audit entry a database deploy writes", () => {
             targetId: DB,
             metadata: { deploymentId: "dep-1" }
         });
-        expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ triggeredById: "member-1" }) });
+        expect(create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ triggeredById: "member-1" })
+        });
     });
 
     it("credits nobody for a deploy nobody asked for, while the history still names the owner", async () => {
         await deployDatabase(DB, OWNER, null);
         expect(recordDeployAudit).toHaveBeenCalledWith(expect.objectContaining({ actorId: null }));
-        expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ triggeredById: OWNER }) });
+        expect(create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ triggeredById: OWNER })
+        });
     });
 });

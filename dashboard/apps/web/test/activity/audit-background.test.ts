@@ -13,16 +13,28 @@ const { create } = vi.hoisted(() => ({ create: vi.fn(async () => ({})) }));
 
 vi.mock("@polaris/db", () => ({ prisma: { auditLog: { create } } }));
 vi.mock("@/lib/auth", () => ({ auth: { api: { getSession: vi.fn(async () => null) } } }));
-vi.mock("@/lib/notifications/security-events", () => ({ notifySecurityChange: vi.fn(async () => undefined) }));
+vi.mock("@/lib/notifications/security-events", () => ({
+    notifySecurityChange: vi.fn(async () => undefined)
+}));
 
 const { recordAudit } = await import("@/lib/audit-service");
 
 beforeEach(() => create.mockClear());
 
 it("records what background work did, with no address to hash", async () => {
-    await recordAudit({ actorId: "owner-1", action: "deploy.app.deploy", targetType: "application", targetId: "app-1" });
+    await recordAudit({
+        actorId: "owner-1",
+        action: "deploy.app.deploy",
+        targetType: "application",
+        targetId: "app-1"
+    });
     expect(create).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ action: "deploy.app.deploy", targetId: "app-1", ipHash: undefined, sessionId: undefined })
+        data: expect.objectContaining({
+            action: "deploy.app.deploy",
+            targetId: "app-1",
+            ipHash: undefined,
+            sessionId: undefined
+        })
     });
 });
