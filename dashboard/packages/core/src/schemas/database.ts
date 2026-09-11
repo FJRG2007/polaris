@@ -151,6 +151,18 @@ export function dbEngineLabel(engine: string): string {
     return MANAGED_ENGINE_INFO[engine as ManagedEngine]?.label ?? engine;
 }
 
+/**
+ * What is known to stop a version from running, in a sentence for any screen
+ * that offers it, or null. MongoDB 8 itself refuses to start on Linux 6.19 or
+ * newer (its issue SERVER-121912), which is what new distributions ship; seen
+ * on a Linux 7.0 server, where 7 starts.
+ */
+export function dbVersionCaveat(engine: string, version: string): string | null {
+    return engine === "mongo" && version === "8"
+        ? "MongoDB 8 does not start on Linux 6.19 or newer. On a server with a newer kernel, pick 7."
+        : null;
+}
+
 /** True when an engine can host more databases beside the one it was created
  *  for, which is what makes it an instance others can be placed on. */
 export function canShareInstance(engine: string): boolean {

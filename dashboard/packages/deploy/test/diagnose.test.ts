@@ -130,6 +130,19 @@ describe("what it leaves alone", () => {
         expect(diagnoseDeploy(log("ERR_PNPM_OUTDATED_LOCKFILE  Cannot install"))?.cause).toBe("lockfile-mismatch");
     });
 
+    it("names a MongoDB that refuses the server's kernel, with nothing to change on the service", () => {
+        // The line mongo:8 printed on a Linux 7.0 server (2026-09-11), verbatim.
+        const found = diagnoseDeploy(
+            log(
+                "==> The last 40 lines it printed:",
+                '{"t":{"$date":"2026-09-10T23:36:33.529+00:00"},"s":"F",  "c":"CONTROL",  "id":12257600,"ctx":"main","msg":"MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version of MongoDB. See https://jira.mongodb.org/browse/SERVER-121912 for more information."}'
+            )
+        );
+        expect(found?.cause).toBe("mongo-kernel-incompatible");
+        expect(found?.fix).toBeNull();
+        expect(found?.detail).toContain("MongoDB 7");
+    });
+
     it("answers nothing for a log it does not recognize", () => {
         expect(diagnoseDeploy(log("error: something only this project knows about"))).toBeNull();
     });

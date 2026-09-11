@@ -32,6 +32,11 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
     const recoveredFrom = row.recoveredFromId
         ? await prisma.managedDatabase.findUnique({ where: { id: row.recoveredFromId }, select: { name: true } })
         : null;
+    const lastDeploy = await prisma.deployment.findFirst({
+        where: { deployableType: "database", deployableId: row.id },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, status: true }
+    });
     return {
         id: row.id,
         name: row.name,
@@ -39,6 +44,8 @@ export async function databaseOverview(databaseId: string, ownerId: string) {
         version: row.version,
         status: row.status,
         deployed: Boolean(row.containerName),
+        // The last provision, when it failed, so the panel can say why.
+        failedDeploymentId: lastDeploy?.status === "failed" ? lastDeploy.id : null,
         hosted,
         hostName: row.parent?.name ?? null,
         storage: isStorageEngine(engine),

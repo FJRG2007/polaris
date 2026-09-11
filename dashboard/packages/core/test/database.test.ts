@@ -3,6 +3,7 @@ import {
     createDatabaseCommands,
     databaseCreateSchema,
     dbEngineLabel,
+    dbVersionCaveat,
     dropDatabaseCommands,
     type DatabaseGrant
 } from "../src/index.js";
@@ -23,6 +24,14 @@ describe("engine catalog", () => {
         expect(dbEngineLabel("mongo")).toBe("MongoDB");
         // An engine written by a newer version still renders as something.
         expect(dbEngineLabel("cockroach")).toBe("cockroach");
+    });
+
+    it("warns about MongoDB 8 on a new kernel, and about nothing else", () => {
+        expect(dbVersionCaveat("mongo", "8")).toContain("Linux 6.19");
+        expect(dbVersionCaveat("mongo", "7")).toBeNull();
+        // Blank is the server's default, which for MongoDB is 7.
+        expect(dbVersionCaveat("mongo", "")).toBeNull();
+        expect(dbVersionCaveat("redis", "8")).toBeNull();
     });
 });
 

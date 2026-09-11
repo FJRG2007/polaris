@@ -43,6 +43,7 @@ import {
 import {
     databaseCreateSchema,
     dbEngineLabel,
+    dbVersionCaveat,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
     REDIS_CLUSTER_MASTERS,
@@ -1628,7 +1629,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
                     {!hosted && (
                         <>
-                            <Field label="Version">
+                            <Field label="Version" hint={dbVersionCaveat(engine, version) ?? undefined}>
                                 <Select
                                     value={version}
                                     onValueChange={setVersion}

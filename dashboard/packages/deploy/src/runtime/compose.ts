@@ -416,6 +416,19 @@ export class ComposeRuntime implements RuntimeDriver {
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));
         }
+        // An engine that refuses to start exits after compose has returned, so
+        // it counts only once it has stayed up, and what it printed goes into
+        // the log where the diagnosis reads it. Every member, like every copy.
+        const waited = timer(ctx)("Waiting for it to come up");
+        for (const service of spec.services) {
+            const ready = await waitUntilServing(ctx, service.name, {});
+            if (!ready.ok) {
+                waited("it did not");
+                await tailIntoLog(ctx, service.name);
+                return fail(ctx, ready.reason);
+            }
+        }
+        waited();
         return { ok: true };
     }
 

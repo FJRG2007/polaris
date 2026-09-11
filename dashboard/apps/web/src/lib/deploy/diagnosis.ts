@@ -40,13 +40,19 @@ async function logTail(deploymentId: string): Promise<string> {
     }
 }
 
-async function failedApplicationDeployment(deploymentId: string, ownerId: string) {
+async function failedDeployment(deploymentId: string) {
     const deployment = await prisma.deployment.findUnique({
         where: { id: deploymentId },
         select: { id: true, status: true, error: true, deployableType: true, deployableId: true }
     });
-    if (!deployment || deployment.deployableType !== "application" || !FAILED.has(deployment.status)) return null;
-    const app = await prisma.application.findFirst({
+    return deployment && FAILED.has(deployment.status) ? deployment : null;
+}
+
+type FailedDeployment = NonNullable<Awaited<ReturnType<typeof failedDeployment>>>;
+
+async function applicationOf(deployment: FailedDeployment, ownerId: string) {
+    if (deployment.deployableType !== "application") return null;
+    return prisma.application.findFirst({
         where: { id: deployment.deployableId, environment: { project: { ownerId } } },
         select: {
             id: true,
@@ -56,15 +62,37 @@ async function failedApplicationDeployment(deploymentId: string, ownerId: string
             domains: { select: { targetPort: true }, take: 1 }
         }
     });
-    return app ? { deployment, app } : null;
+}
+
+async function isOwnedDatabase(deployment: FailedDeployment, ownerId: string): Promise<boolean> {
+    if (deployment.deployableType !== "database") return false;
+    const row = await prisma.managedDatabase.findFirst({
+        where: { id: deployment.deployableId, environment: { project: { ownerId } } },
+        select: { id: true }
+    });
+    return row !== null;
+}
+
+async function failedApplicationDeployment(deploymentId: string, ownerId: string) {
+    const deployment = await failedDeployment(deploymentId);
+    const app = deployment ? await applicationOf(deployment, ownerId) : null;
+    return deployment && app ? { deployment, app } : null;
 }
 
 /** Why this failed deploy failed, when its log says; null when it does not. */
 export async function diagnoseDeployment(deploymentId: string, ownerId: string): Promise<Diagnosis | null> {
-    const found = await failedApplicationDeployment(deploymentId, ownerId);
-    if (!found) return null;
-    const log = await logTail(deploymentId);
-    return diagnoseDeploy(`${log}\n${found.deployment.error ?? ""}`, { port: containerPortOf(found.app) });
+    const deployment = await failedDeployment(deploymentId);
+    if (!deployment) return null;
+    const app = await applicationOf(deployment, ownerId);
+    if (app) {
+        const log = await logTail(deploymentId);
+        return diagnoseDeploy(`${log}\n${deployment.error ?? ""}`, { port: containerPortOf(app) });
+    }
+    if (!(await isOwnedDatabase(deployment, ownerId))) return null;
+    // A database has none of the settings a fix changes, so only a cause with
+    // nothing to change on the service can be its own.
+    const found = diagnoseDeploy(`${await logTail(deploymentId)}\n${deployment.error ?? ""}`);
+    return found?.fix === null ? found : null;
 }
 
 /** A secret a framework accepts. Laravel's key has a shape of its own. */
