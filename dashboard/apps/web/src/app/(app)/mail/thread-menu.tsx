@@ -60,13 +60,15 @@ import {
     ShieldOff,
     Star,
     Tag,
-    Trash2
+    Trash2,
+    Undo2
 } from "lucide-react";
 
 export function ThreadContextMenu({
     thread,
     canArchive,
     permanentDelete,
+    restorable,
     onAct,
     onSnooze,
     onLabel,
@@ -87,6 +89,8 @@ export function ThreadContextMenu({
     selection: readonly string[] | null;
     canArchive: boolean;
     permanentDelete: boolean;
+    /** Whether these can go back where they were deleted from. */
+    restorable: boolean;
     onAct: (action: MailAction, messageIds: readonly string[], announce: string) => void;
     onSnooze: (messageIds: readonly string[], until: Date) => void;
     onLabel: (labelId: string, messageIds: readonly string[]) => void;
@@ -298,11 +302,21 @@ export function ThreadContextMenu({
                 {/* The two that take mail away from somebody are drawn as what
                     they are. Spam is destructive twice over: it moves the
                     message AND teaches a provider about the sender. */}
-                <ContextMenuItem variant="danger" onSelect={() => onAct("junk", ids, "Moved to spam.")}>
-                    <Bug className="size-3.5 shrink-0" aria-hidden />
-                    {said("Report as spam", (n) => `Report ${n} as spam`)}
-                    <MenuShortcut keys={keyFor("junk")} />
-                </ContextMenuItem>
+                {restorable ? (
+                    <ContextMenuItem onSelect={() => onAct("restore", ids, "Put back.")}>
+                        <Undo2 className="size-3.5 shrink-0" aria-hidden />
+                        {said("Put back where it was", (n) => `Put ${n} back`)}
+                    </ContextMenuItem>
+                ) : (
+                    <ContextMenuItem
+                        variant="danger"
+                        onSelect={() => onAct("junk", ids, "Moved to spam.")}
+                    >
+                        <Bug className="size-3.5 shrink-0" aria-hidden />
+                        {said("Report as spam", (n) => `Report ${n} as spam`)}
+                        <MenuShortcut keys={keyFor("junk")} />
+                    </ContextMenuItem>
+                )}
                 <ContextMenuItem
                     variant="danger"
                     onSelect={() =>

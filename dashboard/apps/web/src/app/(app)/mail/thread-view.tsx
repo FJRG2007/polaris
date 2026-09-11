@@ -89,6 +89,7 @@ import {
     Star,
     Tag,
     Trash2,
+    Undo2,
     UserRoundX
 } from "lucide-react";
 
@@ -405,6 +406,18 @@ export function ThreadView({
                         </Button>
                     ) : null}
                     <LabelMenu messageIds={messages.map((message) => message.id)} />
+                    {context.restorable ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Put back where it was"
+                            title="Put back where it was"
+                            disabled={busy}
+                            onClick={() => act("restore")}
+                        >
+                            <Undo2 className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="icon"

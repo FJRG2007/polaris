@@ -23,6 +23,7 @@ export function leavesTheView(action: MailAction): boolean {
     switch (action) {
         case "archive":
         case "trash":
+        case "restore":
         case "delete":
         case "junk":
         case "not-junk":

@@ -9848,6 +9848,7 @@ model MailAccount {
     spamReputation MailSpamReputation[]
     spamFeedback   MailSpamFeedback[]
     subscriptions  MailSubscription[]
+    trashOrigins   MailTrashOrigin[]
     templates      MailTemplate[]
 
     @@unique([userId, address])
@@ -10006,9 +10007,43 @@ model MailFolder {
 
     account  MailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
     messages MailMessage[]
+    cameFrom MailTrashOrigin[]
 
     @@unique([accountId, path])
     @@index([accountId, role])
+}
+
+/**
+ * Where a message was when somebody put it in the trash.
+ *
+ * Kept here rather than on the message because the message does not survive the
+ * move: a move deletes the row and the destination writes a new one with the
+ * uid the server chose, so anything recorded on the old row goes with it. What
+ * does survive is the Message-Id header, which is what this is keyed on.
+ *
+ * It exists so that taking something out of the trash puts it back where it was
+ * rather than in the inbox. Restoring to the inbox is what a client does when it
+ * never wrote this down, and it is wrong for everybody who files their mail:
+ * a message deleted out of a project folder belongs in that project folder.
+ *
+ * A row is written when the move succeeds and deleted when the message is put
+ * back or destroyed. If the folder it names is deleted in the meantime the row
+ * goes with it, and the restore falls back to the inbox.
+ */
+model MailTrashOrigin {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    // The Message-Id header, bare, exactly as MailMessage.messageId holds it.
+    messageId String
+    folderId  String @db.Uuid
+
+    at DateTime @default(now())
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    folder  MailFolder  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, messageId])
+    @@index([accountId, at])
 }
 
 // A conversation, as this app groups it.

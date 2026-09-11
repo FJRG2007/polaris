@@ -36,6 +36,7 @@ import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as folders from "@/lib/mailbox/folders";
 import * as messages from "@/lib/mailbox/messages";
+import { emptyEveryFolderOfRole } from "@/lib/mailbox/trash";
 import * as contacts from "@/lib/mailbox/contacts";
 import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
@@ -418,6 +419,31 @@ export async function moveAction(input: unknown) {
             userId,
             parsed.data.messageIds,
             parsed.data.folderId
+        );
+        refresh();
+        return { done };
+    } catch (caught) {
+        return failure(caught, "The mail server did not accept that.");
+    }
+}
+
+/**
+ * Throw away everything in the trash - or in the spam folder.
+ *
+ * The whole folder on the server rather than the page of it Polaris holds, so
+ * the screen can honestly say the mailbox is empty afterwards. Named by mailbox
+ * so the merged view empties every mailbox it is showing and a single mailbox
+ * empties only its own.
+ */
+export async function emptyFolderAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailEmptyFolderSchema.safeParse(input);
+    if (!parsed.success) return { error: "Say which folder to empty." };
+    try {
+        const done = await emptyEveryFolderOfRole(
+            userId,
+            parsed.data.role,
+            parsed.data.accountIds
         );
         refresh();
         return { done };

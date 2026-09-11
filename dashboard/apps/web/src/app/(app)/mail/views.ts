@@ -28,7 +28,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "Nothing waiting",
             emptyBody: "Everything that has arrived is dealt with.",
             canArchive: true,
-            permanentDelete: false
+            permanentDelete: false,
+            restorable: false,
+            emptyRole: ""
         }
     },
     starred: {
@@ -38,7 +40,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "Nothing starred",
             emptyBody: "Star a conversation to keep it here, across every mailbox.",
             canArchive: true,
-            permanentDelete: false
+            permanentDelete: false,
+            restorable: false,
+            emptyRole: ""
         }
     },
     important: {
@@ -48,7 +52,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "Nothing marked important",
             emptyBody: "Mark a message important to keep it here, across every mailbox.",
             canArchive: true,
-            permanentDelete: false
+            permanentDelete: false,
+            restorable: false,
+            emptyRole: ""
         }
     },
     snoozed: {
@@ -58,7 +64,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "Nothing put off",
             emptyBody: "A conversation you snooze drops out of the inbox until the hour you chose.",
             canArchive: true,
-            permanentDelete: false
+            permanentDelete: false,
+            restorable: false,
+            emptyRole: ""
         }
     },
     sent: {
@@ -68,7 +76,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "Nothing sent yet",
             emptyBody: "Messages you send appear here, across every mailbox.",
             canArchive: true,
-            permanentDelete: false
+            permanentDelete: false,
+            restorable: false,
+            emptyRole: ""
         }
     },
     archive: {
@@ -78,7 +88,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "Nothing archived",
             emptyBody: "Archiving takes a conversation out of the inbox without deleting it.",
             canArchive: false,
-            permanentDelete: false
+            permanentDelete: false,
+            restorable: false,
+            emptyRole: ""
         }
     },
     junk: {
@@ -88,7 +100,11 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "No spam",
             emptyBody: "What your mail server marks as spam ends up here.",
             canArchive: false,
-            permanentDelete: true
+            permanentDelete: true,
+            // Spam has "Not spam", which files it back in the inbox and teaches
+            // the filter. Putting it back where it was would teach nothing.
+            restorable: false,
+            emptyRole: "junk"
         }
     },
     trash: {
@@ -98,7 +114,9 @@ export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
             emptyTitle: "The trash is empty",
             emptyBody: "Deleted conversations wait here until the mail server clears them out.",
             canArchive: false,
-            permanentDelete: true
+            permanentDelete: true,
+            restorable: true,
+            emptyRole: "trash"
         }
     }
 };

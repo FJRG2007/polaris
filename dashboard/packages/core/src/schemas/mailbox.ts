@@ -415,6 +415,8 @@ export const mailMessageAction = z.enum([
     "unimportant",
     "archive",
     "trash",
+    // Out of the trash, into the folder it was deleted from.
+    "restore",
     "delete",
     "junk",
     "not-junk",
@@ -457,6 +459,18 @@ export const mailConversationStateSchema = z
     .refine((value) => value.pinned !== undefined || value.muted !== undefined, {
         message: "Say whether to pin or mute."
     });
+
+/**
+ * Emptying the trash, or the spam folder, on purpose.
+ *
+ * Named by mailbox rather than by message: this is the whole folder, on the
+ * server, including everything older than the window Polaris keeps. No mailbox
+ * named means every mailbox on the screen, which is what the merged view is.
+ */
+export const mailEmptyFolderSchema = z.object({
+    role: z.enum(["trash", "junk"]),
+    accountIds: z.array(z.string().uuid()).max(50).default([])
+});
 
 export const mailMoveSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),

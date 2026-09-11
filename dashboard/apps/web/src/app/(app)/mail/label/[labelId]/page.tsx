@@ -37,7 +37,9 @@ export default async function MailLabelPage({
                     emptyTitle: `Nothing labelled ${label.name}`,
                     emptyBody: "Put this label on a conversation and it will be collected here.",
                     canArchive: true,
-                    permanentDelete: false
+                    permanentDelete: false,
+                    restorable: false,
+                    emptyRole: "" as const
                 }
             }}
             searchParams={searchParams}

@@ -38,7 +38,10 @@ export default async function MailFolderPage({
                     emptyTitle: `${folder.name} is empty`,
                     emptyBody: "Nothing in this folder has been synced yet, or there is nothing in it.",
                     canArchive: folder.role !== "archive",
-                    permanentDelete: folder.role === "trash" || folder.role === "junk"
+                    permanentDelete: folder.role === "trash" || folder.role === "junk",
+                    restorable: folder.role === "trash",
+                    emptyRole:
+                        folder.role === "trash" || folder.role === "junk" ? folder.role : ""
                 }
             }}
             searchParams={searchParams}

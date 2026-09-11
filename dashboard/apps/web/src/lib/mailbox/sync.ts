@@ -20,15 +20,17 @@
  * 4. Ask for the flags that have changed since the last modseq, where the server
  *    keeps one, and reconcile deletions from a uid search.
  *
- * Nothing here fetches a body. Bodies arrive when somebody opens a message,
- * because a mailbox is mostly messages nobody will ever open again.
+ * A pass also brings down the bodies of the mail somebody is likely to open -
+ * see `warmBodies`. Every other mail client stores a message when it arrives,
+ * and it is the whole difference between opening one instantly and waiting for
+ * a connection, a login and a fetch to somebody else's IMAP server.
  */
 
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
-import { decodePart } from "./decode";
-import { readShape } from "./structure";
+import { decodePart, unflow } from "./decode";
+import { readShape, type MessageShape } from "./structure";
 import { replyIfAway } from "./vacation";
 import { ACCOUNT_COLUMNS } from "./access";
 import { rememberContacts } from "./contacts";
@@ -314,6 +316,9 @@ async function syncFolder(client: ImapFlow, account: AccountRow, folder: FolderR
             ? await fetchSince(client, known)
             : await fetchNewest(client, mailbox.exists);
         if (arrived.length > 0) await storeMessages(client, account, folder, arrived);
+
+        // What has arrived, and a few of whatever is still only a headline.
+        await warmBodies(client, account, folder);
 
         if (!validityMoved) {
             await reconcileFlags(client, folder, mailbox.highestModseq ?? null);
@@ -651,7 +656,13 @@ async function fetchSnippets(
     fetched: readonly Fetched[]
 ): Promise<Map<number, string>> {
     const out = new Map<number, string>();
-    await readParts(client, fetched, out, "text", TEXT_PREVIEW_BYTES);
+    await readParts(
+        client,
+        fetched,
+        out,
+        (shape) => shape.textPart || shape.htmlPart,
+        TEXT_PREVIEW_BYTES
+    );
     // A plain part with nothing in it is not a message with nothing in it.
     //
     // Plenty of senders put their words in the HTML half and leave the plain one
@@ -662,8 +673,145 @@ async function fetchSnippets(
     const silent = fetched.filter(
         (message) => !core.snippetFrom(out.get(message.uid) ?? "") && message.structure.htmlPart
     );
-    if (silent.length > 0) await readParts(client, silent, out, "html", HTML_PREVIEW_BYTES);
+    if (silent.length > 0) {
+        await readParts(client, silent, out, (shape) => shape.htmlPart, HTML_PREVIEW_BYTES);
+    }
     return out;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bodies                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Which folders are worth holding whole messages for.
+ *
+ * What somebody reads: the inbox, whatever they have filed into folders of their
+ * own, and the archive. Not Sent, which is mail they wrote; not Spam or Trash,
+ * which are read once if ever; and never Gmail's "All Mail", which is a second
+ * copy of every message in the account and would double the disk this costs.
+ * Anything left out still opens exactly as it did before - the body is fetched
+ * then, and kept from then on.
+ */
+const BODY_ROLES: ReadonlySet<string> = new Set(["inbox", "archive", "none"]);
+
+/**
+ * The size of message worth storing whole, and the ceiling on one part.
+ *
+ * A megabyte of message is an enormous amount of writing; past it what is big is
+ * the attachments, which are never stored here and are streamed from the server
+ * when somebody asks for one. The part ceiling is only a guard - a message under
+ * the first limit cannot have a part over the second - so nothing is ever
+ * silently stored truncated.
+ */
+const BODY_MAX_MESSAGE_BYTES = 1_000_000;
+const BODY_MAX_PART_BYTES = 2_000_000;
+
+/**
+ * How many are brought down in one pass over one folder.
+ *
+ * A pass happens every few minutes, so this is the rate a backlog is worked
+ * through at rather than a limit on what is kept: a mailbox connected today has
+ * its newest few hundred messages held within the hour, newest first, and new
+ * mail is always in the first batch because it is the newest thing there is.
+ * Bounded because a first sync on twenty folders must not turn into a thousand
+ * body fetches before the rail has finished drawing.
+ */
+const BODIES_PER_PASS = 30;
+
+/** What a body fetch needs to know about a message, which is only where its
+ *  halves are. */
+interface BodyOwner {
+    readonly uid: number;
+    readonly structure: MessageShape;
+}
+
+/**
+ * Bring down the messages of this folder that are still only a headline.
+ *
+ * This is what every other mail client does when mail arrives, and not doing it
+ * is why Polaris felt slower to open a message than a webmail: a row with no
+ * body is a whole IMAP session - connect, authenticate, select, fetch, log out -
+ * standing between the click and the words, and on a large provider that is
+ * seconds. The hover prefetch covers somebody who points before they press;
+ * this covers everybody else, and the mail that arrives while nobody is looking.
+ *
+ * Newest first, because that is the order mail is read in. Failures are silent
+ * and cost nothing: the message opens the way it always did.
+ */
+async function warmBodies(
+    client: ImapFlow,
+    account: AccountRow,
+    folder: FolderRow
+): Promise<void> {
+    if (!BODY_ROLES.has(folder.role)) return;
+    const waiting = await prisma.mailMessage.findMany({
+        where: {
+            folderId: folder.id,
+            bodyText: null,
+            bodyHtml: null,
+            size: { lte: BODY_MAX_MESSAGE_BYTES }
+        },
+        orderBy: { sentAt: "desc" },
+        take: BODIES_PER_PASS,
+        select: {
+            id: true,
+            uid: true,
+            listId: true,
+            sentAt: true,
+            fromJson: true,
+            headers: true
+        }
+    });
+    if (waiting.length === 0) return;
+
+    const uids = waiting.map((message) => Number(message.uid));
+    const owners: BodyOwner[] = [];
+    try {
+        for await (const one of client.fetch(
+            uids,
+            { uid: true, bodyStructure: true },
+            { uid: true }
+        )) {
+            owners.push({ uid: one.uid, structure: readShape(one.bodyStructure) });
+        }
+    } catch {
+        // A server that will not describe these messages will be asked again on
+        // the next pass, and they open the old way in the meantime.
+        return;
+    }
+    if (owners.length === 0) return;
+
+    const text = new Map<number, string>();
+    const html = new Map<number, string>();
+    await readParts(client, owners, text, (shape) => shape.textPart, BODY_MAX_PART_BYTES);
+    await readParts(client, owners, html, (shape) => shape.htmlPart, BODY_MAX_PART_BYTES);
+
+    for (const message of waiting) {
+        const uid = Number(message.uid);
+        const body = { text: text.get(uid) ?? "", html: html.get(uid) ?? "" };
+        // Nothing came back for it: left alone rather than written as empty,
+        // which would be a message that opens blank for ever.
+        if (!body.text && !body.html) continue;
+        await prisma.mailMessage.update({
+            where: { id: message.id },
+            data: { bodyText: body.text, bodyHtml: body.html }
+        });
+        // The one moment a message's footer can be read - the same registration
+        // opening one used to do, now that opening one usually finds the body
+        // already here. Plenty of mail that is unmistakably a mailing list
+        // publishes no `List-Unsubscribe` header and its only way out is a link
+        // in a sentence.
+        await recordSubscription(account.id, {
+            from: addressesFrom(message.fromJson),
+            headers: (message.headers as Record<string, string> | null) ?? null,
+            html: body.html,
+            text: body.text,
+            listId: message.listId,
+            at: message.sentAt,
+            counts: false
+        }).catch(() => undefined);
+    }
 }
 
 /**
@@ -675,17 +823,18 @@ async function fetchSnippets(
  */
 async function readParts(
     client: ImapFlow,
-    fetched: readonly Fetched[],
+    fetched: readonly BodyOwner[],
     out: Map<number, string>,
-    half: "text" | "html",
+    /** Which half of the message this pass wants. A function rather than a name
+     *  because the answer differs: a preview falls back to the HTML when the
+     *  plain part is silent, and a stored body must not - a body written into
+     *  both columns from one part is a message that reads twice. */
+    pick: (shape: MessageShape) => string,
     maxLength: number
 ): Promise<void> {
     const byPart = new Map<string, number[]>();
     for (const message of fetched) {
-        const key =
-            half === "text"
-                ? message.structure.textPart || message.structure.htmlPart
-                : message.structure.htmlPart;
+        const key = pick(message.structure);
         if (!key) continue;
         const held = byPart.get(key);
         if (held) held.push(message.uid);
@@ -709,10 +858,14 @@ async function readParts(
                 // character set, and skipping either is what put `Mar=C3=ADa`
                 // and `=20` in every preview line in the list.
                 const coding = html ? shape?.htmlCoding : shape?.textCoding;
-                const text = decodePart(bytes, {
+                const decoded = decodePart(bytes, {
                     encoding: coding?.encoding,
                     charset: coding?.charset
                 });
+                // A plain part sent `format=flowed` arrives cut into
+                // 72-character pieces, and joining them back is the difference
+                // between a paragraph and a wall of ragged lines.
+                const text = coding?.flowed ? unflow(decoded) : decoded;
                 // Handed over as it arrived, markup and all: the preview
                 // function undoes the encoding, the tags and the padding in one
                 // place, so the list and a repaired old row read alike.

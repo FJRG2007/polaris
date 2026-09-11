@@ -29,6 +29,7 @@ import { decodePart, unflow } from "./decode";
 import { folderForRole } from "./folder-roles";
 import { recordSubscription } from "./subscriptions";
 import { catchUpFolder, refreshThreads } from "./sync";
+import { forgetTrashOrigins, rememberTrashOrigins, restoreFromTrash } from "./trash"
 import { withImap, type MailConnectionSource } from "./imap";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import {
@@ -49,6 +50,10 @@ export type MailAction =
     | "unimportant"
     | "archive"
     | "trash"
+    // Out of the trash and back where it was - see `trash.ts`. Kept as an action
+    // rather than a screen of its own so every place that can act on a
+    // conversation can offer it: the toolbar, the context menu, the keyboard.
+    | "restore"
     | "delete"
     | "junk"
     | "not-junk"
@@ -291,6 +296,11 @@ export async function actOnMessages(
     action: MailAction,
     options: MailActionOptions = {}
 ): Promise<number> {
+    // Putting something back is a move per message rather than a move per
+    // folder - each one goes where it came from - so it has a function of its
+    // own and this is the door to it.
+    if (action === "restore") return await restoreFromTrash(userId, messageIds);
+
     const messages = await ownedMessages(userId, messageIds);
     if (messages.length === 0) return 0;
 
@@ -345,7 +355,7 @@ export async function actOnMessages(
             for (const [folderId, rows] of byFolder(mine)) {
                 const folder = await prisma.mailFolder.findUnique({
                     where: { id: folderId },
-                    select: { path: true }
+                    select: { path: true, role: true }
                 });
                 if (!folder) continue;
                 const uids = rows.map((row) => Number(row.uid));
@@ -358,7 +368,8 @@ export async function actOnMessages(
                         folderId,
                         uids,
                         rows,
-                        action
+                        action,
+                        folder.role
                     );
                     done += outcome.done;
                     target = outcome.movedTo;
@@ -555,8 +566,11 @@ async function applyOne(
     accountId: string,
     folderId: string,
     uids: number[],
-    rows: readonly { id: string; seen: boolean }[],
-    action: MailAction
+    rows: readonly { id: string; seen: boolean; messageId: string }[],
+    action: MailAction,
+    /** What the folder these are leaving is for, so a message leaving the trash
+     *  stops claiming it came from somewhere. */
+    leaving: string
 ): Promise<Applied> {
     const unseen = rows.filter((row) => !row.seen).length;
     const flag = FLAG_ACTIONS[action];
@@ -578,6 +592,12 @@ async function applyOne(
         const removed = await client.messageDelete(uids, { uid: true });
         if (!removed) return { done: 0, movedTo: "", unseen: 0 };
         await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
+        if (leaving === "trash") {
+            await forgetTrashOrigins(
+                accountId,
+                rows.map((row) => row.messageId)
+            );
+        }
         return { done: rows.length, movedTo: "", unseen };
     }
 
@@ -587,6 +607,21 @@ async function applyOne(
     if (target.id === folderId) return { done: 0, movedTo: "", unseen: 0 };
     const moved = await client.messageMove(uids, target.path, { uid: true });
     if (!moved) return { done: 0, movedTo: "", unseen: 0 };
+    // Where these were, written down now that they have actually left - so that
+    // taking them out of the trash later puts them back in this folder rather
+    // than in the inbox. And the other way for a message leaving the trash by
+    // another door: it is somewhere deliberate now, and the note is spent.
+    if (action === "trash") {
+        await rememberTrashOrigins(
+            accountId,
+            rows.map((row) => ({ messageId: row.messageId, folderId }))
+        );
+    } else if (leaving === "trash") {
+        await forgetTrashOrigins(
+            accountId,
+            rows.map((row) => row.messageId)
+        );
+    }
     // The uids the messages now have are the destination's, and the server may
     // not have said what they are. The rows are dropped rather than guessed at:
     // the next pass over the destination folder picks them up with the uids the

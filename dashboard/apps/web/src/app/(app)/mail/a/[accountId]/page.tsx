@@ -39,7 +39,9 @@ export default async function MailAccountPage({
                     emptyTitle: "Nothing waiting",
                     emptyBody: `Nothing new has arrived at ${account.address}.`,
                     canArchive: true,
-                    permanentDelete: false
+                    permanentDelete: false,
+                    restorable: false,
+                    emptyRole: "" as const
                 }
             }}
             searchParams={searchParams}

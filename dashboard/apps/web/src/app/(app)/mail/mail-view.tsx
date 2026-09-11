@@ -57,6 +57,7 @@ import {
     actOnAction,
     applyLabelAction,
     blockSenderAction,
+    emptyFolderAction,
     openMessageAction,
     warmMessageAction,
     snoozeAction,
@@ -78,6 +79,7 @@ import {
     MailOpen,
     Paperclip,
     RefreshCw,
+    Undo2,
     Rows3,
     Star,
     Trash2
@@ -127,6 +129,13 @@ export interface MailViewContext {
     readonly canArchive: boolean;
     /** Whether Delete means "for ever" rather than "to the trash". */
     readonly permanentDelete: boolean;
+    /** Whether a conversation here can be put back where it was deleted from.
+     *  The trash, and only the trash: nowhere else has a note of where its mail
+     *  came from. */
+    readonly restorable: boolean;
+    /** Which folder this screen can empty in one go, or "" for the screens that
+     *  are not a folder anybody empties. */
+    readonly emptyRole: "trash" | "junk" | "";
 }
 
 /** What the address says the tab is, when it says something Polaris knows.
@@ -476,6 +485,9 @@ export function MailView({
      *  answered yet, so it survives a list arriving in between - see
      *  `inFlight`. Only an action uses this: a read mark is the server catching
      *  up with a screen rather than something being waited on. */
+    /** Whether the question about emptying this folder is on screen. */
+    const [emptying, setEmptying] = useState(false);
+
     const patchUntilAnswered = useCallback(
         (ids: readonly string[], change: ThreadPatch) => {
             const held = { ...inFlight.current };
@@ -1290,6 +1302,16 @@ export function MailView({
                                     )}
                                 </Button>
                                 <ListFilters filter={filter} sort={sort} fixed={fixedFilter} />
+                                {context.emptyRole && threads.length > 0 ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="shrink-0 text-danger"
+                                        onClick={() => setEmptying(true)}
+                                    >
+                                        Empty now
+                                    </Button>
+                                ) : null}
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -1362,18 +1384,33 @@ export function MailView({
                                 >
                                     <Clock className="size-4 shrink-0" aria-hidden />
                                 </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label="Report as spam"
-                                    title="Report as spam"
-                                    disabled={busy}
-                                    onClick={() =>
-                                        act("junk", selectedMessageIds, "Moved to spam.")
-                                    }
-                                >
-                                    <Bug className="size-4 shrink-0" aria-hidden />
-                                </Button>
+                                {context.restorable ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Put back where it was"
+                                        title="Put back where it was"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            act("restore", selectedMessageIds, "Put back.")
+                                        }
+                                    >
+                                        <Undo2 className="size-4 shrink-0" aria-hidden />
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Report as spam"
+                                        title="Report as spam"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            act("junk", selectedMessageIds, "Moved to spam.")
+                                        }
+                                    >
+                                        <Bug className="size-4 shrink-0" aria-hidden />
+                                    </Button>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -1475,6 +1512,7 @@ export function MailView({
                                         }
                                         canArchive={context.canArchive}
                                         permanentDelete={context.permanentDelete}
+                                        restorable={context.restorable}
                                         onAct={act}
                                         onSnooze={snooze}
                                         onLabel={label}
@@ -1499,6 +1537,7 @@ export function MailView({
                                             dragging={() => dragging(thread)}
                                             canArchive={context.canArchive}
                                             permanentDelete={context.permanentDelete}
+                                            restorable={context.restorable}
                                             onAct={(action, announce) =>
                                                 act(action, [thread.leadMessageId], announce)
                                             }
@@ -1559,6 +1598,54 @@ export function MailView({
                             refresh();
                         })
                     }
+                />
+            ) : null}
+
+            {emptying && context.emptyRole ? (
+                <ConfirmDeleteDialog
+                    open
+                    name={context.title}
+                    kind="folder"
+                    // Plainly rather than by typing: this is a folder whose
+                    // whole purpose is holding what somebody already threw away,
+                    // and the question names what it is about to destroy.
+                    requireTyping={false}
+                    title={`Empty ${context.title}?`}
+                    question={`Delete everything in ${context.title}, for good?`}
+                    description="Every message in it is deleted on the mail server, including older ones that are not on this screen. Nothing here can bring them back."
+                    confirmLabel="Empty it"
+                    onOpenChange={(next) => (next ? undefined : setEmptying(false))}
+                    onConfirm={() => {
+                        setEmptying(false);
+                        // The screen empties now. What it is waiting for is a
+                        // command that walks a whole folder on somebody else's
+                        // server, which is the slowest thing in this app.
+                        const here = threads.map((thread) => thread.id);
+                        patchUntilAnswered(here, { gone: true });
+                        if (openThread) closeOpen();
+                        void (async () => {
+                            const outcome = await emptyFolderAction({
+                                role: context.emptyRole,
+                                // The mailboxes this screen is actually
+                                // showing. Never "all of them": the merged
+                                // trash is one shelf's worth, and emptying a
+                                // mailbox that is not on screen - an
+                                // organization's, while somebody stands in
+                                // their own - is not what was asked for.
+                                accountIds: page.accountId
+                                    ? [page.accountId]
+                                    : accounts.map((account) => account.id)
+                            });
+                            const said = refusalOf(outcome);
+                            if (said) {
+                                clearPatches();
+                                toast.show({ title: said });
+                                return;
+                            }
+                            toast.show({ title: `${context.title} is empty.` });
+                            reloadLists();
+                        })();
+                    }}
                 />
             ) : null}
 
@@ -2136,6 +2223,7 @@ function ThreadRow({
     dragging,
     canArchive,
     permanentDelete,
+    restorable,
     sort,
     onAct,
     onSnooze,
@@ -2170,6 +2258,8 @@ function ThreadRow({
     dragging: () => readonly string[];
     canArchive: boolean;
     permanentDelete: boolean;
+    /** Whether this row can go back where it was deleted from. */
+    restorable: boolean;
     /** Which way the list is ordered, which decides what the corner of the row
      *  says. */
     sort: core.MailSort;
@@ -2428,6 +2518,13 @@ function ThreadRow({
                             label="Snooze until tomorrow morning"
                             onClick={onSnooze}
                         />
+                        {restorable ? (
+                            <RowAction
+                                icon={Undo2}
+                                label="Put back where it was"
+                                onClick={() => onAct("restore", "Put back.")}
+                            />
+                        ) : null}
                         <RowAction
                             icon={Trash2}
                             danger
