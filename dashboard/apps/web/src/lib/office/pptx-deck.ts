@@ -33,23 +33,6 @@ import { buildRenderSlide, type RenderSlide } from "@polaris/pptx-render";
 /** What a deck comes back as: one entry per page, in order. */
 export interface RenderedDeck {
     readonly slides: readonly RenderSlide[];
-    /**
-     * Where each drawn box actually lives, by page: the id the renderer put on a
-     * node, against that element's position in the page.
-     *
-     * This exists because **an element's id is not stable across two parses.**
-     * `openPptx` numbers what it finds from a counter that lives as long as the
-     * process, so opening the same file twice gives the same shape a different
-     * id - `sp_0` the first time, `sp_1` the second. Anything that draws a deck
-     * in one request and changes it in another is therefore addressing a box by
-     * a name that expired the moment it was handed out.
-     *
-     * A position has not expired. It is a property of the file rather than of
-     * the reading, so a browser told "the third element of page one" is still
-     * talking about the same box when the server opens the file again to write
-     * to it.
-     */
-    readonly places: readonly Readonly<Record<string, number>>[];
 }
 
 /** The width the slides are built for. Geometry is resolved against it, so a
@@ -73,15 +56,7 @@ export async function renderPptxDeck(
     // built per page decodes, sniffs, scrubs and base64s it again on each one.
     const media = makeMediaResolvers(opened);
     const slides: RenderSlide[] = [];
-    const places: Record<string, number>[] = [];
     for (const [index, slide] of opened.deck.slides.entries()) {
-        // Built from the same parse that drew the page, which is the only moment
-        // the drawing and the file agree on what anything is called.
-        places.push(
-            Object.fromEntries(
-                (slide.elements as { id: string }[]).map((element, at) => [element.id, at])
-            )
-        );
         slides.push(
             buildRenderSlide(slide, opened.deck.size, {
                 fitWidthPx,
@@ -96,5 +71,5 @@ export async function renderPptxDeck(
             })
         );
     }
-    return { slides, places };
+    return { slides };
 }
