@@ -16,10 +16,15 @@ import { prisma } from "@polaris/db";
 import { serviceName, shortHash, slugify } from "@polaris/deploy";
 
 /**
- * How many kept releases stay running, newest first. Older ones are torn down as
- * each new release is promoted, so a long history cannot quietly fill the host.
+ * How many kept releases stay running, newest first.
+ *
+ * One: the newest. Older ones are torn down as each new release is promoted, so
+ * a service that keeps its history keeps the addresses of its past builds and
+ * not their containers - it was three, which is three copies of a service
+ * running for every service that has the setting on, on a host that has to fit
+ * all of them.
  */
-export const KEPT_RELEASES = 3;
+export const KEPT_RELEASES = 1;
 
 /** Longest container name DNS (and docker) will take. */
 const MAX_NAME = 63;

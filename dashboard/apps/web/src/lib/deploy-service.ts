@@ -3211,12 +3211,20 @@ export async function setDeploymentCanary(
 }
 
 /**
- * How many releases of one service keep their image for an instant rollback,
- * newest first, besides the one that is live and any somebody pinned. Enough to
- * reach back past a bad afternoon; few enough that a service deployed forty
- * times a day does not fill its server with images.
+ * How many releases of one service keep their image besides the one that is live
+ * and any somebody pinned.
+ *
+ * None. It was five, and five is how a host fills up without anybody doing
+ * anything: one service deployed a handful of times held five copies of a 1.8 GB
+ * image, which on the machine this was found on was nine gigabytes of builds
+ * nobody had asked to keep and no screen ever mentioned.
+ *
+ * A release somebody pins is still kept - pinning is a person saying "this one
+ * stays" - and so is whatever is live. Everything else goes as soon as its
+ * successor is promoted, and rolling back past that point is a build rather than
+ * a restart. That is the trade, and the disk is the reason.
  */
-export const ROLLBACK_WINDOW = 5;
+export const ROLLBACK_WINDOW = 0;
 
 /**
  * Remove the kept images that have fallen out of the window.
