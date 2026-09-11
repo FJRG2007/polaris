@@ -27,6 +27,7 @@ import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
+import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
@@ -417,6 +418,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Leased, so two processes never both stop or start the same container.
         leaseMs: 2 * MINUTE,
         run: () => runSleepPass()
+    },
+    {
+        key: "service-desired-state",
+        // Every five minutes. A service somebody stopped is stopped for good, so
+        // this is only ever repairing the rare stop whose container half failed -
+        // and the machine is asked once per target, about services that are
+        // believed to be down and usually are.
+        everyMs: 5 * MINUTE,
+        // Leased, so two processes never both stop the same container.
+        leaseMs: 10 * MINUTE,
+        run: () => runDesiredStatePass()
     },
     {
         key: "update-scan",
