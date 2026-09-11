@@ -1127,7 +1127,8 @@ export async function setApplicationEdgeConfig(
 export async function setApplicationPublishPort(
     applicationId: string,
     ownerId: string,
-    publish: boolean
+    publish: boolean,
+    actorId: string | null
 ): Promise<{ redeployed: boolean }> {
     const view = await getApplicationEdgeSettings(applicationId, ownerId);
     if (!publish && view.catalog) {
@@ -1149,7 +1150,7 @@ export async function setApplicationPublishPort(
     if (!app.currentDeploymentId) return { redeployed: false };
     // The port only changes when the container is recreated, and recreated is
     // all it needs: the live release is started again rather than rebuilt.
-    await restartFromKeptImage(applicationId, ownerId, ownerId, "settings");
+    await restartFromKeptImage(applicationId, ownerId, actorId, "settings");
     return { redeployed: true };
 }
 
@@ -1993,13 +1994,16 @@ export async function restartApplication(applicationId: string, ownerId: string)
 export async function setApplicationRunning(
     applicationId: string,
     ownerId: string,
-    running: boolean
+    running: boolean,
+    /** Who asked, or null for a schedule, a sweep or anything else nobody pressed. */
+    actorId: string | null = null,
+    audit?: Record<string, unknown>
 ): Promise<void> {
     // Starting recreates from the current spec so it comes up with the latest env -
     // from the live release's kept image, not a fresh build of today's source;
     // stopping just halts the container while keeping the deployment record.
     if (running) {
-        await restartFromKeptImage(applicationId, ownerId, ownerId, "settings");
+        await restartFromKeptImage(applicationId, ownerId, actorId, "settings", audit);
         await prisma.application.update({
             where: { id: applicationId },
             data: { desiredState: "running" }
@@ -2651,7 +2655,9 @@ function stringOrNull(value: unknown): string | null {
 export async function redeployForEnvScope(
     scope: "application" | "environment",
     scopeId: string,
-    ownerId: string
+    ownerId: string,
+    actorId: string | null,
+    audit?: Record<string, unknown>
 ): Promise<void> {
     const where =
         scope === "application"
@@ -2667,7 +2673,7 @@ export async function redeployForEnvScope(
               };
     const apps = await prisma.application.findMany({ where, select: { id: true } });
     for (const app of apps) {
-        await restartFromKeptImage(app.id, ownerId, ownerId, "variables").catch(() => undefined);
+        await restartFromKeptImage(app.id, ownerId, actorId, "variables", audit).catch(() => undefined);
     }
 }
 
@@ -2814,7 +2820,9 @@ async function mergedEnv(
 export async function deployApplication(
     applicationId: string,
     ownerId: string,
-    userId: string,
+    /** Who asked for it, or null when nobody did - a push, the autoscaler, a
+     *  sweep. The history then names the owner, and the audit trail nobody. */
+    userId: string | null,
     meta?: {
         commitMessage?: string;
         commitSha?: string;
@@ -2912,7 +2920,7 @@ export async function deployApplication(
             deployableType: "application",
             deployableId: applicationId,
             status: "queued",
-            triggeredById: userId,
+            triggeredById: userId ?? ownerId,
             commitMessage,
             commitSha,
             authorName,
@@ -3048,8 +3056,10 @@ export interface RollbackSource {
 export async function restartFromKeptImage(
     applicationId: string,
     ownerId: string,
-    userId: string,
-    reason: "variables" | "settings" | "scale" = "variables"
+    userId: string | null,
+    reason: "variables" | "settings" | "scale" = "variables",
+    /** More to say on the deploy's audit entry, such as the API key that asked. */
+    audit?: Record<string, unknown>
 ): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -3071,9 +3081,9 @@ export async function restartFromKeptImage(
           })
         : null;
     if (!live?.imageKept || !isReleaseImage(live.imageTag)) {
-        return deployApplication(applicationId, ownerId, userId, { trigger: reason });
+        return deployApplication(applicationId, ownerId, userId, { trigger: reason, audit });
     }
-    return deployApplication(applicationId, ownerId, userId, undefined, {
+    return deployApplication(applicationId, ownerId, userId, { audit }, {
         deploymentId: live.id,
         imageTag: live.imageTag,
         commitSha: live.commitSha,
@@ -3101,7 +3111,9 @@ export async function restartFromKeptImage(
 export async function rollbackToDeployment(
     deploymentId: string,
     ownerId: string,
-    userId: string
+    userId: string,
+    /** More to say on the deploy's audit entry, such as the API key that asked. */
+    audit?: Record<string, unknown>
 ): Promise<{ deploymentId: string; applicationId: string; commitSha: string | null }> {
     const source = await prisma.deployment.findFirst({
         where: { id: deploymentId, deployableType: "application" },
@@ -3129,7 +3141,7 @@ export async function rollbackToDeployment(
         select: { currentDeploymentId: true }
     });
     if (app?.currentDeploymentId === source.id) throw new Error("That release is already live.");
-    const started = await deployApplication(source.deployableId, ownerId, userId, undefined, {
+    const started = await deployApplication(source.deployableId, ownerId, userId, { audit }, {
         deploymentId: source.id,
         imageTag: source.imageTag,
         commitSha: source.commitSha,

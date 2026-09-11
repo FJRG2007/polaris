@@ -65,7 +65,7 @@ describe("a pushed commit", () => {
         ]);
         expect(answers.sort()).toEqual([false, true]);
         expect(deployApplication).toHaveBeenCalledTimes(1);
-        expect(deployApplication).toHaveBeenCalledWith("app-1", "owner-1", "owner-1", {
+        expect(deployApplication).toHaveBeenCalledWith("app-1", "owner-1", null, {
             ...COMMIT,
             trigger: "push"
         });

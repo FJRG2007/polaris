@@ -1014,7 +1014,7 @@ export async function setApplicationRunningAction(
     const user = await requirePermission("deploy.manage");
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "deploy.run");
-        await deployService.setApplicationRunning(applicationId, access.ownerId, running);
+        await deployService.setApplicationRunning(applicationId, access.ownerId, running, user.id);
         await recordServiceEvent(
             user.id,
             applicationId,
@@ -1484,7 +1484,8 @@ export async function setPublishPortAction(
         const outcome = await deployService.setApplicationPublishPort(
             applicationId,
             access.ownerId,
-            publish
+            publish,
+            user.id
         );
         await recordDeployAudit({
             actorId: user.id,
@@ -1934,7 +1935,7 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
         // Apply on the running service (a volume takes effect on container recreate),
         // only if it is currently deployed - same Vercel-style flow as env vars.
         void deployService
-            .redeployForEnvScope("application", input.applicationId, access.ownerId)
+            .redeployForEnvScope("application", input.applicationId, access.ownerId, user.id)
             .catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -1975,7 +1976,7 @@ export async function updateVolumeAction(
             targetId: applicationId
         });
         void deployService
-            .redeployForEnvScope("application", applicationId, ownerId)
+            .redeployForEnvScope("application", applicationId, ownerId, user.id)
             .catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -1999,7 +2000,7 @@ export async function deleteVolumeAction(input: {
             targetId: applicationId
         });
         void deployService
-            .redeployForEnvScope("application", applicationId, ownerId)
+            .redeployForEnvScope("application", applicationId, ownerId, user.id)
             .catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};

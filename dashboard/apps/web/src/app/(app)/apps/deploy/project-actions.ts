@@ -649,7 +649,7 @@ export async function stageVolumeDeleteAction(input: {
         if (!(await staged.projectStagesChanges(access.projectId))) {
             await deleteVolume(input.volumeId, access.ownerId, { wipe: input.wipe });
             void deployService
-                .redeployForEnvScope("application", volume.applicationId, access.ownerId)
+                .redeployForEnvScope("application", volume.applicationId, access.ownerId, user.id)
                 .catch(() => undefined);
             refresh(access.projectId);
             return { staged: false };

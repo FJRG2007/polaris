@@ -239,7 +239,7 @@ describe("rolling back", () => {
         });
         const result = await surface.rollback(caller(["deploy.manage"]), EARLIER);
         expect(deployments.requireDeploymentAccess).toHaveBeenCalledWith(EARLIER, USER, "deploy.run");
-        expect(rollbackToDeployment).toHaveBeenCalledWith(EARLIER, OWNER, USER);
+        expect(rollbackToDeployment).toHaveBeenCalledWith(EARLIER, OWNER, USER, { via: "api", keyId: "key-1" });
         expect(result).toEqual({ deploymentId: "dep-2", commitSha: "abcdef1234" });
         expect(recordAudit).toHaveBeenCalledWith(
             expect.objectContaining({

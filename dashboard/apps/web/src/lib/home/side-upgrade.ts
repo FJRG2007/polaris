@@ -102,7 +102,7 @@ export async function upgradeHomeServices(): Promise<void> {
         });
         if (application?.desiredState !== "running") continue;
         try {
-            await deployApplication(applicationId, install.ownerId, install.ownerId);
+            await deployApplication(applicationId, install.ownerId, null);
         } catch (error) {
             allWell = false;
             console.error(`polaris: could not bring ${install.catalogId} to this build:`, error);

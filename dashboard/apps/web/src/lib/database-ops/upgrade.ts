@@ -129,7 +129,7 @@ async function runUpgrade(
             // The same tag, pulled again. Nothing to go back to if it fails -
             // the tag is what it was - so what the instance was pointed at stays.
             await operation.step(`Pulling the newest ${version} release`);
-            const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);
+            const failure = await deployDatabaseAndWait(databaseId, ownerId, actorId);
             if (failure) throw new DatabaseOperationError(`The newest ${version} release did not start: ${failure}`);
             await finish(databaseId, operation);
             return;
@@ -149,7 +149,7 @@ async function runUpgrade(
                 }
             });
             switched = true;
-            const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);
+            const failure = await deployDatabaseAndWait(databaseId, ownerId, actorId);
             if (failure) throw new DatabaseOperationError(`Version ${version} did not start: ${failure}`);
             await finish(databaseId, operation);
             return;
@@ -157,7 +157,7 @@ async function runUpgrade(
 
         if (core.resolveTopology(row).kind === "replicaSet") {
             await backupFirst(databaseId, userId, operation);
-            await rollReplicaSet(databaseId, ownerId, userId, version, operation);
+            await rollReplicaSet(databaseId, ownerId, actorId, version, operation);
             await finish(databaseId, operation);
             return;
         }
@@ -210,7 +210,7 @@ async function runUpgrade(
             }
         });
         switched = true;
-        const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);
+        const failure = await deployDatabaseAndWait(databaseId, ownerId, actorId);
         if (failure) throw new DatabaseOperationError(`Version ${version} did not start: ${failure}`);
 
         const fresh = await instanceContext(databaseId, ownerId);
@@ -278,7 +278,7 @@ async function backupFirst(databaseId: string, userId: string, operation: Operat
 async function rollReplicaSet(
     databaseId: string,
     ownerId: string,
-    userId: string,
+    actorId: string | null,
     version: string,
     operation: OperationHandle
 ): Promise<void> {
@@ -308,7 +308,7 @@ async function rollReplicaSet(
                     await operation.step(`Moving ${member} to ${label} ${next}`);
                     images[member] = image;
                     moved = true;
-                    const failure = await deployDatabaseAndWait(databaseId, ownerId, userId, { memberImages: { ...images } });
+                    const failure = await deployDatabaseAndWait(databaseId, ownerId, actorId, { memberImages: { ...images } });
                     if (failure) throw new DatabaseOperationError(`${member} did not start on ${label} ${next}: ${failure}`);
                 });
                 await prisma.managedDatabase.update({
@@ -325,7 +325,7 @@ async function rollReplicaSet(
         } catch (error) {
             if (moved && !committed) {
                 await operation.step(`Putting every member back on ${label} ${row.version}`);
-                await deployDatabaseAndWait(databaseId, ownerId, userId).catch(() => null);
+                await deployDatabaseAndWait(databaseId, ownerId, actorId).catch(() => null);
             }
             throw error;
         }
@@ -358,7 +358,7 @@ async function rollBack(databaseId: string, ownerId: string, actorId: string | n
             previousVolumeName: null
         }
     });
-    const failure = await deployDatabaseAndWait(databaseId, ownerId, actorId ?? (await projectOwnerUser(databaseId)));
+    const failure = await deployDatabaseAndWait(databaseId, ownerId, actorId);
     if (failure) throw new Error(failure);
 }
 

@@ -65,7 +65,7 @@ export async function deployPushedCommit(
     });
     if (claimed.count === 0) return false;
     try {
-        await deployApplication(app.id, ownerId, ownerId, { ...commit, trigger: "push" });
+        await deployApplication(app.id, ownerId, null, { ...commit, trigger: "push" });
         return true;
     } catch (error) {
         await prisma.application.updateMany({

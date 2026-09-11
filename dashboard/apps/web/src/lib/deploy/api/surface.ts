@@ -198,6 +198,12 @@ export async function resolveService(
     return { access, applicationId: id };
 }
 
+/** What an audit entry says about a change that came through this surface: how,
+ *  and with which key. */
+function callerAudit(caller: DeployCaller): Pick<DeployCaller, "via" | "keyId"> {
+    return { via: caller.via, keyId: caller.keyId };
+}
+
 /** Record a change made through this surface, in both places the dashboard
  *  records one: the audit log (who, with which key, from where) and the service's
  *  own activity feed when there is a service. */
@@ -221,7 +227,7 @@ async function recordChange(
         targetType: event.targetType,
         targetId: event.targetId,
         ...(event.orgId ? { orgId: event.orgId } : {}),
-        metadata: { via: caller.via, keyId: caller.keyId, ...event.metadata }
+        metadata: { ...callerAudit(caller), ...event.metadata }
     });
     if (event.activity) {
         await activity.record({
@@ -624,7 +630,7 @@ export async function deploy(caller: DeployCaller, ref: string): Promise<{ deplo
         // exactly as it does from the dashboard.
     }
     const deploymentId = await deployService.deployApplication(applicationId, access.ownerId, caller.userId, {
-        audit: { via: caller.via, keyId: caller.keyId }
+        audit: callerAudit(caller)
     });
     await activity.record({ subjectType: "app", subjectId: applicationId, userId: caller.userId, action: "deployed" });
     return { deploymentId };
@@ -656,7 +662,13 @@ export async function power(caller: DeployCaller, ref: string, action: PowerActi
     if (action === "restart") {
         await deployService.restartApplication(applicationId, access.ownerId);
     } else {
-        await deployService.setApplicationRunning(applicationId, access.ownerId, action === "start");
+        await deployService.setApplicationRunning(
+            applicationId,
+            access.ownerId,
+            action === "start",
+            caller.userId,
+            callerAudit(caller)
+        );
     }
     const past = action === "restart" ? "restarted" : action === "start" ? "started" : "stopped";
     await recordChange(caller, {
@@ -682,7 +694,12 @@ export async function rollback(
 ): Promise<{ deploymentId: string; commitSha: string | null }> {
     requireScope(caller, "deploy.manage");
     const access = await deploymentAccess(caller, deploymentId, "deploy.run");
-    const started = await deployService.rollbackToDeployment(deploymentId, access.ownerId, caller.userId);
+    const started = await deployService.rollbackToDeployment(
+        deploymentId,
+        access.ownerId,
+        caller.userId,
+        callerAudit(caller)
+    );
     await recordChange(caller, {
         action: "deploy.app.rollback",
         targetType: "application",
@@ -747,9 +764,17 @@ function requireRedeploy(access: ProjectAccess, redeploy: boolean): void {
 
 /** Once asked for, the services a change reaches pick it up the way they do from
  *  the dashboard: those already deployed redeploy in the background. */
-function applyVariables(envScope: EnvScope, scopeId: string, ownerId: string, redeploy: boolean): void {
+function applyVariables(
+    caller: DeployCaller,
+    envScope: EnvScope,
+    scopeId: string,
+    ownerId: string,
+    redeploy: boolean
+): void {
     if (!redeploy) return;
-    void deployService.redeployForEnvScope(envScope, scopeId, ownerId).catch(() => undefined);
+    void deployService
+        .redeployForEnvScope(envScope, scopeId, ownerId, caller.userId, callerAudit(caller))
+        .catch(() => undefined);
 }
 
 export async function setVariable(
@@ -776,7 +801,7 @@ export async function setVariable(
             ? { activity: { applicationId: scopeId, action: "variable", to: input.key } }
             : {})
     });
-    applyVariables(envScope, scopeId, access.ownerId, input.redeploy);
+    applyVariables(caller, envScope, scopeId, access.ownerId, input.redeploy);
     return { redeployed: input.redeploy };
 }
 
@@ -800,7 +825,7 @@ export async function importVariables(
             ? { activity: { applicationId: scopeId, action: "variables-imported", to: String(count) } }
             : {})
     });
-    applyVariables(envScope, scopeId, access.ownerId, input.redeploy);
+    applyVariables(caller, envScope, scopeId, access.ownerId, input.redeploy);
     return { count, redeployed: input.redeploy };
 }
 
@@ -840,7 +865,7 @@ export async function deleteVariable(
             ? { activity: { applicationId: removed.scopeId, action: "variable-removed" } }
             : {})
     });
-    applyVariables(removed.scope, removed.scopeId, access.ownerId, options.redeploy);
+    applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, options.redeploy);
     return { redeployed: options.redeploy };
 }
 

@@ -104,6 +104,6 @@ describe("redeployEnvScopeAction", () => {
         redeployForEnvScope.mockReset().mockResolvedValue(undefined);
         expect(await redeployEnvScopeAction({ scope: "environment", scopeId: "env-1" })).toEqual({});
         expect(requireEnvScopeAccess).toHaveBeenCalledWith("environment", "env-1", "user-1", "deploy.run");
-        expect(redeployForEnvScope).toHaveBeenCalledWith("environment", "env-1", "owner-1");
+        expect(redeployForEnvScope).toHaveBeenCalledWith("environment", "env-1", "owner-1", "user-1");
     });
 });

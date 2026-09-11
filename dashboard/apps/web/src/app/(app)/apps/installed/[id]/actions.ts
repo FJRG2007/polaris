@@ -46,13 +46,13 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
 
 export async function setInstalledAppRunningAction(id: string, running: boolean): Promise<{ error?: string }> {
     try {
-        const { access } = await requirePermissionOn("deploy.manage", installRef(id));
+        const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
         if (!running) await flushGameWorld(access.ownerId, id);
         // Starting it again is somebody saying the crash it was stopped for has
         // been dealt with. If it has not, the health sweep says so within a minute.
         if (running) await clearCrashLoop(id);
-        await setApplicationRunning(applicationId, access.ownerId, running);
+        await setApplicationRunning(applicationId, access.ownerId, running, user.id);
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {

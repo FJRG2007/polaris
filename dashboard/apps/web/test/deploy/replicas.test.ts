@@ -17,7 +17,7 @@ const { parseAppEdgeConfig } = await import("@polaris/core");
 const { expandReplicas, replicaNames } = await import("@polaris/deploy");
 const { restartFromKeptImage, syncAppRoutes } = await import("@/lib/deploy-service");
 const { balancedOver, copiesOf } = await import("@/lib/deploy/replicas");
-const { setServiceScaling, singleCopyReason } = await import("@/lib/deploy/scaling-service");
+const { scaleService, setServiceScaling, singleCopyReason } = await import("@/lib/deploy/scaling-service");
 const { renderDynamicConfig } = await import("@/lib/deploy/router");
 
 /** The block of text belonging to one router or service, by its name. */
@@ -239,6 +239,11 @@ describe("saving a new count", () => {
     it("changes over when new limits come with it, since every copy is recreated", async () => {
         await setServiceScaling("app-1", "owner-1", "user-1", { ...input, limits: { cpus: 1, memoryMb: null } });
         expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", "user-1", "settings");
+    });
+
+    it("credits nobody for a step the autoscaler takes", async () => {
+        await scaleService("app-1", "owner-1", 3);
+        expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", null, "scale");
     });
 });
 

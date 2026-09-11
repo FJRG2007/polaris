@@ -1251,7 +1251,7 @@ export async function resetServerConfigAction(installedAppId: string): Promise<{
         // it is stopped for a crash it is currently being given a chance to avoid.
         // If it crashes anyway the health sweep writes it back within the minute.
         await clearCrashLoop(installedAppId);
-        await setApplicationRunning(access.install.applicationId, access.ownerId, true);
+        await setApplicationRunning(access.install.applicationId, access.ownerId, true, user.id);
         await recordAudit({
             actorId: user.id,
             action: "games.config-reset",

@@ -186,5 +186,5 @@ export async function scaleService(
     replicas: number
 ): Promise<void> {
     await prisma.application.update({ where: { id: applicationId }, data: { replicas } });
-    await restartFromKeptImage(applicationId, ownerId, ownerId, "scale");
+    await restartFromKeptImage(applicationId, ownerId, null, "scale");
 }

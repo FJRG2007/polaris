@@ -115,7 +115,7 @@ export async function saveEnvVarChangesAction(
             }
         }
 
-        if (redeploy) void redeployForEnvScope(scope, scopeId, access.ownerId).catch(() => undefined);
+        if (redeploy) void redeployForEnvScope(scope, scopeId, access.ownerId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return { saved: set.length + secrecy.length + remove.length, redeployed: redeploy };
     } catch (caught) {
@@ -130,7 +130,7 @@ export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: 
     if (!parsed.success) return { error: "Nothing to redeploy" };
     try {
         const access = await requireEnvScopeAccess(parsed.data.scope, parsed.data.scopeId, user.id, "deploy.run");
-        void redeployForEnvScope(parsed.data.scope, parsed.data.scopeId, access.ownerId).catch(() => undefined);
+        void redeployForEnvScope(parsed.data.scope, parsed.data.scopeId, access.ownerId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

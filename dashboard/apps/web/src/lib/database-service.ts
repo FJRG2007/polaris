@@ -532,13 +532,12 @@ export interface DeployDatabaseOptions {
     readonly memberImages?: Readonly<Record<string, string>>;
 }
 
-/** Provision (or re-provision) a managed database. */
 /**
  * Every database deploy on the audit trail, whatever started it - the Deploy
  * button, a settings change, a point-in-time recovery, an environment clone.
  * Said here, where they all pass, rather than by each (most never did).
  */
-async function auditDatabaseDeploy(userId: string, databaseId: string, deploymentId: string): Promise<void> {
+async function auditDatabaseDeploy(userId: string | null, databaseId: string, deploymentId: string): Promise<void> {
     // Loaded when a deploy happens: the audit writer brings the sign-in stack
     // with it, which nothing else in this module needs to have loaded.
     const { recordDeployAudit } = await import("./deploy-audit");
@@ -551,10 +550,13 @@ async function auditDatabaseDeploy(userId: string, databaseId: string, deploymen
     });
 }
 
+/** Provision (or re-provision) a managed database. */
 export async function deployDatabase(
     databaseId: string,
     ownerId: string,
-    userId: string,
+    /** Who asked for it, or null when nobody did - a maintenance window. The
+     *  history then names the owner, and the audit trail nobody. */
+    userId: string | null,
     options: DeployDatabaseOptions = {}
 ): Promise<string> {
     const db = await prisma.managedDatabase.findFirst({
@@ -573,7 +575,7 @@ export async function deployDatabase(
                 deployableType: "database",
                 deployableId: db.id,
                 status: "deploying",
-                triggeredById: userId
+                triggeredById: userId ?? ownerId
             }
         });
         await auditDatabaseDeploy(userId, db.id, deployment.id);
@@ -669,7 +671,7 @@ export async function deployDatabase(
             deployableType: "database",
             deployableId: db.id,
             status: "queued",
-            triggeredById: userId
+            triggeredById: userId ?? ownerId
         }
     });
     await auditDatabaseDeploy(userId, db.id, deployment.id);
@@ -720,7 +722,7 @@ const DEPLOY_WAIT_MS = 20 * 60_000;
 export async function deployDatabaseAndWait(
     databaseId: string,
     ownerId: string,
-    userId: string,
+    userId: string | null,
     options: DeployDatabaseOptions = {}
 ): Promise<string | null> {
     let deploymentId: string;

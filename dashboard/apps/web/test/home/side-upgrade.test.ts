@@ -62,7 +62,7 @@ describe("bringing them to this build", () => {
     it("redeploys each one, which is what pulls the new image", async () => {
         await upgradeHomeServices();
         expect(deployApplication).toHaveBeenCalledTimes(2);
-        expect(deployApplication).toHaveBeenCalledWith("vision-app", "owner-1", "owner-1");
+        expect(deployApplication).toHaveBeenCalledWith("vision-app", "owner-1", null);
     });
 
     it("does it once per build and not once per restart", async () => {
@@ -87,7 +87,7 @@ describe("bringing them to this build", () => {
         installs.push({ applicationId: "face-app", ownerId: "owner-1", catalogId: "face-recognizer" });
         states["face-app"] = "stopped";
         await upgradeHomeServices();
-        expect(deployApplication).not.toHaveBeenCalledWith("face-app", "owner-1", "owner-1");
+        expect(deployApplication).not.toHaveBeenCalledWith("face-app", "owner-1", null);
         expect(deployApplication).toHaveBeenCalledTimes(2);
     });
 

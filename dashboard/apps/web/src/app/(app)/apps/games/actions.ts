@@ -295,7 +295,7 @@ export async function setGameServerRunningAction(
         // with, or at least worth another try. If it was not, the health sweep
         // writes the loop back within the minute.
         if (running) await clearCrashLoop(installedAppId);
-        await setApplicationRunning(access.install.applicationId, access.ownerId, running);
+        await setApplicationRunning(access.install.applicationId, access.ownerId, running, user.id);
         await recordAudit({
             actorId: user.id,
             action: running ? "games.start" : "games.stop",
