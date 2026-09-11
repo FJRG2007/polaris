@@ -20,65 +20,28 @@ vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit: async () => undefined 
 vi.mock("@/lib/deploy-service", () => ({ redeployForEnvScope }));
 vi.mock("@/lib/deploy-project-access", () => ({ requireEnvScopeAccess }));
 vi.mock("@/lib/deploy/variable-links", () => ({ variableLinks: async () => ({}) }));
-vi.mock("@/lib/env-var-service", () => ({
-    setEnvVar,
-    setEnvVarSecrecy,
-    deleteEnvVar,
-    envVarScope
-}));
+vi.mock("@/lib/env-var-service", () => ({ setEnvVar, setEnvVarSecrecy, deleteEnvVar, envVarScope }));
 
-const { saveEnvVarChangesAction, redeployEnvScopeAction } = await import(
-    "@/app/(app)/apps/deploy/variable-actions"
-);
+const { saveEnvVarChangesAction, redeployEnvScopeAction } = await import("@/app/(app)/apps/deploy/variable-actions");
 
-const BASE = {
-    scope: "application",
-    scopeId: "app-1",
-    set: [],
-    secrecy: [],
-    remove: [],
-    redeploy: false
-};
+const BASE = { scope: "application", scopeId: "app-1", set: [], secrecy: [], remove: [], redeploy: false };
 
 describe("saveEnvVarChangesAction", () => {
     beforeEach(() => {
-        for (const mock of [
-            requireEnvScopeAccess,
-            redeployForEnvScope,
-            setEnvVar,
-            setEnvVarSecrecy,
-            deleteEnvVar,
-            envVarScope
-        ]) {
+        for (const mock of [requireEnvScopeAccess, redeployForEnvScope, setEnvVar, setEnvVarSecrecy, deleteEnvVar, envVarScope]) {
             mock.mockReset();
         }
         requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null });
         redeployForEnvScope.mockResolvedValue(undefined);
-        envVarScope.mockImplementation(async (id: string) => ({
-            scope: "application",
-            scopeId: "app-1",
-            key: `KEY_${id}`
-        }));
+        envVarScope.mockImplementation(async (id: string) => ({ scope: "application", scopeId: "app-1", key: `KEY_${id}` }));
     });
 
     it("saves without redeploying when a redeploy was not asked for", async () => {
-        const result = await saveEnvVarChangesAction({
-            ...BASE,
-            set: [{ key: "PORT", value: "8080", isSecret: false }]
-        });
+        const result = await saveEnvVarChangesAction({ ...BASE, set: [{ key: "PORT", value: "8080", isSecret: false }] });
         expect(result).toEqual({ saved: 1, redeployed: false });
-        expect(setEnvVar).toHaveBeenCalledWith("application", "app-1", "owner-1", {
-            key: "PORT",
-            value: "8080",
-            isSecret: false
-        });
+        expect(setEnvVar).toHaveBeenCalledWith("application", "app-1", "owner-1", { key: "PORT", value: "8080", isSecret: false });
         expect(redeployForEnvScope).not.toHaveBeenCalled();
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
-            "application",
-            "app-1",
-            "user-1",
-            "variables.write"
-        );
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "variables.write");
     });
 
     it("redeploys once for the whole batch when asked, after checking the right to deploy", async () => {
@@ -92,12 +55,7 @@ describe("saveEnvVarChangesAction", () => {
             redeploy: true
         });
         expect(result).toEqual({ saved: 3, redeployed: true });
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
-            "application",
-            "app-1",
-            "user-1",
-            "deploy.run"
-        );
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "deploy.run");
         expect(redeployForEnvScope).toHaveBeenCalledTimes(1);
     });
 
@@ -134,10 +92,7 @@ describe("saveEnvVarChangesAction", () => {
     });
 
     it("refuses a malformed batch", async () => {
-        const result = await saveEnvVarChangesAction({
-            ...BASE,
-            set: [{ key: "9LIVES", value: "", isSecret: false }]
-        });
+        const result = await saveEnvVarChangesAction({ ...BASE, set: [{ key: "9LIVES", value: "", isSecret: false }] });
         expect(result.error).toContain("Letters, digits and underscores");
         expect(requireEnvScopeAccess).not.toHaveBeenCalled();
     });
@@ -147,20 +102,8 @@ describe("redeployEnvScopeAction", () => {
     it("asks for the right to deploy", async () => {
         requireEnvScopeAccess.mockReset().mockResolvedValue({ ownerId: "owner-1", orgId: null });
         redeployForEnvScope.mockReset().mockResolvedValue(undefined);
-        expect(await redeployEnvScopeAction({ scope: "environment", scopeId: "env-1" })).toEqual(
-            {}
-        );
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
-            "environment",
-            "env-1",
-            "user-1",
-            "deploy.run"
-        );
-        expect(redeployForEnvScope).toHaveBeenCalledWith(
-            "environment",
-            "env-1",
-            "owner-1",
-            "user-1"
-        );
+        expect(await redeployEnvScopeAction({ scope: "environment", scopeId: "env-1" })).toEqual({});
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith("environment", "env-1", "user-1", "deploy.run");
+        expect(redeployForEnvScope).toHaveBeenCalledWith("environment", "env-1", "owner-1", "user-1");
     });
 });

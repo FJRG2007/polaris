@@ -29,12 +29,7 @@ import { getPorts, type TargetRow } from "./runtime";
 import * as databaseOps from "@/lib/database-ops/ops";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { createDatabase, deployDatabaseAndWait } from "@/lib/database-service";
-import {
-    awaitDeployment,
-    createApplication,
-    deployAndWait,
-    deployApplication
-} from "@/lib/deploy-service";
+import { awaitDeployment, createApplication, deployAndWait, deployApplication } from "@/lib/deploy-service";
 
 /** How long one readiness check or setup command is given before it counts as
  *  failed, so a container that never answers cannot hold the setup forever. */
@@ -45,8 +40,7 @@ const EXEC_LIMIT_MS = 5 * 60_000;
 const PROMOTION_WAIT_MS = 60_000;
 
 /** What a failure nobody anticipated reads as; the error itself goes to the log. */
-const UNEXPECTED =
-    "It stopped on something Polaris did not expect. The details are in the server log.";
+const UNEXPECTED = "It stopped on something Polaris did not expect. The details are in the server log.";
 
 /** A secret the way the catalog generates one: 32 random bytes as hex. */
 const generateSecret = (): string => randomBytes(32).toString("hex");
@@ -61,10 +55,7 @@ export interface TemplateParts {
  * The source a template's container is created with. The service's own carries
  * the template's id, which is how its setup can be run again later.
  */
-export function templateSource(
-    service: core.TemplateService,
-    templateId?: string
-): Record<string, unknown> {
+export function templateSource(service: core.TemplateService, templateId?: string): Record<string, unknown> {
     return {
         imageRef: service.image,
         port: service.port,
@@ -118,12 +109,7 @@ export async function addTemplateParts(input: {
             safeHeaders: true
         });
         await addVolumes(row.id, ownerId, `${template.id}-${part.suffix}`, part.volumes);
-        await setEnvVars(
-            "application",
-            row.id,
-            ownerId,
-            core.templateVariables(part, { self: row.slug }, generateSecret)
-        );
+        await setEnvVars("application", row.id, ownerId, core.templateVariables(part, { self: row.slug }, generateSecret));
         companion = { id: row.id, name: row.slug };
     }
 
@@ -133,12 +119,7 @@ export async function addTemplateParts(input: {
         ...(database ? { database: database.name } : {}),
         ...(companion ? { companion: companion.name } : {})
     };
-    await setEnvVars(
-        "application",
-        service.id,
-        ownerId,
-        core.templateVariables(template, slugs, generateSecret)
-    );
+    await setEnvVars("application", service.id, ownerId, core.templateVariables(template, slugs, generateSecret));
     return { database, companion };
 }
 
@@ -184,13 +165,7 @@ export async function firstTemplateDeploy(input: {
     try {
         if (parts.database) {
             const reason = await bringUpDatabase(parts.database.id, ownerId, userId);
-            if (reason)
-                return await note(
-                    applicationId,
-                    "setup-blocked",
-                    `its database ${parts.database.name}`,
-                    reason
-                );
+            if (reason) return await note(applicationId, "setup-blocked", `its database ${parts.database.name}`, reason);
         }
         if (parts.companion && template.companion) {
             const reason = await deployAndWait(parts.companion.id, ownerId, userId);
@@ -207,8 +182,7 @@ export async function firstTemplateDeploy(input: {
         try {
             deploymentId = await deployApplication(applicationId, ownerId, userId);
         } catch (error) {
-            const reason =
-                error instanceof Error ? error.message : "The deploy could not be started.";
+            const reason = error instanceof Error ? error.message : "The deploy could not be started.";
             return await note(applicationId, "first-deploy-failed", null, reason);
         }
 
@@ -251,11 +225,7 @@ async function servingFrom(applicationId: string, deploymentId: string): Promise
  * started, and a service started against it before then exits, is restarted, and
  * has its deploy counted as failed.
  */
-async function bringUpDatabase(
-    databaseId: string,
-    ownerId: string,
-    userId: string
-): Promise<string | null> {
+async function bringUpDatabase(databaseId: string, ownerId: string, userId: string): Promise<string | null> {
     const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);
     if (failure) return failure;
     try {
@@ -285,10 +255,7 @@ export async function runTemplateSetup(
     try {
         const app = await prisma.application.findFirst({
             where: { id: applicationId, environment: { project: { ownerId } } },
-            include: {
-                target: true,
-                environment: { select: { project: { select: { slug: true } } } }
-            }
+            include: { target: true, environment: { select: { project: { select: { slug: true } } } } }
         });
         if (!app) return;
         if (!app.currentDeploymentId || app.desiredState !== "running") {
@@ -307,13 +274,7 @@ export async function runTemplateSetup(
             const release = await currentReleaseRef(app);
             outcomes = await core.runPrepareSteps(
                 steps,
-                (command) =>
-                    databaseOps.runWithin(
-                        ports,
-                        release.name,
-                        ["sh", "-c", command],
-                        EXEC_LIMIT_MS
-                    ),
+                (command) => databaseOps.runWithin(ports, release.name, ["sh", "-c", command], EXEC_LIMIT_MS),
                 (ms) => new Promise((resolve) => setTimeout(resolve, ms))
             );
         } finally {
@@ -328,9 +289,7 @@ export async function runTemplateSetup(
                     userId: null,
                     action: outcome.ok ? "setup" : "setup-failed",
                     fromValue: outcome.title,
-                    toValue: outcome.ok
-                        ? said || null
-                        : [outcome.reason, said].filter(Boolean).join(" ")
+                    toValue: outcome.ok ? said || null : [outcome.reason, said].filter(Boolean).join(" ")
                 };
             })
         );
@@ -352,8 +311,7 @@ export async function rerunTemplateSetup(applicationId: string, ownerId: string)
     if (!app) throw new Error("Service not found");
     const template = templateOf(app.sourceConfig);
     if (!template?.prepare?.length) throw new Error("This service has no setup to run.");
-    if (!app.currentDeploymentId)
-        throw new Error("Deploy the service first - its setup runs inside it.");
+    if (!app.currentDeploymentId) throw new Error("Deploy the service first - its setup runs inside it.");
     void runTemplateSetup(template, applicationId, ownerId);
 }
 
@@ -368,21 +326,9 @@ function templateOf(sourceConfig: string): core.ServiceTemplate | null {
     }
 }
 
-async function note(
-    applicationId: string,
-    action: string,
-    fromValue: string | null,
-    toValue: string
-): Promise<void> {
+async function note(applicationId: string, action: string, fromValue: string | null, toValue: string): Promise<void> {
     await activity
-        .record({
-            subjectType: "app",
-            subjectId: applicationId,
-            userId: null,
-            action,
-            fromValue,
-            toValue
-        })
+        .record({ subjectType: "app", subjectId: applicationId, userId: null, action, fromValue, toValue })
         .catch((error: unknown) => {
             console.error("polaris: could not record a service's setup:", error);
         });

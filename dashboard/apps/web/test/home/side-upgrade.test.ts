@@ -84,11 +84,7 @@ describe("bringing them to this build", () => {
         // A recognizer that is stopped is stopped because somebody wanted the
         // memory back. Starting it to upgrade it is the worst possible reading
         // of that switch.
-        installs.push({
-            applicationId: "face-app",
-            ownerId: "owner-1",
-            catalogId: "face-recognizer"
-        });
+        installs.push({ applicationId: "face-app", ownerId: "owner-1", catalogId: "face-recognizer" });
         states["face-app"] = "stopped";
         await upgradeHomeServices();
         expect(deployApplication).not.toHaveBeenCalledWith("face-app", "owner-1", null);
