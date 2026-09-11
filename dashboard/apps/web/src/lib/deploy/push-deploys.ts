@@ -49,10 +49,18 @@ export function commitPassesFilter(message: string, filter: string | null | unde
 export async function deployPushedCommit(
     app: { readonly id: string; readonly lastDeployedSha: string | null },
     ownerId: string,
-    commit: { commitSha: string; commitMessage: string; authorName?: string; authorAvatarUrl?: string }
+    commit: {
+        commitSha: string;
+        commitMessage: string;
+        authorName?: string;
+        authorAvatarUrl?: string;
+    }
 ): Promise<boolean> {
     const claimed = await prisma.application.updateMany({
-        where: { id: app.id, OR: [{ lastDeployedSha: null }, { lastDeployedSha: { not: commit.commitSha } }] },
+        where: {
+            id: app.id,
+            OR: [{ lastDeployedSha: null }, { lastDeployedSha: { not: commit.commitSha } }]
+        },
         data: { lastDeployedSha: commit.commitSha }
     });
     if (claimed.count === 0) return false;
