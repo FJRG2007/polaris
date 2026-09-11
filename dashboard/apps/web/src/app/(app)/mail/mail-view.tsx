@@ -1608,6 +1608,9 @@ export function MailView({
                             clearPatches();
                             openAgain(openThread.id);
                         }}
+                        // The same block the list's own menu offers, from an
+                        // address in the header of the message being read.
+                        onBlock={block}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
                         //

@@ -23,22 +23,35 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
+import type { MailFolderView } from "@/lib/mailbox/views";
 import { useMail } from "./mail-shell";
 import { MAIL_PALETTE } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
 import { RefusedMailboxes } from "./refused-notice";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { refusedMailboxHref } from "@/lib/mailbox/refusals";
-import { moveToFolderAction, setFolderColorAction } from "./actions";
+import {
+    deleteFolderAction,
+    moveToFolderAction,
+    renameFolderAction,
+    setFolderColorAction
+} from "./actions";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     cn,
+    Button,
+    ConfirmDeleteDialog,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuSeparator,
     ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
     useToast
 } from "@polaris/ui";
 import {
@@ -136,6 +149,12 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
         },
         [router, toast]
     );
+
+    /** The folder being renamed, and the one being thrown away. Held here rather
+     *  than per row: a menu closes as it is chosen from, and a dialog owned by
+     *  something that has just unmounted never opens. */
+    const [renaming, setRenaming] = useState<MailFolderView | null>(null);
+    const [deleting, setDeleting] = useState<MailFolderView | null>(null);
 
     const fileInto = useCallback(
         async (folderId: string, name: string, messageIds: string[]) => {
@@ -320,6 +339,35 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                     >
                                                         No colour
                                                     </ContextMenuItem>
+                                                    {/* A folder this mailbox is
+                                                        built out of - the inbox,
+                                                        Sent, Trash - is not one
+                                                        to rename or throw away
+                                                        from a rail, and the
+                                                        server would refuse it
+                                                        anyway. The colour above
+                                                        is Polaris' own and
+                                                        applies to all of them. */}
+                                                    {folder.role === "none" ? (
+                                                        <>
+                                                            <ContextMenuSeparator />
+                                                            <ContextMenuItem
+                                                                onSelect={() =>
+                                                                    setRenaming(folder)
+                                                                }
+                                                            >
+                                                                Rename
+                                                            </ContextMenuItem>
+                                                            <ContextMenuItem
+                                                                className="text-danger"
+                                                                onSelect={() =>
+                                                                    setDeleting(folder)
+                                                                }
+                                                            >
+                                                                Delete
+                                                            </ContextMenuItem>
+                                                        </>
+                                                    ) : null}
                                                 </ContextMenuContent>
                                             </ContextMenu>
                                         </li>
@@ -368,7 +416,118 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     </ul>
                 </>
             ) : null}
+
+            {/* Both reach the mail server, so both are the same shape as every
+                other thing here that does: said in a sentence, answered in one
+                press, and the rail redraws off the frame the server publishes. */}
+            {renaming ? (
+                <RenameFolderDialog folder={renaming} onClose={() => setRenaming(null)} />
+            ) : null}
+            {deleting ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(next) => (next ? undefined : setDeleting(null))}
+                    name={deleting.name}
+                    kind="folder"
+                    title={`Delete ${deleting.name}?`}
+                    // The one thing in Mail that destroys mail. Polaris holds a
+                    // window onto this folder and the server holds the folder,
+                    // so "delete" here is the server's delete and there is no
+                    // copy of it anywhere.
+                    description="The folder and every message in it are deleted on the mail server. This cannot be undone from Polaris."
+                    confirmLabel="Delete it"
+                    onConfirm={async () => {
+                        const outcome = await deleteFolderAction(deleting.id);
+                        const said = refusalOf(outcome);
+                        if (said) {
+                            toast.show({ title: said });
+                            return;
+                        }
+                        toast.show({ title: `${deleting.name} is gone.` });
+                        setDeleting(null);
+                        // The folder somebody was looking at no longer exists.
+                        if (pathname === `/mail/f/${deleting.id}`) router.push("/mail");
+                        else router.refresh();
+                    }}
+                />
+            ) : null}
         </nav>
+    );
+}
+
+/**
+ * Rename a folder.
+ *
+ * One field, and the name it already has in it - which is what somebody is
+ * about to edit rather than retype. Everything under it comes with it, said on
+ * the form only when there is something under it: a sentence about subfolders
+ * over a folder with none is noise.
+ */
+function RenameFolderDialog({
+    folder,
+    onClose
+}: {
+    folder: MailFolderView;
+    onClose: () => void;
+}) {
+    const router = useRouter();
+    const toast = useToast();
+    const [name, setName] = useState(folder.name);
+    const [saving, startSaving] = useTransition();
+    const wanted = name.trim();
+    const ready = wanted.length > 0 && wanted !== folder.name;
+
+    return (
+        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Rename folder</DialogTitle>
+                </DialogHeader>
+                <form
+                    className="space-y-3"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!ready || saving) return;
+                        startSaving(async () => {
+                            const outcome = await renameFolderAction(folder.id, wanted);
+                            const said = refusalOf(outcome);
+                            if (said) {
+                                toast.show({ title: said });
+                                return;
+                            }
+                            toast.show({ title: `Renamed to ${wanted}.` });
+                            onClose();
+                            router.refresh();
+                        });
+                    }}
+                >
+                    <label className="block">
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            Name <span aria-hidden>*</span>
+                        </span>
+                        <Input
+                            value={name}
+                            autoFocus
+                            maxLength={100}
+                            onChange={(event) => setName(event.target.value)}
+                            aria-label="Folder name"
+                        />
+                    </label>
+                    <p className="text-[12px] text-foreground-subtle">
+                        It is renamed on the mail server, so every client you read this mailbox in
+                        follows.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={!ready || saving}>
+                            {saving ? "Renaming..." : "Rename"}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

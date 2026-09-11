@@ -23,6 +23,7 @@ import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
+import { AddressChip } from "./address-chip";
 import { leavesTheView, scopeOf } from "./mail-actions";
 import { forwardSeed, replySeed } from "./answering";
 import { missingFolderRole, refusalOf } from "./refusal";
@@ -100,7 +101,8 @@ export function ThreadView({
     onBack,
     onRead,
     onGone,
-    onStayed
+    onStayed,
+    onBlock
 }: {
     thread: MailThreadView;
     messages: MailMessageView[];
@@ -128,6 +130,9 @@ export function ThreadView({
     /** Put the reader back, for a filing the server refused after this pane had
      *  already stepped out of the way. */
     onStayed?: () => void;
+    /** Stop somebody writing, from the header of one of their messages. The
+     *  list's own menu offers the same thing on a row. */
+    onBlock?: (accountId: string, address: string) => void;
 }) {
     const { refresh, reloadLists, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
@@ -438,6 +443,8 @@ export function ThreadView({
                                 message={entry.message}
                                 markRead={markRead}
                                 readAlready={readAlready}
+                                accountId={thread.accountId}
+                                onBlock={onBlock}
                                 onRead={onRead}
                                 open={open.includes(entry.message.id)}
                                 onToggle={() =>
@@ -651,6 +658,8 @@ function MessageCard({
     open,
     markRead,
     readAlready,
+    accountId,
+    onBlock,
     onToggle,
     onRead
 }: {
@@ -659,6 +668,10 @@ function MessageCard({
     markRead: core.MailMarkRead;
     /** The conversation was marked read on the way in - see `ThreadView`. */
     readAlready?: boolean;
+    /** Which mailbox this is in, so an address in the header can be blocked -
+     *  a block is a rule and a rule belongs to a mailbox. */
+    accountId: string;
+    onBlock?: (accountId: string, address: string) => void;
     onToggle: () => void;
     onRead?: () => void;
 }) {
@@ -751,22 +764,54 @@ function MessageCard({
                 onClick={onToggle}
             >
                 {open ? (
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2">
-                            <span className="truncate text-[13px] font-medium text-foreground">
-                                {sender ? core.addressLabel(sender) : "(nobody)"}
-                            </span>
-                            <span className="min-w-0 truncate text-[12px] text-foreground-subtle">
-                                {sender?.address}
-                            </span>
+                    // Each person is a chip rather than text: copy under the
+                    // pointer, and the rest on the right-click. See
+                    // `address-chip`. The div is not a button - it sits inside
+                    // one - so the chips stop the click that would collapse the
+                    // message when somebody is acting on an address in it.
+                    <div
+                        className="min-w-0 flex-1"
+                        onClick={(event) => event.stopPropagation()}
+                        onContextMenu={(event) => event.stopPropagation()}
+                        role="presentation"
+                    >
+                        <div className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-foreground">
+                            {sender ? (
+                                <AddressChip
+                                    entry={sender}
+                                    accountId={accountId}
+                                    onBlock={onBlock}
+                                />
+                            ) : (
+                                <span className="truncate">(nobody)</span>
+                            )}
                         </div>
-                        <p className="mt-0.5 truncate text-[12px] text-foreground-subtle">
-                            to{" "}
-                            {message.to.map((entry) => core.addressLabel(entry)).join(", ") ||
-                                "nobody"}
-                            {message.cc.length > 0
-                                ? `, copy to ${message.cc.map((entry) => core.addressLabel(entry)).join(", ")}`
-                                : ""}
+                        <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1 text-[12px] text-foreground-subtle">
+                            <span>to</span>
+                            {message.to.length === 0 ? (
+                                // A message delivered with nobody in its To line
+                                // is a blind copy, which is a fact about it
+                                // rather than a gap. "to nobody" read as a bug.
+                                <span>undisclosed recipients</span>
+                            ) : (
+                                message.to.map((entry, index) => (
+                                    <span key={`${entry.address}-${index}`} className="min-w-0">
+                                        <AddressChip entry={entry} />
+                                        {index < message.to.length - 1 ? "," : ""}
+                                    </span>
+                                ))
+                            )}
+                            {message.cc.length > 0 ? (
+                                <>
+                                    <span>, copy to</span>
+                                    {message.cc.map((entry, index) => (
+                                        <span key={`${entry.address}-${index}`} className="min-w-0">
+                                            <AddressChip entry={entry} />
+                                            {index < message.cc.length - 1 ? "," : ""}
+                                        </span>
+                                    ))}
+                                </>
+                            ) : null}
                         </p>
                     </div>
                 ) : (

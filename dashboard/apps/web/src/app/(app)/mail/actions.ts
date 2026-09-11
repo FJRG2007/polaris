@@ -19,6 +19,7 @@
  * already have sentences of their own.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import * as spam from "@/lib/mailbox/spam";
 import { revalidatePath } from "next/cache";
@@ -33,6 +34,7 @@ import * as blocking from "@/lib/mailbox/blocking";
 import * as accounts from "@/lib/mailbox/accounts";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
+import * as folders from "@/lib/mailbox/folders";
 import * as messages from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
 import * as templates from "@/lib/mailbox/templates";
@@ -71,6 +73,7 @@ function failure(
         return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
+    if (caught instanceof folders.MailFolderError) return { error: caught.message };
     if (caught instanceof templates.MailTemplateNameTaken) return { error: caught.message, field: "name" };
     if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
@@ -190,6 +193,46 @@ export async function setFolderColorAction(folderId: string, color: string) {
         return {};
     } catch (caught) {
         return failure(caught, "That colour could not be saved.");
+    }
+}
+
+/**
+ * Rename a folder, on the mail server as well as here.
+ *
+ * Everything under it comes with it, which is what IMAP does and what the rows
+ * are rewritten to match - see `folders.ts`.
+ */
+export async function renameFolderAction(folderId: unknown, name: unknown) {
+    const userId = await actorId();
+    const id = z.string().uuid().safeParse(folderId);
+    const wanted = z.string().min(1).max(100).safeParse(name);
+    if (!id.success) return { error: "That folder is not here." };
+    if (!wanted.success) return { error: "A folder needs a name." };
+    try {
+        await folders.renameFolder(userId, id.data, wanted.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That folder could not be renamed.");
+    }
+}
+
+/**
+ * Delete a folder and the mail in it.
+ *
+ * The one thing in Mail that destroys something Polaris does not hold a copy of,
+ * which is why the screen that asks says so in those words.
+ */
+export async function deleteFolderAction(folderId: unknown) {
+    const userId = await actorId();
+    const id = z.string().uuid().safeParse(folderId);
+    if (!id.success) return { error: "That folder is not here." };
+    try {
+        await folders.deleteFolder(userId, id.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That folder could not be deleted.");
     }
 }
 
