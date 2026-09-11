@@ -44,6 +44,15 @@ describe("image pull policy", () => {
         }
     });
 
+    it("never asks a registry for the release an image deploy kept, or rolls back to", () => {
+        // The tag the live deploy of a registry image failed on (2026-09-10):
+        // pinned locally, then `pull access denied` when compose asked for it.
+        const kept = "polaris-release/marketplace-vision-worker-8a3f:1a0304a494d2";
+        const spec = appComposeSpec(appPlan("image"), kept, PROXY_NETWORK);
+        expect(spec.services[0].pullPolicy).toBe("never");
+        expect(renderComposeYaml(spec, "/var/polaris/volumes", "/var/polaris/mounts")).toContain('pull_policy: "never"');
+    });
+
     it("always re-resolves a database engine image", () => {
         expect(dbComposeSpec(dbPlan(), PROXY_NETWORK).services[0].pullPolicy).toBe("always");
     });
