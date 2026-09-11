@@ -26,13 +26,15 @@
  */
 
 import { auth } from "@/lib/auth";
+import { z } from "zod";
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { markConnectionProven } from "./proven";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { findConnectionProvider } from "@polaris/core";
+import * as core from "@polaris/core";
+import { findConnectionProvider, sameAddress } from "@polaris/core";
 import { publicAppUrl, requestOrigin } from "@/lib/domain-service";
 import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
@@ -86,6 +88,9 @@ export type LinkOutcome =
     | "unavailable"
     /** This dashboard has no address the provider could send anybody back to. */
     | "not_public"
+    /** The provider vouched for a different account than the one this was
+     *  started for. Nothing was linked - see `finishLink`. */
+    | "wrong_account"
     | "error";
 
 /**
@@ -106,12 +111,48 @@ interface FlowState {
     mode: ConnectionMode;
     state: string;
     target?: string;
+    /**
+     * The address this trip was started FOR, when it was started for one.
+     *
+     * A mailbox is typed before it is authorized, and the two are not the same
+     * question: somebody types `me@gmail.com`, Google opens on whichever account
+     * that browser is signed into, and one press later Polaris holds a token for
+     * a different mailbox than the one on the form. It then stored a mailbox
+     * under the address they typed and reached somebody else's mail with it - or,
+     * more often, simply failed to log in and said nothing anybody could act on.
+     *
+     * So the address travels with the trip, in the cookie rather than in the URL
+     * where it could be edited between the two halves, and the account that
+     * comes back has to be it.
+     */
+    wanted?: string;
+    /** The mailbox being re-authorized, so the screen it came from opens again on
+     *  it rather than on a list. */
+    edit?: string;
 }
 
-function backToConnections(origin: string, provider: string, outcome: LinkOutcome, screen?: string): URL {
+/** Where a mail trip goes back to, as parameters on `MAIL_SCREEN`: the dialog
+ *  somebody was standing in, open again. Without it an authorization lands on a
+ *  closed form and the address has to be typed a second time. */
+function mailReturn(held: Pick<FlowState, "mode" | "edit"> | null): Record<string, string> | undefined {
+    if (held?.mode !== "mail") return undefined;
+    return held.edit ? { edit: held.edit } : { connect: "1" };
+}
+
+function backToConnections(
+    origin: string,
+    provider: string,
+    outcome: LinkOutcome,
+    screen?: string,
+    extra?: Record<string, string>
+): URL {
     const url = new URL(screen ?? CONNECTIONS_SCREEN, origin);
     url.searchParams.set("provider", provider);
     url.searchParams.set("connection", outcome);
+    // Never the address: it is the person's own, they are about to be shown it
+    // on the screen anyway, and a query string is the one place it would outlive
+    // this redirect - in their history, and in whatever logs the way here.
+    for (const [key, value] of Object.entries(extra ?? {})) url.searchParams.set(key, value);
     return url;
 }
 
@@ -144,7 +185,10 @@ async function begin(
     request: Request,
     provider: string,
     mode: ConnectionMode,
-    target?: string
+    target?: string,
+    /** What a mail trip is for: the mailbox address typed on the form, and the
+     *  mailbox being re-authorized when it is one that already exists. */
+    about?: { wanted?: string; edit?: string }
 ): Promise<Response> {
     const origin = await connectionFlowOrigin();
     const moved = moveOnto(request, origin);
@@ -173,17 +217,34 @@ async function begin(
      * screen that says what is missing and where to set it.
      */
     if (mode !== "signin" && !(await publicAppUrl())) {
-        return endLink(origin, provider, "not_public", mode === "mail" ? MAIL_SCREEN : undefined);
+        return endLink(
+            origin,
+            provider,
+            "not_public",
+            mode === "mail" ? MAIL_SCREEN : undefined,
+            mailReturn({ mode, ...(about?.edit ? { edit: about.edit } : {}) })
+        );
     }
 
     const state = randomBytes(16).toString("hex");
-    const payload: FlowState = { provider, mode, state, ...(target ? { target } : {}) };
+    const payload: FlowState = {
+        provider,
+        mode,
+        state,
+        ...(target ? { target } : {}),
+        ...(about?.wanted ? { wanted: about.wanted } : {}),
+        ...(about?.edit ? { edit: about.edit } : {})
+    };
     const authorize = connectionAuthorizeUrl(
         provider,
         client,
         connectionCallbackUrl(provider, origin),
         state,
-        mode
+        mode,
+        // Opens the consent screen on the mailbox being connected rather than on
+        // whichever account this browser is signed into. A hint and nothing
+        // more: what settles it is the address the token comes back for.
+        about?.wanted
     );
 
     const response = NextResponse.redirect(authorize);
@@ -267,7 +328,18 @@ export async function startConnectionLink(request: Request, provider: string): P
         return NextResponse.redirect(backToConnections(await connectionFlowOrigin(), provider, "unavailable"));
     }
     const scope = url.searchParams.get("scope");
-    return begin(request, provider, scope === "storage" ? "storage" : scope === "mail" ? "mail" : "link");
+    if (scope !== "mail") {
+        return begin(request, provider, scope === "storage" ? "storage" : "link");
+    }
+    // Validated rather than carried as typed: what this becomes is a value in a
+    // cookie, a hint on somebody else's consent screen, and the thing the
+    // account that comes back is measured against.
+    const wanted = core.mailAddress.safeParse(url.searchParams.get("address") ?? "");
+    const edit = z.string().uuid().safeParse(url.searchParams.get("edit") ?? "");
+    return begin(request, provider, "mail", undefined, {
+        ...(wanted.success ? { wanted: wanted.data } : {}),
+        ...(edit.success ? { edit: edit.data } : {})
+    });
 }
 
 /**
@@ -315,9 +387,10 @@ export async function finishConnectionCallback(request: Request, provider: strin
     // arrived with no cookie at all: it lands on the screen it was started from,
     // which for a link is the one that says what went wrong.
     const screen = held?.mode === "mail" ? MAIL_SCREEN : undefined;
-    if (!code) return endLink(origin, provider, "cancelled", screen);
-    if (!valid) return endLink(origin, provider, "state_error", screen);
-    return finishLink(origin, provider, code, screen);
+    const back = mailReturn(held);
+    if (!code) return endLink(origin, provider, "cancelled", screen, back);
+    if (!valid) return endLink(origin, provider, "state_error", screen, back);
+    return finishLink(origin, provider, code, screen, back, held?.wanted);
 }
 
 /**
@@ -369,15 +442,34 @@ async function finishLink(
     origin: string,
     provider: string,
     code: string,
-    screen?: string
+    screen?: string,
+    extra?: Record<string, string>,
+    /** The address this was started for - see `FlowState.wanted`. */
+    wanted?: string
 ): Promise<Response> {
     const user = await requireUser();
 
     const client = await connectionOAuthClient(provider);
-    if (!client) return endLink(origin, provider, "unavailable", screen);
+    if (!client) return endLink(origin, provider, "unavailable", screen, extra);
 
     try {
         const authorized = await exchangeConnectionCode(provider, client, code, connectionCallbackUrl(provider, origin));
+        /**
+         * The account that came back is not the one this was started for.
+         *
+         * The ordinary mistake rather than an attack: somebody types one
+         * address, the consent screen opens on the account their browser is
+         * already signed into, and they press Continue. What followed was a
+         * mailbox stored under the address on the form and a token for a
+         * different one.
+         *
+         * Nothing is linked. Linking it anyway would put an account on their
+         * profile they never meant to connect, and it would still not be the
+         * mailbox they asked for.
+         */
+        if (wanted && !sameAddress(authorized.email ?? "", wanted)) {
+            return endLink(origin, provider, "wrong_account", screen, extra);
+        }
         const saved = await saveConnection(user.id, {
             provider,
             accountId: authorized.accountId,
@@ -403,16 +495,16 @@ async function finishLink(
         await markConnectionProven(provider);
         // Whatever it last refused, it does not refuse now.
         await clearConnectionFailure(provider);
-        return endLink(origin, provider, "linked", screen);
+        return endLink(origin, provider, "linked", screen, extra);
     } catch (caught) {
         // The two refusals somebody can actually do something about are named;
         // everything else is a provider that did not complete the authorization.
-        if (caught instanceof ConnectionClaimedError) return endLink(origin, provider, "taken", screen);
-        if (caught instanceof ConnectionLimitError) return endLink(origin, provider, "limit", screen);
+        if (caught instanceof ConnectionClaimedError) return endLink(origin, provider, "taken", screen, extra);
+        if (caught instanceof ConnectionLimitError) return endLink(origin, provider, "limit", screen, extra);
         // Those two are this person's to resolve. This one is the operator's, and
         // they are not the person standing at the redirect - so they are told.
         await recordConnectionFailure(provider, describeFailure(caught));
-        return endLink(origin, provider, "error", screen);
+        return endLink(origin, provider, "error", screen, extra);
     }
 }
 
@@ -493,8 +585,16 @@ async function finishSignIn(
  * connections list, which would leave them to find their way back. It is never
  * read from the request: that would make this an open redirect.
  */
-function endLink(origin: string, provider: string, outcome: LinkOutcome, screen?: string): Response {
-    const response = NextResponse.redirect(backToConnections(origin, provider, outcome, screen));
+function endLink(
+    origin: string,
+    provider: string,
+    outcome: LinkOutcome,
+    screen?: string,
+    extra?: Record<string, string>
+): Response {
+    const response = NextResponse.redirect(
+        backToConnections(origin, provider, outcome, screen, extra)
+    );
     response.cookies.delete(STATE_COOKIE);
     return response;
 }

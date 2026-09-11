@@ -56,6 +56,7 @@ import {
 } from "@polaris/ui";
 import {
     findMailService,
+    sameAddress,
     mailAccountSetupSchema,
     mailAccountUpdateSchema,
     mailHost,
@@ -69,9 +70,53 @@ export interface LinkedAccount {
     readonly id: string;
     readonly provider: string;
     readonly label: string;
+    /**
+     * The address the provider vouched for, or empty where it vouched for none.
+     *
+     * What decides whether this link is any use for the mailbox being connected.
+     * Without it every authorized account was offered for every address and the
+     * first was picked, so somebody typing one address and authorizing a
+     * different account ended up with a mailbox stored under the address they
+     * typed and a token for another one.
+     */
+    readonly address: string;
     /** Whether it has been granted what a mailbox needs, rather than only what a
      *  calendar needs. */
     readonly readyForMail: boolean;
+}
+
+/**
+ * Where the address being connected waits while its owner is at the provider.
+ *
+ * Authorizing leaves Polaris entirely - a full navigation to Google and back -
+ * so everything typed into this dialog is gone by the time they return, and what
+ * they came back to was an empty form and a sentence telling them to add the
+ * mailbox they had just authorized. Kept for this tab only, and for long enough
+ * to sign in and no longer.
+ */
+const RESUME_KEY = "polaris.mail.connecting";
+const RESUME_TTL_MS = 15 * 60 * 1000;
+
+function keepResume(address: string): void {
+    try {
+        window.sessionStorage.setItem(RESUME_KEY, JSON.stringify({ address, at: Date.now() }));
+    } catch {
+        // A browser told to keep no site data. They come back to the form they
+        // would have come back to before this existed.
+    }
+}
+
+function takeResume(): string {
+    try {
+        const held = window.sessionStorage.getItem(RESUME_KEY);
+        window.sessionStorage.removeItem(RESUME_KEY);
+        if (!held) return "";
+        const parsed = JSON.parse(held) as { address?: unknown; at?: unknown };
+        if (typeof parsed.address !== "string" || typeof parsed.at !== "number") return "";
+        return Date.now() - parsed.at < RESUME_TTL_MS ? parsed.address : "";
+    } catch {
+        return "";
+    }
 }
 
 /** Which field a refusal was about, when it named one. Read the same way
@@ -209,6 +254,24 @@ export function ConnectMailboxDialog({
     const [problem, setProblem] = useState("");
     const [field, setField] = useState("");
     const [connecting, startConnecting] = useTransition();
+    /**
+     * Whether this dialog is the second half of a trip to a provider.
+     *
+     * Authorizing is a full navigation away and back, so the form somebody
+     * filled in is gone by the time they return - and what they returned to was
+     * an empty one, under a sentence congratulating them on an authorization
+     * that had connected no mailbox. The address comes back from where it was
+     * left, and the rest finishes itself: pressing Authorize was never a thing
+     * anybody wanted done on its own.
+     */
+    const [resuming, setResuming] = useState(false);
+    useEffect(() => {
+        if (editing) return;
+        const held = takeResume();
+        if (!held) return;
+        setAddress(held);
+        setResuming(true);
+    }, [editing]);
 
     // Which lookup the answer on the wire belongs to. An address typed on top of
     // a slow lookup must not be filled in with the previous domain's servers.
@@ -269,13 +332,48 @@ export function ConnectMailboxDialog({
             ? microsoftReady
             : false;
     const authorizable = Boolean(discovery?.oauth) && oauthReady && !usePassword;
-    const usable = links.filter((link) => link.provider === discovery?.oauth && link.readyForMail);
+    /** The mailbox this dialog is about, which is what any authorization has to
+     *  be for. */
+    const forAddress = (editing?.address ?? address).trim();
+    const authorized = links.filter(
+        (link) => link.provider === discovery?.oauth && link.readyForMail
+    );
+    /**
+     * The ones that are this mailbox.
+     *
+     * Matched on the address the provider vouched for rather than offered as a
+     * list: an account somebody authorized for another mailbox cannot read this
+     * one, and picking it stored a mailbox that could never log in.
+     *
+     * A link with no address on it - an older one, or a provider that vouched
+     * for none - is not offered. There is nothing to check it against, and
+     * guessing is the bug this exists to remove.
+     */
+    const usable = authorized.filter(
+        (link) => forAddress !== "" && link.address !== "" && sameAddress(link.address, forAddress)
+    );
+    /** Authorized here, but a different account than the one being connected -
+     *  which is exactly what happens when the consent screen opens on whoever
+     *  the browser is already signed into. */
+    const otherAccount = usable.length === 0 && authorized.length > 0;
     // The one chosen, while it is still one that can be chosen: a mailbox being
     // changed may point at a link that has since lost its mail access.
     const chosenConnection = usable.some((link) => link.id === connectionId)
         ? connectionId
         : (usable[0]?.id ?? "");
     const provider = discovery?.oauth === "microsoft" ? "Microsoft" : "Google";
+    /**
+     * Where Authorize goes.
+     *
+     * It names the mailbox: the provider opens its consent screen on that
+     * account rather than on whichever one the browser is signed into, and the
+     * callback refuses to link any other - see `link-flow`. `edit` is what
+     * brings a re-authorization back to the mailbox it was for instead of to a
+     * list.
+     */
+    const authorizeHref = `/api/connections/${discovery?.oauth ?? ""}/link?scope=mail&address=${encodeURIComponent(
+        forAddress
+    )}${editing ? `&edit=${encodeURIComponent(editing.id)}` : ""}`;
 
     /** What would be sent, as it stands. Checked against the server's own
      *  schema as it is typed, and compared with the mailbox as it was loaded. */
@@ -438,6 +536,21 @@ export function ConnectMailboxDialog({
         (authorizable ? Boolean(chosenConnection) : password.length > 0 || keepsPassword) &&
         (!editing || (checked.success && changed));
 
+    /**
+     * Come back from the provider with everything it needed, and add the
+     * mailbox.
+     *
+     * Held until the lookup that fills in the servers has landed, which is what
+     * `ready` is. Anything missing - no link for this address, because the
+     * account authorized was a different one - leaves the form standing with the
+     * reason on it rather than submitting something that would be refused.
+     */
+    useEffect(() => {
+        if (!resuming || connecting || !ready || !authorizable || !chosenConnection) return;
+        setResuming(false);
+        connect();
+    }, [resuming, connecting, ready, authorizable, chosenConnection]); // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
@@ -517,6 +630,21 @@ export function ConnectMailboxDialog({
                             ) : null}
                             {authorizable ? (
                                 <div className="space-y-2">
+                                    {/* Authorized here, and not this mailbox.
+                                        The consent screen opens on whoever the
+                                        browser is signed into, so this is the
+                                        ordinary way to end up with a token for
+                                        the wrong account - and the server
+                                        refuses to link one, which is why there
+                                        is something to say rather than a mailbox
+                                        that cannot log in. */}
+                                    {otherAccount ? (
+                                        <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[12px]">
+                                            The {provider} account you authorized is not{" "}
+                                            {forAddress || "this mailbox"}. Authorize that one to
+                                            connect it, or use a password instead.
+                                        </p>
+                                    ) : null}
                                     {usable.length > 0 ? (
                                         <>
                                             <label className="block">
@@ -547,7 +675,8 @@ export function ConnectMailboxDialog({
                                             </p>
                                             <Button asChild className="w-full">
                                                 <a
-                                                    href={`/api/connections/${discovery.oauth}/link?scope=mail`}
+                                                    href={authorizeHref}
+                                                    onClick={() => keepResume(forAddress)}
                                                 >
                                                     {editing
                                                         ? `Reconnect with ${provider}`
@@ -562,9 +691,7 @@ export function ConnectMailboxDialog({
                                         that stopped working is this one's. */}
                                     {editing && usable.length > 0 ? (
                                         <Button asChild variant="outline" className="w-full">
-                                            <a
-                                                href={`/api/connections/${discovery.oauth}/link?scope=mail`}
-                                            >
+                                            <a href={authorizeHref} onClick={() => keepResume(forAddress)}>
                                                 Reconnect with {provider}
                                             </a>
                                         </Button>

@@ -21,6 +21,17 @@ export interface MailConnectOptions {
         readonly id: string;
         readonly provider: string;
         readonly label: string;
+        /**
+         * The address the provider vouched for, lowercased, or empty where it
+         * vouched for none.
+         *
+         * What makes a link usable for one mailbox and not another. Without it
+         * the connect dialog offered every authorized account for every address
+         * and picked the first: somebody typing one address and authorizing a
+         * different account got a mailbox stored under the address they typed
+         * and a token for somebody else's mail.
+         */
+        readonly address: string;
         readonly readyForMail: boolean;
     }[];
     readonly googleReady: boolean;
@@ -35,6 +46,21 @@ export interface MailConnectOptions {
      * screen says which, because the two look identical until it is too late.
      */
     readonly publicAddress: boolean;
+}
+
+/**
+ * The address a link vouches for, as far as a mailbox is concerned.
+ *
+ * Read off the label rather than from a column of its own, because for these two
+ * providers the label IS the address: Google labels a link with the verified
+ * address on the account, Microsoft with the mailbox or the user principal name.
+ * Anything that is not one - an older link, a provider that vouched for no
+ * address - is empty, which means "do not offer this for a mailbox" rather than
+ * "offer it for any".
+ */
+function addressOf(label: string): string {
+    const trimmed = label.trim().toLowerCase();
+    return trimmed.includes("@") ? trimmed : "";
 }
 
 export async function mailConnectOptions(userId: string): Promise<MailConnectOptions> {
@@ -54,6 +80,7 @@ export async function mailConnectOptions(userId: string): Promise<MailConnectOpt
             id: link.id,
             provider: link.provider,
             label: link.label,
+            address: addressOf(link.label),
             readyForMail: grantsMailAccess(link.provider, link.scope)
         })),
         // An application is only offerable once the operator has connected it

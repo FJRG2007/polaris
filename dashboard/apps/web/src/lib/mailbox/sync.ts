@@ -57,6 +57,39 @@ function worthSyncing(folder: { role: string; subscribed: boolean; hidden: boole
 }
 
 /**
+ * Which folder is worth having first.
+ *
+ * A first pass is one connection working through every folder in turn, up to
+ * four hundred envelopes each, and on a large Gmail that is minutes. What decides
+ * whether those minutes are felt is the order: the folders used to be walked in
+ * alphabetical order of their role, which on Gmail put "all" - a copy of every
+ * message in the account - ahead of the inbox, and left somebody who had just
+ * connected their mailbox looking at an empty inbox while Polaris read All Mail.
+ *
+ * So the inbox is first, then the folders somebody moves mail into and reads,
+ * then the ones they look at rarely. "all" is deliberately last: every message
+ * in it is in another folder too, so it is the one folder whose absence costs
+ * nothing for the longest.
+ */
+const SYNC_ORDER: readonly string[] = [
+    "inbox",
+    "sent",
+    "drafts",
+    "archive",
+    "junk",
+    "trash",
+    // Anything somebody subscribed to that has no role of its own sits here, by
+    // being neither named above nor "all".
+    "none",
+    "all"
+];
+
+function syncRank(role: string): number {
+    const at = SYNC_ORDER.indexOf(role);
+    return at === -1 ? SYNC_ORDER.indexOf("none") : at;
+}
+
+/**
  * One pass over one account.
  *
  * Never throws: a mailbox that cannot be reached leaves its reason on itself and
@@ -112,9 +145,9 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         await withImap(account, async (client) => {
             await syncFolders(client, account.id);
             const folders = await prisma.mailFolder.findMany({
-                where: { accountId: account.id },
-                orderBy: { role: "asc" }
+                where: { accountId: account.id }
             });
+            folders.sort((left, right) => syncRank(left.role) - syncRank(right.role));
             for (const folder of folders) {
                 if (!worthSyncing(folder)) continue;
                 await syncFolder(client, account, folder);

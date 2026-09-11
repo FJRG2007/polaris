@@ -148,6 +148,12 @@ export function AccountsView({
                         "Ask an administrator to give Polaris a public address."
                     )}
                 </p>
+            ) : outcome === "wrong_account" ? (
+                <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[13px]">
+                    That is not the {outcomeProvider === "microsoft" ? "Microsoft" : "Google"}{" "}
+                    account this mailbox is. Nothing was connected. Authorize the account whose
+                    address you typed, or add the mailbox with a password.
+                </p>
             ) : outcome && outcome !== "linked" ? (
                 <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
                     That authorization did not finish. Nothing was changed.

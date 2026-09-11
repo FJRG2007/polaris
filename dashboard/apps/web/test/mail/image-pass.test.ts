@@ -10,8 +10,16 @@
  * So the address carries its own authority. These are the properties that has to
  * have to be worth anything: it round-trips, it cannot be moved onto another
  * message or another picture, it cannot be forged, and it stops working.
+ *
+ * And the one thing the route itself has to get right: a picture it will not
+ * pass on is answered with nothing at all. `new Response("", { status: 204 })`
+ * throws - a 204 carries no body, and an empty string is a body - so every
+ * blocked image raised "Invalid response status code 204" in production instead
+ * of quietly not drawing.
  */
 
+import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import { beforeAll, describe, expect, it } from "vitest";
 import { resetEnvCache } from "@polaris/config";
 
@@ -80,5 +88,21 @@ describe("a signed picture address", () => {
         const good = readImagePass(tokenOf(url), "msg_1", 0);
         expect(good).not.toBeNull();
         expect(readImagePass(`${payload}.anything`, "msg_1", 0)).toBeNull();
+    });
+});
+
+describe("a picture that is not passed on", () => {
+    it("answers with no body, which is what a 204 is", async () => {
+        const route = await readFile(
+            fileURLToPath(
+                new URL(
+                    "../../src/app/api/mail/image/[messageId]/[index]/[token]/route.ts",
+                    import.meta.url
+                )
+            ),
+            "utf8"
+        );
+        expect(route).toContain("new Response(null, { status: 204 })");
+        expect(route).not.toContain('new Response("", { status: 204 })');
     });
 });

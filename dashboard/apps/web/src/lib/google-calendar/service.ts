@@ -96,7 +96,13 @@ export function googleAuthorizeUrl(
     client: GoogleOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" | "mail" = "link"
+    flow: "link" | "signin" | "storage" | "mail" = "link",
+    /** The account this is being authorized FOR, when something downstream
+     *  knows - a mailbox address somebody typed. Google opens on that account
+     *  instead of on whichever one the browser happens to be signed into, which
+     *  is the whole of how the wrong one gets authorized. Only a hint: what
+     *  settles it is the address the token comes back for. */
+    loginHint?: string
 ): string {
     const signIn = flow === "signin";
     const scopes = signIn
@@ -115,6 +121,7 @@ export function googleAuthorizeUrl(
     url.searchParams.set("prompt", signIn ? "select_account" : "consent");
     url.searchParams.set("include_granted_scopes", "true");
     url.searchParams.set("state", state);
+    if (loginHint) url.searchParams.set("login_hint", loginHint);
     return url.toString();
 }
 

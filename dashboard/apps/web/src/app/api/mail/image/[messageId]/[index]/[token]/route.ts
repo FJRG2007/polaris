@@ -78,13 +78,13 @@ export async function GET(
     if (!target) return new Response("Not found", { status: 404 });
 
     const response = await follow(target, "image/*");
-    if (!response || response.status !== 200) return new Response("", { status: 204 });
+    if (!response || response.status !== 200) return new Response(null, { status: 204 });
 
     const type = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
-    if (!IMAGE_TYPES.test(type)) return new Response("", { status: 204 });
+    if (!IMAGE_TYPES.test(type)) return new Response(null, { status: 204 });
 
     const bytes = await readCapped(response, MAX_BYTES);
-    if (!bytes) return new Response("", { status: 204 });
+    if (!bytes) return new Response(null, { status: 204 });
 
     return new Response(new Uint8Array(bytes), {
         headers: {

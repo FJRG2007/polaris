@@ -115,7 +115,11 @@ interface ProviderOAuth {
         client: OAuthClient,
         redirectUri: string,
         state: string,
-        flow: ConnectionFlow
+        flow: ConnectionFlow,
+        /** Which account the provider should open on, where it takes one and
+         *  something upstream knows - the mailbox address somebody typed.
+         *  Ignored by the providers that have no such thing. */
+        loginHint?: string
     ): string;
     exchange(
         client: OAuthClient,
@@ -381,9 +385,10 @@ export function connectionAuthorizeUrl(
     client: OAuthClient,
     redirectUri: string,
     state: string,
-    flow: ConnectionFlow = "link"
+    flow: ConnectionFlow = "link",
+    loginHint?: string
 ): string {
-    return adapter(provider).authorizeUrl(client, redirectUri, state, flow);
+    return adapter(provider).authorizeUrl(client, redirectUri, state, flow, loginHint);
 }
 
 export function exchangeConnectionCode(

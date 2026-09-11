@@ -1167,6 +1167,41 @@ export function MailView({
         [selected, selectedMessageIds]
     );
 
+    /**
+     * Whether the mail is on its way rather than absent.
+     *
+     * A mailbox connected a moment ago has its folder list and every folder's
+     * count - those come from one LIST on the first pass - and none of the
+     * messages, which arrive folder by folder over the minutes after. In between,
+     * a list drawn from what Polaris holds is empty, and it said so: "Inbox is
+     * empty", beside a rail saying the inbox held four thousand.
+     *
+     * The server's own count is the answer. It is on the folder row, it is right
+     * before a single envelope has been read, and a folder that says it holds
+     * mail while this list holds none of it is a first sync in progress and
+     * nothing else.
+     *
+     * Only for the plain view of a folder. A search, a tab or a filter has every
+     * right to come back empty out of a folder that is full, and saying "still
+     * fetching" over one of those would be an excuse rather than a fact.
+     */
+    const feeding = useMemo(
+        () =>
+            folders.filter(
+                (folder) =>
+                    (!page.accountId || folder.accountId === page.accountId) &&
+                    (page.folderId
+                        ? folder.id === page.folderId
+                        : page.role
+                          ? folder.role === page.role
+                          : false)
+            ),
+        [folders, page.accountId, page.folderId, page.role]
+    );
+    const narrowed = Boolean(page.query) || filter !== "" || category !== "";
+    const stillFetching =
+        !narrowed && threads.length === 0 && feeding.some((folder) => folder.total > 0);
+
     const allPicked = threads.length > 0 && selected.length === threads.length;
     /**
      * Whether the screen is split, which is not quite "there is a conversation".
@@ -1401,6 +1436,18 @@ export function MailView({
                                 }
                             />
                         </div>
+                    ) : stillFetching ? (
+                        // On its way. The shape of the rows that are coming,
+                        // under a line saying why there are none yet - the same
+                        // answer a first visit gets, because it is the same
+                        // situation: this list is not empty, it is not here yet.
+                        <>
+                            <p className="border-b border-border px-4 py-3 text-[13px] text-muted-foreground">
+                                Fetching this mailbox. Messages appear as they arrive, newest
+                                first.
+                            </p>
+                            <ThreadRowsSkeleton />
+                        </>
                     ) : threads.every((thread) => patched[thread.id]?.gone) ? (
                         <div className="p-6">
                             <EmptyState
