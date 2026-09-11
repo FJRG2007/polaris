@@ -12,6 +12,7 @@
 
 import * as core from "@polaris/core";
 import { CopyRow } from "./deploy-view";
+import { LikelyCause } from "./likely-cause";
 import * as actions from "./database-actions";
 import { useProjectCan } from "./access-context";
 import { DbEngineIcon } from "@/components/db-engine-icon";
@@ -163,6 +164,14 @@ export function DatabaseManageDialog({
 
                 {overview ? (
                     <div className="flex flex-col gap-4">
+                        {overview.failedDeploymentId ? (
+                            <LikelyCause
+                                deploymentId={overview.failedDeploymentId}
+                                canConfigure={false}
+                                canSetVariables={false}
+                                onFixed={() => void load()}
+                            />
+                        ) : null}
                         {tabs.length > 1 ? (
                             <ScrollRow>
                                 <SegmentedControl
@@ -267,6 +276,7 @@ function VersionsSection({
     const [pending, startTransition] = useTransition();
     const moment = fromLocalInput(at);
     const refresh = version === overview.version;
+    const caveat = refresh ? null : core.dbVersionCaveat(overview.engine, version);
     const options = [
         { value: overview.version, label: `Newest ${label} ${overview.version} release` },
         ...upgrade.versions.map((entry) => ({ value: entry, label: `${label} ${entry}` }))
@@ -363,6 +373,7 @@ function VersionsSection({
                             />
                         </label>
                     ) : null}
+                    {caveat ? <p className="text-xs text-muted-foreground">{caveat}</p> : null}
                     <div>
                         <Button
                             size="sm"

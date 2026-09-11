@@ -9,7 +9,13 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state, db, deployApplication, setApplicationPort, setEnvVar } = vi.hoisted(() => {
-    const state = { logPath: "", app: {} as Record<string, unknown>, status: "failed" };
+    const state = {
+        logPath: "",
+        app: {} as Record<string, unknown>,
+        status: "failed",
+        deployableType: "application",
+        database: { id: "db-1" } as { id: string } | null
+    };
     return {
         state,
         db: {
@@ -18,13 +24,16 @@ const { state, db, deployApplication, setApplicationPort, setEnvVar } = vi.hoist
                     id: "dep-1",
                     status: state.status,
                     error: "build failed",
-                    deployableType: "application",
-                    deployableId: "app-1"
+                    deployableType: state.deployableType,
+                    deployableId: state.deployableType === "database" ? "db-1" : "app-1"
                 }))
             },
             application: {
                 findFirst: vi.fn(async () => state.app),
                 update: vi.fn(async () => ({}))
+            },
+            managedDatabase: {
+                findFirst: vi.fn(async () => state.database)
             }
         },
         deployApplication: vi.fn(async () => "dep-2"),
@@ -54,6 +63,8 @@ afterAll(async () => {
 });
 beforeEach(() => {
     state.status = "failed";
+    state.deployableType = "application";
+    state.database = { id: "db-1" };
     state.app = {
         id: "app-1",
         sourceType: "nixpacks",
@@ -81,6 +92,31 @@ describe("reading the cause", () => {
 
     it("offers nothing for a deploy that did not fail", async () => {
         state.status = "running";
+        expect(await diagnoseDeployment("dep-1", "owner-1")).toBeNull();
+    });
+
+    it("reads a database's failed provision, for a cause with nothing to change on it", async () => {
+        state.deployableType = "database";
+        await writeFile(
+            state.logPath,
+            "==> The last 40 lines it printed:\nMongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility\n",
+            "utf8"
+        );
+        const found = await diagnoseDeployment("dep-1", "owner-1");
+        expect(found?.cause).toBe("mongo-kernel-incompatible");
+        expect(found?.fix).toBeNull();
+    });
+
+    it("offers a database no fix meant for an application's settings", async () => {
+        state.deployableType = "database";
+        await writeFile(state.logPath, 'npm error Missing script: "start"\n', "utf8");
+        expect(await diagnoseDeployment("dep-1", "owner-1")).toBeNull();
+    });
+
+    it("offers nothing for a database that is not the owner's", async () => {
+        state.deployableType = "database";
+        state.database = null;
+        await writeFile(state.logPath, "MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility\n", "utf8");
         expect(await diagnoseDeployment("dep-1", "owner-1")).toBeNull();
     });
 });
@@ -132,6 +168,12 @@ describe("applying a fix", () => {
 
     it("refuses a deploy that did not fail", async () => {
         state.status = "running";
+        await expect(applyDeployFix("dep-1", "owner-1", "user-1", { kind: "set-port", port: 8080 })).rejects.toThrow();
+        expect(deployApplication).not.toHaveBeenCalled();
+    });
+
+    it("refuses a database's deploy", async () => {
+        state.deployableType = "database";
         await expect(applyDeployFix("dep-1", "owner-1", "user-1", { kind: "set-port", port: 8080 })).rejects.toThrow();
         expect(deployApplication).not.toHaveBeenCalled();
     });

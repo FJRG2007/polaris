@@ -3,7 +3,8 @@
 /**
  * What a failed deploy's log says went wrong, and the fix for it as one press.
  *
- * Shown under the failed-deploy callout. A fix that needs a value the log cannot
+ * Shown under the failed-deploy callout, and atop a database's Manage panel
+ * when its last provision failed. A fix that needs a value the log cannot
  * give - the start command, a variable's value - asks for it in place, checked as
  * it is typed against the schema the server applies; the others are one button.
  * Either way the setting changes and a new deploy starts.

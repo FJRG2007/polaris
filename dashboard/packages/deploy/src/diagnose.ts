@@ -128,7 +128,7 @@ const RULES: readonly Rule[] = [
         pattern: /MongoDB cannot start: Linux kernel versions 6\.19 and newer has a known incompatibility/,
         diagnose: () => ({
             title: "This MongoDB version cannot run on this server's Linux kernel",
-            detail: "MongoDB 8 refuses to start on Linux 6.19 or newer (MongoDB issue SERVER-121912). Use a MongoDB 7 image on this server until MongoDB ships a fix, or run it on a server with an older kernel.",
+            detail: "MongoDB 8 refuses to start on Linux 6.19 or newer (MongoDB issue SERVER-121912). Run MongoDB 7 on this server until MongoDB ships a fix, or use a server with an older kernel.",
             fix: null
         })
     },

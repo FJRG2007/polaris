@@ -161,6 +161,52 @@ describe("deploying the members", () => {
     });
 });
 
+describe("waiting for the members to come up", () => {
+    /** A machine where every member has been running a while, except the ones
+     *  named, which exited with MongoDB's refusal as their last line. */
+    function machine(exited: readonly string[] = []) {
+        const written: string[] = [];
+        const ports = {
+            pull: vi.fn(async () => undefined),
+            composeUp: vi.fn(async () => undefined),
+            logs: vi.fn(async (_name: string, sink: (chunk: Buffer) => void) => {
+                sink(Buffer.from("MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility\n"));
+            }),
+            inspect: vi.fn(async (name: string) => ({
+                RestartCount: 0,
+                State: exited.includes(name)
+                    ? { Status: "exited", ExitCode: 14 }
+                    : { Status: "running", StartedAt: "2026-09-10T09:00:00Z" }
+            }))
+        };
+        const ctx = {
+            ports,
+            target: { id: "local", kind: "local", engine: "compose", proxyNetwork: NETWORK },
+            log: (chunk: Buffer) => void written.push(chunk.toString())
+        } as unknown as RuntimeContext;
+        return { ctx, ports, log: () => written.join("") };
+    }
+
+    it("counts the database only once every member is running", async () => {
+        const { ctx, ports } = machine();
+        const result = await new ComposeRuntime().deployDatabase(plan(), ctx);
+        expect(result.ok).toBe(true);
+        expect(ports.inspect.mock.calls.map(([name]) => name)).toEqual([
+            "shop-orders-1a2b",
+            "shop-orders-1a2b-m2",
+            "shop-orders-1a2b-m3"
+        ]);
+    });
+
+    it("fails when a member exits on start, with what it printed in the log", async () => {
+        const { ctx, ports, log } = machine(["shop-orders-1a2b-m3"]);
+        const result = await new ComposeRuntime().deployDatabase(plan(), ctx);
+        expect(result).toEqual({ ok: false, error: expect.stringContaining("exit code 14") });
+        expect(ports.logs).toHaveBeenCalledWith("shop-orders-1a2b-m3", expect.any(Function), { tail: 40 });
+        expect(log()).toContain("MongoDB cannot start: Linux kernel versions 6.19");
+    });
+});
+
 describe("forCompose", () => {
     it("refuses a command with a line break, naming the service", () => {
         const spec = dbComposeSpec(
