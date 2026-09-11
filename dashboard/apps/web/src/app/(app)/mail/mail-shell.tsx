@@ -94,6 +94,19 @@ export interface MailContextValue {
      * reason: this is what somebody just did, not what is true.
      */
     readonly nudgeUnread: (entries: readonly UnreadNudge[]) => void;
+    /**
+     * Show a folder renamed, or gone, before the mail server has answered.
+     *
+     * `null` takes the overlay back, which is what a refusal does. Dropped by
+     * itself the moment the server's own list moves, so nothing has to remember
+     * to clear it after a success. A colour is Polaris' own rather than the mail
+     * server's and still goes through here: the write is quick, the render that
+     * shows it was not.
+     */
+    readonly patchFolder: (
+        folderId: string,
+        change: { name?: string; color?: string; gone?: boolean } | null
+    ) => void;
     /** The colour standing for one mailbox, so a row in a merged list says which
      *  mailbox it came from without being read. */
     readonly accountColor: (accountId: string) => string;
@@ -274,10 +287,45 @@ export function MailShell({
         [folders, nudgeBadge]
     );
 
+    /**
+     * What has just been done to a folder itself, before the server says so.
+     *
+     * The same overlay the counts have, for the same reason and exactly as long:
+     * renaming a folder or throwing it away is a round trip to somebody else's
+     * IMAP server, and a rail that goes on showing the old name - or the folder
+     * that was just deleted - until that answers is a rail saying the press did
+     * nothing. Both come back, with the reason, if the server refuses.
+     */
+    const [folderEdits, setFolderEdits] = useState<
+        Record<string, { readonly name?: string; readonly color?: string; readonly gone?: boolean }>
+    >({});
+    const patchFolder = useCallback(
+        (folderId: string, change: { name?: string; color?: string; gone?: boolean } | null) => {
+            setFolderEdits((held) => {
+                if (change === null) {
+                    if (!held[folderId]) return held;
+                    const next = { ...held };
+                    delete next[folderId];
+                    return next;
+                }
+                return { ...held, [folderId]: { ...held[folderId], ...change } };
+            });
+        },
+        []
+    );
+    // The server's own list has moved, which is the end of standing in for it.
+    const folderTruth = useMemo(
+        () => folders.map((folder) => `${folder.id}:${folder.name}`).join(","),
+        [folders]
+    );
+    useEffect(() => {
+        setFolderEdits((held) => (Object.keys(held).length === 0 ? held : {}));
+    }, [folderTruth]);
+
     /** The counts as the reader should see them: the server's, with what they
      *  have just done laid over, and never below nothing. */
-    const shownFolders = useMemo(
-        () =>
+    const shownFolders = useMemo(() => {
+        const counted =
             Object.keys(drift).length === 0
                 ? folders
                 : folders.map((folder) => {
@@ -285,9 +333,21 @@ export function MailShell({
                       return by === 0
                           ? folder
                           : { ...folder, unread: Math.max(0, folder.unread + by) };
-                  }),
-        [folders, drift]
-    );
+                  });
+        if (Object.keys(folderEdits).length === 0) return counted;
+        return counted.flatMap((folder) => {
+            const over = folderEdits[folder.id];
+            if (!over) return [folder];
+            if (over.gone) return [];
+            return [
+                {
+                    ...folder,
+                    ...(over.name ? { name: over.name } : {}),
+                    ...(over.color === undefined ? {} : { color: over.color })
+                }
+            ];
+        });
+    }, [folders, drift, folderEdits]);
     const shownUnread = useMemo(() => {
         if (Object.keys(drift).length === 0) return unread;
         const byAccount: Record<string, number> = {};
@@ -433,6 +493,7 @@ export function MailShell({
             reloadLists,
             revision,
             nudgeUnread,
+            patchFolder,
             accountColor,
             composing,
             openComposer,
@@ -450,6 +511,7 @@ export function MailShell({
             reloadLists,
             revision,
             nudgeUnread,
+            patchFolder,
             accountColor,
             composing,
             openComposer,

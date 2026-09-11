@@ -116,8 +116,14 @@ export function AccountsView({
      */
     const [pending, setPending] = useState<Record<string, Partial<MailAccountView>>>({});
     useEffect(() => setPending({}), [accounts]);
+    /** Mailboxes removed here, gone from the list before the server's own list
+     *  comes back without them. */
+    const [removed, setRemoved] = useState<string[]>([]);
+    useEffect(() => setRemoved([]), [accounts]);
 
-    const shown = accounts.map((account) => ({ ...account, ...pending[account.id] }));
+    const shown = accounts
+        .filter((account) => !removed.includes(account.id))
+        .map((account) => ({ ...account, ...pending[account.id] }));
     const editedAccount = editing ? accounts.find((account) => account.id === editing.id) : undefined;
 
     function closeEditor(): void {
@@ -190,6 +196,13 @@ export function AccountsView({
                             key={account.id}
                             account={account}
                             onEdit={(focusPassword) => setEditing({ id: account.id, focusPassword })}
+                            onRemoved={(gone) =>
+                                setRemoved((held) =>
+                                    gone
+                                        ? [...held, account.id]
+                                        : held.filter((id) => id !== account.id)
+                                )
+                            }
                         />
                     ))}
                 </ul>
@@ -239,11 +252,16 @@ export function AccountsView({
 
 function AccountRow({
     account,
-    onEdit
+    onEdit,
+    onRemoved
 }: {
     account: MailAccountView;
     /** Open the edit form, on the password box when that is what is wrong. */
     onEdit: (focusPassword: boolean) => void;
+    /** Taken off the list now, and put back when the server refuses: removing a
+     *  mailbox is a write and a revalidation, and a row that sits there until
+     *  both land reads as the press having done nothing. */
+    onRemoved: (gone: boolean) => void;
 }) {
     const router = useRouter();
     const toast = useToast();
@@ -422,15 +440,20 @@ function AccountRow({
                             : ""
                     }`}
                     confirmLabel="Remove it"
-                    onConfirm={async () => {
-                        const answer = await removeAccountAction(account.id);
-                        const said = refusalOf(answer);
-                        if (said) {
-                            toast.show({ title: said });
-                            return;
-                        }
-                        toast.show({ title: `${account.address} is no longer connected.` });
-                        router.refresh();
+                    onConfirm={() => {
+                        setRemoving(false);
+                        onRemoved(true);
+                        void (async () => {
+                            const answer = await removeAccountAction(account.id);
+                            const said = refusalOf(answer);
+                            if (said) {
+                                onRemoved(false);
+                                toast.show({ title: said });
+                                return;
+                            }
+                            toast.show({ title: `${account.address} is no longer connected.` });
+                            router.refresh();
+                        })();
                     }}
                 />
             ) : null}

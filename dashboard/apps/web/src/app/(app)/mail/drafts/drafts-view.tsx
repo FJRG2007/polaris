@@ -13,10 +13,9 @@
  * queue, and the composer's own countdown is what takes it back.
  */
 
-import { useTransition } from "react";
 import { refusalOf } from "../refusal";
 import { useMail } from "../mail-shell";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { discardDraftAction } from "../actions";
 import { Pencil, Send, Trash2 } from "lucide-react";
 import type { MailDraftView } from "@/lib/mailbox/compose";
@@ -24,13 +23,24 @@ import { useDisplayFormat } from "@/components/display-format";
 import { Button, EmptyState, cn, useToast } from "@polaris/ui";
 
 export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
-    const router = useRouter();
     const toast = useToast();
     const format = useDisplayFormat();
-    const { openComposer } = useMail();
-    const [busy, startBusy] = useTransition();
+    const { openComposer, reloadLists } = useMail();
+    /**
+     * Drafts thrown away here, before the server has said so.
+     *
+     * The row went when the answer came back and the whole screen was rendered
+     * again for it, which on a list of drafts is a press that appears to do
+     * nothing for a moment and then redraws everything. It goes now; it comes
+     * back, with the reason, if the server refuses.
+     */
+    const [discarded, setDiscarded] = useState<string[]>([]);
+    // The server's own list has moved: whatever this was standing in for is
+    // either in it or gone from it.
+    useEffect(() => setDiscarded([]), [drafts]);
+    const shown = drafts.filter((draft) => !discarded.includes(draft.id));
 
-    if (drafts.length === 0) {
+    if (shown.length === 0) {
         return (
             <div className="p-6">
                 <EmptyState
@@ -52,7 +62,7 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
             </header>
 
             <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                {drafts.map((draft) => {
+                {shown.map((draft) => {
                     const waiting = Boolean(draft.sendAt);
                     return (
                         <li key={draft.id} className="border-b border-border/60">
@@ -104,18 +114,25 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                     size="icon"
                                     aria-label="Throw this draft away"
                                     title="Throw this draft away"
-                                    disabled={busy || waiting}
-                                    onClick={() =>
-                                        startBusy(async () => {
+                                    disabled={waiting}
+                                    onClick={() => {
+                                        setDiscarded((held) => [...held, draft.id]);
+                                        void (async () => {
                                             const answer = await discardDraftAction(draft.id);
                                             const said = refusalOf(answer);
                                             if (said) {
+                                                setDiscarded((held) =>
+                                                    held.filter((id) => id !== draft.id)
+                                                );
                                                 toast.show({ title: said });
                                                 return;
                                             }
-                                            router.refresh();
-                                        })
-                                    }
+                                            // The list this screen draws is the
+                                            // server's; asking for it again is
+                                            // what makes the row's absence real.
+                                            reloadLists();
+                                        })();
+                                    }}
                                 >
                                     <Trash2 className="size-4 shrink-0" aria-hidden />
                                 </Button>

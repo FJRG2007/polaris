@@ -29,7 +29,7 @@ import { MAIL_PALETTE } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
 import { RefusedMailboxes } from "./refused-notice";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { refusedMailboxHref } from "@/lib/mailbox/refusals";
 import {
     deleteFolderAction,
@@ -118,7 +118,7 @@ const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: s
 ];
 
 export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
-    const { accounts, folders, labels, unread } = useMail();
+    const { accounts, folders, labels, unread, patchFolder } = useMail();
     const pathname = usePathname();
     const search = useSearchParams();
     const router = useRouter();
@@ -137,17 +137,19 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
      * both are looked up against the person asking, so a drag can only ever move
      * their own mail into their own folder.
      */
-    /** Give a folder a colour, or take it off. The rail is the server's, so the
-     *  answer arrives with the refresh rather than being patched in - one small
-     *  write and one small re-render. */
+    /** Give a folder a colour, or take it off. The swatch lands now and the
+     *  write follows it; a refusal puts the old colour back and says why. */
     const colour = useCallback(
         async (folderId: string, hex: string) => {
+            patchFolder(folderId, { color: hex });
             const outcome = await setFolderColorAction(folderId, hex);
             const said = refusalOf(outcome);
-            if (said) toast.show({ title: said });
-            else router.refresh();
+            if (said) {
+                patchFolder(folderId, null);
+                toast.show({ title: said });
+            }
         },
-        [router, toast]
+        [patchFolder, toast]
     );
 
     /** The folder being renamed, and the one being thrown away. Held here rather
@@ -436,18 +438,27 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     // copy of it anywhere.
                     description="The folder and every message in it are deleted on the mail server. This cannot be undone from Polaris."
                     confirmLabel="Delete it"
-                    onConfirm={async () => {
-                        const outcome = await deleteFolderAction(deleting.id);
-                        const said = refusalOf(outcome);
-                        if (said) {
-                            toast.show({ title: said });
-                            return;
-                        }
-                        toast.show({ title: `${deleting.name} is gone.` });
+                    onConfirm={() => {
+                        // Gone from the rail now, and out of the folder if that
+                        // is where they were standing. Deleting a folder is a
+                        // round trip to somebody else's IMAP server, and a rail
+                        // that keeps drawing it until that answers reads as the
+                        // press having done nothing. It comes back, with the
+                        // reason, if the server refuses.
+                        const folder = deleting;
                         setDeleting(null);
-                        // The folder somebody was looking at no longer exists.
-                        if (pathname === `/mail/f/${deleting.id}`) router.push("/mail");
-                        else router.refresh();
+                        patchFolder(folder.id, { gone: true });
+                        if (pathname === `/mail/f/${folder.id}`) router.push("/mail");
+                        void (async () => {
+                            const outcome = await deleteFolderAction(folder.id);
+                            const said = refusalOf(outcome);
+                            if (said) {
+                                patchFolder(folder.id, null);
+                                toast.show({ title: said });
+                                return;
+                            }
+                            toast.show({ title: `${folder.name} is gone.` });
+                        })();
                     }}
                 />
             ) : null}
@@ -470,10 +481,9 @@ function RenameFolderDialog({
     folder: MailFolderView;
     onClose: () => void;
 }) {
-    const router = useRouter();
     const toast = useToast();
+    const { patchFolder } = useMail();
     const [name, setName] = useState(folder.name);
-    const [saving, startSaving] = useTransition();
     const wanted = name.trim();
     const ready = wanted.length > 0 && wanted !== folder.name;
 
@@ -487,18 +497,20 @@ function RenameFolderDialog({
                     className="space-y-3"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (!ready || saving) return;
-                        startSaving(async () => {
+                        if (!ready) return;
+                        // The rail says the new name now. The server is told in
+                        // the same breath and nobody watches it: a refusal puts
+                        // the old name back and says why.
+                        onClose();
+                        patchFolder(folder.id, { name: wanted });
+                        void (async () => {
                             const outcome = await renameFolderAction(folder.id, wanted);
                             const said = refusalOf(outcome);
                             if (said) {
+                                patchFolder(folder.id, null);
                                 toast.show({ title: said });
-                                return;
                             }
-                            toast.show({ title: `Renamed to ${wanted}.` });
-                            onClose();
-                            router.refresh();
-                        });
+                        })();
                     }}
                 >
                     <label className="block">
@@ -518,11 +530,11 @@ function RenameFolderDialog({
                         follows.
                     </p>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+                        <Button type="button" variant="ghost" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={!ready || saving}>
-                            {saving ? "Renaming..." : "Rename"}
+                        <Button type="submit" disabled={!ready}>
+                            Rename
                         </Button>
                     </div>
                 </form>
