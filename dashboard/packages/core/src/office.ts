@@ -226,9 +226,17 @@ export function normalizeOfficeTitle(value: string, kind: OfficeKind): string {
 export const officeCreateSchema = z.object({
     kind: z.enum(OFFICE_KINDS),
     title: z.string().trim().max(MAX_OFFICE_TITLE).default(""),
-    /** The organization it belongs to, or nothing for somebody's own. Checked
-     *  against what the caller may actually create for. */
-    orgId: z.string().trim().max(64).nullable().default(null)
+    /**
+     * The organization it belongs to.
+     *
+     * Three answers rather than two, and the third is the useful one: an id is
+     * that organization, `null` is explicitly somebody's own, and leaving it out
+     * means the shelf they are working on. A caller that does not ask the
+     * question - which is every "New document" button now - should not have to
+     * answer it, and answering it as "mine" is how somebody on a company shelf
+     * ends up with the company's document in their personal space.
+     */
+    orgId: z.string().trim().max(64).nullable().optional()
 });
 
 export type OfficeCreateInput = z.infer<typeof officeCreateSchema>;

@@ -75,13 +75,16 @@ export async function createDocumentAction(
         if (!parsed.success) {
             return { error: parsed.error.issues[0]?.message ?? "That could not be created" };
         }
-        const id = await office.createDocument({ id: user.id }, parsed.data);
+        // Where they are working, unless the caller said. See `officeCreateSchema`.
+        const orgId =
+            parsed.data.orgId === undefined ? await scopeOrgIdFor(user.id) : parsed.data.orgId;
+        const id = await office.createDocument({ id: user.id }, { ...parsed.data, orgId });
         await recordAudit({
             actorId: user.id,
             action: "office.create",
             targetType: "officeDocument",
             targetId: id,
-            metadata: { kind: parsed.data.kind, orgId: parsed.data.orgId }
+            metadata: { kind: parsed.data.kind, orgId }
         });
         revalidatePath(PATH);
         return { id, kind: parsed.data.kind };

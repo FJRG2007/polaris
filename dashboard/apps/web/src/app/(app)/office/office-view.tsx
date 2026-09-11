@@ -43,17 +43,12 @@ import {
     createDocumentAction,
     deleteDocumentAction,
     listDocumentsAction,
-    ownerOptionsAction,
     starDocumentAction,
     trashDocumentAction
 } from "./actions";
 import {
     Button,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    ConfirmDeleteDialog,
     EmptyState,
     Input,
     PageHeader,
@@ -108,7 +103,39 @@ export function OfficeView({
     const [sort, setSort] = useState<core.OfficeSort>(core.DEFAULT_OFFICE_SORT);
     const [query, setQuery] = useState("");
     const [busy, setBusy] = useState(false);
+    /**
+     * Making one is pressing the button, and nothing else.
+     *
+     * It used to be a form asking for a name and a shelf, which is two questions
+     * nobody has an answer to yet: the name is decided by what ends up in the
+     * document, and the shelf is the one they are already working on. Every
+     * other editor - Google's, Office's - makes an untitled document and opens
+     * it, and the title is a field at the top of it that somebody fills in when
+     * they have something to say. So does this: the server names it
+     * "Untitled spreadsheet" until somebody renames it, and files it where they
+     * are - see `officeCreateSchema`.
+     */
     const [making, setMaking] = useState<core.OfficeKind | null>(null);
+    /** The document about to be deleted for good, and what it is called - which
+     *  is what the question has to name. */
+    const [burning, setBurning] = useState<{ id: string; title: string } | null>(null);
+
+    const make = useCallback(
+        (kind: core.OfficeKind) => {
+            if (making) return;
+            setMaking(kind);
+            void (async () => {
+                const answer = await createDocumentAction({ kind });
+                setMaking(null);
+                if (answer.error || !answer.id) {
+                    toast.show({ title: answer.error ?? "That could not be made" });
+                    return;
+                }
+                router.push(core.officeDocumentPath(kind, answer.id));
+            })();
+        },
+        [making, router, toast]
+    );
     const [importing, setImporting] = useState(false);
     const [reading, setReading] = useState(false);
 
@@ -228,7 +255,7 @@ export function OfficeView({
                 <PageHeader title={title} description={description} />
                 {shelf === "live" ? (
                     <NewButton
-                        onPick={setMaking}
+                        onPick={make}
                         onImport={() => setImporting(true)}
                         busy={reading}
                     />
@@ -285,7 +312,7 @@ export function OfficeView({
                     action={
                         shelf === "live" && !query && !sharedOnly ? (
                             <NewButton
-                                onPick={setMaking}
+                                onPick={make}
                                 onImport={() => setImporting(true)}
                                 busy={reading}
                             />
@@ -317,9 +344,7 @@ export function OfficeView({
                                     row.trashed ? "Put back" : "Moved to the bin"
                                 )
                             }
-                            onDelete={() =>
-                                void act(() => deleteDocumentAction(row.id), "Deleted for good")
-                            }
+                            onDelete={() => setBurning({ id: row.id, title: row.title })}
                         />
                     ))}
                 </ul>
@@ -334,14 +359,24 @@ export function OfficeView({
                 />
             ) : null}
 
-            <NewDialog
-                kind={making}
-                onClose={() => setMaking(null)}
-                onMade={(id, made) => {
-                    setMaking(null);
-                    router.push(core.officeDocumentPath(made, id));
-                }}
-            />
+            {/* The permanent one, and the only delete here that asks: the bin
+                is where a document waits, and this is the end of it. */}
+            {burning ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(next: boolean) => (next ? undefined : setBurning(null))}
+                    name={burning.title}
+                    kind="document"
+                    title={`Delete ${burning.title} for good?`}
+                    description="It goes from the bin and from Polaris. Nothing here can bring it back."
+                    confirmLabel="Delete for good"
+                    onConfirm={async () => {
+                        const id = burning.id;
+                        setBurning(null);
+                        await act(() => deleteDocumentAction(id), "Deleted for good");
+                    }}
+                />
+            ) : null}
         </div>
     );
 }
@@ -536,102 +571,6 @@ function NewButton({
                 Import
             </Button>
         </ScrollRow>
-    );
-}
-
-/** Name it, and say whose it is. Both on one form: the owner is the one choice
- *  renaming cannot undo afterwards. */
-function NewDialog({
-    kind,
-    onClose,
-    onMade
-}: {
-    kind: core.OfficeKind | null;
-    onClose: () => void;
-    onMade: (id: string, kind: core.OfficeKind) => void;
-}) {
-    const toast = useToast();
-    const [title, setTitle] = useState("");
-    const [owner, setOwner] = useState("");
-    const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
-    const [me, setMe] = useState<{ id: string; name: string } | null>(null);
-    const [busy, setBusy] = useState(false);
-
-    useEffect(() => {
-        if (!kind) return;
-        setTitle("");
-        void (async () => {
-            const answer = await ownerOptionsAction();
-            setOrgs(answer.orgs ?? []);
-            setMe(answer.me ?? null);
-            // The shelf that is open, for the reason the space picker learned.
-            setOwner(answer.scopeOrgId ?? "");
-        })();
-    }, [kind]);
-
-    if (!kind) return null;
-    return (
-        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>New {core.OFFICE_KIND_LABELS[kind].toLowerCase()}</DialogTitle>
-                    <DialogDescription>{core.OFFICE_KIND_HINTS[kind]}</DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
-                        Name
-                        <Input
-                            autoFocus
-                            value={title}
-                            placeholder={core.OFFICE_KIND_UNTITLED[kind]}
-                            onChange={(event) => setTitle(event.target.value)}
-                        />
-                    </label>
-                    {orgs.length > 0 ? (
-                        <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
-                            Who it belongs to
-                            <Select
-                                value={owner}
-                                aria-label="Who this belongs to"
-                                onValueChange={setOwner}
-                                options={[
-                                    { value: "", label: me?.name ?? "You" },
-                                    ...orgs.map((org) => ({ value: org.id, label: org.name }))
-                                ]}
-                            />
-                        </label>
-                    ) : null}
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button
-                            disabled={busy}
-                            aria-disabled={busy}
-                            onClick={async () => {
-                                setBusy(true);
-                                const answer = await createDocumentAction({
-                                    kind,
-                                    title,
-                                    orgId: owner || null
-                                });
-                                setBusy(false);
-                                if (answer.error || !answer.id) {
-                                    toast.show({ title: answer.error ?? "That could not be made" });
-                                    return;
-                                }
-                                onMade(answer.id, kind);
-                            }}
-                        >
-                            {busy ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                            ) : null}
-                            Create
-                        </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
     );
 }
 

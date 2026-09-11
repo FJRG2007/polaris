@@ -411,7 +411,7 @@ export async function createDocument(
             kind: input.kind,
             title: core.normalizeOfficeTitle(input.title, input.kind),
             ownerId: actor.id,
-            orgId: input.orgId,
+            orgId: input.orgId ?? null,
             createdById: actor.id,
             editedById: actor.id,
             editedAt: new Date()
