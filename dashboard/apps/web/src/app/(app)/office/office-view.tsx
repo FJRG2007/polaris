@@ -16,6 +16,7 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useShelfScope } from "@/components/shelf-scope";
 import { RelativeTime } from "@/components/relative-time";
 import { asFiles } from "@/components/file-picker/as-files";
@@ -102,7 +103,7 @@ export function OfficeView({
     const [documents, setDocuments] = useState<OfficeDocumentView[] | null>(null);
     const [sort, setSort] = useState<core.OfficeSort>(core.DEFAULT_OFFICE_SORT);
     const [query, setQuery] = useState("");
-    const [busy, setBusy] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
     /**
      * Making one is pressing the button, and nothing else.
      *
@@ -237,17 +238,67 @@ export function OfficeView({
         [load, on, router, toast]
     );
 
-    const act = async (run: () => Promise<{ error?: string }>, said: string): Promise<void> => {
-        setBusy(true);
-        const answer = await run();
-        setBusy(false);
-        if (answer.error) {
-            toast.show({ title: answer.error });
-            return;
-        }
-        toast.show({ title: said });
-        await load();
-    };
+    /**
+     * A row moves when it is pressed, not when the server agrees.
+     *
+     * Everything here is one write away - starred, archived, binned - and the
+     * screen used to disable every button on every row and wait for the answer,
+     * then ask for the whole list again. That makes the common case, the write
+     * succeeding, the one that reads as broken. So the row goes where it is
+     * going now; a refusal puts the list back exactly as it was and says why.
+     */
+    const act = useCallback(
+        async (
+            change: (rows: OfficeDocumentView[]) => OfficeDocumentView[],
+            run: () => Promise<{ error?: string }>,
+            said: string
+        ): Promise<void> => {
+            const before = documents;
+            setDocuments((rows) => (rows === null ? rows : change(rows)));
+            const answer = await run();
+            if (answer.error) {
+                setDocuments(before);
+                toast.show({ title: answer.error });
+                return;
+            }
+            toast.show({ title: said });
+            await load();
+        },
+        [documents, load, toast]
+    );
+
+    /** Off this list: every screen here is one shelf, so archiving, binning and
+     *  putting back all mean the row belongs somewhere else now. */
+    const drop = (id: string) => (rows: OfficeDocumentView[]) =>
+        rows.filter((row) => row.id !== id);
+
+    /**
+     * Into the bin, once they have said so.
+     *
+     * Asked, because a bin icon on a row of a list is pressed by accident and
+     * the document it takes is the one somebody was working on. Putting one
+     * back is not asked: nothing is lost by it.
+     */
+    const bin = useCallback(
+        async (row: OfficeDocumentView): Promise<void> => {
+            if (!row.trashed) {
+                const sure = await confirm({
+                    title: `Move ${row.title} to the bin?`,
+                    description:
+                        "It leaves this list and waits in the bin, where you can put it back or delete it for good.",
+                    confirmLabel: "Move to the bin",
+                    danger: true
+                });
+                if (!sure) return;
+            }
+            await act(
+                drop(row.id),
+                () => trashDocumentAction(row.id, !row.trashed),
+                row.trashed ? "Put back" : "Moved to the bin"
+            );
+        },
+        [act, confirm]
+    );
 
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
@@ -325,25 +376,30 @@ export function OfficeView({
                         <Row
                             key={row.id}
                             row={row}
-                            busy={busy}
                             onStar={() =>
                                 void act(
+                                    // Unstarred on the starred shelf is a row
+                                    // that no longer belongs to this list.
+                                    starredOnly
+                                        ? drop(row.id)
+                                        : (rows) =>
+                                              rows.map((one) =>
+                                                  one.id === row.id
+                                                      ? { ...one, starred: !row.starred }
+                                                      : one
+                                              ),
                                     () => starDocumentAction(row.id, !row.starred),
                                     row.starred ? "Unstarred" : "Starred"
                                 )
                             }
                             onArchive={() =>
                                 void act(
+                                    drop(row.id),
                                     () => archiveDocumentAction(row.id, !row.archived),
                                     row.archived ? "Put back" : "Archived"
                                 )
                             }
-                            onTrash={() =>
-                                void act(
-                                    () => trashDocumentAction(row.id, !row.trashed),
-                                    row.trashed ? "Put back" : "Moved to the bin"
-                                )
-                            }
+                            onTrash={() => void bin(row)}
                             onDelete={() => setBurning({ id: row.id, title: row.title })}
                         />
                     ))}
@@ -366,17 +422,24 @@ export function OfficeView({
                     open
                     onOpenChange={(next: boolean) => (next ? undefined : setBurning(null))}
                     name={burning.title}
+                    requireTyping={false}
                     kind="document"
                     title={`Delete ${burning.title} for good?`}
                     description="It goes from the bin and from Polaris. Nothing here can bring it back."
                     confirmLabel="Delete for good"
-                    onConfirm={async () => {
-                        const id = burning.id;
+                    onConfirm={() => {
+                        const gone = burning;
                         setBurning(null);
-                        await act(() => deleteDocumentAction(id), "Deleted for good");
+                        void act(
+                            drop(gone.id),
+                            () => deleteDocumentAction(gone.id),
+                            "Deleted for good"
+                        );
                     }}
                 />
             ) : null}
+
+            {confirmDialog}
         </div>
     );
 }
@@ -384,14 +447,12 @@ export function OfficeView({
 /** One row: what it is, what it is called, and what has happened to it. */
 function Row({
     row,
-    busy,
     onStar,
     onArchive,
     onTrash,
     onDelete
 }: {
     row: OfficeDocumentView;
-    busy: boolean;
     onStar: () => void;
     onArchive: () => void;
     onTrash: () => void;
@@ -454,7 +515,6 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            disabled={busy}
                             aria-label={`Put ${row.title} back`}
                             title="Put back"
                             onClick={onTrash}
@@ -464,7 +524,6 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            disabled={busy}
                             aria-label={`Delete ${row.title} for good`}
                             title="Delete for good"
                             onClick={onDelete}
@@ -477,7 +536,6 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            disabled={busy}
                             aria-pressed={row.starred}
                             aria-label={row.starred ? `Unstar ${row.title}` : `Star ${row.title}`}
                             title={row.starred ? "Unstar" : "Star"}
@@ -494,7 +552,6 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            disabled={busy}
                             aria-label={
                                 row.archived ? `Put ${row.title} back` : `Archive ${row.title}`
                             }
@@ -513,7 +570,6 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            disabled={busy}
                             aria-label={`Move ${row.title} to the bin`}
                             title="Move to the bin"
                             onClick={onTrash}

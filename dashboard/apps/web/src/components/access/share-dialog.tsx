@@ -17,6 +17,7 @@
 
 import * as core from "@polaris/core";
 import type { GrantView } from "@/lib/access/grants";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
@@ -99,6 +100,7 @@ export function ShareDialog({
     const [grants, setGrants] = useState<GrantView[] | null>(null);
     const [candidates, setCandidates] = useState<GrantCandidate[]>([]);
     const [busy, setBusy] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
 
     const capabilities = core.GRANT_CAPABILITIES[subject] as readonly string[];
     // The weakest by default, everywhere. Sharing is a thing people do quickly,
@@ -196,11 +198,27 @@ export function ShareDialog({
         toast.show({ title: "Shared" });
     };
 
-    const revoke = async (grantId: string): Promise<void> => {
-        setBusy(true);
-        const answer = await revokeShareAction(subject, subjectId, grantId);
-        setBusy(false);
+    /**
+     * Taking somebody's access back.
+     *
+     * Asked first, because the bin icon sits on a row of people and the one
+     * above the one somebody meant is somebody who then cannot open the thing
+     * at all. The row goes on the answer to the question, not on the server's:
+     * a refusal puts it back and says why.
+     */
+    const revoke = async (grant: GrantView): Promise<void> => {
+        const sure = await confirm({
+            title: `Stop sharing with ${grant.principalName}?`,
+            description: `${grant.principalName} loses access to ${name} at once. You can share it again afterwards.`,
+            confirmLabel: "Stop sharing",
+            danger: true
+        });
+        if (!sure) return;
+        const before = grants;
+        setGrants((held) => (held ?? []).filter((one) => one.id !== grant.id));
+        const answer = await revokeShareAction(subject, subjectId, grant.id);
         if (answer.error) {
+            setGrants(before);
             toast.show({ title: answer.error });
             return;
         }
@@ -279,8 +297,7 @@ export function ShareDialog({
                                         size="icon"
                                         aria-label={`Stop sharing with ${grant.principalName}`}
                                         title={`Stop sharing with ${grant.principalName}`}
-                                        disabled={busy}
-                                        onClick={() => void revoke(grant.id)}
+                                        onClick={() => void revoke(grant)}
                                     >
                                         <Trash2 className="size-4 shrink-0" aria-hidden />
                                     </Button>
@@ -529,6 +546,7 @@ export function ShareDialog({
                     </div>
                 </section>
                 {extra}
+                {confirmDialog}
             </DialogContent>
         </Dialog>
     );

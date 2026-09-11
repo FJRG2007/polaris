@@ -8,9 +8,17 @@
  * the title as a field at the top that somebody fills in when they have
  * something to say.
  *
- * **And deleting one for good asked nothing at all.** The bin is where a
- * document waits; emptying it past that point is the end of it, and it went on
- * one click with no question and no way back.
+ * **And deleting one asked nothing at all.** Both of them: the bin icon on a
+ * row took the document somebody was working on with one press of a button that
+ * sits a few pixels from the star, and emptying the bin past that point - which
+ * is the end of the document - went the same way. Two different questions are
+ * owed there: "into the bin?", which is answered plainly because it is undone
+ * from the bin, and "for good?", which names what it is destroying.
+ *
+ * **And neither moved the screen until the server answered.** Every button on
+ * every row was disabled for the round trip and then the whole list was fetched
+ * again, so the case that works - all of them - is the one that reads as
+ * broken.
  */
 
 import { fileURLToPath } from "node:url";
@@ -74,23 +82,92 @@ describe("pressing New", () => {
     });
 });
 
-describe("deleting one for good", () => {
-    it("asks first, and names what it is deleting", async () => {
-        const view = await readFile(`${SRC}app/(app)/office/office-view.tsx`, "utf8");
-        expect(view).toContain("<ConfirmDeleteDialog");
-        expect(view).toContain("onDelete={() => setBurning({ id: row.id, title: row.title })}");
-        expect(view).toContain("Nothing here can bring it back.");
+describe("putting one in the bin", () => {
+    const view = readFile(`${SRC}app/(app)/office/office-view.tsx`, "utf8");
+
+    it("asks, and names the document it is about to take", async () => {
+        const source = await view;
+        expect(source).toContain("title: `Move ${row.title} to the bin?`");
+        expect(source).toContain('confirmLabel: "Move to the bin"');
+        expect(source).toContain("if (!sure) return;");
     });
 
-    it("leaves the bin itself one press away, which is the reversible one", async () => {
-        // Moving to the bin asks nothing on purpose: it is undone by the button
-        // next to it.
-        const view = await readFile(`${SRC}app/(app)/office/office-view.tsx`, "utf8");
-        expect(view).toContain("trashDocumentAction(row.id, !row.trashed)");
+    it("says where it goes and that it can come back", async () => {
+        const source = await view;
+        expect(source).toContain("waits in the bin, where you can put it back");
+    });
+
+    it("does not ask to put one back, which loses nothing", async () => {
+        const source = await view;
+        const ask = source.slice(source.indexOf("const bin = useCallback"));
+        expect(ask.slice(0, ask.indexOf("await act("))).toContain("if (!row.trashed) {");
+    });
+
+    it("takes the row off the list on that answer, not the server's", async () => {
+        const source = await view;
+        expect(source).toContain("onTrash={() => void bin(row)}");
+        expect(source).toContain("drop(row.id),");
+    });
+});
+
+describe("deleting one for good", () => {
+    const view = readFile(`${SRC}app/(app)/office/office-view.tsx`, "utf8");
+
+    it("asks first, and names what it is deleting", async () => {
+        const source = await view;
+        expect(source).toContain("<ConfirmDeleteDialog");
+        expect(source).toContain("onDelete={() => setBurning({ id: row.id, title: row.title })}");
+        expect(source).toContain("Nothing here can bring it back.");
+    });
+
+    it("asks it plainly: one row of a bin somebody empties a few at a time", async () => {
+        const source = await view;
+        expect(source).toContain("requireTyping={false}");
     });
 
     it("is the schema's own default that says an untitled document is allowed", async () => {
         const office = await readFile(`${ROOT}packages/core/src/office.ts`, "utf8");
         expect(office).toContain('title: z.string().trim().max(MAX_OFFICE_TITLE).default("")');
+    });
+});
+
+describe("what the list does while the server is being told", () => {
+    const view = readFile(`${SRC}app/(app)/office/office-view.tsx`, "utf8");
+
+    it("moves the row first and puts the list back if the write is refused", async () => {
+        const source = await view;
+        const act = source.slice(source.indexOf("const act = useCallback"));
+        const body = act.slice(0, act.indexOf("[documents, load, toast]"));
+        expect(body).toContain("const before = documents;");
+        expect(body.indexOf("setDocuments((rows) =>")).toBeLessThan(body.indexOf("await run()"));
+        expect(body).toContain("setDocuments(before);");
+    });
+
+    it("stops disabling every button on every row for the round trip", async () => {
+        const source = await view;
+        expect(source).not.toContain("const [busy, setBusy] = useState(false);");
+        expect(source).not.toContain("busy={busy}");
+    });
+
+    it("keeps a starred row in place, except on the shelf it just left", async () => {
+        const source = await view;
+        expect(source).toContain("starredOnly");
+        expect(source).toContain("{ ...one, starred: !row.starred }");
+    });
+});
+
+describe("taking somebody's access back", () => {
+    const dialog = readFile(`${SRC}components/access/share-dialog.tsx`, "utf8");
+
+    it("asks before the person loses it, and says who", async () => {
+        const source = await dialog;
+        expect(source).toContain("title: `Stop sharing with ${grant.principalName}?`");
+        expect(source).toContain('confirmLabel: "Stop sharing"');
+    });
+
+    it("drops the row on that answer and restores it on a refusal", async () => {
+        const source = await dialog;
+        expect(source).toContain("const before = grants;");
+        expect(source).toContain("setGrants(before);");
     });
 });
