@@ -21,6 +21,7 @@ import { syncAccount } from "./sync";
 import * as core from "@polaris/core";
 import { MailAuthError } from "./credentials";
 import { settleRefusalNotices } from "./refused";
+import { removeAccountUploads } from "./uploads";
 import { recordAudit } from "@/lib/audit-service";
 import { ownedAccount, ownedAccounts } from "./access";
 import { grantsMailAccess, sealMailSecret } from "./credentials";
@@ -500,13 +501,27 @@ export async function setVacation(
 /**
  * Take a mailbox off Polaris.
  *
- * Everything cached goes with it, which is the whole of what is deleted: the
- * mail itself is on the server and is not touched. Said plainly on the screen
- * that asks, because "remove mailbox" reads like "delete my mail" to anybody who
- * has not thought about where it lives.
+ * Everything Polaris holds about it goes with it, which is more than the cached
+ * mail: its folders and conversations, its filters, templates and signature, the
+ * addresses it may send as, its drafts, its contacts and trusted senders, the
+ * subscriptions it found, and what its spam filter learned. All of that hangs
+ * off the mailbox row and is deleted by the database when it goes - see the
+ * cascades on `MailAccount` in the schema, which is where this rule is actually
+ * written.
+ *
+ * Two things are deliberately NOT deleted, and the screen that asks says both:
+ * the mail on the server, which Polaris never had, and the outside account
+ * authorizing it, which is a link on somebody's profile and may be authorizing a
+ * calendar or a drive as well.
+ *
+ * The files somebody attached to a draft are the one thing a cascade cannot
+ * finish: the rows go with the drafts, and the bytes sit on a disk with nothing
+ * left pointing at them. So they are taken off first, while the paths can still
+ * be read.
  */
 export async function removeAccount(userId: string, accountId: string): Promise<void> {
     const account = await ownedAccount(userId, accountId);
+    await removeAccountUploads(accountId).catch(() => undefined);
     await prisma.mailAccount.delete({ where: { id: accountId } });
     await settleRefusalNotices(account.userId, accountId);
     await recordAudit({

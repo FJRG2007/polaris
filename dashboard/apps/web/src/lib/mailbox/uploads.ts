@@ -224,6 +224,27 @@ export async function attachUploads(
 }
 
 /** Uploads nobody attached to anything, gone. Run from the schedule. */
+/**
+ * Take every file attached to a mailbox's drafts off the disk.
+ *
+ * Deleting a mailbox deletes its drafts, and the rows for the files on them go
+ * with the drafts - but a row is not the file. The bytes sit on whatever storage
+ * they were written to with nothing left pointing at them: the sweep below only
+ * knows about uploads whose ROW is still here, so once the cascade has run there
+ * is nothing that could ever find them again.
+ *
+ * Called before the mailbox row goes, which is the only moment the paths can
+ * still be read.
+ */
+export async function removeAccountUploads(accountId: string): Promise<number> {
+    const rows = await prisma.mailUpload.findMany({
+        where: { draft: { accountId } },
+        select: { id: true, userId: true }
+    });
+    for (const row of rows) await removeUpload(row.userId, row.id);
+    return rows.length;
+}
+
 export async function sweepOrphanUploads(): Promise<number> {
     const orphans = await prisma.mailUpload.findMany({
         where: { draftId: null, createdAt: { lt: new Date(Date.now() - ORPHAN_TTL_MS) } },

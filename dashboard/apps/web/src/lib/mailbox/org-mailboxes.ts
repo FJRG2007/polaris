@@ -29,6 +29,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addAccount } from "./accounts";
 import { settleRefusalNotices } from "./refused";
+import { removeAccountUploads } from "./uploads";
 import { recordAudit } from "@/lib/audit-service";
 import { orgIdsWhere, type OrgActor } from "@/lib/orgs/org-service";
 
@@ -156,10 +157,15 @@ export async function takeBackMailbox(
     });
     if (!row) throw new OrgMailboxError("That mailbox is not this organization's.");
 
-    // The row and everything cached under it - the folders, threads, messages and
-    // the stored credential all cascade from it. The mailbox on the mail server
-    // is untouched, which is right: it is the company's account with a provider,
-    // not Polaris' to close.
+    // The row and everything Polaris holds under it - the folders, threads,
+    // messages, filters, templates, signature and the stored credential all
+    // cascade from it. The mailbox on the mail server is untouched, which is
+    // right: it is the company's account with a provider, not Polaris' to close.
+    //
+    // The files on its drafts are the exception a cascade cannot reach, exactly
+    // as in `removeAccount`: the rows go, the bytes stay on a disk with nothing
+    // pointing at them.
+    await removeAccountUploads(row.id).catch(() => undefined);
     await prisma.mailAccount.delete({ where: { id: row.id } });
     await settleRefusalNotices(row.userId, row.id);
 

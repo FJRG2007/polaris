@@ -17,10 +17,12 @@
  */
 
 import Link from "next/link";
+import { z } from "zod";
 import { cn } from "@polaris/ui";
 import { Composer } from "./composer";
 import { MailRail } from "./mail-rail";
-import { MAIL_PALETTE } from "./palette";
+import { MAIL_VIEWS } from "./views";
+import { MAIL_PALETTE, coloursFor } from "./palette";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
 import { Menu, PenLine, Plus } from "lucide-react";
@@ -137,38 +139,42 @@ export function useMail(): MailContextValue {
     return held;
 }
 
-/**
- * The colours a mailbox is told apart by when its owner has not chosen one.
- *
- * Derived from the address rather than from the row's position, so a mailbox
- * keeps its colour when another is added above it - a rail whose colours shuffle
- * on every change is a rail nobody learns.
- */
-const ACCOUNT_COLORS = MAIL_PALETTE.map((swatch) => swatch.hex);
-
-function colorFor(seed: string): string {
-    let hash = 0;
-    for (let index = 0; index < seed.length; index += 1) {
-        hash = (hash * 31 + seed.charCodeAt(index)) | 0;
-    }
-    return ACCOUNT_COLORS[Math.abs(hash) % ACCOUNT_COLORS.length] ?? ACCOUNT_COLORS[0]!;
-}
-
 /** How long the live channel is allowed to settle before the screen is asked
  *  for again. One action lands as several frames, and each of them used to be a
  *  fetch of the whole page. */
 const STREAM_SETTLE_MS = 400;
+
+/** Where the rail's mailboxes, folders and counts come from between renders. */
+const RAIL_PATH = "/api/mail/rail";
+
+/** The merged views, as addresses: `/mail/starred`, `/mail/sent` and the rest.
+ *  Read off the same table the routes are built from, so a view added there is
+ *  a list here without anybody saying so twice. */
+const MAIL_VIEW_PATHS = new Set(Object.keys(MAIL_VIEWS).map((view) => `/mail/${view}`));
+
+/**
+ * What that answers, validated on arrival.
+ *
+ * A tab left open across a deploy is talking to a server that has moved on, and
+ * a shape it does not understand has to leave the rail as it was rather than
+ * blank it.
+ */
+const railSchema = z.object({
+    accounts: z.array(z.custom<MailAccountView>()),
+    folders: z.array(z.custom<MailFolderView>()),
+    unread: z.object({ total: z.number(), byAccount: z.record(z.string(), z.number()) })
+});
 
 /** Where somebody with no mailbox is sent when they ask to write: the connect
  *  dialog, already open. */
 export const CONNECT_MAILBOX_HREF = "/mail/settings/accounts?connect=1";
 
 export function MailShell({
-    accounts,
-    folders,
+    accounts: sentAccounts,
+    folders: sentFolders,
     labels,
     identities,
-    unread,
+    unread: sentUnread,
     viewerName,
     shelf,
     children
@@ -183,6 +189,27 @@ export function MailShell({
     children: ReactNode;
 }) {
     const router = useRouter();
+    /**
+     * The rail, as it stands rather than as the server last rendered it.
+     *
+     * Seeded from the layout - which is what makes the first paint right - and
+     * moved after that by the live channel, which asks a small endpoint for
+     * these three things alone. It used to be `router.refresh()`: a mailbox
+     * syncing announces itself several times a minute, each announcement
+     * re-rendered the whole signed-in frame and the page inside it, and a router
+     * that is fetching defers what somebody clicks next. Links and buttons doing
+     * nothing - or doing it a second later - for as long as Mail was open was
+     * this, and nothing else.
+     */
+    const [rail, setRail] = useState({ accounts: sentAccounts, folders: sentFolders, unread: sentUnread });
+    // The server has rendered again - a mailbox added, a label written, a shelf
+    // switched - and what it says now is the truth this was standing in for.
+    useEffect(() => {
+        setRail({ accounts: sentAccounts, folders: sentFolders, unread: sentUnread });
+    }, [sentAccounts, sentFolders, sentUnread]);
+    const accounts = rail.accounts;
+    const folders = rail.folders;
+    const unread = rail.unread;
     const nudgeBadge = useNudgeMailUnread();
     const pathname = usePathname();
     const search = useSearchParams();
@@ -278,6 +305,28 @@ export function MailShell({
 
     const [revision, setRevision] = useState(0);
     const reloadLists = useCallback(() => setRevision((count) => count + 1), []);
+
+    /**
+     * Pull the rail's own three things, and nothing else.
+     *
+     * What a live frame costs now. The alternative was `router.refresh()`, which
+     * re-runs the signed-in frame - every badge, every count, the presence, the
+     * notifications - and then this layout and the page inside it, to move a
+     * number beside a folder.
+     */
+    const pullRail = useCallback(() => {
+        void fetch(RAIL_PATH, { cache: "no-store" })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((body) => {
+                const parsed = railSchema.safeParse(body);
+                if (parsed.success) setRail(parsed.data);
+            })
+            .catch(() => {
+                // The rail stays as it is, which is the last thing the server
+                // actually said. The next frame asks again.
+            });
+    }, []);
+
     const refresh = useCallback(() => {
         // Both halves of the screen, which no longer come from the same place.
         reloadLists();
@@ -303,9 +352,14 @@ export function MailShell({
         if (settling.current) clearTimeout(settling.current);
         settling.current = setTimeout(() => {
             settling.current = null;
-            refresh();
+            // The lists this tab fetches for itself, and the rail. Deliberately
+            // NOT the router: see `rail`. Everything a frame can change is in
+            // one of those two, and the things that are not - a label written, a
+            // mailbox added - are actions whose own handler refreshes.
+            reloadLists();
+            pullRail();
         }, STREAM_SETTLE_MS);
-    }, [refresh]);
+    }, [pullRail, reloadLists]);
     useEffect(
         () => () => {
             if (settling.current) clearTimeout(settling.current);
@@ -333,12 +387,12 @@ export function MailShell({
         }
     }, [shelf, reloadLists, router, search, pathname]);
 
+    // Worked out for the whole rail at once, because "which colour is free" is a
+    // question about the others - see `coloursFor`.
+    const colours = useMemo(() => coloursFor(accounts), [accounts]);
     const accountColor = useCallback(
-        (accountId: string) => {
-            const account = accounts.find((one) => one.id === accountId);
-            return account?.color ?? colorFor(account?.address ?? accountId);
-        },
-        [accounts]
+        (accountId: string) => colours[accountId] ?? MAIL_PALETTE[0]!.hex,
+        [colours]
     );
 
     const askFolderRole = useCallback(
@@ -407,7 +461,29 @@ export function MailShell({
     // decides a class rather than a render: the list keeps its scroll position
     // and its selection while it is off screen.
     const reading = Boolean(search.get("open")) || pathname.startsWith("/mail/t/");
-    const inSettings = pathname.startsWith("/mail/settings");
+    /**
+     * Whether what is inside scrolls itself, or has to be scrolled.
+     *
+     * A list of conversations owns its own scrollbar: the rows move under a
+     * toolbar that stays. So the area holding one must not have a scrollbar of
+     * its own, or there are two. Everything else here is an ordinary page,
+     * taller than the window, and this area is the only thing that can move it.
+     *
+     * Decided by what IS a list rather than by what is not, which is the bug
+     * this had: it asked whether the path was under `/mail/settings`, so
+     * Subscriptions - a page of every sender somebody could leave, easily
+     * hundreds of rows - was cut off at the bottom of the window with no way to
+     * reach the rest of it. A page added under /mail tomorrow scrolls without
+     * anybody remembering to come here.
+     */
+    const listing =
+        pathname === "/mail" ||
+        pathname.startsWith("/mail/t/") ||
+        pathname.startsWith("/mail/a/") ||
+        pathname.startsWith("/mail/f/") ||
+        pathname.startsWith("/mail/label/") ||
+        pathname === "/mail/drafts" ||
+        MAIL_VIEW_PATHS.has(pathname);
 
     return (
         <MailContext.Provider value={value}>
@@ -482,7 +558,7 @@ export function MailShell({
                     <div
                         className={cn(
                             "min-h-0 flex-1",
-                            inSettings ? "overflow-y-auto overscroll-contain" : "overflow-hidden"
+                            listing ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
                         )}
                     >
                         {children}

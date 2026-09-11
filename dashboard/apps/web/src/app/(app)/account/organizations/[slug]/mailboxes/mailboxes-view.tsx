@@ -75,7 +75,7 @@ export function MailboxesView({
             // What is actually being destroyed, and what is not. The mailbox on
             // the provider is the company's account with them and is untouched;
             // what goes is this copy of it and the credential it was reached with.
-            description: `${row.holderName} loses it here, along with everything Polaris has cached from it. The mailbox itself and its mail are not touched - it can be handed out again.`,
+            description: `${row.holderName} loses it here, along with everything Polaris holds for it: the cached mail, the filters and templates they wrote, the signature and the drafts. The mailbox itself and its mail are not touched, and it can be handed out again.`,
             confirmLabel: "Take it back",
             danger: true
         });

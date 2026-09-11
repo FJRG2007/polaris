@@ -35,7 +35,7 @@ export function SubscriptionsView({
      *  whole of it instead of implying it is. */
     capped?: boolean;
 }) {
-    const { accounts } = useMail();
+    const { accounts, accountColor } = useMail();
     const format = useDisplayFormat();
     const [query, setQuery] = useState("");
 
@@ -112,6 +112,10 @@ export function SubscriptionsView({
                                 <Row
                                     key={one.id}
                                     subscription={one}
+                                    // Which mailbox this list writes to, for
+                                    // somebody who has several. Empty for
+                                    // somebody who has one, where it is the
+                                    // answer to a question nobody asked.
                                     mailbox={
                                         accounts.length > 1
                                             ? (accounts.find(
@@ -119,6 +123,7 @@ export function SubscriptionsView({
                                               )?.address ?? "")
                                             : ""
                                     }
+                                    colour={accountColor(one.accountId)}
                                     format={format}
                                 />
                             ))}
@@ -133,10 +138,15 @@ export function SubscriptionsView({
 function Row({
     subscription,
     mailbox,
+    colour,
     format
 }: {
     subscription: MailSubscriptionView;
+    /** The mailbox this sender writes to, or "" where there is only one. */
     mailbox: string;
+    /** That mailbox's own colour, the same one the rail and every merged list
+     *  draw it with. */
+    colour: string;
     format: ReturnType<typeof useDisplayFormat>;
 }) {
     const router = useRouter();
@@ -164,8 +174,24 @@ function Row({
                 <span className="block truncate text-[12px] text-foreground-subtle">
                     {subscription.senderName ? `${subscription.sender} - ` : ""}
                     {messages}, last on {format.date(subscription.lastMessageAt)}
-                    {mailbox ? ` - to ${mailbox}` : ""}
                 </span>
+                {/* Which mailbox it arrives in, on a line of its own rather than
+                    at the end of one that truncates - where it was the first
+                    thing to go, on exactly the rows long enough to need it. The
+                    dot is the mailbox's own, so this row and the rail agree
+                    without either being read. */}
+                {mailbox ? (
+                    <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-foreground-subtle">
+                        <span
+                            className="size-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: colour }}
+                            aria-hidden
+                        />
+                        <span className="truncate" title={mailbox}>
+                            to {mailbox}
+                        </span>
+                    </span>
+                ) : null}
                 {subscription.askedAt ? (
                     <span
                         className={

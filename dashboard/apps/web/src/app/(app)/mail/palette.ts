@@ -17,3 +17,67 @@ export const MAIL_PALETTE: readonly { hex: string; name: string }[] = [
     { hex: "#14b8a6", name: "Teal" },
     { hex: "#f43f5e", name: "Pink" }
 ];
+
+/**
+ * The colours a mailbox is told apart by when its owner has not chosen one.
+ *
+ * Derived from the address rather than from the row's position, so a mailbox
+ * keeps its colour when another is added above it - a rail whose colours shuffle
+ * on every change is a rail nobody learns.
+ */
+const ACCOUNT_COLORS = MAIL_PALETTE.map((swatch) => swatch.hex);
+
+function colorFor(seed: string): string {
+    let hash = 0;
+    for (let index = 0; index < seed.length; index += 1) {
+        hash = (hash * 31 + seed.charCodeAt(index)) | 0;
+    }
+    return ACCOUNT_COLORS[Math.abs(hash) % ACCOUNT_COLORS.length] ?? ACCOUNT_COLORS[0]!;
+}
+
+/**
+ * A colour per mailbox, and never the same one twice.
+ *
+ * The hash above is what keeps a mailbox's colour still when another is added
+ * above it, and on its own it is not enough: eight colours and two addresses
+ * collide about one time in eight. Two mailboxes sharing a colour is the whole
+ * feature not working - a row in a merged list is supposed to say which mailbox
+ * it came from, and then it does not.
+ *
+ * So a collision walks forward to the first colour nobody has. The ones somebody
+ * chose are claimed first and the rest are walked in the rail's own order, so
+ * the answer does not depend on who asks: a mailbox given a colour keeps it,
+ * every other keeps the one it had, and only the mailbox that collided moves -
+ * once, as it is added.
+ *
+ * Past eight mailboxes there is nothing left to move to and the hash stands.
+ * Eight dots are already more than anybody tells apart at a glance.
+ */
+export function coloursFor(
+    accounts: readonly { id: string; address: string; color: string | null }[]
+): Record<string, string> {
+    const taken = new Set(
+        accounts.map((account) => account.color).filter((color): color is string => Boolean(color))
+    );
+    const out: Record<string, string> = {};
+    for (const account of accounts) {
+        if (account.color) {
+            out[account.id] = account.color;
+            continue;
+        }
+        const wanted = colorFor(account.address || account.id);
+        let next = wanted;
+        if (taken.has(wanted)) {
+            const from = ACCOUNT_COLORS.indexOf(wanted);
+            for (let step = 1; step < ACCOUNT_COLORS.length; step += 1) {
+                const candidate = ACCOUNT_COLORS[(from + step) % ACCOUNT_COLORS.length]!;
+                if (taken.has(candidate)) continue;
+                next = candidate;
+                break;
+            }
+        }
+        out[account.id] = next;
+        taken.add(next);
+    }
+    return out;
+}

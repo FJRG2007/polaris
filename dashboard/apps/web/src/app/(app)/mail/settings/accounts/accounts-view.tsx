@@ -409,9 +409,18 @@ function AccountRow({
                     // plain confirmation rather than typing the address out.
                     requireTyping={false}
                     title={`Remove ${account.address}?`}
-                    // Said plainly, because "remove mailbox" reads as "delete my
-                    // mail" to anybody who has not thought about where it lives.
-                    description="Polaris stops checking this mailbox and forgets the copy it keeps. Nothing on the mail server is touched, and your mail stays exactly where it is."
+                    // Both halves, because each is a thing somebody gets wrong
+                    // in the opposite direction: "remove mailbox" reads as
+                    // "delete my mail" to anybody who has not thought about
+                    // where mail lives, and it reads as "only stop checking it"
+                    // to anybody who has - while the filters they wrote here,
+                    // and everything else Polaris holds for this mailbox alone,
+                    // go with it.
+                    description={`Polaris stops checking it and deletes what it holds for it: the mail it cached, its filters, templates, signature, send-as addresses, drafts and what its spam filter learned. Nothing on the mail server is touched.${
+                        account.auth === "oauth"
+                            ? " Your connected account stays connected: it is on your profile and may be authorizing other things too."
+                            : ""
+                    }`}
                     confirmLabel="Remove it"
                     onConfirm={async () => {
                         const answer = await removeAccountAction(account.id);
