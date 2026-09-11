@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { addGroupMember, createGroup, deleteGroup, removeGroupMember } from "@polaris/auth";
 import { requireAdmin } from "@/lib/session";
+import { publishAccessChange } from "@/lib/access-live";
 import { recordAudit } from "@/lib/audit-service";
 
 export async function createGroupAction(name: string, description?: string): Promise<{ error?: string }> {
@@ -22,6 +23,9 @@ export async function createGroupAction(name: string, description?: string): Pro
 export async function deleteGroupAction(id: string): Promise<void> {
     const admin = await requireAdmin();
     await deleteGroup(id);
+    // Whoever was in it, which the cascade has just taken away - see
+    // `access-live` for why nobody is named.
+    publishAccessChange();
     await recordAudit({ actorId: admin.id, action: "group.delete", targetType: "group", targetId: id });
     revalidatePath("/admin/groups");
 }
@@ -29,6 +33,7 @@ export async function deleteGroupAction(id: string): Promise<void> {
 export async function addGroupMemberAction(groupId: string, userId: string): Promise<void> {
     const admin = await requireAdmin();
     await addGroupMember(groupId, userId);
+    publishAccessChange({ userIds: [userId] });
     await recordAudit({ actorId: admin.id, action: "group.member.add", targetType: "group", targetId: groupId, metadata: { userId } });
     revalidatePath("/admin/groups");
 }
@@ -36,6 +41,7 @@ export async function addGroupMemberAction(groupId: string, userId: string): Pro
 export async function removeGroupMemberAction(groupId: string, userId: string): Promise<void> {
     const admin = await requireAdmin();
     await removeGroupMember(groupId, userId);
+    publishAccessChange({ userIds: [userId] });
     await recordAudit({ actorId: admin.id, action: "group.member.remove", targetType: "group", targetId: groupId, metadata: { userId } });
     revalidatePath("/admin/groups");
 }

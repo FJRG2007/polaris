@@ -11,6 +11,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { createRoleSchema, roleGrantsSchema } from "@polaris/core";
+import { publishAccessChange } from "@/lib/access-live";
 import { createRole, deleteRole, setRolePermissions } from "@/lib/role-service";
 
 const idSchema = z.string().uuid();
@@ -43,6 +44,10 @@ export async function setRolePermissionsAction(roleId: unknown, input: unknown):
 
     const result = await setRolePermissions(admin.id, id.data, parsed.data.permissions);
     if (result.error) return result;
+    // Everybody holding it, and working out who that is is a query and a chance
+    // to be wrong - so nobody is named and every open tab redraws. A role is
+    // rewritten a handful of times in an instance's life. See `access-live`.
+    publishAccessChange();
     refresh();
     return {};
 }
@@ -54,6 +59,7 @@ export async function deleteRoleAction(roleId: unknown): Promise<{ error?: strin
 
     const result = await deleteRole(admin.id, id.data);
     if (result.error) return result;
+    publishAccessChange();
     refresh();
     return {};
 }

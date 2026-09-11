@@ -17,6 +17,7 @@ import { createVolume } from "@/lib/deploy-volume-service";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
+import { publishAccessChange } from "@/lib/access-live";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
@@ -270,6 +271,11 @@ export async function installApp(
     });
 
     invalidateInstallPresence(app.id);
+    // An app the switcher only offers once somebody installs it - Game servers,
+    // the mail server - has just started existing, and every switcher on the
+    // instance was drawn before it did. Nobody is named: an install is not about
+    // one person. See `access-live`.
+    publishAccessChange();
 
     // Kick off the first deploy; a failure is surfaced on the app's own page and
     // recorded on the install, but installation itself still succeeds.
@@ -472,6 +478,9 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
         });
     }
     invalidateInstallPresence(row.catalogId);
+    // And gone: a switcher still offering it opens a screen for something that
+    // is no longer installed.
+    publishAccessChange();
     // Forget any cached bridge endpoint so the inbox reflects the removal at once.
     if (row.catalogId === "messaging-bridge") invalidateBridgeCache();
 }

@@ -19,6 +19,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
 import { recordAudit } from "@/lib/audit-service";
+import { publishAccessChange } from "@/lib/access-live";
 import {
     owningOrgIds,
     requireMayShare,
@@ -118,6 +119,15 @@ export async function shareAction(
             }
         });
         settled(kind);
+        // Lending somebody a thing can hand them a whole app: a door opens
+        // Places for a visitor who holds none of its permissions, a game server
+        // opens Game servers. Their switcher is drawn on the server, so without
+        // this they are given something they cannot see until they reload. A
+        // team or a role is everybody in it, which is a query and a chance to be
+        // wrong - so only a person is named. See `access-live`.
+        publishAccessChange(
+            parsed.data.principalType === "user" ? { userIds: [parsed.data.principalId] } : {}
+        );
         return { grants: await listSubjectGrants(kind, String(subjectId)) };
     } catch (caught) {
         return refusal(caught, "That share could not be written");
@@ -167,6 +177,10 @@ export async function revokeShareAction(
             targetId: String(subjectId)
         });
         settled(kind);
+        // Nobody is named: what the grant said is gone by now, and the person
+        // who has just lost the app is the one who most needs the screen to
+        // stop offering it.
+        publishAccessChange();
         return { grants: await listSubjectGrants(kind, String(subjectId)) };
     } catch (caught) {
         return refusal(caught, "That share could not be taken back");

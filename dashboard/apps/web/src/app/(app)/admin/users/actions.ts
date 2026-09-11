@@ -14,6 +14,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { publishAccessChange } from "@/lib/access-live";
 import { setSetting } from "@/lib/setting-store";
 import { setProfilesPublic } from "@/lib/profile-service";
 import { FOLLOWERS_DEFAULT_KEY, setDefaultFollowerAudience } from "@/lib/privacy-service";
@@ -106,6 +107,7 @@ export async function banUserAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await banUser(admin.id, userId, reason, minutes);
+    if (!result.error) publishAccessChange({ userIds: [userId] });
     revalidatePath("/admin/users");
     return result;
 }
@@ -113,6 +115,7 @@ export async function banUserAction(
 export async function unbanUserAction(userId: string): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await unbanUser(admin.id, userId);
+    if (!result.error) publishAccessChange({ userIds: [userId] });
     revalidatePath("/admin/users");
     return result;
 }
@@ -120,6 +123,10 @@ export async function unbanUserAction(userId: string): Promise<{ error?: string 
 export async function setAdminAccessAction(userId: string, isAdmin: boolean): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await setAdminAccess(admin.id, userId, isAdmin);
+    // An administrator reaches every app there is, so this is the largest change
+    // to a switcher there can be - and the person it happens to is looking at
+    // the old one until they are told. See `access-live`.
+    if (!result.error) publishAccessChange({ userIds: [userId] });
     revalidatePath("/admin/users");
     return result;
 }
@@ -140,6 +147,10 @@ export async function setUserRoleAction(userId: string, role: string): Promise<{
     // Roles are rows, not a fixed list: the service settles whether this one
     // exists rather than a copy of the names kept here.
     const result = await setUserRole(admin.id, userId, String(role));
+    // Their sessions stay open on purpose, which is exactly why their screens
+    // have to be told: the apps this role reaches are decided on the server and
+    // drawn once. See `access-live`.
+    if (!result.error) publishAccessChange({ userIds: [userId] });
     revalidatePath("/admin/users");
     return result;
 }

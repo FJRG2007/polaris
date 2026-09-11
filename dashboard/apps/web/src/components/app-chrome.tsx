@@ -26,6 +26,7 @@ import { CallHolder } from "@/components/call-holder";
 import { accessFor, type SessionUser } from "@/lib/session";
 import { AccountMenu } from "@/components/account-menu";
 import { DeniedNotice } from "@/components/denied-notice";
+import { AccessWatcher } from "@/components/access-watcher";
 import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
@@ -183,6 +184,11 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                         hasChat={apps.ids.includes("chat")}
                                                     >
                                                         <NotificationFavicon />
+                                                        {/* An app granted or taken back is a
+                                    switcher that lies until the page is drawn
+                                    again, and nobody reloads a page they were
+                                    never told had changed. */}
+                                                        <AccessWatcher />
                                                         <PresenceReporter />
                                                         <TimeZoneReporter reported={reportedZone} />
                                                         <ServiceWorkerRegistration />
