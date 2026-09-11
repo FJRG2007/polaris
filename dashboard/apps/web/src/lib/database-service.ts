@@ -533,6 +533,24 @@ export interface DeployDatabaseOptions {
 }
 
 /** Provision (or re-provision) a managed database. */
+/**
+ * Every database deploy on the audit trail, whatever started it - the Deploy
+ * button, a settings change, a point-in-time recovery, an environment clone.
+ * Said here, where they all pass, rather than by each (most never did).
+ */
+async function auditDatabaseDeploy(userId: string, databaseId: string, deploymentId: string): Promise<void> {
+    // Loaded when a deploy happens: the audit writer brings the sign-in stack
+    // with it, which nothing else in this module needs to have loaded.
+    const { recordDeployAudit } = await import("./deploy-audit");
+    await recordDeployAudit({
+        actorId: userId,
+        action: "deploy.db.deploy",
+        targetType: "database",
+        targetId: databaseId,
+        metadata: { deploymentId }
+    });
+}
+
 export async function deployDatabase(
     databaseId: string,
     ownerId: string,
@@ -558,6 +576,7 @@ export async function deployDatabase(
                 triggeredById: userId
             }
         });
+        await auditDatabaseDeploy(userId, db.id, deployment.id);
         try {
             await provisionInInstance(db.id, ownerId);
             await prisma.deployment.update({ where: { id: deployment.id }, data: { status: "running" } });
@@ -653,6 +672,7 @@ export async function deployDatabase(
             triggeredById: userId
         }
     });
+    await auditDatabaseDeploy(userId, db.id, deployment.id);
 
     enqueueOnTarget(db.targetId, async () => {
         await executeDeployment(

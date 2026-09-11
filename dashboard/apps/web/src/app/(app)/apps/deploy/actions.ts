@@ -529,12 +529,6 @@ export async function createApplicationAction(input: {
         }
         try {
             deploymentId = await deployService.deployApplication(app.id, owner, user.id);
-            await recordDeployAudit({
-                actorId: user.id,
-                action: "deploy.app.deploy",
-                targetType: "application",
-                targetId: app.id
-            });
         } catch {
             // Surfaced on the app's next manual deploy; creation still succeeds.
         }
@@ -798,7 +792,8 @@ export async function deployApplicationAction(
             access.ownerId,
             user.id
         );
-        await recordServiceEvent(user.id, applicationId, "deploy.app.deploy", "deployed");
+        // The audit entry is the deploy's own; only the service's history is ours.
+        await activity.record({ subjectType: "app", subjectId: applicationId, userId: user.id, action: "deployed" });
         revalidatePath(DEPLOY_PATH);
         return { deploymentId };
     } catch (caught) {
@@ -1807,12 +1802,6 @@ export async function deployDatabaseAction(
     try {
         const access = await requireDatabaseAccess(databaseId, user.id, "databases.manage");
         const deploymentId = await deployDatabase(databaseId, access.ownerId, user.id);
-        await recordDeployAudit({
-            actorId: user.id,
-            action: "deploy.db.deploy",
-            targetType: "database",
-            targetId: databaseId
-        });
         revalidatePath(DEPLOY_PATH);
         return { deploymentId };
     } catch (caught) {

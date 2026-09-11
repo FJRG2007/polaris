@@ -77,13 +77,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // way it does from the Deploy button.
     try {
         const deploymentId = await deployApplication(id, ownerId, user.id, { trigger: "upload" });
-        await recordDeployAudit({
-            actorId: user.id,
-            action: "deploy.app.deploy",
-            targetType: "application",
-            targetId: id,
-            metadata: { deploymentId }
-        });
         return NextResponse.json({ upload, deploymentId });
     } catch (caught) {
         return NextResponse.json({ upload, deployError: caught instanceof Error ? caught.message : "Could not deploy" });

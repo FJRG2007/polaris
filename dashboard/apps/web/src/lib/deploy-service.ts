@@ -2825,6 +2825,8 @@ export async function deployApplication(
         /** A release built on somebody's own machine and uploaded: loaded and run
          *  as it is, with nothing cloned or built. */
         prebuilt?: { image: string; archive: string; bytes: number };
+        /** More to say on the audit entry, such as the API key that asked. */
+        audit?: Record<string, unknown>;
     },
     /** Run a kept release image instead of building: a rollback, or the live
      *  release started again with changed variables. */
@@ -2932,6 +2934,19 @@ export async function deployApplication(
     // id it records is what the states after it are posted against, and a build
     // that started first would find nothing to post against.
     await announceDeployQueued(deployment.id);
+    // Every deploy is on the audit trail, whatever started it - a screen, the API,
+    // a push, a rollback, a one-press fix, an installed app's redeploy. There are
+    // more than twenty ways in and this is the one way through, so it is said
+    // here rather than by each of them (and forgotten by most, as it was). Loaded
+    // here, not at the top: the audit writer brings the sign-in stack with it.
+    const { recordDeployAudit } = await import("./deploy-audit");
+    await recordDeployAudit({
+        actorId: userId,
+        action: "deploy.app.deploy",
+        targetType: "application",
+        targetId: applicationId,
+        metadata: { deploymentId: deployment.id, trigger: deployment.trigger, ...meta?.audit }
+    });
     // A release that runs beside the one before it needs a project and names of its
     // own before the plan is handed to the runtime, and one that keeps its history
     // also the hostname it will answer on. Only those cases pay for the second plan.

@@ -27,7 +27,6 @@ import { setEnvVars } from "@/lib/env-var-service";
 import * as activity from "@/lib/activity/activity";
 import { getPorts, type TargetRow } from "./runtime";
 import * as databaseOps from "@/lib/database-ops/ops";
-import { recordDeployAudit } from "@/lib/deploy-audit";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { createDatabase, deployDatabaseAndWait } from "@/lib/database-service";
 import { awaitDeployment, createApplication, deployAndWait, deployApplication } from "@/lib/deploy-service";
@@ -170,7 +169,6 @@ export async function firstTemplateDeploy(input: {
         }
         if (parts.companion && template.companion) {
             const reason = await deployAndWait(parts.companion.id, ownerId, userId);
-            await audit(userId, "deploy.app.deploy", "application", parts.companion.id);
             if (reason) {
                 return await note(
                     applicationId,
@@ -187,7 +185,6 @@ export async function firstTemplateDeploy(input: {
             const reason = error instanceof Error ? error.message : "The deploy could not be started.";
             return await note(applicationId, "first-deploy-failed", null, reason);
         }
-        await audit(userId, "deploy.app.deploy", "application", applicationId);
 
         const first = template.prepare?.[0];
         if (!first) return;
@@ -230,7 +227,6 @@ async function servingFrom(applicationId: string, deploymentId: string): Promise
  */
 async function bringUpDatabase(databaseId: string, ownerId: string, userId: string): Promise<string | null> {
     const failure = await deployDatabaseAndWait(databaseId, ownerId, userId);
-    await audit(userId, "deploy.db.deploy", "database", databaseId);
     if (failure) return failure;
     try {
         const context = await databaseOps.instanceContext(databaseId, ownerId);
@@ -336,8 +332,4 @@ async function note(applicationId: string, action: string, fromValue: string | n
         .catch((error: unknown) => {
             console.error("polaris: could not record a service's setup:", error);
         });
-}
-
-async function audit(actorId: string, action: string, targetType: string, targetId: string): Promise<void> {
-    await recordDeployAudit({ actorId, action, targetType, targetId }).catch(() => undefined);
 }

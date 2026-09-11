@@ -52,8 +52,15 @@ export function auditIpHash(ip: string): string {
  *  the same helper the rest of Polaris resolves an address with, so an entry is
  *  hashed from the address every other subsystem saw. */
 async function clientIpHash(): Promise<string | undefined> {
-    const ip = await clientIp();
-    return ip ? auditIpHash(ip) : undefined;
+    // Background work - the push poller, a cron tick, the autoscaler - has no
+    // request to read an address from, and asking outside one throws. Thrown
+    // from inside the write below, that dropped every such entry without a word.
+    try {
+        const ip = await clientIp();
+        return ip ? auditIpHash(ip) : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**

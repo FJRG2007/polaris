@@ -116,7 +116,7 @@ describe("the project capability", () => {
     it("asks for the capability the dashboard asks for, and acts as the project's owner", async () => {
         await surface.deploy(caller(["deploy.manage"]), APP);
         expect(requireApplicationAccess).toHaveBeenCalledWith(APP, USER, "deploy.run");
-        expect(deployApplication).toHaveBeenCalledWith(APP, OWNER, USER);
+        expect(deployApplication).toHaveBeenCalledWith(APP, OWNER, USER, expect.anything());
     });
 
     it("answers a project the key cannot reach with a plain 404", async () => {
@@ -194,16 +194,13 @@ describe("naming a service", () => {
 });
 
 describe("what is recorded", () => {
-    it("audits a deploy with the key and the surface it came through", async () => {
+    it("hands the key and the surface to the deploy's own audit entry", async () => {
+        // The deploy writes its audit entry itself, whatever started it; the API
+        // only says who asked.
         await surface.deploy(caller(["deploy.manage"]), APP);
-        expect(recordAudit).toHaveBeenCalledWith(
-            expect.objectContaining({
-                actorId: USER,
-                action: "deploy.app.deploy",
-                targetId: APP,
-                metadata: expect.objectContaining({ via: "api", keyId: "key-1", deploymentId: "dep-1" })
-            })
-        );
+        expect(deployApplication).toHaveBeenCalledWith(APP, OWNER, USER, {
+            audit: { via: "api", keyId: "key-1" }
+        });
     });
 
     it("audits a variable by its name and never its value", async () => {

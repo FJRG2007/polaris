@@ -19,7 +19,6 @@ import { prisma } from "@polaris/db";
 import { createReadStream } from "node:fs";
 import { DeployApiRefusal } from "./refusal";
 import * as deployService from "@/lib/deploy-service";
-import { recordDeployAudit } from "@/lib/deploy-audit";
 import { requireScope, resolveService, type DeployCaller } from "./surface";
 import { archiveImageTags, isReleaseImage, releaseImage, serviceName } from "@polaris/deploy";
 
@@ -81,14 +80,8 @@ export async function deployUploadedRelease(
         trigger: "upload",
         commitSha: meta.commitSha,
         commitMessage: meta.commitMessage,
-        prebuilt: { image, archive: archive.file, bytes: archive.bytes }
-    });
-    await recordDeployAudit({
-        actorId: caller.userId,
-        action: "deploy.app.deploy",
-        targetType: "application",
-        targetId: applicationId,
-        metadata: { via: caller.via, keyId: caller.keyId, deploymentId, uploaded: image, bytes: archive.bytes }
+        prebuilt: { image, archive: archive.file, bytes: archive.bytes },
+        audit: { via: caller.via, keyId: caller.keyId, uploaded: image, bytes: archive.bytes }
     });
     return { deploymentId, image };
 }

@@ -623,14 +623,10 @@ export async function deploy(caller: DeployCaller, ref: string): Promise<{ deplo
         // No free-subdomain base yet; the service still deploys without one,
         // exactly as it does from the dashboard.
     }
-    const deploymentId = await deployService.deployApplication(applicationId, access.ownerId, caller.userId);
-    await recordChange(caller, {
-        action: "deploy.app.deploy",
-        targetType: "application",
-        targetId: applicationId,
-        activity: { applicationId, action: "deployed" },
-        metadata: { deploymentId }
+    const deploymentId = await deployService.deployApplication(applicationId, access.ownerId, caller.userId, {
+        audit: { via: caller.via, keyId: caller.keyId }
     });
+    await activity.record({ subjectType: "app", subjectId: applicationId, userId: caller.userId, action: "deployed" });
     return { deploymentId };
 }
 
