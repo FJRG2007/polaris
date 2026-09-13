@@ -70,6 +70,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.filter.outputs.web }}
+      # Not an image. It gates the suites only - see the filter below.
+      extension: ${{ steps.filter.outputs.extension }}
       mdns: ${{ steps.filter.outputs.mdns }}
       hostd: ${{ steps.filter.outputs.hostd }}
       updater: ${{ steps.filter.outputs.updater }}
@@ -90,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; out face true; }
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -108,7 +110,23 @@ jobs:
           # and published no image at all.
           has() { grep -qE "$1" "$CHANGED"; }
           if has '^\.github/workflows/dashboard-publish\.yml$'; then all; exit 0; fi
-          has '^dashboard/(apps|packages|cli|patches|scripts)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
+          # The browser extension lives in this repository and in no image. The
+          # Dockerfile installs `apps/web` alone and the runtime stage copies
+          # nothing of the extension, so a change to it yields a byte-different
+          # build context and a functionally identical dashboard. Published
+          # anyway it moves `latest`, and then every deployment in the world is
+          # offered an update that changes nothing it runs - which teaches people
+          # to ignore the one button that also delivers security fixes.
+          #
+          # So image decisions are taken on the changed list with those paths
+          # removed, while the extension keeps its own gate below: its suites run
+          # through `npm run test --workspaces`, and losing them would be the
+          # other way to get this wrong.
+          IMAGE_CHANGED="$RUNNER_TEMP/changed-images.txt"
+          grep -vE '^dashboard/apps/extension/' "$CHANGED" > "$IMAGE_CHANGED" || true
+          image_has() { grep -qE "$1" "$IMAGE_CHANGED"; }
+          has '^dashboard/apps/extension/' && out extension true || out extension false
+          image_has '^dashboard/(apps|packages|cli|patches|scripts)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false
@@ -138,7 +156,7 @@ jobs:
   # filter anyway.
   dashboard-ci:
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.extension == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/dashboard-ci.yml
     with:
       # The web image builds the same app from the same commit; building it twice
