@@ -3,15 +3,10 @@ import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
+import { readUriMatch, type UriMatch } from "@polaris/core";
+import { displayHost, matchesPage, rankForPage } from "@/lib/matching";
 import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
 import { decrypt, decryptRsa, fromBase64, symmetricKeyFromBytes } from "@polaris/vault-crypto";
-import {
-    URI_MATCH_NEVER,
-    uriMatches,
-    type UriMatch,
-    hostOf,
-    readUriMatch
-} from "@polaris/core";
 import {
     currentOrigin,
     forgetOrigin,
@@ -250,20 +245,7 @@ async function logins(): Promise<Login[]> {
  * site that only had to put the right word in its query string.
  */
 async function forUrl(url: string): Promise<Login[]> {
-    const all = await logins();
-    const matched = all.filter((login) =>
-        login.uris.some(
-            (entry) => entry.match !== URI_MATCH_NEVER && uriMatches(entry.uri, entry.match, url)
-        )
-    );
-    const host = hostOf(url);
-    // An exact host before a base-domain match: on a site with a login for the
-    // site and one for its account subdomain, the closer one is the one meant.
-    return matched.sort((left, right) => {
-        const closeness = (login: Login): number =>
-            login.uris.some((entry) => hostOf(entry.uri) === host) ? 0 : 1;
-        return closeness(left) - closeness(right) || left.name.localeCompare(right.name);
-    });
+    return rankForPage(await logins(), url);
 }
 
 function summarize(login: Login): messages.ItemSummary {
@@ -271,7 +253,7 @@ function summarize(login: Login): messages.ItemSummary {
         id: login.id,
         name: login.name,
         username: login.username,
-        host: login.uris[0] ? hostOf(login.uris[0].uri) : null,
+        host: displayHost(login.uris),
         totp: login.totp !== null
     };
 }
@@ -462,11 +444,12 @@ async function fill(id: string): Promise<messages.Reply> {
 
     // Re-checked here, against the tab as it is now: between the popup drawing a
     // list and somebody pressing it, a page can navigate, and a fill must never
-    // land on a site the item was not saved for.
-    const allowed = login.uris.some(
-        (entry) => entry.match !== URI_MATCH_NEVER && uriMatches(entry.uri, entry.match, tab.url!)
-    );
-    if (!allowed) return { ok: false, error: "That item is not saved for this site." };
+    // land on a site the item was not saved for. Through the same function the
+    // list was built from, so the two cannot disagree about what belongs where -
+    // and it is the one the tests cover.
+    if (!matchesPage(login.uris, tab.url)) {
+        return { ok: false, error: "That item is not saved for this site." };
+    }
 
     try {
         // What the page actually found, rather than that the message was
