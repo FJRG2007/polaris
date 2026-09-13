@@ -25,6 +25,7 @@
 import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
+import { notificationStreamPath } from "@/lib/notifications/stream-path";
 import {
     createContext,
     useCallback,
@@ -52,7 +53,6 @@ export function useAdminWaiting(): AdminWaiting {
     return useContext(WaitingContext);
 }
 
-const STREAM_PATH = "/api/notifications/stream";
 const WAITING_PATH = "/api/admin/waiting";
 
 const waitingSchema = z.object({
@@ -102,7 +102,11 @@ export function AdminWaitingProvider({
 
     useEffect(() => {
         if (!enabled) return;
-        const stop = subscribeSharedStream(STREAM_PATH, scope, () => {
+        // The same address the bell follows, which is what keeps this to one
+        // connection per device: `subscribeSharedStream` shares by the path it is
+        // given, so a second spelling would be a second stream - and only one of
+        // the two is the one the server elects to chime.
+        const stop = subscribeSharedStream(notificationStreamPath(), scope, () => {
             // Every frame, without reading it. What arrives on this stream is a
             // notification for this account, and the cheap recount below is a
             // better answer than teaching this component the vocabulary of every

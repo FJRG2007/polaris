@@ -119,11 +119,38 @@ describe("what the stream asks per frame", () => {
         openLiveClient("u1", "app", "desktop", AT);
         openLiveClient("u1", "tab", "browser", AT);
         for (let tick = 5_000; tick <= 100_000; tick += 5_000) {
-            touchLiveClient("u1", "app", AT + tick);
-            touchLiveClient("u1", "tab", AT + tick);
+            touchLiveClient("u1", "app", "desktop", AT + tick);
+            touchLiveClient("u1", "tab", "browser", AT + tick);
         }
         expect(liveClientChimes("u1", "tab", AT + 100_000)).toBe(false);
         expect(liveClientChimes("u1", "app", AT + 100_000)).toBe(true);
+    });
+
+    it("hears a connection again after its feed stalled past the sweep", () => {
+        openLiveClient("u1", "app", "desktop", AT);
+        openLiveClient("u1", "tab", "browser", AT);
+        // The app's poll hangs on a slow database for longer than a connection is
+        // believed in without a word, so the next question sweeps it out from
+        // under itself and the tab inherits the sound.
+        touchLiveClient("u1", "tab", "browser", AT + 40_000);
+        expect(liveClientChimes("u1", "tab", AT + 40_000)).toBe(true);
+        // It is still open, and its next tick says so. A connection that could not
+        // come back would go on losing an election it is no longer in - the app
+        // would never chime again while it was running.
+        touchLiveClient("u1", "app", "desktop", AT + 41_000);
+        expect(liveClientChimes("u1", "app", AT + 41_000)).toBe(true);
+        expect(liveClientChimes("u1", "tab", AT + 41_000)).toBe(false);
+    });
+
+    it("puts a connection the cap pushed out back in the election", () => {
+        // Sixteen is the cap, and the seventeenth takes the place of the one heard
+        // from longest ago - which here is a connection that is still open rather
+        // than one nobody is behind.
+        openLiveClient("u1", "app", "desktop", AT);
+        for (let nth = 1; nth <= 16; nth += 1) openLiveClient("u1", `tab${nth}`, "browser", AT + nth);
+        expect(liveClientChimes("u1", "app", AT + 20)).toBe(false);
+        touchLiveClient("u1", "app", "desktop", AT + 20);
+        expect(liveClientChimes("u1", "app", AT + 20)).toBe(true);
     });
 
     it("chimes for a caller nothing knows about", () => {

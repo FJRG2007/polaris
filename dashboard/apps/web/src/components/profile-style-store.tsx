@@ -274,7 +274,8 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
     }, []);
 
     /**
-     * Ask about everybody in a list, in requests the server will answer.
+     * Ask about everybody in a list, in requests the server will answer, and give
+     * back the clocks they were answered at.
      *
      * Cut at `MAX_PEOPLE_PER_STYLE_ASK`, because what is asked about is every
      * face drawn since the page loaded rather than the ones on screen now: an
@@ -283,10 +284,8 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
      * was silent and permanent - every name and every decoration stopped moving
      * for the rest of the session, including the nickname somebody had just set.
      */
-    const ask = useCallback(
-        async (ids: readonly string[], again: boolean) => {
-            if (ids.length === 0) return;
-            const since = again ? at.current : null;
+    const gather = useCallback(
+        async (ids: readonly string[], since: string | null) => {
             const clocks: string[] = [];
             let lost = false;
             for (let from = 0; from < ids.length; from += core.MAX_PEOPLE_PER_STYLE_ASK) {
@@ -297,21 +296,53 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                 if (clock) clocks.push(clock);
                 else lost = true;
             }
-            // The earliest of them. A later one would start the next revalidation
-            // after an answer this one had already given, and whatever changed in
-            // between would never be asked about again.
-            //
-            // And nothing at all if any chunk was lost. Moving the clock on past a
-            // request that failed is the same bug one step further along: every
-            // later revalidation would ask only for what changed AFTER an answer
-            // this browser never received, so those people would keep the name the
-            // page was rendered with and draw plain for the rest of the session.
-            // Standing still is always safe - the old clock is no later than any
-            // new one, so the next answer covers the gap.
-            const earliest = clocks.sort()[0];
-            if (!lost && earliest) at.current = earliest;
+            return { clocks, lost };
         },
         [askChunk]
+    );
+
+    /**
+     * Move the clock on to where the next question starts.
+     *
+     * The earliest clock of the pass. A later one would start the next
+     * revalidation after an answer this one had already given, and whatever
+     * changed in between would never be asked about again.
+     *
+     * Nothing at all if any of it was lost. Moving the clock on past a request
+     * that failed is that same bug one step further along: every later
+     * revalidation would ask only for what changed AFTER an answer this browser
+     * never received, so those people would keep the name the page was rendered
+     * with and draw plain for the rest of the session.
+     *
+     * And nothing unless the pass covered every face on screen. There is one
+     * clock for all of them, so a pass about the three faces that just arrived
+     * says nothing about the thirty already drawn, and carrying it forward would
+     * skip the window between the two answers for every one of those thirty.
+     * Standing still is always safe - the old clock is no later than any new one,
+     * so the next answer covers the gap.
+     */
+    const commit = useCallback(
+        (covered: readonly string[], clocks: readonly string[], lost: boolean) => {
+            if (lost) return;
+            const earliest = [...clocks].sort()[0];
+            if (!earliest) return;
+            const answered = new Set(covered);
+            for (const id of watched.current.keys()) {
+                if (!answered.has(id)) return;
+            }
+            at.current = earliest;
+        },
+        []
+    );
+
+    /** Ask about a list of people from scratch. */
+    const ask = useCallback(
+        async (ids: readonly string[]) => {
+            if (ids.length === 0) return;
+            const { clocks, lost } = await gather(ids, null);
+            commit(ids, clocks, lost);
+        },
+        [gather, commit]
     );
 
     const watch = useCallback(
@@ -330,7 +361,7 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                         timer.current = null;
                         const going = [...fresh.current];
                         fresh.current.clear();
-                        void ask(going, false);
+                        void ask(going);
                     }, GATHER_MS);
                 }
             }
@@ -343,21 +374,36 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
         [ask]
     );
 
-    /** Ask about everybody on this screen again, saying what we already have. */
+    /**
+     * Ask about everybody on this screen again, saying what we already have.
+     *
+     * Two lists that do not overlap. Anybody a full answer never arrived for - a
+     * request that failed, an offline moment - is asked about properly rather
+     * than being carried along by a question that only reports changes, which
+     * would leave them at the name the page was rendered with until the tab was
+     * reloaded. Everybody else is asked what has moved since the last answer.
+     *
+     * One pass, though, and not two. They finish together and the clock is taken
+     * from the whole of it: two passes each moving it on their own would leave
+     * the window between their two answers unasked for, which is the missed
+     * change this exists to catch.
+     */
     const revalidate = useCallback(() => {
         const live = [...watched.current.keys()];
-        // Anybody a full answer never arrived for - a request that failed, an
-        // offline moment - is asked about properly rather than being carried along
-        // by a question that only reports changes. Without this they would sit at
-        // the name the page was rendered with until the tab was reloaded.
-        const never = live.filter((id) => !known.current.has(id));
-        if (never.length > 0) void ask(never, false);
-        if (!at.current) return;
-        void ask(live, true);
-    }, [ask]);
+        if (live.length === 0) return;
+        const since = at.current;
+        // With no clock to count from there is no delta to ask for, and asking in
+        // full is what gets one back.
+        const first = since ? live.filter((id) => !known.current.has(id)) : live;
+        const changed = since ? live.filter((id) => known.current.has(id)) : [];
+        void (async () => {
+            const [full, delta] = await Promise.all([gather(first, null), gather(changed, since)]);
+            commit(live, [...full.clocks, ...delta.clocks], full.lost || delta.lost);
+        })();
+    }, [gather, commit]);
 
     const refresh = useCallback(() => {
-        void ask([...watched.current.keys()], false);
+        void ask([...watched.current.keys()]);
     }, [ask]);
 
     /**
@@ -392,7 +438,7 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
             // Only what is actually on this screen. A frame about somebody
             // nobody here is drawing costs one array filter and no request.
             const mine = ids.filter((id) => watched.current.has(id));
-            if (mine.length > 0) void ask(mine, false);
+            if (mine.length > 0) void ask(mine);
         }
 
         if (document.visibilityState !== "hidden") start();

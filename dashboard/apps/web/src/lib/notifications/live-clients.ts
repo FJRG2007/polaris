@@ -122,12 +122,31 @@ export function openLiveClient(
     }
 }
 
-/** Say a connection is still there. Called as the stream ticks, so a connection
- *  that is open is never swept out from under itself. */
-export function touchLiveClient(userId: string, id: string, now = Date.now()): void {
-    const client = clients.get(userId)?.get(id);
-    if (!client) return;
-    clients.get(userId)?.set(id, { ...client, seen: now });
+/**
+ * Say a connection is still there. Called as the stream ticks, so a connection
+ * that is open is never swept out from under itself.
+ *
+ * A connection that is open and no longer here rejoins rather than being left
+ * out. There are two ways to end up in that state and neither means the
+ * connection has gone: a feed that stalled for longer than `STALE_MS` was swept,
+ * and one past the cap was pushed out by a newer one. An entry that could never
+ * come back would spend the rest of its life losing an election it is not in -
+ * which is a Polaris that never chimes again, the one failure this is not allowed
+ * to have.
+ */
+export function touchLiveClient(
+    userId: string,
+    id: string,
+    kind: LiveClientKind,
+    now = Date.now()
+): void {
+    const held = clients.get(userId);
+    const client = held?.get(id);
+    if (!client) {
+        openLiveClient(userId, id, kind, now);
+        return;
+    }
+    held?.set(id, { ...client, seen: now });
 }
 
 /** Record that a connection has gone. */

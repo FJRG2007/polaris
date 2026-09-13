@@ -18,6 +18,7 @@ import { claimForDevice } from "@/lib/device-once";
 import { notifyDesktop } from "@/lib/desktop-notify";
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
+import { notificationStreamPath } from "@/lib/notifications/stream-path";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
 import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
@@ -49,22 +50,6 @@ export interface NotificationFeed {
     /** A selection, in one write rather than one per row. */
     markManyRead: (ids: readonly string[]) => void;
     removeMany: (ids: readonly string[]) => void;
-}
-
-const STREAM_PATH = "/api/notifications/stream";
-
-/**
- * The stream, saying which kind of Polaris is asking.
- *
- * The server elects one of an account's connections to raise what belongs to the
- * device - the chime above all - and prefers the desktop app. That cannot be
- * settled here: the tabs of one browser agree between themselves through
- * `device-once`, but the desktop app has a storage partition of its own, so its
- * claim and a tab's are written where neither can read the other, and an arriving
- * message sounded twice. See `lib/notifications/live-clients`.
- */
-function streamPath(): string {
-    return `${STREAM_PATH}?client=${desktopBridge() ? "desktop" : "browser"}`;
 }
 
 const FeedContext = createContext<NotificationFeed | null>(null);
@@ -110,7 +95,7 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
 
     useEffect(
         () =>
-            subscribeSharedStream(streamPath(), scope, ({ data }) => {
+            subscribeSharedStream(notificationStreamPath(), scope, ({ data }) => {
                 if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
                 try {
                     const payload = JSON.parse(data) as {

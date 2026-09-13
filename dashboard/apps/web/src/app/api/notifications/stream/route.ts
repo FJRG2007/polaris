@@ -30,10 +30,10 @@ export const dynamic = "force-dynamic";
 /** How often the feed is re-read. Fast enough to read as live, cheap enough to hold open. */
 const POLL_MS = 5000;
 
-/** What kind of Polaris is asking. Anything else is read as a browser rather than
- *  refused: the kind only decides which client makes a sound, so a value nobody
- *  recognises must not cost somebody their feed. */
-const clientSchema = z.enum(["desktop", "browser"]).catch("browser");
+/** What kind of Polaris is asking. A value nobody recognises is not refused - the
+ *  kind only decides which client makes a sound, and getting it wrong must never
+ *  cost somebody their feed - it simply takes no part in the election. */
+const clientSchema = z.enum(["desktop", "browser"]);
 
 export async function GET(request: Request): Promise<Response> {
     const session = await resolveSession();
@@ -42,7 +42,13 @@ export async function GET(request: Request): Promise<Response> {
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const userId = session.id;
-    const kind = clientSchema.parse(new URL(request.url).searchParams.get("client"));
+    // Nobody, where it was not said. Only a connection that declared itself is
+    // listening for the answer below, so one that did not - something that is not
+    // this Polaris, a tab still running an older build - must not be able to hold
+    // an election the client waiting on it would lose. It is still served, and it
+    // is still told to chime.
+    const declared = clientSchema.safeParse(new URL(request.url).searchParams.get("client"));
+    const kind = declared.success ? declared.data : null;
     // Names this connection and nothing else. Minted here rather than taken from
     // the client, so nothing can claim to be somebody else's connection.
     const connection = randomUUID();
@@ -60,13 +66,13 @@ export async function GET(request: Request): Promise<Response> {
 
     const stream = new ReadableStream<Uint8Array>({
         start(controller) {
-            openLiveClient(userId, connection, kind);
+            if (kind) openLiveClient(userId, connection, kind);
 
             async function tick(): Promise<void> {
                 if (closed) return;
                 // Said on every tick, so a connection that is open is never swept
                 // out from under itself for being quiet.
-                touchLiveClient(userId, connection);
+                if (kind) touchLiveClient(userId, connection, kind);
                 let payload: string;
                 try {
                     payload = JSON.stringify({
@@ -77,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
                         // desktop app opening takes it off a browser tab - and the
                         // frame is the only thing the client is already listening
                         // to.
-                        chime: liveClientChimes(userId, connection)
+                        chime: kind === null || liveClientChimes(userId, connection)
                     });
                 } catch {
                     return; // Transient database error: hold the connection and retry.
