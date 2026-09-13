@@ -424,7 +424,15 @@ main() {
     if git -C "$dash_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         log "syncing the deployment files"
         before=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
-        if ! git -C "$dash_dir" pull --ff-only; then
+        # --quiet, because this is one repository for the whole product: a
+        # fast-forward prints a diffstat of everything the release touched, and most
+        # of it - the browser extension, the tests, the docs - has nothing to do with
+        # this machine and is not what arrived here. That list went into a log read in
+        # the dashboard by somebody who was promised they would never read one, and it
+        # reads like the update is installing source it is not. What actually moved is
+        # reported below as a single line; a pull that fails still explains itself on
+        # stderr, which is the part an operator needs.
+        if ! git -C "$dash_dir" pull --ff-only --quiet; then
             if [ "$source" = "build" ]; then
                 err "could not fast-forward the checkout, and this deployment builds its own image"
                 err "resolve the checkout at $repo_root, or switch Settings back to the published build"
@@ -433,6 +441,9 @@ main() {
             realign_checkout || err "could not fast-forward the checkout; continuing with the published images"
         fi
         after=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
+        if [ -n "$after" ] && [ "$before" != "$after" ]; then
+            log "the deployment files are now at $(printf '%.8s' "$after")"
+        fi
         # The sync may have replaced this very script. A shell keeps running the copy
         # it already parsed, so re-exec once (guarded against a loop) to be sure the
         # newest updater does the work.
