@@ -1430,6 +1430,18 @@ export async function openDirect(
                     private: true,
                     orgId,
                     dmKey: key,
+                    // Starting a conversation is activity in it, exactly as
+                    // starting a group is - the rails order on this and fall back
+                    // to an empty string, which sorts before every timestamp, so
+                    // a conversation opened seconds ago sat below ones nobody had
+                    // touched in months.
+                    //
+                    // Only on the way in. Asking for this conversation again
+                    // REOPENS it - the two returns above, on `existing` and on
+                    // `raced`, are that path - and neither passes through here,
+                    // which is the point: merely opening a conversation to read
+                    // it must not reorder somebody's list.
+                    lastMessageAt: new Date(),
                     createdById: actor.id,
                     members: { createMany: { data: everyone.map((userId) => ({ userId })) } }
                 },
