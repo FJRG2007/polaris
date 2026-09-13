@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { cn } from "@polaris/ui";
-import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
 import { useNow } from "@/components/presence";
+import { useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
+import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
+import { setPresenceAction, setStatusAction } from "@/app/(app)/account/preferences/actions";
 import {
     Bell,
     CalendarClock,
@@ -19,8 +21,6 @@ import {
     MessageSquareText,
     UserCog
 } from "lucide-react";
-import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
-import { setPresenceAction, setStatusAction } from "@/app/(app)/account/preferences/actions";
 import {
     MAX_STATUS,
     PRESENCE_CHOICES,
@@ -304,7 +304,13 @@ export function AccountMenu({
                 >
                     <Avatar person={{ id, name }} size={32} />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                {/* A ceiling on the width, which is what makes the `truncate` below
+                    do anything. A menu sizes itself to its widest child, so a long
+                    status - or a long email - used to stretch it across the window
+                    and the clipping those spans ask for never happened. Bounded
+                    here rather than on each item, because the item that is too wide
+                    is whichever one somebody typed into next. */}
+                <DropdownMenuContent align="end" className="max-w-[18rem]">
                     <DropdownMenuLabel>
                         <span className="block text-sm font-medium text-foreground">{name}</span>
                         <span className="block truncate">{email}</span>
