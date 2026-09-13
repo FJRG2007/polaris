@@ -2600,6 +2600,20 @@ export function FilesView({
                                                                                         connectionId,
                                                                                         entry.path
                                                                                     )}
+                                                                                    // Not a drag
+                                                                                    // source: an
+                                                                                    // anchor is
+                                                                                    // draggable by
+                                                                                    // default and
+                                                                                    // wins over the
+                                                                                    // row, leaving
+                                                                                    // only what it
+                                                                                    // does not
+                                                                                    // cover to
+                                                                                    // start a move.
+                                                                                    draggable={
+                                                                                        false
+                                                                                    }
                                                                                     onClick={(e) =>
                                                                                         e.preventDefault()
                                                                                     }

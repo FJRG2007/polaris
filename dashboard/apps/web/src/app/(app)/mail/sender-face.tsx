@@ -119,6 +119,10 @@ export function SenderFace({
                     src={`/api/mail/face/${encodeURIComponent(address)}`}
                     alt=""
                     className="size-full object-contain"
+                    // An image is draggable by default, which would make the
+                    // face its own drag rather than the row's - see the row in
+                    // mail-view.tsx.
+                    draggable={false}
                     loading="lazy"
                     decoding="async"
                     ref={attach}

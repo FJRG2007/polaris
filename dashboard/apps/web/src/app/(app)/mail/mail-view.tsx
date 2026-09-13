@@ -2391,6 +2391,11 @@ function ThreadRow({
                 <Link
                     href={`?open=${thread.id}`}
                     scroll={false}
+                    // Not a drag source. An anchor is draggable by default and
+                    // wins over the row it sits in, so the only part of a
+                    // conversation that could be dragged onto a folder was the
+                    // few pixels this does not cover.
+                    draggable={false}
                     // A press opens the conversation by changing the address,
                     // with no request: the pane beside the list fetches the
                     // conversation itself, so a round trip here bought nothing

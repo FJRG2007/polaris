@@ -394,6 +394,11 @@ function TreeRow({
                         {href ? (
                             <Link
                                 href={href}
+                                // Not a drag source. An anchor is draggable by
+                                // default and wins over the row it sits in,
+                                // leaving only what it does not cover to start
+                                // a move.
+                                draggable={false}
                                 className={cn(
                                     "flex min-w-0 flex-1 items-center gap-1.5 py-1 text-sm",
                                     active ? "font-medium text-foreground" : "text-muted-foreground"
