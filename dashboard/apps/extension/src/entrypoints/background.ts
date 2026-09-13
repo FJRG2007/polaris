@@ -1,6 +1,7 @@
 import { storage } from "#imports";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
+import { readIntendedLogin } from "@/lib/save";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
@@ -8,7 +9,13 @@ import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
-import { decrypt, decryptRsa, fromBase64, symmetricKeyFromBytes } from "@polaris/vault-crypto";
+import {
+    decrypt,
+    decryptRsa,
+    encrypt,
+    fromBase64,
+    symmetricKeyFromBytes
+} from "@polaris/vault-crypto";
 import {
     currentOrigin,
     forgetOrigin,
@@ -571,8 +578,74 @@ const USES_VAULT = new Set<messages.Request["kind"]>([
     "itemsFor",
     "fill",
     "copy",
-    "totpNow"
+    "totpNow",
+    "save"
 ]);
+
+/**
+ * Save a new login into the account's OWN vault.
+ *
+ * Which vault is not a parameter, and that is deliberate rather than unfinished:
+ * writing into a shared one means choosing a collection and holding the key for
+ * it, and an extension that guessed would put a password somewhere other people
+ * can read it. The Polaris screens are where an item goes into a shared vault,
+ * and moving one there re-encrypts it under that vault's key.
+ *
+ * What was typed is checked again here with the same function the popup used. The
+ * popup's copy is so the button can say why it is disabled; this one is the one
+ * that decides, because a caller is not where a decision is allowed to be final.
+ */
+async function save(item: {
+    readonly name: string;
+    readonly username: string;
+    readonly password: string;
+    readonly uri: string;
+}): Promise<messages.Reply> {
+    const opened = await vault();
+    if (!opened) return { ok: false, error: "The vault is locked." };
+
+    const intent = readIntendedLogin(item);
+    if (!intent.ok) return { ok: false, error: intent.error };
+
+    const origin = await currentOrigin();
+    if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+    const base = vaultBase(origin);
+    const access = await token(base);
+    if (!access) return { ok: false, error: "That server did not answer. Sign in again." };
+
+    const { login } = intent;
+    const key = opened.key;
+    const outcome = await protocol.createLogin(base, access, {
+        type: CIPHER_LOGIN,
+        name: await encrypt(login.name, key),
+        login: {
+            username: login.username === null ? null : await encrypt(login.username, key),
+            password: login.password === null ? null : await encrypt(login.password, key),
+            // Omitted rather than sent empty: a login saved for no page should have
+            // no address, not one that matches nothing and shows as a blank row.
+            ...(login.uri === null
+                ? {}
+                : { uris: [{ uri: await encrypt(login.uri, key), match: null }] })
+        }
+    });
+
+    if (!outcome.ok) {
+        if (outcome.status === null)
+            return { ok: false, error: "That server could not be reached." };
+        if (outcome.status === 401)
+            return { ok: false, error: "That session has ended. Sign in again." };
+        // A 400 here is this client having built the item wrong, which is a defect
+        // rather than something the reader can act on - so it is logged with the
+        // status and they are told the one useful thing: nothing was saved.
+        console.error("polaris: the vault refused a new item, status", outcome.status);
+        return { ok: false, error: "That could not be saved." };
+    }
+
+    // Straight away rather than on the next poll: the item somebody just saved has
+    // to be in the list they are looking at, and the badge has to count it.
+    await sync(true);
+    return { ok: true, status: await status() };
+}
 
 browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // Only the extension's own pages may ask for any of this. A page that
@@ -743,6 +816,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "fill":
                 return fill(request.id);
+
+            case "save":
+                return save(request);
 
             case "copy": {
                 const login = (await logins()).find((one) => one.id === request.id);

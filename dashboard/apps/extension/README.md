@@ -38,6 +38,7 @@ src/lib/server.ts        which Polaris this belongs to, and permission for it
 src/lib/protocol.ts      the Bitwarden protocol client: sign in, sync, refresh
 src/lib/matching.ts      whether an item belongs to this page, and which comes first
 src/lib/lock.ts          when an open vault locks itself again
+src/lib/save.ts          what was typed for a new login, before it is encrypted
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
 src/entrypoints/         background worker and popup
 test/                    the decisions that can do harm: what matches, and when it locks
@@ -49,6 +50,17 @@ injected onto the tab in front of you at the moment you ask for it, and it is
 handed the two strings and nothing else. A declared content script would itself
 be a host permission - `<all_urls>` at install time - which is the access this
 manifest is written to avoid, and a page can read anything running inside it.
+
+## Saving a login
+
+"Save a login for this page" writes into your own vault, prefilled with the site
+you are on. It is encrypted in the extension and sent to `POST /vault/api/ciphers`,
+the same endpoint every other client uses.
+
+It cannot put an item into a vault you share with somebody else, and that is on
+purpose rather than missing: which collection it goes in and whose key it is
+encrypted under are decisions an extension should not make for you. Do that in the
+Polaris screens, where moving an item re-encrypts it under that vault's key.
 
 ## When it locks
 

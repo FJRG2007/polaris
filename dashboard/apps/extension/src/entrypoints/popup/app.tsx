@@ -1,4 +1,5 @@
 import { TIMEOUT_CHOICES } from "@/lib/lock";
+import { readIntendedLogin } from "@/lib/save";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
@@ -354,6 +355,118 @@ function TotpCell({ id }: { id: string }): React.JSX.Element | null {
 }
 
 /**
+ * Saving the login for the page somebody is on.
+ *
+ * Closed until asked for, like the generator: most visits here are to read a
+ * password rather than to add one, and a form standing open above the list would
+ * be in the way of the common case to serve the rarer one.
+ *
+ * Prefilled with what is already known - the site's name and its address - because
+ * the alternative is somebody retyping what the popup could see. Checked on every
+ * keystroke by `readIntendedLogin`, the same function the worker decides with, so
+ * the button says why it is disabled instead of failing after the press.
+ */
+function SaveLogin({
+    url,
+    host,
+    onChange
+}: {
+    url: string | null;
+    host: string | null;
+    onChange: () => Promise<void>;
+}): React.JSX.Element {
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState("");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [refused, setRefused] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    const typed = { name, username, password, uri: url ?? "" };
+    const check = readIntendedLogin(typed);
+    // Nothing is said until something has been typed: an error under an untouched
+    // form is a complaint about not having started yet.
+    const started = name !== "" || username !== "" || password !== "";
+
+    // What the server refused wins over what the form can see, because it is the
+    // newer and more specific answer: a reader who has just been told the session
+    // ended is not helped by going back to "give it a name".
+    let problem: string | null = refused;
+    if (problem === null && started && !check.ok) problem = check.error;
+
+    const save = async (): Promise<void> => {
+        setBusy(true);
+        setRefused(null);
+        const reply = await askBackground({ kind: "save", ...typed });
+        setBusy(false);
+        if (!reply.ok) {
+            setRefused(reply.error);
+            return;
+        }
+        setOpen(false);
+        setName("");
+        setUsername("");
+        setPassword("");
+        await onChange();
+    };
+
+    if (!open) {
+        return (
+            <div className="row">
+                <button
+                    className="ghost"
+                    onClick={() => {
+                        setOpen(true);
+                        setName(host ?? "");
+                        setRefused(null);
+                    }}
+                >
+                    {host ? "Save a login for this page" : "Save a login"}
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="row wrap">
+            <input
+                autoFocus
+                value={name}
+                placeholder="Name"
+                aria-label="Name"
+                onChange={(event) => setName(event.target.value)}
+            />
+            <input
+                value={username}
+                placeholder="Username"
+                aria-label="Username"
+                onChange={(event) => setUsername(event.target.value)}
+            />
+            <input
+                type="password"
+                value={password}
+                placeholder="Password"
+                aria-label="Password"
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && check.ok && void save()}
+            />
+            <span className="muted small">
+                {url ? `Saved for ${host ?? url}` : "Not tied to any page"}
+            </span>
+            <div className="acts">
+                <button className="ghost" disabled={busy || !check.ok} onClick={() => void save()}>
+                    {busy ? "Saving" : "Save"}
+                </button>
+                <button className="ghost" onClick={() => setOpen(false)}>
+                    Cancel
+                </button>
+            </div>
+            <Problem text={problem} />
+        </div>
+    );
+}
+
+/**
  * How long the vault stays open while nobody is using it.
  *
  * Here rather than buried in an options page, because it is the one setting that
@@ -407,6 +520,9 @@ function Items({
     const [found, setFound] = useState<readonly ItemSummary[]>([]);
     const [query, setQuery] = useState("");
     const [note, setNote] = useState<string | null>(null);
+    // The page somebody is on, kept so saving a login for it does not ask them to
+    // type an address the popup can already see.
+    const [pageUrl, setPageUrl] = useState<string | null>(null);
     const clearing = useRef<number | null>(null);
     // The site in front of somebody and whether they have shut this out of it,
     // asked of the worker rather than worked out here: the popup does not hold
@@ -428,6 +544,7 @@ function Items({
         void (async () => {
             const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
             if (tab?.url && /^https?:/i.test(tab.url)) {
+                setPageUrl(tab.url);
                 const reply = await askBackground({ kind: "itemsFor", url: tab.url });
                 if (reply.ok && "items" in reply) setSuggested(reply.items);
             }
@@ -581,6 +698,8 @@ function Items({
                     </div>
                 </div>
             ) : null}
+
+            <SaveLogin url={pageUrl} host={here.host} onChange={onChange} />
 
             <Generator />
 

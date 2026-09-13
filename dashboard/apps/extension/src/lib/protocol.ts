@@ -257,6 +257,50 @@ export async function sync(base: string, accessToken: string): Promise<SyncRespo
 }
 
 /**
+ * One new item, with every valuable leaf already encrypted.
+ *
+ * The shape is `cipherSchema` in `packages/core/src/schemas/vault.ts`, which is
+ * what the server validates this against - read off that file rather than taken
+ * from Bitwarden's documentation. `name` is required and has to look encrypted;
+ * `organizationId` and `folderId` are omitted entirely rather than sent as null,
+ * because the schema wants a uuid where they are present.
+ */
+export interface NewLogin {
+    readonly type: number;
+    readonly name: string;
+    readonly login: {
+        readonly username: string | null;
+        readonly password: string | null;
+        readonly uris?: readonly { readonly uri: string; readonly match: number | null }[];
+    };
+}
+
+/**
+ * Save a new item, and say what the server made of it.
+ *
+ * The status comes back rather than a bare failure because the three that happen
+ * mean different things to whoever is looking at the popup: 401 is a session that
+ * has ended, 400 is an item this client built wrong, and nothing at all is a
+ * server that could not be reached.
+ */
+export async function createLogin(
+    base: string,
+    accessToken: string,
+    item: NewLogin
+): Promise<{ readonly ok: boolean; readonly status: number | null }> {
+    const reply = await ask(vaultUrl(base, "api/ciphers"), {
+        method: "POST",
+        headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json"
+        },
+        body: JSON.stringify(item)
+    });
+    if (!reply) return { ok: false, status: null };
+    return { ok: reply.ok, status: reply.status };
+}
+
+/**
  * When the vault last changed, as a number of milliseconds.
  *
  * The cheap half of syncing: this is one row of the account rather than every

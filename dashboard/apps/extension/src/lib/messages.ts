@@ -69,7 +69,21 @@ export type Request =
     /** Shut this extension out of the current site, or let it back in. */
     | { readonly kind: "setBlocked"; readonly blocked: boolean }
     /** Change how long an unlocked vault may sit unused before it locks itself. */
-    | { readonly kind: "setTimeout"; readonly timeoutMs: number };
+    | { readonly kind: "setTimeout"; readonly timeoutMs: number }
+    /**
+     * Save a new login into the account's own vault.
+     *
+     * The fields arrive as they were typed; the worker normalizes and checks them
+     * again with the same function the popup used, and does the encrypting. A
+     * caller cannot choose which vault it lands in - see `save` in the worker.
+     */
+    | {
+          readonly kind: "save";
+          readonly name: string;
+          readonly username: string;
+          readonly password: string;
+          readonly uri: string;
+      };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
