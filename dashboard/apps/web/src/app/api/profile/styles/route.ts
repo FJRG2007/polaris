@@ -22,6 +22,7 @@
 
 import { z } from "zod";
 import { apiUser } from "@/lib/api-session";
+import { MAX_PEOPLE_PER_STYLE_ASK } from "@polaris/core";
 import {
     namesFor,
     nameChangesSince,
@@ -33,8 +34,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** More than any one screen draws at once, and a ceiling on what one request can
- *  ask this to look up. */
-const MOST = 200;
+ *  ask this to look up. Shared with the browser that does the asking, which cuts
+ *  its list at the same number rather than being refused for a list too long. */
+const MOST = MAX_PEOPLE_PER_STYLE_ASK;
 
 const askSchema = z.object({
     ids: z.array(z.string().uuid()).max(MOST),
@@ -65,13 +67,15 @@ export async function POST(request: Request): Promise<Response> {
         const from = new Date(since);
         const [moved, names] = await Promise.all([
             styleChangesSince(ids, from, styled ?? []),
-            nameChangesSince(viewer.id, ids, from)
+            nameChangesSince(ids, from)
         ]);
         return Response.json(
             {
                 people: Object.fromEntries(moved.changed),
                 // What they are called, which changes for the same reasons and is
-                // drawn in the same places - see `namesFor`.
+                // drawn in the same places - see `namesFor`. No nicknames ride
+                // with it: the browser holds those from its first answer and they
+                // do not change because their subject renamed themselves.
                 names: Object.fromEntries(names),
                 cleared: moved.cleared,
                 at: at.toISOString()
@@ -83,11 +87,17 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
 
-    const [found, names] = await Promise.all([stylesFor(ids), namesFor(viewer.id, ids)]);
+    const [found, live] = await Promise.all([stylesFor(ids), namesFor(viewer.id, ids)]);
     return Response.json(
         {
             people: Object.fromEntries(found),
-            names: Object.fromEntries(names),
+            names: Object.fromEntries(live.names),
+            // What this reader calls them, kept apart from what they call
+            // themselves rather than merged over it: the two are different claims
+            // and only the screen drawing them knows which one it may show. Sent
+            // for everybody asked about, so a nickname taken off is an id missing
+            // from here rather than one that lingers until a reload.
+            nicknames: Object.fromEntries(live.called),
             cleared: [],
             at: at.toISOString()
         },

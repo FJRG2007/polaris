@@ -12,13 +12,14 @@
  * What is tested here is the server half: which names come back, and that a
  * revalidation answers with the ones that moved rather than with all of them.
  *
- * Nicknames are part of that half rather than a separate feature, and they are the
- * reason this file grew. The answer here OVERWRITES the name a page was rendered
- * with - the store keeps it as "what they are called now" and the rendered name is
- * only the fallback - so a nickname the server had already applied to the page was
- * replaced by the person's real name on the next paint, and came back no matter how
- * many times somebody reloaded. A nickname that does not survive this function does
- * not survive at all.
+ * Nicknames ride the same answer, and what this file pins down is that they ride
+ * BESIDE the names rather than over them. The browser keeps this answer as "what
+ * they are called now" and it overwrites the name every screen was rendered
+ * with, so a nickname left out of it appears for one paint and then vanishes -
+ * and a nickname merged into it replaces a real name on the screens where a name
+ * is a claim about who somebody is rather than a note the reader keeps: a
+ * moderation queue, an administration table, a field that names an account. Two
+ * maps is what lets the screen decide, which is where that decision belongs.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -88,7 +89,7 @@ beforeEach(() => {
 
 describe("what everybody is called", () => {
     it("answers for the people being drawn", async () => {
-        const names = await namesFor("me", ["u1", "u2"]);
+        const { names } = await namesFor("me", ["u1", "u2"]);
         expect(names.get("u1")).toBe("Ada");
         expect(names.get("u2")).toBe("Grace");
     });
@@ -99,23 +100,32 @@ describe("what everybody is called", () => {
     });
 
     it("has nothing to ask about an empty screen", async () => {
-        expect((await namesFor("me", [])).size).toBe(0);
+        const answer = await namesFor("me", []);
+        expect(answer.names.size).toBe(0);
+        expect(answer.called.size).toBe(0);
         expect(asked).toBeNull();
         expect(nicknameLookups).toEqual([]);
     });
 
-    it("answers with what this reader calls them", async () => {
+    it("carries what this reader calls them beside what they call themselves", async () => {
         nicknames = [{ ownerId: "me", subjectId: "u1", nickname: "Dad" }];
-        const names = await namesFor("me", ["u1", "u2"]);
-        expect(names.get("u1")).toBe("Dad");
-        // Somebody with no nickname is still called what they call themselves: a
-        // missing one is the real name, never an empty string.
+        const { names, called } = await namesFor("me", ["u1", "u2"]);
+        expect(called.get("u1")).toBe("Dad");
+        // Both of them, and the real one is untouched: a moderation queue and an
+        // administration table are drawn from the same answer as a conversation,
+        // and only they know a nickname is not what they may show.
+        expect(names.get("u1")).toBe("Ada");
+        // Somebody with no nickname is simply absent, which is what lets the
+        // browser fall back to their own name rather than to an empty string.
+        expect(called.has("u2")).toBe(false);
         expect(names.get("u2")).toBe("Grace");
     });
 
     it("keeps one reader's names out of another's", async () => {
         nicknames = [{ ownerId: "me", subjectId: "u1", nickname: "Dad" }];
-        expect((await namesFor("somebody-else", ["u1"])).get("u1")).toBe("Ada");
+        const answer = await namesFor("somebody-else", ["u1"]);
+        expect(answer.called.size).toBe(0);
+        expect(answer.names.get("u1")).toBe("Ada");
     });
 });
 
@@ -123,28 +133,23 @@ describe("what has changed since the last answer", () => {
     // The ordinary revalidation, and the reason an idle tab costs nothing: forty
     // people, none of whom renamed themselves, is an empty answer.
     it("leaves out the ones that did not move", async () => {
-        const moved = await nameChangesSince("me", ["u1", "u2"], new Date("2026-09-06T11:00:00Z"));
+        const moved = await nameChangesSince(["u1", "u2"], new Date("2026-09-06T11:00:00Z"));
         expect([...moved.keys()]).toEqual(["u2"]);
     });
 
     it("says nothing at all when nobody moved", async () => {
-        const moved = await nameChangesSince("me", ["u1", "u2"], new Date("2026-09-06T13:00:00Z"));
+        const moved = await nameChangesSince(["u1", "u2"], new Date("2026-09-06T13:00:00Z"));
         expect(moved.size).toBe(0);
     });
 
-    it("asks about nobody's nickname when nobody moved", async () => {
+    it("asks about nobody's nickname, whoever moved", async () => {
         // What keeps a tab that is merely open from being a workload: the quiet
-        // answer is one indexed lookup and then nothing.
-        await nameChangesSince("me", ["u1", "u2"], new Date("2026-09-06T13:00:00Z"));
-        expect(nicknameLookups).toEqual([]);
-    });
-
-    it("still answers with this reader's name for somebody who renamed themselves", async () => {
-        // The case that made reloading useless. Grace renames herself, the
-        // revalidation carries her new name, and a reader who calls her something
-        // else must not have their own name replaced by it.
+        // answer is one indexed lookup and then nothing. A nickname does not
+        // change because its subject renamed themselves, and the browser already
+        // holds the ones it was told about.
         nicknames = [{ ownerId: "me", subjectId: "u2", nickname: "G" }];
-        const moved = await nameChangesSince("me", ["u1", "u2"], new Date("2026-09-06T11:00:00Z"));
-        expect(moved.get("u2")).toBe("G");
+        const moved = await nameChangesSince(["u1", "u2"], new Date("2026-09-06T11:00:00Z"));
+        expect(moved.get("u2")).toBe("Grace");
+        expect(nicknameLookups).toEqual([]);
     });
 });

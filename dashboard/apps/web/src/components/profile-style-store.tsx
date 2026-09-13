@@ -75,6 +75,10 @@ interface Store {
     /** What each of them is called now, which is not always what the page was
      *  rendered with - see `useProfileName`. */
     readonly names: ReadonlyMap<string, string>;
+    /** What the reader calls them, for the few they have named - see
+     *  `useContactName`. Kept apart from `names` because only the screen drawing
+     *  somebody knows which of the two it is allowed to show. */
+    readonly called: ReadonlyMap<string, string>;
     readonly watch: (id: string) => void;
     readonly refresh: () => void;
 }
@@ -113,6 +117,21 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
      * replaces it once the server has answered.
      */
     const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
+    /**
+     * What this reader has called people, where they have named any.
+     *
+     * Beside the names rather than laid over them. A nickname is the reader's own
+     * note and belongs where Polaris is showing them their own list of people; it
+     * is not what somebody is called in a moderation queue, an administration
+     * table or anywhere else a name stands for who somebody is - see
+     * `contact-names`. One map that had already replaced the other would leave
+     * the screen no way to tell the two apart.
+     *
+     * Only a full answer carries these. A revalidation is about what changed on
+     * accounts, and a nickname does not change because its subject renamed
+     * themselves.
+     */
+    const [called, setCalled] = useState<ReadonlyMap<string, string>>(new Map());
     /** Everybody drawn since this page loaded, which is what a revalidation asks
      *  about again. */
     const watched = useRef(new Set<string>());
@@ -127,10 +146,15 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
     const drawn = useRef<ReadonlyMap<string, core.ProfileStyle>>(new Map());
     drawn.current = people;
 
-    const ask = useCallback(async (ids: readonly string[], again: boolean) => {
-        if (ids.length === 0) return;
+    /**
+     * One request's worth of them, answering the server's clock.
+     *
+     * The clock is given back rather than stored here because a page can take
+     * more than one request, and the next revalidation has to start from before
+     * the first of them - see `ask`.
+     */
+    const askChunk = useCallback(async (ids: readonly string[], since: string | null) => {
         try {
-            const since = again ? at.current : null;
             const response = await fetch("/api/profile/styles", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
@@ -153,14 +177,15 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                         : {})
                 })
             });
-            if (!response.ok) return;
+            if (!response.ok) return null;
             const body = (await response.json()) as {
                 people?: Record<string, unknown>;
                 names?: Record<string, unknown>;
+                nicknames?: Record<string, unknown>;
                 cleared?: string[];
                 at?: string;
             };
-            if (typeof body.at === "string") at.current = body.at;
+            const clock = typeof body.at === "string" ? body.at : null;
             const answered = Object.entries(body.people ?? {});
             const cleared = body.cleared ?? [];
             const named = Object.entries(body.names ?? {}).filter(
@@ -176,9 +201,30 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                     return next;
                 });
             }
+            // Only a full answer carries these, and it carries one for everybody
+            // it was asked about - so an id missing from it is a nickname taken
+            // off rather than one this answer had nothing to say about, and it
+            // comes off here too. Without that, taking a nickname off left it on
+            // screen until the tab was reloaded.
+            if (body.nicknames) {
+                const given = body.nicknames;
+                setCalled((current) => {
+                    const next = new Map(current);
+                    let moved = false;
+                    for (const id of ids) {
+                        const told = given[id];
+                        const wanted = typeof told === "string" && told !== "" ? told : null;
+                        if ((next.get(id) ?? null) === wanted) continue;
+                        moved = true;
+                        if (wanted) next.set(id, wanted);
+                        else next.delete(id);
+                    }
+                    return moved ? next : current;
+                });
+            }
             // The ordinary revalidation: nothing moved. Not setting state here is
             // what makes an idle tab free rather than a re-render every minute.
-            if (answered.length === 0 && cleared.length === 0) return;
+            if (answered.length === 0 && cleared.length === 0) return clock;
             setPeople((current) => {
                 const next = new Map(current);
                 // Checked here as well as on the server. This ends up in a
@@ -194,11 +240,44 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                 for (const id of cleared) next.set(id, core.NO_PROFILE_STYLE);
                 return next;
             });
+            return clock;
         } catch {
             // Offline, or a request that went away with the page. Faces draw
             // plain, which is what they draw for almost everybody anyway.
+            return null;
         }
     }, []);
+
+    /**
+     * Ask about everybody in a list, in requests the server will answer.
+     *
+     * Cut at `MAX_PEOPLE_PER_STYLE_ASK`, because what is asked about is every
+     * face drawn since the page loaded rather than the ones on screen now: an
+     * afternoon in a directory or a busy chat passes that ceiling, and a request
+     * over it is refused. There is nowhere to show that refusal, so the symptom
+     * was silent and permanent - every name and every decoration stopped moving
+     * for the rest of the session, including the nickname somebody had just set.
+     */
+    const ask = useCallback(
+        async (ids: readonly string[], again: boolean) => {
+            if (ids.length === 0) return;
+            const since = again ? at.current : null;
+            const clocks: string[] = [];
+            for (let from = 0; from < ids.length; from += core.MAX_PEOPLE_PER_STYLE_ASK) {
+                const clock = await askChunk(
+                    ids.slice(from, from + core.MAX_PEOPLE_PER_STYLE_ASK),
+                    since
+                );
+                if (clock) clocks.push(clock);
+            }
+            // The earliest of them. A later one would start the next revalidation
+            // after an answer this one had already given, and whatever changed in
+            // between would never be asked about again.
+            const earliest = clocks.sort()[0];
+            if (earliest) at.current = earliest;
+        },
+        [askChunk]
+    );
 
     const watch = useCallback(
         (id: string) => {
@@ -274,8 +353,8 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
     }, [ask, revalidate]);
 
     const store = useMemo<Store>(
-        () => ({ people, names, watch, refresh }),
-        [people, names, watch, refresh]
+        () => ({ people, names, called, watch, refresh }),
+        [people, names, called, watch, refresh]
     );
     return <Context.Provider value={store}>{children}</Context.Provider>;
 }
@@ -320,6 +399,29 @@ export function useProfileName(id: string | null | undefined): string | null {
 
     if (!id || !store) return null;
     return store.names.get(id) ?? null;
+}
+
+/**
+ * What this reader calls somebody, if they have given them a name.
+ *
+ * Separate from `useProfileName` on purpose: that is what the person is called,
+ * this is a note the reader keeps about them. Most screens draw the note, and
+ * the ones where a name is a claim about who somebody is - a moderation queue,
+ * an administration table, a field that names an account - draw what they are
+ * called. `PersonName` is where that choice is made; see `contact-names` for the
+ * rule behind it.
+ */
+export function useContactName(id: string | null | undefined): string | null {
+    const store = useContext(Context);
+    const watch = store?.watch;
+
+    useEffect(() => {
+        if (!id || !watch) return;
+        watch(id);
+    }, [id, watch]);
+
+    if (!id || !store) return null;
+    return store.called.get(id) ?? null;
 }
 
 export function useProfileStyle(id: string | null | undefined): core.ProfileStyle | null {

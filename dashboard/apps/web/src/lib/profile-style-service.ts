@@ -18,7 +18,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { asNamed, nicknamesFor } from "@/lib/contact-names";
+import { nicknamesFor } from "@/lib/contact-names";
 
 const COLUMNS = {
     banner: true,
@@ -42,6 +42,14 @@ export async function getProfileStyle(userId: string): Promise<core.ProfileStyle
  * and leaving the plain ones out would make it ask about them again on every
  * render for the rest of the session.
  */
+/** The two names a person can have on a screen, kept apart. */
+export interface LiveNames {
+    /** What each of them calls themselves. */
+    readonly names: Map<string, string>;
+    /** What this reader calls them, for the few they have named. */
+    readonly called: Map<string, string>;
+}
+
 /**
  * What everybody on screen is called, asked with what they look like.
  *
@@ -53,28 +61,34 @@ export async function getProfileStyle(userId: string): Promise<core.ProfileStyle
  * a second one asking the same server about the same forty people would be twice
  * the requests for half the answer.
  */
-export async function namesFor(
-    viewerId: string,
-    ids: readonly string[]
-): Promise<Map<string, string>> {
+export async function namesFor(viewerId: string, ids: readonly string[]): Promise<LiveNames> {
     const wanted = [...new Set(ids)];
-    if (wanted.length === 0) return new Map();
+    if (wanted.length === 0) return { names: new Map(), called: new Map() };
     const [rows, called] = await Promise.all([
         prisma.user.findMany({ where: { id: { in: wanted } }, select: { id: true, name: true } }),
         nicknamesFor(viewerId, wanted)
     ]);
-    // What this reader calls them, over what they call themselves. Applied here
-    // rather than only on the server-rendered page because this answer OVERWRITES
-    // that one: the store keeps it as "what they are called now" and the name a
-    // screen was rendered with is only the fallback - so a nickname that was not
-    // applied here was a nickname that appeared for one paint and then vanished,
-    // and came back no matter how many times the page was reloaded.
-    return new Map(rows.map((row) => [row.id, asNamed(called, row.id, row.name) ?? row.name]));
+    // Two answers rather than one merged one, and the reason is what the browser
+    // does with this: it keeps the answer as "what they are called now" and it
+    // OVERWRITES the name every screen was rendered with - so a nickname left out
+    // here is a nickname that appears for one paint and then vanishes, and a
+    // nickname merged in here is one that replaces a real name on screens where a
+    // name is a claim about who somebody is rather than a note the reader keeps.
+    // The store carries both and the surface decides, exactly as the server does
+    // when it renders a page; see `contact-names` for which surfaces those are.
+    return { names: new Map(rows.map((row) => [row.id, row.name])), called };
 }
 
-/** The names among those that have changed since a browser last asked. */
+/**
+ * The names among those that have changed since a browser last asked.
+ *
+ * What somebody calls themselves, only - no nicknames. Not an omission: a
+ * nickname is the reader's own and does not change because its subject renamed
+ * themselves, so the browser already holds it from the full answer and lays it
+ * over this one. Asking again here would be a second lookup on every
+ * revalidation of every open tab, to be told what that tab already knows.
+ */
 export async function nameChangesSince(
-    viewerId: string,
     ids: readonly string[],
     since: Date
 ): Promise<Map<string, string>> {
@@ -84,20 +98,7 @@ export async function nameChangesSince(
         where: { id: { in: wanted }, updatedAt: { gt: since } },
         select: { id: true, name: true }
     });
-    if (rows.length === 0) return new Map();
-    // Through the reader's own names, like the full answer above: a person who
-    // renamed themselves must not come back wearing their new name in a list where
-    // this reader had given them one.
-    //
-    // A nickname being SET is not one of the changes this query finds - it asks what
-    // moved on the account, and a nickname moves nothing there. It does not need to
-    // be: a nickname is private to whoever gave it, so the only screen that has to
-    // catch up is theirs, and the dialog that sets it refreshes that screen itself.
-    const called = await nicknamesFor(
-        viewerId,
-        rows.map((row) => row.id)
-    );
-    return new Map(rows.map((row) => [row.id, asNamed(called, row.id, row.name) ?? row.name]));
+    return new Map(rows.map((row) => [row.id, row.name]));
 }
 
 export async function stylesFor(ids: readonly string[]): Promise<Map<string, core.ProfileStyle>> {

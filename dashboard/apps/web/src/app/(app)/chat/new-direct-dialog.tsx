@@ -264,7 +264,7 @@ export function NewDirectDialog({
                             // Leaving one afterwards is a different thing and stays
                             // allowed: a group that has been used is a place, and a
                             // place does not stop existing because somebody left.
-                            disabled={busy || picked.length < (kind === "group" ? 2 : 1)}
+                            disabled={busy || picked.length < 2}
                             onClick={() => void open_(picked.map((person) => person.id))}
                         >
                             {busy && <Loader2 className="size-4 animate-spin" />}

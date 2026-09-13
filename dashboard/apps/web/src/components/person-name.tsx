@@ -23,10 +23,10 @@
 
 import { cn } from "@polaris/ui";
 import { createContext, useContext } from "react";
-import { useProfileName, useProfileStyle } from "@/components/profile-style-store";
 import { nameLookOf, nameplateOf, type Nameplate } from "@polaris/core";
 import { nameStyleClass, nameLookCss, nameplateCss } from "@/lib/profile-style-css";
 import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
+import { useContactName, useProfileName, useProfileStyle } from "@/components/profile-style-store";
 
 /**
  * The places a person is a row of data rather than a person.
@@ -52,12 +52,45 @@ import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } 
 const PlainNamesContext = createContext(false);
 
 export function PlainNames({ children }: { children: ReactNode }) {
-    return <PlainNamesContext.Provider value={true}>{children}</PlainNamesContext.Provider>;
+    // A list of accounts as records is also a list where a name stands for who
+    // somebody is, so it is both: plain, and under the name the account has.
+    return (
+        <PlainNamesContext.Provider value={true}>
+            <RealNames>{children}</RealNames>
+        </PlainNamesContext.Provider>
+    );
 }
 
 /** Whether this part of the screen draws people plainly. */
 export function useNamesArePlain(): boolean {
     return useContext(PlainNamesContext);
+}
+
+/**
+ * The places a name is a claim about who somebody is.
+ *
+ * A nickname is one reader's note about a person - "Dad" for an account whose
+ * name is a handle nobody recognises - and Polaris shows it wherever it is
+ * showing that reader their own people: a conversation, the messages in it, a
+ * roster. It must not stand in for the name in an audit entry, a moderation
+ * queue, an invitation or a field that names an account, because there the name
+ * is what the record is about and the reader invented the other one. Somebody
+ * lifting a ban has to be reading the name the ban was placed on.
+ *
+ * Switched off by surface for the same reason `PlainNames` is, and it is the
+ * same shape: a wrapper around the table, the queue or the picker, and every
+ * name inside it is the one its owner chose, however deep it is drawn and
+ * whichever list is added there next. `PlainNames` includes it.
+ */
+const RealNamesContext = createContext(false);
+
+export function RealNames({ children }: { children: ReactNode }) {
+    return <RealNamesContext.Provider value={true}>{children}</RealNamesContext.Provider>;
+}
+
+/** Whether this part of the screen calls people what they call themselves. */
+export function useNamesAreReal(): boolean {
+    return useContext(RealNamesContext);
 }
 
 export function PersonName({
@@ -77,6 +110,7 @@ export function PersonName({
     children?: ReactNode;
 }) {
     const plain = useNamesArePlain();
+    const real = useNamesAreReal();
     const chosen = nameLookOf(useProfileStyle(id)?.nameStyle ?? null);
     const style = plain ? null : chosen;
     // What they are called now, where that is known, and what this screen was
@@ -84,12 +118,19 @@ export function PersonName({
     // was the one that did not move: somebody renamed themselves and every open
     // conversation went on saying the old name until the tab was reloaded.
     const live = useProfileName(id);
+    // Over it, what this reader calls them - except where the name is a claim
+    // about who somebody is rather than a note, which is what `RealNames` marks.
+    // A nickname surviving a rename is the point of it: the person renames
+    // themselves, the answer above carries their new name, and a reader who
+    // called them something else goes on seeing their own name for them.
+    const called = useContactName(id);
+    const shown = (real ? null : called) ?? live ?? name;
     return (
         <span
             className={cn(className, nameStyleClass(style))}
             style={style ? nameLookCss(style) : undefined}
         >
-            {live ?? name}
+            {shown}
             {children}
         </span>
     );

@@ -27,9 +27,9 @@ import { createPortal } from "react-dom";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { TOKEN_SEPARATOR, tokenAt } from "@/lib/token-field";
-import { PersonName, PersonRow } from "@/components/person-name";
 import { searchAccountsAction } from "@/app/(app)/mention-actions";
 import type { AccountCandidate } from "@/lib/rich-text/mention-service";
+import { PersonName, PersonRow, RealNames } from "@/components/person-name";
 import { POPUP_CLASS, POPUP_ITEM_CLASS } from "@/components/rich-text/suggestion";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
@@ -302,54 +302,59 @@ export function AccountInput({
             />
             {showing && anchor
                 ? createPortal(
-                <ul
-                    id={listId}
-                    role="listbox"
-                    // Above the dialog it is usually inside, which sits at z-50.
-                    style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
-                    className={cn(POPUP_CLASS, "fixed z-[60]")}
-                >
-                    {results.map((account, index) => {
-                        const identity = identityOf(account);
-                        return (
-                            <li key={account.id}>
-                                <PersonRow
-                                    as="button"
-                                    personId={account.id}
-                                    type="button"
-                                    role="option"
-                                    aria-selected={index === active}
-                                    // Mouse down rather than click: the blur that
-                                    // follows would have closed the list before a
-                                    // click ever landed.
-                                    onMouseDown={(event) => {
-                                        event.preventDefault();
-                                        choose(account);
-                                    }}
-                                    onMouseEnter={() => setActive(index)}
-                                    className={cn(
-                                        POPUP_ITEM_CLASS,
-                                        index === active ? "bg-muted" : "hover:bg-muted/60"
-                                    )}
-                                >
-                                    <Avatar
-                                        person={{ id: account.id, name: account.name, image: account.image }}
-                                        size={20}
-                                    />
-                                    <span className="min-w-0 flex-1 truncate" title={account.name}>
-                                        <PersonName id={account.id} name={account.name} />
-                                    </span>
-                                    <span
-                                        className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground"
-                                        title={identity}
+                // A field that names an account matches on the identity beside
+                // the name, so the name here is the account's own rather than
+                // whatever the person typing once called them.
+                <RealNames>
+                    <ul
+                        id={listId}
+                        role="listbox"
+                        // Above the dialog it is usually inside, which sits at z-50.
+                        style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
+                        className={cn(POPUP_CLASS, "fixed z-[60]")}
+                    >
+                        {results.map((account, index) => {
+                            const identity = identityOf(account);
+                            return (
+                                <li key={account.id}>
+                                    <PersonRow
+                                        as="button"
+                                        personId={account.id}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={index === active}
+                                        // Mouse down rather than click: the blur that
+                                        // follows would have closed the list before a
+                                        // click ever landed.
+                                        onMouseDown={(event) => {
+                                            event.preventDefault();
+                                            choose(account);
+                                        }}
+                                        onMouseEnter={() => setActive(index)}
+                                        className={cn(
+                                            POPUP_ITEM_CLASS,
+                                            index === active ? "bg-muted" : "hover:bg-muted/60"
+                                        )}
                                     >
-                                        {identity}
-                                    </span>
-                                </PersonRow>
-                            </li>
-                        );
-                    })}
-                </ul>,
+                                        <Avatar
+                                            person={{ id: account.id, name: account.name, image: account.image }}
+                                            size={20}
+                                        />
+                                        <span className="min-w-0 flex-1 truncate" title={account.name}>
+                                            <PersonName id={account.id} name={account.name} />
+                                        </span>
+                                        <span
+                                            className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground"
+                                            title={identity}
+                                        >
+                                            {identity}
+                                        </span>
+                                    </PersonRow>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </RealNames>,
                 document.body
               )
                 : null}

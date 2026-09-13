@@ -19,8 +19,8 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
-import { PersonName, PersonRow } from "@/components/person-name";
 import type { ChatBanView } from "@/lib/chat/chat-service";
+import { PersonName, PersonRow, RealNames } from "@/components/person-name";
 import {
     Button,
     Dialog,
@@ -68,69 +68,73 @@ export function BansDialog({
     };
 
     return (
-        <Dialog open={space !== null} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Kept out of {space?.name}</DialogTitle>
-                    <DialogDescription>
-                        Letting somebody back in allows them to return. It does not put them back in
-                        - that is theirs to decide.
-                    </DialogDescription>
-                </DialogHeader>
+        // Somebody lifting a ban has to be reading the name the ban was placed
+        // on, not the note whoever is looking at this once wrote about them.
+        <RealNames>
+            <Dialog open={space !== null} onOpenChange={onOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Kept out of {space?.name}</DialogTitle>
+                        <DialogDescription>
+                            Letting somebody back in allows them to return. It does not put them back in
+                            - that is theirs to decide.
+                        </DialogDescription>
+                    </DialogHeader>
 
-                {bans === null ? (
-                    <div className="flex flex-col gap-2" aria-hidden="true">
-                        {[0, 1, 2].map((row) => (
-                            <div key={row} className="flex items-center gap-2">
-                                <Skeleton className="size-7 rounded-full" />
-                                <Skeleton className="h-3 w-40" />
-                            </div>
-                        ))}
-                    </div>
-                ) : bans.length === 0 ? (
-                    <EmptyState
-                        title="Nobody is kept out."
-                        description="Banning somebody from this space puts them here, so they can be let back in."
-                    />
-                ) : (
-                    <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto overscroll-contain">
-                        {bans.map((ban) => (
-                            <PersonRow
-                                as="li"
-                                key={ban.userId}
-                                personId={ban.userId}
-                                className="flex items-center gap-2 rounded-md px-2 py-1.5"
-                            >
-                                <Avatar person={{ id: ban.userId, name: ban.name }} size={28} />
-                                <span className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-sm" title={ban.name}>
-                                        <PersonName id={ban.userId} name={ban.name} />
-                                    </span>
-                                    <span className="truncate text-[0.6875rem] text-muted-foreground">
-                                        {ban.reason || "No reason given"}
-                                        {ban.byName ? ` - ${ban.byName}` : ""},{" "}
-                                        <RelativeTime iso={ban.at} />
-                                    </span>
-                                </span>
-                                <Button
-                                    size="xs"
-                                    variant="secondary"
-                                    disabled={busy !== null}
-                                    onClick={() => void lift(ban.userId)}
+                    {bans === null ? (
+                        <div className="flex flex-col gap-2" aria-hidden="true">
+                            {[0, 1, 2].map((row) => (
+                                <div key={row} className="flex items-center gap-2">
+                                    <Skeleton className="size-7 rounded-full" />
+                                    <Skeleton className="h-3 w-40" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : bans.length === 0 ? (
+                        <EmptyState
+                            title="Nobody is kept out."
+                            description="Banning somebody from this space puts them here, so they can be let back in."
+                        />
+                    ) : (
+                        <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto overscroll-contain">
+                            {bans.map((ban) => (
+                                <PersonRow
+                                    as="li"
+                                    key={ban.userId}
+                                    personId={ban.userId}
+                                    className="flex items-center gap-2 rounded-md px-2 py-1.5"
                                 >
-                                    Let back in
-                                </Button>
-                            </PersonRow>
-                        ))}
-                    </ul>
-                )}
+                                    <Avatar person={{ id: ban.userId, name: ban.name }} size={28} />
+                                    <span className="flex min-w-0 flex-1 flex-col">
+                                        <span className="truncate text-sm" title={ban.name}>
+                                            <PersonName id={ban.userId} name={ban.name} />
+                                        </span>
+                                        <span className="truncate text-[0.6875rem] text-muted-foreground">
+                                            {ban.reason || "No reason given"}
+                                            {ban.byName ? ` - ${ban.byName}` : ""},{" "}
+                                            <RelativeTime iso={ban.at} />
+                                        </span>
+                                    </span>
+                                    <Button
+                                        size="xs"
+                                        variant="secondary"
+                                        disabled={busy !== null}
+                                        onClick={() => void lift(ban.userId)}
+                                    >
+                                        Let back in
+                                    </Button>
+                                </PersonRow>
+                            ))}
+                        </ul>
+                    )}
 
-                {error && (
-                    <p role="alert" className="text-sm text-danger">
-                        {error}
-                    </p>
-                )}
-            </DialogContent>
-        </Dialog>
+                    {error && (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
+                    )}
+                </DialogContent>
+            </Dialog>
+        </RealNames>
     );
 }

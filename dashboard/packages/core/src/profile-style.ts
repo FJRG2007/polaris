@@ -22,6 +22,19 @@
  * that is a component's business.
  */
 
+/**
+ * The most people one request may ask about at once.
+ *
+ * More than any one screen draws, and the ceiling the endpoint refuses beyond -
+ * so it is here rather than in the route, where only one of the two halves could
+ * read it. The browser asks about every face it has drawn since the page loaded,
+ * which passes a screenful over a long session, and a browser that asked for
+ * more than this was answered with a refusal it has nowhere to show: names and
+ * decorations simply stopped moving for the rest of the session. It has to know
+ * where to cut, and it can only know if the number is written once.
+ */
+export const MAX_PEOPLE_PER_STYLE_ASK = 200;
+
 /** A flat colour behind a profile, or two of them and an angle. */
 export type BannerFill =
     | { readonly kind: "solid"; readonly color: string }
