@@ -314,6 +314,20 @@ function Items({
     const [query, setQuery] = useState("");
     const [note, setNote] = useState<string | null>(null);
     const clearing = useRef<number | null>(null);
+    // The site in front of somebody and whether they have shut this out of it,
+    // asked of the worker rather than worked out here: the popup does not hold
+    // the list, and the answer has to be the same one the badge and the fill use.
+    const [here, setHere] = useState<{ host: string | null; blocked: boolean }>({
+        host: null,
+        blocked: false
+    });
+
+    useEffect(() => {
+        void (async () => {
+            const reply = await askBackground({ kind: "blocked" });
+            if (reply.ok && "blocked" in reply) setHere({ host: reply.host, blocked: reply.blocked });
+        })();
+    }, []);
 
     useEffect(() => {
         void (async () => {
@@ -440,6 +454,33 @@ function Items({
             </section>
 
             <Problem text={note} />
+
+            {here.host ? (
+                <div className="row">
+                    <span className="muted small">
+                        {here.blocked
+                            ? `Switched off for ${here.host}.`
+                            : `Offering logins for ${here.host}.`}
+                    </span>
+                    <div className="acts">
+                        <button
+                            className="ghost"
+                            onClick={() => {
+                                void askBackground({
+                                    kind: "setBlocked",
+                                    blocked: !here.blocked
+                                }).then((reply) => {
+                                    if (reply.ok && "blocked" in reply) {
+                                        setHere({ host: reply.host, blocked: reply.blocked });
+                                    }
+                                });
+                            }}
+                        >
+                            {here.blocked ? "Use it here again" : "Never on this site"}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             <Generator />
 

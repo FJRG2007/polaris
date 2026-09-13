@@ -3,8 +3,8 @@ import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
-import { readUriMatch, type UriMatch } from "@polaris/core";
-import { displayHost, matchesPage, rankForPage } from "@/lib/matching";
+import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
 import { decrypt, decryptRsa, fromBase64, symmetricKeyFromBytes } from "@polaris/vault-crypto";
 import {
@@ -73,6 +73,13 @@ const ACCESS = storage.defineItem<{ token: string; expiresAt: number } | null>(
     { fallback: null }
 );
 const EMAIL = storage.defineItem<string | null>("local:vault.email", { fallback: null });
+/**
+ * Sites this extension is to keep out of.
+ *
+ * Local rather than session, because it is an instruction rather than a
+ * credential and somebody who said "never here" means it after a restart too.
+ */
+const BLOCKED = storage.defineItem<string[]>("local:blocked.hosts", { fallback: [] });
 const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallback: null });
 /** The wrapped keys, kept so unlocking does not need the network. */
 const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf: unknown } | null>(
@@ -245,7 +252,19 @@ async function logins(): Promise<Login[]> {
  * site that only had to put the right word in its query string.
  */
 async function forUrl(url: string): Promise<Login[]> {
+    // Before anything is matched or counted: a site somebody has shut this out of
+    // produces no suggestions, no badge and nothing to fill, which is the whole
+    // point of having said so.
+    if (isBlockedHost(await BLOCKED.getValue(), url)) return [];
     return rankForPage(await logins(), url);
+}
+
+/** The site in front of somebody, and whether they have shut this out of it. */
+async function blockedHere(): Promise<{ host: string | null; blocked: boolean }> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url ?? "";
+    if (!/^https?:/i.test(url)) return { host: null, blocked: false };
+    return { host: hostOf(url), blocked: isBlockedHost(await BLOCKED.getValue(), url) };
 }
 
 function summarize(login: Login): messages.ItemSummary {
@@ -447,6 +466,9 @@ async function fill(id: string): Promise<messages.Reply> {
     // land on a site the item was not saved for. Through the same function the
     // list was built from, so the two cannot disagree about what belongs where -
     // and it is the one the tests cover.
+    if (isBlockedHost(await BLOCKED.getValue(), tab.url)) {
+        return { ok: false, error: "This extension is switched off for this site." };
+    }
     if (!matchesPage(login.uris, tab.url)) {
         return { ok: false, error: "That item is not saved for this site." };
     }
@@ -588,6 +610,19 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                       )
                     : all;
                 return { ok: true, items: found.slice(0, 100).map(summarize) };
+            }
+
+            case "blocked":
+                return { ok: true, ...(await blockedHere()) };
+
+            case "setBlocked": {
+                const { host } = await blockedHere();
+                if (!host) return { ok: false, error: "There is no site here to switch off." };
+                const held = await BLOCKED.getValue();
+                const without = held.filter((entry) => entry !== host);
+                await BLOCKED.setValue(request.blocked ? [...without, host] : without);
+                await badge();
+                return { ok: true, ...(await blockedHere()) };
             }
 
             case "fill":

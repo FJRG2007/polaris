@@ -68,3 +68,25 @@ export function rankForPage<T extends Matchable>(items: readonly T[], url: strin
 export function displayHost(uris: readonly SavedUri[]): string | null {
     return uris[0] ? hostOf(uris[0].uri) : null;
 }
+
+/**
+ * Whether somebody has said this extension is not to act on this site.
+ *
+ * The one instruction that overrides everything else here - not a preference
+ * about which item is best, but "do not offer, do not fill, do not count". It is
+ * checked before matching rather than after, so a blocked site never even
+ * produces a list to rank.
+ *
+ * Blocking a domain blocks what is under it: somebody who blocks their bank means
+ * the whole bank, not the one page they happened to be on. The other direction
+ * does not hold - blocking `accounts.example.com` leaves `example.com` alone,
+ * because the narrower instruction is the one they gave.
+ */
+export function isBlockedHost(blocked: readonly string[], url: string): boolean {
+    const host = hostOf(url);
+    if (!host) return false;
+    return blocked.some((entry) => {
+        const named = entry.trim().toLowerCase();
+        return named !== "" && (host === named || host.endsWith(`.${named}`));
+    });
+}

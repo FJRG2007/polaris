@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { URI_MATCH_EXACT, URI_MATCH_HOST, URI_MATCH_NEVER, type UriMatch } from "@polaris/core";
 import {
     displayHost,
+    isBlockedHost,
     matchesPage,
     rankForPage,
     type Matchable,
@@ -107,6 +108,31 @@ describe("which one comes first", () => {
             "https://example.com/"
         );
         expect(ranked.map((one) => one.name)).toEqual(["Wanted"]);
+    });
+});
+
+describe("a site somebody has blocked", () => {
+    it("covers what is under the domain they named", () => {
+        expect(isBlockedHost(["example.com"], "https://example.com/login")).toBe(true);
+        expect(isBlockedHost(["example.com"], "https://accounts.example.com/login")).toBe(true);
+    });
+
+    it("does not spread upwards from a subdomain they named", () => {
+        // The narrower instruction is the one they gave: blocking the account
+        // subdomain must not silently disable the whole site.
+        expect(isBlockedHost(["accounts.example.com"], "https://example.com/")).toBe(false);
+    });
+
+    it("does not catch a different site that ends the same way", () => {
+        expect(isBlockedHost(["example.com"], "https://notexample.com/")).toBe(false);
+        expect(isBlockedHost(["example.com"], "https://example.com.evil.test/")).toBe(false);
+    });
+
+    it("ignores blanks rather than blocking everything", () => {
+        // An empty entry that matched would turn one stray space into a silent
+        // switch that disables the extension everywhere.
+        expect(isBlockedHost(["", "   "], "https://example.com/")).toBe(false);
+        expect(isBlockedHost([], "https://example.com/")).toBe(false);
     });
 });
 

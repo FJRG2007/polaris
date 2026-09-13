@@ -23,12 +23,6 @@ export interface ItemSummary {
     readonly totp: boolean;
 }
 
-/** What filling one item needs, and nothing besides. */
-export interface FillPayload {
-    readonly username: string | null;
-    readonly password: string | null;
-}
-
 /** The state the popup draws itself from. */
 export interface VaultStatus {
     readonly server: string | null;
@@ -58,12 +52,18 @@ export type Request =
     /** Everything, for the search box, still only as summaries. */
     | { readonly kind: "items"; readonly query: string }
     | { readonly kind: "fill"; readonly id: string }
-    | { readonly kind: "copy"; readonly id: string; readonly field: "username" | "password" | "totp" };
+    | { readonly kind: "copy"; readonly id: string; readonly field: "username" | "password" | "totp" }
+    /** Whether the tab in front of somebody is one they have shut this out of. */
+    | { readonly kind: "blocked" }
+    /** Shut this extension out of the current site, or let it back in. */
+    | { readonly kind: "setBlocked"; readonly blocked: boolean };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }
+    /** The site in front of somebody, and whether they have shut this out of it. */
+    | { readonly ok: true; readonly host: string | null; readonly blocked: boolean }
     | { readonly ok: true }
     | { readonly ok: false; readonly error: string; readonly needsCode?: boolean };
 
