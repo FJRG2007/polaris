@@ -65,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
         const from = new Date(since);
         const [moved, names] = await Promise.all([
             styleChangesSince(ids, from, styled ?? []),
-            nameChangesSince(ids, from)
+            nameChangesSince(viewer.id, ids, from)
         ]);
         return Response.json(
             {
@@ -83,7 +83,7 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
 
-    const [found, names] = await Promise.all([stylesFor(ids), namesFor(ids)]);
+    const [found, names] = await Promise.all([stylesFor(ids), namesFor(viewer.id, ids)]);
     return Response.json(
         {
             people: Object.fromEntries(found),

@@ -18,6 +18,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { asNamed, nicknamesFor } from "@/lib/contact-names";
 
 const COLUMNS = {
     banner: true,
@@ -52,18 +53,28 @@ export async function getProfileStyle(userId: string): Promise<core.ProfileStyle
  * a second one asking the same server about the same forty people would be twice
  * the requests for half the answer.
  */
-export async function namesFor(ids: readonly string[]): Promise<Map<string, string>> {
+export async function namesFor(
+    viewerId: string,
+    ids: readonly string[]
+): Promise<Map<string, string>> {
     const wanted = [...new Set(ids)];
     if (wanted.length === 0) return new Map();
-    const rows = await prisma.user.findMany({
-        where: { id: { in: wanted } },
-        select: { id: true, name: true }
-    });
-    return new Map(rows.map((row) => [row.id, row.name]));
+    const [rows, called] = await Promise.all([
+        prisma.user.findMany({ where: { id: { in: wanted } }, select: { id: true, name: true } }),
+        nicknamesFor(viewerId, wanted)
+    ]);
+    // What this reader calls them, over what they call themselves. Applied here
+    // rather than only on the server-rendered page because this answer OVERWRITES
+    // that one: the store keeps it as "what they are called now" and the name a
+    // screen was rendered with is only the fallback - so a nickname that was not
+    // applied here was a nickname that appeared for one paint and then vanished,
+    // and came back no matter how many times the page was reloaded.
+    return new Map(rows.map((row) => [row.id, asNamed(called, row.id, row.name) ?? row.name]));
 }
 
 /** The names among those that have changed since a browser last asked. */
 export async function nameChangesSince(
+    viewerId: string,
     ids: readonly string[],
     since: Date
 ): Promise<Map<string, string>> {
@@ -73,7 +84,20 @@ export async function nameChangesSince(
         where: { id: { in: wanted }, updatedAt: { gt: since } },
         select: { id: true, name: true }
     });
-    return new Map(rows.map((row) => [row.id, row.name]));
+    if (rows.length === 0) return new Map();
+    // Through the reader's own names, like the full answer above: a person who
+    // renamed themselves must not come back wearing their new name in a list where
+    // this reader had given them one.
+    //
+    // A nickname being SET is not one of the changes this query finds - it asks what
+    // moved on the account, and a nickname moves nothing there. It does not need to
+    // be: a nickname is private to whoever gave it, so the only screen that has to
+    // catch up is theirs, and the dialog that sets it refreshes that screen itself.
+    const called = await nicknamesFor(
+        viewerId,
+        rows.map((row) => row.id)
+    );
+    return new Map(rows.map((row) => [row.id, asNamed(called, row.id, row.name) ?? row.name]));
 }
 
 export async function stylesFor(ids: readonly string[]): Promise<Map<string, core.ProfileStyle>> {
@@ -149,7 +173,10 @@ export async function styleChangesSince(
  * of one. It also keeps the table the size of the number of people who actually
  * chose something.
  */
-export async function setProfileStyle(userId: string, input: core.ProfileStyleInput): Promise<void> {
+export async function setProfileStyle(
+    userId: string,
+    input: core.ProfileStyleInput
+): Promise<void> {
     const style: core.ProfileStyle = {
         banner: input.banner,
         decoration: input.decoration,

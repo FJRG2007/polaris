@@ -13,10 +13,19 @@
  * comes off.
  */
 
-import { useEffect, useState } from "react";
 import * as actions from "./actions";
+import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { useProfileStyleRefresh } from "@/components/profile-style-store";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 
 /** The longest a nickname may be, matching what the action will accept. A box
  *  that takes more than the server keeps is a save that silently truncates. */
@@ -36,6 +45,10 @@ export function NicknameDialog({
 }) {
     const [nickname, setNickname] = useState("");
     const [error, setError] = useState("");
+    // The store keeps what everybody on screen is called, and its answer beats the
+    // name a page was rendered with - so it is what has to be told, or the nickname
+    // is replaced by their real name again on the next paint.
+    const refreshNames = useProfileStyleRefresh();
 
     useEffect(() => {
         if (open) {
@@ -79,6 +92,13 @@ export function NicknameDialog({
                             // box: a dialog that closes on a save that did not
                             // happen is a nickname somebody believes they set.
                             if (!result || result.error) return;
+                            // Asked here rather than in the five screens that open
+                            // this dialog. Each of them passes a different `onSaved`
+                            // - one refreshes a router, one closes a panel, one
+                            // reloads a list - and none of them knows about the name
+                            // store, so a rule spread across them is a rule that
+                            // holds until the sixth.
+                            refreshNames();
                             onOpenChange(false);
                             onSaved();
                         }}
