@@ -48,8 +48,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/extension-v')
         run: |
           expected="extension-v$(node -p "require('./apps/extension/package.json').version")"
-          if [ "$expected" != "${{ github.ref_name }}" ]; then
-            echo "tag ${{ github.ref_name }} does not match $expected from package.json"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
             exit 1
           fi
 

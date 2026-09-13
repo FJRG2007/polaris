@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
     DESKTOP_TAG_PREFIX,
     EXTENSION_TAG_PREFIX,
+    desktopDownload,
     pickRelease,
     type ReleaseListing
 } from "../../src/lib/app-releases";
@@ -14,13 +15,18 @@ import {
  * to "No releases found". Now a link is only drawn for a release that exists, and
  * these are the ways that choice can go wrong while still looking like it worked:
  * this repository releases three different things, a draft is invisible to everybody
- * who cannot edit the repository, and the order the API answers in is not a promise.
+ * who cannot edit the repository, a prerelease is a build nobody said was ready, and
+ * the order the API answers in is not a promise.
+ *
+ * The lookup around it is covered too, because the same button goes quiet when the
+ * release is real and simply further down the list than one page reaches.
  */
 
 const release = (over: Partial<ReleaseListing> = {}): ReleaseListing => ({
     tag_name: "desktop-v0.2.0",
     html_url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
     draft: false,
+    prerelease: false,
     published_at: "2026-07-20T10:00:00Z",
     ...over
 });
@@ -69,6 +75,27 @@ describe("pickRelease", () => {
 
     it("offers nothing when every matching release is a draft", () => {
         expect(pickRelease([release({ draft: true })], DESKTOP_TAG_PREFIX)).toBeNull();
+    });
+
+    it("never offers a prerelease, which is a build nobody said was ready", () => {
+        // This is the only download a deployment draws, so an rc would not sit
+        // beside the release as an option - it would be the release, for everybody.
+        const found = pickRelease(
+            [
+                release({
+                    tag_name: "desktop-v0.3.0-rc.1",
+                    prerelease: true,
+                    published_at: "2026-08-01T00:00:00Z"
+                }),
+                release({ tag_name: "desktop-v0.2.0", published_at: "2026-07-20T10:00:00Z" })
+            ],
+            DESKTOP_TAG_PREFIX
+        );
+        expect(found?.version).toBe("0.2.0");
+    });
+
+    it("offers nothing when every matching release is a prerelease", () => {
+        expect(pickRelease([release({ prerelease: true })], DESKTOP_TAG_PREFIX)).toBeNull();
     });
 
     it("takes the newest by publication date, not by position in the answer", () => {
@@ -122,5 +149,42 @@ describe("pickRelease", () => {
             DESKTOP_TAG_PREFIX
         );
         expect(found?.version).toBe("0.2.0");
+    });
+});
+
+describe("appDownload", () => {
+    const answering = (pages: Record<string, readonly ReleaseListing[]>) =>
+        vi.fn(async (url: string) => ({
+            ok: true,
+            json: async () => pages[new URL(url).searchParams.get("page") ?? "1"] ?? []
+        }));
+
+    it("walks past a full page of other releases to reach the app's own", async () => {
+        // One page used to be thirty releases of anything. A desktop release with
+        // thirty dashboard releases published after it was then a button reading
+        // "not released yet" for a release sitting right there, with nothing said
+        // anywhere to tell that apart from never having cut one.
+        const others = Array.from({ length: 100 }, (_, index) =>
+            release({ tag_name: `dashboard-v0.${index}.0`, published_at: "2026-09-01T00:00:00Z" })
+        );
+        const fetching = answering({ "1": others, "2": [release({ tag_name: "desktop-v0.2.0" })] });
+        vi.stubGlobal("fetch", fetching);
+        try {
+            expect((await desktopDownload("example/walks"))?.version).toBe("0.2.0");
+            expect(fetching).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("stops at a page the API did not fill", async () => {
+        const fetching = answering({ "1": [release({ tag_name: "dashboard-v0.4.6" })] });
+        vi.stubGlobal("fetch", fetching);
+        try {
+            expect(await desktopDownload("example/stops")).toBeNull();
+            expect(fetching).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });

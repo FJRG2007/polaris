@@ -11,17 +11,17 @@
  * Browsers without the event (Safari, Firefox) install from their own menu, and
  * the card says where.
  *
- * The same card mentions the native desktop app (`desktop/` in the repository),
- * and offers it for download only when a release of it actually exists - see
- * `lib/app-releases.ts`. Inside that app it says so instead of offering to
- * install anything.
+ * The same card mentions the native desktop app (`desktop/` in the repository).
+ * Whether there is one to download is a question for GitHub, so the offer is
+ * handed in as `nativeApp` - the page streams it in behind a boundary of its own,
+ * and nothing here waits on it. Inside that app the card says so instead of
+ * offering to install anything.
  */
 
 import { Download } from "lucide-react";
-import type { AppDownload } from "@/lib/app-releases";
 import { useDesktopBridge } from "@/components/desktop-app";
-import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 /** The event Chromium browsers fire when Polaris can be installed. Not in the DOM
  *  typings, so only what is used here is described. */
@@ -65,7 +65,7 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export function InstallAppCard({ download }: { download: AppDownload | null }) {
+export function InstallAppCard({ nativeApp }: { nativeApp: ReactNode }) {
     const prompt = useSyncExternalStore(
         subscribe,
         () => held,
@@ -123,32 +123,7 @@ export function InstallAppCard({ download }: { download: AppDownload | null }) {
                                 build from your own computer and follows a service&apos;s logs in a
                                 window of its own.
                             </p>
-                            {download ? (
-                                <div>
-                                    <Button asChild variant="secondary">
-                                        <a href={download.url} target="_blank" rel="noreferrer">
-                                            <Download className="size-4" /> Download the desktop app{" "}
-                                            {download.version}
-                                        </a>
-                                    </Button>
-                                </div>
-                            ) : (
-                                <>
-                                    <div>
-                                        {/* Shown and disabled rather than hidden: somebody who has heard
-                                            the app exists should find out here that it is not out yet,
-                                            instead of looking for a button nobody drew. */}
-                                        <Button variant="secondary" disabled>
-                                            <Download className="size-4" /> Download the desktop app
-                                        </Button>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Not released yet. Installing Polaris above is how to have it
-                                        in a window of its own today, and it updates with Polaris
-                                        itself.
-                                    </p>
-                                </>
-                            )}
+                            {nativeApp}
                         </div>
                     </>
                 )}

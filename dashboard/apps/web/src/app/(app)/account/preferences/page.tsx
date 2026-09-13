@@ -10,10 +10,12 @@
  * somebody is reading on, not about the person.
  */
 
+import { Suspense } from "react";
+import { Skeleton } from "@polaris/ui";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
-import { desktopDownload } from "@/lib/app-releases";
 import { resolveDisplayPreferences } from "@polaris/core";
+import { DesktopDownload } from "@/components/app-download";
 import { InstallAppCard } from "@/components/installed-app";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
 import { DeviceCacheCard } from "@/components/device-cache-card";
@@ -30,14 +32,10 @@ export const dynamic = "force-dynamic";
 
 export default async function PreferencesPage() {
     const session = await requireUser();
-    const [platform, mine, mayChooseTheme, download] = await Promise.all([
+    const [platform, mine, mayChooseTheme] = await Promise.all([
         getPlatformDisplayPreferences(),
         getUserDisplayPreferences(session.id),
-        usersMayChooseTheme(),
-        // Beside the rest rather than after it. It is a cached lookup that usually
-        // answers from memory, and on the ten-minute miss it must not add a round
-        // trip of its own to this page.
-        desktopDownload(loadEnv().POLARIS_REPO)
+        usersMayChooseTheme()
     ]);
 
     const effective = resolveDisplayPreferences(platform, mine);
@@ -67,7 +65,16 @@ export default async function PreferencesPage() {
                 save={saveTextSizeAction}
             />
             <SpoilersCard />
-            <InstallAppCard download={download} />
+            <InstallAppCard
+                nativeApp={
+                    // The only thing on this page that waits on GitHub, so it is the
+                    // only thing that waits: the card, and everything explaining what
+                    // the app is, is drawn before the lookup has answered.
+                    <Suspense fallback={<Skeleton className="h-8 w-56" />}>
+                        <DesktopDownload repo={loadEnv().POLARIS_REPO} />
+                    </Suspense>
+                }
+            />
             <DeviceCacheCard />
         </div>
     );

@@ -9,17 +9,18 @@
  */
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { getVault } from "@/lib/vault/account";
 import { requirePermission } from "@/lib/session";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { CopyButton } from "@/components/copy-button";
-import { extensionDownload } from "@/lib/app-releases";
 import { listVaultClients } from "@/lib/vault/devices";
 import { BitwardenMark } from "@/components/brand-icons";
 import { RelativeTime } from "@/components/relative-time";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
-import { Download, ExternalLink, Puzzle, Terminal, TriangleAlert } from "lucide-react";
+import { ExtensionDownload } from "@/components/app-download";
+import { ExternalLink, Puzzle, Terminal, TriangleAlert } from "lucide-react";
+import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,7 @@ export default async function VaultClientsPage() {
     // The configured sharing origin, not the tab's host: an address that only
     // works from inside the house is not one to paste into a phone.
     const base = await sharingBaseUrl();
-    // Beside each other: one is a database read and the other a lookup that answers
-    // from memory for ten minutes at a time, and neither should queue behind the
-    // other to draw one page.
-    const [clients, extension] = await Promise.all([
-        listVaultClients(user.id),
-        extensionDownload(loadEnv().POLARIS_REPO)
-    ]);
+    const clients = await listVaultClients(user.id);
     const serverUrl = `${base}/vault`;
     const insecure =
         !serverUrl.startsWith("https://") && !loadEnv().POLARIS_APP_URL.includes("localhost");
@@ -167,25 +162,18 @@ export default async function VaultClientsPage() {
                             Loaded this way it does not update itself, and Firefox lets it go when
                             it closes.
                         </p>
-                        <div className="mt-2">
-                            {extension ? (
-                                <Button asChild size="sm">
-                                    <a href={extension.url} target="_blank" rel="noreferrer">
-                                        <Download className="size-4" /> Download {extension.version}
-                                    </a>
-                                </Button>
-                            ) : (
-                                <Button size="sm" disabled>
-                                    <Download className="size-4" /> Download the extension
-                                </Button>
-                            )}
-                        </div>
-                        {!extension ? (
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                No package has been published yet, so there is nothing to load. It
-                                is built from this repository and released on a tag of its own.
-                            </p>
-                        ) : null}
+                        {/* The one thing on this page that waits on GitHub, so it is
+                            the only thing that waits: what the extension is, and how
+                            to load it, is drawn without it. */}
+                        <Suspense
+                            fallback={
+                                <div className="mt-2">
+                                    <Skeleton className="h-7 w-40" />
+                                </div>
+                            }
+                        >
+                            <ExtensionDownload repo={loadEnv().POLARIS_REPO} />
+                        </Suspense>
                     </div>
                 </CardBody>
             </Card>

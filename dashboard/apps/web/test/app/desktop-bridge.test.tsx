@@ -137,31 +137,18 @@ describe("desktopDownload", () => {
 });
 
 describe("the install card", () => {
-    it("offers the download when a release exists, and names the version", () => {
-        const html = renderToStaticMarkup(
-            <InstallAppCard
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
-                    version: "0.2.0"
-                }}
-            />
-        );
-        expect(html).toContain(
-            'href="https://github.com/example/polaris/releases/tag/desktop-v0.2.0"'
-        );
-        expect(html).toContain("Download the desktop app");
-        expect(html).toContain("0.2.0");
+    it("draws whole while the download is still being looked up", () => {
+        // What lets the offer stream in behind a boundary instead of holding the
+        // page: the card does not wait on it, so everything saying the native app
+        // exists is on screen before GitHub has answered. The two states of the
+        // offer itself are asserted in `app-download`.
+        const html = renderToStaticMarkup(<InstallAppCard nativeApp={null} />);
+        expect(html).toContain("There is also a native app");
+        expect(html).not.toContain("Download the desktop app");
     });
 
-    it("says the app exists but gives nothing to press when it has no release", () => {
-        // The text stays and the link does not. Hiding the whole thing would leave
-        // somebody who has heard of the app looking for a button nobody drew, and
-        // the old behaviour - a link built from the repository name regardless -
-        // sent them to a releases page reading "No releases found".
-        const html = renderToStaticMarkup(<InstallAppCard download={null} />);
-        expect(html).toContain("Download the desktop app");
-        expect(html).toContain("Not released yet");
-        expect(html).toContain("disabled");
-        expect(html).not.toContain("href=");
+    it("draws the offer it is handed", () => {
+        const html = renderToStaticMarkup(<InstallAppCard nativeApp={<b>An offer</b>} />);
+        expect(html).toContain("<b>An offer</b>");
     });
 });
