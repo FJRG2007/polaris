@@ -76,6 +76,24 @@ services:
     # the list exists to refuse: a hostname that resolves here is still refused
     # unless it is named, so `1.2.3.4.sslip.io` does not match this.
     #
+    # That shape carries an assumption - "a network they are already on" - which a
+    # forwarded port makes false. On a box reachable from the internet it meant the
+    # sign-in page answered on the bare public address, so anything walking the
+    # IPv4 space found a real login form with everything the dashboard knows behind
+    # it. So the IPv4 shape now lives on its own router (`polaris-web-ip`) behind an
+    # allow list of the ranges that assumption actually holds for: loopback, RFC1918,
+    # link-local, CGNAT (which is where a Tailscale address lands) and their v6
+    # equivalents. From anywhere else the address answers 403, and Polaris is reached
+    # by its name - which is how it is reached from the internet anyway.
+    #
+    # The named hosts are deliberately NOT behind it. A public domain is served
+    # either from here or by the dashboard's own generated router (which carries the
+    # WAF), and an allow list in front of either would refuse the internet the domain
+    # exists to be reached from.
+    #
+    # POLARIS_IP_ACCESS_RANGES widens it again - `0.0.0.0/0,::/0` restores the old
+    # behaviour - and is an edit made from the LAN, which this keeps reachable.
+    #
     # TLS on :443 (Traefik's default self-signed cert for the local names, or a
     # Let's Encrypt cert for a public domain), with :80 redirected to https.
     labels:
@@ -83,7 +101,7 @@ services:
       - "polaris.role=edge"
       - "traefik.enable=true"
       - "traefik.docker.network=polaris_default"
-      - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
+      - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
       - "traefik.http.routers.polaris-web.entrypoints=websecure"
       - "traefik.http.routers.polaris-web.tls=true"
       # Lowest, and stated rather than left to work itself out. Unset, Traefik
@@ -99,12 +117,32 @@ services:
       # router must name its service explicitly - Traefik will not auto-link.
       - "traefik.http.routers.polaris-web.service=polaris-web"
       - "traefik.http.services.polaris-web.loadbalancer.server.port=3000"
-      - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
+      - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
       - "traefik.http.routers.polaris-web-http.entrypoints=web"
       - "traefik.http.routers.polaris-web-http.service=polaris-web"
       - "traefik.http.routers.polaris-web-http.priority=10"
       - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
       - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
+      # Reaching the dashboard by a bare address, from a network where that still
+      # means what it used to mean. Same service and same priority as the named
+      # router it was split out of; the allow list is the only difference.
+      - "traefik.http.routers.polaris-web-ip.rule=HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
+      - "traefik.http.routers.polaris-web-ip.entrypoints=websecure"
+      - "traefik.http.routers.polaris-web-ip.tls=true"
+      - "traefik.http.routers.polaris-web-ip.priority=10"
+      - "traefik.http.routers.polaris-web-ip.service=polaris-web"
+      - "traefik.http.routers.polaris-web-ip.middlewares=polaris-lan-only"
+      - "traefik.http.routers.polaris-web-ip-http.rule=HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
+      - "traefik.http.routers.polaris-web-ip-http.entrypoints=web"
+      - "traefik.http.routers.polaris-web-ip-http.priority=10"
+      - "traefik.http.routers.polaris-web-ip-http.service=polaris-web"
+      - "traefik.http.routers.polaris-web-ip-http.middlewares=polaris-lan-only,polaris-redirect-https"
+      # On the routers and never on the entrypoint. ACME answers its HTTP-01
+      # challenge on `web` ahead of any router, so an allow list there would stop
+      # every certificate this deployment renews - the dashboard's domain and every
+      # deployed app's - a few weeks after it was added, which is the worst shape a
+      # mistake here could take.
+      - "traefik.http.middlewares.polaris-lan-only.ipallowlist.sourcerange=${POLARIS_IP_ACCESS_RANGES:-127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10}"
       # The interactive-terminal WebSocket sidecar listens on a separate port.
       - "traefik.http.routers.polaris-ws.rule=PathPrefix(`/api/deploy/ws`)"
       - "traefik.http.routers.polaris-ws.entrypoints=websecure"

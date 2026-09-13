@@ -73,6 +73,21 @@ must be freshly generated, never copied:
 Set `POLARIS_SITE_ADDRESS` to your domain for automatic HTTPS via Caddy, and
 `POLARIS_APP_URL` to the origin users reach.
 
+### Reaching it by IP
+
+Polaris answers on a bare IP address only from the networks where that means
+somebody is already on the same network: loopback, private ranges, link-local
+and CGNAT. From anywhere else the address answers 403, so a forwarded port does
+not put the sign-in page in front of whatever is scanning the internet that
+week - it is reached by its domain, which is how it is reached from outside
+anyway.
+
+Names are not affected. A configured domain answers normally, and the local
+names keep working over both HTTP and HTTPS.
+
+`POLARIS_IP_ACCESS_RANGES` is the list. Setting it to `0.0.0.0/0,::/0` serves
+the bare address to anybody, which is what versions before this did.
+
 Chat calls run through the `livekit` service in this stack. The dashboard and
 that service agree on a signing key through a file on a volume they share -
 the dashboard writes it on first boot, so there is nothing to configure, on a
