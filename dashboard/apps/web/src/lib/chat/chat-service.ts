@@ -21,7 +21,8 @@ import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
-import { // enigma: predates the namespace-import rule; converting its call sites is its own change.
+import {
+    // enigma: predates the namespace-import rule; converting its call sites is its own change.
     ChatAccessError,
     ChatRuleError,
     channelAccess,
@@ -1460,6 +1461,16 @@ export async function openDirect(
             name: name.trim().slice(0, core.MAX_CHAT_CHANNEL_NAME),
             private: true,
             orgId,
+            // Starting a group is activity in it, so it opens at the top of the list
+            // rather than at the bottom. The rail orders by this and falls back to an
+            // empty string, which sorts before every timestamp - so a group created
+            // seconds ago appeared below conversations nobody had touched in months,
+            // and the one thing everybody does next is look for it.
+            //
+            // Nothing reads this as "somebody has spoken here": its readers are the
+            // two rails that order by it and the send that moves it. A notice
+            // deliberately leaves it alone, which is the distinction being kept.
+            lastMessageAt: new Date(),
             createdById: actor.id,
             // Whoever starts a group runs it. Left unset, a group had no owner at
             // all: its creator was told they were not the owner when they tried to
@@ -1601,7 +1612,10 @@ export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElse
         new Map(heard.map((row) => [row.channelId, row]))
     );
 
-    const grouped = new Map<string | null, { name: string; conversations: number; unread: number }>();
+    const grouped = new Map<
+        string | null,
+        { name: string; conversations: number; unread: number }
+    >();
     for (const channel of away) {
         const entry = grouped.get(channel.orgId) ?? {
             // A conversation filed under an organization that is gone cannot
