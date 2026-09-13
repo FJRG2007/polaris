@@ -53,6 +53,20 @@ export interface NotificationFeed {
 
 const STREAM_PATH = "/api/notifications/stream";
 
+/**
+ * The stream, saying which kind of Polaris is asking.
+ *
+ * The server elects one of an account's connections to raise what belongs to the
+ * device - the chime above all - and prefers the desktop app. That cannot be
+ * settled here: the tabs of one browser agree between themselves through
+ * `device-once`, but the desktop app has a storage partition of its own, so its
+ * claim and a tab's are written where neither can read the other, and an arriving
+ * message sounded twice. See `lib/notifications/live-clients`.
+ */
+function streamPath(): string {
+    return `${STREAM_PATH}?client=${desktopBridge() ? "desktop" : "browser"}`;
+}
+
 const FeedContext = createContext<NotificationFeed | null>(null);
 
 /** The shared feed. Only valid under NotificationsProvider. */
@@ -96,10 +110,13 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
 
     useEffect(
         () =>
-            subscribeSharedStream(STREAM_PATH, scope, ({ data }) => {
+            subscribeSharedStream(streamPath(), scope, ({ data }) => {
                 if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
                 try {
-                    const payload = JSON.parse(data) as { items?: NotificationView[] };
+                    const payload = JSON.parse(data) as {
+                        items?: NotificationView[];
+                        chime?: unknown;
+                    };
                     if (!Array.isArray(payload.items)) return;
                     // Inside the desktop app a finished deploy is also a notice
                     // from the system, as the app's own pushes are: a build is
@@ -128,7 +145,16 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                     // to whichever tab holds the connection, because on an
                     // install served over plain http every tab holds one of its
                     // own; see `device-once`.
-                    if (arrived && notificationSoundEnabled()) {
+                    // Two gates, because there are two ways to end up with one
+                    // event and several Polarises. The server says which CLIENT
+                    // makes the sound, which is the only place the browser and the
+                    // desktop app can be compared at all; `claimForDevice` then
+                    // says which TAB of that client does, which no server can see.
+                    // Only `false` is silence: a frame from a Polaris that predates
+                    // this says nothing, and a missing answer must not mute a
+                    // device.
+                    const elected = payload.chime !== false;
+                    if (arrived && elected && notificationSoundEnabled()) {
                         void claimForDevice(`${scope}:notification-chime`).then((mine) => {
                             if (mine) playNotificationSound();
                         });
