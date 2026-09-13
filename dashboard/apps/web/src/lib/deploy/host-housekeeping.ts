@@ -185,7 +185,6 @@ async function warn(fullness: number, freed: number): Promise<void> {
         // into the next five points is.
         const band = `tight:${Math.floor(fullness * 20)}`;
         if ((await getSetting(KEY)) === band) return;
-        await setSetting(KEY, band);
 
         const admins = await prisma.user
             .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
@@ -206,6 +205,11 @@ async function warn(fullness: number, freed: number): Promise<void> {
                 })
             )
         );
+        // Written last, and only once the alert is out. The other way round - the
+        // order this was in - a dispatch that failed still marked the band as
+        // reported, so the one message that says a disk needs a person was lost
+        // until the disk got five points worse.
+        await setSetting(KEY, band);
     } catch (error) {
         console.error("polaris: could not report a full disk:", error);
     }

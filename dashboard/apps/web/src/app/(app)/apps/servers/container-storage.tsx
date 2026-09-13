@@ -101,7 +101,7 @@ export function ContainerStorage() {
             <div className="flex flex-wrap items-center gap-2">
                 <p className={cn("text-xs", worth ? "text-foreground" : "text-muted-foreground")}>
                     {worth
-                        ? `About ${size(space.reclaimable)} of that is build cache and untagged layers. Freeing it costs nothing but the time to build or pull them again - your volumes are not touched.`
+                        ? `About ${size(space.reclaimable)} of that is build cache and images nothing is running. Freeing it costs nothing but the time to build or pull them again - an app that is stopped keeps its data and fetches its image on the next start. Your volumes are not touched, and a release kept for a rollback is not either.`
                         : "There is nothing worth reclaiming here. Volumes are never touched by this."}
                 </p>
                 {worth ? (

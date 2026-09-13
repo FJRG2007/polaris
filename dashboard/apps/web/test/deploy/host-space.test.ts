@@ -30,7 +30,9 @@ vi.mock("@polaris/hostd-client", () => ({
     }
 }));
 
-const { hostSpace, reclaimHostSpace } = await import("@/lib/deploy/host-space");
+const { hostSpace, reclaimHostSpace, unusedImagesPrunePath } = await import(
+    "@/lib/deploy/host-space"
+);
 
 const GB = 1024 * 1024 * 1024;
 
@@ -82,6 +84,26 @@ describe("what the container store is holding", () => {
         expect((await hostSpace())?.reclaimable).toBe(0);
     });
 
+    it("does not offer room a rollback is holding", async () => {
+        // A pinned release runs on no container, so the arithmetic would call it
+        // loose - and the prune refuses it by its label, so the number would be a
+        // promise the button cannot keep.
+        df({
+            Images: [
+                { Size: 2 * GB, Containers: 0, RepoTags: ["polaris-release/orphion-e6ba:cf94f613"] },
+                { Size: 1 * GB, Containers: 0, RepoTags: ["mongo:7"] }
+            ]
+        });
+        expect((await hostSpace())?.reclaimable).toBe(1 * GB);
+    });
+
+    it("counts an image that has lost its tags", async () => {
+        // Untagged is the oldest case of all and the one a prune is for: a layer
+        // set no tag points at any more, left by the pull that replaced it.
+        df({ Images: [{ Size: 3 * GB, Containers: 0, RepoTags: ["<none>:<none>"] }] });
+        expect((await hostSpace())?.reclaimable).toBe(3 * GB);
+    });
+
     it("does not double-count shared build cache", async () => {
         df({ BuildCache: [{ Size: 1 * GB, InUse: false, Shared: true }] });
         expect((await hostSpace())?.reclaimable).toBe(0);
@@ -100,14 +122,36 @@ describe("what the container store is holding", () => {
 describe("giving room back", () => {
     it("asks for both kinds and reports what was actually removed", async () => {
         replies["/build/prune"] = { status: 200, body: JSON.stringify({ SpaceReclaimed: 8 * GB }) };
-        replies["/images/prune"] = { status: 200, body: JSON.stringify({ SpaceReclaimed: 2 * GB }) };
+        replies[unusedImagesPrunePath()] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 2 * GB })
+        };
         expect(await reclaimHostSpace()).toBe(10 * GB);
-        expect(asked.map((call) => call.path)).toEqual(["/build/prune", "/images/prune"]);
+        expect(asked.map((call) => call.path)).toEqual([
+            "/build/prune",
+            unusedImagesPrunePath()
+        ]);
+    });
+
+    it("asks for every image no container is on, and never for a pinned release", async () => {
+        // The two halves of the filter, and the reason ten gigabytes sat on a
+        // full disk being measured as reclaimable and never removed: without
+        // `dangling=false` a prune takes only what has lost its tags, and without
+        // the label a prune takes the image a rollback needs.
+        const path = unusedImagesPrunePath();
+        const filters = JSON.parse(decodeURIComponent(path.split("filters=")[1] ?? "{}")) as Record<
+            string,
+            string[]
+        >;
+        expect(filters["dangling"]).toEqual(["false"]);
+        expect(filters["label!"]).toEqual(["polaris.release"]);
+        // No spaces: the daemon's allowlist refuses a path carrying one.
+        expect(path).not.toContain(" ");
     });
 
     it("never asks for a volume to be pruned", async () => {
         replies["/build/prune"] = { status: 200, body: "{}" };
-        replies["/images/prune"] = { status: 200, body: "{}" };
+        replies[unusedImagesPrunePath()] = { status: 200, body: "{}" };
         await reclaimHostSpace();
         expect(asked.some((call) => call.path.includes("volume"))).toBe(false);
     });
@@ -115,7 +159,10 @@ describe("giving room back", () => {
     it("does the second even when the first frees nothing", async () => {
         // They hold different things, and somebody pressing this once means both.
         replies["/build/prune"] = { status: 200, body: JSON.stringify({ SpaceReclaimed: 0 }) };
-        replies["/images/prune"] = { status: 200, body: JSON.stringify({ SpaceReclaimed: 3 * GB }) };
+        replies[unusedImagesPrunePath()] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 3 * GB })
+        };
         expect(await reclaimHostSpace()).toBe(3 * GB);
     });
 
