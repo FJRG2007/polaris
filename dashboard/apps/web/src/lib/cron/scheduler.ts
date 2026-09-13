@@ -111,9 +111,23 @@ async function run(job: ScheduledJob): Promise<unknown> {
  * Start the schedule. Idempotent, and skipped entirely when
  * `POLARIS_CRON=off` - the escape hatch for an instance where the first pass is
  * doing more than somebody wants it to while they look into it.
+ *
+ * That switch now covers more than it did. Domain health and Watch alarms used
+ * to be timers of their own in `instrumentation.ts` and ran whatever it was set
+ * to; they are scheduled jobs here, so turning the schedule off turns the
+ * monitoring off with it - no alarm is evaluated and no domain is probed, which
+ * is to say nobody is told when one breaks. It is said out loud on the way past
+ * for that reason: it is the one consequence of this flag that is invisible
+ * afterwards, because what it stops is the thing whose whole job is to speak up.
  */
 export function startScheduledWork(): void {
-    if (started || process.env.POLARIS_CRON === "off") return;
+    if (started) return;
+    if (process.env.POLARIS_CRON === "off") {
+        console.warn(
+            "polaris: POLARIS_CRON=off - no scheduled work is running, which includes Watch alarms and domain health, so nothing will report an outage"
+        );
+        return;
+    }
     started = true;
 
     const ticker = (jobs: readonly ScheduledJob[], tickMs: number) => (): void => {

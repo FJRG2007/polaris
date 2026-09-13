@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { setSetting } from "@/lib/setting-store";
@@ -67,6 +68,26 @@ export async function sweepRetentionAction(): Promise<{
         console.error("polaris: the retention sweep failed:", error);
         return { error: "That could not be run just now" };
     }
+}
+
+/**
+ * How many messages are holding a body right now.
+ *
+ * Asked by the card rather than handed to it by the page, because no index
+ * answers this: a held body is one of two nullable columns being set, over the
+ * table that grows fastest here. Awaited in the page it was a scan of the whole
+ * of MailMessage standing between somebody and the screen; asked from the card
+ * it is a number that arrives a moment later, on a screen that is already up.
+ *
+ * Not audited: it reads a count and changes nothing.
+ */
+export async function mailBodyHeldAction(): Promise<{ held: number }> {
+    await requireAdmin();
+    return {
+        held: await prisma.mailMessage.count({
+            where: { OR: [{ bodyText: { not: null } }, { bodyHtml: { not: null } }] }
+        })
+    };
 }
 
 /**

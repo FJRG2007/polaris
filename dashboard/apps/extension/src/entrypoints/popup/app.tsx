@@ -14,7 +14,16 @@ import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/message
  * (open). Somebody who has used it before opens it on the last of those.
  */
 
-/** How long a copied password stays on the clipboard. */
+/**
+ * How long a copied password stays on the clipboard, for as long as this popup
+ * is the thing holding the timer.
+ *
+ * Which is only while it is open. A browser action popup is torn down the moment
+ * it loses focus, and its timers go with it, so this cannot be promised past
+ * that - and the line it puts on screen says so rather than claiming a clearance
+ * nobody is left to perform. Moving it somewhere that outlives the popup means
+ * the worker, and a worker has no document to write a clipboard from.
+ */
 const CLEAR_AFTER_MS = 30_000;
 
 function useStatus(): [VaultStatus | null, () => Promise<void>] {
@@ -240,7 +249,11 @@ function Items({
             return;
         }
         await navigator.clipboard.writeText(reply.value);
-        setNote(field === "username" ? "Username copied." : "Copied, and cleared in 30 seconds.");
+        setNote(
+            field === "username"
+                ? "Username copied."
+                : "Copied. Cleared in 30 seconds if this stays open."
+        );
         if (field !== "username") {
             if (clearing.current !== null) window.clearTimeout(clearing.current);
             clearing.current = window.setTimeout(() => {

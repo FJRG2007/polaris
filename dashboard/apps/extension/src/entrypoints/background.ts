@@ -123,6 +123,37 @@ async function remember(issued: protocol.VaultToken): Promise<void> {
 }
 
 /**
+ * Every other vault's key, unwrapped with this account's private half.
+ *
+ * Read from whatever the last sync left, and so worked out again whenever that
+ * changes rather than once while unlocking. A vault opened before any sync has
+ * landed - signing in against a server that was briefly unreachable, which
+ * unlocks anyway because the password is in hand - has no profile to read, and
+ * held once it would stay empty for the session: every shared item silently
+ * undecryptable, with nothing on screen saying why.
+ *
+ * A vault whose key will not open is skipped rather than fatal: it means
+ * somebody has not been let in yet.
+ */
+async function organizationKeys(key: SymmetricKey): Promise<Map<string, SymmetricKey>> {
+    const organizations = new Map<string, SymmetricKey>();
+    const [wrapped, held] = await Promise.all([WRAPPED.getValue(), CIPHERS.getValue()]);
+    if (!wrapped?.privateKey || !held) return organizations;
+
+    const pkcs8 = await decryptBytes(wrapped.privateKey, key);
+    if (!pkcs8) return organizations;
+    const profile = held.profile as { organizations?: { id?: unknown; key?: unknown }[] };
+    for (const organization of profile.organizations ?? []) {
+        if (typeof organization.id !== "string" || typeof organization.key !== "string") continue;
+        const orgKey = await decryptRsa(organization.key, pkcs8);
+        if (orgKey && orgKey.length === 64) {
+            organizations.set(organization.id, symmetricKeyFromBytes(orgKey));
+        }
+    }
+    return organizations;
+}
+
+/**
  * Open the vault with the master password.
  *
  * The password is turned into a key here and dropped; what is kept is what it
@@ -140,25 +171,7 @@ async function unlock(password: string): Promise<boolean> {
     if (raw === null || raw.length !== 64) return false;
     const key = symmetricKeyFromBytes(raw);
 
-    // Every other vault's key is wrapped to this account's public half, so the
-    // private half has to be opened first. A vault whose key will not open is
-    // skipped rather than fatal: it means somebody has not been let in yet.
-    const organizations = new Map<string, SymmetricKey>();
-    const held = await CIPHERS.getValue();
-    if (wrapped.privateKey && held) {
-        const pkcs8 = await decryptBytes(wrapped.privateKey, key);
-        const profile = held.profile as { organizations?: { id?: unknown; key?: unknown }[] };
-        for (const organization of profile.organizations ?? []) {
-            if (typeof organization.id !== "string" || typeof organization.key !== "string") continue;
-            if (!pkcs8) break;
-            const orgKey = await decryptRsa(organization.key, pkcs8);
-            if (orgKey && orgKey.length === 64) {
-                organizations.set(organization.id, symmetricKeyFromBytes(orgKey));
-            }
-        }
-    }
-
-    open = { key, organizations };
+    open = { key, organizations: await organizationKeys(key) };
     return true;
 }
 
@@ -289,11 +302,9 @@ async function sync(force: boolean): Promise<boolean> {
     const access = await token(base);
     if (!access) return false;
 
+    const moved = await protocol.revisionDate(base, access);
     if (!force) {
-        const [seen, moved] = await Promise.all([
-            REVISION.getValue(),
-            protocol.revisionDate(base, access)
-        ]);
+        const seen = await REVISION.getValue();
         if (moved !== null && seen !== null && moved <= seen) return true;
     }
 
@@ -302,8 +313,18 @@ async function sync(force: boolean): Promise<boolean> {
     await Promise.all([
         CIPHERS.setValue(fresh),
         SYNCED_AT.setValue(Date.now()),
-        REVISION.setValue(Date.now())
+        // The server's revision, never this browser's clock, because that is what
+        // the poll above compares it against. Stored as `Date.now()` the two were
+        // different clocks: a machine running even slightly ahead of the server
+        // held a number no revision it reported could exceed, so every later poll
+        // decided there was nothing new and a password changed on another device
+        // never arrived. Left alone when the server did not say, so the next poll
+        // asks again rather than trusting a gap.
+        ...(moved !== null ? [REVISION.setValue(moved)] : [])
     ]);
+    // The profile arrived with it, and it is what the other vaults' keys are read
+    // from - so an open vault that started without them has them now.
+    if (open) open = { key: open.key, organizations: await organizationKeys(open.key) };
     await badge();
     return true;
 }
@@ -345,7 +366,18 @@ async function fill(id: string): Promise<messages.Reply> {
 
     const payload: messages.FillPayload = { username: login.username, password: login.password };
     try {
-        await browser.tabs.sendMessage(tab.id, { kind: "fill", payload });
+        // What the page actually found, rather than that the message was
+        // delivered. The popup closes itself on success, so a page with no login
+        // form on it used to have the popup vanish as though the two strings had
+        // been typed into it - and somebody then submits an empty form, or
+        // pastes a password into whatever is focused, looking for the one they
+        // were told had already been filled in.
+        const filled = (await browser.tabs.sendMessage(tab.id, { kind: "fill", payload })) as
+            | { user?: boolean; pass?: boolean }
+            | undefined;
+        if (!filled?.user && !filled?.pass) {
+            return { ok: false, error: "No login form was found on this page." };
+        }
         return { ok: true };
     } catch {
         return { ok: false, error: "This page cannot be filled." };
@@ -354,9 +386,14 @@ async function fill(id: string): Promise<messages.Reply> {
 
 browser.runtime.onMessage.addListener((raw, sender): Promise<messages.Reply> | undefined => {
     // Only the extension's own pages may ask for any of this. A page that
-    // guessed the extension id gets nothing: `sender.url` is the caller, and
-    // anything that is not one of ours is refused before it is parsed.
+    // guessed the extension id gets nothing: anything that is not one of ours is
+    // refused before it is parsed.
     if (sender.id !== browser.runtime.id) return undefined;
+    // And the id alone is not that boundary, because the content script carries
+    // it too - so this surface, which hands back decrypted items, would be open
+    // to a script running inside whatever page somebody is on. Ours speak from
+    // no tab; anything sent from inside a page has one.
+    if (sender.tab) return undefined;
     const request = raw as messages.Request;
 
     const answer = async (): Promise<messages.Reply> => {

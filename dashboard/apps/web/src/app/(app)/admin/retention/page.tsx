@@ -14,9 +14,15 @@
  * The mail body cache is the fourth thing that grows without a bound and the one
  * that grows fastest, so it is here too - as a count of messages rather than a
  * period, which is why it is its own card and not a fourth row of the table.
+ *
+ * Its count is the exception to the paragraph above: it is the only one the card
+ * fetches for itself. The three tables are counted on an indexed timestamp; a
+ * held body is `bodyText` or `bodyHtml` being set, which no index answers, over
+ * the largest table in the product - so awaiting it here held the whole
+ * navigation to /admin/retention for as long as that scan took. The card draws
+ * without it and fills the number in.
  */
 
-import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { MailBodyForm } from "./mail-body-form";
@@ -31,14 +37,9 @@ export default async function RetentionPage() {
     await requireAdmin();
     const policy = await retentionPolicy();
     const totals = await retentionTotals(policy);
-    // What the window is set to, and what it is actually holding. The second is
-    // the number that says whether the first is doing anything.
-    const [storedKeep, held] = await Promise.all([
-        getSetting(MAIL_BODY_KEEP_KEY),
-        prisma.mailMessage.count({
-            where: { OR: [{ bodyText: { not: null } }, { bodyHtml: { not: null } }] }
-        })
-    ]);
+    // What the window is set to. What it is actually holding - the number that
+    // says whether the setting is doing anything - the card asks for itself.
+    const storedKeep = await getSetting(MAIL_BODY_KEEP_KEY);
 
     return (
         // Narrow: three settings and nothing wide, so the column is centred in
@@ -50,7 +51,7 @@ export default async function RetentionPage() {
             />
             <RetentionView policy={policy} totals={totals} />
             <div className="mt-4">
-                <MailBodyForm kept={mailBodyKeep(storedKeep)} held={held} />
+                <MailBodyForm kept={mailBodyKeep(storedKeep)} />
             </div>
         </div>
     );

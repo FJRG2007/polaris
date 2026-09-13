@@ -15,16 +15,39 @@
  * short of disk would rather spend the second.
  */
 
-import { useState, useTransition } from "react";
+import { runAction } from "@/lib/run-action";
 import { MAIL_BODY_KEEP_MAX } from "@polaris/core";
-import { saveMailBodyKeepAction } from "./actions";
+import { useEffect, useState, useTransition } from "react";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { mailBodyHeldAction, saveMailBodyKeepAction } from "./actions";
 
-export function MailBodyForm({ kept, held }: { kept: number; held: number }) {
+/** What the card says about the count while it is still being read, and when it
+ *  could not be. Neither is an error worth the form's own error line: the
+ *  setting above is editable and savable whether or not this number arrives. */
+function heldLine(held: number | null, failed: boolean): string {
+    if (failed) return "How much is held could not be read just now.";
+    if (held === null) return "Counting what is held right now.";
+    if (held === 0) return "No message is being held whole right now.";
+    return `${held.toLocaleString()} ${held === 1 ? "message is" : "messages are"} being held whole right now.`;
+}
+
+export function MailBodyForm({ kept }: { kept: number }) {
     const [value, setValue] = useState(String(kept));
     const [error, setError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [pending, startTransition] = useTransition();
+    // Read here rather than handed down by the page: counting held bodies is a
+    // scan of the whole message table, and awaited on the server it stood
+    // between somebody and this screen. The card is up immediately and the
+    // number follows.
+    const [held, setHeld] = useState<number | null>(null);
+    const [countFailed, setCountFailed] = useState(false);
+
+    useEffect(() => {
+        void runAction(() => mailBodyHeldAction(), () => setCountFailed(true)).then((result) => {
+            if (result) setHeld(result.held);
+        });
+    }, []);
 
     const parsed = Number.parseInt(value, 10);
     const valid = Number.isInteger(parsed) && parsed >= 0 && parsed <= MAIL_BODY_KEEP_MAX;
@@ -77,11 +100,7 @@ export function MailBodyForm({ kept, held }: { kept: number; held: number }) {
                     </span>
                 </label>
 
-                <p className="text-sm text-muted-foreground">
-                    {held === 0
-                        ? "No message is being held whole right now."
-                        : `${held.toLocaleString()} ${held === 1 ? "message is" : "messages are"} being held whole right now.`}
-                </p>
+                <p className="text-sm text-muted-foreground">{heldLine(held, countFailed)}</p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
                 {saved && !dirty && <p className="text-sm text-muted-foreground">Saved.</p>}

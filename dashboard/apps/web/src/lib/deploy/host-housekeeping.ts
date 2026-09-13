@@ -189,7 +189,7 @@ async function warn(fullness: number, freed: number): Promise<void> {
         const admins = await prisma.user
             .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
             .catch(() => []);
-        await Promise.all(
+        const sent = await Promise.allSettled(
             admins.map((admin) =>
                 notify({
                     userId: admin.id,
@@ -209,7 +209,12 @@ async function warn(fullness: number, freed: number): Promise<void> {
         // order this was in - a dispatch that failed still marked the band as
         // reported, so the one message that says a disk needs a person was lost
         // until the disk got five points worse.
-        await setSetting(KEY, band);
+        //
+        // Settled rather than all, and recorded when anybody at all was told: one
+        // administrator whose dispatch keeps failing would otherwise throw before
+        // the band was written, and every administrator who did get the message
+        // would get it again on every pass for as long as that one kept failing.
+        if (sent.some((one) => one.status === "fulfilled")) await setSetting(KEY, band);
     } catch (error) {
         console.error("polaris: could not report a full disk:", error);
     }
