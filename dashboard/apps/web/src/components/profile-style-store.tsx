@@ -79,7 +79,10 @@ interface Store {
      *  `useContactName`. Kept apart from `names` because only the screen drawing
      *  somebody knows which of the two it is allowed to show. */
     readonly called: ReadonlyMap<string, string>;
-    readonly watch: (id: string) => void;
+    /** Say a face is on screen, and give back the way to say it has gone. What
+     *  comes back has to be called: a revalidation asks about what is being drawn,
+     *  and an id nothing un-watches is asked about forever. */
+    readonly watch: (id: string) => () => void;
     readonly refresh: () => void;
 }
 
@@ -132,9 +135,28 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
      * themselves.
      */
     const [called, setCalled] = useState<ReadonlyMap<string, string>>(new Map());
-    /** Everybody drawn since this page loaded, which is what a revalidation asks
-     *  about again. */
-    const watched = useRef(new Set<string>());
+    /**
+     * The faces on screen right now, and how many things are drawing each.
+     *
+     * It used to be every id seen since the page loaded, never pruned, and that
+     * is what a revalidation asked about - so an afternoon in a directory or a
+     * busy chat grew the question without bound, and once it passed the server's
+     * ceiling it became several serial requests every forty-five seconds, each
+     * one a pair of lookups, forever. A count rather than a set because the same
+     * person is drawn several times over on one screen - a message list, the
+     * rail, the member panel - and the first of those unmounting must not take
+     * the other two off the list.
+     */
+    const watched = useRef(new Map<string, number>());
+    /**
+     * Who a full answer has actually arrived for.
+     *
+     * Two jobs. A face that comes back on screen is not asked about again from
+     * scratch, and a request that FAILED leaves its people out of here - so they
+     * are asked about in full again rather than being silently skipped by every
+     * later revalidation, which only ever carries what changed.
+     */
+    const known = useRef(new Set<string>());
     /** Ids that arrived since the last request went out. */
     const fresh = useRef(new Set<string>());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,6 +208,9 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                 at?: string;
             };
             const clock = typeof body.at === "string" ? body.at : null;
+            // These have been answered in full. A chunk that failed never reaches
+            // this line, which is what leaves its people to be asked about again.
+            if (since === null) for (const id of ids) known.current.add(id);
             const answered = Object.entries(body.people ?? {});
             const cleared = body.cleared ?? [];
             const named = Object.entries(body.names ?? {}).filter(
@@ -263,46 +288,76 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
             if (ids.length === 0) return;
             const since = again ? at.current : null;
             const clocks: string[] = [];
+            let lost = false;
             for (let from = 0; from < ids.length; from += core.MAX_PEOPLE_PER_STYLE_ASK) {
                 const clock = await askChunk(
                     ids.slice(from, from + core.MAX_PEOPLE_PER_STYLE_ASK),
                     since
                 );
                 if (clock) clocks.push(clock);
+                else lost = true;
             }
             // The earliest of them. A later one would start the next revalidation
             // after an answer this one had already given, and whatever changed in
             // between would never be asked about again.
+            //
+            // And nothing at all if any chunk was lost. Moving the clock on past a
+            // request that failed is the same bug one step further along: every
+            // later revalidation would ask only for what changed AFTER an answer
+            // this browser never received, so those people would keep the name the
+            // page was rendered with and draw plain for the rest of the session.
+            // Standing still is always safe - the old clock is no later than any
+            // new one, so the next answer covers the gap.
             const earliest = clocks.sort()[0];
-            if (earliest) at.current = earliest;
+            if (!lost && earliest) at.current = earliest;
         },
         [askChunk]
     );
 
     const watch = useCallback(
         (id: string) => {
-            if (watched.current.has(id)) return;
-            watched.current.add(id);
-            fresh.current.add(id);
-            if (timer.current) return;
-            timer.current = setTimeout(() => {
-                timer.current = null;
-                const going = [...fresh.current];
-                fresh.current.clear();
-                void ask(going, false);
-            }, GATHER_MS);
+            const held = watched.current.get(id) ?? 0;
+            watched.current.set(id, held + 1);
+            // Asked about only the first time something draws them, and only if no
+            // full answer has arrived yet: a row that scrolls out and back, or a
+            // dialog opened twice, is not news. What keeps those current is the
+            // revalidation, which is about what changed rather than about who is
+            // new here.
+            if (held === 0 && !known.current.has(id)) {
+                fresh.current.add(id);
+                if (!timer.current) {
+                    timer.current = setTimeout(() => {
+                        timer.current = null;
+                        const going = [...fresh.current];
+                        fresh.current.clear();
+                        void ask(going, false);
+                    }, GATHER_MS);
+                }
+            }
+            return () => {
+                const now = watched.current.get(id) ?? 0;
+                if (now > 1) watched.current.set(id, now - 1);
+                else watched.current.delete(id);
+            };
         },
         [ask]
     );
 
     /** Ask about everybody on this screen again, saying what we already have. */
     const revalidate = useCallback(() => {
+        const live = [...watched.current.keys()];
+        // Anybody a full answer never arrived for - a request that failed, an
+        // offline moment - is asked about properly rather than being carried along
+        // by a question that only reports changes. Without this they would sit at
+        // the name the page was rendered with until the tab was reloaded.
+        const never = live.filter((id) => !known.current.has(id));
+        if (never.length > 0) void ask(never, false);
         if (!at.current) return;
-        void ask([...watched.current], true);
+        void ask(live, true);
     }, [ask]);
 
     const refresh = useCallback(() => {
-        void ask([...watched.current], false);
+        void ask([...watched.current.keys()], false);
     }, [ask]);
 
     /**
@@ -394,7 +449,7 @@ export function useProfileName(id: string | null | undefined): string | null {
 
     useEffect(() => {
         if (!id || !watch) return;
-        watch(id);
+        return watch(id);
     }, [id, watch]);
 
     if (!id || !store) return null;
@@ -417,7 +472,7 @@ export function useContactName(id: string | null | undefined): string | null {
 
     useEffect(() => {
         if (!id || !watch) return;
-        watch(id);
+        return watch(id);
     }, [id, watch]);
 
     if (!id || !store) return null;
@@ -430,7 +485,7 @@ export function useProfileStyle(id: string | null | undefined): core.ProfileStyl
 
     useEffect(() => {
         if (!id || !watch) return;
-        watch(id);
+        return watch(id);
     }, [id, watch]);
 
     if (!id || !store) return null;
