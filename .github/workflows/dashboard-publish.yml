@@ -118,15 +118,18 @@ jobs:
           # offered an update that changes nothing it runs - which teaches people
           # to ignore the one button that also delivers security fixes.
           #
-          # So image decisions are taken on the changed list with those paths
-          # removed, while the extension keeps its own gate below: its suites run
-          # through `npm run test --workspaces`, and losing them would be the
-          # other way to get this wrong.
-          IMAGE_CHANGED="$RUNNER_TEMP/changed-images.txt"
-          grep -vE '^dashboard/apps/extension/' "$CHANGED" > "$IMAGE_CHANGED" || true
-          image_has() { grep -qE "$1" "$IMAGE_CHANGED"; }
+          # So the web filter names `apps/web` instead of all of `apps/`, which is
+          # what the image actually installs and builds. Said that way round, an app
+          # added beside the extension is outside the image until somebody puts it in
+          # one, rather than silently rebuilding it the day it lands. The same rule is
+          # mirrored by `WEB_IMAGE_PATHS` in the dashboard's update-service.ts, which
+          # decides whether the update card says a build is on its way.
+          #
+          # The extension keeps its own gate below: its suites run through
+          # `npm run test --workspaces`, and losing them would be the other way to get
+          # this wrong.
           has '^dashboard/apps/extension/' && out extension true || out extension false
-          image_has '^dashboard/(apps|packages|cli|patches|scripts)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
+          has '^dashboard/apps/web/|^dashboard/(packages|cli|patches|scripts)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false
@@ -535,7 +538,9 @@ jobs:
   #
   # `!cancelled()` rather than `always()`: a cancelled run must leave `latest` where
   # it is, and a skipped dashboard-ci (nothing here was rebuilt) skips this too,
-  # since its result is then not 'success'.
+  # since its result is then not 'success'. A push that only touched the extension
+  # does run dashboard-ci, so this runs and tags nothing - every step below is
+  # guarded on its own image's result, and all of them were skipped.
   tag:
     needs: [dashboard-ci, web, bridge, guard, relay, vision, face]
     if: ${{ !cancelled() && needs.dashboard-ci.result == 'success' }}

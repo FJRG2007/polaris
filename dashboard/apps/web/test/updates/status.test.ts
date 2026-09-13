@@ -139,6 +139,24 @@ describe("what counts as an update", () => {
         expect(status.upToDate).toBe(true);
     });
 
+    it("stays up to date when the commits are the browser extension, which no image carries", async () => {
+        // The publish workflow builds no image for these, so "waiting on a build"
+        // would be a wait with nothing at the end of it: the card would sit there
+        // until an unrelated commit happened to rebuild the dashboard.
+        const status = await check({
+            published: IMAGE(RUNNING),
+            compare: {
+                status: "ahead",
+                ahead_by: 4,
+                files: [{ filename: "dashboard/apps/extension/src/entrypoints/popup.tsx" }]
+            }
+        });
+
+        expect(status.phase).toBe("up-to-date");
+        expect(status.upToDate).toBe(true);
+        expect(status.buildingCount).toBeNull();
+    });
+
     it("is up to date when the running build is the published one", async () => {
         const status = await check({
             published: IMAGE(RUNNING),
