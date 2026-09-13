@@ -7,3 +7,9 @@ build
 coverage
 packages/db/generated
 package-lock.json
+# The extension's build output and the types WXT generates from its config. Both
+# are made by a command rather than written by anybody, and `wxt prepare` runs on
+# install - so a formatter that walks them reformats generated files on every
+# checkout, and reports them as style violations in between.
+apps/extension/.output
+apps/extension/.wxt
