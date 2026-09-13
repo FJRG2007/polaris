@@ -23,7 +23,7 @@ import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
 import { unblockPersonAction } from "./actions";
 import type { BlockedPerson } from "@/lib/blocks";
-import { PersonName, PersonRow } from "@/components/person-name";
+import { PersonName, PersonRow, RealNames } from "@/components/person-name";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
@@ -44,53 +44,62 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
             <CardHeader>
                 <CardTitle>Blocked</CardTitle>
             </CardHeader>
-            <CardBody className="flex flex-col gap-3 p-3">
-                <p className="text-xs text-muted-foreground">
-                    They cannot message, call or mention you, and what they write where you both are
-                    is folded away. They are not told.
-                </p>
-
-                {people.length === 0 ? (
+            {/* Everybody here is named by the account the block was placed on,
+                not by whatever this reader calls them. The row was contradicting
+                itself: the visible name became the nickname while the unblock
+                button's label kept the account name, so the screen and a screen
+                reader announced different people for the same row - and lifting
+                a block is the same act as lifting a ban, which is already drawn
+                this way. See `contact-names` for where a nickname does belong. */}
+            <RealNames>
+                <CardBody className="flex flex-col gap-3 p-3">
                     <p className="text-xs text-muted-foreground">
-                        Nobody. You can block somebody from the menu on their name.
+                        They cannot message, call or mention you, and what they write where you both
+                        are is folded away. They are not told.
                     </p>
-                ) : (
-                    <ul className="flex flex-col gap-1">
-                        {people.map((person) => (
-                            <PersonRow
-                                as="li"
-                                key={person.id}
-                                personId={person.id}
-                                className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
-                            >
-                                <Avatar person={person} size={24} />
-                                <span
-                                    className="min-w-0 flex-1 truncate text-sm"
-                                    title={person.name}
-                                >
-                                    <PersonName id={person.id} name={person.name} />
-                                </span>
-                                <Button
-                                    size="xs"
-                                    variant="ghost"
-                                    disabled={busy === person.id}
-                                    aria-label={`Unblock ${person.name}`}
-                                    title="Unblock"
-                                    onClick={() => void letThrough(person)}
-                                >
-                                    <ShieldBan className="size-3.5" />
-                                </Button>
-                            </PersonRow>
-                        ))}
-                    </ul>
-                )}
 
-                {error && (
-                    <p role="alert" className="text-sm text-danger">
-                        {error}
-                    </p>
-                )}
-            </CardBody>
+                    {people.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                            Nobody. You can block somebody from the menu on their name.
+                        </p>
+                    ) : (
+                        <ul className="flex flex-col gap-1">
+                            {people.map((person) => (
+                                <PersonRow
+                                    as="li"
+                                    key={person.id}
+                                    personId={person.id}
+                                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                                >
+                                    <Avatar person={person} size={24} />
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-sm"
+                                        title={person.name}
+                                    >
+                                        <PersonName id={person.id} name={person.name} />
+                                    </span>
+                                    <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        disabled={busy === person.id}
+                                        aria-label={`Unblock ${person.name}`}
+                                        title="Unblock"
+                                        onClick={() => void letThrough(person)}
+                                    >
+                                        <ShieldBan className="size-3.5" />
+                                    </Button>
+                                </PersonRow>
+                            ))}
+                        </ul>
+                    )}
+
+                    {error && (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
+                    )}
+                </CardBody>
+            </RealNames>
         </Card>
     );
 }
