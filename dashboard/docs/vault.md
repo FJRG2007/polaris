@@ -158,6 +158,7 @@ Named here rather than left to be discovered:
 packages/core/src/vault.ts              the wire vocabulary (types, EncString)
 packages/core/src/schemas/vault.ts      what a request may contain
 packages/vault-crypto/src/index.ts      the client's cryptography, shared with the extension (never imported by the server)
+packages/vault-crypto/src/totp.ts       the six digits beside a login, pinned against RFC 6238's own vectors
 apps/extension/                         Polaris' own browser extension, another client of the surface below
 apps/web/src/lib/vault/portability.ts   reading and writing every import/export format
 apps/web/src/lib/vault/api/routes.ts    every path the surface answers

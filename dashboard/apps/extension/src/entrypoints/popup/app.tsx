@@ -302,6 +302,56 @@ function Generator(): React.JSX.Element {
     );
 }
 
+/**
+ * The six digits beside an item that carries them, and how long they have left.
+ *
+ * Asked of the worker rather than computed here, because the secret stays there -
+ * what crosses is a code that expires on its own within the minute. Re-asked when
+ * the countdown runs out rather than on a fixed timer, so the digits on screen are
+ * never the previous period's.
+ */
+function TotpCell({ id }: { id: string }): React.JSX.Element | null {
+    const [code, setCode] = useState<string | null>(null);
+    const [left, setLeft] = useState(0);
+
+    useEffect(() => {
+        let alive = true;
+        const ask = async (): Promise<void> => {
+            const reply = await askBackground({ kind: "totpNow", id });
+            if (!alive) return;
+            if (reply.ok && "code" in reply) {
+                setCode(reply.code);
+                setLeft(reply.remaining);
+            } else {
+                setCode(null);
+            }
+        };
+        void ask();
+        const tick = window.setInterval(() => {
+            setLeft((was) => {
+                if (was <= 1) {
+                    void ask();
+                    return 30;
+                }
+                return was - 1;
+            });
+        }, 1000);
+        return () => {
+            alive = false;
+            window.clearInterval(tick);
+        };
+    }, [id]);
+
+    if (!code) return null;
+    // Grouped in threes, which is how everybody reads a code off a screen.
+    const shown = code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+    return (
+        <span className="code" title={`Turns over in ${left} seconds`}>
+            {shown} <span className="muted">{left}s</span>
+        </span>
+    );
+}
+
 function Items({
     status,
     onChange
@@ -387,6 +437,7 @@ function Items({
             <div className="who">
                 <span className="name">{item.name}</span>
                 <span className="muted small">{item.username ?? item.host ?? ""}</span>
+                {item.totp ? <TotpCell id={item.id} /> : null}
             </div>
             <div className="acts">
                 {offerFill ? (

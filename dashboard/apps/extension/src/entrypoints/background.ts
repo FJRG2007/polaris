@@ -4,6 +4,7 @@ import * as messages from "@/lib/messages";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
 import { decrypt, decryptRsa, fromBase64, symmetricKeyFromBytes } from "@polaris/vault-crypto";
@@ -612,6 +613,17 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, items: found.slice(0, 100).map(summarize) };
             }
 
+            case "totpNow": {
+                // Computed here and handed over as six digits with the seconds
+                // left, so the secret stays in this worker and the popup holds
+                // only something that expires on its own.
+                const login = (await logins()).find((one) => one.id === request.id);
+                if (!login?.totp) return { ok: false, error: "That item has no one-time code." };
+                const code = await totpCode(login.totp);
+                if (!code) return { ok: false, error: "That authenticator value cannot be read." };
+                return { ok: true, code, remaining: totpRemaining(login.totp) };
+            }
+
             case "blocked":
                 return { ok: true, ...(await blockedHere()) };
 
@@ -634,12 +646,18 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // The popup writes to the clipboard itself, from the gesture that
                 // asked for it: a worker has no document to copy from, and the
                 // value crosses to a page of ours rather than to a web page.
+                // The code, never the secret. `login.totp` is the `otpauth` value
+                // the vault stores, and handing that over as "the code" was a
+                // button that copied something no site will accept - and that
+                // somebody might then paste somewhere it does not belong.
                 const value =
                     request.field === "username"
                         ? login.username
                         : request.field === "password"
                           ? login.password
-                          : login.totp;
+                          : login.totp
+                            ? await totpCode(login.totp)
+                            : null;
                 return value ? { ok: true, value } : { ok: false, error: "There is nothing to copy." };
             }
         }

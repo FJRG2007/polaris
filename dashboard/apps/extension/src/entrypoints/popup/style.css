@@ -206,3 +206,10 @@ footer {
     padding: 4px 6px;
     font-size: 12px;
 }
+
+/* A one-time code, which is read off the screen rather than clicked. */
+.code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+}

@@ -53,6 +53,8 @@ export type Request =
     | { readonly kind: "items"; readonly query: string }
     | { readonly kind: "fill"; readonly id: string }
     | { readonly kind: "copy"; readonly id: string; readonly field: "username" | "password" | "totp" }
+    /** The current one-time code for an item, and how long it has left. */
+    | { readonly kind: "totpNow"; readonly id: string }
     /** Whether the tab in front of somebody is one they have shut this out of. */
     | { readonly kind: "blocked" }
     /** Shut this extension out of the current site, or let it back in. */
@@ -64,6 +66,8 @@ export type Reply =
     | { readonly ok: true; readonly value: string }
     /** The site in front of somebody, and whether they have shut this out of it. */
     | { readonly ok: true; readonly host: string | null; readonly blocked: boolean }
+    /** Six digits and the seconds before they turn over. */
+    | { readonly ok: true; readonly code: string; readonly remaining: number }
     | { readonly ok: true }
     | { readonly ok: false; readonly error: string; readonly needsCode?: boolean };
 
