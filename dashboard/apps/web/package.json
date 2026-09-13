@@ -38,6 +38,7 @@
         "@polaris/ssh": "0.1.0",
         "@polaris/storage": "0.1.0",
         "@polaris/ui": "0.1.0",
+        "@polaris/vault-crypto": "0.1.0",
         "@sapphi-red/web-noise-suppressor": "0.4.0",
         "@tanstack/react-virtual": "3.11.2",
         "@tiptap/core": "3.29.2",

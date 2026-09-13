@@ -1,0 +1,24 @@
+{
+    "name": "@polaris/vault-crypto",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "The vault's client-side cryptography, Bitwarden-compatible: key derivation, enc strings, org keys. Runs in a browser or an extension, never on the server.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/core": "0.1.0",
+        "hash-wasm": "4.12.0"
+    }
+}
