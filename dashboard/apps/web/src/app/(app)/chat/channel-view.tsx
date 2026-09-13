@@ -21,39 +21,40 @@
  * did not read them.
  */
 
-import { useConfirm } from "@/components/confirm-dialog";
-import { useVoiceSettings } from "./voice-settings";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
-import type { PollDraft } from "./poll-dialog";
 import { CallRoom } from "./call-room";
 import { threadRootFor } from "./links";
 import { useChat } from "./chat-context";
-import { draftMessage } from "./draft-message";
 import * as calls from "./meeting-actions";
+import { channelDraftKey } from "./drafts";
+import { posterFor } from "./video-poster";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
-import { channelDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { useCallHold } from "./call-session";
+import type { PollDraft } from "./poll-dialog";
+import { draftMessage } from "./draft-message";
+import { ScheduledBar } from "./scheduled-bar";
 import { ChannelHeader } from "./channel-header";
+import { DirectProfile } from "./direct-profile";
+import { ForwardDialog } from "./forward-dialog";
 import { useChatStream } from "./use-chat-stream";
+import { useVoiceSettings } from "./voice-settings";
 import type { RecordedSound } from "./voice-recorder";
 import type * as messagesLib from "@/lib/chat/messages";
+import { useConfirm } from "@/components/confirm-dialog";
+import { useAttention } from "@/components/use-attention";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { ChannelMembers, useMembersPanel } from "./members-panel";
-import { posterFor } from "./video-poster";
-import { ScheduledBar } from "./scheduled-bar";
-import { DirectProfile } from "./direct-profile";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
-import { ForwardDialog } from "./forward-dialog";
-import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
-import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
+import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
+import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
+import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 /** How close to the bottom still counts as "following along". A few pixels of
@@ -213,6 +214,15 @@ export function ChannelView({
     // areas all resize the viewport after the first paint.
     const foot = useRef<HTMLDivElement>(null);
     const following = useRef(true);
+    // The catch-up, held so the hook below can reach it: attention is watched from
+    // here and the callback is built hundreds of lines further down, and a stale
+    // copy of it would mark the wrong message read.
+    const catchUpMarkRef = useRef<((deliberate?: boolean) => void) | null>(null);
+    // Whether somebody is actually looking at this tab, and the moment they start
+    // again: coming back to a conversation left at the bottom has read whatever
+    // arrived while it sat behind another window, and without catching up here the
+    // channel would stay bold until the next message turned up.
+    const attending = useAttention(() => catchUpMarkRef.current?.(true));
     // How long the list insists on the bottom after a conversation opens.
     // Everything that lands late - pictures, link cards, players, a font - grows
     // it, and the browser's own scroll anchoring moves the position while that
@@ -998,15 +1008,57 @@ export function ChannelView({
      * that frame's audience like every other screen this person has open, so
      * asking for the list again as well is the same three queries twice.
      */
-    const catchUpMark = useCallback(() => {
-        if (!following.current) return;
-        const newest = held.current[held.current.length - 1];
-        if (!newest || marked.current === newest.id) return;
-        marked.current = newest.id;
-        void actions.markReadAction({ channelId, messageId: newest.id });
-    }, [channelId]);
+    const catchUpMark = useCallback(
+        (deliberate = false) => {
+            if (!following.current) return;
+            // Being at the live end is not the same as reading it. A tab in the
+            // background, a minimised window, or a browser with something on top of it
+            // is a conversation nobody is looking at - and marking those messages read
+            // loses them twice over, because the notification that would have said so is
+            // suppressed for exactly the same reason. See `components/use-attention`.
+            //
+            // Except when somebody just did something. Pressing "3 new messages",
+            // scrolling back down by hand, or coming back to the tab are all the reader
+            // demonstrating they are here, which is better evidence than anything a
+            // browser will tell us - and `hasFocus` is false in places a person is
+            // plainly reading, so a gesture must not have to argue with it.
+            if (!deliberate && !attending.current) return;
+            const newest = held.current[held.current.length - 1];
+            if (!newest || marked.current === newest.id) return;
+            marked.current = newest.id;
+            void actions.markReadAction({ channelId, messageId: newest.id });
+            // Whether a read actually went out, which is what lets the caller below
+            // tell "nothing to mark yet" apart from "marked".
+            return true;
+        },
+        [channelId]
+    );
 
-    useEffect(catchUpMark, [messages, catchUpMark]);
+    catchUpMarkRef.current = catchUpMark;
+
+    /**
+     * The first pass is somebody opening this conversation, and every pass after it
+     * is messages arriving on their own.
+     *
+     * That is the whole difference the attention guard cares about. Navigating here
+     * is a person deciding to read, and it must not have to argue with what the
+     * browser says about the window - `hasFocus` is false in places somebody is
+     * plainly reading, and a conversation that would not clear on being opened is a
+     * worse bug than the one being fixed. What has to prove attention is the quiet
+     * case: a thread left open while its reader is somewhere else entirely.
+     */
+    // Not `opening`: that name is taken further up by the round trip that opens a
+    // conversation with somebody from their message, and reusing it here resolved
+    // against theirs rather than shadowing it.
+    const firstPass = useRef(true);
+    useEffect(() => {
+        // Spent when it marks something, not when it merely runs. This effect fires
+        // once on mount before a single message has arrived, and a pass with nothing
+        // to mark would use up the exemption there - leaving the real first mark, the
+        // messages landing a tick later, arguing with `hasFocus` in a tab somebody
+        // had just opened on purpose.
+        if (catchUpMark(firstPass.current)) firstPass.current = false;
+    }, [messages, catchUpMark]);
 
     /**
      * Keep a message, or stop keeping it.
@@ -1367,7 +1419,7 @@ export function ChannelView({
                         // Back at the live end, so nothing is waiting below
                         // and everything on screen has now been seen.
                         setUnseen(0);
-                        catchUpMark();
+                        catchUpMark(true);
                     } else if (Date.now() > settling.current) following.current = false;
                     // Both edges, because the window moves in both
                     // directions: up into the history, and back down out of
@@ -1464,7 +1516,7 @@ export function ChannelView({
                                 if (newerThan) void load();
                                 else {
                                     stick();
-                                    catchUpMark();
+                                    catchUpMark(true);
                                 }
                             }}
                             className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"

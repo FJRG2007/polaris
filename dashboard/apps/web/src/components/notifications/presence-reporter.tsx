@@ -21,6 +21,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { attending } from "@/components/use-attention";
 
 const ENDPOINT = "/api/notifications/presence";
 
@@ -34,7 +35,8 @@ export function PresenceReporter() {
 
     useEffect(() => {
         const id = viewerId.current;
-        const payload = (viewing: boolean): string => JSON.stringify({ viewerId: id, path: pathname, viewing });
+        const payload = (viewing: boolean): string =>
+            JSON.stringify({ viewerId: id, path: pathname, viewing });
 
         function report(viewing: boolean): void {
             void fetch(ENDPOINT, {
@@ -50,28 +52,46 @@ export function PresenceReporter() {
         function withdraw(): void {
             const body = payload(false);
             try {
-                if (navigator.sendBeacon?.(ENDPOINT, new Blob([body], { type: "application/json" }))) return;
+                if (
+                    navigator.sendBeacon?.(ENDPOINT, new Blob([body], { type: "application/json" }))
+                )
+                    return;
             } catch {
                 // No beacon, or the browser refused it. Fall through to the fetch.
             }
             report(false);
         }
 
-        function onVisibility(): void {
-            if (document.visibilityState === "visible") report(true);
+        /**
+         * Visible AND focused, through the shared rule.
+         *
+         * Visibility alone was not enough and said so by example: a window with a
+         * call, an editor or a game on top of it is still `visible` - nothing about
+         * the page changed, only what is in front of it - so a message arriving then
+         * was treated as one the reader was watching and the alert about it was
+         * swallowed. `components/use-attention` is the same decision the
+         * conversation's read marking asks, kept in one place because the two were
+         * wrong in the same direction.
+         */
+        function settle(): void {
+            if (attending(document.visibilityState, document.hasFocus())) report(true);
             else withdraw();
         }
 
-        if (document.visibilityState === "visible") report(true);
+        settle();
         const timer = setInterval(() => {
-            if (document.visibilityState === "visible") report(true);
+            if (attending(document.visibilityState, document.hasFocus())) report(true);
         }, BEAT_MS);
-        document.addEventListener("visibilitychange", onVisibility);
+        document.addEventListener("visibilitychange", settle);
+        window.addEventListener("focus", settle);
+        window.addEventListener("blur", settle);
         window.addEventListener("pagehide", withdraw);
 
         return () => {
             clearInterval(timer);
-            document.removeEventListener("visibilitychange", onVisibility);
+            document.removeEventListener("visibilitychange", settle);
+            window.removeEventListener("focus", settle);
+            window.removeEventListener("blur", settle);
             window.removeEventListener("pagehide", withdraw);
         };
     }, [pathname]);
@@ -84,7 +104,9 @@ function newViewerId(): string {
     const bytes = new Uint8Array(16);
     const source = typeof crypto === "undefined" ? null : crypto;
     if (source?.getRandomValues) source.getRandomValues(bytes);
-    else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+    else
+        for (let index = 0; index < bytes.length; index += 1)
+            bytes[index] = Math.floor(Math.random() * 256);
     // Version and variant, so the id parses as the UUID the endpoint asks for.
     bytes[6] = (bytes[6]! & 0x0f) | 0x40;
     bytes[8] = (bytes[8]! & 0x3f) | 0x80;
