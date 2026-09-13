@@ -11,12 +11,15 @@
  * Browsers without the event (Safari, Firefox) install from their own menu, and
  * the card says where.
  *
- * The same card offers the native desktop app (`desktop/` in the repository) for
- * download, and inside that app says so instead of offering to install anything.
+ * The same card mentions the native desktop app (`desktop/` in the repository),
+ * and offers it for download only when a release of it actually exists - see
+ * `lib/desktop-release.ts`. Inside that app it says so instead of offering to
+ * install anything.
  */
 
 import { Download } from "lucide-react";
 import { useDesktopBridge } from "@/components/desktop-app";
+import type { DesktopDownload } from "@/lib/desktop-release";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
@@ -62,7 +65,7 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export function InstallAppCard({ downloadUrl }: { downloadUrl: string | null }) {
+export function InstallAppCard({ download }: { download: DesktopDownload | null }) {
     const prompt = useSyncExternalStore(
         subscribe,
         () => held,
@@ -90,13 +93,14 @@ export function InstallAppCard({ downloadUrl }: { downloadUrl: string | null }) 
             <CardBody className="flex flex-col gap-3">
                 {desktop ? (
                     <p className="text-sm">
-                        You are using the Polaris desktop app{desktop.version ? `, version ${desktop.version}` : ""}.
+                        You are using the Polaris desktop app
+                        {desktop.version ? `, version ${desktop.version}` : ""}.
                     </p>
                 ) : (
                     <>
                         <p className="text-sm text-muted-foreground">
-                            Install Polaris to open it in its own window, with its own icon in the dock, taskbar
-                            or home screen. It updates with Polaris itself.
+                            Install Polaris to open it in its own window, with its own icon in the
+                            dock, taskbar or home screen. It updates with Polaris itself.
                         </p>
                         {installed ? (
                             <p className="text-sm">You are using the installed app.</p>
@@ -108,26 +112,44 @@ export function InstallAppCard({ downloadUrl }: { downloadUrl: string | null }) 
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground">
-                                Your browser installs it from its own menu: Install Polaris in Chrome and Edge, Add
-                                to Dock in Safari, Add to Home Screen on a phone. It needs Polaris to be open over
-                                https.
+                                Your browser installs it from its own menu: Install Polaris in
+                                Chrome and Edge, Add to Dock in Safari, Add to Home Screen on a
+                                phone. It needs Polaris to be open over https.
                             </p>
                         )}
-                        {downloadUrl && (
-                            <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-                                <p className="text-sm text-muted-foreground">
-                                    The desktop app for Windows, macOS and Linux also pushes a build from your own
-                                    computer and follows a service&apos;s logs in a window of its own.
-                                </p>
+                        <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
+                            <p className="text-sm text-muted-foreground">
+                                There is also a native app for Windows, macOS and Linux: it pushes a
+                                build from your own computer and follows a service&apos;s logs in a
+                                window of its own.
+                            </p>
+                            {download ? (
                                 <div>
                                     <Button asChild variant="secondary">
-                                        <a href={downloadUrl} target="_blank" rel="noreferrer">
-                                            <Download className="size-4" /> Download the desktop app
+                                        <a href={download.url} target="_blank" rel="noreferrer">
+                                            <Download className="size-4" /> Download the desktop app{" "}
+                                            {download.version}
                                         </a>
                                     </Button>
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <>
+                                    <div>
+                                        {/* Shown and disabled rather than hidden: somebody who has heard
+                                            the app exists should find out here that it is not out yet,
+                                            instead of looking for a button nobody drew. */}
+                                        <Button variant="secondary" disabled>
+                                            <Download className="size-4" /> Download the desktop app
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Not released yet. Installing Polaris above is how to have it
+                                        in a window of its own today, and it updates with Polaris
+                                        itself.
+                                    </p>
+                                </>
+                            )}
+                        </div>
                     </>
                 )}
             </CardBody>

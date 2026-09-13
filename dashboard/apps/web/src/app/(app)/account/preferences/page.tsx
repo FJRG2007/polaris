@@ -12,8 +12,8 @@
 
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
+import { desktopDownload } from "@/lib/desktop-release";
 import { resolveDisplayPreferences } from "@polaris/core";
-import { desktopReleasesUrl } from "@/lib/desktop-release";
 import { InstallAppCard } from "@/components/installed-app";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
 import { DeviceCacheCard } from "@/components/device-cache-card";
@@ -30,10 +30,14 @@ export const dynamic = "force-dynamic";
 
 export default async function PreferencesPage() {
     const session = await requireUser();
-    const [platform, mine, mayChooseTheme] = await Promise.all([
+    const [platform, mine, mayChooseTheme, download] = await Promise.all([
         getPlatformDisplayPreferences(),
         getUserDisplayPreferences(session.id),
-        usersMayChooseTheme()
+        usersMayChooseTheme(),
+        // Beside the rest rather than after it. It is a cached lookup that usually
+        // answers from memory, and on the ten-minute miss it must not add a round
+        // trip of its own to this page.
+        desktopDownload(loadEnv().POLARIS_REPO)
     ]);
 
     const effective = resolveDisplayPreferences(platform, mine);
@@ -63,7 +67,7 @@ export default async function PreferencesPage() {
                 save={saveTextSizeAction}
             />
             <SpoilersCard />
-            <InstallAppCard downloadUrl={desktopReleasesUrl(loadEnv().POLARIS_REPO)} />
+            <InstallAppCard download={download} />
             <DeviceCacheCard />
         </div>
     );

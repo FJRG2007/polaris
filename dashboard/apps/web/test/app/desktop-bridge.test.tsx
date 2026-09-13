@@ -3,15 +3,20 @@
 /**
  * The Polaris desktop app, as the dashboard sees it: the bridge is used only
  * when it is really there, the dashboard's notices go through it inside the app,
- * a finished deploy raises a notice only once, and the download link is built
- * from the repository this deployment updates from.
+ * a finished deploy raises a notice only once, and the download is offered only
+ * for a release of the app that actually exists.
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { desktopReleasesUrl } from "@/lib/desktop-release";
+import { desktopDownload } from "@/lib/desktop-release";
 import { InstallAppCard } from "@/components/installed-app";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { arrivedDeployResults, desktopBridge, isDesktopBridge, type PolarisDesktop } from "@/lib/desktop-bridge";
+import {
+    arrivedDeployResults,
+    desktopBridge,
+    isDesktopBridge,
+    type PolarisDesktop
+} from "@/lib/desktop-bridge";
 
 function fakeBridge(overrides: Partial<PolarisDesktop> = {}): PolarisDesktop {
     return {
@@ -63,8 +68,18 @@ describe("notifyDesktop inside the app", () => {
         const bridge = fakeBridge();
         install(bridge);
         const { notifyDesktop } = await import("@/lib/desktop-notify");
-        const shown = await notifyDesktop({ title: "Call from Ada", tag: "call:1", href: "/chat/1", insistent: true });
-        expect(bridge.notify).toHaveBeenCalledWith({ title: "Call from Ada", tag: "call:1", href: "/chat/1", insistent: true });
+        const shown = await notifyDesktop({
+            title: "Call from Ada",
+            tag: "call:1",
+            href: "/chat/1",
+            insistent: true
+        });
+        expect(bridge.notify).toHaveBeenCalledWith({
+            title: "Call from Ada",
+            tag: "call:1",
+            href: "/chat/1",
+            insistent: true
+        });
         shown?.close();
         expect(bridge.closeNotice).toHaveBeenCalledWith("call:1");
     });
@@ -88,35 +103,65 @@ describe("arrivedDeployResults", () => {
             row("read", "deploy.failed", true),
             row("chat", "chat.callMissed")
         ];
-        expect(arrivedDeployResults(seen, rows).map((item) => item.id)).toEqual(["new-ok", "new-fail"]);
+        expect(arrivedDeployResults(seen, rows).map((item) => item.id)).toEqual([
+            "new-ok",
+            "new-fail"
+        ]);
     });
 });
 
-describe("desktopReleasesUrl", () => {
-    it("links the repository's desktop releases", () => {
-        expect(desktopReleasesUrl("FJRG2007/polaris")).toBe(
-            "https://github.com/FJRG2007/polaris/releases?q=desktop-v&expanded=true"
-        );
-        expect(desktopReleasesUrl(" owner/my.repo_name ")).toBe(
-            "https://github.com/owner/my.repo_name/releases?q=desktop-v&expanded=true"
-        );
-    });
-
-    it("gives no link for something that is not owner/name", () => {
-        for (const repo of ["", "polaris", "https://github.com/a/b", "a/b/c", "a b/c", "../x"]) {
-            expect(desktopReleasesUrl(repo)).toBeNull();
+describe("desktopDownload", () => {
+    it("asks for nothing at all when the repository is not owner/name", async () => {
+        // A typo in the environment used to become a link to a page that was not
+        // there. Now it must not even become a request: asserted by counting the
+        // calls, because "returned null" alone would also be true of a lookup that
+        // went out, failed, and swallowed the failure.
+        const fetching = vi.fn();
+        vi.stubGlobal("fetch", fetching);
+        try {
+            for (const repo of [
+                "",
+                "polaris",
+                "https://github.com/a/b",
+                "a/b/c",
+                "a b/c",
+                "../x"
+            ]) {
+                expect(await desktopDownload(repo)).toBeNull();
+            }
+            expect(fetching).not.toHaveBeenCalled();
+        } finally {
+            vi.unstubAllGlobals();
         }
     });
 });
 
 describe("the install card", () => {
-    it("offers the desktop download in a browser", () => {
-        const html = renderToStaticMarkup(<InstallAppCard downloadUrl="https://github.com/o/p/releases?q=desktop-v" />);
-        expect(html).toContain('href="https://github.com/o/p/releases?q=desktop-v"');
+    it("offers the download when a release exists, and names the version", () => {
+        const html = renderToStaticMarkup(
+            <InstallAppCard
+                download={{
+                    url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
+                    version: "0.2.0"
+                }}
+            />
+        );
+        expect(html).toContain(
+            'href="https://github.com/example/polaris/releases/tag/desktop-v0.2.0"'
+        );
         expect(html).toContain("Download the desktop app");
+        expect(html).toContain("0.2.0");
     });
 
-    it("offers no download when there is no link to give", () => {
-        expect(renderToStaticMarkup(<InstallAppCard downloadUrl={null} />)).not.toContain("Download the desktop app");
+    it("says the app exists but gives nothing to press when it has no release", () => {
+        // The text stays and the link does not. Hiding the whole thing would leave
+        // somebody who has heard of the app looking for a button nobody drew, and
+        // the old behaviour - a link built from the repository name regardless -
+        // sent them to a releases page reading "No releases found".
+        const html = renderToStaticMarkup(<InstallAppCard download={null} />);
+        expect(html).toContain("Download the desktop app");
+        expect(html).toContain("Not released yet");
+        expect(html).toContain("disabled");
+        expect(html).not.toContain("href=");
     });
 });
