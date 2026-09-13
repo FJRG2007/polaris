@@ -224,11 +224,11 @@ function Unlock({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element 
  * of the common case every time to serve the rare one.
  *
  * The generating is `@polaris/core`'s, the same module the web vault will use, so
- * a password made here and one made there are drawn the same way. Nothing is
- * saved: this hands over a string, and the item it belongs to is made wherever
- * somebody is signing up.
+ * a password made here and one made there are drawn the same way. This makes a
+ * string and saves nothing itself: "Use it" hands it to the form above, and "Copy"
+ * hands it to whatever somebody is signing up to.
  */
-function Generator(): React.JSX.Element {
+function Generator({ onUse }: { onUse: (value: string) => void }): React.JSX.Element {
     const [open, setOpen] = useState(false);
     const [length, setLength] = useState(20);
     const [value, setValue] = useState<string | null>(null);
@@ -294,6 +294,16 @@ function Generator(): React.JSX.Element {
                 </button>
                 <button className="ghost" disabled={!value} onClick={() => void copy()}>
                     Copy
+                </button>
+                <button
+                    className="ghost"
+                    title="Put it straight into a new login"
+                    disabled={!value}
+                    onClick={() => {
+                        if (value) onUse(value);
+                    }}
+                >
+                    Use it
                 </button>
                 <button className="ghost" onClick={() => setOpen(false)}>
                     Hide
@@ -369,10 +379,15 @@ function TotpCell({ id }: { id: string }): React.JSX.Element | null {
 function SaveLogin({
     url,
     host,
+    offered,
+    onUsed,
     onChange
 }: {
     url: string | null;
     host: string | null;
+    /** A password the generator has just made, to open this form around it. */
+    offered: string | null;
+    onUsed: () => void;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
     const [open, setOpen] = useState(false);
@@ -381,6 +396,18 @@ function SaveLogin({
     const [password, setPassword] = useState("");
     const [refused, setRefused] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+
+    // A password made next door arrives here rather than through the clipboard.
+    // Taken once and then let go, so a later render does not put it back over
+    // something that has since been typed over it.
+    useEffect(() => {
+        if (offered === null) return;
+        setOpen(true);
+        setPassword(offered);
+        setName((was) => (was === "" ? (host ?? "") : was));
+        setRefused(null);
+        onUsed();
+    }, [offered, host, onUsed]);
 
     const typed = { name, username, password, uri: url ?? "" };
     const check = readIntendedLogin(typed);
@@ -523,6 +550,12 @@ function Items({
     // The page somebody is on, kept so saving a login for it does not ask them to
     // type an address the popup can already see.
     const [pageUrl, setPageUrl] = useState<string | null>(null);
+    // A password the generator has just made, on its way into the save form above
+    // it. Nobody retypes twenty random characters, and sending it out to the
+    // clipboard and back would be a round trip through the one place worth keeping
+    // a password out of.
+    const [offered, setOffered] = useState<string | null>(null);
+    const takeOffered = useCallback(() => setOffered(null), []);
     const clearing = useRef<number | null>(null);
     // The site in front of somebody and whether they have shut this out of it,
     // asked of the worker rather than worked out here: the popup does not hold
@@ -699,9 +732,15 @@ function Items({
                 </div>
             ) : null}
 
-            <SaveLogin url={pageUrl} host={here.host} onChange={onChange} />
+            <SaveLogin
+                url={pageUrl}
+                host={here.host}
+                offered={offered}
+                onUsed={takeOffered}
+                onChange={onChange}
+            />
 
-            <Generator />
+            <Generator onUse={setOffered} />
 
             <Timeout status={status} onChange={onChange} />
 
