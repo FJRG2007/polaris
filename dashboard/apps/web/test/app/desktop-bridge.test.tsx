@@ -7,8 +7,8 @@
  * for a release of the app that actually exists.
  */
 
+import { desktopDownload } from "@/lib/app-releases";
 import { renderToStaticMarkup } from "react-dom/server";
-import { desktopDownload } from "@/lib/desktop-release";
 import { InstallAppCard } from "@/components/installed-app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {

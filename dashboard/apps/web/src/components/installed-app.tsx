@@ -13,13 +13,13 @@
  *
  * The same card mentions the native desktop app (`desktop/` in the repository),
  * and offers it for download only when a release of it actually exists - see
- * `lib/desktop-release.ts`. Inside that app it says so instead of offering to
+ * `lib/app-releases.ts`. Inside that app it says so instead of offering to
  * install anything.
  */
 
 import { Download } from "lucide-react";
+import type { AppDownload } from "@/lib/app-releases";
 import { useDesktopBridge } from "@/components/desktop-app";
-import type { DesktopDownload } from "@/lib/desktop-release";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
@@ -65,7 +65,7 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export function InstallAppCard({ download }: { download: DesktopDownload | null }) {
+export function InstallAppCard({ download }: { download: AppDownload | null }) {
     const prompt = useSyncExternalStore(
         subscribe,
         () => held,

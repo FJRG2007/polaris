@@ -1,0 +1,95 @@
+name: Publish extension
+
+# Build the browser extension and attach the packages to a release.
+#
+# The extension is the one thing in this repository that ships to a browser rather
+# than into an image, so it needs somewhere for people to get it from: `wxt zip`
+# writes a package per target, and a deployment's "Connect an app" screen links the
+# newest release these steps produce. Without that, "install it locally" is an
+# instruction with no file behind it.
+#
+# Tag-driven rather than push-driven, deliberately. A release is a thing somebody
+# decides to cut - the store listing, the signing, the version people quote in a bug
+# report all follow from it - and building a package on every commit would publish a
+# stream of near-identical downloads nobody chose. The suites that keep the extension
+# honest already run on every push through `dashboard-ci`.
+#
+# Push a tag `extension-v<version>` matching `version` in
+# `dashboard/apps/extension/package.json`. The build refuses a tag that does not
+# match, because a package whose manifest says one version and whose tag says
+# another is the kind of thing nobody notices until an update does not apply.
+
+on:
+  push:
+    tags:
+      - "extension-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dashboard
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: The tag has to match the version the manifest will carry
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        run: |
+          expected="extension-v$(node -p "require('./apps/extension/package.json').version")"
+          if [ "$expected" != "${{ github.ref_name }}" ]; then
+            echo "tag ${{ github.ref_name }} does not match $expected from package.json"
+            exit 1
+          fi
+
+      - run: npm ci --prefer-offline
+
+      # The extension imports @polaris/core and @polaris/vault-crypto as workspace
+      # packages and reads their built declarations, so nothing below resolves until
+      # these exist.
+      - run: npm run build:packages
+
+      # Both targets. Chrome gets manifest v3 and Firefox v2, from one source - and
+      # `zip` also writes the sources package that Firefox's review asks for.
+      - run: npm run zip --workspace @polaris/extension
+      - run: npm run zip:firefox --workspace @polaris/extension
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polaris-extension
+          # Repo-relative: `defaults.run.working-directory` applies to `run` steps
+          # and to nothing else.
+          path: dashboard/apps/extension/.output/*.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/extension-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polaris-extension
+          path: packages
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Polaris extension ${{ github.ref_name }}
+          # This repository releases the dashboard too, and that is what "latest"
+          # should keep meaning.
+          make_latest: "false"
+          files: packages/*.zip

@@ -14,9 +14,12 @@ import { getVault } from "@/lib/vault/account";
 import { requirePermission } from "@/lib/session";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { CopyButton } from "@/components/copy-button";
+import { extensionDownload } from "@/lib/app-releases";
+import { listVaultClients } from "@/lib/vault/devices";
 import { BitwardenMark } from "@/components/brand-icons";
-import { ExternalLink, Terminal, TriangleAlert } from "lucide-react";
+import { RelativeTime } from "@/components/relative-time";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Download, ExternalLink, Puzzle, Terminal, TriangleAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +29,13 @@ export default async function VaultClientsPage() {
     // The configured sharing origin, not the tab's host: an address that only
     // works from inside the house is not one to paste into a phone.
     const base = await sharingBaseUrl();
+    // Beside each other: one is a database read and the other a lookup that answers
+    // from memory for ten minutes at a time, and neither should queue behind the
+    // other to draw one page.
+    const [clients, extension] = await Promise.all([
+        listVaultClients(user.id),
+        extensionDownload(loadEnv().POLARIS_REPO)
+    ]);
     const serverUrl = `${base}/vault`;
     const insecure =
         !serverUrl.startsWith("https://") && !loadEnv().POLARIS_APP_URL.includes("localhost");
@@ -117,6 +127,108 @@ export default async function VaultClientsPage() {
                             />
                         </div>
                     </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Puzzle className="size-4" />
+                        Polaris&apos; own extension
+                    </CardTitle>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-4 text-sm">
+                    <p className="text-muted-foreground">
+                        Built for this vault rather than adapted to it: it asks the browser for
+                        permission to talk to this address and no other, fills a login without
+                        holding any standing access to the pages you open, and locks itself again
+                        when you stop using it.
+                    </p>
+
+                    <div>
+                        <p className="font-medium">From your browser&apos;s store</p>
+                        <p className="text-muted-foreground">
+                            Not published yet. This is where it will be, and it is the one that
+                            keeps itself up to date.
+                        </p>
+                        <div className="mt-2">
+                            <Button size="sm" variant="secondary" disabled>
+                                Get it from the store
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p className="font-medium">Load it yourself</p>
+                        <p className="text-muted-foreground">
+                            Unpack the file for your browser and load it: Chrome and Edge at
+                            chrome://extensions with Developer mode turned on, then Load unpacked.
+                            Firefox at about:debugging, This Firefox, then Load Temporary Add-on.
+                            Loaded this way it does not update itself, and Firefox lets it go when
+                            it closes.
+                        </p>
+                        <div className="mt-2">
+                            {extension ? (
+                                <Button asChild size="sm">
+                                    <a href={extension.url} target="_blank" rel="noreferrer">
+                                        <Download className="size-4" /> Download {extension.version}
+                                    </a>
+                                </Button>
+                            ) : (
+                                <Button size="sm" disabled>
+                                    <Download className="size-4" /> Download the extension
+                                </Button>
+                            )}
+                        </div>
+                        {!extension ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                No package has been published yet, so there is nothing to load. It
+                                is built from this repository and released on a tag of its own.
+                            </p>
+                        ) : null}
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Apps signed in to this vault</CardTitle>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3 text-sm">
+                    {clients.length === 0 ? (
+                        <p className="text-muted-foreground">
+                            Nothing has signed in yet. An app appears here the first time it does.
+                        </p>
+                    ) : (
+                        <ul className="flex flex-col divide-y divide-border">
+                            {clients.map((client) => (
+                                <li
+                                    key={client.id}
+                                    className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate" title={client.name}>
+                                            {client.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {client.label} - last used{" "}
+                                            <RelativeTime iso={client.lastSeenAt} />
+                                        </p>
+                                    </div>
+                                    {client.kind === "extension" ? (
+                                        <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                                            Extension
+                                        </span>
+                                    ) : null}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        The name and the kind are what each app said about itself, not something
+                        Polaris checked. If you do not recognise one, change your master password:
+                        removing a row cannot shut out something that already holds the vault key.
+                    </p>
                 </CardBody>
             </Card>
 

@@ -12,7 +12,7 @@
 
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
-import { desktopDownload } from "@/lib/desktop-release";
+import { desktopDownload } from "@/lib/app-releases";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { InstallAppCard } from "@/components/installed-app";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";

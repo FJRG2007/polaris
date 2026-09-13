@@ -355,3 +355,57 @@ export function deviceTypeLabel(type: number | null | undefined): string {
     if (type === null || type === undefined) return "Unknown device";
     return DEVICE_TYPE_LABEL[type] ?? `Device type ${type}`;
 }
+
+/**
+ * What kind of client a device type is.
+ *
+ * The label above names one; this groups them, which is the question somebody
+ * scanning their own list actually has - "which of these is the browser extension"
+ * rather than "which of these is Opera". It sits beside the labels on purpose: a
+ * type added to one without the other is a client that shows a name and no kind, or
+ * a kind and a number, and nothing would say so.
+ *
+ * It reports the kind of CLIENT, never which vendor's: a type says Chrome
+ * extension, not whose extension, and two of them can be signed in at once.
+ *
+ * Deliberately not called `DeviceKind`. That name belongs to `analytics-visit.ts`,
+ * where it means what a user agent string looked like - desktop, mobile, tablet,
+ * bot. Two meanings under one name in one barrel is how a screen ends up comparing
+ * a vault client against "tablet", and the compiler being the only thing that
+ * notices is the good case.
+ */
+export type VaultClientKind = "extension" | "browser" | "mobile" | "desktop" | "cli" | "other";
+
+export const VAULT_CLIENT_KIND: Readonly<Record<number, VaultClientKind>> = {
+    0: "mobile",
+    1: "mobile",
+    2: "extension",
+    3: "extension",
+    4: "extension",
+    5: "extension",
+    6: "desktop",
+    7: "desktop",
+    8: "desktop",
+    9: "browser",
+    10: "browser",
+    11: "browser",
+    12: "browser",
+    13: "browser",
+    14: "browser",
+    15: "mobile",
+    16: "desktop",
+    17: "browser",
+    18: "browser",
+    19: "extension",
+    20: "extension",
+    21: "other",
+    22: "other",
+    23: "cli",
+    24: "cli",
+    25: "cli"
+};
+
+export function vaultClientKind(type: number | null | undefined): VaultClientKind {
+    if (type === null || type === undefined) return "other";
+    return VAULT_CLIENT_KIND[type] ?? "other";
+}
