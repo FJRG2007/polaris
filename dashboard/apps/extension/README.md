@@ -39,6 +39,7 @@ src/lib/protocol.ts      the Bitwarden protocol client: sign in, sync, refresh
 src/lib/matching.ts      whether an item belongs to this page, and which comes first
 src/lib/lock.ts          when an open vault locks itself again
 src/lib/save.ts          what was typed for a new login, before it is encrypted
+src/lib/item.ts          the item to send back when only its password changes
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
 src/entrypoints/         background worker and popup
 test/                    the decisions that can do harm: what matches, and when it locks
@@ -61,6 +62,15 @@ It cannot put an item into a vault you share with somebody else, and that is on
 purpose rather than missing: which collection it goes in and whose key it is
 encrypted under are decisions an extension should not make for you. Do that in the
 Polaris screens, where moving an item re-encrypts it under that vault's key.
+
+"New" beside a login replaces its password, and the old one moves into that item's
+history. The vault has no endpoint for one field, so this re-uploads the whole item -
+which is why the item that goes out is the one that came down, with the password
+swapped, rather than one rebuilt from what the extension happens to read. A field
+left out of that rebuild would be a field deleted from your vault by a save that
+said it worked, so `src/lib/item.ts` is a module of its own with tests that assert
+every field survives. If somebody changed the same item elsewhere first, the save is
+refused, your copy is refreshed, and you are told - never silently overwritten.
 
 ## When it locks
 

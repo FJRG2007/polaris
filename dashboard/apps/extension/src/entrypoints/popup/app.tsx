@@ -365,6 +365,82 @@ function TotpCell({ id }: { id: string }): React.JSX.Element | null {
 }
 
 /**
+ * Replacing one login's password.
+ *
+ * The new password is shown rather than masked, which is deliberate: the point of
+ * changing it here is to set the same one on the site, and a value somebody cannot
+ * read is one they cannot type in. It is a field rather than a label so a password
+ * chosen somewhere else can be pasted into it.
+ *
+ * Nothing about the old password crosses into this popup. The worker reads it from
+ * what it already holds and moves it into the item's history itself, so replacing a
+ * password never requires having seen it.
+ */
+function ChangePassword({
+    item,
+    onClose,
+    onChange
+}: {
+    item: ItemSummary;
+    onClose: () => void;
+    onChange: () => Promise<void>;
+}): React.JSX.Element {
+    const [password, setPassword] = useState("");
+    const [refused, setRefused] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    const submit = async (): Promise<void> => {
+        setBusy(true);
+        setRefused(null);
+        const reply = await askBackground({ kind: "changePassword", id: item.id, password });
+        setBusy(false);
+        if (!reply.ok) {
+            setRefused(reply.error);
+            return;
+        }
+        onClose();
+        await onChange();
+    };
+
+    return (
+        <div className="row wrap">
+            <span className="muted small">New password for {item.name}</span>
+            <input
+                autoFocus
+                value={password}
+                placeholder="The new password"
+                aria-label={`New password for ${item.name}`}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && password !== "" && void submit()}
+            />
+            <div className="acts">
+                <button
+                    className="ghost"
+                    title="Make one up"
+                    onClick={() => setPassword(generatePassword({ length: 20 }) ?? "")}
+                >
+                    Make one up
+                </button>
+                <button
+                    className="ghost"
+                    disabled={busy || password === ""}
+                    onClick={() => void submit()}
+                >
+                    {busy ? "Saving" : "Save"}
+                </button>
+                <button className="ghost" onClick={onClose}>
+                    Cancel
+                </button>
+            </div>
+            <p className="muted small">
+                Change it on the site too, or you will be locked out of it.
+            </p>
+            <Problem text={refused} />
+        </div>
+    );
+}
+
+/**
  * Saving the login for the page somebody is on.
  *
  * Closed until asked for, like the generator: most visits here are to read a
@@ -556,6 +632,9 @@ function Items({
     // a password out of.
     const [offered, setOffered] = useState<string | null>(null);
     const takeOffered = useCallback(() => setOffered(null), []);
+    // The item whose password is being replaced, if any. One at a time: a form per
+    // row would put a password field beside every login in the list.
+    const [changing, setChanging] = useState<ItemSummary | null>(null);
     const clearing = useRef<number | null>(null);
     // The site in front of somebody and whether they have shut this out of it,
     // asked of the worker rather than worked out here: the popup does not hold
@@ -660,6 +739,14 @@ function Items({
                 >
                     Pass
                 </button>
+                <button
+                    className="ghost"
+                    title="Replace the password"
+                    aria-label={`Replace the password for ${item.name}`}
+                    onClick={() => setChanging(item)}
+                >
+                    New
+                </button>
                 {item.totp ? (
                     <button
                         className="ghost"
@@ -704,6 +791,14 @@ function Items({
             </section>
 
             <Problem text={note} />
+
+            {changing ? (
+                <ChangePassword
+                    item={changing}
+                    onClose={() => setChanging(null)}
+                    onChange={onChange}
+                />
+            ) : null}
 
             {here.host ? (
                 <div className="row">

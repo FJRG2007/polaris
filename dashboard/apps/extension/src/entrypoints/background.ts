@@ -1,6 +1,7 @@
 import { storage } from "#imports";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
+import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
@@ -579,7 +580,8 @@ const USES_VAULT = new Set<messages.Request["kind"]>([
     "fill",
     "copy",
     "totpNow",
-    "save"
+    "save",
+    "changePassword"
 ]);
 
 /**
@@ -643,6 +645,68 @@ async function save(item: {
 
     // Straight away rather than on the next poll: the item somebody just saved has
     // to be in the list they are looking at, and the badge has to count it.
+    await sync(true);
+    return { ok: true, status: await status() };
+}
+
+/**
+ * Change one login's password, keeping the rest of the item byte for byte.
+ *
+ * The vault takes an item whole, so the danger here is not the write failing - it
+ * is the write succeeding and quietly emptying every field this extension does not
+ * model. A login can carry notes, custom fields, an attachment key and a password
+ * history; rebuilding one from the reduced shape `readLogin` produces would send
+ * nulls for all of them, and nothing on any screen would say so.
+ *
+ * So the item that goes out is the one that came down from `api/sync`, still
+ * encrypted, with three things replaced. Nothing is decrypted to do this except
+ * the password being written, and the old one is never decrypted at all: it moves
+ * into the history as the ciphertext it already was.
+ */
+async function changePassword(id: string, password: string): Promise<messages.Reply> {
+    const opened = await vault();
+    if (!opened) return { ok: false, error: "The vault is locked." };
+    if (password === "") return { ok: false, error: "Type the new password first." };
+
+    const held = await CIPHERS.getValue();
+    const item = held?.ciphers.find((one) => one["id"] === id);
+    if (!item) return { ok: false, error: "That item is not here. Sync and try again." };
+    const key = keyFor(item);
+    if (!key) return { ok: false, error: "This vault does not hold the key for that item." };
+
+    const origin = await currentOrigin();
+    if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+    const base = vaultBase(origin);
+    const access = await token(base);
+    if (!access) return { ok: false, error: "That server did not answer. Sign in again." };
+
+    // What goes out is built by `lib/item.ts`: the item as it arrived, with the
+    // password replaced, the old one moved into its history and the revision this
+    // browser last saw attached. It is a module of its own and under test because
+    // the vault takes an item whole, so a field left out of it is a field deleted
+    // from somebody's vault by a save that reported success.
+    const rewritten = withNewPassword(item, await encrypt(password, key), new Date().toISOString());
+    const outcome = await protocol.updateLogin(base, access, id, rewritten);
+
+    if (!outcome.ok) {
+        if (outcome.status === null)
+            return { ok: false, error: "That server could not be reached." };
+        if (outcome.status === 401)
+            return { ok: false, error: "That session has ended. Sign in again." };
+        if (outcome.status === 409) {
+            // Somebody else saved it first. Bring their version down before saying
+            // so, because the next thing anybody does is look at the item - and it
+            // should be showing what is actually stored by then.
+            await sync(true);
+            return {
+                ok: false,
+                error: "Somebody changed this item elsewhere. It has been refreshed; try again."
+            };
+        }
+        console.error("polaris: the vault refused an item update, status", outcome.status);
+        return { ok: false, error: "That could not be saved." };
+    }
+
     await sync(true);
     return { ok: true, status: await status() };
 }
@@ -819,6 +883,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "save":
                 return save(request);
+
+            case "changePassword":
+                return changePassword(request.id, request.password);
 
             case "copy": {
                 const login = (await logins()).find((one) => one.id === request.id);

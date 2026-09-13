@@ -301,6 +301,42 @@ export async function createLogin(
 }
 
 /**
+ * Rewrite an item, which the vault only accepts whole.
+ *
+ * There is no endpoint for one field: `api/ciphers/:id/partial` takes the folder
+ * and the star and nothing else, on purpose, because those are the only writes
+ * that touch nothing encrypted. So a password change sends the entire item back.
+ *
+ * Which is why this takes the item as a loose record rather than a modelled shape.
+ * What goes out is what `api/sync` sent, with the fields being changed replaced -
+ * so notes, custom fields, a card's number, anything this extension does not read,
+ * travel back untouched. Typing it here would mean listing every field, and any
+ * field left off that list would be silently deleted from somebody's item the
+ * first time they changed a password. The server's own schema drops what it does
+ * not accept.
+ *
+ * `lastKnownRevisionDate` is what makes a stale write a refusal rather than an
+ * overwrite: the server answers 409 when somebody else has saved since.
+ */
+export async function updateLogin(
+    base: string,
+    accessToken: string,
+    id: string,
+    item: Record<string, unknown>
+): Promise<{ readonly ok: boolean; readonly status: number | null }> {
+    const reply = await ask(vaultUrl(base, `api/ciphers/${encodeURIComponent(id)}`), {
+        method: "PUT",
+        headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json"
+        },
+        body: JSON.stringify(item)
+    });
+    if (!reply) return { ok: false, status: null };
+    return { ok: reply.ok, status: reply.status };
+}
+
+/**
  * When the vault last changed, as a number of milliseconds.
  *
  * The cheap half of syncing: this is one row of the account rather than every

@@ -83,7 +83,15 @@ export type Request =
           readonly username: string;
           readonly password: string;
           readonly uri: string;
-      };
+      }
+    /**
+     * Replace one login's password, leaving every other field exactly as it is.
+     *
+     * The id is the only way to name an item across this boundary, and nothing
+     * here carries the old password: the worker reads it from what it already
+     * holds, so the popup never needs to have seen it to replace it.
+     */
+    | { readonly kind: "changePassword"; readonly id: string; readonly password: string };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
