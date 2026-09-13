@@ -36,12 +36,18 @@ asking to read every page you open.
 ```
 src/lib/server.ts        which Polaris this belongs to, and permission for it
 src/lib/protocol.ts      the Bitwarden protocol client: sign in, sync, refresh
-src/entrypoints/         background worker, popup, content script
+src/lib/matching.ts      whether an item belongs to this page, and which comes first
+src/lib/messages.ts      what the popup may ask the worker for, as a closed list
+src/entrypoints/         background worker and popup
+test/                    the matching rules, which are the ones that can do harm
 ```
 
-The background worker owns everything that touches the network or a key. A
-content script never holds either: it is handed the two strings to type into a
-form and nothing else, because a page can read anything a script in it holds.
+The background worker owns everything that touches the network or a key, and
+nothing is declared into your pages: the function that types into a form is
+injected onto the tab in front of you at the moment you ask for it, and it is
+handed the two strings and nothing else. A declared content script would itself
+be a host permission - `<all_urls>` at install time - which is the access this
+manifest is written to avoid, and a page can read anything running inside it.
 
 ## Lifting it out of this monorepo
 
