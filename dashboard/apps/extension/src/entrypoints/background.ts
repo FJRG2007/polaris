@@ -6,6 +6,7 @@ import type { SymmetricKey } from "@polaris/vault-crypto";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
+import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
 import { decrypt, decryptRsa, fromBase64, symmetricKeyFromBytes } from "@polaris/vault-crypto";
 import {
@@ -39,7 +40,12 @@ import {
  *   worker. Locking drops them; so does the worker being recycled, which under
  *   manifest v3 happens whenever the browser feels like it. That is a lock that
  *   happens on its own, and it is the correct behaviour rather than a bug to work
- *   around - the alternative is key material at rest.
+ *   around - the alternative is key material at rest. It is not something to
+ *   RELY on, though, and this comment used to imply it was: a manifest v2
+ *   background page is persistent, so on Firefox nothing recycles this and an
+ *   unlocked vault stayed unlocked until the browser closed. The deadline in
+ *   `lib/lock.ts` is what makes the two behave alike, and an alarm enforces it
+ *   whether or not anybody opens the popup.
  * - The **refresh token**: `storage.session`, which the browser clears when it
  *   closes. It is a credential, so it does not go to disk.
  * - The **ciphers**: `storage.session` as they arrived, still encrypted. They are
@@ -50,7 +56,8 @@ import {
  *   secrets and asking for them on every browser start would be theatre.
  *
  * There is deliberately no "never lock" setting. It would mean keeping the key
- * where a restart cannot take it, which is the one thing this design is for.
+ * where a restart cannot take it, which is the one thing this design is for - so
+ * the longest the setting offers is the browser session.
  */
 
 /** The account's own vault, held only while it is open. */
@@ -87,6 +94,49 @@ const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf
     "session:vault.wrapped",
     { fallback: null }
 );
+
+/**
+ * When the open vault locks itself, and how long it is given.
+ *
+ * The deadline is session storage beside the keys it guards, because it means
+ * nothing once there is no open vault. The length is local: it is a preference
+ * rather than a credential, and somebody who chose one minute still means it
+ * tomorrow.
+ */
+const LOCK_AT = storage.defineItem<number | null>("session:vault.lockAt", { fallback: null });
+const TIMEOUT = storage.defineItem<number>("local:vault.timeoutMs", {
+    fallback: DEFAULT_TIMEOUT_MS
+});
+
+/**
+ * The open vault, or null - locking it here when its deadline has passed.
+ *
+ * Every path that reads a key goes through this rather than through the variable,
+ * so there is one place that answers "is it open" and no route can forget to ask.
+ * Checked here as well as on the alarm because the alarm is a period: between two
+ * ticks the deadline can pass, and the answer to a request has to be the current
+ * one rather than the one the last tick left behind.
+ */
+async function vault(): Promise<OpenVault | null> {
+    if (!open) return null;
+    if (hasExpired(Date.now(), await LOCK_AT.getValue())) {
+        open = null;
+        return null;
+    }
+    return open;
+}
+
+/**
+ * Push the deadline forward, because the vault has just been used.
+ *
+ * This is what makes it a timeout of disuse: somebody working through a list of
+ * logins keeps moving it and is never interrupted, and a browser left alone on a
+ * page stops moving it.
+ */
+async function touch(): Promise<void> {
+    if (!open) return;
+    await LOCK_AT.setValue(deadlineFrom(Date.now(), await TIMEOUT.getValue()));
+}
 
 /** This browser, named so a session list is readable by the person who owns it. */
 async function device(): Promise<{ identifier: string; name: string }> {
@@ -232,8 +282,8 @@ async function readLogin(cipher: Record<string, unknown>): Promise<Login | null>
 
 /** Every login this account can open, decrypted. */
 async function logins(): Promise<Login[]> {
-    const held = await CIPHERS.getValue();
-    if (!held || !open) return [];
+    const [held, opened] = await Promise.all([CIPHERS.getValue(), vault()]);
+    if (!held || !opened) return [];
     const found: Login[] = [];
     for (const cipher of held.ciphers) {
         if (cipher["deletedDate"]) continue;
@@ -279,18 +329,21 @@ function summarize(login: Login): messages.ItemSummary {
 }
 
 async function status(): Promise<messages.VaultStatus> {
-    const [server, email, refreshToken, syncedAt] = await Promise.all([
+    const [server, email, refreshToken, syncedAt, timeout, opened] = await Promise.all([
         currentOrigin(),
         EMAIL.getValue(),
         REFRESH.getValue(),
-        SYNCED_AT.getValue()
+        SYNCED_AT.getValue(),
+        TIMEOUT.getValue(),
+        vault()
     ]);
     return {
         server,
         email,
         connected: refreshToken !== null,
-        unlocked: open !== null,
-        syncedAt
+        unlocked: opened !== null,
+        syncedAt,
+        timeoutMs: readTimeout(timeout)
     };
 }
 
@@ -330,7 +383,8 @@ async function sync(force: boolean): Promise<boolean> {
     ]);
     // The profile arrived with it, and it is what the other vaults' keys are read
     // from - so an open vault that started without them has them now.
-    if (open) open = { key: open.key, organizations: await organizationKeys(open.key) };
+    const opened = await vault();
+    if (opened) open = { key: opened.key, organizations: await organizationKeys(opened.key) };
     await badge();
     return true;
 }
@@ -346,7 +400,10 @@ async function badge(): Promise<void> {
     try {
         const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         const url = tab?.url ?? "";
-        const text = open && /^https?:/i.test(url) ? String((await forUrl(url)).length || "") : "";
+        const text =
+            (await vault()) && /^https?:/i.test(url)
+                ? String((await forUrl(url)).length || "")
+                : "";
         await browser.action.setBadgeText({ text });
         await browser.action.setBadgeBackgroundColor({ color: "#2f6feb" });
     } catch {
@@ -419,7 +476,10 @@ function typeIntoPage(
     // BEFORE it when there is no form - which is the order a login form is
     // written in, and why the search box at the top of the page is not mistaken
     // for the username.
-    const pass = inputs.find((field) => field.type === "password" && field.autocomplete !== "new-password") ?? null;
+    const pass =
+        inputs.find(
+            (field) => field.type === "password" && field.autocomplete !== "new-password"
+        ) ?? null;
     const candidates = pass
         ? inputs.filter((field) =>
               pass.form ? field.form === pass.form : inputs.indexOf(field) < inputs.indexOf(pass)
@@ -496,6 +556,24 @@ async function fill(id: string): Promise<messages.Reply> {
     }
 }
 
+/**
+ * The requests that count as somebody using the vault, and so move its deadline.
+ *
+ * A badge redrawn because a tab changed is deliberately not on this list: the
+ * timeout measures disuse, and browsing with the popup closed is exactly the disuse
+ * it is there to measure.
+ */
+const USES_VAULT = new Set<messages.Request["kind"]>([
+    "signIn",
+    "unlock",
+    "sync",
+    "items",
+    "itemsFor",
+    "fill",
+    "copy",
+    "totpNow"
+]);
+
 browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // Only the extension's own pages may ask for any of this. A page that
     // guessed the extension id gets nothing: anything that is not one of ours is
@@ -518,7 +596,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!origin) return { ok: false, error: "That does not look like an address." };
                 const granted = (await holdsOrigin(origin)) || (await grantOrigin(origin));
                 if (!granted) {
-                    return { ok: false, error: "Without permission for that address, nothing can be read from it." };
+                    return {
+                        ok: false,
+                        error: "Without permission for that address, nothing can be read from it."
+                    };
                 }
                 await rememberOrigin(origin);
                 return { ok: true, status: await status() };
@@ -542,16 +623,26 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 });
                 if (!result.ok) {
                     if (result.kind === "two_factor") {
-                        return { ok: false, error: "Enter the code from your authenticator.", needsCode: true };
+                        return {
+                            ok: false,
+                            error: "Enter the code from your authenticator.",
+                            needsCode: true
+                        };
                     }
                     if (result.kind === "rate_limited") {
                         const minutes = Math.ceil(result.retryAfterMs / 60_000);
-                        return { ok: false, error: `Too many attempts. Try again in ${minutes} minutes.` };
+                        return {
+                            ok: false,
+                            error: `Too many attempts. Try again in ${minutes} minutes.`
+                        };
                     }
                     if (result.kind === "unreachable") {
                         return { ok: false, error: "That server could not be reached." };
                     }
-                    return { ok: false, error: "That address and password did not open the vault." };
+                    return {
+                        ok: false,
+                        error: "That address and password did not open the vault."
+                    };
                 }
 
                 await EMAIL.setValue(email);
@@ -574,12 +665,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "lock":
                 open = null;
+                await LOCK_AT.setValue(null);
                 await badge();
                 return { ok: true, status: await status() };
 
             case "signOut":
                 open = null;
                 await Promise.all([
+                    LOCK_AT.setValue(null),
                     REFRESH.setValue(null),
                     ACCESS.setValue(null),
                     WRAPPED.setValue(null),
@@ -627,6 +720,17 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "blocked":
                 return { ok: true, ...(await blockedHere()) };
 
+            case "setTimeout": {
+                const chosen = readTimeout(request.timeoutMs);
+                await TIMEOUT.setValue(chosen);
+                // Applied to the vault that is open right now rather than at the
+                // next use: somebody who has just shortened this means it, and
+                // leaving the standing deadline alone would keep the vault open for
+                // exactly the length they were trying to get away from.
+                if (open) await LOCK_AT.setValue(deadlineFrom(Date.now(), chosen));
+                return { ok: true, status: await status() };
+            }
+
             case "setBlocked": {
                 const { host } = await blockedHere();
                 if (!host) return { ok: false, error: "There is no site here to switch off." };
@@ -658,7 +762,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                           : login.totp
                             ? await totpCode(login.totp)
                             : null;
-                return value ? { ok: true, value } : { ok: false, error: "There is nothing to copy." };
+                return value
+                    ? { ok: true, value }
+                    : { ok: false, error: "There is nothing to copy." };
             }
         }
     };
@@ -669,7 +775,17 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // popup ever made would resolve to `undefined` and the extension would look
     // like it does nothing at all. WXT ships no polyfill over that difference:
     // `browser` is the native object.
-    void answer()
+    // Answered first, and only then is the deadline moved. After rather than
+    // before, because a request that arrives past the deadline has to find the
+    // vault locked: pushing it forward first would mean the act of asking kept the
+    // vault open, which is every timeout undone by the thing it was measuring.
+    const answerAndTouch = async (): Promise<messages.Reply> => {
+        const reply = await answer();
+        if (USES_VAULT.has(request.kind)) await touch();
+        return reply;
+    };
+
+    void answerAndTouch()
         .catch((error: unknown): messages.Reply => {
             console.error("polaris: the vault worker could not answer:", error);
             return { ok: false, error: "Something went wrong." };
@@ -690,7 +806,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
  * page it was not saved for would be worse.
  */
 async function fillFromKeyboard(command: string): Promise<void> {
-    if (command !== "fill-login" || !open) return;
+    if (command !== "fill-login" || !(await vault())) return;
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url || !/^https?:/i.test(tab.url)) return;
     const best = (await forUrl(tab.url))[0];
@@ -711,6 +827,23 @@ export default defineBackground(() => {
     // which is still synchronous registration - what manifest v3 requires of a
     // listener that has to survive the worker being recycled.
     browser.commands.onCommand.addListener((command) => void fillFromKeyboard(command));
+
+    // The deadline is enforced on a period, not only when something asks. On
+    // Firefox nothing else would: a persistent background page goes on holding the
+    // key with no request ever arriving, so a vault left open at lunchtime has to
+    // lock itself. A minute is finer than the shortest length on offer, and on
+    // manifest v3 this mostly finds the worker was recycled long ago - which is the
+    // same lock, arrived at for free.
+    browser.alarms.create("vault-lock", { periodInMinutes: 1 });
+    browser.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name !== "vault-lock") return;
+        void (async () => {
+            const wasOpen = open !== null;
+            // `vault()` is what locks it; this only has to notice that it did, so
+            // the badge stops offering counts for a vault nobody can read.
+            if (!(await vault()) && wasOpen) await badge();
+        })();
+    });
 
     // Nothing else to do on install. The keys are not here yet and asking for them
     // before somebody opens the popup would be asking the browser to hold a

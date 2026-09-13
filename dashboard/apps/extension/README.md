@@ -37,9 +37,10 @@ asking to read every page you open.
 src/lib/server.ts        which Polaris this belongs to, and permission for it
 src/lib/protocol.ts      the Bitwarden protocol client: sign in, sync, refresh
 src/lib/matching.ts      whether an item belongs to this page, and which comes first
+src/lib/lock.ts          when an open vault locks itself again
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
 src/entrypoints/         background worker and popup
-test/                    the matching rules, which are the ones that can do harm
+test/                    the decisions that can do harm: what matches, and when it locks
 ```
 
 The background worker owns everything that touches the network or a key, and
@@ -48,6 +49,19 @@ injected onto the tab in front of you at the moment you ask for it, and it is
 handed the two strings and nothing else. A declared content script would itself
 be a host permission - `<all_urls>` at install time - which is the access this
 manifest is written to avoid, and a page can read anything running inside it.
+
+## When it locks
+
+An open vault locks itself after a spell of disuse, which you pick in the popup
+under "Lock after". The key lives in the worker's memory and nowhere else, so on
+Chrome it also goes whenever the browser recycles the service worker - but that is
+not something to rely on: a Firefox background page is persistent and is never
+recycled, so without a deadline of its own a vault there stayed open until the
+browser closed. The deadline is what makes the two behave alike, and an alarm
+enforces it whether or not you open the popup.
+
+The longest choice is the browser session. There is no "never", because that would
+mean keeping the key somewhere a restart cannot take it.
 
 ## Lifting it out of this monorepo
 

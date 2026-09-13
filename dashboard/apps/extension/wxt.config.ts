@@ -26,7 +26,12 @@ export default defineConfig({
     manifest: ({ browser, manifestVersion }) => ({
         name: "Polaris",
         description: "Your Polaris vault, in the toolbar.",
-        permissions: ["storage", "activeTab", "scripting"],
+        // `alarms` is what makes the idle lock real rather than something that only
+        // happens the next time somebody opens the popup. Under manifest v3 the
+        // worker is recycled and takes the key with it; a manifest v2 background
+        // page is persistent and never is, so without a timer of its own an
+        // unlocked vault on Firefox would stay unlocked until the browser closed.
+        permissions: ["storage", "activeTab", "scripting", "alarms"],
         // Filling from the keyboard, without going through the toolbar. The
         // browser owns the binding - somebody can change or remove it in its own
         // shortcuts screen - and it does nothing at all while the vault is

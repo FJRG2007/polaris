@@ -1,3 +1,4 @@
+import { TIMEOUT_CHOICES } from "@/lib/lock";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
@@ -171,8 +172,8 @@ function SignIn({
                 {busy ? "Opening" : "Unlock"}
             </button>
             <p className="muted small">
-                The master password never leaves this browser. It is turned into a key here, and what
-                goes out cannot be turned back into it.
+                The master password never leaves this browser. It is turned into a key here, and
+                what goes out cannot be turned back into it.
             </p>
         </main>
     );
@@ -352,6 +353,49 @@ function TotpCell({ id }: { id: string }): React.JSX.Element | null {
     );
 }
 
+/**
+ * How long the vault stays open while nobody is using it.
+ *
+ * Here rather than buried in an options page, because it is the one setting that
+ * decides how exposed an unattended screen is, and somebody who wants it shorter
+ * should not have to go looking. The choices and the default are `lib/lock.ts`'s,
+ * which is also what the worker enforces - so the list cannot drift from what is
+ * actually accepted.
+ */
+function Timeout({
+    status,
+    onChange
+}: {
+    status: VaultStatus;
+    onChange: () => Promise<void>;
+}): React.JSX.Element {
+    return (
+        <div className="row">
+            <label className="muted small" htmlFor="vault-timeout">
+                Lock after
+            </label>
+            <div className="acts">
+                <select
+                    id="vault-timeout"
+                    value={status.timeoutMs}
+                    onChange={(event) => {
+                        void askBackground({
+                            kind: "setTimeout",
+                            timeoutMs: Number(event.target.value)
+                        }).then(onChange);
+                    }}
+                >
+                    {TIMEOUT_CHOICES.map((choice) => (
+                        <option key={choice.ms} value={choice.ms}>
+                            {choice.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
+        </div>
+    );
+}
+
 function Items({
     status,
     onChange
@@ -375,7 +419,8 @@ function Items({
     useEffect(() => {
         void (async () => {
             const reply = await askBackground({ kind: "blocked" });
-            if (reply.ok && "blocked" in reply) setHere({ host: reply.host, blocked: reply.blocked });
+            if (reply.ok && "blocked" in reply)
+                setHere({ host: reply.host, blocked: reply.blocked });
         })();
     }, []);
 
@@ -441,7 +486,11 @@ function Items({
             </div>
             <div className="acts">
                 {offerFill ? (
-                    <button className="ghost" title="Fill this page" onClick={() => void fill(item)}>
+                    <button
+                        className="ghost"
+                        title="Fill this page"
+                        onClick={() => void fill(item)}
+                    >
                         Fill
                     </button>
                 ) : null}
@@ -534,6 +583,8 @@ function Items({
             ) : null}
 
             <Generator />
+
+            <Timeout status={status} onChange={onChange} />
 
             <footer>
                 <button

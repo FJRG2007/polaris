@@ -32,6 +32,11 @@ export interface VaultStatus {
     readonly unlocked: boolean;
     /** When the items last came down, for the line that says so. */
     readonly syncedAt: number | null;
+    /**
+     * How long an unlocked vault may sit unused before it locks itself, in the
+     * stored form of `lib/lock.ts` - where zero means the browser session.
+     */
+    readonly timeoutMs: number;
 }
 
 export type Request =
@@ -52,13 +57,19 @@ export type Request =
     /** Everything, for the search box, still only as summaries. */
     | { readonly kind: "items"; readonly query: string }
     | { readonly kind: "fill"; readonly id: string }
-    | { readonly kind: "copy"; readonly id: string; readonly field: "username" | "password" | "totp" }
+    | {
+          readonly kind: "copy";
+          readonly id: string;
+          readonly field: "username" | "password" | "totp";
+      }
     /** The current one-time code for an item, and how long it has left. */
     | { readonly kind: "totpNow"; readonly id: string }
     /** Whether the tab in front of somebody is one they have shut this out of. */
     | { readonly kind: "blocked" }
     /** Shut this extension out of the current site, or let it back in. */
-    | { readonly kind: "setBlocked"; readonly blocked: boolean };
+    | { readonly kind: "setBlocked"; readonly blocked: boolean }
+    /** Change how long an unlocked vault may sit unused before it locks itself. */
+    | { readonly kind: "setTimeout"; readonly timeoutMs: number };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
