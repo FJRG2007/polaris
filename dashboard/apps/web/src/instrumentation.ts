@@ -160,15 +160,11 @@ export async function register(): Promise<void> {
     const { startZoneAddressSync } = await import("./lib/domain-address-sync");
     startZoneAddressSync();
 
-    // Probe each deployed-app domain so a subdomain that resolves but does not
-    // actually serve is flagged as down in the UI, instead of shown as a live link.
-    const { startDomainHealthPoller } = await import("./lib/watch/domain-health-poller");
-    startDomainHealthPoller();
-
-    // Evaluate Watch alarms (CPU/memory spikes, service/domain down) against recent
-    // metrics and health, firing notifications on state transitions.
-    const { startAlarmEvaluator } = await import("./lib/watch/alarm-evaluator");
-    startAlarmEvaluator();
+    // Domain health and Watch alarms used to start here, as two timers of their
+    // own. They are scheduled jobs now - `domain-health` and `alarms` in
+    // `lib/cron/jobs.ts` - because a timer takes no lease, and during an update
+    // two web containers serve at once: both evaluated every alarm, and both
+    // announced the same threshold crossing to the same person.
 
     // Probe the addresses this deployment itself is listed as reachable at, so a
     // domain that stopped resolving is flagged rather than shown as a working link,

@@ -4,9 +4,13 @@
  * or a server) or reachability (domain health, app running state), tracks a
  * breach streak so a blip does not fire, and on a
  * state transition (ok <-> alarm) records an AlarmEvent, raises the alert through
- * the account's notification rules, and optionally messages a channel. Same
- * poller shape as auto-deploy-poller: idempotent start, unref'd interval,
- * delayed first pass.
+ * the account's notification rules, and optionally messages a channel.
+ *
+ * Run from the schedule (`alarms` in `lib/cron/jobs.ts`) rather than from a timer
+ * of its own, and that is not a tidying-up: a timer takes no lease, and during an
+ * update two web containers serve at once. Both evaluated every alarm, both saw
+ * the same threshold crossing, and both announced it - so the one thing an alarm
+ * has to get right, being believed, was the thing it lost.
  */
 
 import { prisma } from "@polaris/db";
@@ -24,14 +28,10 @@ import {
     volumeDiskGb
 } from "./alarm-metrics";
 
-const INTERVAL_MS = Number(process.env.POLARIS_ALARM_POLL_MS) || 60_000;
-const FIRST_PASS_MS = 25_000;
 const RECENT_SAMPLE_MS = 3 * 60_000;
 /** Volumes are measured on the slower storage cadence; three of those missed in a
  *  row is a volume nothing can read, rather than one between measurements. */
 const RECENT_VOLUME_MS = 3 * STORAGE_EVERY_TICKS * COLLECT_TICK_MS;
-
-let started = false;
 
 interface AlarmRow {
     id: string;
@@ -249,14 +249,4 @@ export async function evaluateAlarms(): Promise<void> {
             console.error("polaris: alarm evaluation failed:", error);
         }
     }
-}
-
-export function startAlarmEvaluator(): void {
-    if (started) return;
-    started = true;
-    const tick = (): void => {
-        void evaluateAlarms().catch((error) => console.error("polaris: alarm evaluator tick failed:", error));
-    };
-    setTimeout(tick, FIRST_PASS_MS).unref();
-    setInterval(tick, INTERVAL_MS).unref();
 }

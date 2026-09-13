@@ -26,13 +26,15 @@ import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
+import { probeAllDomains } from "@/lib/watch/health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
-import { runDesiredStatePass } from "@/lib/deploy/desired-state";
+import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { runMailServerPass } from "@/lib/mail-server/scheduled";
+import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
@@ -616,6 +618,29 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
         run: sweepEveryDisk
+    },
+    {
+        key: "domain-health",
+        // A minute, which is what it was as a timer of its own.
+        everyMs: Number(process.env.POLARIS_HEALTH_POLL_MS) || MINUTE,
+        // Leased, and this is why it moved here from a bare interval: during an
+        // update two web containers serve at once, and both were probing. The
+        // probe itself survives that - it writes the result before it decides
+        // whether to announce anything - but there is no reason for a deployment
+        // to be dialled twice by the same Polaris, and the evaluator below did
+        // not survive it.
+        leaseMs: 5 * MINUTE,
+        run: probeAllDomains
+    },
+    {
+        key: "alarms",
+        everyMs: Number(process.env.POLARIS_ALARM_POLL_MS) || MINUTE,
+        // The one that was actually broken. An alarm crossing its threshold is
+        // announced on the transition, so two processes evaluating the same alarm
+        // in the same minute both saw the same crossing and both told somebody -
+        // and an alarm that fires twice is how people learn to ignore alarms.
+        leaseMs: 5 * MINUTE,
+        run: evaluateAlarms
     },
     {
         key: "private-networks",

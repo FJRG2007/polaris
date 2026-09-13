@@ -68,6 +68,10 @@ describe("the work Polaris runs on a schedule", () => {
             // the same daemon call, and the one that loses fails on a container
             // the other already removed.
             "agent-sessions",
+            // An alarm is announced on the transition, so two evaluators in the
+            // same minute both see the same crossing and both tell somebody. An
+            // alarm that arrives twice is one people learn to ignore.
+            "alarms",
             // The audit chain has exactly one writer, and two sealing passes
             // would hand out the same places twice. Verification walks the whole
             // chain and has no reason to do that twice at once.
@@ -82,6 +86,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would take two base backups of the same instance, and
             // two replication checks could each find a copy stopped and start one.
             "database-archives",
+            // One Polaris has no reason to dial the same deployment twice a
+            // minute, and this is the pass the alarm above reads.
+            "domain-health",
             "game-health",
             "game-schedules",
             "home-availability",
