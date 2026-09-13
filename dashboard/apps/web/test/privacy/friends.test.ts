@@ -25,7 +25,9 @@ let deleted: string[] = [];
 
 /** The `where` shapes this module actually builds. */
 function match(row: Row, where: Record<string, unknown>): boolean {
-    const clauses = (where.OR as Record<string, string>[] | undefined) ?? [where as Record<string, string>];
+    const clauses = (where.OR as Record<string, string>[] | undefined) ?? [
+        where as Record<string, string>
+    ];
     const status = where.status as string | undefined;
     if (status && row.status !== status) return false;
     return clauses.some((clause) =>
@@ -51,6 +53,23 @@ const followed: { subjectId: string; userId: string }[] = [];
 vi.mock("@/lib/follow/follow", () => ({
     follow: async (_kind: string, subjectId: string, userId: string) => {
         followed.push({ subjectId, userId });
+    }
+}));
+
+// The conversation two friends are owed. Recorded rather than opened: the chat
+// service is this module's collaborator and not the subject here, and it is reached
+// through a dynamic import - chat imports this module back, so the real one cannot
+// be pulled in from the top of it.
+const opened: { actorId: string; withIds: string[] }[] = [];
+/** Who may use chat in a given test. Both of them, unless a test says otherwise. */
+let chatAllowed = new Set<string>(["ada", "grace"]);
+vi.mock("@/lib/chat/access", () => ({
+    messageable: async (ids: readonly string[]) => new Set(ids.filter((id) => chatAllowed.has(id)))
+}));
+vi.mock("@/lib/chat/chat-service", () => ({
+    openDirect: async (actor: { id: string }, withIds: readonly string[]) => {
+        opened.push({ actorId: actor.id, withIds: [...withIds] });
+        return "channel-1";
     }
 }));
 
@@ -105,6 +124,94 @@ beforeEach(() => {
     deleted = [];
     followed.length = 0;
     takesRequests = true;
+    opened.length = 0;
+    chatAllowed = new Set(["ada", "grace"]);
+});
+
+describe("the conversation a friendship is owed", () => {
+    it("opens one when a request is accepted", async () => {
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" }];
+        await friends.respondToRequest("ada", "r1", true);
+        expect(opened).toEqual([{ actorId: "ada", withIds: ["grace"] }]);
+    });
+
+    it("opens one when asking somebody who had already asked", async () => {
+        // The other accept path. It used to be the one that got forgotten, which is
+        // why both are asserted rather than only the obvious one.
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" }];
+        await friends.requestFriend("ada", "grace");
+        expect(opened).toEqual([{ actorId: "ada", withIds: ["grace"] }]);
+    });
+
+    it("opens none for a request that is only asked", async () => {
+        await friends.requestFriend("ada", "grace");
+        expect(opened).toEqual([]);
+    });
+
+    it("opens none when the other one cannot use chat", async () => {
+        // Both sides are checked, not just the one being messaged: nobody pressed a
+        // button here, so neither side's right can be taken for granted.
+        chatAllowed = new Set(["ada"]);
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" }];
+        await friends.respondToRequest("ada", "r1", true);
+        expect(opened).toEqual([]);
+    });
+
+    it("opens none when the one accepting cannot use chat", async () => {
+        chatAllowed = new Set(["grace"]);
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" }];
+        await friends.respondToRequest("ada", "r1", true);
+        expect(opened).toEqual([]);
+    });
+
+    it("still records the friendship when the conversation cannot be opened", async () => {
+        // The friendship is what happened. A conversation that did not open is one
+        // search box away from being opened by hand.
+        chatAllowed = new Set();
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" }];
+        await friends.respondToRequest("ada", "r1", true);
+        expect(rows[0]?.status).toBe("accepted");
+        expect(followed).toHaveLength(2);
+    });
+
+    it("names the other person whichever way the row points", async () => {
+        const partners = friends.friendPartnerIds(
+            [
+                { requesterId: "ada", addresseeId: "grace" },
+                { requesterId: "linus", addresseeId: "ada" },
+                // A row pointing at itself would otherwise ask for a conversation
+                // with oneself, be refused, and take the rest of the list with it.
+                { requesterId: "ada", addresseeId: "ada" }
+            ],
+            "ada"
+        );
+        expect(partners).toEqual(["grace", "linus"]);
+    });
+
+    it("catches up the ones owed from before access arrived", async () => {
+        rows = [
+            { id: "r1", requesterId: "ada", addresseeId: "grace", status: "accepted" },
+            { id: "r2", requesterId: "linus", addresseeId: "ada", status: "accepted" },
+            // Not accepted, so not owed anything yet.
+            { id: "r3", requesterId: "ada", addresseeId: "pending-person", status: "pending" }
+        ];
+        chatAllowed = new Set(["ada", "grace", "linus"]);
+        await friends.openMissingFriendDms("ada");
+        expect(opened).toEqual([
+            { actorId: "ada", withIds: ["grace"] },
+            { actorId: "ada", withIds: ["linus"] }
+        ]);
+    });
+
+    it("skips a friend who still cannot use chat when catching up", async () => {
+        rows = [
+            { id: "r1", requesterId: "ada", addresseeId: "grace", status: "accepted" },
+            { id: "r2", requesterId: "ada", addresseeId: "linus", status: "accepted" }
+        ];
+        chatAllowed = new Set(["ada", "grace"]);
+        await friends.openMissingFriendDms("ada");
+        expect(opened).toEqual([{ actorId: "ada", withIds: ["grace"] }]);
+    });
 });
 
 describe("asking", () => {

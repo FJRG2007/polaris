@@ -13,8 +13,8 @@
  * no reachable administrator is only recoverable from the database.
  */
 
-import { prisma, VISIBLE_USER } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { discardAvatars } from "@/lib/avatar-service";
 import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
@@ -323,7 +323,10 @@ export async function setContactVerified(
     if (what === "email") {
         await prisma.user.update({ where: { id: userId }, data: { emailVerified: verified } });
     } else {
-        const phone = await prisma.userPhone.findUnique({ where: { userId }, select: { phone: true } });
+        const phone = await prisma.userPhone.findUnique({
+            where: { userId },
+            select: { phone: true }
+        });
         if (!phone) return { error: "This account has no number to verify." };
         await prisma.userPhone.update({
             where: { userId },
@@ -363,6 +366,12 @@ export async function setUserRole(
     // Only what the role reaches is re-decided, and this is what carries that to the
     // guards already serving them.
     await markPrincipalsMoved([userId]);
+    // A role is how somebody gets chat, and a friendship made before they had it is
+    // owed a conversation from the moment they do. Opened here rather than waiting
+    // for one of the two to go looking for the other in a picker, and best-effort
+    // inside: a chat that cannot be reached must not fail the role change.
+    const { openMissingFriendDms } = await import("@/lib/friends-service");
+    await openMissingFriendDms(userId);
     await recordAudit({
         actorId,
         action: "user.role",

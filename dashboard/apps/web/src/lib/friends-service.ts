@@ -13,9 +13,9 @@
  * wearing one name.
  */
 
-import { prisma, VISIBLE_USER } from "@polaris/db";
 import { follow } from "@/lib/follow/follow";
 import { blockedEitherWay } from "@/lib/blocks";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
 
@@ -130,9 +130,10 @@ export async function listFriendsPage(
         })
     ]);
 
-    const people = [...asked.map((row) => row.addressee), ...wereAsked.map((row) => row.requester)].sort(
-        byName
-    );
+    const people = [
+        ...asked.map((row) => row.addressee),
+        ...wereAsked.map((row) => row.requester)
+    ].sort(byName);
     const page = people.slice(0, limit);
     const last = page.at(-1);
     return {
@@ -150,9 +151,7 @@ export async function friendIds(userId: string): Promise<Set<string>> {
         },
         select: { requesterId: true, addresseeId: true }
     });
-    return new Set(
-        rows.map((row) => (row.requesterId === userId ? row.addresseeId : row.requesterId))
-    );
+    return new Set(friendPartnerIds(rows, userId));
 }
 
 /** Whether these two are friends. */
@@ -260,6 +259,7 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
             follow("user", otherId, userId, "friend"),
             follow("user", userId, otherId, "friend")
         ]).catch(() => undefined);
+        await ensureFriendDm(userId, otherId);
         await announce(otherId, userId, "accepted");
         return;
     }
@@ -407,8 +407,95 @@ export async function respondToRequest(
         follow("user", userId, request.requesterId, "friend")
     ]).catch(() => undefined);
 
+    await ensureFriendDm(userId, request.requesterId);
+
     // The one who asked is the one waiting to hear.
     await announce(request.requesterId, userId, "accepted");
+}
+
+/**
+ * Open the direct conversation two friends are now entitled to.
+ *
+ * Becoming friends is the moment a conversation between two people stops needing
+ * to be asked for, so it is opened here rather than waiting for one of them to go
+ * looking for the other in a picker. Both accept paths call this: `requestFriend`
+ * when somebody asks a person who had already asked them, and `respondToRequest`
+ * when a request is answered from the friends screen. One function for both,
+ * because a rule with two implementations is a rule with one hole in it.
+ *
+ * Idempotent, by way of `openDirect` keying a one-to-one conversation on its
+ * members: calling this twice, or for two people who already have a thread with
+ * years of history in it, returns that thread and changes nothing.
+ *
+ * BOTH sides are checked rather than one. `openDirect` verifies that the people
+ * being messaged may be messaged and takes the actor's own right for granted -
+ * true of somebody pressing a button in a picker, and not true here, where nobody
+ * pressed anything. A pair where either one cannot use chat gets no conversation
+ * now and gets one the moment that changes; see `openMissingFriendDms`.
+ *
+ * Never fails the friendship, for the same reason the follow rows above are not
+ * allowed to either: the friendship is the thing that happened, and a conversation
+ * that did not open is one search box away from being opened by hand.
+ *
+ * Reached at call time rather than imported. `chat/messages.ts` imports this
+ * module, so pulling chat in at the top would close the loop - the same reason the
+ * privacy service is reached this way in `requestFriend`.
+ */
+export async function ensureFriendDm(oneId: string, otherId: string): Promise<void> {
+    if (oneId === otherId) return;
+    try {
+        const [{ messageable }, { openDirect }] = await Promise.all([
+            import("@/lib/chat/access"),
+            import("@/lib/chat/chat-service")
+        ]);
+        const allowed = await messageable([oneId, otherId]);
+        if (allowed.size !== 2) return;
+        await openDirect({ id: oneId }, [otherId]);
+    } catch {
+        // A conversation that did not open is not a friendship that did not happen.
+    }
+}
+
+/**
+ * The other person in each friendship row, from one account's point of view.
+ *
+ * Pure, and tested, because a friendship is one row that can point either way and
+ * the mistake available here returns the account its own id - which would then ask
+ * for a conversation with itself, be refused by `openDirect`, and leave every real
+ * conversation unopened with nothing on screen to say why.
+ */
+export function friendPartnerIds(
+    rows: readonly { readonly requesterId: string; readonly addresseeId: string }[],
+    selfId: string
+): string[] {
+    const partners = new Set<string>();
+    for (const row of rows) {
+        const other = row.requesterId === selfId ? row.addresseeId : row.requesterId;
+        if (other !== selfId) partners.add(other);
+    }
+    return [...partners];
+}
+
+/**
+ * Open the conversations an account's friendships are owed and do not have.
+ *
+ * The other half of `ensureFriendDm`. A pair becomes friends before either of them
+ * necessarily has chat - somebody is invited as a guest, made friends with, and
+ * given the run of the place a week later - and the conversation is owed from the
+ * moment the second of those is true, not only at the moment of the friendship.
+ * So this is what gets called when an account's access changes.
+ *
+ * Sequential rather than all at once. Each conversation is a row plus a change
+ * published to whoever is listening, and an account with two hundred friends
+ * should not turn one role change into two hundred simultaneous writes.
+ *
+ * Best-effort throughout: `ensureFriendDm` swallows its own failures, so a chat
+ * that is unreachable cannot fail the role change that called this.
+ */
+export async function openMissingFriendDms(userId: string): Promise<void> {
+    for (const partner of await friendIds(userId)) {
+        await ensureFriendDm(userId, partner);
+    }
 }
 
 /** Stop being friends. Either of them, without telling the other - and it is
@@ -448,9 +535,14 @@ export async function clearFriendNoticeAbout(userId: string, personId: string): 
             where: { userId, type: "account.friend", readAt: null, actionRequired: false },
             select: { id: true, metadata: true }
         });
-        const mine = unread.filter((row) => notificationIsAbout(row.metadata, personId)).map((row) => row.id);
+        const mine = unread
+            .filter((row) => notificationIsAbout(row.metadata, personId))
+            .map((row) => row.id);
         if (mine.length === 0) return;
-        await prisma.notification.updateMany({ where: { id: { in: mine } }, data: { readAt: new Date() } });
+        await prisma.notification.updateMany({
+            where: { id: { in: mine } },
+            data: { readAt: new Date() }
+        });
     } catch {
         // A tidied bell is not worth failing a conversation over.
     }
