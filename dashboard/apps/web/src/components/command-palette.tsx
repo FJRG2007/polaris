@@ -23,6 +23,7 @@ import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import * as recentStore from "@/lib/search/recent";
+import { PlainNames } from "@/components/person-name";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
@@ -567,6 +568,12 @@ export function CommandPalette({
                         aria-label="Search results"
                         className="max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain p-2"
                     >
+                        {/* A column read by scanning it for one match, which is
+                            the surface `PlainNames` exists for: no ring around a
+                            face, no gradient across a name, and accounts under
+                            their own names - somebody searching for a person
+                            types the name that account is under. */}
+                        <PlainNames>
                         {failure ? (
                             <p className="px-2 py-10 text-center text-sm text-danger">{failure}</p>
                         ) : rows.length === 0 && searching ? (
@@ -665,6 +672,7 @@ export function CommandPalette({
                             ))
                         )}
                         {rows.length > 0 && searching ? <HitSkeleton /> : null}
+                        </PlainNames>
                     </div>
 
                     <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">

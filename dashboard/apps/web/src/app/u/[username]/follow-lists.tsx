@@ -34,8 +34,8 @@ import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Search } from "lucide-react";
 import { loadFollowListAction } from "./actions";
-import { PersonName, PersonRow } from "@/components/person-name";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import { Button, Dialog, DialogContent, DialogTitle, Input } from "@polaris/ui";
 
 interface Person {
@@ -245,67 +245,77 @@ function PeopleDialog({
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+            {/* Hundreds of accounts, searched for one - the same column
+                `PlainNames` was written for, so a face here wears no ring and a
+                name no gradient. These are other people's followers rather than
+                this reader's own people, and they are told apart by the @handle
+                beside them, so they are drawn under the names their accounts
+                carry. */}
             <DialogContent className="max-w-sm">
-                <DialogTitle>
-                    {which === "followers" ? `People following ${name}` : `Who ${name} follows`}
-                </DialogTitle>
+                <PlainNames>
+                    <DialogTitle>
+                        {which === "followers" ? `People following ${name}` : `Who ${name} follows`}
+                    </DialogTitle>
 
-                <div className="relative">
-                    <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
-                    <Input
-                        autoFocus
-                        value={typed}
-                        onChange={(event) => setTyped(event.target.value)}
-                        placeholder="Search by name or username"
-                        aria-label="Search these people"
-                        className="pl-8"
-                    />
-                </div>
+                    <div className="relative">
+                        <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
+                        <Input
+                            autoFocus
+                            value={typed}
+                            onChange={(event) => setTyped(event.target.value)}
+                            placeholder="Search by name or username"
+                            aria-label="Search these people"
+                            className="pl-8"
+                        />
+                    </div>
 
-                <ul
-                    ref={listBox}
-                    className="flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain"
-                >
-                    {shown.map((person) => (
-                        <li key={person.id}>
-                            <PersonRow
-                                as={Link}
-                                personId={person.id}
-                                href={`/u/${person.username}`}
-                                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                            >
-                                <Avatar person={person} size={24} status={false} />
-                                <span className="min-w-0 flex-1 truncate" title={person.name}>
-                                    <PersonName id={person.id} name={person.name} />
-                                </span>
-                                <span className="text-muted-foreground shrink-0 text-xs">
-                                    @{person.username}
-                                </span>
-                            </PersonRow>
-                        </li>
-                    ))}
-                    {shown.length === 0 && loaded && !busy && !error ? (
-                        <li className="text-muted-foreground px-2 py-6 text-center text-sm">
-                            {query ? "Nobody here matches that." : "Nobody here."}
-                        </li>
-                    ) : null}
-                    {/* The end of what has been loaded. Only drawn while there is
+                    <ul
+                        ref={listBox}
+                        className="flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain"
+                    >
+                        {shown.map((person) => (
+                            <li key={person.id}>
+                                <PersonRow
+                                    as={Link}
+                                    personId={person.id}
+                                    href={`/u/${person.username}`}
+                                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+                                >
+                                    <Avatar person={person} size={24} status={false} />
+                                    <span className="min-w-0 flex-1 truncate" title={person.name}>
+                                        <PersonName id={person.id} name={person.name} />
+                                    </span>
+                                    <span className="text-muted-foreground shrink-0 text-xs">
+                                        @{person.username}
+                                    </span>
+                                </PersonRow>
+                            </li>
+                        ))}
+                        {shown.length === 0 && loaded && !busy && !error ? (
+                            <li className="text-muted-foreground px-2 py-6 text-center text-sm">
+                                {query ? "Nobody here matches that." : "Nobody here."}
+                            </li>
+                        ) : null}
+                        {/* The end of what has been loaded. Only drawn while there is
                         more, so an exhausted list has nothing left to trip. */}
-                    {cursor ? <div ref={sentinel} aria-hidden className="h-px shrink-0" /> : null}
-                </ul>
+                        {cursor ? (
+                            <div ref={sentinel} aria-hidden className="h-px shrink-0" />
+                        ) : null}
+                    </ul>
 
-                {error ? <p className="text-danger text-sm">{error}</p> : null}
-                {busy ? (
-                    <Loader2 className="mx-auto size-4 animate-spin text-muted-foreground" />
-                ) : null}
-                {/* The way down for anybody the observer cannot serve - a browser
+                    {error ? <p className="text-danger text-sm">{error}</p> : null}
+                    {busy ? (
+                        <Loader2 className="mx-auto size-4 animate-spin text-muted-foreground" />
+                    ) : null}
+                    {/* The way down for anybody the observer cannot serve - a browser
                     with it switched off, and a keyboard, which never scrolls a
                     box it has not been given a reason to enter. */}
-                {cursor && !busy ? (
-                    <Button size="sm" variant="ghost" onClick={() => void load(cursor, query)}>
-                        Show more
-                    </Button>
-                ) : null}
+                    {cursor && !busy ? (
+                        <Button size="sm" variant="ghost" onClick={() => void load(cursor, query)}>
+                            Show more
+                        </Button>
+                    ) : null}
+                </PlainNames>
             </DialogContent>
         </Dialog>
     );

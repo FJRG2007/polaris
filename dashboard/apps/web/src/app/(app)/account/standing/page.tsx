@@ -14,6 +14,7 @@
 
 import { requireUser } from "@/lib/session";
 import { StandingView } from "./standing-view";
+import { PlainNames } from "@/components/person-name";
 import { accountStandingFor } from "@/lib/account-standing-service";
 
 export const dynamic = "force-dynamic";
@@ -30,17 +31,23 @@ export default async function AccountStandingPage() {
                     Where your account stands here, and anything in force against it.
                 </p>
             </div>
-            <StandingView
-                person={{ id: session.id, name: session.name }}
-                standing={view.standing}
-                upheld={view.upheld}
-                since={view.since.toISOString()}
-                restrictions={view.restrictions.map((restriction) => ({
-                    kind: restriction.kind,
-                    where: restriction.where,
-                    until: restriction.until ? restriction.until.toISOString() : null
-                }))}
-            />
+            {/* A record about this account, so it is drawn as one: the face here
+                wears no ring and the name no gradient. What the page is telling
+                somebody is where they stand with the instance, and a decoration
+                across that is the account decorating the notice served on it. */}
+            <PlainNames>
+                <StandingView
+                    person={{ id: session.id, name: session.name }}
+                    standing={view.standing}
+                    upheld={view.upheld}
+                    since={view.since.toISOString()}
+                    restrictions={view.restrictions.map((restriction) => ({
+                        kind: restriction.kind,
+                        where: restriction.where,
+                        until: restriction.until ? restriction.until.toISOString() : null
+                    }))}
+                />
+            </PlainNames>
         </div>
     );
 }
