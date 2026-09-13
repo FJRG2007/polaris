@@ -23,11 +23,29 @@ import { defineConfig } from "wxt";
 export default defineConfig({
     srcDir: "src",
     modules: ["@wxt-dev/module-react"],
-    manifest: ({ browser }) => ({
+    manifest: ({ browser, manifestVersion }) => ({
         name: "Polaris",
         description: "Your Polaris vault, in the toolbar.",
         permissions: ["storage", "activeTab", "scripting"],
-        optional_host_permissions: ["https://*/*", "http://*/*"],
+        // Filling from the keyboard, without going through the toolbar. The
+        // browser owns the binding - somebody can change or remove it in its own
+        // shortcuts screen - and it does nothing at all while the vault is
+        // locked, because the alternative is a shortcut that silently opens a
+        // password prompt somebody did not ask for.
+        commands: {
+            "fill-login": {
+                suggested_key: { default: "Ctrl+Shift+L", mac: "Command+Shift+L" },
+                description: "Fill the login for this page"
+            }
+        },
+        // The same request, under the name each manifest version has for it.
+        // `optional_host_permissions` does not exist in version 2 and WXT does not
+        // translate it, so it was simply absent from the Firefox build - and an
+        // origin that is in no optional list is one `permissions.request` refuses,
+        // which left the extension unable to reach any server at all there.
+        ...(manifestVersion === 3
+            ? { optional_host_permissions: ["https://*/*", "http://*/*"] }
+            : { optional_permissions: ["https://*/*", "http://*/*"] }),
         ...(browser === "firefox"
             ? { browser_specific_settings: { gecko: { id: "vault@polaris.local" } } }
             : {})

@@ -25,6 +25,7 @@ export * from "./names.js";
 export * from "./office-export.js";
 export * from "./office.js";
 export * from "./passkeys.js";
+export * from "./password-generator.js";
 export * from "./colors.js";
 export * from "./contrast.js";
 export * from "./profile-style.js";

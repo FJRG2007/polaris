@@ -21,6 +21,10 @@
             "types": "./dist/link-password.d.ts",
             "import": "./dist/link-password.js"
         },
+        "./password-generator": {
+            "types": "./dist/password-generator.d.ts",
+            "import": "./dist/password-generator.js"
+        },
         "./sheets": {
             "types": "./dist/sheets/index.d.ts",
             "import": "./dist/sheets/index.js"
@@ -29,7 +33,7 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/waf.ts src/sheets/index.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/waf.ts src/sheets/index.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },

@@ -179,3 +179,30 @@ footer {
     padding: 10px 16px;
     border-top: 1px solid var(--line);
 }
+
+/* The generator, which is one row until somebody opens it and two after. */
+.row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--line);
+}
+
+.row.wrap {
+    flex-wrap: wrap;
+}
+
+.value {
+    flex: 1 1 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    word-break: break-all;
+    user-select: all;
+}
+
+.tiny {
+    width: 62px;
+    padding: 4px 6px;
+    font-size: 12px;
+}

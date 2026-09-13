@@ -31,7 +31,11 @@ import {
  * filled and gets the two strings it was about to have typed into it, for the
  * item somebody chose, on the site that was already in front of them. Neither
  * ever holds the key, the token, or an item it did not ask for - because anything
- * a content script holds, the page it runs in can read.
+ * running inside a page can be read by that page.
+ *
+ * Nothing is declared into pages at all. The function that types into a form is
+ * injected on the tab in front of somebody at the moment they ask for it, so the
+ * manifest asks for no access to any site - see `typeIntoPage`.
  *
  * What is kept where:
  *
@@ -349,7 +353,107 @@ async function badge(): Promise<void> {
     }
 }
 
-/** Type the two strings into the page, through the content script. */
+/**
+ * The one thing this extension puts inside a page, and only when asked.
+ *
+ * Injected at the moment of a fill rather than declared in the manifest, because
+ * a declared content script IS a host permission: `matches: ["<all_urls>"]` is
+ * the browser telling somebody, at install time, that this extension may read
+ * every page they open - which is the access the manifest deliberately does not
+ * ask for. Injected onto the tab in front of them instead, the same work happens
+ * with no standing reach into anything.
+ *
+ * Self-contained by necessity: the browser serializes this function and runs it
+ * in the page, so it cannot see one thing outside its own body - not an import,
+ * not a constant, not another function in this file. That is also why the two
+ * strings arrive as arguments. By the time it runs, which item to use has already
+ * been decided, and the page is handed nothing it was not about to be typed.
+ *
+ * It does not submit the form. Filling is the help somebody asked for; pressing
+ * the button for them is a decision nobody made.
+ */
+function typeIntoPage(
+    username: string | null,
+    password: string | null
+): { user: boolean; pass: boolean } {
+    const never = new Set([
+        "hidden",
+        "file",
+        "button",
+        "image",
+        "reset",
+        "submit",
+        "checkbox",
+        "radio",
+        "range",
+        "color"
+    ]);
+    const notALogin = /search|captcha|find|query|coupon|voucher|discount|promo/i;
+    const identifier =
+        /user|login|email|correo|usuario|e-?mail|account|cuenta|identifiant|benutzer|nome|phone|telefono|mobile/i;
+
+    const describe = (field: HTMLInputElement): string =>
+        [
+            field.name,
+            field.id,
+            field.placeholder,
+            field.title,
+            field.getAttribute("aria-label") ?? "",
+            field.labels?.[0]?.textContent ?? ""
+        ]
+            .join(" ")
+            .toLowerCase();
+
+    const usable = (field: HTMLInputElement): boolean => {
+        if (never.has(field.type) || field.disabled || field.readOnly) return false;
+        const box = field.getBoundingClientRect();
+        if (box.width < 2 || box.height < 2) return false;
+        return getComputedStyle(field).visibility !== "hidden";
+    };
+
+    const inputs = [...document.querySelectorAll("input")].filter(usable);
+    // The password first, because `type="password"` is not a guess. The name that
+    // goes with it is then looked for in the same form, or among the fields
+    // BEFORE it when there is no form - which is the order a login form is
+    // written in, and why the search box at the top of the page is not mistaken
+    // for the username.
+    const pass = inputs.find((field) => field.type === "password" && field.autocomplete !== "new-password") ?? null;
+    const candidates = pass
+        ? inputs.filter((field) =>
+              pass.form ? field.form === pass.form : inputs.indexOf(field) < inputs.indexOf(pass)
+          )
+        : inputs;
+
+    const named = (field: HTMLInputElement): boolean => {
+        const token = field.autocomplete?.toLowerCase() ?? "";
+        if (token === "username" || token === "email") return true;
+        if (token !== "off" && token !== "") return false;
+        if (!["text", "email", "tel", "number"].includes(field.type)) return false;
+        const words = describe(field);
+        if (notALogin.test(words)) return false;
+        return identifier.test(words) || field.type === "email";
+    };
+    const user = candidates.find(named) ?? null;
+
+    // Written through the property descriptor and then announced: a form built
+    // with a framework holds its own copy of what it believes the field says, so
+    // a value assigned straight to `value` is one the page never learns about and
+    // discards on submit.
+    const put = (field: HTMLInputElement, value: string): void => {
+        const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+        field.focus();
+        descriptor?.set?.call(field, value);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+        field.blur();
+    };
+
+    if (username && user) put(user, username);
+    if (password && pass) put(pass, password);
+    return { user: Boolean(user), pass: Boolean(pass) };
+}
+
+/** Type the two strings into the page in front of somebody. */
 async function fill(id: string): Promise<messages.Reply> {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id || !tab.url) return { ok: false, error: "There is no page to fill." };
@@ -364,7 +468,6 @@ async function fill(id: string): Promise<messages.Reply> {
     );
     if (!allowed) return { ok: false, error: "That item is not saved for this site." };
 
-    const payload: messages.FillPayload = { username: login.username, password: login.password };
     try {
         // What the page actually found, rather than that the message was
         // delivered. The popup closes itself on success, so a page with no login
@@ -372,9 +475,12 @@ async function fill(id: string): Promise<messages.Reply> {
         // been typed into it - and somebody then submits an empty form, or
         // pastes a password into whatever is focused, looking for the one they
         // were told had already been filled in.
-        const filled = (await browser.tabs.sendMessage(tab.id, { kind: "fill", payload })) as
-            | { user?: boolean; pass?: boolean }
-            | undefined;
+        const [outcome] = await browser.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: typeIntoPage,
+            args: [login.username, login.password]
+        });
+        const filled = outcome?.result as { user?: boolean; pass?: boolean } | undefined;
         if (!filled?.user && !filled?.pass) {
             return { ok: false, error: "No login form was found on this page." };
         }
@@ -384,16 +490,16 @@ async function fill(id: string): Promise<messages.Reply> {
     }
 }
 
-browser.runtime.onMessage.addListener((raw, sender): Promise<messages.Reply> | undefined => {
+browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // Only the extension's own pages may ask for any of this. A page that
     // guessed the extension id gets nothing: anything that is not one of ours is
     // refused before it is parsed.
-    if (sender.id !== browser.runtime.id) return undefined;
-    // And the id alone is not that boundary, because the content script carries
-    // it too - so this surface, which hands back decrypted items, would be open
-    // to a script running inside whatever page somebody is on. Ours speak from
-    // no tab; anything sent from inside a page has one.
-    if (sender.tab) return undefined;
+    if (sender.id !== browser.runtime.id) return false;
+    // And the id alone is not that boundary, because anything injected into a
+    // page carries it too - so this surface, which hands back decrypted items,
+    // would be open to script running inside whatever page somebody is on. Ours
+    // speak from no tab; anything sent from inside a page has one.
+    if (sender.tab) return false;
     const request = raw as messages.Request;
 
     const answer = async (): Promise<messages.Reply> => {
@@ -521,11 +627,39 @@ browser.runtime.onMessage.addListener((raw, sender): Promise<messages.Reply> | u
         }
     };
 
-    return answer().catch((error: unknown) => {
-        console.error("polaris: the vault worker could not answer:", error);
-        return { ok: false, error: "Something went wrong." };
-    });
+    // Answered through the callback, with `return true` to hold the channel open -
+    // never by returning the promise. Firefox accepts a returned promise here;
+    // Chrome ignores it and closes the channel immediately, so every request the
+    // popup ever made would resolve to `undefined` and the extension would look
+    // like it does nothing at all. WXT ships no polyfill over that difference:
+    // `browser` is the native object.
+    void answer()
+        .catch((error: unknown): messages.Reply => {
+            console.error("polaris: the vault worker could not answer:", error);
+            return { ok: false, error: "Something went wrong." };
+        })
+        .then(sendResponse);
+    return true;
 });
+
+/**
+ * Fill from the keyboard, on the page in front of somebody.
+ *
+ * The best match for the tab, which is the same order the popup shows, so the
+ * shortcut and the list agree about what "the login for this page" means.
+ *
+ * Silent when the vault is locked or nothing matches: a shortcut that answered by
+ * demanding a master password would be a keystroke that opens a password prompt
+ * somebody did not ask for, and one that filled the only item it could find on a
+ * page it was not saved for would be worse.
+ */
+async function fillFromKeyboard(command: string): Promise<void> {
+    if (command !== "fill-login" || !open) return;
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.url || !/^https?:/i.test(tab.url)) return;
+    const best = (await forUrl(tab.url))[0];
+    if (best) await fill(best.id);
+}
 
 /** Keep the badge honest as somebody moves around. */
 browser.tabs.onActivated.addListener(() => void badge());
@@ -534,7 +668,15 @@ browser.tabs.onUpdated.addListener((_id, change) => {
 });
 
 export default defineBackground(() => {
-    // Nothing to do on install. The keys are not here yet and asking for them
+    // Registered here rather than beside the others above, and not by preference:
+    // WXT evaluates this module during the build against a stand-in browser that
+    // implements no `commands`, so a top-level registration throws there and takes
+    // the build with it. Inside this function it runs when the worker starts,
+    // which is still synchronous registration - what manifest v3 requires of a
+    // listener that has to survive the worker being recycled.
+    browser.commands.onCommand.addListener((command) => void fillFromKeyboard(command));
+
+    // Nothing else to do on install. The keys are not here yet and asking for them
     // before somebody opens the popup would be asking the browser to hold a
     // master password, which is the one thing this design refuses.
     void badge();

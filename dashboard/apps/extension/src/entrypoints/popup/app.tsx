@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/messages";
+// The subpath rather than the package: `@polaris/core` is a barrel over the whole
+// product's domain logic, and pulling it in for one function put a quarter of a
+// megabyte of zod schemas, CIDR arithmetic and camera geometry into a popup that
+// draws six buttons.
+import {
+    generatePassword,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH
+} from "@polaris/core/password-generator";
 
 /**
  * The popup, which is four screens and knows nothing.
@@ -205,6 +214,94 @@ function Unlock({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element 
     );
 }
 
+/**
+ * Making up a password, where somebody is already signing up for something.
+ *
+ * Closed until asked for, because most visits here are to read a password rather
+ * than to invent one, and a panel of options above the list would be in the way
+ * of the common case every time to serve the rare one.
+ *
+ * The generating is `@polaris/core`'s, the same module the web vault will use, so
+ * a password made here and one made there are drawn the same way. Nothing is
+ * saved: this hands over a string, and the item it belongs to is made wherever
+ * somebody is signing up.
+ */
+function Generator(): React.JSX.Element {
+    const [open, setOpen] = useState(false);
+    const [length, setLength] = useState(20);
+    const [value, setValue] = useState<string | null>(null);
+    const [note, setNote] = useState<string | null>(null);
+    const clearing = useRef<number | null>(null);
+
+    useEffect(
+        () => () => {
+            if (clearing.current !== null) window.clearTimeout(clearing.current);
+        },
+        []
+    );
+
+    const make = (at: number): void => {
+        setValue(generatePassword({ length: at }));
+        setNote(null);
+    };
+
+    const show = (): void => {
+        setOpen(true);
+        make(length);
+    };
+
+    const copy = async (): Promise<void> => {
+        if (!value) return;
+        await navigator.clipboard.writeText(value);
+        setNote("Copied. Cleared in 30 seconds if this stays open.");
+        if (clearing.current !== null) window.clearTimeout(clearing.current);
+        clearing.current = window.setTimeout(() => {
+            void navigator.clipboard.writeText("");
+        }, CLEAR_AFTER_MS);
+    };
+
+    if (!open) {
+        return (
+            <div className="row">
+                <button className="ghost" onClick={show}>
+                    Generate a password
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="row wrap">
+            <code className="value">{value ?? "Nothing can be made of that."}</code>
+            <div className="acts">
+                <input
+                    className="tiny"
+                    type="number"
+                    min={PASSWORD_MIN_LENGTH}
+                    max={PASSWORD_MAX_LENGTH}
+                    value={length}
+                    aria-label="How many characters"
+                    onChange={(event) => {
+                        const at = Number.parseInt(event.target.value, 10);
+                        setLength(at);
+                        if (Number.isFinite(at)) make(at);
+                    }}
+                />
+                <button className="ghost" title="Make another" onClick={() => make(length)}>
+                    Again
+                </button>
+                <button className="ghost" disabled={!value} onClick={() => void copy()}>
+                    Copy
+                </button>
+                <button className="ghost" onClick={() => setOpen(false)}>
+                    Hide
+                </button>
+            </div>
+            {note ? <p className="muted small">{note}</p> : null}
+        </div>
+    );
+}
+
 function Items({
     status,
     onChange
@@ -343,6 +440,8 @@ function Items({
             </section>
 
             <Problem text={note} />
+
+            <Generator />
 
             <footer>
                 <button
