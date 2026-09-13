@@ -92,6 +92,14 @@ secrets.*
 *.pem
 *.key
 
+# Browser extension build output
+#
+# WXT writes the unpacked extension into `.output/` and its generated TypeScript
+# config into `.wxt/`, both per target browser. Neither is source: `wxt prepare`
+# makes the second on install and the first is what gets loaded or zipped.
+.output/
+.wxt/
+
 # Editor / OS
 .idea/
 .vscode/

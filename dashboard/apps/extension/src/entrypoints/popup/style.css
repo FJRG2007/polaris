@@ -1,0 +1,181 @@
+/*
+ * The popup's own styling, deliberately not the dashboard's.
+ *
+ * Pulling the design system in would mean shipping Tailwind and the component
+ * library into a 360-pixel panel to draw six buttons and a list. This is the
+ * whole surface, it follows whichever theme the browser is in, and it stays in
+ * one file somebody can read in a minute.
+ */
+
+:root {
+    --ink: #12161c;
+    --muted: #5b6472;
+    --surface: #ffffff;
+    --line: #e3e7ec;
+    --accent: #2f6feb;
+    --danger: #b42318;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ink: #e8ecf2;
+        --muted: #98a2b3;
+        --surface: #16191f;
+        --line: #262b33;
+        --accent: #7aa2f7;
+        --danger: #f97066;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    width: 360px;
+    font:
+        14px/1.45 system-ui,
+        sans-serif;
+    color: var(--ink);
+    background: var(--surface);
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    max-height: 560px;
+}
+
+.pad {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+h1 {
+    font-size: 15px;
+    margin: 0;
+}
+
+h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0;
+    padding: 10px 16px 6px;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+.small {
+    font-size: 12px;
+}
+
+.grow {
+    margin-left: auto;
+}
+
+.problem {
+    margin: 8px 16px;
+    color: var(--danger);
+    font-size: 12px;
+}
+
+input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+}
+
+input:focus-visible,
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+button {
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+button.ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+button.ghost:hover:not(:disabled) {
+    color: var(--ink);
+}
+
+header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+section {
+    overflow-y: auto;
+}
+
+ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.acts {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--line);
+}

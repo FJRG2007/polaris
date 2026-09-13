@@ -61,6 +61,7 @@ COPY packages/project-store/package.json ./packages/project-store/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/vault-crypto/package.json ./packages/vault-crypto/
 # Build-only sidecar workspace (services/*). Its manifest must be present or `npm
 # ci` fails the lockfile-consistency check, even though the web image never builds
 # it - it ships as its own image.
