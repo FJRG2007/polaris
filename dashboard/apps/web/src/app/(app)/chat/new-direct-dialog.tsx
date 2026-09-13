@@ -17,17 +17,17 @@
  * keeps its button.
  */
 
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@polaris/ui";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { chatAvatarUrl } from "@/lib/avatar-url";
-import { CROP_ACCEPTED, FACE_CROP, ImageCropDialog } from "@/components/image-cropper";
+import { useEffect, useRef, useState } from "react";
 import { MAX_CHAT_CHANNEL_NAME } from "@polaris/core";
-import { ImagePlus, Loader2, MessageSquare, Users } from "lucide-react";
 import { openDirectAction, searchPeopleAction } from "./actions";
+import { ImagePlus, Loader2, MessageSquare, Users } from "lucide-react";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import { CROP_ACCEPTED, FACE_CROP, ImageCropDialog } from "@/components/image-cropper";
 import {
     Button,
     Dialog,
@@ -186,7 +186,9 @@ export function NewDirectDialog({
                             type="button"
                             onClick={() => file.current?.click()}
                             className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-primary"
-                            aria-label={picture ? "Change the group picture" : "Add a group picture"}
+                            aria-label={
+                                picture ? "Change the group picture" : "Add a group picture"
+                            }
                             title={picture ? "Change the group picture" : "Add a group picture"}
                         >
                             {preview ? (
@@ -251,7 +253,18 @@ export function NewDirectDialog({
                     {kind === "group" && (
                         <Button
                             size="sm"
-                            disabled={busy || picked.length === 0}
+                            // A group is three people or it is a conversation. Two
+                            // of them already have one - keyed on the pair, with
+                            // whatever history it holds - so a "group" of two would
+                            // either be that same conversation under another name or
+                            // a second one competing with it. The server cannot tell
+                            // the two apart by the count alone, which is why the
+                            // minimum belongs here, where the intent is known.
+                            //
+                            // Leaving one afterwards is a different thing and stays
+                            // allowed: a group that has been used is a place, and a
+                            // place does not stop existing because somebody left.
+                            disabled={busy || picked.length < (kind === "group" ? 2 : 1)}
                             onClick={() => void open_(picked.map((person) => person.id))}
                         >
                             {busy && <Loader2 className="size-4 animate-spin" />}
