@@ -44,6 +44,7 @@ export * from "./mailbox-folder-look.js";
 export * from "./mailbox-list.js";
 export * from "./mail-prefs.js";
 export * from "./mail-keys.js";
+export * from "./mail-body-window.js";
 export * from "./mailto.js";
 export * from "./mailbox-providers.js";
 export * from "./mailbox-mbox.js";

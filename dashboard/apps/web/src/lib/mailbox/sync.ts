@@ -29,19 +29,20 @@
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
-import { decodePart, unflow } from "./decode";
-import { readShape, type MessageShape } from "./structure";
 import { replyIfAway } from "./vacation";
 import { ACCOUNT_COLUMNS } from "./access";
+import { decodePart, unflow } from "./decode";
 import { rememberContacts } from "./contacts";
 import { applyRulesToMessage } from "./rules";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
+import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
 import { fileJudgedJunk, judgeArrival } from "./spam";
 import { MailUnreachableError, withImap } from "./imap";
+import { readShape, type MessageShape } from "./structure";
 import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
 import { mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
@@ -144,6 +145,12 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
     if (!mayTryMailbox(account, { force })) return;
 
     try {
+        // Read before the pass rather than during it, so every folder decides
+        // against the same line. Mail arriving in the meantime is newer than the
+        // edge and therefore inside the window whatever it does, so the pass
+        // holds at most a few more than `BODIES_KEPT` - and the next one, which
+        // reads the edge again, settles it.
+        const edge = await bodyWindowEdge(account.id);
         await withImap(account, async (client) => {
             await syncFolders(client, account.id);
             const folders = await prisma.mailFolder.findMany({
@@ -152,9 +159,12 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             folders.sort((left, right) => syncRank(left.role) - syncRank(right.role));
             for (const folder of folders) {
                 if (!worthSyncing(folder)) continue;
-                await syncFolder(client, account, folder);
+                await syncFolder(client, account, folder, edge);
             }
         });
+        // After the connection is closed, because this is database work and
+        // holding somebody else's IMAP session open through it buys nothing.
+        if (edge) await pruneBodies(account.id, edge);
         await recordAccountState(accountId, "ok");
     } catch (caught) {
         const auth = caught instanceof MailAuthError;
@@ -293,10 +303,19 @@ export async function catchUpFolder(
         prisma.mailFolder.findUnique({ where: { id: folderId } })
     ]);
     if (!account || !folder || folder.accountId !== accountId) return;
-    await syncFolder(client, account, folder);
+    // The window is read here too: this runs right after a move, on the
+    // destination folder, and the message that was just filed is the newest
+    // thing in it - so it is inside the window and its body comes down with it.
+    await syncFolder(client, account, folder, await bodyWindowEdge(accountId));
 }
 
-async function syncFolder(client: ImapFlow, account: AccountRow, folder: FolderRow): Promise<void> {
+async function syncFolder(
+    client: ImapFlow,
+    account: AccountRow,
+    folder: FolderRow,
+    /** Where the body window ends for this mailbox, forwarded to `warmBodies`. */
+    edge: Date | null
+): Promise<void> {
     const lock = await client.getMailboxLock(folder.path, { readOnly: true });
     try {
         const mailbox = client.mailbox;
@@ -318,7 +337,7 @@ async function syncFolder(client: ImapFlow, account: AccountRow, folder: FolderR
         if (arrived.length > 0) await storeMessages(client, account, folder, arrived);
 
         // What has arrived, and a few of whatever is still only a headline.
-        await warmBodies(client, account, folder);
+        await warmBodies(client, account, folder, edge);
 
         if (!validityMoved) {
             await reconcileFlags(client, folder, mailbox.highestModseq ?? null);
@@ -698,14 +717,36 @@ const BODY_ROLES: ReadonlySet<string> = new Set(["inbox", "archive", "none"]);
 /**
  * The size of message worth storing whole, and the ceiling on one part.
  *
- * A megabyte of message is an enormous amount of writing; past it what is big is
- * the attachments, which are never stored here and are streamed from the server
- * when somebody asks for one. The part ceiling is only a guard - a message under
- * the first limit cannot have a part over the second - so nothing is ever
- * silently stored truncated.
+ * Half a megabyte of message is an enormous amount of writing; past it what is
+ * big is the attachments, which are never stored here and are streamed from the
+ * server when somebody asks for one. The part ceiling is only a guard - a
+ * message under the first limit cannot have a part over the second - so nothing
+ * is ever silently stored truncated.
+ *
+ * Lower than what `loadBody` will fetch, and deliberately: this is a guess about
+ * what somebody is going to open, and the handful of enormous messages in a
+ * mailbox are the ones that cost the most to guess wrong about. Opening one is
+ * not a guess, so it has no ceiling at all - it is fetched whole and held.
  */
-const BODY_MAX_MESSAGE_BYTES = 1_000_000;
+const BODY_MAX_MESSAGE_BYTES = 512_000;
 const BODY_MAX_PART_BYTES = 2_000_000;
+
+/**
+ * How many of a mailbox's newest messages are held whole, right now.
+ *
+ * Set from `/admin/retention`, because it is the number that decides the disk
+ * and an operator watching one fill has no other way to act on it. The env var
+ * is the fallback rather than the answer: it only applies until somebody sets
+ * the value, so an install that never edited its `.env` - which is nearly all of
+ * them - still gets a bounded cache. See `core.mailBodyKeep` for what the window
+ * means and why it has a ceiling.
+ *
+ * Read once per pass, alongside the edge it decides; see `bodyWindowEdge`.
+ */
+async function bodiesKept(): Promise<number> {
+    const stored = await getSetting(core.MAIL_BODY_KEEP_KEY);
+    return core.mailBodyKeep(stored ?? process.env.POLARIS_MAIL_BODY_KEEP ?? null);
+}
 
 /**
  * How many are brought down in one pass over one folder.
@@ -718,6 +759,75 @@ const BODY_MAX_PART_BYTES = 2_000_000;
  * body fetches before the rail has finished drawing.
  */
 const BODIES_PER_PASS = 30;
+
+/**
+ * The same, on the fast pass a watching tab drives.
+ *
+ * That pass runs every twenty seconds rather than every five minutes, and
+ * leaving the number alone made having Mail open cost fifteen times the fetches
+ * - thousands an hour against somebody else's server, which is how an account
+ * gets rate limited for the sin of being read. The backlog is not urgent and is
+ * drained by the scheduled passes; what is urgent is the mail that just arrived,
+ * and that is always in the first few rows because the query is newest first.
+ */
+const BODIES_PER_WATCHED_PASS = 5;
+
+/**
+ * The date the body window ends at, or null while the mailbox is smaller than
+ * the window and everything in it is worth holding.
+ *
+ * One indexed read: `@@index([accountId, sentAt])` puts the messages in order
+ * and the offset lands on the oldest one still inside. Read once per pass rather
+ * than per folder - it is a property of the mailbox, and twenty folders would
+ * otherwise be twenty identical reads for one answer.
+ *
+ * A window of zero is the operator saying to hold nothing ahead of time. The
+ * edge is then "now", which leaves nothing for `warmBodies` to fetch and hands
+ * `pruneBodies` everything - and a message still opens, and is still held from
+ * then until the next pass lets it go.
+ */
+async function bodyWindowEdge(accountId: string): Promise<Date | null> {
+    const kept = await bodiesKept();
+    if (kept === 0) return new Date();
+    const [edge] = await prisma.mailMessage.findMany({
+        where: { accountId },
+        orderBy: { sentAt: "desc" },
+        skip: kept - 1,
+        take: 1,
+        select: { sentAt: true }
+    });
+    return edge?.sentAt ?? null;
+}
+
+/**
+ * Let go of the bodies that have fallen out of the window.
+ *
+ * Safe by construction, which is the whole reason this can be done at all: the
+ * message is on the server and this row is a copy of it. `loadBody` brings the
+ * copy back the moment somebody opens it, so what eviction costs is one round
+ * trip on a message nobody has looked at in months.
+ *
+ * Starred and pinned messages are kept whatever their age. Age is a good guess
+ * at what nobody will open again and a bad one about the old thread somebody
+ * marked precisely so they could come back to it - and a mark is the one signal
+ * here that came from a person rather than from a clock.
+ *
+ * Runs on the pass rather than on a sweep of its own: the window is only ever
+ * exceeded by what the pass just added, the account is already in hand, and a
+ * mailbox that has stopped syncing has also stopped growing.
+ */
+async function pruneBodies(accountId: string, edge: Date): Promise<void> {
+    await prisma.mailMessage.updateMany({
+        where: {
+            accountId,
+            sentAt: { lt: edge },
+            flagged: false,
+            pinned: false,
+            OR: [{ bodyText: { not: null } }, { bodyHtml: { not: null } }]
+        },
+        data: { bodyText: null, bodyHtml: null }
+    });
+}
 
 /** What a body fetch needs to know about a message, which is only where its
  *  halves are. */
@@ -736,13 +846,17 @@ interface BodyOwner {
  * seconds. The hover prefetch covers somebody who points before they press;
  * this covers everybody else, and the mail that arrives while nobody is looking.
  *
- * Newest first, because that is the order mail is read in. Failures are silent
- * and cost nothing: the message opens the way it always did.
+ * Newest first, because that is the order mail is read in, and only inside the
+ * window - see `BODIES_KEPT`. Failures are silent and cost nothing: the message
+ * opens the way it always did.
  */
 async function warmBodies(
     client: ImapFlow,
     account: AccountRow,
-    folder: FolderRow
+    folder: FolderRow,
+    /** The oldest message worth holding whole, or null while the whole mailbox
+     *  fits inside the window. */
+    edge: Date | null
 ): Promise<void> {
     if (!BODY_ROLES.has(folder.role)) return;
     const waiting = await prisma.mailMessage.findMany({
@@ -750,10 +864,16 @@ async function warmBodies(
             folderId: folder.id,
             bodyText: null,
             bodyHtml: null,
-            size: { lte: BODY_MAX_MESSAGE_BYTES }
+            size: { lte: BODY_MAX_MESSAGE_BYTES },
+            // Outside the window there is nothing to fetch: a body brought down
+            // here would be dropped again by `pruneBodies` on this same pass,
+            // which is a round trip spent to write something and then unwrite
+            // it. Without this the query walks backwards through the whole
+            // mailbox, thirty at a time, for ever.
+            ...(edge ? { sentAt: { gte: edge } } : {})
         },
         orderBy: { sentAt: "desc" },
-        take: BODIES_PER_PASS,
+        take: watchedReaders().has(account.userId) ? BODIES_PER_WATCHED_PASS : BODIES_PER_PASS,
         select: {
             id: true,
             uid: true,

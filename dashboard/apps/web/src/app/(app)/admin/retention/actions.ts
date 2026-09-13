@@ -8,11 +8,13 @@
  * and by whom.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
-import { retentionPolicySchema } from "@polaris/core";
 import { setRetentionPolicy, sweepRetention } from "@/lib/retention-service";
+import { MAIL_BODY_KEEP_KEY, MAIL_BODY_KEEP_MAX, retentionPolicySchema } from "@polaris/core";
 
 export async function saveRetentionAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
@@ -65,4 +67,34 @@ export async function sweepRetentionAction(): Promise<{
         console.error("polaris: the retention sweep failed:", error);
         return { error: "That could not be run just now" };
     }
+}
+
+/**
+ * How many messages of each mailbox keep their body.
+ *
+ * Audited like the periods above it, and for the same reason: it decides what
+ * gets deleted - a smaller window is a sweep of held bodies on the next sync
+ * pass - and the disk it frees is the kind of change somebody later wants to be
+ * able to attribute.
+ */
+export async function saveMailBodyKeepAction(kept: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z
+        .number()
+        .int("Whole messages only.")
+        .min(0, "Use 0 to fetch every message when it is opened.")
+        .max(MAIL_BODY_KEEP_MAX, `That is more than ${MAIL_BODY_KEEP_MAX} messages.`)
+        .safeParse(kept);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the number." };
+
+    await setSetting(MAIL_BODY_KEEP_KEY, String(parsed.data));
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.mail-body-keep",
+        targetType: "setting",
+        targetId: MAIL_BODY_KEEP_KEY,
+        metadata: { kept: parsed.data }
+    });
+    revalidatePath("/admin/retention");
+    return {};
 }

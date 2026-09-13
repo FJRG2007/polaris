@@ -1607,7 +1607,10 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "days",
                 "gdpr",
                 "cleanup",
-                "disk"
+                "disk",
+                "mail",
+                "bodies",
+                "cache"
             ],
             group: ADMIN_PLATFORM_GROUP
         },
