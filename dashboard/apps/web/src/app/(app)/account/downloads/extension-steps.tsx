@@ -39,7 +39,7 @@ export function ExtensionSteps() {
     // Detected in an effect, not during render: this is rendered on the server
     // too, where there is no navigator, and seeding from one would have the
     // browser hydrate something the HTML does not contain.
-    const [browser, setBrowser] = useState<BrowserId>("chromium");
+    const [browser, setBrowser] = useState<BrowserId>("chrome");
     const [detected, setDetected] = useState<BrowserId | null | undefined>(undefined);
     // A browser the reader picked outranks the one that was detected. They may
     // be following these steps for a different browser than the one they are
@@ -79,8 +79,8 @@ export function ExtensionSteps() {
                 they would have to open instead. */}
             {detected === null ? (
                 <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                    There is no build for the browser you are reading this in. The extension is
-                    built for the two families below.
+                    There is no build for the browser you are reading this in. Pick the one you are
+                    installing into.
                 </p>
             ) : null}
 
@@ -94,18 +94,18 @@ export function ExtensionSteps() {
                     )}
                 </li>
                 <li>
-                    Open <Value text={guide.page} /> in {guide.label.split(",")[0]}. Paste it into
-                    the address bar - a page is not allowed to open that address for you.
+                    Open <Value text={guide.page} /> in {guide.label}. Paste it into the address bar
+                    - a page is not allowed to open that address for you.
                 </li>
-                {guide.id === "chromium" ? (
-                    <li>
-                        Turn on <Press text="Developer mode" />, top right. Without it the next
-                        button is not there.
-                    </li>
-                ) : (
+                {guide.id === "firefox" ? (
                     <li>
                         You land on <Press text={guide.pageLabel} />, which is the pane that can
                         load one.
+                    </li>
+                ) : (
+                    <li>
+                        Turn on <Press text="Developer mode" />, top right. Without it the next
+                        button is not there.
                     </li>
                 )}
                 <li>

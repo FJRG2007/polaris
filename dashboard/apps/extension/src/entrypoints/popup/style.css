@@ -1,30 +1,69 @@
 /*
- * The popup's own styling, deliberately not the dashboard's.
+ * The popup, in Polaris's own colours.
  *
- * Pulling the design system in would mean shipping Tailwind and the component
- * library into a 360-pixel panel to draw six buttons and a list. This is the
- * whole surface, it follows whichever theme the browser is in, and it stays in
- * one file somebody can read in a minute.
+ * The values are copied from `packages/ui/src/styles/tokens.css` rather than
+ * imported, and that is the whole trick here: pulling the design system in would
+ * mean shipping Tailwind and the component library into a 360-pixel panel that
+ * draws six buttons and a list. So the tokens are the same numbers, under the
+ * same names, and this stays one file somebody can read in a minute.
+ *
+ * Dark is Polaris's default and it is this popup's default too; the light theme
+ * arrives through `prefers-color-scheme` because a popup has no theme switcher
+ * of its own to read.
+ *
+ * Colours are HSL channels, as in the dashboard, so a fill can be composed with
+ * an alpha - `hsl(var(--danger) / 0.14)` - instead of a second hard-coded value
+ * drifting away from the first.
  */
 
 :root {
-    --ink: #12161c;
-    --muted: #5b6472;
-    --surface: #ffffff;
-    --line: #e3e7ec;
-    --accent: #2f6feb;
-    --danger: #b42318;
-    color-scheme: light dark;
+    /* Depth. */
+    --background: 225 12% 5%;
+    --surface: 225 11% 7%;
+    --card: 225 11% 9%;
+    --elevated: 225 12% 13%;
+
+    /* Text, brightest to faintest. */
+    --foreground: 220 14% 96%;
+    --muted-foreground: 222 10% 66%;
+    --subtle-foreground: 222 9% 48%;
+
+    /* Fills and edges. */
+    --field: 225 11% 7%;
+    --border: 225 10% 16%;
+    --border-strong: 225 10% 24%;
+    --ring: 258 88% 66%;
+
+    --primary: 258 82% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --danger: 356 68% 57%;
+    --danger-ink: 356 86% 72%;
+
+    --radius: 0.5rem;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+
+    color-scheme: dark light;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
     :root {
-        --ink: #e8ecf2;
-        --muted: #98a2b3;
-        --surface: #16191f;
-        --line: #262b33;
-        --accent: #7aa2f7;
-        --danger: #f97066;
+        --background: 225 24% 97%;
+        --surface: 0 0% 100%;
+        --card: 0 0% 100%;
+        --elevated: 0 0% 100%;
+
+        --foreground: 225 22% 12%;
+        --muted-foreground: 225 10% 40%;
+        --subtle-foreground: 225 8% 48%;
+
+        --field: 225 20% 95%;
+        --border: 225 16% 89%;
+        --border-strong: 225 16% 78%;
+        --ring: 258 78% 56%;
+
+        --primary: 258 78% 55%;
     }
 }
 
@@ -35,11 +74,9 @@
 body {
     margin: 0;
     width: 360px;
-    font:
-        14px/1.45 system-ui,
-        sans-serif;
-    color: var(--ink);
-    background: var(--surface);
+    font: 14px/1.45 var(--font-sans);
+    color: hsl(var(--foreground));
+    background: hsl(var(--surface));
 }
 
 main {
@@ -64,13 +101,13 @@ h2 {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--muted);
+    color: hsl(var(--muted-foreground));
     margin: 0;
     padding: 10px 16px 6px;
 }
 
 .muted {
-    color: var(--muted);
+    color: hsl(var(--muted-foreground));
 }
 
 .small {
@@ -83,7 +120,7 @@ h2 {
 
 .problem {
     margin: 8px 16px;
-    color: var(--danger);
+    color: hsl(var(--danger-ink));
     font-size: 12px;
 }
 
@@ -92,29 +129,29 @@ h2 {
    worth knowing before the master password, not after it. */
 .notice {
     padding: 8px 16px;
-    border-bottom: 1px solid var(--line);
-    color: var(--muted);
+    border-bottom: 1px solid hsl(var(--border));
+    color: hsl(var(--muted-foreground));
 }
 
 .notice a {
-    color: var(--accent);
+    color: hsl(var(--primary));
 }
 
 input {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: transparent;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--field));
     color: inherit;
     font: inherit;
 }
 
 select {
     padding: 4px 6px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: transparent;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--field));
     color: inherit;
     font: inherit;
     font-size: 12px;
@@ -123,16 +160,16 @@ select {
 input:focus-visible,
 select:focus-visible,
 button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid hsl(var(--ring));
     outline-offset: 1px;
 }
 
 button {
     padding: 8px 12px;
     border: 0;
-    border-radius: 8px;
-    background: var(--accent);
-    color: #fff;
+    border-radius: var(--radius);
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
     font: inherit;
     font-weight: 500;
     cursor: pointer;
@@ -145,19 +182,20 @@ button:disabled {
 
 button.ghost {
     background: transparent;
-    color: var(--muted);
-    border: 1px solid var(--line);
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--border));
     padding: 4px 8px;
     font-size: 12px;
 }
 
 button.ghost:hover:not(:disabled) {
-    color: var(--ink);
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border-strong));
 }
 
 header {
     padding: 12px 16px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid hsl(var(--border));
 }
 
 section {
@@ -175,7 +213,7 @@ li {
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid hsl(var(--border));
 }
 
 .who {
@@ -201,7 +239,7 @@ footer {
     align-items: center;
     gap: 6px;
     padding: 10px 16px;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid hsl(var(--border));
 }
 
 /* The generator, which is one row until somebody opens it and two after. */
@@ -210,7 +248,7 @@ footer {
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid hsl(var(--border));
 }
 
 .row.wrap {
@@ -219,7 +257,7 @@ footer {
 
 .value {
     flex: 1 1 100%;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
     word-break: break-all;
     user-select: all;
@@ -233,7 +271,7 @@ footer {
 
 /* A one-time code, which is read off the screen rather than clicked. */
 .code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     letter-spacing: 0.04em;
 }

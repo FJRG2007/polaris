@@ -23,9 +23,37 @@ import { defineConfig } from "wxt";
 export default defineConfig({
     srcDir: "src",
     modules: ["@wxt-dev/module-react"],
+    /**
+     * One name per browser, with no version in it.
+     *
+     * The package is loaded by hand by most of the people who have it, and an
+     * unpacked extension is refreshed from the folder it was loaded from - so a
+     * filename that changes every release means a new folder every release, and
+     * "Load unpacked" again instead of the refresh button. A constant name lets
+     * the same download replace the same file in the same place, which is the
+     * whole of what updating one of these is.
+     *
+     * `publicDir` is relative to the project root rather than to `srcDir`, so the
+     * icon below lives at `public/icon/128.png` and is copied out as-is.
+     */
+    zip: {
+        artifactTemplate: "polaris-extension-{{browser}}.zip",
+        sourcesTemplate: "polaris-extension-sources.zip"
+    },
     manifest: ({ browser, manifestVersion }) => ({
         name: "Polaris",
         description: "Your Polaris vault, in the toolbar.",
+        // Polaris's own mark. Without this the browser draws the grey puzzle
+        // piece, which is what every extension nobody has looked at looks like.
+        // One file at every size: the browsers pick the nearest and scale, and a
+        // 128 mark scaled down reads better than four separate crops drifting
+        // apart. Sizes still have to be declared even when they share a file.
+        icons: {
+            16: "icon/128.png",
+            32: "icon/128.png",
+            48: "icon/128.png",
+            128: "icon/128.png"
+        },
         // `alarms` is what makes the idle lock real rather than something that only
         // happens the next time somebody opens the popup. Under manifest v3 the
         // worker is recycled and takes the key with it; a manifest v2 background

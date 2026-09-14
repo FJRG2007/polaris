@@ -65,12 +65,25 @@ jobs:
       - run: npm run zip --workspace @polaris/extension
       - run: npm run zip:firefox --workspace @polaris/extension
 
+      # The installers ride along with the packages, so the release carries the
+      # easy way in as well as the files it installs. They are ordinary files in
+      # the repository; the release job has no checkout of its own, so they are
+      # put beside the zips here and attached from one place.
+      - name: Carry the installers with the packages
+        run: cp apps/extension/scripts/install.sh apps/extension/scripts/install.ps1 apps/extension/.output/
+
       - uses: actions/upload-artifact@v4
         with:
           name: polaris-extension
           # Repo-relative: `defaults.run.working-directory` applies to `run` steps
           # and to nothing else.
-          path: dashboard/apps/extension/.output/*.zip
+          # Named rather than a wildcard over the directory: `.output` also holds
+          # the unpacked builds the zips were made from, and an artifact carrying
+          # both is the same extension twice.
+          path: |
+            dashboard/apps/extension/.output/*.zip
+            dashboard/apps/extension/.output/install.sh
+            dashboard/apps/extension/.output/install.ps1
           # WXT writes into `.output`, and this action counts "files within
           # folders beginning with a dot" as hidden - which it skips unless told
           # otherwise. So the packages were built, matched by nothing, and the
@@ -99,4 +112,7 @@ jobs:
           # This repository releases the dashboard too, and that is what "latest"
           # should keep meaning.
           make_latest: "false"
-          files: packages/*.zip
+          files: |
+            packages/*.zip
+            packages/install.sh
+            packages/install.ps1

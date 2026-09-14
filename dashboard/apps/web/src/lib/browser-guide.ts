@@ -8,21 +8,28 @@
  * to take live here, where they can be asserted without a DOM.
  *
  * The address is deliberately not a link. A page cannot navigate to
- * `chrome://extensions` or `about:debugging` - every browser refuses that from
- * page content, and an anchor that silently does nothing is worse than no anchor
- * at all - so it is shown verbatim with a copy button, the way the router guide
- * shows a gateway address.
+ * `chrome://extensions` or `about:debugging` - Chrome's own documentation says
+ * it outright, "by design chrome:// URLs are not linkable" - and an anchor that
+ * silently does nothing is worse than no anchor. It is shown verbatim with a copy
+ * button, the way the router guide shows a gateway address.
  *
- * Two builds exist because `wxt zip` writes two: manifest v3 for the Chromium
+ * The Chromium browsers are listed separately even though the steps are
+ * identical, because the address is not: Brave answers on `brave://extensions`,
+ * Edge on `edge://extensions`, Opera on `opera://extensions`. Each accepts
+ * `chrome://extensions` too, but telling a Brave user to paste a Chrome address
+ * is telling them to trust that it is the same browser underneath, which is not
+ * something a person should have to know.
+ *
+ * Two packages exist because `wxt zip` writes two: manifest v3 for the Chromium
  * family and v2 for Firefox. A browser that is neither gets no build and is told
  * so, rather than being handed a package that will not load.
  */
 
-export type BrowserId = "chromium" | "firefox";
+export type BrowserId = "chrome" | "edge" | "brave" | "opera" | "firefox";
 
 export interface BrowserGuide {
     readonly id: BrowserId;
-    /** Every browser this one set of steps is true for. */
+    /** The browser's own name, as its users call it. */
     readonly label: string;
     /** The address to paste, complete enough to land on the right pane. */
     readonly page: string;
@@ -38,19 +45,22 @@ export interface BrowserGuide {
     readonly caveat: string;
 }
 
+/** Everything the Chromium family shares: one build, one set of steps. */
+const CHROMIUM = {
+    pageLabel: "Extensions",
+    file: "chrome",
+    // Chromium takes a folder here, never the archive: pointing Load unpacked
+    // at a .zip is the commonest way this goes wrong.
+    unpack: true,
+    action: "Load unpacked",
+    caveat: "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version."
+} as const;
+
 export const BROWSER_GUIDES: readonly BrowserGuide[] = [
-    {
-        id: "chromium",
-        label: "Chrome, Edge, Brave or Opera",
-        page: "chrome://extensions",
-        pageLabel: "Extensions",
-        file: "chrome",
-        // Chromium takes a folder here, never the archive: pointing Load unpacked
-        // at a .zip is the commonest way this goes wrong.
-        unpack: true,
-        action: "Load unpacked",
-        caveat: "It stays until you remove it, and it does not update itself. Chrome asks about developer-mode extensions each time it starts."
-    },
+    { id: "chrome", label: "Chrome", page: "chrome://extensions", ...CHROMIUM },
+    { id: "edge", label: "Edge", page: "edge://extensions", ...CHROMIUM },
+    { id: "brave", label: "Brave", page: "brave://extensions", ...CHROMIUM },
+    { id: "opera", label: "Opera", page: "opera://extensions", ...CHROMIUM },
     {
         id: "firefox",
         label: "Firefox",
@@ -73,20 +83,25 @@ export function browserGuide(id: BrowserId): BrowserGuide {
 }
 
 /**
- * Which of the two the reader is on, or null when there is no build for it.
+ * Which browser the reader is on, or null when it cannot be told from the user
+ * agent.
  *
- * Null is a real answer rather than a fallback to Chromium. Safari is the case
- * that matters: its user agent says "Safari" and not "Chrome", it loads neither
+ * Null is a real answer rather than a fallback to Chrome. Safari is the case
+ * that matters: its user agent says Safari and not Chrome, it loads neither
  * package, and quietly handing it the Chromium steps would send somebody to a
  * menu their browser does not have.
  *
- * Edge, Brave and Opera all carry "Chrome" in their user agent, which is exactly
- * right here - the steps and the file are the same for all of them.
+ * Brave is deliberately absent. It is not in the user agent - that is the point
+ * of it - and the only way to ask is a `navigator.brave` object that no
+ * specification documents. Rather than branch on something unverifiable, Brave
+ * is one of the choices in the picker and a Brave user takes it in one click.
+ * Being wrong about Brave costs nothing anyway: it is detected as Chrome, whose
+ * address it also accepts.
  */
 export function detectBrowser(userAgent: string): BrowserId | null {
     if (/firefox|fxios/i.test(userAgent)) return "firefox";
-    if (/edg[ea]?\//i.test(userAgent)) return "chromium";
-    if (/opr\//i.test(userAgent)) return "chromium";
-    if (/chrom(e|ium)|crios/i.test(userAgent)) return "chromium";
+    if (/edg[ea]?\//i.test(userAgent)) return "edge";
+    if (/opr\//i.test(userAgent)) return "opera";
+    if (/chrom(e|ium)/i.test(userAgent)) return "chrome";
     return null;
 }
