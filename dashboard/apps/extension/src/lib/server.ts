@@ -21,27 +21,12 @@ const ORIGIN = storage.defineItem<string | null>("local:server.origin", {
 });
 
 /**
- * Turn what somebody typed into an origin, or refuse it.
- *
- * People type `polaris.local`, `https://polaris.example.com/vault`, and their
- * address with a path on the end because that is what the browser showed them.
- * All three mean the same server. What is refused is anything that is not a URL
- * at all, so the failure happens here with a sentence rather than later as a
- * fetch nobody can explain.
+ * Reading an address is pure, and the popup needs it too - to know whether its
+ * own button can be pressed - so it lives in `lib/address` and is re-exported
+ * here for everything that already asks this module for it. The popup imports it
+ * from there instead, and so touches neither storage nor permissions.
  */
-export function readOrigin(typed: string): string | null {
-    const trimmed = typed.trim();
-    if (trimmed === "") return null;
-    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    try {
-        const url = new URL(withScheme);
-        if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-        if (url.hostname === "") return null;
-        return url.origin;
-    } catch {
-        return null;
-    }
-}
+export { readOrigin } from "@/lib/address";
 
 /** The stored server, or null while the extension has not been told one. */
 export async function currentOrigin(): Promise<string | null> {
@@ -49,15 +34,16 @@ export async function currentOrigin(): Promise<string | null> {
 }
 
 /**
- * Ask the browser for the one origin this extension needs.
+ * The asking itself is deliberately not here any more.
  *
- * Must be called from a gesture - a click in the popup - because a browser
- * refuses a permission request that did not come from one. Returns whether it
- * was granted; a refusal is a normal answer and not an error.
+ * A browser refuses `permissions.request` that did not come from a user gesture,
+ * and this module runs in the background worker, which never has one. The comment
+ * that used to sit here said as much - "must be called from a gesture, a click in
+ * the popup" - while the only caller was the worker, so every first connection
+ * failed with "This function must be called during a user gesture" and the popup
+ * showed "Something went wrong." The popup now asks, from the click, and the
+ * worker checks the answer with `holdsOrigin` below.
  */
-export async function grantOrigin(origin: string): Promise<boolean> {
-    return browser.permissions.request({ origins: [`${origin}/*`] });
-}
 
 /** Whether the extension already holds permission for this origin. */
 export async function holdsOrigin(origin: string): Promise<boolean> {

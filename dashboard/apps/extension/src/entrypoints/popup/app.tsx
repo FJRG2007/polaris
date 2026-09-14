@@ -1,6 +1,7 @@
 import { TIMEOUT_CHOICES } from "@/lib/lock";
 import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
+import { looksLikeAddress, readOrigin } from "@/lib/address";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
@@ -139,10 +140,37 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [asking, setAsking] = useState(false);
+    // Not "is it non-empty": one letter is a URL the moment a scheme goes in
+    // front of it, so the button went live on the first keystroke and pressing
+    // it spent the one prompt a gesture is good for on a host that cannot exist.
+    const usable = looksLikeAddress(typed);
 
     const connect = async (): Promise<void> => {
+        const origin = readOrigin(typed);
+        if (!origin) {
+            setError("That does not look like an address.");
+            return;
+        }
         setAsking(true);
         setError(null);
+
+        // Asked here, inside the handler, and that is the whole point: a browser
+        // refuses a permission request that did not come from a user gesture, and
+        // the worker this used to be sent to has none. It failed with "This
+        // function must be called during a user gesture", which reached the
+        // screen as "Something went wrong." on a perfectly good address.
+        let granted = false;
+        try {
+            granted = await browser.permissions.request({ origins: [`${origin}/*`] });
+        } catch {
+            granted = false;
+        }
+        if (!granted) {
+            setAsking(false);
+            setError("Without permission for that address, nothing can be read from it.");
+            return;
+        }
+
         const reply = await askBackground({ kind: "connect", typed });
         setAsking(false);
         if (!reply.ok) {

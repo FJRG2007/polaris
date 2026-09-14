@@ -22,7 +22,6 @@ import {
 import {
     currentOrigin,
     forgetOrigin,
-    grantOrigin,
     holdsOrigin,
     readOrigin,
     rememberOrigin,
@@ -978,8 +977,11 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "connect": {
                 const origin = readOrigin(request.typed);
                 if (!origin) return { ok: false, error: "That does not look like an address." };
-                const granted = (await holdsOrigin(origin)) || (await grantOrigin(origin));
-                if (!granted) {
+                // Checked, never requested: asking is the popup's job because only
+                // a user gesture may ask, and this worker has none. What is left
+                // here is the decision - a caller saying it was granted is not
+                // the same as the browser having granted it.
+                if (!(await holdsOrigin(origin))) {
                     return {
                         ok: false,
                         error: "Without permission for that address, nothing can be read from it."
