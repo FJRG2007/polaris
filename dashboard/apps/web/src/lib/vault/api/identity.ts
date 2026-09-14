@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { deviceSchema } from "@polaris/core";
 import { preloginFor } from "@/lib/vault/account";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { issueClientKey } from "@/lib/vault/client-key";
 import { readAnyBody, readJsonBody, type VaultContext } from "@/lib/vault/api/router";
 import { clientHost, clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { claimVaultAuthorization, openVaultAuthorization } from "@/lib/vault/authorization";
@@ -246,11 +247,20 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
     // The same credential the password grant issues, because it reaches the same
     // surface; what differs is that it was earned in person rather than typed.
     const token = await issueVaultToken(claim.claimed.userId, claim.claimed.device);
+    // And the account credential, so one approval is the whole of it: a client
+    // that has just been let in should not then ask for a second sign-in to find
+    // out whose account it is on. Best effort - an approval that could not mint
+    // one is still an approval, and the vault half of it works - so the field is
+    // simply absent, which is what an older client sees anyway.
+    const accountKey = await issueClientKey(claim.claimed.userId, claim.claimed.device).catch(
+        () => null
+    );
     return Response.json({
         status: "approved",
         // The account's vault key, sealed to the public half this extension sent.
         // Polaris cannot open it, which is the whole point of the exchange.
         wrappedKey: claim.claimed.wrappedKey,
+        ...(accountKey ? { accountKey } : {}),
         ...token
     });
 }

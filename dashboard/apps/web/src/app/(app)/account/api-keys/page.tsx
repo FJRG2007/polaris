@@ -8,6 +8,7 @@
 import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { ApiKeysView } from "./api-keys-view";
+import { isClientKey } from "@/lib/vault/client-key";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,12 @@ export default async function ApiKeysPage() {
     const user = await requireUser();
     // Only the keys. What a key may carry is decided on the page that mints or
     // changes one, which is where the scopes and the address groups are read.
-    const keys = await listApiKeys(user.id);
+    // Not the ones a connected app was given. They are issued by approving a
+    // client rather than by anybody filling in this screen's form, and a row here
+    // that appeared on its own is a credential nobody can explain later - which is
+    // the kind people leave alone rather than manage. Connected apps are listed,
+    // and disconnected, under Account > Sessions.
+    const keys = (await listApiKeys(user.id)).filter((key) => !isClientKey(key.description));
 
     return (
         // Wider than the rest of the account screens, because this one is a
