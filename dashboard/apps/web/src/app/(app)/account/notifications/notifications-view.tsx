@@ -25,11 +25,11 @@ import { loadNotificationHistoryAction } from "./actions";
 import type { NotificationView } from "@/lib/notification-service";
 import { NOTIFICATION_EVENTS, notificationEvent } from "@polaris/core";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { Badge, Button, Card, CardBody, Checkbox, Input, Select, cn } from "@polaris/ui";
-import { Bell, Check, CheckCheck, ChevronDown, Loader2, Search, Trash2, X } from "lucide-react";
-import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
+import { useNotificationFeed } from "@/components/notifications/notifications-provider";
+import { Badge, Button, Card, CardBody, Checkbox, Input, Select, cn } from "@polaris/ui";
+import { Bell, Check, CheckCheck, ChevronDown, Loader2, Search, Trash2, X } from "lucide-react";
 
 /**
  * The unfiltered choice. Radix forbids an empty-string item value, and event ids
@@ -167,7 +167,12 @@ export function NotificationsView() {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-                <label className="relative min-w-0 flex-1 sm:max-w-xs">
+                {/* A line of its own. Sharing one with the three filters and the
+                    two buttons left it whatever they did not want - and they
+                    want 36rem of fixed width on a page 48rem wide, so `flex-1`
+                    resolved to a box a few characters across. The filters wrap
+                    underneath, where they fit. */}
+                <label className="relative w-full">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={query}
