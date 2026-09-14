@@ -18,7 +18,13 @@
 import { Select } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
-import { BROWSER_GUIDES, browserGuide, detectBrowser, type BrowserId } from "@/lib/browser-guide";
+import {
+    BROWSER_GUIDES,
+    browserGuide,
+    detectBrowser,
+    isBraveBrowser,
+    type BrowserId
+} from "@/lib/browser-guide";
 
 /** A value to type elsewhere: shown as it must be typed, copied in one click. */
 function Value({ text }: { text: string }) {
@@ -47,9 +53,19 @@ export function ExtensionSteps() {
     const picked = useRef(false);
 
     useEffect(() => {
-        const found = detectBrowser(navigator.userAgent);
-        setDetected(found);
-        if (!picked.current && found) setBrowser(found);
+        let alive = true;
+        void (async () => {
+            const found = detectBrowser(navigator.userAgent);
+            // Brave answers as Chrome in the user agent, so the guess is put to
+            // the browser itself before it is shown - see `isBraveBrowser`.
+            const real = found === "chrome" && (await isBraveBrowser()) ? "brave" : found;
+            if (!alive) return;
+            setDetected(real);
+            if (!picked.current && real) setBrowser(real);
+        })();
+        return () => {
+            alive = false;
+        };
     }, []);
 
     const guide = browserGuide(browser);
@@ -84,7 +100,11 @@ export function ExtensionSteps() {
                 </p>
             ) : null}
 
-            <ol className="ml-4 flex list-decimal flex-col gap-2 text-sm">
+            {/* Roomier than a list of one-liners would need, because these are
+                not one-liners: each step is a sentence with an address or a
+                control name inside it, and set tight they read as a wall the
+                reader has to find their place in twice. */}
+            <ol className="ml-5 flex list-decimal flex-col gap-3 text-sm leading-relaxed marker:text-muted-foreground">
                 <li>
                     Download the <Press text={guide.file} /> file above.
                     {guide.unpack ? (
@@ -113,8 +133,8 @@ export function ExtensionSteps() {
                     {guide.unpack ? "unpacked folder" : "file you downloaded"}.
                 </li>
                 <li>
-                    Open the extension and point it at this Polaris. It asks for permission to
-                    talk to this address and no other.
+                    Open the extension and point it at this Polaris. It asks for permission to talk
+                    to this address and no other.
                 </li>
             </ol>
 

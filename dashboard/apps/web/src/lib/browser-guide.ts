@@ -91,12 +91,9 @@ export function browserGuide(id: BrowserId): BrowserGuide {
  * package, and quietly handing it the Chromium steps would send somebody to a
  * menu their browser does not have.
  *
- * Brave is deliberately absent. It is not in the user agent - that is the point
- * of it - and the only way to ask is a `navigator.brave` object that no
- * specification documents. Rather than branch on something unverifiable, Brave
- * is one of the choices in the picker and a Brave user takes it in one click.
- * Being wrong about Brave costs nothing anyway: it is detected as Chrome, whose
- * address it also accepts.
+ * Brave cannot be answered here at all. It reports itself as Chrome on purpose,
+ * so this says Chrome for it and `isBraveBrowser` is what corrects that - the
+ * user agent is a string and the question needs to be asked of the browser.
  */
 export function detectBrowser(userAgent: string): BrowserId | null {
     if (/firefox|fxios/i.test(userAgent)) return "firefox";
@@ -104,4 +101,30 @@ export function detectBrowser(userAgent: string): BrowserId | null {
     if (/opr\//i.test(userAgent)) return "opera";
     if (/chrom(e|ium)/i.test(userAgent)) return "chrome";
     return null;
+}
+
+/**
+ * Whether this is Brave, which is the one browser the user agent will not say.
+ *
+ * Hiding it is the point of Brave, and the only thing that answers is
+ * `navigator.brave.isBrave()` - shipped and documented by Brave, covered by no
+ * specification. So it is asked for defensively and anything that does not
+ * answer properly is simply not Brave.
+ *
+ * Worth asking even though Brave accepts `chrome://extensions` too: a reader
+ * being told to paste a Chrome address into Brave has to work out for themselves
+ * that it is the same browser underneath, and that is not something anybody
+ * should have to know to install an extension.
+ *
+ * Browser-only, and async because Brave's own answer is a promise.
+ */
+export async function isBraveBrowser(): Promise<boolean> {
+    if (typeof navigator === "undefined") return false;
+    const brave = (navigator as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
+    if (typeof brave?.isBrave !== "function") return false;
+    try {
+        return await brave.isBrave();
+    } catch {
+        return false;
+    }
 }
