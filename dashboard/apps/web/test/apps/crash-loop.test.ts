@@ -16,6 +16,7 @@ import {
     crashLoopOf,
     isConfigCrash,
     isCrashLooping,
+    outlivedTheLoop,
     reachedReady,
     watchesRestarts
 } from "@/lib/apps/crash-loop";
@@ -41,14 +42,14 @@ function seen(restartCount: number) {
  *  wrapper exception, its frames, the suppressed siblings, and the root. */
 const PAPER_DOWNGRADE = [
     "2026-08-12T21:05:12.645526782Z [21:05:12 ERROR]: Encountered an unexpected exception",
-    "2026-08-12T21:05:12.645530667Z org.spongepowered.configurate.serialize.SerializationException: [entities, spawning, monster-spawn-max-light-level] of type java.lang.Integer: java.lang.NumberFormatException: For input string: \"default\"",
+    '2026-08-12T21:05:12.645530667Z org.spongepowered.configurate.serialize.SerializationException: [entities, spawning, monster-spawn-max-light-level] of type java.lang.Integer: java.lang.NumberFormatException: For input string: "default"',
     "2026-08-12T21:05:12.645533266Z     at org.spongepowered.configurate.serialize.NumericSerializers.parseNumber(NumericSerializers.java:346) ~[configurate-core-4.1.2.jar:?]",
     "2026-08-12T21:05:12.645535578Z     at io.papermc.paper.configuration.Configurations.initializeWorldDefaultsConfiguration(Configurations.java:154) ~[paper-1.19.4.jar:git-Paper-550]",
     "2026-08-12T21:05:12.645588582Z     at java.lang.Thread.run(Unknown Source) ~[?:?]",
-    "2026-08-12T21:05:12.645590527Z     Suppressed: org.spongepowered.configurate.serialize.SerializationException: [misc, max-leash-distance] of type java.lang.Float: java.lang.NumberFormatException: For input string: \"default\"",
+    '2026-08-12T21:05:12.645590527Z     Suppressed: org.spongepowered.configurate.serialize.SerializationException: [misc, max-leash-distance] of type java.lang.Float: java.lang.NumberFormatException: For input string: "default"',
     "2026-08-12T21:05:12.645598269Z         at org.spongepowered.configurate.serialize.FunctionScalarSerializer.deserialize(FunctionScalarSerializer.java:40) ~[configurate-core-4.1.2.jar:?]",
     "2026-08-12T21:05:12.645705198Z         ... 19 more",
-    "2026-08-12T21:05:12.645710961Z Caused by: java.lang.NumberFormatException: For input string: \"default\"",
+    '2026-08-12T21:05:12.645710961Z Caused by: java.lang.NumberFormatException: For input string: "default"',
     "2026-08-12T21:05:12.645712923Z     at java.lang.NumberFormatException.forInputString(Unknown Source) ~[?:?]",
     "2026-08-12T21:05:12.645718782Z     ... 20 more",
     "2026-08-12T21:05:12.648865749Z [21:05:12 ERROR]: This crash report has been saved to: /data/./crash-reports/crash-2026-08-12_21.05.12-server.txt",
@@ -69,7 +70,7 @@ const RECOVERED = [
     "2026-08-12T22:44:17.743076622Z     at org.spigotmc.AsyncCatcher.catchOp(AsyncCatcher.java:16) ~[paper-1.19.4.jar:git-Paper-550]",
     "2026-08-12T22:44:17.743116649Z [22:44:17 INFO]: Thread RCON Client /0:0:0:0:0:0:0:1 shutting down",
     "2026-08-12T22:44:18.269346032Z [22:44:18 INFO]: Flushing Chunk IO",
-    "2026-08-12T22:44:19.394568977Z 2026-08-12T22:44:19.394Z    WARN    mc-server-runner    Minecraft server failed. Inspect logs above for errors that indicate cause. DO NOT report this line as an error.    {\"exitCode\": 1}",
+    '2026-08-12T22:44:19.394568977Z 2026-08-12T22:44:19.394Z    WARN    mc-server-runner    Minecraft server failed. Inspect logs above for errors that indicate cause. DO NOT report this line as an error.    {"exitCode": 1}',
     "2026-08-12T22:44:20.277006455Z [init] Running as uid=1000 gid=1000 with /data as 'drwxr-x--- 26 1000 1000 4096 Aug 12 22:40 /data'",
     "2026-08-12T22:44:24.994008348Z [init] Copying any configs from /config to /data/config",
     "2026-08-12T22:44:30.117935685Z [init] Starting the Minecraft server...",
@@ -88,7 +89,9 @@ describe("whether a container is worth watching", () => {
     it("says no to a server that looped a long time ago and settled", () => {
         // The count is cumulative for the container's whole life, so without the
         // clock beside it every server that ever had a bad week reads as broken.
-        expect(watchesRestarts(looping({ startedAt: "2026-08-10T09:00:00.000Z" }), NOW)).toBe(false);
+        expect(watchesRestarts(looping({ startedAt: "2026-08-10T09:00:00.000Z" }), NOW)).toBe(
+            false
+        );
     });
 
     it("says no to one restart, which is somebody pressing the button", () => {
@@ -100,7 +103,9 @@ describe("whether a container is worth watching", () => {
     });
 
     it("takes the engine's own word for it when the poll lands in the backoff", () => {
-        expect(watchesRestarts({ status: "restarting", restartCount: 4, restarting: true }, NOW)).toBe(true);
+        expect(
+            watchesRestarts({ status: "restarting", restartCount: 4, restarting: true }, NOW)
+        ).toBe(true);
     });
 
     it("does not suspect a count with no start time to read it against", () => {
@@ -144,7 +149,9 @@ describe("what the log says went wrong", () => {
         // Java prints the outer failure first and each cause under the last, so
         // the deepest one is the answer. "Failed to initialize world defaults" is
         // true and useless; the input string is the half somebody can act on.
-        expect(crashCause(PAPER_DOWNGRADE)).toBe('NumberFormatException: For input string: "default"');
+        expect(crashCause(PAPER_DOWNGRADE)).toBe(
+            'NumberFormatException: For input string: "default"'
+        );
     });
 
     it("never returns a stack frame", () => {
@@ -160,10 +167,13 @@ describe("what the log says went wrong", () => {
     });
 
     it("falls back to the last error line for a crash that is not Java", () => {
-        const ark = ["Setting breakpad minidump AppID = 2430930", "Fatal error: could not open PrimalGameData"].join(
-            "\n"
+        const ark = [
+            "Setting breakpad minidump AppID = 2430930",
+            "Fatal error: could not open PrimalGameData"
+        ].join("\n");
+        expect(crashCause(`${ark}\nERROR: Shutdown handler: initiate app exit`)).toContain(
+            "Shutdown handler"
         );
-        expect(crashCause(`${ark}\nERROR: Shutdown handler: initiate app exit`)).toContain("Shutdown handler");
     });
 
     it("never blames the crash on Polaris asking who is online", () => {
@@ -184,9 +194,10 @@ describe("what the log says went wrong", () => {
     });
 
     it("says nothing about a server that is running fine", () => {
-        const healthy = ['[12:00:00 INFO]: Done (21.5s)! For help, type "help"', "[12:00:04 INFO]: Alice joined"].join(
-            "\n"
-        );
+        const healthy = [
+            '[12:00:00 INFO]: Done (21.5s)! For help, type "help"',
+            "[12:00:04 INFO]: Alice joined"
+        ].join("\n");
         expect(crashCause(healthy)).toBeNull();
     });
 });
@@ -254,11 +265,70 @@ describe("whether the server got up", () => {
     it("does not count a start that a later boot has already replaced", () => {
         // The same log with one more restart on the end: the server was up, and
         // then it was not, and what matters is the run it is on now.
-        expect(reachedReady(`${RECOVERED}\n2026-08-12T22:45:01.0Z [init] Running as uid=1000 gid=1000`)).toBe(false);
+        expect(
+            reachedReady(`${RECOVERED}\n2026-08-12T22:45:01.0Z [init] Running as uid=1000 gid=1000`)
+        ).toBe(false);
     });
 
     it("does not claim a crashing server got anywhere", () => {
         expect(reachedReady(PAPER_DOWNGRADE)).toBe(false);
+    });
+});
+
+/**
+ * Taking the verdict back.
+ *
+ * A real server: it looped one morning, was repaired, ran all afternoon with
+ * people on it, and was then stopped by its owner. The page answered that stop
+ * by announcing the server keeps failing to start and quoting the crash from six
+ * hours earlier - because the record was written once and nothing ever cleared
+ * it. The sweep forgot the restart watch of a healthy server and left the verdict
+ * standing.
+ */
+describe("whether the verdict is spent", () => {
+    it("clears it for a server that has been up long enough to have got somewhere", () => {
+        // Hours into a good run, whatever the count says: the count never resets,
+        // and a loop cannot keep a single run alive this long.
+        expect(outlivedTheLoop(looping({ startedAt: "2026-08-12T18:00:00.000Z" }), NOW)).toBe(true);
+    });
+
+    it("keeps it while the run is still young enough to be another lap", () => {
+        expect(outlivedTheLoop(looping(), NOW)).toBe(false);
+    });
+
+    it("keeps it for a container that is down", () => {
+        // The case that would cost the most. A stopped server reaches the same
+        // branch of the sweep, and the record is the only thing left that knows
+        // why Polaris turned it off - clearing it there would leave the page with
+        // nothing to say about a server that is off for a reason.
+        expect(outlivedTheLoop({ status: "exited", restartCount: 9 }, NOW)).toBe(false);
+        expect(
+            outlivedTheLoop(
+                { status: "exited", restartCount: 9, startedAt: "2026-08-12T18:00:00.000Z" },
+                NOW
+            )
+        ).toBe(false);
+    });
+
+    it("keeps it while the engine is waiting out a backoff", () => {
+        expect(
+            outlivedTheLoop(
+                {
+                    status: "running",
+                    restartCount: 9,
+                    restarting: true,
+                    startedAt: "2026-08-12T18:00:00.000Z"
+                },
+                NOW
+            )
+        ).toBe(false);
+    });
+
+    it("keeps it when there is no start time to judge the run by", () => {
+        // Same caution as the rule that convicts: a missing or zero start time is
+        // not evidence of anything, in either direction.
+        expect(outlivedTheLoop({ status: "running", restartCount: 9 }, NOW)).toBe(false);
+        expect(outlivedTheLoop(looping({ startedAt: "0001-01-01T00:00:00Z" }), NOW)).toBe(false);
     });
 });
 

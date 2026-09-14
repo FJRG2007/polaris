@@ -32,6 +32,7 @@ import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config
 import {
     crashLoopOf,
     isCrashLooping,
+    outlivedTheLoop,
     reachedReady,
     watchesRestarts,
     type CrashLoop,
@@ -84,7 +85,10 @@ export interface HealthSweep {
  * cannot be inspected is not evidence of anything, and the next pass is a minute
  * away.
  */
-export async function sweepCrashLoops(ownerId: string, now: Date = new Date()): Promise<HealthSweep> {
+export async function sweepCrashLoops(
+    ownerId: string,
+    now: Date = new Date()
+): Promise<HealthSweep> {
     const installs = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
         select: { id: true, name: true, applicationId: true, catalogId: true, config: true }
@@ -114,6 +118,14 @@ export async function sweepCrashLoops(ownerId: string, now: Date = new Date()): 
         const watching = readRestartWatch(install.config);
         if (!watchesRestarts(state, now)) {
             if (watching) await forget(install.id, RESTART_WATCH_KEY);
+            // And the verdict itself, once the server has been up long enough to
+            // have disproved it. Without this the record was written once and
+            // never taken back: a server that was repaired, started and ran for
+            // hours still carried it, and the moment its owner stopped it on
+            // purpose its page said it keeps failing to start and quoted a crash
+            // from that morning. Only ever while the container is up - see
+            // `outlivedTheLoop`, which is where the reasoning lives.
+            if (outlivedTheLoop(state, now)) await forget(install.id, CRASH_LOOP_KEY);
             continue;
         }
         // First sighting. It is only half the evidence, so it is recorded rather
@@ -121,7 +133,10 @@ export async function sweepCrashLoops(ownerId: string, now: Date = new Date()): 
         // several more times by the time this runs again.
         if (!watching) {
             await patchInstallConfig(install.id, {
-                [RESTART_WATCH_KEY]: { restartCount: state.restartCount, at: now.toISOString() } satisfies RestartWatch
+                [RESTART_WATCH_KEY]: {
+                    restartCount: state.restartCount,
+                    at: now.toISOString()
+                } satisfies RestartWatch
             }).catch(() => undefined);
             continue;
         }
@@ -182,7 +197,10 @@ export function readRestartWatch(config: string | null): RestartWatch | null {
     if (typeof value !== "object" || value === null) return null;
     const record = value as Record<string, unknown>;
     if (typeof record.restartCount !== "number") return null;
-    return { restartCount: record.restartCount, at: typeof record.at === "string" ? record.at : "" };
+    return {
+        restartCount: record.restartCount,
+        at: typeof record.at === "string" ? record.at : ""
+    };
 }
 
 /** What was recorded about the loop this server was stopped for, if it was. */

@@ -110,6 +110,34 @@ export function watchesRestarts(state: RestartFacts, now: Date): boolean {
 }
 
 /**
+ * Whether this container has outlived the loop it was once stopped for.
+ *
+ * The verdict Polaris records when it stops a looping server is kept so the
+ * server's own page can explain itself hours later, and nothing used to take it
+ * back. A server that was repaired and started again carried it for the rest of
+ * its life: it ran perfectly for hours, and the moment its owner stopped it on
+ * purpose the page announced that it keeps failing to start and quoted a crash
+ * from that morning. The record outlived the thing it described.
+ *
+ * So this is the other direction - the reading that says the verdict is spent.
+ * Up, not waiting out a backoff, and on a run old enough to have got somewhere:
+ * the same threshold `watchesRestarts` uses to decide a run is no longer young,
+ * read the other way round. A loop cannot hide behind it, because a looping
+ * container never keeps one run alive that long.
+ *
+ * Deliberately says no to a container that is down. That case reaches the same
+ * branch of the sweep - a stopped server is not restarting either - and clearing
+ * the record there would delete the only remaining account of why Polaris turned
+ * it off.
+ */
+export function outlivedTheLoop(state: RestartFacts, now: Date): boolean {
+    if (state.status !== "running" || state.restarting === true) return false;
+    const started = state.startedAt ? Date.parse(state.startedAt) : Number.NaN;
+    if (Number.isNaN(started) || started <= 0) return false;
+    return now.getTime() - started >= LOOP_UPTIME_MS;
+}
+
+/**
  * Whether this container is restarting in a loop rather than starting slowly.
  *
  * Two readings, because one cannot tell a loop from a recovery. `since` is what the
@@ -118,7 +146,11 @@ export function watchesRestarts(state: RestartFacts, now: Date): boolean {
  * comparison for the next one. Erring towards no is deliberate: the cost of a false
  * yes is stopping a server people are on, and the cost of a false no is a minute.
  */
-export function isCrashLooping(state: RestartFacts, since: RestartWatch | null, now: Date): boolean {
+export function isCrashLooping(
+    state: RestartFacts,
+    since: RestartWatch | null,
+    now: Date
+): boolean {
     if (!watchesRestarts(state, now)) return false;
     if (since === null) return false;
     return state.restartCount - since.restartCount >= LOOP_RESTARTS;
