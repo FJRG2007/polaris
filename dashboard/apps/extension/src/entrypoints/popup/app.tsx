@@ -1206,6 +1206,22 @@ function Items({
                 >
                     Lock
                 </button>
+                {/* The way out of a 360-pixel panel and into the whole thing.
+                    Everything this extension cannot do - and that is most of
+                    Polaris - is one press away instead of an address somebody
+                    has to remember they configured here. */}
+                {status.server ? (
+                    <button
+                        className="ghost"
+                        title={`Open ${new URL(status.server).host}`}
+                        onClick={() => {
+                            void browser.tabs.create({ url: status.server as string });
+                            window.close();
+                        }}
+                    >
+                        Open Polaris
+                    </button>
+                ) : null}
                 <button
                     className="ghost"
                     onClick={() => void askBackground({ kind: "signOut" }).then(onChange)}
