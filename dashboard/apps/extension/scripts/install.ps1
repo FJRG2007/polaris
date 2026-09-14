@@ -50,12 +50,14 @@ function Invoke-PolarisExtensionInstall {
         return
     }
 
-    # The package is asked for rather than spelled out. `wxt zip` names its
-    # output after the package and the version - polarisextension-0.1.0-chrome.zip
-    # - so a filename built here is one that breaks on the next release, and
-    # breaks as a 404 half way through an install. "chrome" identifies it: the
-    # other two packages on the release are the Firefox build and the sources
-    # archive, and neither carries that word.
+    # The package is asked for rather than spelled out. Published releases do not
+    # agree on a filename: `wxt zip` used to name its output after the package and
+    # the version - polarisextension-0.1.0-chrome.zip - and the config now pins one
+    # stable name per browser. Both kinds are installable, since
+    # POLARIS_EXTENSION_TAG is how somebody pins an older release, so a name
+    # written here is right for some of them and a 404 half way through an install
+    # for the rest. "chrome" identifies it: the other two packages on the release
+    # are the Firefox build and the sources archive, and neither carries that word.
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -Headers $agent
     $asset = $release.assets | Where-Object { $_.name -like "*chrome*.zip" } | Select-Object -First 1
     if (-not $asset) {

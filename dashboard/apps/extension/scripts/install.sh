@@ -48,11 +48,16 @@ newest_extension_tag() {
 
 # The Chromium package on that release, asked for rather than spelled out.
 #
-# `wxt zip` names its output after the package and the version it is building -
-# `polarisextension-0.1.0-chrome.zip` - so a filename built here is a filename
-# that is wrong the next time the version changes, and wrong in the only way
-# nobody notices until an install 404s. The release knows what it carries; this
-# asks it, the same way the dashboard's own download does.
+# Published releases do not agree on a filename. `wxt zip` used to name its
+# output after the package and the version - `polarisextension-0.1.0-chrome.zip`
+# - and the config now pins one stable name per browser instead. Both kinds of
+# release exist and both are installable, since POLARIS_EXTENSION_TAG is how
+# somebody pins an older one, so a name written here is a name that is right for
+# some releases and a 404 from the middle of an install for the others.
+#
+# The release knows what it carries. This asks it, the way the dashboard's own
+# download already does, and then no future change of naming reaches this file at
+# all.
 #
 # "chrome" alone identifies it: the other two packages are the Firefox build and
 # the sources archive Firefox's review asks for, and neither carries that word.
