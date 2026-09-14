@@ -27,7 +27,7 @@ import { publishMail } from "./live";
 import { catchUpFolder } from "./sync";
 import { refreshThreads } from "./sync";
 import { findFolderForRole } from "./folder-roles";
-import { MailAccessError, ownedAccount, ownedMessages } from "./access";
+import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 
 /** What is remembered about a message on its way to the trash. */
@@ -250,6 +250,69 @@ export async function emptyEveryFolderOfRole(
         dropped += await emptyFolderOfRole(userId, account.id, role).catch(() => 0);
     }
     return dropped;
+}
+
+/**
+ * Throw away what has been in the trash long enough, on every mailbox that asked
+ * for it.
+ *
+ * What every mail service does, and the reason they all do it: a trash nobody
+ * empties is not a safety net, it is a second mailbox that grows for ever - on
+ * the mail server, where the quota is, and in Polaris' own copy of it.
+ *
+ * The date is the server's own search rather than a scan of what is cached here:
+ * the window Polaris holds is the newest few hundred messages of the folder, and
+ * the ones old enough to go are exactly the ones outside it. A mailbox set to
+ * zero is not asked about at all.
+ *
+ * Never throws. One unreachable mailbox must not stop the sweep for every other
+ * account on the instance, and nothing is waiting on the answer.
+ */
+export async function sweepTrash(): Promise<number> {
+    const accounts = await prisma.mailAccount.findMany({
+        where: { trashKeepDays: { gt: 0 } },
+        select: ACCOUNT_COLUMNS
+    });
+    let dropped = 0;
+    for (const account of accounts) {
+        const folder = await findFolderForRole(account.id, "trash");
+        if (!folder) continue;
+        const before = new Date(Date.now() - account.trashKeepDays * DAY_MS);
+        try {
+            await withImap(account, async (client) => {
+                const lock = await client.getMailboxLock(folder.path);
+                try {
+                    // `before` is the server's own comparison, against the date
+                    // the message carries - which is what a reader means by "it
+                    // has been in the bin a month".
+                    const old = await client.search({ before }, { uid: true });
+                    if (!old || old.length === 0) return;
+                    await client.messageDelete(old, { uid: true });
+                    const { count } = await prisma.mailMessage.deleteMany({
+                        where: { folderId: folder.id, uid: { in: old.map((uid) => BigInt(uid)) } }
+                    });
+                    dropped += count;
+                } finally {
+                    lock.release();
+                }
+            });
+        } catch {
+            // Unreachable, refused, a folder that has gone: all of them are
+            // reasons to try again on the next pass rather than to stop here.
+            continue;
+        }
+        await forgetOldOrigins(account.id, before);
+        publishMail({ accountId: account.id, kind: "messages", actorId: account.userId });
+    }
+    return dropped;
+}
+
+/** A day, for the window above. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Notes about where messages came from, for messages that no longer exist. */
+async function forgetOldOrigins(accountId: string, before: Date): Promise<void> {
+    await prisma.mailTrashOrigin.deleteMany({ where: { accountId, at: { lt: before } } });
 }
 
 /** Read the folders a restore landed in, on a connection of their own. Failures

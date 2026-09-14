@@ -189,8 +189,30 @@ export const mailAccountEditSchema = z.object({
     signatureAboveQuote: z.boolean().default(true),
     /** When it goes in without being asked for. A signature that has to be
      *  inserted by hand every time is one nobody ever sends. */
-    signatureAuto: mailSignatureAuto.default("new")
+    signatureAuto: mailSignatureAuto.default("new"),
+    /**
+     * How long this mailbox's trash keeps what was thrown away, in days.
+     *
+     * Thirty by default, which is what every mail service does and what anybody
+     * who has used one expects. Zero is "until somebody empties it", which is
+     * what Polaris did before this existed - so it is a real answer rather than
+     * an absent one, and the screen offers it.
+     *
+     * Capped at a year: past that it is not a bin being tidied, it is an archive
+     * somebody should be filing into a folder.
+     */
+    trashKeepDays: z.coerce.number().int().min(0).max(365).default(30)
 });
+
+/** What the screen offers, and what each one means. */
+export const MAIL_TRASH_KEEP_CHOICES: readonly { readonly days: number; readonly label: string }[] =
+    [
+        { days: 0, label: "Until I empty it" },
+        { days: 7, label: "After 7 days" },
+        { days: 30, label: "After 30 days" },
+        { days: 60, label: "After 60 days" },
+        { days: 90, label: "After 90 days" }
+    ];
 
 /**
  * A change to a mailbox's settings, of only the fields a screen actually sent.

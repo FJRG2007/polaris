@@ -82,6 +82,7 @@ export const ACCOUNT_COLUMNS = {
     signatureAuto: true,
     securityKeepMinutes: true,
     spamFilter: true,
+    trashKeepDays: true,
     vacationEnabled: true,
     vacationSubject: true,
     vacationBody: true,

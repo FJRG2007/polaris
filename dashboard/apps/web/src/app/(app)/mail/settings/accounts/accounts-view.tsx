@@ -30,7 +30,8 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
-import { Button, ConfirmDeleteDialog, Switch, cn, useToast } from "@polaris/ui";
+import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
+import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import { AlertTriangle, CheckCircle2, Mail, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
@@ -269,6 +270,7 @@ function AccountRow({
     const [removing, setRemoving] = useState(false);
     const [unified, setUnified] = useState(account.unified);
     const [notify, setNotify] = useState(account.notify);
+    const [trashDays, setTrashDays] = useState(account.trashKeepDays);
 
     const refused = account.state === "auth";
     const broken = refused || account.state === "unreachable";
@@ -375,6 +377,43 @@ function AccountRow({
                         aria-label="Tell me when new mail arrives in this mailbox"
                     />
                     Notify me
+                </label>
+
+                {/* What every mail service does, said where the mailbox's own
+                    switches are. The default is thirty days; "until I empty it"
+                    is what Polaris did before this existed and is still an
+                    answer somebody can give. */}
+                <label
+                    className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
+                    title="Messages in this mailbox's trash are deleted on the mail server once they are this old"
+                >
+                    Empty the trash
+                    <Select
+                        value={String(trashDays)}
+                        aria-label="When this mailbox's trash is emptied"
+                        className="h-7 w-44 text-[12px]"
+                        options={MAIL_TRASH_KEEP_CHOICES.map((choice) => ({
+                            value: String(choice.days),
+                            label: choice.label
+                        }))}
+                        onValueChange={(next) => {
+                            const days = Number(next);
+                            const before = trashDays;
+                            setTrashDays(days);
+                            startBusy(async () => {
+                                const answer = await editAccountAction(account.id, {
+                                    trashKeepDays: days
+                                });
+                                const said = refusalOf(answer);
+                                if (said) {
+                                    setTrashDays(before);
+                                    toast.show({ title: said });
+                                    return;
+                                }
+                                router.refresh();
+                            });
+                        }}
+                    />
                 </label>
 
                 <Button

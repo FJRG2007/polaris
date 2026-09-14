@@ -64,6 +64,9 @@ export interface MailAccountView {
     readonly securityKeepMinutes: number;
     /** Whether Polaris judges this mailbox's arriving mail for itself. */
     readonly spamFilter: boolean;
+    /** How long the trash keeps what was thrown away, in days. Zero is until
+     *  somebody empties it. */
+    readonly trashKeepDays: number;
     readonly vacationEnabled: boolean;
     readonly pollSeconds: number;
     readonly position: number;
@@ -104,6 +107,7 @@ export function accountView(row: AccountRow): MailAccountView {
         signatureAuto: row.signatureAuto,
         securityKeepMinutes: row.securityKeepMinutes,
         spamFilter: row.spamFilter,
+        trashKeepDays: row.trashKeepDays,
         vacationEnabled: row.vacationEnabled,
         pollSeconds: row.pollSeconds,
         position: row.position

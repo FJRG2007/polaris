@@ -9869,6 +9869,11 @@ model MailAccount {
     // worse than the setting being wrong.
     spamFilter Boolean @default(true)
 
+    // How long the trash holds what was thrown away, in days. Thirty is what
+    // every mail service does; zero is "until somebody empties it", which is
+    // what every mailbox here did before this existed.
+    trashKeepDays Int @default(30)
+
     vacationEnabled    Boolean   @default(false)
     vacationSubject    String    @default("")
     vacationBody       String    @default("")

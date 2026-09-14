@@ -105,6 +105,10 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would read the same DMARC report mailbox at once.
             "mail-server",
             "mail-sync",
+            // Two passes would both walk the same trash and both delete what is
+            // old enough, and the one that lost would fail on messages the other
+            // had already destroyed.
+            "mail-trash",
             "object-replication",
             // A capture stores the lines after the newest one it has; two at once
             // would both read the same newest line and store what follows twice.

@@ -16,6 +16,7 @@
 
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
+import { sweepTrash } from "@/lib/mailbox/trash";
 import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueSends } from "@/lib/mailbox/compose";
@@ -383,6 +384,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // twice.
         leaseMs: null,
         run: wakeSnoozed
+    },
+    {
+        key: "mail-trash",
+        // Once a day: what this does is delete mail that has been in a bin for
+        // thirty days, and the hour it happens on the thirtieth is nobody's
+        // business. Leased, because two passes are two IMAP sessions per mailbox
+        // and the large services answer that by rate limiting the account.
+        everyMs: 24 * HOUR,
+        leaseMs: 25 * HOUR,
+        run: sweepTrash
     },
     {
         key: "mail-uploads",
