@@ -26,12 +26,23 @@ import {
     type BrowserId
 } from "@/lib/browser-guide";
 
-/** A value to type elsewhere: shown as it must be typed, copied in one click. */
-function Value({ text }: { text: string }) {
+/**
+ * An address to paste into the browser's own bar, on a line of its own.
+ *
+ * It sits in a box rather than inline because copying it is the whole step, and
+ * as a few words of code between two clauses the one thing to do here read as
+ * punctuation. There is no button that opens it: a page is not allowed to
+ * navigate to `chrome://` or `brave://` - Chrome documents that as deliberate -
+ * and a button that quietly did nothing would be worse than none, so the copy is
+ * made the obvious action instead.
+ */
+function AddressToPaste({ text }: { text: string }) {
     return (
-        <span className="inline-flex items-center gap-1 align-middle">
-            <code className="text-foreground">{text}</code>
-            <CopyButton value={text} className="[&_svg]:size-3" />
+        <span className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+            <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-foreground">
+                {text}
+            </code>
+            <CopyButton value={text} />
         </span>
     );
 }
@@ -104,7 +115,7 @@ export function ExtensionSteps() {
                 not one-liners: each step is a sentence with an address or a
                 control name inside it, and set tight they read as a wall the
                 reader has to find their place in twice. */}
-            <ol className="ml-5 flex list-decimal flex-col gap-3 text-sm leading-relaxed marker:text-muted-foreground">
+            <ol className="ml-5 flex list-decimal flex-col gap-5 text-sm leading-relaxed marker:text-muted-foreground">
                 <li>
                     Download the <Press text={guide.file} /> file above.
                     {guide.unpack ? (
@@ -114,8 +125,10 @@ export function ExtensionSteps() {
                     )}
                 </li>
                 <li>
-                    Open <Value text={guide.page} /> in {guide.label}. Paste it into the address bar
-                    - a page is not allowed to open that address for you.
+                    Open the extensions page in {guide.label}. Copy this and paste it into the
+                    address bar yourself - no page is allowed to open that address, which is why
+                    there is no button here that does it for you.
+                    <AddressToPaste text={guide.page} />
                 </li>
                 {guide.id === "firefox" ? (
                     <li>

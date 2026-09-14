@@ -26,6 +26,7 @@ import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
 import { ExtensionSteps } from "./extension-steps";
+import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone, Terminal } from "lucide-react";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
@@ -92,8 +93,13 @@ export default async function DownloadsPage() {
                         </p>
                     </div>
 
-                    <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
+                    <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
                         <p className="font-medium">Load it yourself</p>
+                        {/* First, because it is the only way on this screen that
+                            makes the next version a refresh arrow instead of the
+                            whole install again. The zip and the steps stay under
+                            it for anybody who would rather do it by hand. */}
+                        <ExtensionCommand repo={repo} />
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
                         </Suspense>
@@ -140,8 +146,8 @@ export default async function DownloadsPage() {
                             <p className="font-medium">Command line</p>
                             <p className="text-muted-foreground">
                                 For managing your things from your own computer, and for opening a
-                                tunnel from it to a service here. Nothing to install yet, so there is
-                                no command to copy.
+                                tunnel from it to a service here. Nothing to install yet, so there
+                                is no command to copy.
                             </p>
                         </div>
                     </div>
