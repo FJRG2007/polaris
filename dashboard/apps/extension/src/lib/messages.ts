@@ -48,6 +48,17 @@ export type Request =
           readonly password: string;
           readonly code?: string;
       }
+    /**
+     * Ask the server to let this extension in, and open the page that decides.
+     *
+     * The way in that does not involve typing a master password into a popup: the
+     * dashboard is already open, already unlocked, already holds the key. What
+     * comes back is the code to show while somebody approves it.
+     */
+    | { readonly kind: "authorize" }
+    /** Ask once whether the request has been answered. The popup does the waiting;
+     *  the worker does the asking, because only it may hold the credential. */
+    | { readonly kind: "authorizeCheck" }
     | { readonly kind: "unlock"; readonly password: string }
     | { readonly kind: "lock" }
     | { readonly kind: "signOut" }
@@ -101,6 +112,20 @@ export type Reply =
     | { readonly ok: true; readonly host: string | null; readonly blocked: boolean }
     /** Six digits and the seconds before they turn over. */
     | { readonly ok: true; readonly code: string; readonly remaining: number }
+    /** A request waiting to be approved in the dashboard: what to show, and how
+     *  long it is good for. */
+    | {
+          readonly ok: true;
+          readonly userCode: string;
+          readonly expiresAt: string;
+          readonly pollMs: number;
+      }
+    /** Where that request stands. `approved` arrives with the vault already open,
+     *  so the popup only has to ask for the status again. */
+    | {
+          readonly ok: true;
+          readonly waiting: "pending" | "approved" | "denied" | "expired";
+      }
     | { readonly ok: true }
     | { readonly ok: false; readonly error: string; readonly needsCode?: boolean };
 

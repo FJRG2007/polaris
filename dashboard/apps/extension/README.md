@@ -35,7 +35,7 @@ asking to read every page you open.
 
 ```
 src/lib/server.ts        which Polaris this belongs to, and permission for it
-src/lib/protocol.ts      the Bitwarden protocol client: sign in, sync, refresh
+src/lib/protocol.ts      the Bitwarden protocol client: sign in, be let in, sync, refresh
 src/lib/matching.ts      whether an item belongs to this page, and which comes first
 src/lib/lock.ts          when an open vault locks itself again
 src/lib/save.ts          what was typed for a new login, before it is encrypted

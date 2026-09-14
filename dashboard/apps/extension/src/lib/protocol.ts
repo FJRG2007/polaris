@@ -152,6 +152,102 @@ function readToken(body: Record<string, unknown>): VaultToken | null {
     };
 }
 
+/** A request waiting for somebody to approve it in the dashboard. */
+export interface AuthorizationOpened {
+    readonly userCode: string;
+    /** This extension's own secret, sent on every poll. Never shown to anybody. */
+    readonly deviceCode: string;
+    readonly expiresAt: string;
+    readonly pollMs: number;
+}
+
+/** Where that request stands, and what it carried if it was approved. */
+export type AuthorizationClaim =
+    | { readonly status: "pending" | "denied" | "expired" }
+    | {
+          readonly status: "approved";
+          readonly token: VaultToken;
+          /** The account's vault key, sealed to the public half this extension
+           *  sent. Only this extension can open it. */
+          readonly wrappedKey: string;
+      };
+
+/**
+ * Ask to be let in by a browser that is already inside the vault.
+ *
+ * The alternative to asking for a master password in a popup, and strictly better
+ * than one: what approves this is a Polaris session AND an unlocked vault, which
+ * is more than the password alone proves. The public half goes out; the private
+ * half never leaves this worker, so the key that comes back is sealed to something
+ * only this extension holds.
+ */
+export async function openAuthorization(
+    base: string,
+    input: {
+        readonly publicKey: string;
+        readonly device: { readonly identifier: string; readonly name: string };
+    }
+): Promise<AuthorizationOpened | null> {
+    const reply = await ask(vaultUrl(base, "identity/connect/authorize"), {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: tokenForm({
+            publicKey: input.publicKey,
+            deviceIdentifier: input.device.identifier,
+            deviceName: input.device.name,
+            deviceType: String(deviceType())
+        }).toString()
+    });
+    if (!reply || !reply.ok) return null;
+    const body = (await reply.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body) return null;
+    const userCode = body["userCode"];
+    const deviceCode = body["deviceCode"];
+    if (typeof userCode !== "string" || typeof deviceCode !== "string") return null;
+    return {
+        userCode,
+        deviceCode,
+        expiresAt: typeof body["expiresAt"] === "string" ? body["expiresAt"] : "",
+        pollMs: typeof body["pollMs"] === "number" ? body["pollMs"] : 2000
+    };
+}
+
+/**
+ * Ask whether it has been approved, and collect the credential when it has.
+ *
+ * A request still waiting answers 200 with a status rather than an error, because
+ * "not yet" is the ordinary case and treating it as a failure would make the popup
+ * give up on the first poll. An unreachable server is the one thing reported as
+ * nothing at all, so the caller can tell it apart from a refusal.
+ */
+export async function claimAuthorization(
+    base: string,
+    deviceCode: string
+): Promise<AuthorizationClaim | null> {
+    const reply = await ask(vaultUrl(base, "identity/connect/authorize/claim"), {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: tokenForm({ deviceCode }).toString()
+    });
+    if (!reply) return null;
+    const body = (await reply.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!reply.ok || !body) return { status: "expired" };
+
+    const status = body["status"];
+    if (status !== "approved") {
+        return {
+            status: status === "denied" ? "denied" : status === "pending" ? "pending" : "expired"
+        };
+    }
+    const token = readToken(body);
+    const wrappedKey = body["wrappedKey"];
+    // An approval that arrived without either piece is not an approval this can
+    // act on, and pretending otherwise would leave a signed-in extension that can
+    // read nothing.
+    if (!token || typeof wrappedKey !== "string") return { status: "expired" };
+    return { status: "approved", token, wrappedKey };
+}
+
 /**
  * Sign in with the hash the crypto module derived, and say what happened.
  *

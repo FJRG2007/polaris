@@ -15,6 +15,7 @@ import {
     decryptRsa,
     encrypt,
     fromBase64,
+    generateRsaKeyPair,
     symmetricKeyFromBytes
 } from "@polaris/vault-crypto";
 import {
@@ -102,6 +103,28 @@ const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf
     "session:vault.wrapped",
     { fallback: null }
 );
+/**
+ * A request waiting for somebody to approve it in the dashboard.
+ *
+ * Session storage, because it is a credential: whoever holds the code can collect
+ * the approval. It lives there rather than in memory because a manifest v3 worker
+ * is recycled whenever the browser feels like it, and a request that somebody has
+ * gone to approve must survive that - otherwise the approval lands on a code
+ * nothing is waiting on any more.
+ *
+ * The private half of the pair is the opposite: memory only, and losing it to a
+ * recycle means the request simply cannot be collected. That is the correct
+ * direction to fail in - key material at rest is the one thing this design will not
+ * have - and the popup says so rather than leaving somebody waiting on a code that
+ * can no longer be used.
+ */
+const WAITING = storage.defineItem<{ deviceCode: string; userCode: string } | null>(
+    "session:vault.waiting",
+    { fallback: null }
+);
+
+/** The pair this extension generated for a request in flight. Memory only. */
+let asking: { publicKey: string; privateKey: Uint8Array } | null = null;
 
 /**
  * When the open vault locks itself, and how long it is given.
@@ -237,6 +260,23 @@ async function unlock(password: string): Promise<boolean> {
     const key = symmetricKeyFromBytes(raw);
 
     open = { key, organizations: await organizationKeys(key) };
+    return true;
+}
+
+/**
+ * Open the vault with the key itself, rather than with a password.
+ *
+ * For the approval flow: a browser that is already inside the vault sealed the key
+ * to this extension's public half, so what arrives here is the 64 bytes rather than
+ * something to derive them from. Nothing else differs - the same key, the same
+ * other-vault keys read off the same sync - which is why this is the same three
+ * lines `unlock` ends with rather than a second way of being open.
+ */
+async function openWithKey(raw: Uint8Array): Promise<boolean> {
+    if (raw.length !== 64) return false;
+    const key = symmetricKeyFromBytes(raw);
+    open = { key, organizations: await organizationKeys(key) };
+    await LOCK_AT.setValue(deadlineFrom(Date.now(), await TIMEOUT.getValue()));
     return true;
 }
 
@@ -790,6 +830,81 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 await unlock(request.password);
                 await badge();
                 return { ok: true, status: await status() };
+            }
+
+            case "authorize": {
+                const origin = await currentOrigin();
+                if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+                // A pair for this one exchange. The public half goes to the server;
+                // the private half stays here and is the only thing that can open
+                // what comes back.
+                const pair = await generateRsaKeyPair();
+                const opened = await protocol.openAuthorization(vaultBase(origin), {
+                    publicKey: pair.publicKey,
+                    device: await device()
+                });
+                if (!opened) return { ok: false, error: "That server did not answer." };
+
+                asking = { publicKey: pair.publicKey, privateKey: pair.privateKey };
+                await WAITING.setValue({
+                    deviceCode: opened.deviceCode,
+                    userCode: opened.userCode
+                });
+                // Opened here rather than left to the popup: a popup is torn down
+                // the moment it loses focus, which is exactly what opening a tab
+                // does to it.
+                await browser.tabs.create({
+                    url: `${origin}/vault/authorize?code=${encodeURIComponent(opened.userCode)}`
+                });
+                return {
+                    ok: true,
+                    userCode: opened.userCode,
+                    expiresAt: opened.expiresAt,
+                    pollMs: opened.pollMs
+                };
+            }
+
+            case "authorizeCheck": {
+                const [origin, waiting] = await Promise.all([currentOrigin(), WAITING.getValue()]);
+                if (!origin || !waiting) return { ok: true, waiting: "expired" };
+                // The private half is gone, so nothing can open what an approval
+                // would carry. Said plainly rather than polling forever: under
+                // manifest v3 the worker is recycled whenever the browser likes.
+                if (!asking) {
+                    await WAITING.setValue(null);
+                    return { ok: false, error: "This browser lost the request. Ask again." };
+                }
+
+                const claim = await protocol.claimAuthorization(
+                    vaultBase(origin),
+                    waiting.deviceCode
+                );
+                if (!claim) return { ok: true, waiting: "pending" };
+                if (claim.status !== "approved") {
+                    if (claim.status !== "pending") {
+                        await WAITING.setValue(null);
+                        asking = null;
+                    }
+                    return { ok: true, waiting: claim.status };
+                }
+
+                const raw = await decryptRsa(claim.wrappedKey, asking.privateKey);
+                await WAITING.setValue(null);
+                const privateKey = asking.privateKey;
+                asking = null;
+                if (!raw || !(await openWithKey(raw))) {
+                    // Approved, and unreadable. Nothing is kept: a session that
+                    // cannot decrypt anything is worse than none, because it looks
+                    // signed in.
+                    privateKey.fill(0);
+                    return { ok: false, error: "What came back could not be opened. Ask again." };
+                }
+                privateKey.fill(0);
+
+                await remember(claim.token);
+                await sync(true);
+                await badge();
+                return { ok: true, waiting: "approved" };
             }
 
             case "unlock": {

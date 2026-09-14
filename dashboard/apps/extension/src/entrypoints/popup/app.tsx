@@ -105,6 +105,19 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
     );
 }
 
+/**
+ * Signing in, which is two ways of proving the same thing.
+ *
+ * The offered one asks Polaris itself: a tab opens on the dashboard, somebody who
+ * is already signed in and has their vault open says yes, and the key arrives
+ * sealed to a pair this extension made for the exchange. Nothing is typed here.
+ * That is a higher bar than the alternative, not a lower one - it needs a session
+ * AND an unlocked vault, where a password is just the password.
+ *
+ * The master password is still offered underneath, because the first way needs a
+ * dashboard somebody can reach right now, and a browser on a machine where that is
+ * not true would otherwise have no way in at all.
+ */
 function SignIn({
     server,
     onDone
@@ -118,6 +131,9 @@ function SignIn({
     const [needsCode, setNeedsCode] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [typing, setTyping] = useState(false);
+    /** The request in flight: the code to show, and how often to ask about it. */
+    const [waiting, setWaiting] = useState<{ userCode: string; pollMs: number } | null>(null);
 
     const signIn = async (): Promise<void> => {
         setBusy(true);
@@ -137,45 +153,131 @@ function SignIn({
         await onDone();
     };
 
+    const ask = async (): Promise<void> => {
+        setBusy(true);
+        setError(null);
+        const reply = await askBackground({ kind: "authorize" });
+        setBusy(false);
+        if (!reply.ok) {
+            setError(reply.error);
+            return;
+        }
+        if ("userCode" in reply) setWaiting({ userCode: reply.userCode, pollMs: reply.pollMs });
+    };
+
+    // Asking, while a request is in flight. The worker does the asking and holds
+    // everything; this only decides how often and stops when it is answered.
+    useEffect(() => {
+        if (!waiting) return;
+        let alive = true;
+        const timer = window.setInterval(() => {
+            void (async () => {
+                const reply = await askBackground({ kind: "authorizeCheck" });
+                if (!alive) return;
+                if (!reply.ok) {
+                    setWaiting(null);
+                    setError(reply.error);
+                    return;
+                }
+                if (!("waiting" in reply)) return;
+                if (reply.waiting === "approved") {
+                    setWaiting(null);
+                    await onDone();
+                    return;
+                }
+                if (reply.waiting === "pending") return;
+                setWaiting(null);
+                setError(
+                    reply.waiting === "denied"
+                        ? "That was turned down in Polaris."
+                        : "That request ran out. Ask again."
+                );
+            })();
+        }, waiting.pollMs);
+        return () => {
+            alive = false;
+            window.clearInterval(timer);
+        };
+    }, [waiting, onDone]);
+
+    if (waiting) {
+        return (
+            <main className="pad">
+                <h1>Waiting for Polaris</h1>
+                <p className="muted">
+                    Approve this in the tab that opened. The code there should read:
+                </p>
+                <code className="value">{waiting.userCode}</code>
+                <p className="muted small">
+                    Nothing is handed over until somebody with the vault open says yes.
+                </p>
+                <button className="ghost" onClick={() => setWaiting(null)}>
+                    Cancel
+                </button>
+            </main>
+        );
+    }
+
     return (
         <main className="pad">
             <h1>Sign in</h1>
             <p className="muted">{new URL(server).host}</p>
-            <input
-                autoFocus
-                type="email"
-                value={email}
-                placeholder="you@example.com"
-                onChange={(event) => setEmail(event.target.value)}
-            />
-            <input
-                type="password"
-                value={password}
-                placeholder="Master password"
-                onChange={(event) => setPassword(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && void signIn()}
-            />
-            {needsCode ? (
-                <input
-                    autoFocus
-                    inputMode="numeric"
-                    value={code}
-                    placeholder="Code from your authenticator"
-                    onChange={(event) => setCode(event.target.value)}
-                    onKeyDown={(event) => event.key === "Enter" && void signIn()}
-                />
-            ) : null}
-            <Problem text={error} />
-            <button
-                disabled={busy || email.trim() === "" || password === ""}
-                onClick={() => void signIn()}
-            >
-                {busy ? "Opening" : "Unlock"}
-            </button>
-            <p className="muted small">
-                The master password never leaves this browser. It is turned into a key here, and
-                what goes out cannot be turned back into it.
-            </p>
+            {typing ? (
+                <>
+                    <input
+                        autoFocus
+                        type="email"
+                        value={email}
+                        placeholder="you@example.com"
+                        onChange={(event) => setEmail(event.target.value)}
+                    />
+                    <input
+                        type="password"
+                        value={password}
+                        placeholder="Master password"
+                        onChange={(event) => setPassword(event.target.value)}
+                        onKeyDown={(event) => event.key === "Enter" && void signIn()}
+                    />
+                    {needsCode ? (
+                        <input
+                            autoFocus
+                            inputMode="numeric"
+                            value={code}
+                            placeholder="Code from your authenticator"
+                            onChange={(event) => setCode(event.target.value)}
+                            onKeyDown={(event) => event.key === "Enter" && void signIn()}
+                        />
+                    ) : null}
+                    <Problem text={error} />
+                    <button
+                        disabled={busy || email.trim() === "" || password === ""}
+                        onClick={() => void signIn()}
+                    >
+                        {busy ? "Opening" : "Unlock"}
+                    </button>
+                    <p className="muted small">
+                        The master password never leaves this browser. It is turned into a key here,
+                        and what goes out cannot be turned back into it.
+                    </p>
+                    <button className="ghost" onClick={() => setTyping(false)}>
+                        Ask Polaris instead
+                    </button>
+                </>
+            ) : (
+                <>
+                    <Problem text={error} />
+                    <button disabled={busy} onClick={() => void ask()}>
+                        {busy ? "Asking" : "Sign in with Polaris"}
+                    </button>
+                    <p className="muted small">
+                        A tab opens on your dashboard. Approve it there, with your vault unlocked,
+                        and the key arrives sealed so that only this extension can open it.
+                    </p>
+                    <button className="ghost" onClick={() => setTyping(true)}>
+                        Use the master password
+                    </button>
+                </>
+            )}
         </main>
     );
 }
