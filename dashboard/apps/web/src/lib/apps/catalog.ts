@@ -96,6 +96,16 @@ export interface TemplateEnvVar {
     tunable?: boolean;
     /** Groups tunables under a heading in the settings form. */
     group?: string;
+    /**
+     * The default is written for a server that runs plugins, so it is seeded only
+     * when the software chosen at install actually runs them.
+     *
+     * A Minecraft server's software is chosen in the same form as this value, and
+     * a plugin has no build for a modded server - so seeding Paper's plugins onto
+     * a NeoForge server put three entries on its list that could never install,
+     * two of them reported on screen as projects Modrinth had never heard of.
+     */
+    pluginServersOnly?: boolean;
 }
 
 /** A volume the app needs. The install wizard offers the same choice as Deploy:
@@ -458,10 +468,16 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // alpha, and the image takes finished releases by default - so
                     // the anticheat every server was supposed to get was quietly
                     // never installed on any of them.
+                    // All three are Bukkit plugins, so they are seeded only onto a
+                    // server that runs plugins. A modded server got them too, and
+                    // no build of any of them exists for one: two were drawn on the
+                    // Mods screen as projects Modrinth had never heard of, and the
+                    // third installed a jar that brought the server down.
                     key: "MODRINTH_PROJECTS",
                     label: "Mods and plugins",
                     help: "Modrinth projects to install, comma separated. Managed from the Mods tab.",
                     default: "grimac?:alpha,coreprotect?,luckperms?",
+                    pluginServersOnly: true,
                     tunable: true,
                     group: "Mods"
                 },

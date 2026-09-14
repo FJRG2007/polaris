@@ -43,6 +43,17 @@ const LOADER_BY_TYPE: Record<string, string> = {
  *  nothing at all rather than with an error. */
 const PLUGIN_LOADERS = new Set(["paper", "spigot", "purpur", "bukkit", "folia"]);
 
+/**
+ * Whether this loader runs plugins rather than mods.
+ *
+ * The line everything about a Minecraft server falls on: what it can install,
+ * which half of Modrinth to search, and - because a plugin has no build for a
+ * modded server and never will - what may be put on its list at all.
+ */
+export function isPluginLoader(loader: string): boolean {
+    return PLUGIN_LOADERS.has(loader);
+}
+
 /** Whether this server software can load anything from Modrinth at all. */
 export function loaderForType(type: string): string | null {
     return LOADER_BY_TYPE[type.toUpperCase()] ?? null;
@@ -89,7 +100,7 @@ const MOD_CATEGORIES: readonly ModrinthCategory[] = [
 
 /** What a server of this flavour can be browsed by. */
 export function categoriesForLoader(loader: string): readonly ModrinthCategory[] {
-    return PLUGIN_LOADERS.has(loader) ? PLUGIN_CATEGORIES : MOD_CATEGORIES;
+    return isPluginLoader(loader) ? PLUGIN_CATEGORIES : MOD_CATEGORIES;
 }
 
 /** Whether a category tag is one this loader is actually browsed by. Checked on
@@ -181,7 +192,7 @@ export async function searchModrinth(
     loader: string,
     options: { version?: string | null; category?: string; limit?: number } = {}
 ): Promise<ModrinthProject[]> {
-    const projectType = PLUGIN_LOADERS.has(loader) ? "plugin" : "mod";
+    const projectType = isPluginLoader(loader) ? "plugin" : "mod";
     const facets: string[][] = [[`project_type:${projectType}`], [`categories:${loader}`]];
     // A plugin is server-side by definition and Modrinth does not always tag one,
     // so this is only worth asking of mods - where the client-only ones are the

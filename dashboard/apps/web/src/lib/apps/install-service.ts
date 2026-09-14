@@ -13,13 +13,14 @@ import { slugify } from "@polaris/deploy";
 import { listHosts } from "@/lib/host-service";
 import { encryptSecret } from "@polaris/storage";
 import { appBaseUrl } from "@/lib/domain-service";
+import { publishAccessChange } from "@/lib/access-live";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
-import { publishAccessChange } from "@/lib/access-live";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
+import { isPluginLoader, loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
 import { MAIL_SERVER_APP, uninstallRefusal as mailServerUninstallRefusal } from "@/lib/mail-server/app-install";
@@ -205,6 +206,20 @@ export async function installApp(
         const value = normalizeEnvValue(declared, entry.value);
         if (!isAllowedEnvValue(declared, value)) continue;
         envByKey.set(entry.key, { value, isSecret: Boolean(declared.secret) });
+    }
+    // A default written for a server that runs plugins is not seeded onto one that
+    // runs mods. Which software a Minecraft server runs is chosen in the same form
+    // as these values, and a plugin has no build for NeoForge or Fabric - so the
+    // seed could only ever be entries that fail to install, which is what it was:
+    // two reported on screen as projects Modrinth had never heard of, and one jar
+    // the server could not boot on. Anything the operator typed is theirs and stays.
+    const typedKeys = new Set(input.env.map((entry) => entry.key));
+    const software = envByKey.get("TYPE")?.value ?? "";
+    const loader = loaderForType(software);
+    if (!loader || !isPluginLoader(loader)) {
+        for (const declared of template.env ?? []) {
+            if (declared.pluginServersOnly && !typedKeys.has(declared.key)) envByKey.delete(declared.key);
+        }
     }
     // Generated vars are the app's own credentials (Minecraft's RCON password): minted
     // here so nobody is asked for them and no app ships a default one.

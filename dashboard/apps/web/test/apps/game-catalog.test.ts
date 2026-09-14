@@ -34,6 +34,30 @@ import {
     isGameManagerApp
 } from "@/lib/apps/games-catalog";
 
+/**
+ * What a new Minecraft server is given before anybody has chosen anything.
+ *
+ * The protection seed is three Bukkit plugins, and the software a server runs is
+ * chosen in the same form. A modded server was handed them anyway: no build of a
+ * plugin exists for NeoForge, so two sat on the Mods screen as projects Modrinth
+ * had never heard of and the third installed a jar the server could not boot on.
+ */
+describe("the mod list a server starts with", () => {
+    const field = (findApp("minecraft")?.template?.env ?? []).find((entry) => entry.key === "MODRINTH_PROJECTS");
+
+    it("is seeded only onto a server that runs plugins", () => {
+        expect(field).toBeDefined();
+        expect(field!.pluginServersOnly).toBe(true);
+    });
+
+    it("still carries the protection a plugin server is meant to get", () => {
+        // Dropping it for everybody would leave the servers it does fit without an
+        // anticheat or block history, which is what it exists to prevent.
+        expect(field!.default).toContain("grimac");
+        expect(field!.default).toContain("coreprotect");
+    });
+});
+
 describe("the app every game is created from", () => {
     const app = findApp(GAME_SERVERS_APP_ID);
 
