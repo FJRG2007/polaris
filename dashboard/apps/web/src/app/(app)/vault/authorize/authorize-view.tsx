@@ -128,11 +128,20 @@ export function AuthorizeView() {
                         <dl className="flex flex-col gap-1 text-xs">
                             <div className="flex justify-between gap-3">
                                 <dt className="text-muted-foreground">Asked from</dt>
-                                <dd className="truncate">{pending.requestIp ?? "Unknown"}</dd>
+                                {/* The whole address, because this is half the
+                                    decision and an IPv6 one does not fit the row. */}
+                                <dd className="truncate" title={pending.requestIp ?? "Unknown"}>
+                                    {pending.requestIp ?? "Unknown"}
+                                </dd>
                             </div>
                             <div className="flex justify-between gap-3">
                                 <dt className="text-muted-foreground">On</dt>
-                                <dd className="truncate">{pending.host ?? "Unknown"}</dd>
+                                {/* And the whole name it was asked on: which of a
+                                    deployment's addresses saw the request is the
+                                    other half, and the tail is where they differ. */}
+                                <dd className="truncate" title={pending.host ?? "Unknown"}>
+                                    {pending.host ?? "Unknown"}
+                                </dd>
                             </div>
                         </dl>
                         <p className="text-xs text-muted-foreground">
