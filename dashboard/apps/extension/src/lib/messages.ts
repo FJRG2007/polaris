@@ -23,6 +23,20 @@ export interface ItemSummary {
     readonly host: string | null;
     /** Whether it carries a one-time code, so the popup can offer it. */
     readonly totp: boolean;
+    /**
+     * Which vault it came out of, named as its owner named it, or null for this
+     * account's own.
+     *
+     * Nobody has one vault. A person has their own and a share from every
+     * organization they are in, and the same login - a shared account, the same
+     * address, often the same name - exists in more than one of them. Without
+     * this the list showed two identical rows and no way to tell which was which,
+     * so the only way to find out was to copy one and try it.
+     *
+     * Plain text, because it is: the vault's own name travels unencrypted in the
+     * sync profile and is never something decrypted here.
+     */
+    readonly vault: string | null;
 }
 
 /**
@@ -162,7 +176,31 @@ export type Reply =
     | { readonly ok: true }
     | { readonly ok: false; readonly error: string; readonly needsCode?: boolean };
 
-/** Ask the background worker something, from the popup. */
+/**
+ * Ask the background worker something, from the popup.
+ *
+ * Never rejects, and that is the point. Under manifest v3 the worker is recycled
+ * whenever the browser feels like it, and `sendMessage` to one that is gone -
+ * or that dies part way through answering - rejects rather than returning
+ * anything. Every screen here presses a button, awaits this, and then turns its
+ * own "busy" back off; a rejection skipped that line, so the button sat on
+ * "Asking the browser" or "Opening" for as long as the popup stayed open and
+ * nothing ever said why. It looked exactly like a button that does nothing.
+ *
+ * So a worker that cannot be reached is an answer like any other, in the shape
+ * every caller already handles. Re-opening the popup starts it again, which is
+ * what the sentence asks for.
+ */
 export async function askBackground(request: Request): Promise<Reply> {
-    return (await browser.runtime.sendMessage(request)) as Reply;
+    const unreachable = { ok: false, error: "Polaris did not answer. Open this again." } as const;
+    try {
+        const reply = (await browser.runtime.sendMessage(request)) as Reply | undefined;
+        // A worker torn down mid-question can also answer with nothing at all,
+        // which is not a rejection and would otherwise be read as a Reply whose
+        // every field is undefined - a screen waiting on `ok` that never comes.
+        if (typeof reply !== "object" || reply === null || !("ok" in reply)) return unreachable;
+        return reply;
+    } catch {
+        return unreachable;
+    }
 }

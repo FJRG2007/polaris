@@ -42,7 +42,11 @@ export default defineConfig({
     },
     manifest: ({ browser, manifestVersion }) => ({
         name: "Polaris",
-        description: "Your Polaris vault, in the toolbar.",
+        // Polaris, not "Polaris's vault". The logins are what it does today and
+        // the only thing described here, but the extension is the product's
+        // window in the toolbar rather than one feature of it - and a name that
+        // says "vault" is one that has to be argued with every time it grows.
+        description: "Polaris in your toolbar.",
         // Polaris's own mark. Without this the browser draws the grey puzzle
         // piece, which is what every extension nobody has looked at looks like.
         // One file at every size: the browsers pick the nearest and scale, and a

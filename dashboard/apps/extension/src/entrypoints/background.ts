@@ -435,6 +435,35 @@ interface Login {
     readonly password: string | null;
     readonly totp: string | null;
     readonly uris: readonly { uri: string; match: UriMatch | null }[];
+    /** Which vault it belongs to, or null for this account's own. Carried so the
+     *  list can say which of two identical logins is which - see `vaultNames`. */
+    readonly organizationId: string | null;
+}
+
+/**
+ * What each vault is called, by the id its items carry.
+ *
+ * Read straight off the last sync's profile and never decrypted, because a
+ * vault's name is not a secret and does not arrive as one: the server sends it
+ * in plain text so a client can name a vault before it can open it.
+ *
+ * Separate from `organizationKeys` on purpose. That one needs the account's
+ * private key and runs on unlock; this needs nothing and is wanted on every
+ * listing, including for a vault whose key would not unwrap - which is somebody
+ * who has been invited and not yet let in, and whose rows should still say where
+ * they came from.
+ */
+async function vaultNames(): Promise<Map<string, string>> {
+    const names = new Map<string, string>();
+    const held = await CIPHERS.getValue();
+    if (!held) return names;
+    const profile = held.profile as { organizations?: { id?: unknown; name?: unknown }[] };
+    for (const organization of profile.organizations ?? []) {
+        if (typeof organization.id !== "string") continue;
+        if (typeof organization.name !== "string" || organization.name === "") continue;
+        names.set(organization.id, organization.name);
+    }
+    return names;
 }
 
 /** The login type, as the wire numbers it. */
@@ -463,7 +492,11 @@ async function readLogin(cipher: Record<string, unknown>): Promise<Login | null>
         username: await say(login["username"]),
         password: await say(login["password"]),
         totp: await say(login["totp"]),
-        uris
+        uris,
+        // Already read a few lines up to choose the key this was decrypted with;
+        // kept here so the list can say which vault a row came out of.
+        organizationId:
+            typeof cipher["organizationId"] === "string" ? cipher["organizationId"] : null
     };
 }
 
@@ -505,13 +538,17 @@ async function blockedHere(): Promise<{ host: string | null; blocked: boolean }>
     return { host: hostOf(url), blocked: isBlockedHost(await BLOCKED.getValue(), url) };
 }
 
-function summarize(login: Login): messages.ItemSummary {
+function summarize(login: Login, vaults: ReadonlyMap<string, string>): messages.ItemSummary {
     return {
         id: login.id,
         name: login.name,
         username: login.username,
         host: displayHost(login.uris),
-        totp: login.totp !== null
+        totp: login.totp !== null,
+        // Null for this account's own vault, and null too for a shared one whose
+        // name did not arrive - an unnamed row is honest where "Shared" would be
+        // a label nobody chose.
+        vault: login.organizationId === null ? null : (vaults.get(login.organizationId) ?? null)
     };
 }
 
@@ -1169,8 +1206,13 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     ? { ok: true, status: await status() }
                     : { ok: false, error: "Nothing came back from that server." };
 
-            case "itemsFor":
-                return { ok: true, items: (await forUrl(request.url)).map(summarize) };
+            case "itemsFor": {
+                const vaults = await vaultNames();
+                return {
+                    ok: true,
+                    items: (await forUrl(request.url)).map((login) => summarize(login, vaults))
+                };
+            }
 
             case "items": {
                 const query = request.query.trim().toLowerCase();
@@ -1182,7 +1224,13 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                               (login.username ?? "").toLowerCase().includes(query)
                       )
                     : all;
-                return { ok: true, items: found.slice(0, 100).map(summarize) };
+                {
+                    const vaults = await vaultNames();
+                    return {
+                        ok: true,
+                        items: found.slice(0, 100).map((login) => summarize(login, vaults))
+                    };
+                }
             }
 
             case "totpNow": {

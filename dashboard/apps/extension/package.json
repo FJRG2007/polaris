@@ -3,7 +3,7 @@
     "version": "0.1.1",
     "private": true,
     "type": "module",
-    "description": "The Polaris browser extension: the vault in the toolbar, with autofill, for Chrome and Firefox.",
+    "description": "The Polaris browser extension for Chrome and Firefox: Polaris in the toolbar, starting with your logins and autofill.",
     "scripts": {
         "dev": "wxt",
         "dev:firefox": "wxt -b firefox",

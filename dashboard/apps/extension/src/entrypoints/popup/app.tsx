@@ -92,8 +92,8 @@ function UpdateBanner({
     }
     return (
         <div className="notice small">
-            Version {notice.version} is out. This copy was loaded by hand, so it has to be
-            loaded again the same way.{" "}
+            Version {notice.version} is out. This copy was loaded by hand, so it has to be loaded
+            again the same way.{" "}
             <a
                 href={server ? `${server}/account/downloads` : notice.url}
                 target="_blank"
@@ -192,7 +192,12 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
                 onKeyDown={(event) => event.key === "Enter" && void connect()}
             />
             <Problem text={error} />
-            <button disabled={asking || typed.trim() === ""} onClick={() => void connect()}>
+            {/* `usable`, not "something was typed". The permission prompt is the
+                thing being protected: a browser grants one per gesture, and a
+                button that lights up on the first keystroke spends it on a host
+                that cannot exist - after which the reader is left with a refusal
+                and no way to tell it from a real one. */}
+            <button disabled={asking || !usable} onClick={() => void connect()}>
                 {asking ? "Asking the browser" : "Continue"}
             </button>
             <p className="muted small">
@@ -550,7 +555,52 @@ function Generator({ onUse }: { onUse: (value: string) => void }): React.JSX.Ele
  * the countdown runs out rather than on a fixed timer, so the digits on screen are
  * never the previous period's.
  */
-function TotpCell({ id }: { id: string }): React.JSX.Element | null {
+/**
+ * The seconds left, as a ring that empties.
+ *
+ * The same shape the vault draws in the dashboard, down to the radius and the
+ * thresholds, because it answers the same question in both places: somebody
+ * looking at six digits wants to know whether there is time to type them, and
+ * that is a shape rather than an arithmetic. Redrawn here rather than imported -
+ * the dashboard's is a Tailwind component and this popup ships no Tailwind - so
+ * the numbers are copied and the colours come from the tokens in `style.css`.
+ */
+function CountdownRing({ left, of }: { left: number; of: number }): React.JSX.Element {
+    const period = Math.max(1, of);
+    const held = Math.max(0, Math.min(period, left));
+    const radius = 9;
+    const circumference = 2 * Math.PI * radius;
+    const tone = held <= 5 ? "danger" : held <= Math.max(8, period / 3) ? "warning" : "success";
+
+    return (
+        <span className={`ring ${tone}`} role="timer" aria-label={`${held} seconds left`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle
+                    cx="12"
+                    cy="12"
+                    r={radius}
+                    fill="none"
+                    strokeWidth="2.5"
+                    className="track"
+                />
+                <circle
+                    cx="12"
+                    cy="12"
+                    r={radius}
+                    fill="none"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - held / period)}
+                />
+            </svg>
+            <span className="ring-left">{held}</span>
+        </span>
+    );
+}
+
+function TotpCell({ id, onCopy }: { id: string; onCopy: () => void }): React.JSX.Element | null {
     const [code, setCode] = useState<string | null>(null);
     const [left, setLeft] = useState(0);
 
@@ -586,9 +636,76 @@ function TotpCell({ id }: { id: string }): React.JSX.Element | null {
     // Grouped in threes, which is how everybody reads a code off a screen.
     const shown = code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
     return (
-        <span className="code" title={`Turns over in ${left} seconds`}>
-            {shown} <span className="muted">{left}s</span>
-        </span>
+        <button
+            type="button"
+            className="field code-field"
+            title="Copy the one-time code"
+            aria-label="Copy the one-time code"
+            onClick={onCopy}
+        >
+            <CountdownRing left={left} of={30} />
+            <span className="code">{shown}</span>
+            <CopyMark />
+        </button>
+    );
+}
+
+/**
+ * The mark on a line that can be copied.
+ *
+ * Hidden until the row is hovered or something in it has focus, which is what
+ * lets a login be three readable lines instead of a name and a row of buttons
+ * named after the thing they copy. `aria-hidden`, because the line it sits in is
+ * already a button with a name of its own - announcing it again would read the
+ * same action twice.
+ */
+function CopyMark(): React.JSX.Element {
+    return (
+        <svg className="copy-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="9" width="11" height="11" rx="2" />
+            <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+    );
+}
+
+/**
+ * One value on a login, as a line that copies itself when pressed.
+ *
+ * The whole line is the button rather than an icon at the end of it: at 360
+ * pixels a row of four labelled buttons is most of the width, and the thing
+ * somebody wants is almost always "give me that value". A password is shown as
+ * dots - it is copied, never read off the screen - and a login with no username
+ * says so rather than drawing an empty line that looks pressable and is not.
+ */
+function Field({
+    label,
+    shown,
+    mono,
+    onCopy
+}: {
+    label: string;
+    shown: string;
+    mono?: boolean;
+    onCopy: (() => void) | null;
+}): React.JSX.Element {
+    if (!onCopy) {
+        return (
+            <span className="field empty">
+                <span className="muted small">{shown}</span>
+            </span>
+        );
+    }
+    return (
+        <button
+            type="button"
+            className="field"
+            title={`Copy the ${label.toLowerCase()}`}
+            aria-label={`Copy the ${label.toLowerCase()}`}
+            onClick={onCopy}
+        >
+            <span className={mono ? "shown mono" : "shown"}>{shown}</span>
+            <CopyMark />
+        </button>
     );
 }
 
@@ -934,13 +1051,48 @@ function Items({
         window.close();
     };
 
+    /**
+     * One login, as three lines that copy themselves.
+     *
+     * It used to be a name and five buttons - Fill, User, Pass, New, Code - which
+     * at 360 pixels left the name about eight characters before it was cut, and
+     * named every button after the thing it copied rather than showing it. Now the
+     * values are the lines: what the username is, that there is a password, and
+     * what the code is right now, each one a button that copies it and each one
+     * showing what it will copy.
+     *
+     * Which vault it came out of is on the name line, because a person has their
+     * own and one from every organization they are in - and the same login lives
+     * in more than one of them.
+     */
     const row = (item: ItemSummary, offerFill: boolean): React.JSX.Element => (
         <li key={item.id}>
-            <div className="who">
-                <span className="name">{item.name}</span>
-                <span className="muted small">{item.username ?? item.host ?? ""}</span>
-                {item.totp ? <TotpCell id={item.id} /> : null}
+            <div className="item">
+                <div className="head">
+                    <span className="name">{item.name}</span>
+                    {item.vault ? (
+                        <span className="vault" title={`Shared from ${item.vault}`}>
+                            {item.vault}
+                        </span>
+                    ) : null}
+                </div>
+                <Field
+                    label="Username"
+                    shown={item.username ?? item.host ?? "No username"}
+                    onCopy={item.username === null ? null : () => void copy(item, "username")}
+                />
+                <Field
+                    label="Password"
+                    shown="••••••••••"
+                    mono
+                    onCopy={() => void copy(item, "password")}
+                />
+                {item.totp ? (
+                    <TotpCell id={item.id} onCopy={() => void copy(item, "totp")} />
+                ) : null}
             </div>
+            {/* What is left is the two things that are not "copy that": putting it
+                into the page in front of somebody, and replacing the password. */}
             <div className="acts">
                 {offerFill ? (
                     <button
@@ -953,38 +1105,12 @@ function Items({
                 ) : null}
                 <button
                     className="ghost"
-                    title="Copy the username"
-                    aria-label={`Copy the username for ${item.name}`}
-                    onClick={() => void copy(item, "username")}
-                >
-                    User
-                </button>
-                <button
-                    className="ghost"
-                    title="Copy the password"
-                    aria-label={`Copy the password for ${item.name}`}
-                    onClick={() => void copy(item, "password")}
-                >
-                    Pass
-                </button>
-                <button
-                    className="ghost"
                     title="Replace the password"
                     aria-label={`Replace the password for ${item.name}`}
                     onClick={() => setChanging(item)}
                 >
                     New
                 </button>
-                {item.totp ? (
-                    <button
-                        className="ghost"
-                        title="Copy the one-time code"
-                        aria-label={`Copy the one-time code for ${item.name}`}
-                        onClick={() => void copy(item, "totp")}
-                    >
-                        Code
-                    </button>
-                ) : null}
             </div>
         </li>
     );
@@ -995,7 +1121,7 @@ function Items({
                 <input
                     autoFocus
                     value={query}
-                    placeholder="Search the vault"
+                    placeholder="Search your logins"
                     onChange={(event) => setQuery(event.target.value)}
                 />
             </header>
@@ -1011,7 +1137,7 @@ function Items({
                 <h2>{query === "" ? "Everything" : "Found"}</h2>
                 {found.length === 0 ? (
                     <p className="muted pad">
-                        {query === "" ? "This vault has no logins yet." : "Nothing matches that."}
+                        {query === "" ? "No logins saved yet." : "Nothing matches that."}
                     </p>
                 ) : (
                     <ul>{found.map((item) => row(item, false))}</ul>

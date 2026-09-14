@@ -40,6 +40,11 @@
     --danger: 356 68% 57%;
     --danger-ink: 356 86% 72%;
 
+    /* The countdown ring walks these as a code runs out, the same three the
+       dashboard's does. Copied from the same tokens file as everything above. */
+    --success: 152 52% 44%;
+    --warning: 38 88% 54%;
+
     --radius: 0.5rem;
     --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
@@ -64,6 +69,9 @@
         --ring: 258 78% 56%;
 
         --primary: 258 78% 55%;
+
+        --success: 152 50% 34%;
+        --warning: 34 88% 44%;
     }
 }
 
@@ -210,15 +218,32 @@ ul {
 
 li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     padding: 8px 16px;
     border-bottom: 1px solid hsl(var(--border));
 }
 
-.who {
+/*
+ * One login, as lines rather than as a name with buttons after it.
+ *
+ * `min-width: 0` on the column is what makes the truncation below work at all: a
+ * flex child's floor is the width of its content, so without it a long username
+ * pushes the row wider than the 360 pixels the popup has and the buttons leave
+ * the panel. That is the defect this layout exists to end.
+ */
+.item {
     display: flex;
     flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
     min-width: 0;
 }
 
@@ -228,8 +253,101 @@ li {
     white-space: nowrap;
 }
 
+/* Which vault a login came out of. Allowed to shrink to nothing before the name
+   does: the name is what somebody is looking for, and this only tells two rows
+   with the same name apart once they have both been found. */
+.vault {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--elevated));
+    border: 1px solid hsl(var(--border));
+}
+
+/*
+ * A value that copies itself when pressed.
+ *
+ * A button stripped back to a line of text, so the whole width is the target
+ * rather than an icon at the end of it - at 360 pixels an icon-sized hit area is
+ * the reason a copy takes two attempts.
+ */
+.field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    padding: 2px 4px;
+    margin-left: -4px;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.field:hover,
+.field:focus-visible {
+    background: hsl(var(--elevated));
+    color: hsl(var(--foreground));
+}
+
+/* Nothing to copy: a login with no username says so, and must not look pressable. */
+.field.empty {
+    cursor: default;
+    background: transparent;
+}
+
+.shown {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.mono {
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+}
+
+/*
+ * The copy mark, which is there only when it is wanted.
+ *
+ * Hidden by default and shown on hover or focus, which is what buys the room
+ * these rows needed - and `:focus-visible` rather than hover alone, because a
+ * control that only exists under a pointer is one nobody reaching the row by
+ * keyboard can see.
+ */
+.copy-mark {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    opacity: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.field:hover .copy-mark,
+.field:focus-visible .copy-mark {
+    opacity: 1;
+}
+
 .acts {
     display: flex;
+    flex: none;
     gap: 4px;
     margin-left: auto;
 }
@@ -269,9 +387,65 @@ footer {
     font-size: 12px;
 }
 
-/* A one-time code, which is read off the screen rather than clicked. */
+/* A one-time code: read off the screen as often as it is copied, so it is shown
+   in full and the whole line copies it. */
 .code {
     font-family: var(--font-mono);
     font-size: 12px;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
+    color: hsl(var(--foreground));
+    flex: 1 1 auto;
+}
+
+/*
+ * The seconds left, as a ring that empties.
+ *
+ * The question somebody has while looking at six digits is whether there is time
+ * to type them, which is a shape rather than a number - so the arc is the answer
+ * and the digit inside it is for anybody who would rather read one. The colour
+ * walks green to amber to red as that answer changes.
+ */
+.ring {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: none;
+}
+
+.ring svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.ring .track {
+    stroke: hsl(var(--border));
+}
+
+.ring.success {
+    color: hsl(var(--success));
+}
+
+.ring.warning {
+    color: hsl(var(--warning));
+}
+
+.ring.danger {
+    color: hsl(var(--danger));
+}
+
+/* Moved once a second, because that is when the fact changes. */
+.ring circle {
+    transition: stroke-dashoffset 1s linear;
+}
+
+.ring-left {
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--muted-foreground));
 }
