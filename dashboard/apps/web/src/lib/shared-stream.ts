@@ -69,8 +69,32 @@ const relaySchema = z.discriminatedUnion("kind", [
 type Relay = z.infer<typeof relaySchema>;
 
 /**
+ * One connection per stream in THIS tab, whatever asks for it.
+ *
+ * The tabs elect one of themselves below, and that election is a Web Lock - which
+ * does not exist outside a secure context, so on a Polaris reached over plain http
+ * at a LAN address there is none. Every subscription then served itself, and a tab
+ * has more than one: the bell follows this stream and so does the administration
+ * waiting count. Two connections in one tab, two feed polls, and - since the
+ * server elects exactly one of an account's connections to carry the chime - a
+ * coin flip over which of them got it. The one that never reads it won about half
+ * the time, and that device then went quiet for the rest of the page's life.
+ *
+ * So sharing happens twice, at two scales: this map inside the tab, the lock
+ * between tabs. Keyed on the same name the lock uses, so they agree about what
+ * "the same stream" means.
+ */
+interface SharedConnection {
+    readonly listeners: Set<(frame: SharedFrame) => void>;
+    readonly stop: () => void;
+}
+
+const inThisTab = new Map<string, SharedConnection>();
+
+/**
  * Follow a server-sent stream, sharing one connection with every other tab on
- * this device that asked for the same path and scope. Returns the unsubscribe.
+ * this device that asked for the same path and scope - and with everything in this
+ * tab that asked for it. Returns the unsubscribe.
  */
 export function subscribeSharedStream(
     path: string,
@@ -78,6 +102,40 @@ export function subscribeSharedStream(
     onFrame: (frame: SharedFrame) => void
 ): () => void {
     const name = `${PREFIX}${scope}:${path}`;
+    let shared = inThisTab.get(name);
+    if (!shared) {
+        const listeners = new Set<(frame: SharedFrame) => void>();
+        // A copy, so a listener that unsubscribes while being handed a frame does
+        // not change the set being walked.
+        const stop = followStream(path, name, (frame) => {
+            for (const listener of [...listeners]) listener(frame);
+        });
+        shared = { listeners, stop };
+        inThisTab.set(name, shared);
+    }
+    const held = shared;
+    held.listeners.add(onFrame);
+
+    let done = false;
+    return () => {
+        // Idempotent: a second call must not close a connection somebody else
+        // opened under the same name in between.
+        if (done) return;
+        done = true;
+        held.listeners.delete(onFrame);
+        if (held.listeners.size > 0) return;
+        if (inThisTab.get(name) === held) inThisTab.delete(name);
+        held.stop();
+    };
+}
+
+/** The connection itself: the election between tabs, the relay, and the fallbacks.
+ *  One of these exists per shared stream per tab. */
+function followStream(
+    path: string,
+    name: string,
+    onFrame: (frame: SharedFrame) => void
+): () => void {
     const channel = openChannel(name);
     const locks = lockManager();
     const abort = new AbortController();
