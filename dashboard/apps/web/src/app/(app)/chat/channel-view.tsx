@@ -30,6 +30,7 @@ import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { channelDraftKey } from "./drafts";
 import { posterFor } from "./video-poster";
+import { callBandHeight } from "./call-band";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
@@ -1401,6 +1402,11 @@ export function ChannelView({
      *  for while that is true, and the conversation moves to the side of it. */
     const voiceRoom = channel?.kind === "voice" && inCall !== null;
 
+    /** A call between people rather than a room somebody walked into. It gets a
+     *  band across the top of the conversation instead of most of the column -
+     *  see `call-band`, which is where the reasoning lives. */
+    const directCall = channel?.kind === "dm" || channel?.kind === "group";
+
     /**
      * The conversation itself: what has been said, and the box to say more in.
      *
@@ -1783,14 +1789,13 @@ export function ChannelView({
                     <div
                         className={cn(
                             "flex min-h-0 shrink-0 flex-col border-b border-border",
-                            // A picture worth watching changes what this column
-                            // is for. At the usual height a shared screen got a
-                            // third of 60% of the column - about a hand's width
-                            // of somebody's document - and "make it bigger"
-                            // could not make it bigger, because the room it
-                            // would take was being held for messages nobody was
-                            // reading while a screen was up.
-                            voiceRoom ? "flex-1" : staged ? "max-h-[78%]" : "max-h-[60%]"
+                            // How much of the column this is allowed to take -
+                            // see `call-band`, which is where the reasoning
+                            // lives.
+                            callBandHeight(
+                                voiceRoom ? "room" : directCall ? "direct" : "channel",
+                                staged
+                            )
                         )}
                     >
                         <CallRoom
