@@ -71,6 +71,13 @@ jobs:
           # Repo-relative: `defaults.run.working-directory` applies to `run` steps
           # and to nothing else.
           path: dashboard/apps/extension/.output/*.zip
+          # WXT writes into `.output`, and this action counts "files within
+          # folders beginning with a dot" as hidden - which it skips unless told
+          # otherwise. So the packages were built, matched by nothing, and the
+          # step failed with "No files were found with the provided path",
+          # taking the release job down with it. They are the whole point of
+          # the run, and there is nothing else in that directory.
+          include-hidden-files: true
           if-no-files-found: error
 
   release:
