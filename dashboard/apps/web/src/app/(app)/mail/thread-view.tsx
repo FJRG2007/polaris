@@ -24,8 +24,8 @@ import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
 import { AddressChip } from "./address-chip";
-import { leavesTheView, scopeOf } from "./mail-actions";
 import { forwardSeed, replySeed } from "./answering";
+import { leavesTheView, scopeOf } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
@@ -135,7 +135,8 @@ export function ThreadView({
      *  list's own menu offers the same thing on a row. */
     onBlock?: (accountId: string, address: string) => void;
 }) {
-    const { refresh, reloadLists, openComposer, accounts, accountColor, askFolderRole } = useMail();
+    const { refreshMailbox, reloadLists, openComposer, accounts, accountColor, askFolderRole } =
+        useMail();
     const toast = useToast();
     const [busy, startBusy] = useTransition();
     const [answering, startAnswering] = useTransition();
@@ -215,10 +216,10 @@ export function ThreadView({
                     reloadLists();
                     return;
                 }
-                refresh();
+                refreshMailbox();
             });
         },
-        [askFolderRole, messages, onGone, onStayed, refresh, reloadLists, toast]
+        [askFolderRole, messages, onGone, onStayed, refreshMailbox, reloadLists, toast]
     );
 
     /**
@@ -518,7 +519,7 @@ function ConversationMenu({
     thread: MailThreadView;
     messageIds: string[];
 }) {
-    const { refresh } = useMail();
+    const { refreshMailbox } = useMail();
     const toast = useToast();
 
     const change = (state: { pinned?: boolean; muted?: boolean }, announce: string) => {
@@ -530,7 +531,7 @@ function ConversationMenu({
                 return;
             }
             toast.show({ title: announce });
-            refresh();
+            refreshMailbox();
         })();
     };
 
@@ -599,7 +600,7 @@ function ConversationMenu({
  * empty menu that reads as broken.
  */
 function LabelMenu({ messageIds }: { messageIds: string[] }) {
-    const { labels, refresh } = useMail();
+    const { labels, refreshMailbox } = useMail();
     const toast = useToast();
 
     return (
@@ -636,7 +637,7 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
                                         return;
                                     }
                                     toast.show({ title: `Labelled ${label.name}.` });
-                                    refresh();
+                                    refreshMailbox();
                                 })()
                             }
                         >
@@ -689,7 +690,7 @@ function MessageCard({
     onRead?: () => void;
 }) {
     const format = useDisplayFormat();
-    const { refresh } = useMail();
+    const { refreshMailbox } = useMail();
     const [viewing, setViewing] = useState<ViewerTarget | null>(null);
     const [readable, setReadable] = useState<ReadableMessage | null>(null);
     const [failed, setFailed] = useState("");
@@ -744,7 +745,7 @@ function MessageCard({
                 // Nothing is said about it: nobody asked for this, so a failure is
                 // not news - and the next refresh brings the bold row back on its
                 // own.
-                if (!refusalOf(outcome)) refresh();
+                if (!refusalOf(outcome)) refreshMailbox();
             })();
         };
 
@@ -757,7 +758,7 @@ function MessageCard({
         // wait is the whole difference between passing over and reading.
         const timer = setTimeout(mark, core.MAIL_MARK_READ_DELAY_MS);
         return () => clearTimeout(timer);
-    }, [open, markRead, message.id, message.seen, onRead, readAlready, refresh]);
+    }, [open, markRead, message.id, message.seen, onRead, readAlready, refreshMailbox]);
 
     const sender = message.from[0];
 

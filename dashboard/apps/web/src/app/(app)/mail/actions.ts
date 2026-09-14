@@ -29,20 +29,20 @@ import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
 import * as reading from "@/lib/mailbox/reading";
 import { syncAccount } from "@/lib/mailbox/sync";
+import * as folders from "@/lib/mailbox/folders";
 import { requirePermission } from "@/lib/session";
 import * as blocking from "@/lib/mailbox/blocking";
 import * as accounts from "@/lib/mailbox/accounts";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
-import * as folders from "@/lib/mailbox/folders";
 import * as messages from "@/lib/mailbox/messages";
-import { emptyEveryFolderOfRole } from "@/lib/mailbox/trash";
 import * as contacts from "@/lib/mailbox/contacts";
 import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
+import { emptyEveryFolderOfRole } from "@/lib/mailbox/trash";
 import * as subscriptions from "@/lib/mailbox/subscriptions";
 import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import { MailAccessError, ownedAccount, ownedAccountIds } from "@/lib/mailbox/access";
@@ -81,6 +81,23 @@ function failure(
     return { error: fallback };
 }
 
+/**
+ * Draw Mail's own frame again: the mailboxes, their folders, the labels and the
+ * counts, which the layout resolves.
+ *
+ * **For a change to the shape of a mailbox, never for a message moving.** Filing,
+ * reading, labelling, snoozing and sending change rows and counts, and nothing
+ * here draws either of those: the list routes render no conversations at all (see
+ * `list-page`), and the rail's three things come from `/api/mail/rail`, which the
+ * screen pulls for itself the moment an action answers. So a message action that
+ * called this bought one thing - invalidating every cached route payload the
+ * browser was holding, which is what made the app switcher need a second press
+ * after deleting an email.
+ *
+ * The two-sided rule is pinned in `test/mail/mail-does-not-hold-the-router.test.ts`
+ * rather than left to this comment, because the cost of getting it wrong is
+ * invisible on the screen that causes it.
+ */
 function refresh(): void {
     revalidatePath(MAIL_PATH, "layout");
 }
@@ -385,7 +402,6 @@ export async function actOnAction(input: unknown) {
             parsed.data.action,
             { scope: parsed.data.scope }
         );
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "The mail server did not accept that.");
@@ -403,7 +419,6 @@ export async function setConversationStateAction(input: unknown) {
             pinned: parsed.data.pinned,
             muted: parsed.data.muted
         });
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "That could not be changed.");
@@ -420,7 +435,6 @@ export async function moveAction(input: unknown) {
             parsed.data.messageIds,
             parsed.data.folderId
         );
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "The mail server did not accept that.");
@@ -445,7 +459,6 @@ export async function emptyFolderAction(input: unknown) {
             parsed.data.role,
             parsed.data.accountIds
         );
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "The mail server did not accept that.");
@@ -462,7 +475,6 @@ export async function snoozeAction(input: unknown) {
             parsed.data.messageIds,
             parsed.data.until
         );
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "That could not be put off.");
@@ -629,7 +641,6 @@ export async function sendAction(input: unknown) {
     }
     try {
         const queued = await compose.queueSend(userId, composeInput(parsed.data));
-        refresh();
         return { draftId: queued.draftId, sendAt: queued.sendAt.toISOString() };
     } catch (caught) {
         return failure(caught, "That message could not be sent.");
@@ -654,7 +665,6 @@ export async function undoSendAction(draftId: string) {
     const userId = await actorId();
     try {
         const undone = await compose.cancelSend(userId, draftId);
-        refresh();
         return { undone };
     } catch (caught) {
         return failure(caught, "That message has already gone.");
@@ -718,7 +728,6 @@ export async function applyLabelAction(input: unknown) {
             parsed.data.messageIds,
             parsed.data.applied
         );
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "That label could not be applied.");
@@ -1024,7 +1033,6 @@ export async function discardDraftAction(draftId: string) {
     const userId = await actorId();
     try {
         await compose.discardDraft(userId, draftId);
-        refresh();
         return {};
     } catch (caught) {
         return failure(caught, "That draft could not be removed.");
@@ -1042,7 +1050,6 @@ export async function moveToFolderAction(input: unknown) {
             parsed.data.messageIds,
             parsed.data.folderId
         );
-        refresh();
         return { done };
     } catch (caught) {
         return failure(caught, "Those could not be moved.");

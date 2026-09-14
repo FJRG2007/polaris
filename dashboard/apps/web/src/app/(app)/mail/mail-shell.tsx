@@ -16,16 +16,16 @@
  * the list gives way to the conversation once one is open, with a way back.
  */
 
-import Link from "next/link";
 import { z } from "zod";
+import Link from "next/link";
 import { cn } from "@polaris/ui";
+import { MAIL_VIEWS } from "./views";
 import { Composer } from "./composer";
 import { MailRail } from "./mail-rail";
-import { MAIL_VIEWS } from "./views";
-import { MAIL_PALETTE, coloursFor } from "./palette";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
 import { Menu, PenLine, Plus } from "lucide-react";
+import { MAIL_PALETTE, coloursFor } from "./palette";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { useNudgeMailUnread } from "@/components/mail-unread";
@@ -70,6 +70,23 @@ export interface MailContextValue {
      * reloads the data and lets the navigation be the navigation.
      */
     readonly reloadLists: () => void;
+    /**
+     * Mail moved: a message was filed, read, labelled, snoozed or sent.
+     *
+     * The answer to everything that changes messages rather than the shape of the
+     * mailbox, and the difference from `refresh` is the router. Both halves of the
+     * screen are pulled - the lists this tab fetches, and the rail's counts - and
+     * the router is left alone, because it has nothing left to redraw: the list
+     * routes render no conversations (see `list-page`), and the rail's three
+     * things come from an endpoint of their own.
+     *
+     * Asking the router anyway is what made the rest of Polaris feel stuck. A
+     * router that is fetching defers what somebody clicks next, so deleting a
+     * message and reaching for the app switcher meant pressing it twice - the
+     * first press landed while the whole signed-in frame was being re-fetched to
+     * move a number beside a folder.
+     */
+    readonly refreshMailbox: () => void;
     /**
      * How many times that has been asked for.
      *
@@ -387,6 +404,13 @@ export function MailShell({
             });
     }, []);
 
+    /** Both halves of the screen, and never the router. See `refreshMailbox` on
+     *  the context for why that is the whole point of it. */
+    const refreshMailbox = useCallback(() => {
+        reloadLists();
+        pullRail();
+    }, [pullRail, reloadLists]);
+
     const refresh = useCallback(() => {
         // Both halves of the screen, which no longer come from the same place.
         reloadLists();
@@ -416,10 +440,9 @@ export function MailShell({
             // NOT the router: see `rail`. Everything a frame can change is in
             // one of those two, and the things that are not - a label written, a
             // mailbox added - are actions whose own handler refreshes.
-            reloadLists();
-            pullRail();
+            refreshMailbox();
         }, STREAM_SETTLE_MS);
-    }, [pullRail, reloadLists]);
+    }, [refreshMailbox]);
     useEffect(
         () => () => {
             if (settling.current) clearTimeout(settling.current);
@@ -491,6 +514,7 @@ export function MailShell({
             shelf,
             refresh,
             reloadLists,
+            refreshMailbox,
             revision,
             nudgeUnread,
             patchFolder,
@@ -509,6 +533,7 @@ export function MailShell({
             shelf,
             refresh,
             reloadLists,
+            refreshMailbox,
             revision,
             nudgeUnread,
             patchFolder,

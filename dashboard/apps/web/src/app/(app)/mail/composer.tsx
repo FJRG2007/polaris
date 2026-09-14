@@ -100,7 +100,7 @@ const writeDraft: DraftWriter = async (fields, id) => {
 };
 
 export function Composer() {
-    const { accounts, identities, composing, openComposer, refresh, viewerName } = useMail();
+    const { accounts, identities, composing, openComposer, refreshMailbox, viewerName } = useMail();
     const toast = useToast();
     const [sending, startSending] = useTransition();
 
@@ -336,10 +336,10 @@ export function Composer() {
                         until: new Date(outcome.sendAt).getTime()
                     });
                 }
-                refresh();
+                refreshMailbox();
             });
         },
-        [accountId, identityId, to, cc, bcc, subject, body, files, composing, refresh]
+        [accountId, identityId, to, cc, bcc, subject, body, files, composing, refreshMailbox]
     );
 
     /**
@@ -366,9 +366,21 @@ export function Composer() {
         void (async () => {
             const id = await saves.current?.save(fields);
             if (id) await fileDraftOnServerAction(id);
-            refresh();
+            refreshMailbox();
         })();
-    }, [openComposer, queued, accountId, identityId, to, cc, bcc, subject, body, files, refresh]);
+    }, [
+        openComposer,
+        queued,
+        accountId,
+        identityId,
+        to,
+        cc,
+        bcc,
+        subject,
+        body,
+        files,
+        refreshMailbox
+    ]);
 
     const account = accounts.find((one) => one.id === accountId);
     const own = useMemo(() => identities[accountId] ?? [], [identities, accountId]);
@@ -460,7 +472,7 @@ export function Composer() {
                                 setQueued(null);
                                 saves.current?.release();
                                 toast.show({ title: "Brought back. Nothing was sent." });
-                                refresh();
+                                refreshMailbox();
                                 return;
                             }
                             toast.show({ title: "That message has already gone." });

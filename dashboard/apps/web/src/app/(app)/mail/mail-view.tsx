@@ -35,14 +35,14 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { mailShortcuts, useMailKeys } from "./use-mail-keys";
 import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
-import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
 import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
 import {
     useCallback,
     useEffect,
@@ -245,6 +245,7 @@ export function MailView({
         nudgeUnread,
         openComposer,
         refresh,
+        refreshMailbox,
         reloadLists,
         revision,
         shelf
@@ -850,7 +851,7 @@ export function MailView({
                     reloadLists();
                     return;
                 }
-                refresh();
+                refreshMailbox();
             });
         },
         [
@@ -863,7 +864,7 @@ export function MailView({
             openThread,
             patchUntilAnswered,
             preferences.afterFiling,
-            refresh,
+            refreshMailbox,
             reloadLists,
             shown,
             threads,
@@ -902,10 +903,10 @@ export function MailView({
                 inFlight.current = {};
                 setSelected([]);
                 toast.show({ title: announce });
-                refresh();
+                refreshMailbox();
             });
         },
-        [clearPatches, patchUntilAnswered, refresh, threadsOf, toast]
+        [clearPatches, patchUntilAnswered, refreshMailbox, threadsOf, toast]
     );
 
     const snooze = useCallback(
@@ -918,10 +919,10 @@ export function MailView({
                     return;
                 }
                 setSelected([]);
-                refresh();
+                refreshMailbox();
             });
         },
-        [refresh, toast]
+        [refreshMailbox, toast]
     );
 
     const onRow = threads[Math.min(onIndex, threads.length - 1)] ?? null;
@@ -1052,10 +1053,10 @@ export function MailView({
                     toast.show({ title: said });
                     return;
                 }
-                refresh();
+                refreshMailbox();
             });
         },
-        [refresh, toast]
+        [refreshMailbox, toast]
     );
 
     /**
