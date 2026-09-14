@@ -3,6 +3,7 @@ import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
+import { injectableOrigins } from "@/lib/injection";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { noticeFor, type UpdateNotice } from "@/lib/update";
@@ -39,9 +40,19 @@ import {
  * ever holds the key, the token, or an item it did not ask for - because anything
  * running inside a page can be read by that page.
  *
- * Nothing is declared into pages at all. The function that types into a form is
- * injected on the tab in front of somebody at the moment they ask for it, so the
- * manifest asks for no access to any site - see `typeIntoPage`.
+ * Nothing is declared into pages by the manifest, which still asks for access to
+ * no site at all. Two things nevertheless end up running inside one, and they are
+ * different in a way worth keeping straight:
+ *
+ * - The function that types into a form is injected on the tab in front of
+ *   somebody at the moment they ask for it, and only then - see `typeIntoPage`.
+ * - The inline login mark is a file with no manifest entry, registered at runtime
+ *   for the origins somebody has granted by hand and no others - see
+ *   `syncAutofill`, and `lib/injection` for the rule that a broad grant is never
+ *   registered on.
+ *
+ * Neither is a standing reach over every page: the first outlives one call, the
+ * second outlives only the grant it was made for.
  *
  * What is kept where:
  *
@@ -1357,7 +1368,60 @@ browser.tabs.onUpdated.addListener((_id, change) => {
     if (change.url || change.status === "complete") void badge();
 });
 
+/** The id the inline script is registered under, so the old registration can be
+ *  found and replaced rather than piling up. */
+const AUTOFILL_ID = "polaris-autofill";
+
+/**
+ * Keep the inline login script registered for the sites somebody has granted.
+ *
+ * The script is built as an unlisted file with no manifest entry, so nothing is
+ * injected anywhere until this runs - which is what lets the extension offer
+ * filling inside a page while still asking, at install time, for access to no
+ * site at all. What it may run on is `injectableOrigins`, and the rule that a
+ * broad grant is never registered on lives there.
+ *
+ * The old registration is removed first: registering an id that already exists
+ * fails the whole call rather than replacing it, so a worker that came back
+ * would otherwise register nothing and say nothing.
+ *
+ * Firefox gets no inline filling for now. Manifest v2 has no `scripting`
+ * namespace, and the check below is what makes that a feature this browser does
+ * not have rather than a worker that throws on startup and takes the vault with
+ * it. Everything else - the popup, the keyboard fill - is unaffected.
+ */
+async function syncAutofill(): Promise<void> {
+    if (!browser.scripting?.registerContentScripts) return;
+    const [held, home] = await Promise.all([
+        browser.permissions.getAll().catch(() => ({ origins: [] as string[] })),
+        currentOrigin()
+    ]);
+    const matches = injectableOrigins(held.origins ?? [], home);
+
+    await browser.scripting.unregisterContentScripts({ ids: [AUTOFILL_ID] }).catch(() => undefined);
+    if (matches.length === 0) return;
+    await browser.scripting
+        .registerContentScripts([
+            {
+                id: AUTOFILL_ID,
+                js: ["autofill.js"],
+                matches,
+                runAt: "document_idle",
+                persistAcrossSessions: true
+            }
+        ])
+        .catch(() => undefined);
+}
+
 export default defineBackground(() => {
+    // The sites this may run inside, kept current. Once at startup because a
+    // grant made while the worker was recycled is one nothing else would notice,
+    // and on every change because the browser's own extension settings page can
+    // give and take access without this extension being asked.
+    void syncAutofill();
+    browser.permissions.onAdded.addListener(() => void syncAutofill());
+    browser.permissions.onRemoved.addListener(() => void syncAutofill());
+
     // Registered here rather than beside the others above, and not by preference:
     // WXT evaluates this module during the build against a stand-in browser that
     // implements no `commands`, so a top-level registration throws there and takes
