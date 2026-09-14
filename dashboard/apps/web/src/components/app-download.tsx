@@ -14,7 +14,7 @@
  * the half above it does nothing but await.
  */
 
-import { Button } from "@polaris/ui";
+import { Badge, Button } from "@polaris/ui";
 import { Download } from "lucide-react";
 import {
     desktopDownload,
@@ -169,11 +169,25 @@ function PlatformList({
     download: AppDownload | null;
     nothing: string;
 }) {
-    if (!download) return <p className="text-sm text-muted-foreground">{nothing}</p>;
+    if (!download) {
+        return (
+            <p className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                {nothing}
+            </p>
+        );
+    }
     return (
         <>
-            <p className="text-xs text-muted-foreground">Version {download.version}</p>
-            <div className="flex flex-col divide-y divide-border">
+            {/* The version sits on the list rather than over it: what somebody
+                is deciding is which file, and the version is a fact about all of
+                them. */}
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Badge variant="neutral">{download.version}</Badge>
+                <a className="underline" href={download.url} target="_blank" rel="noreferrer">
+                    What changed
+                </a>
+            </p>
+            <div className="flex flex-col divide-y divide-border rounded-md border border-border px-3">
                 {rows.map((row) => (
                     <PlatformFile
                         key={`${row.label}-${row.has.join("-")}`}
@@ -192,7 +206,7 @@ export function DesktopFilesOffer({ download }: { download: AppDownload | null }
         <PlatformList
             rows={DESKTOP_ROWS}
             download={download}
-            nothing="Not released yet. Installing Polaris as an app above is how to have it in a window of its own today."
+            nothing="No version has been published yet. Installing Polaris as an app above is how to have it in a window of its own today."
         />
     );
 }
@@ -208,7 +222,7 @@ export function ExtensionFilesOffer({ download }: { download: AppDownload | null
         <PlatformList
             rows={EXTENSION_ROWS}
             download={download}
-            nothing="No package has been published yet. It is built from this repository and released on a tag of its own."
+            nothing="No version has been published yet. The files appear here, one per browser, as soon as one is."
         />
     );
 }

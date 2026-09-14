@@ -28,9 +28,24 @@ import { requireUser } from "@/lib/session";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone, Terminal } from "lucide-react";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
-import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
+
+/** One browser's way of loading an unpacked extension, as steps rather than as a
+ *  sentence with four of them in it. */
+function LoadSteps({ browser, steps }: { browser: string; steps: readonly string[] }) {
+    return (
+        <div className="rounded-md border border-border px-3 py-2.5">
+            <p className="text-xs font-medium">{browser}</p>
+            <ol className="mt-1 flex list-inside list-decimal flex-col gap-0.5 text-xs text-muted-foreground">
+                {steps.map((step) => (
+                    <li key={step}>{step}</li>
+                ))}
+            </ol>
+        </div>
+    );
+}
 
 /** The shape of a list of files, while the release is being looked up. */
 function FilesSkeleton() {
@@ -81,29 +96,49 @@ export default async function DownloadsPage() {
                     </p>
 
                     <div className="flex flex-col gap-2">
-                        <p className="font-medium">From your browser&apos;s store</p>
-                        <p className="text-muted-foreground">
-                            Not published yet. The store version is the one that keeps itself up to
-                            date, so it is worth waiting for if you can.
+                        <p className="flex items-center gap-2 font-medium">
+                            From your browser&apos;s store
+                            <Badge variant="neutral">Not there yet</Badge>
                         </p>
-                        <div>
-                            <Button size="sm" variant="secondary" disabled>
-                                Get it from the store
-                            </Button>
-                        </div>
+                        <p className="text-muted-foreground">
+                            The store version is the one that keeps itself up to date, so it is
+                            worth waiting for if you can.
+                        </p>
                     </div>
 
-                    <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
+                    <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
                         <p className="font-medium">Load it yourself</p>
-                        <p className="text-muted-foreground">
-                            Unpack the file for your browser and load it: Chrome and Edge at
-                            chrome://extensions with Developer mode on, then Load unpacked. Firefox
-                            at about:debugging, This Firefox, then Load Temporary Add-on. Loaded this
-                            way it does not update itself, and Firefox lets it go when it closes.
-                        </p>
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
                         </Suspense>
+                        {/* Numbered, per browser, because this is somebody
+                            following steps in a window that is not this one -
+                            and a paragraph holding four of them is a paragraph
+                            they lose their place in. */}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <LoadSteps
+                                browser="Chrome, Edge, Brave, Opera"
+                                steps={[
+                                    "Unpack the .zip",
+                                    "Open chrome://extensions",
+                                    "Turn on Developer mode",
+                                    "Load unpacked, and choose the folder"
+                                ]}
+                            />
+                            <LoadSteps
+                                browser="Firefox"
+                                steps={[
+                                    "Open about:debugging",
+                                    "This Firefox",
+                                    "Load Temporary Add-on",
+                                    "Choose the .zip"
+                                ]}
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Loaded this way it does not update itself, and Firefox lets it go when
+                            it closes.
+                        </p>
                     </div>
 
                     <p className="border-t border-border/60 pt-4 text-muted-foreground">
