@@ -18,8 +18,10 @@ import { useState, type FormEvent } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
+import type { VaultClientRow } from "@/lib/vault/devices";
 import { TrustedDevicesCard } from "./trusted-devices-card";
 import { describeSignIn, signInSummary } from "@polaris/core";
+import { ConnectedClientsCard } from "./connected-clients-card";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import {
@@ -51,7 +53,9 @@ function Origin({ session }: { session: SessionView }) {
                 a sign-in that already answered a code is a different thing to
                 allow than one that only had the password. */}
             {describeSignIn(session.signIn).length > 0 ? (
-                <p className="text-xs text-muted-foreground">Signed in with {signInSummary(session.signIn)}</p>
+                <p className="text-xs text-muted-foreground">
+                    Signed in with {signInSummary(session.signIn)}
+                </p>
             ) : null}
         </>
     );
@@ -59,12 +63,18 @@ function Origin({ session }: { session: SessionView }) {
 
 export function SessionsView({
     sessions,
-    trusted
+    trusted,
+    clients
 }: {
     sessions: SessionView[];
     /** Browsers allowed to skip the second-factor challenge. Empty on an account
      *  that has never armed one, which is when the card stays away. */
     trusted: TrustedDeviceRow[];
+    /** Apps signed in to the vault - the extension, and anything else that was
+     *  let in. Unlike the list above, this one is drawn even when it is empty:
+     *  "is my extension connected" is the question that brings somebody here,
+     *  and a page that answers it with silence is the reason it was asked. */
+    clients: VaultClientRow[];
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
@@ -217,11 +227,15 @@ export function SessionsView({
                         busyId={busyId}
                         emptyLabel="Nothing is signed in."
                         activityHref={(session) => `/account/activity?session=${session.id}`}
-                        onRevoke={(session) => void (session.current ? signOutHere() : revoke(session))}
+                        onRevoke={(session) =>
+                            void (session.current ? signOutHere() : revoke(session))
+                        }
                         onPin={(session, pinned) => void pin(session, pinned)}
                     />
                 </CardBody>
             </Card>
+
+            <ConnectedClientsCard clients={clients} />
 
             {trusted.length > 0 ? <TrustedDevicesCard devices={trusted} /> : null}
 
