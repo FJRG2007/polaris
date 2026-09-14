@@ -19,19 +19,42 @@
  * case the automatic answer is not wanted: it forces past the shared cache.
  */
 
+import type { SettingsOverview } from "./overview";
 import { LogViewer } from "@/components/log-viewer";
 import type { PublicUrls } from "@/lib/legal/service";
 import { normalizeLegalContact } from "@polaris/core";
 import { AddressList } from "@/components/address-list";
 import type { UpdateStatus } from "@/lib/update-service";
 import type { CheckedAddress } from "@/lib/address-health";
-import type { SettingsOverview } from "./overview";
 import { useDisplayFormat } from "@/components/display-format";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Skeleton } from "@polaris/ui";
+import {
+    isRecentRun,
+    isUpdateInFlight,
+    logIsFromRun,
+    UPDATE_START_GRACE_MS,
+    type UpdateLogTail
+} from "@/lib/update-log";
 import type { AutoUpdateMode, AutoUpdatePolicy, DisplayFormat, UpdateSource } from "@polaris/core";
-import { Bug, CheckCircle2, CircleDashed, DownloadCloud, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
+import {
+    Bug,
+    CheckCircle2,
+    CircleDashed,
+    DownloadCloud,
+    Hammer,
+    RefreshCw,
+    TriangleAlert
+} from "lucide-react";
 import {
     checkUpdatesAction,
     saveAutoUpdateAction,
@@ -51,7 +74,7 @@ interface Deployment {
     readonly autoUpdate: boolean;
 }
 
-const SOURCE_CHOICES: { value: UpdateSource; label: string; }[] = [
+const SOURCE_CHOICES: { value: UpdateSource; label: string }[] = [
     { value: "image", label: "Published build" },
     { value: "build", label: "Build on this host" }
 ];
@@ -89,7 +112,7 @@ const TAIL_BYTES = 128 * 1024;
 /** The updater's completion marker, which is bookkeeping rather than output. */
 const MARKER_RE = /^.*POLARIS_UPDATE_EXIT=-?\d+.*$\n?/gm;
 
-const UPDATE_MODES: { value: AutoUpdateMode; label: string; }[] = [
+const UPDATE_MODES: { value: AutoUpdateMode; label: string }[] = [
     { value: "off", label: "Only tell me" },
     { value: "immediate", label: "As soon as one is published" },
     { value: "daily", label: "Every day at" }
@@ -180,13 +203,20 @@ export function SettingsView({
     // Followed rather than read once: removing an address changes the list, and the
     // page that did it must not keep offering the entry it has just taken away.
     const [addresses, setAddresses] = useState<CheckedAddress[] | null>(null);
-    const [network, setNetwork] = useState<{ publicIp: string | null; serverIp: string | null } | null>(null);
+    const [network, setNetwork] = useState<{
+        publicIp: string | null;
+        serverIp: string | null;
+    } | null>(null);
     // The build that was serving when this run started. A different one answering
     // later means the new dashboard has taken over - the completion signal that
     // survives the updater being cut off by the restart it is performing.
     const startBuild = useRef<string | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const waitRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // The host's clock when this browser last had an update accepted. Everything
+    // written to the log before it belongs to the run before this one - see
+    // `logIsFromRun`, which is the whole reason this is kept.
+    const runFrom = useRef<number | null>(null);
 
     /**
      * Everything that had to be gone and asked for, once the page is on screen.
@@ -303,7 +333,26 @@ export function SettingsView({
                 const data = await fetchTail(0);
                 if (!data) return;
                 startBuild.current = data.build;
+                // An update this browser started whose log has not appeared yet.
+                // The updater is pulled before it runs, so what is on disk is
+                // still the previous run, finished and successful - and reading
+                // that as this run's result is what left the card idle and asked
+                // for the button a second time.
+                const started = rememberedRunStart();
+                if (started !== null && !logIsFromRun(data, started)) {
+                    if (data.now - started <= UPDATE_START_GRACE_MS) {
+                        runFrom.current = started;
+                        setUpdating(true);
+                        setUpdateMsg("The update is starting; waiting for it to report.");
+                        pollLogs();
+                        waitForUpdate();
+                        return;
+                    }
+                    // Long enough that nothing is coming. Stop speaking for it.
+                    forgetRunStart();
+                }
                 if (isUpdateInFlight(data, data.now)) {
+                    runFrom.current = started;
                     setUpdating(true);
                     setUpdateMsg("Reattached to an update already running.");
                     pollLogs();
@@ -323,6 +372,45 @@ export function SettingsView({
         const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
         if (!res.ok) return null;
         return (await res.json()) as UpdateLogTail;
+    }
+
+    /** Where the moment an update was accepted is parked, for this tab. */
+    const RUN_START_KEY = "polaris.update.startedAt";
+
+    /**
+     * When this browser had an update accepted, parked where the reload the
+     * update itself causes cannot take it.
+     *
+     * Per tab on purpose: two tabs watching the same update are two independent
+     * watchers, and one of them finishing is no reason for the other to stop.
+     * Every access is guarded - a private window or blocked site data throws on
+     * the way in as well as the way out, and losing this only costs the page its
+     * ability to tell an old log from a new one.
+     */
+    function rememberRunStart(at: number): void {
+        try {
+            sessionStorage.setItem(RUN_START_KEY, String(at));
+        } catch {
+            // Nothing to do about it, and nothing that stops the update.
+        }
+    }
+
+    function forgetRunStart(): void {
+        try {
+            sessionStorage.removeItem(RUN_START_KEY);
+        } catch {
+            // As above.
+        }
+    }
+
+    function rememberedRunStart(): number | null {
+        try {
+            const raw = sessionStorage.getItem(RUN_START_KEY);
+            const at = raw === null ? Number.NaN : Number(raw);
+            return Number.isFinite(at) ? at : null;
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -389,7 +477,9 @@ export function SettingsView({
             }
         } catch {
             tab?.close();
-            setUpdateMsg("Could not prepare the report. The log above can be attached to an issue by hand.");
+            setUpdateMsg(
+                "Could not prepare the report. The log above can be attached to an issue by hand."
+            );
         } finally {
             setReporting(false);
         }
@@ -401,9 +491,18 @@ export function SettingsView({
         setShowManual(false);
         setLogText("");
         setLogResult(null);
+        // The host's clock before anything is asked for, so what the previous run
+        // left on disk can be told from what this one writes. Read from the host
+        // rather than taken from here: the two clocks disagree, and this decides
+        // whether a finished log is this run's result or the last one's.
+        const before = await fetchTail(0);
+        runFrom.current = before ? Math.max(before.now, before.updatedAt) : null;
         const { status: result } = await triggerHostUpdateAction();
         if (result === "started") {
-            setUpdateMsg("The dashboard keeps serving while the new build starts; this page reloads when it takes over.");
+            if (runFrom.current !== null) rememberRunStart(runFrom.current);
+            setUpdateMsg(
+                "The dashboard keeps serving while the new build starts; this page reloads when it takes over."
+            );
             pollLogs();
             // Watch health as well: an older updater restarts the dashboard in place
             // instead of rolling it over, and that restart is then the only signal.
@@ -412,7 +511,9 @@ export function SettingsView({
         }
         setUpdating(false);
         if (result === "unavailable") {
-            setUpdateMsg("This deployment does not install its own updates; it is updated from the machine it runs on.");
+            setUpdateMsg(
+                "This deployment does not install its own updates; it is updated from the machine it runs on."
+            );
             setShowManual(true);
         } else if (result === "disabled") {
             setUpdateMsg("Auto-update is disabled on this host.");
@@ -429,23 +530,32 @@ export function SettingsView({
     function waitForUpdate(): void {
         if (waitRef.current) return;
         let sawDown = false;
+        let failures = 0;
         let tries = 0;
         waitRef.current = setInterval(async () => {
             tries += 1;
             try {
                 const res = await fetch("/api/health", { cache: "no-store" });
                 if (res.ok) {
+                    failures = 0;
                     if (sawDown) finish("Updated - reloading...");
                 } else {
-                    sawDown = true;
+                    failures += 1;
                 }
             } catch {
-                sawDown = true;
+                failures += 1;
             }
+            // Two in a row before this counts as the dashboard going down. One
+            // failed probe is a dropped request or a moment of edge trouble, and
+            // treating it as the restart meant the next success reloaded the page
+            // on an update that had not even begun.
+            if (failures >= 2) sawDown = true;
             if (tries >= 300) {
                 stopPolling();
                 setUpdating(false);
-                setUpdateMsg("This is taking longer than expected. The log above is still the live one.");
+                setUpdateMsg(
+                    "This is taking longer than expected. The log above is still the live one."
+                );
             }
         }, 2000);
     }
@@ -464,6 +574,9 @@ export function SettingsView({
     /** Stop everything and reload, so the page comes back on the new build. */
     function finish(message: string): void {
         stopPolling();
+        // The run is over, so the page that comes back after this reload has no
+        // run of its own to wait for.
+        forgetRunStart();
         setUpdateMsg(message);
         setTimeout(() => window.location.reload(), 1200);
     }
@@ -483,8 +596,25 @@ export function SettingsView({
                     missing += 1;
                     if (missing >= 4 && !sawContent) {
                         stopPolling();
-                        setUpdateMsg("Updating - this host writes no live log. Reconnecting when Polaris is back...");
+                        setUpdateMsg(
+                            "Updating - this host writes no live log. Reconnecting when Polaris is back..."
+                        );
                         waitForUpdate();
+                    }
+                    return;
+                }
+                // Still the log the previous run left: the updater is an image
+                // that gets pulled before it writes anything, and until it does
+                // the last line on disk is the last run's exit marker. Reading
+                // that as this run's result is what reloaded the page seconds
+                // after the button was pressed and then offered the update again.
+                //
+                // The build check still stands, because a rollover that finished
+                // this fast is a real completion whatever the log says.
+                if (!logIsFromRun(data, runFrom.current)) {
+                    if (data.build && startBuild.current && data.build !== startBuild.current) {
+                        setLogResult({ code: 0 });
+                        finish("The new build is serving - reloading...");
                     }
                     return;
                 }
@@ -510,7 +640,9 @@ export function SettingsView({
                         finish("Update complete - reloading...");
                     } else {
                         setUpdating(false);
-                        setUpdateMsg(`Update failed (exit code ${data.exitCode ?? "unknown"}). See the log below.`);
+                        setUpdateMsg(
+                            `Update failed (exit code ${data.exitCode ?? "unknown"}). See the log below.`
+                        );
                     }
                 }
             } catch {
@@ -531,7 +663,12 @@ export function SettingsView({
                 <CardHeader>
                     <div className="flex items-center justify-between gap-2">
                         <CardTitle>Updates</CardTitle>
-                        <Button size="sm" variant="secondary" onClick={() => onCheck()} disabled={pending || updating}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => onCheck()}
+                            disabled={pending || updating}
+                        >
                             <RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />
                             {pending ? "Checking..." : "Check for updates"}
                         </Button>
@@ -585,8 +722,9 @@ export function SettingsView({
                                 <Hammer className="size-4 text-muted-foreground" />
                                 <span>
                                     {status.buildingCount ?? "New"} commit
-                                    {status.buildingCount === 1 ? "" : "s"} waiting on a build. Nothing is happening on
-                                    this deployment; the update appears here once the image is published.
+                                    {status.buildingCount === 1 ? "" : "s"} waiting on a build.
+                                    Nothing is happening on this deployment; the update appears here
+                                    once the image is published.
                                 </span>
                             </>
                         ) : status.phase === "up-to-date" ? (
@@ -608,12 +746,20 @@ export function SettingsView({
                         <Row label="Running build" value={status?.current ?? null} />
                         <Row
                             label={
-                                status?.source === "build" ? `Latest on ${deployment.branch}` : "Published build"
+                                status?.source === "build"
+                                    ? `Latest on ${deployment.branch}`
+                                    : "Published build"
                             }
                             value={status ? (status.latest ?? "-") : null}
                         />
-                        <Row label="Updates from here" value={deployment.autoUpdate ? "allowed" : "blocked on this host"} />
-                        <Row label="Last checked" value={status ? formatChecked(status.checkedAt, format) : null} />
+                        <Row
+                            label="Updates from here"
+                            value={deployment.autoUpdate ? "allowed" : "blocked on this host"}
+                        />
+                        <Row
+                            label="Last checked"
+                            value={status ? formatChecked(status.checkedAt, format) : null}
+                        />
                     </dl>
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
@@ -637,7 +783,9 @@ export function SettingsView({
                             <Select
                                 aria-label="When updates install themselves"
                                 value={policy.mode}
-                                onValueChange={(mode) => void onSchedule({ ...policy, mode: mode as AutoUpdateMode })}
+                                onValueChange={(mode) =>
+                                    void onSchedule({ ...policy, mode: mode as AutoUpdateMode })
+                                }
                                 options={UPDATE_MODES}
                                 className="w-60"
                                 disabled={updating}
@@ -654,7 +802,8 @@ export function SettingsView({
                                         setTimeDraft(at);
                                         // Only a complete time is a schedule; the
                                         // half-typed states in between are not.
-                                        if (TIME_OF_DAY.test(at)) void onSchedule({ ...policy, at });
+                                        if (TIME_OF_DAY.test(at))
+                                            void onSchedule({ ...policy, at });
                                     }}
                                 />
                             ) : null}
@@ -676,7 +825,8 @@ export function SettingsView({
                                         >
                                             View changes
                                         </a>{" "}
-                                        before installing, or update now - the dashboard stays up while it rolls over.
+                                        before installing, or update now - the dashboard stays up
+                                        while it rolls over.
                                     </span>
                                     <Button size="sm" onClick={onUpdate} disabled={updating}>
                                         {updating ? (
@@ -691,8 +841,8 @@ export function SettingsView({
                             {updateMsg ? <p className="text-foreground">{updateMsg}</p> : null}
                             {showManual ? (
                                 <p>
-                                    Run <code className="text-foreground">polaris update</code> on the host to pull the
-                                    latest images and redeploy.
+                                    Run <code className="text-foreground">polaris update</code> on
+                                    the host to pull the latest images and redeploy.
                                 </p>
                             ) : null}
                             {/* Rendered on the outcome as well as the text: a run cut
@@ -703,17 +853,32 @@ export function SettingsView({
                                     log={logText}
                                     name="polaris-update"
                                     className="h-64"
-                                    emptyText={logResult ? "The updater wrote nothing." : "Waiting for the updater..."}
+                                    emptyText={
+                                        logResult
+                                            ? "The updater wrote nothing."
+                                            : "Waiting for the updater..."
+                                    }
                                     header={
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-foreground">Update log</span>
+                                            <span className="font-medium text-foreground">
+                                                Update log
+                                            </span>
                                             {logResult ? (
-                                                <span className={outcomeTone(logResult)}>{outcomeLabel(logResult)}</span>
+                                                <span className={outcomeTone(logResult)}>
+                                                    {outcomeLabel(logResult)}
+                                                </span>
                                             ) : null}
                                             {isFailure(logResult) ? (
-                                                <Button size="sm" variant="secondary" onClick={onReport} disabled={reporting}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={onReport}
+                                                    disabled={reporting}
+                                                >
                                                     <Bug className="size-3.5" />
-                                                    {reporting ? "Preparing..." : "Report this failure"}
+                                                    {reporting
+                                                        ? "Preparing..."
+                                                        : "Report this failure"}
                                                 </Button>
                                             ) : null}
                                         </div>
@@ -722,8 +887,8 @@ export function SettingsView({
                             ) : null}
                             {isFailure(logResult) ? (
                                 <p>
-                                    The report opens a prefilled issue with this log, your build, server type and
-                                    domain. Nothing is sent until you submit it.
+                                    The report opens a prefilled issue with this log, your build,
+                                    server type and domain. Nothing is sent until you submit it.
                                 </p>
                             ) : null}
                         </div>
@@ -755,8 +920,14 @@ export function SettingsView({
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <Row label="Local hostname" value={`${deployment.hostname}.local`} />
-                        <Row label="Server IP" value={network ? (network.serverIp ?? "unknown") : null} />
-                        <Row label="Public IP" value={network ? (network.publicIp ?? "not detected") : null} />
+                        <Row
+                            label="Server IP"
+                            value={network ? (network.serverIp ?? "unknown") : null}
+                        />
+                        <Row
+                            label="Public IP"
+                            value={network ? (network.publicIp ?? "not detected") : null}
+                        />
                         <Row
                             label="Repository"
                             value={deployment.repo}
@@ -814,9 +985,10 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <p className="text-sm text-muted-foreground">
-                    Everything else here is behind the login. These three are not, because a service you register an
-                    OAuth client with will not verify one it cannot read - Google refuses a home page behind a sign-in,
-                    and asks for the privacy policy and terms on the same domain.
+                    Everything else here is behind the login. These three are not, because a service
+                    you register an OAuth client with will not verify one it cannot read - Google
+                    refuses a home page behind a sign-in, and asks for the privacy policy and terms
+                    on the same domain.
                 </p>
 
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -840,8 +1012,9 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                         </Button>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                        An address or a link, shown on the privacy and terms pages as the way to reach whoever runs this
-                        deployment. Left empty, those pages carry no contact at all.
+                        An address or a link, shown on the privacy and terms pages as the way to
+                        reach whoever runs this deployment. Left empty, those pages carry no contact
+                        at all.
                     </span>
                     {error ? <span className="text-xs text-danger">{error}</span> : null}
                 </label>
@@ -852,7 +1025,7 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
 
 /** One fact. A null value is one that has not arrived yet - the label is already
  *  right, so it stays and only the answer is a placeholder. */
-function Row({ label, value, href }: { label: string; value: string | null; href?: string; }) {
+function Row({ label, value, href }: { label: string; value: string | null; href?: string }) {
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
@@ -860,7 +1033,12 @@ function Row({ label, value, href }: { label: string; value: string | null; href
                 {value === null ? (
                     <Skeleton className="h-4 w-24" />
                 ) : href ? (
-                    <a className="text-primary hover:underline" href={href} target="_blank" rel="noreferrer">
+                    <a
+                        className="text-primary hover:underline"
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
                         {value}
                     </a>
                 ) : (

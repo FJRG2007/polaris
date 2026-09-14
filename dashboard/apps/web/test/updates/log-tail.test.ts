@@ -8,8 +8,8 @@
 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { NextRequest } from "next/server";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const directory = await mkdtemp(join(tmpdir(), "polaris-update-log-"));
@@ -19,11 +19,15 @@ process.env.POLARIS_UPDATE_LOG = logPath;
 vi.mock("@/lib/session", () => ({ getSession: async () => ({ user: { isAdmin: true } }) }));
 
 const { GET } = await import("../../src/app/api/updates/logs/route");
-const { isRecentRun, isUpdateInFlight, RECENT_RUN_MS, STALE_LOG_MS } = await import("../../src/lib/update-log");
+const { isRecentRun, isUpdateInFlight, logIsFromRun, RECENT_RUN_MS, STALE_LOG_MS } = await import(
+    "../../src/lib/update-log"
+);
 type UpdateLogTail = import("../../src/lib/update-log").UpdateLogTail;
 
 async function tail(offset = 0): Promise<UpdateLogTail> {
-    const response = await GET(new NextRequest(`http://localhost/api/updates/logs?offset=${offset}`));
+    const response = await GET(
+        new NextRequest(`http://localhost/api/updates/logs?offset=${offset}`)
+    );
     return (await response.json()) as UpdateLogTail;
 }
 
@@ -175,5 +179,48 @@ describe("showing the run that just finished", () => {
         expect(result.finished).toBe(false);
         expect(result.exitCode).toBeNull();
         expect(isRecentRun(result, Date.now())).toBe(true);
+    });
+});
+
+/**
+ * Telling this run's log from the one before it.
+ *
+ * The defect: pressing Update reloaded the page a second or two later and then
+ * offered the same update again, so it took two presses. The updater is an image
+ * that is pulled before it runs, and until it writes its first line the file on
+ * disk is still the PREVIOUS run - finished, exit 0. The first poll read that as
+ * this run's result and called the update complete.
+ */
+describe("whose log this is", () => {
+    it("does not read the last run's success as this one's result", async () => {
+        await writeFile(logPath, "done\nPOLARIS_UPDATE_EXIT=0\n");
+        const result = await tail();
+
+        // Everything that fooled the page is true of this response.
+        expect(result.done).toBe(true);
+        expect(result.exitCode).toBe(0);
+        // And this is what keeps it from being acted on.
+        expect(logIsFromRun(result, result.now)).toBe(false);
+    });
+
+    it("takes the log as this run's once the updater has actually written it", async () => {
+        await writeFile(logPath, "pulling image...\n");
+        const result = await tail();
+
+        expect(logIsFromRun(result, result.updatedAt - 1)).toBe(true);
+    });
+
+    it("trusts what is there when this page started nothing", async () => {
+        // A page that has just loaded has no run of its own, so it has no older
+        // log to tell apart - re-attaching to somebody else's update depends on
+        // this staying true.
+        await writeFile(logPath, "pulling image...\n");
+        expect(logIsFromRun(await tail(), null)).toBe(true);
+    });
+
+    it("is not satisfied by a log that does not exist yet", async () => {
+        const result = await tail();
+        expect(result.exists).toBe(false);
+        expect(logIsFromRun(result, result.now - 1000)).toBe(false);
     });
 });

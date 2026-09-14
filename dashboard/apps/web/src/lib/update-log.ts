@@ -61,3 +61,39 @@ export function isUpdateInFlight(tail: UpdateLogTail, now: number): boolean {
 export function isRecentRun(tail: UpdateLogTail, now: number): boolean {
     return tail.exists && now - tail.updatedAt <= RECENT_RUN_MS;
 }
+
+/**
+ * How long a run may take between being accepted and writing its first line.
+ *
+ * The updater is a container image that is pulled before it runs, so on a slow
+ * line nothing touches the log for a good while after the button was pressed.
+ * Past this, a run that has still written nothing is one that never started.
+ */
+export const UPDATE_START_GRACE_MS = 5 * 60 * 1000;
+
+/**
+ * Whether the log in front of us was written by the run we started, rather than
+ * left behind by the one before it.
+ *
+ * Nothing in the file itself says which. A new run truncates the log, but only
+ * once it is actually running, and until then the previous run's
+ * `POLARIS_UPDATE_EXIT=0` is still its last line. So a page that had just
+ * triggered an update read that as "finished, exit 0" on its first poll, called
+ * the update complete, reloaded, came back to the same stale log and offered the
+ * same update again - which is the button appearing to do nothing and having to
+ * be pressed a second time.
+ *
+ * `startedAt` is the host's clock when the run was accepted, taken from the same
+ * response that carries the log's timestamp, so the comparison never runs across
+ * two machines' clocks. Null means this browser did not start a run and so has no
+ * older log to tell apart: whatever is there is the truth.
+ */
+export function logIsFromRun(tail: UpdateLogTail, startedAt: number | null): boolean {
+    if (startedAt === null) return true;
+    // Floored, because the two numbers are not the same kind. A file's mtime
+    // carries a fraction of a millisecond and `Date.now()` does not, so a log
+    // written in the very millisecond the run was accepted came back a fraction
+    // "newer" than the moment recorded for it - and the previous run's leftover
+    // would have passed for this one's after all.
+    return tail.exists && Math.floor(tail.updatedAt) > startedAt;
+}
