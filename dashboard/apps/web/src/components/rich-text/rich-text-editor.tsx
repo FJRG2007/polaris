@@ -146,6 +146,23 @@ function writes(event: KeyboardEvent): boolean {
 /** What a chip says while its real name is still being looked up. */
 const PENDING_LABEL = "…";
 
+/**
+ * Whether the caret is somewhere the reader put it rather than somewhere a menu
+ * left it.
+ *
+ * A field, a box or another editor means somebody is writing there and must not
+ * be dragged out of it. A button, the body, or the control a menu handed focus
+ * back to means nobody chose it, and the box that was asked for should have it.
+ */
+function focusIsElsewhere(editor: Editor): boolean {
+    const on = typeof document === "undefined" ? null : document.activeElement;
+    if (!on || on === document.body) return false;
+    if (editor.view.dom.contains(on)) return false;
+    const tag = on.tagName.toLowerCase();
+    if (tag === "input" || tag === "textarea") return true;
+    return on instanceof HTMLElement && on.isContentEditable;
+}
+
 export function RichTextEditor({
     value,
     onChange,
@@ -327,14 +344,32 @@ export function RichTextEditor({
      */
     useEffect(() => {
         if (!focusAt || !editor || disabled) return;
-        const timer = window.setTimeout(() => {
-            if (editor.isDestroyed) return;
-            // "keep" restores the selection the editor still holds from before it
-            // was blurred, which is where the writer left off.
-            if (caret.current === "keep") editor.commands.focus();
-            else editor.commands.focus("end");
-        }, 0);
-        return () => window.clearTimeout(timer);
+        /**
+         * Asked for more than once, because asking once is not enough.
+         *
+         * A Radix menu returns focus to the control that opened it as it
+         * unmounts, and it does that when its exit animation ends - which is
+         * tens of milliseconds after this, not a tick. So a single attempt won
+         * the race on a fast machine and lost it on a slow one, which is exactly
+         * what "sometimes pressing reply does not put me in the box" was.
+         *
+         * Three tries over a fifth of a second, and it stops the moment the
+         * caret is in the box - or the moment it is somewhere the reader put it,
+         * because focus that moved to another field is a decision, not a menu
+         * taking it back.
+         */
+        const attempts = [0, 60, 140];
+        const timers = attempts.map((wait) =>
+            window.setTimeout(() => {
+                if (editor.isDestroyed || editor.isFocused) return;
+                if (focusIsElsewhere(editor)) return;
+                // "keep" restores the selection the editor still holds from
+                // before it was blurred, which is where the writer left off.
+                if (caret.current === "keep") editor.commands.focus();
+                else editor.commands.focus("end");
+            }, wait)
+        );
+        return () => timers.forEach((timer) => window.clearTimeout(timer));
     }, [focusAt, editor, disabled]);
 
     /**

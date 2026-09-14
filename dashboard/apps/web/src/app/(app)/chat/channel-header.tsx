@@ -20,7 +20,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
-import { PersonName } from "@/components/person-name";
+import { PersonName, PersonRealName } from "@/components/person-name";
 import { LeaveDialog } from "./leave-dialog";
 import { NicknameDialog } from "./nickname-dialog";
 import { channelLink, copyText } from "./links";
@@ -193,6 +193,18 @@ export function ChannelHeader({
                         className="text-sm font-semibold"
                     />
                 </span>
+                {/* And what they are actually called, when the name above is
+                    this reader's own for them. A conversation headed by a
+                    nickname is one where nothing on screen says whose account it
+                    is - which is the one thing the top of a conversation is for.
+                    Nothing is drawn for anybody who has not been given a name. */}
+                {!named && channel.others.length === 1 && channel.others[0] ? (
+                    <PersonRealName
+                        id={channel.others[0].id}
+                        name={channel.others[0].name}
+                        className="hidden min-w-0 shrink truncate text-xs sm:block"
+                    />
+                ) : null}
                 {channel.topic && (
                     <>
                         <span className="hidden h-4 w-px bg-border sm:block" />

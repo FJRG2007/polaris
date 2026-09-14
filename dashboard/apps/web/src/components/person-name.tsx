@@ -137,6 +137,41 @@ export function PersonName({
 }
 
 /**
+ * What somebody is actually called, when this reader calls them something else.
+ *
+ * A nickname replaces the name wherever Polaris is showing a reader their own
+ * people, which is what makes it useful and also what makes it lossy: the top of
+ * a conversation says "Dad" and there is nowhere left that says whose account
+ * that is. Every chat client that has nicknames draws both there for exactly
+ * that reason.
+ *
+ * Nothing at all when there is no nickname, or when it matches the name anyway -
+ * the second name is only worth the space when it says something the first one
+ * does not.
+ */
+export function PersonRealName({
+    id,
+    name,
+    className
+}: {
+    id: string | null | undefined;
+    /** What the screen was rendered with, for the moment before the store
+     *  answers. */
+    name: string;
+    className?: string;
+}) {
+    const called = useContactName(id);
+    const live = useProfileName(id);
+    const real = live ?? name;
+    if (!called || !real || called === real) return null;
+    return (
+        <span className={cn("text-muted-foreground", className)} title={real}>
+            {real}
+        </span>
+    );
+}
+
+/**
  * The plate somebody's row is drawn on, if they chose one.
  *
  * A hook rather than a component because a nameplate is a background for a row

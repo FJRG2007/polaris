@@ -152,6 +152,13 @@ export function ChannelView({
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
+    /** Every press of Reply, counted. The composer puts the caret in the box on
+     *  the press rather than on the message changing - see `replyAt` there. */
+    const [replyAt, setReplyAt] = useState(0);
+    const reply = useCallback((message: ChatMessageView) => {
+        setReplyingTo(message);
+        setReplyAt((current) => current + 1);
+    }, []);
     const [forwarding, setForwarding] = useState<ChatMessageView | null>(null);
     /**
      * A message said somewhere else, brought here to be answered.
@@ -1464,7 +1471,7 @@ export function ChannelView({
                         onStar={star}
                         onMarkUnread={markUnread}
                         onJumpTo={jumpHere}
-                        onReply={setReplyingTo}
+                        onReply={reply}
                         // Not in a direct message, where every reply is
                         // already private and the item would do nothing
                         // anybody could tell apart from Reply.
@@ -1625,6 +1632,7 @@ export function ChannelView({
                         }
                         editing={editing}
                         replyingTo={replyingTo ?? carried?.message ?? null}
+                        replyAt={replyAt}
                         replyingFrom={
                             carried?.from ? { name: carried.from, channel: carried.channel } : null
                         }

@@ -88,6 +88,7 @@ export function Composer({
     placeholder,
     editing,
     replyingTo,
+    replyAt = 0,
     replyingFrom,
     insert,
     onCancelReply,
@@ -167,6 +168,9 @@ export function Composer({
     /** The message being answered, if any. Shown above the field so nobody
      *  sends a reply having forgotten what it answers. */
     replyingTo?: ChatMessageView | null;
+    /** Counted up by whoever asked for the reply, so pressing it twice on one
+     *  message still puts the caret in the box. */
+    replyAt?: number;
     /**
      * Where the message being answered was said, when that is not here.
      *
@@ -388,7 +392,11 @@ export function Composer({
         if (!editingId && !replyingToId) return;
         setFocusWhere(editingId ? "end" : "keep");
         setFocusAt((current) => current + 1);
-    }, [editingId, replyingToId]);
+        // `replyAt` as well as the id: pressing Reply on the message already
+        // being answered changes nothing about what is being answered, and the
+        // press still means "put me in the box". Without it, anybody who clicked
+        // away and pressed Reply on the same message again got no caret.
+    }, [editingId, replyingToId, replyAt]);
 
     /**
      * Opening a conversation puts the caret in the box.
