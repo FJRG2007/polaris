@@ -163,6 +163,18 @@ async function canSealTo(publicKey: string): Promise<boolean> {
  * dashboard approves it - see `lib/vault/authorization`.
  */
 export async function connectAuthorize(context: VaultContext): Promise<Response> {
+    // Counted before anything is read or parsed. Nobody has said who they are yet,
+    // and `canSealTo` below is a WebCrypto key import over a string the caller
+    // chose: a limit that came after it would bound how many rows a stranger can
+    // open while leaving the work in front of them unbounded.
+    const ip = await clientIp();
+    const throttle = await rateLimit(
+        `vault-authorize:${hashForLog(ip) ?? "unknown"}`,
+        AUTHORIZE_LIMIT,
+        AUTHORIZE_WINDOW_MS
+    );
+    if (!throttle.ok) return grantError("Too many requests from here. Try again shortly.", 429);
+
     const body = await readAnyBody(context.request);
     const publicKey = (body.publicKey ?? "").trim();
     // The same parse the password grant does, from the same strings: a client that
@@ -179,14 +191,6 @@ export async function connectAuthorize(context: VaultContext): Promise<Response>
         return grantError("That public key is not one a vault key can be sealed to.");
     }
 
-    const ip = await clientIp();
-    const throttle = await rateLimit(
-        `vault-authorize:${hashForLog(ip) ?? "unknown"}`,
-        AUTHORIZE_LIMIT,
-        AUTHORIZE_WINDOW_MS
-    );
-    if (!throttle.ok) return grantError("Too many requests from here. Try again shortly.", 429);
-
     const opened = await openVaultAuthorization(
         {
             publicKey,
@@ -201,6 +205,10 @@ export async function connectAuthorize(context: VaultContext): Promise<Response>
         },
         (size) => crypto.getRandomValues(new Uint8Array(size))
     );
+    // Every code drawn was already taken, which is a table full of live requests
+    // rather than anything this caller did. Said in the shape the client already
+    // handles, so it retries instead of reading an unexplained failure.
+    if (!opened) return grantError("Could not start a request just now. Try again.");
 
     return Response.json({
         userCode: opened.userCode,

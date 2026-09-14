@@ -21,7 +21,7 @@ import * as vaultCrypto from "@/lib/vault/crypto";
 import { useVaultSession } from "../vault-session";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { answerAuthorizationAction, describeAuthorizationAction } from "./actions";
-import { formatUserCode, type PendingAuthorization } from "@/lib/vault/authorization";
+import { formatUserCode, type PendingAuthorization } from "@/lib/vault/authorization-code";
 
 export function AuthorizeView() {
     const { key } = useVaultSession();

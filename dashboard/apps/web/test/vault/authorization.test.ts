@@ -30,6 +30,9 @@ interface Row {
 
 let rows: Row[] = [];
 let nextId = 1;
+/** Stand in the gap between the read that looks for a collision and the write that
+ *  loses to one: the next lookup answers "free" for a code that is not. */
+let missNextRead = false;
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
     for (const [field, wanted] of Object.entries(where)) {
@@ -51,12 +54,23 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         vaultAuthorization: {
             create: async ({ data }: { data: Omit<Row, "id" | "createdAt"> }) => {
+                // The unique index on the short code, which the database has and a
+                // fake without it does not: leave it out and the retry that loses a
+                // race to another opener is a path no test here can reach.
+                if (rows.some((row) => row.userCode === data.userCode)) {
+                    throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+                }
                 const row: Row = { id: `a${nextId++}`, createdAt: new Date(), ...data };
                 rows.push(row);
                 return row;
             },
-            findUnique: async ({ where }: { where: Record<string, unknown> }) =>
-                rows.find((row) => matches(row, where)) ?? null,
+            findUnique: async ({ where }: { where: Record<string, unknown> }) => {
+                if (missNextRead) {
+                    missNextRead = false;
+                    return null;
+                }
+                return rows.find((row) => matches(row, where)) ?? null;
+            },
             updateMany: async ({
                 where,
                 data
@@ -109,9 +123,23 @@ const REQUEST = {
     requestHost: "polaris.example"
 } as const;
 
+/** One draw after another, so a test can say what the second attempt picks. The
+ *  last is repeated, which is how a run of collisions is written. */
+function draws(...picks: number[][]): (size: number) => Uint8Array {
+    let at = 0;
+    return (size) => {
+        const values = picks[Math.min(at, picks.length - 1)]!;
+        at += 1;
+        const out = new Uint8Array(size);
+        for (let index = 0; index < size; index += 1) out[index] = values[index % values.length]!;
+        return out;
+    };
+}
+
 beforeEach(() => {
     rows = [];
     nextId = 1;
+    missNextRead = false;
 });
 
 describe("the code somebody reads off the popup", () => {
@@ -173,6 +201,27 @@ describe("opening a request", () => {
         });
         await openVaultAuthorization(REQUEST, bytes(1), NOW);
         expect(rows.some((row) => row.id === "old")).toBe(false);
+    });
+
+    it("draws again when another opener took the code between the read and the write", async () => {
+        // Two opens can pick the same code at once: the read tells both it is
+        // free and the index refuses the second write. That refusal is what the
+        // retry is for, so it draws another code - rather than escaping as a
+        // failure the extension can neither read nor do anything about.
+        const first = await openVaultAuthorization(REQUEST, draws([1]), NOW);
+        missNextRead = true;
+        const second = await openVaultAuthorization(REQUEST, draws([1], [2]), NOW);
+        expect(second).not.toBeNull();
+        expect(second!.userCode).not.toBe(first!.userCode);
+        expect(rows).toHaveLength(2);
+    });
+
+    it("gives up with an answer rather than an exception", async () => {
+        // Every draw already taken. Null is a refusal the caller turns into
+        // something the client understands; a throw reached it as a 500.
+        await openVaultAuthorization(REQUEST, draws([1]), NOW);
+        expect(await openVaultAuthorization(REQUEST, draws([1]), NOW)).toBeNull();
+        expect(rows).toHaveLength(1);
     });
 });
 

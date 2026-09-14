@@ -70,16 +70,30 @@ export interface AuthorizationRequest {
     readonly requestHost: string | null;
 }
 
+/** Whether a thrown Prisma error is a unique-constraint violation (P2002) - here,
+ *  a short code another opener wrote first. */
+function isUniqueViolation(caught: unknown): boolean {
+    return (
+        typeof caught === "object" &&
+        caught !== null &&
+        (caught as { code?: string }).code === "P2002"
+    );
+}
+
 /**
  * Open a request. Unauthenticated by nature - nobody has said who they are yet -
  * so the caller rate-limits it, and what comes back is useless until somebody
  * inside the vault approves it.
+ *
+ * Null when every code it drew was already taken. A refusal rather than a throw
+ * because the caller answers a client with it, and an exception here would reach
+ * the extension as a failure with nothing it could do about it.
  */
 export async function openVaultAuthorization(
     input: AuthorizationRequest,
     random: (size: number) => Uint8Array,
     now = new Date()
-): Promise<OpenedAuthorization> {
+): Promise<OpenedAuthorization | null> {
     // A request nobody came back for is dead weight the moment it expires, and
     // these are opened far more often than they are answered. Cleared here so the
     // table stays bounded without a scheduled job that would exist for this alone.
@@ -100,24 +114,33 @@ export async function openVaultAuthorization(
             select: { id: true }
         });
         if (taken) continue;
-        await prisma.vaultAuthorization.create({
-            data: {
-                codeHash: hashToken(deviceCode),
-                userCode,
-                publicKey: input.publicKey,
-                status: "pending",
-                deviceIdentifier: input.deviceIdentifier,
-                deviceName: input.deviceName,
-                deviceType: input.deviceType,
-                requestIp: input.requestIp,
-                requestUserAgent: input.requestUserAgent,
-                requestHost: input.requestHost,
-                expiresAt
-            }
-        });
+        try {
+            await prisma.vaultAuthorization.create({
+                data: {
+                    codeHash: hashToken(deviceCode),
+                    userCode,
+                    publicKey: input.publicKey,
+                    status: "pending",
+                    deviceIdentifier: input.deviceIdentifier,
+                    deviceName: input.deviceName,
+                    deviceType: input.deviceType,
+                    requestIp: input.requestIp,
+                    requestUserAgent: input.requestUserAgent,
+                    requestHost: input.requestHost,
+                    expiresAt
+                }
+            });
+        } catch (caught) {
+            // The read above and this write are two statements, so a second
+            // opener drawing the same code can land between them. The unique
+            // index is what settles that, and losing it is the case this loop
+            // exists for - so it draws again. Anything else is not its to swallow.
+            if (isUniqueViolation(caught)) continue;
+            throw caught;
+        }
         return { userCode, deviceCode, expiresAt, pollMs: AUTHORIZATION_POLL_MS };
     }
-    throw new Error("Could not mint a free authorization code");
+    return null;
 }
 
 /**

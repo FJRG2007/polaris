@@ -1644,7 +1644,7 @@ export function MailView({
                                 return;
                             }
                             toast.show({ title: `${context.title} is empty.` });
-                            reloadLists();
+                            refreshMailbox();
                         })();
                     }}
                 />
