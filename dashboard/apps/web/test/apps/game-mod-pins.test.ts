@@ -36,9 +36,13 @@ describe("moving a pin", () => {
     it("keeps everything else about the entry", () => {
         expect(repinEntry("grimac:2.3.73", "2.3.74")).toBe("grimac:2.3.74");
         expect(repinEntry("bedwars1058:beta:25.5", "25.6")).toBe("bedwars1058:beta:25.6");
-        // The trailing question mark is what makes an entry optional, and losing it
-        // turns a plugin that may fail to install into one that stops the boot.
-        expect(repinEntry("geyser:alpha:1.0?", "1.1")).toBe("geyser:alpha:1.1?");
+        // The question mark is what makes an entry optional, and losing it turns a
+        // plugin that may fail to install into one that stops the boot. It is read
+        // wherever it appears and written back onto the project, which is the
+        // spelling the catalog's own defaults ship (`grimac?:alpha`) and the one a
+        // running container has been seen to read as optional. Hanging it off the
+        // end of a version instead is a third form nothing here has evidence for.
+        expect(repinEntry("geyser:alpha:1.0?", "1.1")).toBe("geyser?:alpha:1.1");
     });
 
     it("pins one that was following the newest build", () => {

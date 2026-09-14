@@ -10,18 +10,8 @@
  * operator is logged into.
  */
 
+import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-    categoriesForLoader,
-    isCategoryFor,
-    isModrinthIcon,
-    loaderForType,
-    parseProjectList,
-    projectSlug,
-    readConflicts,
-    readInstalledProjects,
-    searchModrinth
-} from "@/lib/apps/minecraft/modrinth";
 
 /** Every URL Modrinth was asked for, and what it was answered with. */
 let asked: string[] = [];
@@ -52,7 +42,7 @@ function facetsOf(url: string): string[][] {
 describe("what a server is offered", () => {
     it("asks only for what its own software can load", async () => {
         answers.set("/search", { hits: [] });
-        await searchModrinth("worldedit", "paper");
+        await modrinth.searchModrinth("worldedit", "paper");
         const facets = facetsOf(asked[0]!);
         expect(facets).toContainEqual(["project_type:plugin"]);
         expect(facets).toContainEqual(["categories:paper"]);
@@ -60,7 +50,7 @@ describe("what a server is offered", () => {
 
     it("asks only for what has a build for the release it runs", async () => {
         answers.set("/search", { hits: [] });
-        await searchModrinth("", "fabric", { version: "1.21.4" });
+        await modrinth.searchModrinth("", "fabric", { version: "1.21.4" });
         expect(facetsOf(asked[0]!)).toContainEqual(["versions:1.21.4"]);
     });
 
@@ -68,7 +58,7 @@ describe("what a server is offered", () => {
         // A server on LATEST is on no particular release, and inventing one would
         // hide everything that does not happen to support it.
         answers.set("/search", { hits: [] });
-        await searchModrinth("", "fabric", { version: "LATEST" });
+        await modrinth.searchModrinth("", "fabric", { version: "LATEST" });
         expect(JSON.stringify(facetsOf(asked[0]!))).not.toContain("versions:");
     });
 
@@ -76,7 +66,7 @@ describe("what a server is offered", () => {
         // A client-only mod installs cleanly, changes nothing, and leaves somebody
         // convinced their server is broken.
         answers.set("/search", { hits: [] });
-        await searchModrinth("sodium", "fabric");
+        await modrinth.searchModrinth("sodium", "fabric");
         expect(facetsOf(asked[0]!)).toContainEqual(["server_side:required", "server_side:optional"]);
     });
 
@@ -84,13 +74,13 @@ describe("what a server is offered", () => {
         // A plugin is server-side by definition and Modrinth does not always tag
         // one, so the facet would filter out most of what exists.
         answers.set("/search", { hits: [] });
-        await searchModrinth("", "paper");
+        await modrinth.searchModrinth("", "paper");
         expect(JSON.stringify(facetsOf(asked[0]!))).not.toContain("server_side");
     });
 
     it("opens on what is popular rather than on nothing", async () => {
         answers.set("/search", { hits: [] });
-        await searchModrinth("", "paper");
+        await modrinth.searchModrinth("", "paper");
         expect(asked[0]).toContain("index=downloads");
         expect(asked[0]).not.toContain("query=");
     });
@@ -98,7 +88,7 @@ describe("what a server is offered", () => {
     it("comes back empty when Modrinth cannot be reached", async () => {
         // A browser that cannot reach the index is a browser with no results, not
         // a broken page.
-        expect(await searchModrinth("anything", "paper")).toEqual([]);
+        expect(await modrinth.searchModrinth("anything", "paper")).toEqual([]);
     });
 
     it("drops an icon that is not Modrinth's own", async () => {
@@ -108,7 +98,7 @@ describe("what a server is offered", () => {
                 { slug: "bad", title: "Bad", icon_url: "https://someone-else.example/track.png" }
             ]
         });
-        const projects = await searchModrinth("", "paper");
+        const projects = await modrinth.searchModrinth("", "paper");
         expect(projects[0]!.iconUrl).toBe("https://cdn.modrinth.com/data/x/icon.png");
         expect(projects[1]!.iconUrl).toBeNull();
     });
@@ -116,11 +106,11 @@ describe("what a server is offered", () => {
 
 describe("an icon url", () => {
     it("has to be Modrinth over https", () => {
-        expect(isModrinthIcon("https://cdn.modrinth.com/data/x/icon.png")).toBe(true);
-        expect(isModrinthIcon("http://cdn.modrinth.com/data/x/icon.png")).toBe(false);
-        expect(isModrinthIcon("https://cdn.modrinth.com.evil.example/x.png")).toBe(false);
-        expect(isModrinthIcon("javascript:alert(1)")).toBe(false);
-        expect(isModrinthIcon(null)).toBe(false);
+        expect(modrinth.isModrinthIcon("https://cdn.modrinth.com/data/x/icon.png")).toBe(true);
+        expect(modrinth.isModrinthIcon("http://cdn.modrinth.com/data/x/icon.png")).toBe(false);
+        expect(modrinth.isModrinthIcon("https://cdn.modrinth.com.evil.example/x.png")).toBe(false);
+        expect(modrinth.isModrinthIcon("javascript:alert(1)")).toBe(false);
+        expect(modrinth.isModrinthIcon(null)).toBe(false);
     });
 });
 
@@ -136,7 +126,7 @@ describe("what is already on the list", () => {
                 loaders: ["paper"]
             }
         ]);
-        const [entry] = await readInstalledProjects(["coreprotect?"], "paper", "1.21.4");
+        const [entry] = await modrinth.readInstalledProjects(["coreprotect?"], "paper", "1.21.4");
         expect(entry).toMatchObject({ title: "CoreProtect", known: true, fitsVersion: true, fitsLoader: true });
         // The entry is kept exactly as the container holds it, so taking it off
         // does not have to guess at the image's own syntax.
@@ -147,7 +137,7 @@ describe("what is already on the list", () => {
         // Dropping it would show a shorter list than the server is going to try to
         // install, which is the one thing this screen must not do.
         answers.set("/projects?ids=", []);
-        const [entry] = await readInstalledProjects(["nonesuch"], "paper", "1.21.4");
+        const [entry] = await modrinth.readInstalledProjects(["nonesuch"], "paper", "1.21.4");
         expect(entry).toMatchObject({ slug: "nonesuch", known: false });
     });
 
@@ -155,7 +145,7 @@ describe("what is already on the list", () => {
         answers.set("/projects?ids=", [
             { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.20.1"], loaders: ["paper"] }
         ]);
-        const [entry] = await readInstalledProjects(["grimac"], "paper", "1.21.4");
+        const [entry] = await modrinth.readInstalledProjects(["grimac"], "paper", "1.21.4");
         expect(entry!.fitsVersion).toBe(false);
     });
 
@@ -164,7 +154,7 @@ describe("what is already on the list", () => {
         answers.set("/projects?ids=", [
             { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.20.1"], loaders: ["paper"] }
         ]);
-        const [entry] = await readInstalledProjects(["grimac"], "paper", null);
+        const [entry] = await modrinth.readInstalledProjects(["grimac"], "paper", null);
         expect(entry!.fitsVersion).toBeNull();
     });
 
@@ -172,7 +162,7 @@ describe("what is already on the list", () => {
         answers.set("/projects?ids=", [
             { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.21.4"], loaders: [] }
         ]);
-        const [entry] = await readInstalledProjects(["grimac"], "paper", "1.21.4");
+        const [entry] = await modrinth.readInstalledProjects(["grimac"], "paper", "1.21.4");
         expect(entry!.fitsLoader).toBe(true);
     });
 });
@@ -198,25 +188,25 @@ describe("conflicts between them", () => {
 
     it("reports what a publisher says cannot run beside what is here", async () => {
         twoProjects("incompatible", "BBBB");
-        expect(await readConflicts(["one", "two"], "paper")).toEqual([{ slug: "one", withSlug: "two" }]);
+        expect(await modrinth.readConflicts(["one", "two"], "paper")).toEqual([{ slug: "one", withSlug: "two" }]);
     });
 
     it("says nothing about a required dependency", async () => {
         // Needing something is not clashing with it, and the image installs
         // required dependencies by itself.
         twoProjects("required", "BBBB");
-        expect(await readConflicts(["one", "two"], "paper")).toEqual([]);
+        expect(await modrinth.readConflicts(["one", "two"], "paper")).toEqual([]);
     });
 
     it("says nothing about something that is not on the list", async () => {
         // An incompatibility with a project nobody installed is not a problem this
         // server has.
         twoProjects("incompatible", "CCCC");
-        expect(await readConflicts(["one", "two"], "paper")).toEqual([]);
+        expect(await modrinth.readConflicts(["one", "two"], "paper")).toEqual([]);
     });
 
     it("does not go looking when there is only one thing installed", async () => {
-        expect(await readConflicts(["one"], "paper")).toEqual([]);
+        expect(await modrinth.readConflicts(["one"], "paper")).toEqual([]);
         expect(asked).toEqual([]);
     });
 });
@@ -225,37 +215,82 @@ describe("the shelves", () => {
     it("differ between a plugin server and a modded one", () => {
         // The same idea is filed under different tags, so one list with holes in
         // it would offer a shelf that is always empty.
-        expect(categoriesForLoader("paper").some((entry) => entry.value === "economy")).toBe(true);
-        expect(categoriesForLoader("fabric").some((entry) => entry.value === "economy")).toBe(false);
-        expect(categoriesForLoader("fabric").some((entry) => entry.value === "technology")).toBe(true);
+        expect(modrinth.categoriesForLoader("paper").some((entry) => entry.value === "economy")).toBe(true);
+        expect(modrinth.categoriesForLoader("fabric").some((entry) => entry.value === "economy")).toBe(false);
+        expect(modrinth.categoriesForLoader("fabric").some((entry) => entry.value === "technology")).toBe(true);
     });
 
     it("are the only ones a query may name", () => {
         // It goes into a request to somebody else's API, so it is checked rather
         // than passed through.
-        expect(isCategoryFor("paper", "economy")).toBe(true);
-        expect(isCategoryFor("paper", "")).toBe(true);
-        expect(isCategoryFor("paper", "technology")).toBe(false);
-        expect(isCategoryFor("paper", "anything at all")).toBe(false);
+        expect(modrinth.isCategoryFor("paper", "economy")).toBe(true);
+        expect(modrinth.isCategoryFor("paper", "")).toBe(true);
+        expect(modrinth.isCategoryFor("paper", "technology")).toBe(false);
+        expect(modrinth.isCategoryFor("paper", "anything at all")).toBe(false);
     });
 });
 
 describe("the list the container is given", () => {
     it("is read back the way the image writes it", () => {
-        expect(parseProjectList("grimac?,coreprotect?,luckperms?")).toEqual([
+        expect(modrinth.parseProjectList("grimac?,coreprotect?,luckperms?")).toEqual([
             "grimac?",
             "coreprotect?",
             "luckperms?"
         ]);
-        expect(projectSlug("grimac?")).toBe("grimac");
-        expect(projectSlug("coreprotect:1.2.3")).toBe("coreprotect");
+        expect(modrinth.projectSlug("grimac?")).toBe("grimac");
+        expect(modrinth.projectSlug("coreprotect:1.2.3")).toBe("coreprotect");
         // A file rather than a project, which nothing can be asked about.
-        expect(projectSlug("@/mods/thing.jar")).toBeNull();
+        expect(modrinth.projectSlug("@/mods/thing.jar")).toBeNull();
     });
 
     it("knows which software can load anything at all", () => {
-        expect(loaderForType("PAPER")).toBe("paper");
-        expect(loaderForType("purpur")).toBe("paper");
-        expect(loaderForType("VANILLA")).toBeNull();
+        expect(modrinth.loaderForType("PAPER")).toBe("paper");
+        expect(modrinth.loaderForType("purpur")).toBe("paper");
+        expect(modrinth.loaderForType("VANILLA")).toBeNull();
+    });
+});
+
+/**
+ * The "?" sits on the project, not at the end of the line.
+ *
+ * `grimac?:alpha` is the spelling the catalog ships, and every reader here used
+ * to look for the "?" only at the very end of the string. So the slug came out
+ * as `grimac?` - a name no project has - and the row was drawn as something
+ * Modrinth had never heard of, while a repin wrote the "?" into the middle of
+ * the name and lost the fact that it was optional at all.
+ */
+describe("an entry that is optional and pinned at once", () => {
+    it("still names the project it is about", () => {
+        expect(modrinth.projectSlug("grimac?:alpha")).toBe("grimac");
+        expect(modrinth.projectSlug("coreprotect?:1.2.3")).toBe("coreprotect");
+    });
+
+    it("still says which builds it will take", () => {
+        expect(modrinth.entryReleaseType("grimac?:alpha")).toBe("alpha");
+        // The other spelling, which the reader that was wrong about the first was
+        // the one writing. Lists holding it are already deployed.
+        expect(modrinth.entryReleaseType("bedwars1058:beta?")).toBe("beta");
+    });
+
+    it("still says which build it is nailed to", () => {
+        expect(modrinth.pinnedBuild("coreprotect?:1.2.3")).toBe("1.2.3");
+        // A release type is a rule about which builds count, not a version, so it
+        // is not a pin and cannot fall behind.
+        expect(modrinth.pinnedBuild("grimac?:alpha")).toBeNull();
+    });
+
+    it("comes back optional after being pointed at another build", () => {
+        expect(modrinth.repinEntry("grimac?:alpha", "2.0")).toBe("grimac?:alpha:2.0");
+        expect(modrinth.repinEntry("coreprotect?", "1.2.3")).toBe("coreprotect?:1.2.3");
+        expect(modrinth.repinEntry("luckperms", "5.4")).toBe("luckperms:5.4");
+    });
+
+    it("is resolved to the project it names rather than reported as unknown", async () => {
+        answers.set("/projects?ids=", [
+            { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.21.4"], loaders: ["paper"] }
+        ]);
+        const [entry] = await modrinth.readInstalledProjects(["grimac?:alpha"], "paper", "1.21.4");
+        expect(entry).toMatchObject({ title: "GrimAC", known: true });
+        expect(entry!.entry).toBe("grimac?:alpha");
     });
 });

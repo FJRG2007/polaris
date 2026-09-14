@@ -41,6 +41,7 @@ import {
     formatProjectList,
     loaderForType,
     parseProjectList,
+    projectSlug,
     repinEntry,
     type InstalledProject,
     type ModrinthConflict,
@@ -339,12 +340,14 @@ export function MinecraftMods({
                                     key={project.slug}
                                     installedAppId={installedAppId}
                                     project={project}
-                                    added={projects.some(
-                                        (entry) => entry.replace(/\?+$/, "") === project.slug
-                                    )}
-                                    onAdd={() =>
-                                        setProjects((current) => [...current, project.slug])
-                                    }
+                                    added={projects.some((entry) => projectSlug(entry) === project.slug)}
+                                    // Added optional, because the image treats a
+                                    // project it cannot find a build for as a
+                                    // reason to end the boot: one mod that only
+                                    // publishes betas for this release, and the
+                                    // server restarts until it is stopped for it.
+                                    // Optional makes that a skipped mod instead.
+                                    onAdd={() => setProjects((current) => [...current, `${project.slug}?`])}
                                 />
                             ))}
                         </ul>

@@ -375,17 +375,51 @@ export async function modrinthJson(url: string): Promise<unknown> {
     return response.json();
 }
 
+/** One entry of MODRINTH_PROJECTS, as the three things its syntax can carry. */
+export interface ProjectEntry {
+    /** The project, with no "?" left on it. Empty for anything unaskable. */
+    readonly slug: string;
+    /** Whether a build that cannot be found may be skipped instead of ending the
+     *  boot. */
+    readonly optional: boolean;
+    /** What followed the ":", which is a version, a release type, or both. */
+    readonly parts: readonly string[];
+}
+
+/**
+ * An entry split into its parts.
+ *
+ * The "?" belongs to the project rather than to the line: `grimac?:alpha` is the
+ * optional project `grimac` asked for at alpha. Reading it only at the very end
+ * of the string - which every reader here used to do - left the slug as
+ * `grimac?`, a name no project has, so the row was reported as one Modrinth has
+ * never heard of and a repin wrote the "?" into the middle of the name.
+ *
+ * Both spellings are taken, because the reader that was wrong about the first
+ * was the one writing the second, and lists holding either are already deployed.
+ */
+export function splitEntry(entry: string): ProjectEntry {
+    const trimmed = entry.trim();
+    const head = trimmed.split(":")[0]?.trim() ?? "";
+    const optional = /\?+$/.test(trimmed) || /\?+$/.test(head);
+    const [slug = "", ...rest] = trimmed.replace(/\?+$/, "").split(":");
+    return {
+        slug: slug.trim().replace(/\?+$/, ""),
+        optional,
+        parts: rest.map((part) => part.trim().replace(/\?+$/, "")).filter((part) => part.length > 0)
+    };
+}
+
 /**
  * The slug out of a MODRINTH_PROJECTS entry.
  *
- * The image's own syntax: a trailing "?" makes a project optional, a ":" pins a
- * version, and a leading "@" names a file rather than a project. Only a plain
- * slug can be asked about.
+ * The image's own syntax: a "?" makes a project optional, a ":" pins a version,
+ * and a leading "@" names a file rather than a project. Only a plain slug can be
+ * asked about.
  */
 export function projectSlug(entry: string): string | null {
-    const trimmed = entry.trim().replace(/\?+$/, "");
-    if (trimmed.length === 0 || trimmed.startsWith("@")) return null;
-    const slug = trimmed.split(":")[0]?.trim() ?? "";
+    const { slug } = splitEntry(entry);
+    if (slug.length === 0 || slug.startsWith("@")) return null;
     return /^[A-Za-z0-9!@$()`.+,_-]{1,64}$/.test(slug) ? slug : null;
 }
 
@@ -416,9 +450,8 @@ const ADMITS: Record<ReleaseType, ReadonlySet<string>> = {
  * words count; anything else leaves the default alone.
  */
 export function entryReleaseType(entry: string): ReleaseType {
-    const parts = entry.trim().replace(/\?+$/, "").split(":");
-    for (const part of parts.slice(1)) {
-        const value = part.trim().toLowerCase();
+    for (const part of splitEntry(entry).parts) {
+        const value = part.toLowerCase();
         if ((RELEASE_TYPES as readonly string[]).includes(value)) return value as ReleaseType;
     }
     return "release";
@@ -443,7 +476,6 @@ export function formatProjectList(projects: readonly string[]): string {
     return [...new Set(projects)].join(",");
 }
 
-
 /**
  * The exact build an entry is nailed to, if it is nailed to one.
  *
@@ -455,26 +487,22 @@ export function formatProjectList(projects: readonly string[]): string {
  * be telling somebody their server is stale when it updates itself every boot.
  */
 export function pinnedBuild(entry: string): string | null {
-    const parts = entry
-        .trim()
-        .replace(/\?+$/, "")
-        .split(":")
-        .slice(1)
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0);
+    const { parts } = splitEntry(entry);
     return parts.find((part) => !(RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())) ?? null;
 }
 
-/** The same entry pointed at another build, with everything else about it - the
- *  release type, the trailing `?` that makes it optional - left alone. */
+/**
+ * The same entry pointed at another build, with everything else about it - the
+ * release type, the `?` that makes it optional - left alone.
+ *
+ * The "?" is written onto the slug, which is the spelling the catalog's own
+ * defaults use and therefore the one there is evidence the image reads. Hanging
+ * it off the end of a pinned version instead would be inventing a third form.
+ */
 export function repinEntry(entry: string, build: string): string {
-    const optional = /\?+$/.test(entry.trim());
-    const bare = entry.trim().replace(/\?+$/, "");
-    const [slug, ...rest] = bare.split(":");
-    const kept = rest
-        .map((part) => part.trim())
-        .filter((part) => (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase()));
-    return `${[slug, ...kept, build].join(":")}${optional ? "?" : ""}`;
+    const { slug, optional, parts } = splitEntry(entry);
+    const kept = parts.filter((part) => (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase()));
+    return [`${slug}${optional ? "?" : ""}`, ...kept, build].join(":");
 }
 
 const buildSchema = z
