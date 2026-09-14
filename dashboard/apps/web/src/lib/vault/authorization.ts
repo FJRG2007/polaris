@@ -123,10 +123,15 @@ export async function openVaultAuthorization(
 /**
  * The request behind a code, for the account about to decide on it.
  *
- * Null for anything there is nothing to decide about - unknown, expired, already
- * answered, or claimed by another account. One answer on purpose: the code is a
- * short string somebody could have typed at a guess, and telling the guesser which
- * of those it was is telling them whether it exists.
+ * Null for anything there is nothing to decide about - unknown, expired, or
+ * already answered. One answer on purpose: the code is a short string somebody
+ * could have typed at a guess, and telling the guesser which of those it was is
+ * telling them whether it exists.
+ *
+ * There is no owner to check against here, and deliberately so: a pending row has
+ * no account on it by construction - `userId` is written by the answer - so any
+ * signed-in account with `vault.use` may describe a waiting code. What that account
+ * can do with it is the sealing, which needs their own unlocked vault.
  */
 export async function describeVaultAuthorization(
     userCode: string,

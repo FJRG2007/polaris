@@ -76,6 +76,29 @@ describe("asking to be let in", () => {
         ).toBeNull();
     });
 
+    it("holds the server's poll period to something it will actually wait", async () => {
+        // The period is a number a server picks and this browser obeys as a timer.
+        // Zero or a negative one is a loop asking as fast as it can, which spends
+        // the claim budget in seconds and then reads as a request that ran out.
+        const asking = async (pollMs: unknown): Promise<number | undefined> => {
+            answering(200, { userCode: "BCDFGHJK", deviceCode: "secret", pollMs });
+            return (
+                await openAuthorization(BASE, {
+                    publicKey: "PUBLIC",
+                    device: { identifier: "extension-1", name: "Chrome extension" }
+                })
+            )?.pollMs;
+        };
+        expect(await asking(2000)).toBe(2000);
+        expect(await asking(0)).toBe(1000);
+        expect(await asking(-5000)).toBe(1000);
+        expect(await asking(Number.NaN)).toBe(2000);
+        expect(await asking("soon")).toBe(2000);
+        expect(await asking(undefined)).toBe(2000);
+        // And not longer than the request itself lives, or nothing is collected.
+        expect(await asking(600_000)).toBe(30_000);
+    });
+
     it("comes back with nothing when the answer is missing a code", async () => {
         answering(200, { userCode: "BCDFGHJK" });
         expect(
@@ -127,6 +150,23 @@ describe("collecting the approval", () => {
         // the safe reading is "this is over", which sends somebody back to ask
         // again rather than leaving a popup polling forever.
         answering(200, { status: "something-else" });
+        expect(await claimAuthorization(BASE, "secret")).toEqual({ status: "expired" });
+    });
+
+    it("keeps waiting through a server that answered badly", async () => {
+        // A proxy's 502 and the 429 this endpoint returns when the polling budget
+        // runs low are not the server's verdict on the request - it is still there,
+        // still waiting to be approved. Read as "ran out", either one ends a sign-in
+        // that nothing had gone wrong with.
+        for (const status of [429, 500, 502, 503]) {
+            answering(status, { error: "invalid_grant" });
+            expect(await claimAuthorization(BASE, "secret")).toBeNull();
+        }
+    });
+
+    it("reads a refusal the server did give as spent", async () => {
+        // The other side of it: a 400 is an answer about this request, so it ends.
+        answering(400, { error: "invalid_grant" });
         expect(await claimAuthorization(BASE, "secret")).toEqual({ status: "expired" });
     });
 

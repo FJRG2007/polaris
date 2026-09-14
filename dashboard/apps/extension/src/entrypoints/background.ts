@@ -117,11 +117,30 @@ const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf
  * direction to fail in - key material at rest is the one thing this design will not
  * have - and the popup says so rather than leaving somebody waiting on a code that
  * can no longer be used.
+ *
+ * What became of it is kept here too, because the popup is not around to be told.
+ * Opening the tab that approves a request is what closes the popup, so the answer
+ * has to be waiting for whoever opens it next rather than delivered to whoever
+ * asked.
  */
-const WAITING = storage.defineItem<{ deviceCode: string; userCode: string } | null>(
-    "session:vault.waiting",
-    { fallback: null }
-);
+const WAITING = storage.defineItem<WaitingRequest | null>("session:vault.waiting", {
+    fallback: null
+});
+
+/** Where the collection of an approval stands, as the worker's own loop left it. */
+type AuthorizationState = "pending" | "approved" | "denied" | "expired" | "lost" | "unreadable";
+
+/** A request in flight, and what has become of it. */
+interface WaitingRequest {
+    readonly deviceCode: string;
+    readonly userCode: string;
+    /** How often to ask, as the server asked and `protocol` held it to a period
+     *  this client will actually wait. */
+    readonly pollMs: number;
+    /** When the server stops answering for this code, as a moment. */
+    readonly until: number;
+    readonly state: AuthorizationState;
+}
 
 /** The pair this extension generated for a request in flight. Memory only. */
 let asking: { publicKey: string; privateKey: Uint8Array } | null = null;
@@ -249,8 +268,19 @@ async function organizationKeys(key: SymmetricKey): Promise<Map<string, Symmetri
  * to be asked again after the browser - or the worker - has been away.
  */
 async function unlock(password: string): Promise<boolean> {
-    const [email, wrapped] = await Promise.all([EMAIL.getValue(), WRAPPED.getValue()]);
-    if (!email || !wrapped) return false;
+    const [held, wrapped] = await Promise.all([EMAIL.getValue(), WRAPPED.getValue()]);
+    if (!wrapped) return false;
+    // A vault this browser was let into by approval typed no address, and the master
+    // password cannot be stretched without one - it is the salt. Fetched from the
+    // profile rather than refused, because what a refusal looks like on screen is a
+    // locked vault telling somebody their correct password is wrong, with no way
+    // back but signing out.
+    let email = held;
+    if (!email) {
+        await sync(true);
+        email = await EMAIL.getValue();
+    }
+    if (!email) return false;
 
     const settings = wrapped.kdf as Parameters<typeof deriveMasterKey>[2];
     const masterKey = await deriveMasterKey(password, email, settings);
@@ -278,6 +308,107 @@ async function openWithKey(raw: Uint8Array): Promise<boolean> {
     open = { key, organizations: await organizationKeys(key) };
     await LOCK_AT.setValue(deadlineFrom(Date.now(), await TIMEOUT.getValue()));
     return true;
+}
+
+/**
+ * How long a request is given when the server did not say when it runs out.
+ *
+ * A bound rather than a copy of the server's own limit: what this is for is making
+ * sure a loop polling an address that has stopped answering ends by itself.
+ */
+const AUTHORIZATION_FALLBACK_MS = 5 * 60 * 1000;
+
+/** When a request stops being answerable, from what the server said about it. */
+function readExpiry(expiresAt: string): number {
+    const moment = Date.parse(expiresAt);
+    return Number.isFinite(moment) ? moment : Date.now() + AUTHORIZATION_FALLBACK_MS;
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** The collection running right now, so one request is never polled twice over. */
+let collecting: Promise<void> | null = null;
+
+/**
+ * Start collecting the approval, if nothing is collecting it already.
+ *
+ * Started from the request that opens one, and again from the alarm, which is what
+ * makes a worker that came back mid-wait finish the request instead of leaving a
+ * code somebody is approving with nothing on this side listening for it.
+ */
+function startCollecting(): void {
+    if (collecting) return;
+    collecting = collect().finally(() => {
+        collecting = null;
+    });
+}
+
+/** Leave the request where the popup will find out what happened to it. */
+async function settle(waiting: WaitingRequest, state: AuthorizationState): Promise<void> {
+    await WAITING.setValue({ ...waiting, state });
+}
+
+/**
+ * Wait for somebody to approve the request, here in the worker.
+ *
+ * Here rather than in the popup, and that is the whole point of this function: the
+ * request is opened by pressing a button in the popup, and the last thing that
+ * handler does is open a tab on the dashboard - which moves the focus, which tears
+ * the popup down, along with any timer it was holding. A poll that lived there
+ * stopped at the exact moment somebody went off to say yes, so the approval was
+ * never collected and pressing the button again only orphaned the first request.
+ *
+ * It ends in every direction. Approved opens the vault; denied and expired are the
+ * server's own answers; a recycled worker has no private half left and so reports
+ * the request lost; and an address that has stopped answering runs out with the
+ * request rather than polling forever.
+ */
+async function collect(): Promise<void> {
+    for (;;) {
+        const waiting = await WAITING.getValue();
+        if (!waiting || waiting.state !== "pending") return;
+        // The private half is memory only, so a worker that was recycled cannot
+        // open what an approval would carry. Said plainly rather than waited on.
+        if (!asking) return settle(waiting, "lost");
+        if (Date.now() >= waiting.until) return settle(waiting, "expired");
+
+        await sleep(waiting.pollMs);
+
+        // Read again after the wait: the popup may have cancelled it, or asked for
+        // another, and this must not answer for a code nothing is waiting on.
+        const still = await WAITING.getValue();
+        if (!still || still.state !== "pending" || still.deviceCode !== waiting.deviceCode) return;
+
+        const origin = await currentOrigin();
+        if (!origin) return settle(still, "expired");
+        const claim = await protocol.claimAuthorization(vaultBase(origin), still.deviceCode);
+        // Nothing at all is a server that could not be reached, or would not answer
+        // this poll: the request is still alive server-side, so this keeps waiting.
+        if (!claim || claim.status === "pending") continue;
+        if (claim.status !== "approved") return settle(still, claim.status);
+
+        if (!asking) return settle(still, "lost");
+        const privateKey = asking.privateKey;
+        asking = null;
+        const raw = await decryptRsa(claim.wrappedKey, privateKey);
+        if (!raw || !(await openWithKey(raw))) {
+            // Approved, and unreadable. Nothing is kept: a session that cannot
+            // decrypt anything is worse than none, because it looks signed in.
+            privateKey.fill(0);
+            return settle(still, "unreadable");
+        }
+        privateKey.fill(0);
+
+        await remember(claim.token);
+        // The address this vault belongs to arrives with the profile, and the sync
+        // below is what records it. Nothing was typed on this way in, and `unlock`
+        // cannot stretch a master password without it.
+        await sync(true);
+        await badge();
+        return settle(still, "approved");
+    }
 }
 
 /** Which key opens this item: its vault's, or the account's own. */
@@ -396,6 +527,24 @@ async function status(): Promise<messages.VaultStatus> {
 }
 
 /**
+ * The address this vault belongs to, from the profile that just came down.
+ *
+ * Recorded on every sync rather than only where somebody typed it, because it is
+ * what the master password is stretched with: a session that began with an approval
+ * never typed one, and without this the first time the vault locks itself is the
+ * last time it can be opened. Kept lowercased, which is the form the derivation
+ * salts with and the form the password grant already writes - so both ways in
+ * produce the same key from the same password.
+ */
+async function rememberEmail(profile: Record<string, unknown>): Promise<void> {
+    const found = profile["email"];
+    if (typeof found !== "string") return;
+    const email = found.trim().toLowerCase();
+    if (email === "" || email === (await EMAIL.getValue())) return;
+    await EMAIL.setValue(email);
+}
+
+/**
  * Bring the vault down, if there is anything new.
  *
  * The revision date is one row rather than every item, so it is what a poll asks
@@ -427,7 +576,8 @@ async function sync(force: boolean): Promise<boolean> {
         // decided there was nothing new and a password changed on another device
         // never arrived. Left alone when the server did not say, so the next poll
         // asks again rather than trusting a gap.
-        ...(moved !== null ? [REVISION.setValue(moved)] : [])
+        ...(moved !== null ? [REVISION.setValue(moved)] : []),
+        rememberEmail(fresh.profile)
     ]);
     // The profile arrived with it, and it is what the other vaults' keys are read
     // from - so an open vault that started without them has them now.
@@ -845,11 +995,23 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 });
                 if (!opened) return { ok: false, error: "That server did not answer." };
 
+                // Whatever pair this replaces is unreachable the moment it is
+                // overwritten, so its private half is zeroed first rather than left
+                // in memory with nothing referring to it - which is the care the
+                // collecting takes on both of its own paths.
+                asking?.privateKey.fill(0);
                 asking = { publicKey: pair.publicKey, privateKey: pair.privateKey };
                 await WAITING.setValue({
                     deviceCode: opened.deviceCode,
-                    userCode: opened.userCode
+                    userCode: opened.userCode,
+                    pollMs: opened.pollMs,
+                    until: readExpiry(opened.expiresAt),
+                    state: "pending"
                 });
+                // Waited on here, before the tab exists. Opening it is what closes
+                // the popup, so this worker is the only thing that can still be
+                // listening by the time somebody presses yes.
+                startCollecting();
                 // Opened here rather than left to the popup: a popup is torn down
                 // the moment it loses focus, which is exactly what opening a tab
                 // does to it.
@@ -858,53 +1020,53 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 });
                 return {
                     ok: true,
+                    waiting: "pending",
                     userCode: opened.userCode,
-                    expiresAt: opened.expiresAt,
                     pollMs: opened.pollMs
                 };
             }
 
             case "authorizeCheck": {
-                const [origin, waiting] = await Promise.all([currentOrigin(), WAITING.getValue()]);
-                if (!origin || !waiting) return { ok: true, waiting: "expired" };
-                // The private half is gone, so nothing can open what an approval
-                // would carry. Said plainly rather than polling forever: under
-                // manifest v3 the worker is recycled whenever the browser likes.
-                if (!asking) {
-                    await WAITING.setValue(null);
+                const waiting = await WAITING.getValue();
+                if (!waiting) {
+                    return {
+                        ok: true,
+                        waiting: "none",
+                        userCode: null,
+                        pollMs: protocol.DEFAULT_POLL_MS
+                    };
+                }
+                const { state, userCode, pollMs } = waiting;
+                // Read, never asked of the server here. The loop above is what polls,
+                // and a second poller would spend the same claim budget twice as fast
+                // for an approval only one of them could be handed.
+                if (state === "pending") {
+                    // A worker that came back since has no loop running; starting it
+                    // is what turns that into an answer rather than a wait nothing
+                    // will ever end.
+                    startCollecting();
+                    return { ok: true, waiting: "pending", userCode, pollMs };
+                }
+
+                // Reported once and then forgotten, because every state below is an
+                // end: what follows is asking again, not waiting longer.
+                await WAITING.setValue(null);
+                if (state === "lost") {
                     return { ok: false, error: "This browser lost the request. Ask again." };
                 }
-
-                const claim = await protocol.claimAuthorization(
-                    vaultBase(origin),
-                    waiting.deviceCode
-                );
-                if (!claim) return { ok: true, waiting: "pending" };
-                if (claim.status !== "approved") {
-                    if (claim.status !== "pending") {
-                        await WAITING.setValue(null);
-                        asking = null;
-                    }
-                    return { ok: true, waiting: claim.status };
-                }
-
-                const raw = await decryptRsa(claim.wrappedKey, asking.privateKey);
-                await WAITING.setValue(null);
-                const privateKey = asking.privateKey;
-                asking = null;
-                if (!raw || !(await openWithKey(raw))) {
-                    // Approved, and unreadable. Nothing is kept: a session that
-                    // cannot decrypt anything is worse than none, because it looks
-                    // signed in.
-                    privateKey.fill(0);
+                if (state === "unreadable") {
                     return { ok: false, error: "What came back could not be opened. Ask again." };
                 }
-                privateKey.fill(0);
+                return { ok: true, waiting: state, userCode, pollMs };
+            }
 
-                await remember(claim.token);
-                await sync(true);
-                await badge();
-                return { ok: true, waiting: "approved" };
+            case "authorizeCancel": {
+                // The key material goes with the request: somebody who cancelled is
+                // not waiting on it, and the loop stops on its next look.
+                asking?.privateKey.fill(0);
+                asking = null;
+                await WAITING.setValue(null);
+                return { ok: true };
             }
 
             case "unlock": {
@@ -923,7 +1085,13 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "signOut":
                 open = null;
+                // Including anything in flight: a request still being collected
+                // would hand this browser back into an account somebody has just
+                // signed out of.
+                asking?.privateKey.fill(0);
+                asking = null;
                 await Promise.all([
+                    WAITING.setValue(null),
                     LOCK_AT.setValue(null),
                     REFRESH.setValue(null),
                     ACCESS.setValue(null),
@@ -1100,6 +1268,11 @@ export default defineBackground(() => {
             // `vault()` is what locks it; this only has to notice that it did, so
             // the badge stops offering counts for a vault nobody can read.
             if (!(await vault()) && wasOpen) await badge();
+            // And a request somebody went off to approve is collected by a loop in
+            // this worker, which a recycle takes with it. Restarted here so it
+            // reaches an answer - it finds the private half gone and says so -
+            // rather than leaving a code waiting on nothing.
+            if (await WAITING.getValue()) startCollecting();
         })();
     });
 

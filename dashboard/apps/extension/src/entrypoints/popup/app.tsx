@@ -162,43 +162,70 @@ function SignIn({
             setError(reply.error);
             return;
         }
-        if ("userCode" in reply) setWaiting({ userCode: reply.userCode, pollMs: reply.pollMs });
+        if ("waiting" in reply && reply.userCode) {
+            setWaiting({ userCode: reply.userCode, pollMs: reply.pollMs });
+        }
     };
 
-    // Asking, while a request is in flight. The worker does the asking and holds
-    // everything; this only decides how often and stops when it is answered.
+    /**
+     * What the worker says about the request in flight, as a screen.
+     *
+     * One reader for both the first look and every look after it, because they are
+     * the same question: the worker owns the request and the waiting, and this only
+     * draws whatever state it has reached. The code is held there rather than here
+     * for the same reason - this popup does not outlive the tab it opened.
+     */
+    const readWaiting = useCallback(async (): Promise<void> => {
+        const reply = await askBackground({ kind: "authorizeCheck" });
+        if (!reply.ok) {
+            setWaiting(null);
+            setError(reply.error);
+            return;
+        }
+        if (!("waiting" in reply)) return;
+        if (reply.waiting === "pending" && reply.userCode) {
+            // The same object while nothing has moved, so the timer below is not
+            // torn down and rebuilt on every poll.
+            const found = { userCode: reply.userCode, pollMs: reply.pollMs };
+            setWaiting((was) =>
+                was && was.userCode === found.userCode && was.pollMs === found.pollMs ? was : found
+            );
+            return;
+        }
+        setWaiting(null);
+        if (reply.waiting === "approved") {
+            await onDone();
+            return;
+        }
+        if (reply.waiting === "none") return;
+        setError(
+            reply.waiting === "denied"
+                ? "That was turned down in Polaris."
+                : "That request ran out. Ask again."
+        );
+    }, [onDone]);
+
+    // A request left in flight, found again on the way back in. Opening this popup
+    // is the only way back to it: pressing the button opens a tab, and that is what
+    // closed the popup. Without this the screen offers nothing but asking a second
+    // time, which opens a second request and orphans the one somebody is in the
+    // middle of approving.
+    useEffect(() => {
+        void readWaiting();
+    }, [readWaiting]);
+
+    // Asking after it, while one is in flight. The worker polls the server on its
+    // own; this only reads where that got to, so nothing is lost when it closes.
     useEffect(() => {
         if (!waiting) return;
-        let alive = true;
-        const timer = window.setInterval(() => {
-            void (async () => {
-                const reply = await askBackground({ kind: "authorizeCheck" });
-                if (!alive) return;
-                if (!reply.ok) {
-                    setWaiting(null);
-                    setError(reply.error);
-                    return;
-                }
-                if (!("waiting" in reply)) return;
-                if (reply.waiting === "approved") {
-                    setWaiting(null);
-                    await onDone();
-                    return;
-                }
-                if (reply.waiting === "pending") return;
-                setWaiting(null);
-                setError(
-                    reply.waiting === "denied"
-                        ? "That was turned down in Polaris."
-                        : "That request ran out. Ask again."
-                );
-            })();
-        }, waiting.pollMs);
-        return () => {
-            alive = false;
-            window.clearInterval(timer);
-        };
-    }, [waiting, onDone]);
+        const timer = window.setInterval(() => void readWaiting(), waiting.pollMs);
+        return () => window.clearInterval(timer);
+    }, [waiting, readWaiting]);
+
+    const cancel = async (): Promise<void> => {
+        setWaiting(null);
+        await askBackground({ kind: "authorizeCancel" });
+    };
 
     if (waiting) {
         return (
@@ -209,9 +236,10 @@ function SignIn({
                 </p>
                 <code className="value">{waiting.userCode}</code>
                 <p className="muted small">
-                    Nothing is handed over until somebody with the vault open says yes.
+                    Nothing is handed over until somebody with the vault open says yes. You can
+                    close this; it carries on without it.
                 </p>
-                <button className="ghost" onClick={() => setWaiting(null)}>
+                <button className="ghost" onClick={() => void cancel()}>
                     Cancel
                 </button>
             </main>

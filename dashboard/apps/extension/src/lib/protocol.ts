@@ -161,6 +161,27 @@ export interface AuthorizationOpened {
     readonly pollMs: number;
 }
 
+/**
+ * The shortest and longest wait this client will take from a server.
+ *
+ * The period arrives in the response body and is used as a timer, so it is a
+ * number a server picks and this browser obeys: zero, a negative value or NaN
+ * turns the wait into a loop that asks as fast as it can, which spends the claim
+ * budget in seconds and reads as a request that ran out. The ceiling is the other
+ * direction - a period longer than the request lives would collect nothing.
+ */
+const POLL_MIN_MS = 1000;
+const POLL_MAX_MS = 30_000;
+
+/** What to wait when the server did not say, or said something that is not a wait. */
+export const DEFAULT_POLL_MS = 2000;
+
+/** A period this client will actually wait, whatever the server said. */
+function readPollMs(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_POLL_MS;
+    return Math.min(Math.max(value, POLL_MIN_MS), POLL_MAX_MS);
+}
+
 /** Where that request stands, and what it carried if it was approved. */
 export type AuthorizationClaim =
     | { readonly status: "pending" | "denied" | "expired" }
@@ -208,7 +229,7 @@ export async function openAuthorization(
         userCode,
         deviceCode,
         expiresAt: typeof body["expiresAt"] === "string" ? body["expiresAt"] : "",
-        pollMs: typeof body["pollMs"] === "number" ? body["pollMs"] : 2000
+        pollMs: readPollMs(body["pollMs"])
     };
 }
 
@@ -217,8 +238,11 @@ export async function openAuthorization(
  *
  * A request still waiting answers 200 with a status rather than an error, because
  * "not yet" is the ordinary case and treating it as a failure would make the popup
- * give up on the first poll. An unreachable server is the one thing reported as
- * nothing at all, so the caller can tell it apart from a refusal.
+ * give up on the first poll. Nothing at all means keep waiting, and that covers
+ * every answer that is not the server's own verdict: an unreachable server, a
+ * proxy's 502, and the 429 this endpoint returns when the polling budget is spent.
+ * A request that is still alive server-side must not be ended by the road to it -
+ * `expired` is reserved for a refusal the server actually gave.
  */
 export async function claimAuthorization(
     base: string,
@@ -230,6 +254,7 @@ export async function claimAuthorization(
         body: tokenForm({ deviceCode }).toString()
     });
     if (!reply) return null;
+    if (reply.status === 429 || reply.status >= 500) return null;
     const body = (await reply.json().catch(() => null)) as Record<string, unknown> | null;
     if (!reply.ok || !body) return { status: "expired" };
 

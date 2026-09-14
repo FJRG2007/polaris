@@ -125,6 +125,37 @@ const CLAIM_WINDOW_MS = 15 * 60 * 1000;
 const MAX_PUBLIC_KEY = 2048;
 
 /**
+ * Whether a vault key could actually be sealed to this, checked before it is kept.
+ *
+ * The body of this request is unauthenticated, so the public half is a string a
+ * stranger chose. Stored unchecked, the first thing that finds out is the dashboard
+ * of whoever opens the approval screen - sealing to it is the one step only that
+ * browser can do, and a key that is not a key fails there, in front of a person who
+ * asked for none of this. Refused here instead, where the answer costs the asker
+ * their own request and nobody else's screen.
+ *
+ * Done with WebCrypto rather than by pattern, because "parses as an RSA-OAEP SPKI"
+ * is the actual requirement and is not something a regular expression can say. This
+ * imports a public key to see whether it imports; it decrypts nothing, and there is
+ * no private half here to decrypt with.
+ */
+async function canSealTo(publicKey: string): Promise<boolean> {
+    try {
+        await crypto.subtle.importKey(
+            "spki",
+            Buffer.from(publicKey, "base64"),
+            // The pair the clients make, and the only one this exchange uses.
+            { name: "RSA-OAEP", hash: "SHA-1" },
+            false,
+            ["encrypt"]
+        );
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Ask to be let in by a browser that is already inside the vault.
  *
  * The extension's way in. What comes back is a code somebody reads out of the
@@ -143,6 +174,9 @@ export async function connectAuthorize(context: VaultContext): Promise<Response>
     });
     if (publicKey === "" || publicKey.length > MAX_PUBLIC_KEY || !device.success) {
         return grantError("A public key and a device are required.");
+    }
+    if (!(await canSealTo(publicKey))) {
+        return grantError("That public key is not one a vault key can be sealed to.");
     }
 
     const ip = await clientIp();

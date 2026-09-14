@@ -68,10 +68,21 @@ export function AuthorizeView() {
                 setError("Unlock your vault before letting a client in.");
                 return;
             }
-            wrappedKey = await vaultCrypto.encryptRsa(
-                vaultCrypto.symmetricKeyBytes(key),
-                pending.publicKey
-            );
+            // The public half is whatever the asking client sent, so sealing to it
+            // can fail on a key that is not one. Caught here because the failure is
+            // this screen's to report: left to escape, it takes the rejection out of
+            // this function and leaves both buttons disabled reading "Working", with
+            // nothing said and nothing to do but reload the page.
+            try {
+                wrappedKey = await vaultCrypto.encryptRsa(
+                    vaultCrypto.symmetricKeyBytes(key),
+                    pending.publicKey
+                );
+            } catch {
+                setBusy(false);
+                setError("That request did not come with a usable key. Ask the app for a new one.");
+                return;
+            }
         }
         const result = await runAction(
             () => answerAuthorizationAction({ userCode: pending.userCode, approve, wrappedKey }),

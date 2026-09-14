@@ -23,6 +23,15 @@ export interface ItemSummary {
     readonly totp: boolean;
 }
 
+/**
+ * Where a request to be let in by Polaris stands.
+ *
+ * `none` is nothing in flight. The rest are the answers the worker's own poll
+ * arrived at, held in session storage so a popup that was torn down and reopened
+ * reads the same one rather than starting again.
+ */
+export type AuthorizationWait = "none" | "pending" | "approved" | "denied" | "expired";
+
 /** The state the popup draws itself from. */
 export interface VaultStatus {
     readonly server: string | null;
@@ -56,9 +65,16 @@ export type Request =
      * comes back is the code to show while somebody approves it.
      */
     | { readonly kind: "authorize" }
-    /** Ask once whether the request has been answered. The popup does the waiting;
-     *  the worker does the asking, because only it may hold the credential. */
+    /**
+     * Ask where that request stands.
+     *
+     * Reading only: the worker polls the server on its own, because the tab it
+     * opens tears the popup down and a wait that lived here would die with it.
+     * This is also how a reopened popup finds the request it left in flight.
+     */
     | { readonly kind: "authorizeCheck" }
+    /** Drop the request in flight, so the worker stops collecting it. */
+    | { readonly kind: "authorizeCancel" }
     | { readonly kind: "unlock"; readonly password: string }
     | { readonly kind: "lock" }
     | { readonly kind: "signOut" }
@@ -112,19 +128,23 @@ export type Reply =
     | { readonly ok: true; readonly host: string | null; readonly blocked: boolean }
     /** Six digits and the seconds before they turn over. */
     | { readonly ok: true; readonly code: string; readonly remaining: number }
-    /** A request waiting to be approved in the dashboard: what to show, and how
-     *  long it is good for. */
+    /**
+     * A request to be let in by Polaris: where it stands, and what to show while
+     * it is in flight.
+     *
+     * One shape for opening one and for asking after it, because the popup draws
+     * the same screen from either and a reopened popup cannot tell which it is
+     * doing. `none` is nothing in flight, which is the ordinary answer on the way
+     * in and must not read as a request that ran out. `approved` arrives with the
+     * vault already open, so the popup only has to ask for the status again.
+     */
     | {
           readonly ok: true;
-          readonly userCode: string;
-          readonly expiresAt: string;
+          readonly waiting: AuthorizationWait;
+          /** The code somebody approves, or null when nothing is in flight. */
+          readonly userCode: string | null;
+          /** How often to ask, already held to something this client will wait. */
           readonly pollMs: number;
-      }
-    /** Where that request stands. `approved` arrives with the vault already open,
-     *  so the popup only has to ask for the status again. */
-    | {
-          readonly ok: true;
-          readonly waiting: "pending" | "approved" | "denied" | "expired";
       }
     | { readonly ok: true }
     | { readonly ok: false; readonly error: string; readonly needsCode?: boolean };
