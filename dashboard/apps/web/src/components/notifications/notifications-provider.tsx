@@ -21,8 +21,13 @@ import type { NotificationView } from "@/lib/notification-service";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
-import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+    hasNewArrival,
+    NOTIFICATION_SOUND_CHANGED,
+    notificationSoundEnabled,
+    playNotificationSound
+} from "@/lib/notification-sound";
 import {
     applyFeedMutation,
     FEED_CHANNEL,
@@ -93,6 +98,23 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
         };
     }, [scope]);
 
+    /**
+     * Bumped when the sound switch moves, which reconnects the stream below.
+     *
+     * The address carries whether this client would make the sound, because the
+     * server skips a silenced one when it elects the client to chime - and a
+     * connection only says that when it opens. Everything following this stream
+     * reconnects on the same announcement, so they go on agreeing about one
+     * address for it; two spellings alive at once would be two connections with
+     * only one of them elected. See `notifications/stream-path`.
+     */
+    const [soundChanged, setSoundChanged] = useState(0);
+    useEffect(() => {
+        const moved = () => setSoundChanged((was) => was + 1);
+        window.addEventListener(NOTIFICATION_SOUND_CHANGED, moved);
+        return () => window.removeEventListener(NOTIFICATION_SOUND_CHANGED, moved);
+    }, []);
+
     useEffect(
         () =>
             subscribeSharedStream(notificationStreamPath(), scope, ({ data }) => {
@@ -149,7 +171,7 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                     // A malformed frame is not worth recovering from; the next tick resends the state.
                 }
             }),
-        [scope]
+        [scope, soundChanged]
     );
 
     /** Apply a change here and in the other tabs, run it on the server, and

@@ -17,14 +17,29 @@
  */
 
 import { desktopBridge } from "@/lib/desktop-bridge";
+import { notificationSoundEnabled } from "@/lib/notification-sound";
 
 const STREAM_PATH = "/api/notifications/stream";
 
-let settled: string | null = null;
+let kind: string | null = null;
 
-/** Where to follow this account's notifications, saying what is doing the
- *  following. The same string for every caller on this page. */
+/**
+ * Where to follow this account's notifications, saying what is doing the
+ * following and whether it would make a sound.
+ *
+ * The sound is here because the server skips a silenced client when it elects the
+ * one to chime, and a connection only ever says this when it opens. It is read
+ * fresh rather than settled with the kind: the switch moves while the page is
+ * open, and a path that still claimed the old answer would have the server
+ * electing a client that plays nothing.
+ *
+ * Every subscriber must compute the same string at the same moment, which they do
+ * by all asking here and all reconnecting on `NOTIFICATION_SOUND_CHANGED`
+ * together. Two spellings alive at once would be two connections, and only one of
+ * them elected.
+ */
 export function notificationStreamPath(): string {
-    settled ??= `${STREAM_PATH}?client=${desktopBridge() ? "desktop" : "browser"}`;
-    return settled;
+    kind ??= desktopBridge() ? "desktop" : "browser";
+    const sound = notificationSoundEnabled() ? "on" : "off";
+    return `${STREAM_PATH}?client=${kind}&sound=${sound}`;
 }

@@ -25,6 +25,7 @@
 import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
+import { NOTIFICATION_SOUND_CHANGED } from "@/lib/notification-sound";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
 import {
     createContext,
@@ -100,6 +101,23 @@ export function AdminWaitingProvider({
             });
     }, []);
 
+    /**
+     * Reconnected when the sound switch moves, exactly as the bell is.
+     *
+     * This screen has nothing to do with the chime, and that is the point: the
+     * address carries whether this client would make one, so it changes when the
+     * switch does - and if only one of the two subscribers picked up the new
+     * spelling, the device would hold two connections with only one of them
+     * elected. The rule is that everybody following this stream agrees about its
+     * address at every moment. See `notifications/stream-path`.
+     */
+    const [soundChanged, setSoundChanged] = useState(0);
+    useEffect(() => {
+        const moved = () => setSoundChanged((was) => was + 1);
+        window.addEventListener(NOTIFICATION_SOUND_CHANGED, moved);
+        return () => window.removeEventListener(NOTIFICATION_SOUND_CHANGED, moved);
+    }, []);
+
     useEffect(() => {
         if (!enabled) return;
         // The same address the bell follows, which is what keeps this to one
@@ -122,7 +140,7 @@ export function AdminWaitingProvider({
             clearInterval(sweep);
             stop();
         };
-    }, [enabled, scope, recount]);
+    }, [enabled, scope, recount, soundChanged]);
 
     return <WaitingContext.Provider value={waiting}>{children}</WaitingContext.Provider>;
 }

@@ -35,6 +35,11 @@ const POLL_MS = 5000;
  *  cost somebody their feed - it simply takes no part in the election. */
 const clientSchema = z.enum(["desktop", "browser"]);
 
+/** Whether that client would make the sound if it were the one elected to. Absent
+ *  is read as yes, which is what the switch defaults to and the safe direction:
+ *  the cost of being wrong is a chime somebody turned off, not silence. */
+const soundSchema = z.enum(["on", "off"]).catch("on");
+
 export async function GET(request: Request): Promise<Response> {
     const session = await resolveSession();
     // A non-200 makes EventSource give up instead of reconnecting every few
@@ -47,8 +52,10 @@ export async function GET(request: Request): Promise<Response> {
     // this Polaris, a tab still running an older build - must not be able to hold
     // an election the client waiting on it would lose. It is still served, and it
     // is still told to chime.
-    const declared = clientSchema.safeParse(new URL(request.url).searchParams.get("client"));
+    const asked = new URL(request.url).searchParams;
+    const declared = clientSchema.safeParse(asked.get("client"));
     const kind = declared.success ? declared.data : null;
+    const rings = soundSchema.parse(asked.get("sound")) === "on";
     // Names this connection and nothing else. Minted here rather than taken from
     // the client, so nothing can claim to be somebody else's connection.
     const connection = randomUUID();
@@ -66,13 +73,13 @@ export async function GET(request: Request): Promise<Response> {
 
     const stream = new ReadableStream<Uint8Array>({
         start(controller) {
-            if (kind) openLiveClient(userId, connection, kind);
+            if (kind) openLiveClient(userId, connection, kind, rings);
 
             async function tick(): Promise<void> {
                 if (closed) return;
                 // Said on every tick, so a connection that is open is never swept
                 // out from under itself for being quiet.
-                if (kind) touchLiveClient(userId, connection, kind);
+                if (kind) touchLiveClient(userId, connection, kind, rings);
                 let payload: string;
                 try {
                     payload = JSON.stringify({

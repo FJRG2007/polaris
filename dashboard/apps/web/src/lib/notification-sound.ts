@@ -13,6 +13,18 @@
 
 const STORAGE_KEY = "polaris.notifications.sound";
 
+/**
+ * The switch moved, told to whatever is listening on this page.
+ *
+ * The server decides which of an account's clients makes the sound and skips the
+ * ones that have it switched off (see `notifications/live-clients`), so it has to
+ * be told - and it is only ever told when a connection opens. Everything
+ * following the stream therefore reconnects on this, together, so they go on
+ * agreeing about one address for it. Announced here rather than from the settings
+ * screen because this is the one place the choice is written.
+ */
+export const NOTIFICATION_SOUND_CHANGED = "polaris:notification-sound";
+
 /** Mirrors storage so the choice still holds when a write is refused. */
 let enabled: boolean | null = null;
 
@@ -36,6 +48,13 @@ export function setNotificationSoundEnabled(next: boolean): void {
         window.localStorage.setItem(STORAGE_KEY, next ? "on" : "off");
     } catch {
         // Private browsing refuses the write; the choice holds for this visit.
+    }
+    // Announced even when the write was refused: the choice holds for this visit
+    // either way, and the server has to hear about it either way.
+    try {
+        window.dispatchEvent(new CustomEvent(NOTIFICATION_SOUND_CHANGED));
+    } catch {
+        // No window to tell - a server render, a test without a DOM.
     }
 }
 

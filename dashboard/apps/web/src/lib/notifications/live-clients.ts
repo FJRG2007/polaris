@@ -52,6 +52,18 @@ export interface LiveClient {
     /** This connection, for as long as it lives. */
     readonly id: string;
     readonly kind: LiveClientKind;
+    /**
+     * Whether this client would actually make the sound if it were told to.
+     *
+     * Declared by the client, because the switch is not the server's to read: the
+     * chime is turned off per device, in `localStorage`, and the whole premise
+     * here is that the desktop app keeps its own. Without this the preference and
+     * the election worked against each other - the sound turned off in the app,
+     * which still won for being the app, and every browser tab told to stay quiet
+     * because the app had it. The account got no chime anywhere, from a switch
+     * that used to silence one window.
+     */
+    readonly rings: boolean;
     /** When it opened. The election orders by this, so it does not move while the
      *  set of connections does not. */
     readonly opened: number;
@@ -72,8 +84,18 @@ const clients = new Map<string, Map<string, LiveClient>>();
  * of messages would sound on both.
  */
 export function chimingClient(live: readonly LiveClient[]): string | null {
+    // A client that has the sound switched off is not a candidate. It would win on
+    // being the app and then play nothing, and everybody else would have been told
+    // to stay quiet - so the one switch somebody flipped to silence one window
+    // silenced the account.
+    //
+    // Unless they are all switched off, in which case the ordinary rule decides.
+    // Nothing is gained by electing nobody: each of them suppresses the sound
+    // locally anyway, and answering "nobody" here is the one shape this module
+    // must never take.
+    const willing = live.filter((client) => client.rings);
     let best: LiveClient | null = null;
-    for (const client of live) {
+    for (const client of willing.length > 0 ? willing : live) {
         if (!best || better(client, best)) best = client;
     }
     return best?.id ?? null;
@@ -102,6 +124,7 @@ export function openLiveClient(
     userId: string,
     id: string,
     kind: LiveClientKind,
+    rings: boolean,
     now = Date.now()
 ): void {
     sweep(now);
@@ -110,7 +133,7 @@ export function openLiveClient(
         held = new Map();
         clients.set(userId, held);
     }
-    held.set(id, { id, kind, opened: now, seen: now });
+    held.set(id, { id, kind, rings, opened: now, seen: now });
 
     // Past the cap the one heard from longest ago goes, which is the likeliest to
     // be a connection nobody is behind any more.
@@ -138,12 +161,13 @@ export function touchLiveClient(
     userId: string,
     id: string,
     kind: LiveClientKind,
+    rings: boolean,
     now = Date.now()
 ): void {
     const held = clients.get(userId);
     const client = held?.get(id);
     if (!client) {
-        openLiveClient(userId, id, kind, now);
+        openLiveClient(userId, id, kind, rings, now);
         return;
     }
     held?.set(id, { ...client, seen: now });
