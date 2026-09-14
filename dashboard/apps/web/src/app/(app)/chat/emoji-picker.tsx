@@ -31,7 +31,16 @@ import type { TenorResult } from "@/lib/chat/tenor";
 import { Loader2, Search, Smile, Star } from "lucide-react";
 import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+    memo,
+    startTransition,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 import {
     recentEmoji,
     recentMedia,
@@ -158,6 +167,9 @@ function place(button: DOMRect): Placement {
     }
     return { left, top: button.bottom + EDGE_GAP, maxHeight: Math.min(roomBelow, MOST_HEIGHT) };
 }
+
+/** How many emoji groups are built on the frame the picker opens. */
+const FIRST_GROUPS = 2;
 
 export function EmojiPicker({
     disabled,
@@ -364,6 +376,53 @@ export function EmojiPicker({
         };
     }, [open, tab, query, tenorReady]);
 
+    /**
+     * How much of the list is drawn on the frame the picker opens.
+     *
+     * Four hundred emoji is four hundred buttons and about thirteen hundred
+     * elements, and building all of them before anything is painted is the delay
+     * between pressing the face and seeing a panel. What anybody sees at that
+     * moment is the top of the list, so the top of the list is what is built:
+     * the rest follows once the panel is on screen, as a transition, so it never
+     * holds up the search box or a press.
+     *
+     * Two groups, because the first is the big one - Smileys, ninety-three of
+     * them - and two of them already more than fills the panel.
+     */
+    const [restDrawn, setRestDrawn] = useState(false);
+    useEffect(() => {
+        if (!open) {
+            setRestDrawn(false);
+            return;
+        }
+        // After the frame the panel appears on, never during it.
+        const frame = requestAnimationFrame(() => startTransition(() => setRestDrawn(true)));
+        return () => cancelAnimationFrame(frame);
+    }, [open]);
+    const groups = restDrawn ? EMOJI_GROUPS : EMOJI_GROUPS.slice(0, FIRST_GROUPS);
+    /** The same for the row above them: a fresh array every render would defeat
+     *  the memo on the grid that draws it. */
+    const recentEntries = useMemo(
+        () => recent.emoji.map((char) => ({ char, words: "" })),
+        [recent.emoji]
+    );
+
+    /**
+     * Picking one, as one function rather than one per grid.
+     *
+     * The grids are memoised, and a handler written inline in the JSX is a new
+     * function on every render - which is every keystroke in the search box, and
+     * would rebuild every button underneath it for a letter typed above them.
+     */
+    const pick = useCallback(
+        (char: string) => {
+            rememberEmoji(char);
+            onEmoji(char);
+            setOpen(false);
+        },
+        [onEmoji]
+    );
+
     const found = useMemo(() => searchEmoji(query), [query]);
 
     const button = (
@@ -471,14 +530,7 @@ export function EmojiPicker({
                                         No emoji matches that.
                                     </p>
                                 ) : (
-                                    <Grid
-                                        entries={found}
-                                        onPick={(char) => {
-                                            rememberEmoji(char);
-                                            onEmoji(char);
-                                            setOpen(false);
-                                        }}
-                                    />
+                                    <Grid entries={found} onPick={pick} />
                                 )
                             ) : (
                                 <>
@@ -491,32 +543,15 @@ export function EmojiPicker({
                                             <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                                 Recent
                                             </h3>
-                                            <Grid
-                                                entries={recent.emoji.map((char) => ({
-                                                    char,
-                                                    words: ""
-                                                }))}
-                                                onPick={(char) => {
-                                                    rememberEmoji(char);
-                                                    onEmoji(char);
-                                                    setOpen(false);
-                                                }}
-                                            />
+                                            <Grid entries={recentEntries} onPick={pick} />
                                         </section>
                                     )}
-                                    {EMOJI_GROUPS.map((group) => (
+                                    {groups.map((group) => (
                                         <section key={group.name} className="mb-2">
                                             <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                                 {group.name}
                                             </h3>
-                                            <Grid
-                                                entries={group.emoji}
-                                                onPick={(char) => {
-                                                    rememberEmoji(char);
-                                                    onEmoji(char);
-                                                    setOpen(false);
-                                                }}
-                                            />
+                                            <Grid entries={group.emoji} onPick={pick} />
                                         </section>
                                     ))}
                                 </>
@@ -777,7 +812,14 @@ function Tile({
     );
 }
 
-function Grid({
+/**
+ * A grid of emoji.
+ *
+ * Memoised, because there are nine of these on screen at once and the state that
+ * changes most often - the search box, a tab, a GIF search coming back - belongs
+ * to the panel above them and changes nothing about any button in them.
+ */
+const Grid = memo(function Grid({
     entries,
     onPick
 }: {
@@ -801,4 +843,4 @@ function Grid({
             ))}
         </ul>
     );
-}
+});

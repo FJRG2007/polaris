@@ -309,7 +309,7 @@ export function Composer({
         const kept = readDraft(draftKey);
         if (!kept) return;
         setBody(kept);
-        setGeneration((current) => current + 1);
+        emptyTheBox();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- the key, and only on the key
     }, [draftKey]);
 
@@ -338,7 +338,7 @@ export function Composer({
     const editingId = editing?.id ?? null;
     useEffect(() => {
         setBody(editing?.body ?? (draftKey ? readDraft(draftKey) : ""));
-        setGeneration((current) => current + 1);
+        emptyTheBox();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately the id
     }, [editingId]);
 
@@ -373,6 +373,20 @@ export function Composer({
      * One counter for both, so the newest wins whichever it came from.
      */
     const [handed, setHanded] = useState<{ token: number; text: string } | null>(null);
+    /**
+     * Empty the box, and forget what was last put into it.
+     *
+     * The editor owns its document, so clearing it is a rebuild - `generation`
+     * is its key. What was handed in has to go in the same breath: the rebuilt
+     * editor is a new instance, its insert effect runs again on mount, and with
+     * a token still sitting there it put the emoji straight back into the box
+     * that had just been emptied. Which is exactly "I pick an emoji, I send it,
+     * and it is still in the input".
+     */
+    const emptyTheBox = useCallback(() => {
+        setHanded(null);
+        setGeneration((current) => current + 1);
+    }, []);
     const handedCount = useRef(0);
     const hand = useCallback((text: string) => {
         handedCount.current += 1;
@@ -484,7 +498,7 @@ export function Composer({
         setFiles([]);
         setCovered(new Set());
         setRefused("");
-        setGeneration((current) => current + 1);
+        emptyTheBox();
         // It is somewhere that is not a browser now.
         if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
@@ -513,7 +527,7 @@ export function Composer({
         setBody("");
         setFiles([]);
         setRefused("");
-        setGeneration((current) => current + 1);
+        emptyTheBox();
         if (draftKey) dropDraft(draftKey);
         setScheduling(false);
     };
