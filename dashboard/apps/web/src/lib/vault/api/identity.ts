@@ -14,9 +14,16 @@
 import * as core from "@polaris/core";
 import { deviceSchema } from "@polaris/core";
 import { preloginFor } from "@/lib/vault/account";
-import { clientIp, hashForLog } from "@/lib/request-context";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { readAnyBody, readJsonBody, type VaultContext } from "@/lib/vault/api/router";
-import { twoFactorChallengeBody, vaultRefresh, vaultSignIn } from "@/lib/vault/identity";
+import { clientHost, clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
+import { claimVaultAuthorization, openVaultAuthorization } from "@/lib/vault/authorization";
+import {
+    issueVaultToken,
+    twoFactorChallengeBody,
+    vaultRefresh,
+    vaultSignIn
+} from "@/lib/vault/identity";
 
 /** How a client learns to derive a key for an address. */
 export async function prelogin(context: VaultContext): Promise<Response> {
@@ -90,6 +97,120 @@ export async function connectToken(context: VaultContext): Promise<Response> {
         );
     }
     return grantError("Username or password is incorrect. Try again.");
+}
+
+/**
+ * How many requests one address may open, and the window.
+ *
+ * Opening one is unauthenticated by nature - nobody has said who they are yet - so
+ * this is the step a stranger can reach. Loose enough for somebody reinstalling an
+ * extension and trying twice, useless for filling the table from outside.
+ */
+const AUTHORIZE_LIMIT = 20;
+const AUTHORIZE_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * And how often one may poll.
+ *
+ * Deliberately generous: a request waits five minutes and the extension asks every
+ * two seconds, which is a hundred and fifty polls for one sign-in that nothing has
+ * gone wrong with. A limit under that would break the ordinary case rather than an
+ * abusive one.
+ */
+const CLAIM_LIMIT = 600;
+const CLAIM_WINDOW_MS = 15 * 60 * 1000;
+
+/** The longest public key this will store. An RSA-2048 SPKI in base64 is under 400
+ *  characters; the ceiling is here so the column cannot be used as a scratchpad. */
+const MAX_PUBLIC_KEY = 2048;
+
+/**
+ * Ask to be let in by a browser that is already inside the vault.
+ *
+ * The extension's way in. What comes back is a code somebody reads out of the
+ * popup and a secret to poll with, and neither is worth anything until an unlocked
+ * dashboard approves it - see `lib/vault/authorization`.
+ */
+export async function connectAuthorize(context: VaultContext): Promise<Response> {
+    const body = await readAnyBody(context.request);
+    const publicKey = (body.publicKey ?? "").trim();
+    // The same parse the password grant does, from the same strings: a client that
+    // can sign in one way describes itself the same way in the other.
+    const device = deviceSchema.safeParse({
+        identifier: body.deviceIdentifier,
+        name: body.deviceName,
+        type: body.deviceType
+    });
+    if (publicKey === "" || publicKey.length > MAX_PUBLIC_KEY || !device.success) {
+        return grantError("A public key and a device are required.");
+    }
+
+    const ip = await clientIp();
+    const throttle = await rateLimit(
+        `vault-authorize:${hashForLog(ip) ?? "unknown"}`,
+        AUTHORIZE_LIMIT,
+        AUTHORIZE_WINDOW_MS
+    );
+    if (!throttle.ok) return grantError("Too many requests from here. Try again shortly.", 429);
+
+    const opened = await openVaultAuthorization(
+        {
+            publicKey,
+            deviceIdentifier: device.data.identifier,
+            deviceName: device.data.name,
+            deviceType: device.data.type,
+            // Read off the request rather than taken from the body: what the
+            // approval screen shows must not be something the asker wrote.
+            requestIp: ip ?? null,
+            requestUserAgent: (await clientUserAgent()) ?? null,
+            requestHost: (await clientHost()) ?? null
+        },
+        (size) => crypto.getRandomValues(new Uint8Array(size))
+    );
+
+    return Response.json({
+        userCode: opened.userCode,
+        deviceCode: opened.deviceCode,
+        expiresAt: opened.expiresAt.toISOString(),
+        pollMs: opened.pollMs
+    });
+}
+
+/**
+ * Ask whether it has been approved, and collect the credential when it has.
+ *
+ * Answers 200 with a status while it is still waiting, because this is a poll
+ * rather than an attempt: a refusal shape here would have the extension treating
+ * "not yet" as a failure. An approval is spent on the first claim and the row is
+ * gone, so this hands over the sealed key exactly once.
+ */
+export async function connectAuthorizeClaim(context: VaultContext): Promise<Response> {
+    const body = await readAnyBody(context.request);
+    const deviceCode = (body.deviceCode ?? "").trim();
+    if (deviceCode === "") return grantError("A device code is required.");
+
+    const throttle = await rateLimit(
+        `vault-authorize-claim:${hashForLog(await clientIp()) ?? "unknown"}`,
+        CLAIM_LIMIT,
+        CLAIM_WINDOW_MS
+    );
+    if (!throttle.ok) return grantError("Too many requests from here. Try again shortly.", 429);
+
+    const claim = await claimVaultAuthorization(deviceCode);
+    if (claim.status !== "approved" || !claim.claimed) {
+        return Response.json({ status: claim.status });
+    }
+
+    // The same credential the password grant issues, because it reaches the same
+    // surface; what differs is that it was earned in person rather than typed.
+    const token = await issueVaultToken(claim.claimed.userId, claim.claimed.device);
+    return Response.json({
+        status: "approved",
+        // The account's vault key, sealed to the public half this extension sent.
+        // Polaris cannot open it, which is the whole point of the exchange.
+        wrappedKey: claim.claimed.wrappedKey,
+        ...token
+    });
 }
 
 /**

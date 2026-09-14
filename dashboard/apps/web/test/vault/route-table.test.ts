@@ -81,6 +81,14 @@ describe("VAULT_ROUTES", () => {
             "POST api/sends/access/:id",
             "POST identity/accounts/prelogin",
             "POST identity/accounts/register",
+            // Being let in by a browser that is already inside the vault. Open
+            // because the caller has nothing yet - that is the point of it - and
+            // each rate-limits itself. Neither hands anything over on its own: the
+            // first only records a public key and a code, and the second answers
+            // with a credential once an unlocked dashboard has sealed the key to
+            // that public half. See `lib/vault/authorization`.
+            "POST identity/connect/authorize",
+            "POST identity/connect/authorize/claim",
             "POST identity/connect/token",
             "POST notifications/hub/negotiate"
         ]);

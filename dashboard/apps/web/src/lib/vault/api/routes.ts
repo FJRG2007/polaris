@@ -24,6 +24,24 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
     // ---- identity: reached before there is a token -------------------------
     { method: "POST", path: "identity/accounts/prelogin", auth: "none", handle: identity.prelogin },
     { method: "POST", path: "identity/connect/token", auth: "none", handle: identity.connectToken },
+    // Being let in by a browser that is already inside the vault, which is how the
+    // Polaris extension signs in: no master password in a popup, and the key
+    // travels sealed to a public half the extension made for the exchange. Both
+    // are open routes - the caller has nothing yet - and both rate-limit
+    // themselves. The literal third segment sits above nothing that captures, so
+    // the order here is free.
+    {
+        method: "POST",
+        path: "identity/connect/authorize",
+        auth: "none",
+        handle: identity.connectAuthorize
+    },
+    {
+        method: "POST",
+        path: "identity/connect/authorize/claim",
+        auth: "none",
+        handle: identity.connectAuthorizeClaim
+    },
     {
         method: "POST",
         path: "identity/accounts/register",

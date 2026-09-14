@@ -3034,6 +3034,55 @@ model VaultRefreshToken {
     @@index([userId])
 }
 
+// A client asking to be let into a vault by somebody who is already in it.
+//
+// The browser extension is what this exists for. Typing a master password into a
+// popup is the one step that makes an extension feel like a second, lesser client:
+// the dashboard is already open in the next tab, already unlocked, and already
+// holds the key. So the extension asks, the dashboard approves, and the key
+// travels wrapped to a public half the extension generated for this one exchange -
+// the same shape emergency access uses, and for the same reason. Polaris never
+// holds anything that could open it.
+//
+// Short-lived by design: a request nobody answers is worthless within minutes, and
+// the row is deleted the moment it is spent. There is deliberately no relation to
+// the account - the column is a plain id - because these rows outlive nothing and
+// a cascade would be the only thing the relation bought.
+model VaultAuthorization {
+    id         String  @id @default(uuid(7)) @db.Uuid
+    // What the extension polls with, hashed like a refresh token: what is in the
+    // database cannot be replayed as a claim.
+    codeHash   String  @unique
+    // The short code somebody reads off the popup and approves in the dashboard.
+    userCode   String  @unique
+    // The extension's RSA public half, base64. Its private half never leaves that
+    // browser, which is what makes the wrapped key below safe to store here.
+    publicKey  String
+    // The account's vault key, wrapped to `publicKey` by the approving browser.
+    // Null until then, and the only thing that makes an approval real.
+    wrappedKey String?
+    // pending | approved | denied.
+    status     String
+    // Set when somebody signed in claims the code; only they may answer it.
+    userId     String? @db.Uuid
+    // What the extension said it is, carried through to the device the claimed
+    // token is bound to - so it appears in the vault's list of signed-in apps.
+    deviceIdentifier String
+    deviceName       String
+    deviceType       Int
+    // What the request looked like, for the screen that decides on it. Recorded
+    // from the request rather than passed through the code, so nothing the client
+    // says about itself can dress up the approval screen.
+    requestIp        String?
+    requestUserAgent String?
+    requestHost      String?
+    expiresAt  DateTime
+    createdAt  DateTime @default(now())
+
+    @@index([userId])
+    @@index([expiresAt])
+}
+
 // Somebody trusted to reach a vault if its owner cannot.
 //
 // Polaris already has a successor on the account itself, and this is not that:

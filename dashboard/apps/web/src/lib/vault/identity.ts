@@ -155,6 +155,24 @@ async function tokenBody(
 }
 
 /**
+ * Everything a client needs to unlock, for a sign-in that did not present a
+ * master password.
+ *
+ * The extension's is the one: a browser already inside the vault approves it and
+ * hands over the key wrapped to that extension's own public half, so there is no
+ * password to check here - the proof happened in the dashboard, in person. What is
+ * issued is exactly what the password grant issues, because it is the same
+ * credential reaching the same surface; only the way it was earned differs.
+ */
+export async function issueVaultToken(
+    userId: string,
+    device: SignInInput["device"]
+): Promise<Record<string, unknown>> {
+    const deviceId = await rememberDevice(userId, device);
+    return tokenBody(userId, deviceId, device?.identifier ?? null);
+}
+
+/**
  * Sign in with a master password hash.
  *
  * Every refusal below returns the same `invalid` to the caller. An unknown
