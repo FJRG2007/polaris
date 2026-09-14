@@ -191,6 +191,17 @@ export type AuthorizationClaim =
           /** The account's vault key, sealed to the public half this extension
            *  sent. Only this extension can open it. */
           readonly wrappedKey: string;
+          /**
+           * A credential for the account itself, so one approval is the whole of
+           * it and nothing has to be signed in a second time.
+           *
+           * Optional because a Polaris older than the version that mints it says
+           * nothing here, and because minting is best effort on that side: an
+           * approval without it is still an approval, and the vault half works
+           * either way. What is lost is only the extension knowing whose account
+           * this is.
+           */
+          readonly accountKey?: string;
       };
 
 /**
@@ -270,7 +281,15 @@ export async function claimAuthorization(
     // act on, and pretending otherwise would leave a signed-in extension that can
     // read nothing.
     if (!token || typeof wrappedKey !== "string") return { status: "expired" };
-    return { status: "approved", token, wrappedKey };
+    // Taken when it is there and ignored when it is not: it is the one part of
+    // an approval that a server may legitimately not send.
+    const accountKey = body["accountKey"];
+    return {
+        status: "approved",
+        token,
+        wrappedKey,
+        ...(typeof accountKey === "string" && accountKey !== "" ? { accountKey } : {})
+    };
 }
 
 /**

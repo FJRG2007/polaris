@@ -102,6 +102,18 @@ const ACCESS = storage.defineItem<{ token: string; expiresAt: number } | null>(
 );
 const EMAIL = storage.defineItem<string | null>("local:vault.email", { fallback: null });
 /**
+ * The credential for the account, as opposed to for the vault.
+ *
+ * Session storage, beside the refresh token and for the same reason: it is a
+ * credential, so it does not go to disk and the browser closing takes it. What
+ * it buys is the extension being able to say whose account this is without
+ * asking anybody to sign in a second time - it reaches no further than the
+ * vault permission it was minted with.
+ */
+const ACCOUNT_KEY = storage.defineItem<string | null>("session:vault.accountKey", {
+    fallback: null
+});
+/**
  * Sites this extension is to keep out of.
  *
  * Local rather than session, because it is an instruction rather than a
@@ -421,6 +433,10 @@ async function collect(): Promise<void> {
         privateKey.fill(0);
 
         await remember(claim.token);
+        // Kept only when the server sent one. An older Polaris does not, and an
+        // absent credential has to read as "this server does not do that" rather
+        // than as an error on a sign-in that otherwise worked perfectly.
+        if (claim.accountKey) await ACCOUNT_KEY.setValue(claim.accountKey);
         // The address this vault belongs to arrives with the profile, and the sync
         // below is what records it. Nothing was typed on this way in, and `unlock`
         // cannot stretch a master password without it.
@@ -1207,6 +1223,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     SYNCED_AT.setValue(null),
                     REVISION.setValue(null),
                     EMAIL.setValue(null),
+                    ACCOUNT_KEY.setValue(null),
                     forgetOrigin()
                 ]);
                 await badge();
