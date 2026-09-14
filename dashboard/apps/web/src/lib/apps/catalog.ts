@@ -325,7 +325,27 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         dashboard: "builtin",
         consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" },
         template: {
-            image: "itzg/minecraft-server:latest",
+            // Pinned to Java 21, not `latest`, and the reason is a server that
+            // cannot boot at all.
+            //
+            // `latest` is Java 25, which removed the `jdk.crypto.ec` module -
+            // SunEC moved into java.base. Minecraft's own authlib pulls in
+            // nimbus-jose-jwt, whose module-info still requires that module by
+            // name, so a modular launch resolves the module graph, fails to find
+            // it and dies before a single mod is loaded:
+            //
+            //   FindException: Module jdk.crypto.ec not found,
+            //   required by com.nimbusds.jose.jwt
+            //
+            // Forge and NeoForge launch through BootstrapLauncher and hit it every
+            // time; the crash loops, and the log blames a module nobody chose. The
+            // image offers no environment variable for the runtime - the Java
+            // version is the tag - so this is the only place it can be said.
+            //
+            // Java 21 is what the 1.21 line targets, and it runs the plugin
+            // servers just as well. A Minecraft that needs a newer runtime than
+            // its mods do is the moment to revisit this.
+            image: "itzg/minecraft-server:java21",
             env: [
                 // Accepted by installing (the card says so); the image refuses to boot
                 // without it, so it is not a field anyone can usefully get wrong.
