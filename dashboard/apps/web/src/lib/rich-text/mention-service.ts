@@ -17,6 +17,7 @@ import { blockedBy } from "@/lib/blocks";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
 import { allowedBy } from "@/lib/privacy-service";
+import { nicknamesFor } from "@/lib/contact-names";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { conversationAudience } from "@/lib/chat/access";
 import type { ReferenceKind } from "@/components/rich-text/references";
@@ -126,10 +127,39 @@ async function searchPeople(
     // into a channel they were just removed from, or a bad id. Falling back to
     // the ordinary reach rather than refusing: a caret is not worth an error.
     const scope = inRoom ?? (actor.isAdmin ? null : await reachablePeople(actor));
+
+    // The names this reader gave other people are theirs alone, and they are the
+    // name this reader actually thinks in - so typing one has to find whoever it
+    // belongs to. It cannot be a clause in the query below: a nickname lives in
+    // another table, keyed by who gave it, so the ids are looked up first and
+    // joined on. Still inside `scope`, because what somebody calls a person is
+    // not a reason to be able to mention them.
+    const named = contains
+        ? await prisma.contactName.findMany({
+              where: { ownerId: actor.id, nickname: contains },
+              select: { subjectId: true },
+              take: limit
+          })
+        : [];
+
     const users = await prisma.user.findMany({
         where: {
             ...(scope ? { id: { in: scope } } : {}),
-            ...(contains ? { OR: [{ name: contains }, { email: contains }] } : {})
+            ...(contains
+                ? {
+                      OR: [
+                          { name: contains },
+                          { email: contains },
+                          // The handle was shown under every name and matched by
+                          // nothing: typing somebody's username found them only
+                          // when it happened to be part of their display name.
+                          { username: contains },
+                          ...(named.length > 0
+                              ? [{ id: { in: named.map((row) => row.subjectId) } }]
+                              : [])
+                      ]
+                  }
+                : {})
         },
         // Not the picture. Whatever an OAuth provider handed better-auth is one
         // of several sources for somebody's face, and the last word on which of
@@ -154,16 +184,32 @@ async function searchPeople(
     // people with the same name apart, it is public by design - it is how
     // somebody is mentioned and found - and it is not the thing a picker open to
     // everybody in the room should be handing out.
+    // What this reader calls each of them. It leads, because it is the name they
+    // think in - and the one they just typed to get here. The real name does not
+    // disappear with it: a mention names somebody to a room that does not share
+    // the nickname, so what everybody else will read stays on the line below.
+    const calls = await nicknamesFor(
+        actor.id,
+        users.map((user) => user.id)
+    );
+
     return users
         .filter((user) => !shut.has(user.id))
-        .map((user) => ({
-            kind: "user" as const,
-            id: user.id,
-            label: user.name || handle(user.username),
-            detail: user.name ? handle(user.username) : "",
-            // Resolved from the id, like every other face in Polaris.
-            image: null
-        }));
+        .map((user) => {
+            const nickname = calls.get(user.id);
+            const real = user.name || handle(user.username);
+            const under = user.name
+                ? [user.name, handle(user.username)].filter(Boolean).join(" ")
+                : handle(user.username);
+            return {
+                kind: "user" as const,
+                id: user.id,
+                label: nickname || real,
+                detail: nickname ? under : user.name ? handle(user.username) : "",
+                // Resolved from the id, like every other face in Polaris.
+                image: null
+            };
+        });
 }
 
 /** Somebody's handle, written the way it is elsewhere, or nothing. */

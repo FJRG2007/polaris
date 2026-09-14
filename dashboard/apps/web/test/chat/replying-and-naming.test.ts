@@ -36,8 +36,14 @@ describe("pressing reply", () => {
 
     it("survives a menu handing focus back as it closes", async () => {
         const editor = await readFile(`${SRC}components/rich-text/rich-text-editor.tsx`, "utf8");
-        expect(editor).toContain("const attempts = [0, 60, 140];");
-        // And stops the moment the caret is where it was asked for.
+        // The window has to outlast the menu's exit animation rather than race
+        // it. A fifth of a second did not: Reply from a right-click could spend
+        // every try inside the context menu's focus trap, be undone by it, and
+        // leave nothing to try again - while Reply from the hover row, which
+        // opens no menu, worked every time.
+        expect(editor).toContain("const attempts = [0, 60, 140, 260, 400];");
+        // And stops the moment the caret is where it was asked for, so the extra
+        // tries cost nothing in the ordinary case.
         expect(editor).toContain("if (editor.isDestroyed || editor.isFocused) return;");
     });
 

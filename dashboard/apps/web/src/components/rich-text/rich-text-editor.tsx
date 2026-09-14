@@ -22,11 +22,11 @@ import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
 import { SelectionToolbar } from "./toolbar";
-import { EditorMenu, type ListAction } from "./editor-menu";
+import type { JSONContent } from "@tiptap/core";
 import { mentionExtension, popupOpen } from "./suggestion";
+import { EditorMenu, type ListAction } from "./editor-menu";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
-import type { JSONContent } from "@tiptap/core";
 import { resolveReferencesAction, searchMentionsAction } from "@/app/(app)/mention-actions";
 
 export interface RichTextEditorProps {
@@ -353,12 +353,20 @@ export function RichTextEditor({
          * the race on a fast machine and lost it on a slow one, which is exactly
          * what "sometimes pressing reply does not put me in the box" was.
          *
-         * Three tries over a fifth of a second, and it stops the moment the
-         * caret is in the box - or the moment it is somewhere the reader put it,
+         * A fifth of a second was not enough of them. A context menu is the slow
+         * case: it holds focus until its own exit animation ends, so all three
+         * tries could land inside the trap, be undone by it, and leave nothing
+         * to try again - which is why Reply from a right-click put the caret
+         * nowhere while Reply from the hover row, which opens no menu at all,
+         * worked every time.
+         *
+         * So the window outlasts the animation instead of racing it. Each try
+         * costs nothing once the caret is home: it stops the moment the editor
+         * has focus - or the moment focus is somewhere the reader put it,
          * because focus that moved to another field is a decision, not a menu
          * taking it back.
          */
-        const attempts = [0, 60, 140];
+        const attempts = [0, 60, 140, 260, 400];
         const timers = attempts.map((wait) =>
             window.setTimeout(() => {
                 if (editor.isDestroyed || editor.isFocused) return;
