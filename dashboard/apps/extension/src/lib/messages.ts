@@ -12,6 +12,8 @@
  * hostile by default: anything a content script holds, the page can read.
  */
 
+import type { UpdateNotice } from "@/lib/update";
+
 /** One decrypted login, reduced to what a list needs to draw it. */
 export interface ItemSummary {
     readonly id: string;
@@ -93,6 +95,15 @@ export type Request =
     | { readonly kind: "totpNow"; readonly id: string }
     /** Whether the tab in front of somebody is one they have shut this out of. */
     | { readonly kind: "blocked" }
+    /**
+     * Whether a newer extension has been published, and what to do about it.
+     *
+     * Read-only: it answers from what the worker's own slow check last left, so
+     * opening the popup is never what makes a request. A browser that opens it
+     * twenty times a day would otherwise ask twenty times for an answer that
+     * changes a few times a year.
+     */
+    | { readonly kind: "updateStatus" }
     /** Shut this extension out of the current site, or let it back in. */
     | { readonly kind: "setBlocked"; readonly blocked: boolean }
     /** Change how long an unlocked vault may sit unused before it locks itself. */
@@ -122,6 +133,8 @@ export type Request =
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
+    /** A build newer than this one, or null when this one is current. */
+    | { readonly ok: true; readonly update: UpdateNotice | null }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }
     /** The site in front of somebody, and whether they have shut this out of it. */

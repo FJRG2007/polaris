@@ -40,6 +40,7 @@ src/lib/matching.ts      whether an item belongs to this page, and which comes f
 src/lib/lock.ts          when an open vault locks itself again
 src/lib/save.ts          what was typed for a new login, before it is encrypted
 src/lib/item.ts          the item to send back when only its password changes
+src/lib/update.ts        whether a newer build is out, and who is going to install it
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
 src/entrypoints/         background worker and popup
 test/                    the decisions that can do harm: what matches, and when it locks
@@ -84,6 +85,30 @@ enforces it whether or not you open the popup.
 
 The longest choice is the browser session. There is no "never", because that would
 mean keeping the key somewhere a restart cannot take it.
+
+## Finding out it is out of date
+
+An extension loaded by hand never updates itself, and nothing in a browser will
+ever mention it. So the worker asks - when the browser starts, and twice a day
+after that - and the popup carries a line above whichever screen is showing when
+there is something to say.
+
+It asks **your Polaris**, not GitHub. The manifest declares no host permission,
+the one origin this may reach is the one you named, and the dashboard already
+makes and caches that release lookup for its own downloads page. A second host
+here would be permission every install stands on, permanently, to read a version
+number. The route is `GET /api/polaris/extension`, and it needs no session: a
+locked vault should still be able to find out it is months behind.
+
+What you are told depends on how this copy got here, which `management.getSelf()`
+reports - the one method of that API that needs no `management` permission.
+Installed from a package, the browser updates it once the store has reviewed the
+new version and there is nothing for you to do. Loaded from disk, whether as an
+unpacked folder or Firefox's temporary add-on, it has to be loaded again the same
+way, and the line points at the steps on your own Polaris rather than repeating
+them in a 360-pixel panel. Anything else - put there by other software, or by
+policy - is told the same as loaded-by-hand, because Polaris cannot promise those
+are being kept current.
 
 ## Lifting it out of this monorepo
 

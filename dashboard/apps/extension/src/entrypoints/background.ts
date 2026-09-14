@@ -5,6 +5,7 @@ import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
+import { noticeFor, type UpdateNotice } from "@/lib/update";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
@@ -98,6 +99,14 @@ const EMAIL = storage.defineItem<string | null>("local:vault.email", { fallback:
  */
 const BLOCKED = storage.defineItem<string[]>("local:blocked.hosts", { fallback: [] });
 const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallback: null });
+/**
+ * A published build newer than this one, once a check has found it.
+ *
+ * Local rather than session, and deliberately: it is a fact about what has been
+ * released rather than a credential, and somebody who has not got round to
+ * reloading the extension should still be told tomorrow.
+ */
+const UPDATE = storage.defineItem<UpdateNotice | null>("local:update.notice", { fallback: null });
 /** The wrapped keys, kept so unlocking does not need the network. */
 const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf: unknown } | null>(
     "session:vault.wrapped",
@@ -901,6 +910,54 @@ async function changePassword(id: string, password: string): Promise<messages.Re
     return { ok: true, status: await status() };
 }
 
+/** How often the server is asked whether a newer extension has been published.
+ *  Twice a day: the answer changes a few times a year. */
+const UPDATE_EVERY_MINUTES = 12 * 60;
+
+/** Long enough for a server on the other side of a tunnel, short enough that a
+ *  worker is not held open by it. */
+const UPDATE_TIMEOUT_MS = 10_000;
+
+/**
+ * Ask this Polaris whether a newer extension is out, and remember the answer.
+ *
+ * The server rather than GitHub, and that is the whole shape of this: the
+ * manifest declares no host permission at all, the one origin this extension may
+ * reach is the one somebody named, and the dashboard already makes and caches
+ * this exact lookup for its own downloads page. Asking GitHub from here would
+ * mean a password manager standing on permission to reach a second host, for a
+ * version number.
+ *
+ * How it got here is read at the same moment, because that is what decides what
+ * the popup says: a store install is updated by the store, and a copy loaded from
+ * disk has to be loaded again. `management.getSelf` is the one method of that API
+ * which needs no permission; if it refuses anyway, `noticeFor` reads the absent
+ * answer as the manual case, which is the direction that leaves nobody waiting
+ * for an update that is never coming.
+ *
+ * Never throws, and never withdraws a notice it could not re-confirm: it runs
+ * from an alarm, and a server that was briefly unreachable is not news that the
+ * extension is suddenly current.
+ */
+async function checkForUpdate(): Promise<void> {
+    const origin = await currentOrigin();
+    if (!origin) return;
+    try {
+        const response = await fetch(`${origin}/api/polaris/extension`, {
+            signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS),
+            credentials: "omit"
+        });
+        if (!response.ok) return;
+        const answer = (await response.json()) as { version?: unknown; url?: unknown };
+        const self = await browser.management.getSelf().catch(() => null);
+        await UPDATE.setValue(
+            noticeFor(answer, browser.runtime.getManifest().version, self?.installType)
+        );
+    } catch {
+        // Unreachable, or an answer that was not JSON. What is stored stands.
+    }
+}
+
 browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // Only the extension's own pages may ask for any of this. A page that
     // guessed the extension id gets nothing: anything that is not one of ours is
@@ -1140,6 +1197,11 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "blocked":
                 return { ok: true, ...(await blockedHere()) };
 
+            case "updateStatus":
+                // Read, never checked here: the popup asking is not a reason to
+                // make a request, and the alarm is what keeps this current.
+                return { ok: true, update: await UPDATE.getValue() };
+
             case "setTimeout": {
                 const chosen = readTimeout(request.timeoutMs);
                 await TIMEOUT.setValue(chosen);
@@ -1261,7 +1323,15 @@ export default defineBackground(() => {
     // manifest v3 this mostly finds the worker was recycled long ago - which is the
     // same lock, arrived at for free.
     browser.alarms.create("vault-lock", { periodInMinutes: 1 });
+    // And a far slower one, for a question whose answer changes a few times a
+    // year. An extension loaded by hand never updates itself, so this is the only
+    // thing that would ever tell somebody they are months behind.
+    browser.alarms.create("update-check", { periodInMinutes: UPDATE_EVERY_MINUTES });
     browser.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === "update-check") {
+            void checkForUpdate();
+            return;
+        }
         if (alarm.name !== "vault-lock") return;
         void (async () => {
             const wasOpen = open !== null;
@@ -1280,4 +1350,8 @@ export default defineBackground(() => {
     // before somebody opens the popup would be asking the browser to hold a
     // master password, which is the one thing this design refuses.
     void badge();
+    // Except this, which needs no key and nothing typed: a browser that starts
+    // once a day would otherwise wait for the alarm's whole period before finding
+    // out anything at all.
+    void checkForUpdate();
 });

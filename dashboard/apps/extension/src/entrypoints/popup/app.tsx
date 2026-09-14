@@ -1,5 +1,6 @@
 import { TIMEOUT_CHOICES } from "@/lib/lock";
 import { readIntendedLogin } from "@/lib/save";
+import type { UpdateNotice } from "@/lib/update";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
@@ -49,16 +50,85 @@ function useStatus(): [VaultStatus | null, () => Promise<void>] {
     return [status, read];
 }
 
+/** What the worker's last check found, if it found anything. */
+function useUpdate(): UpdateNotice | null {
+    const [notice, setNotice] = useState<UpdateNotice | null>(null);
+    useEffect(() => {
+        void (async () => {
+            const reply = await askBackground({ kind: "updateStatus" });
+            if (reply.ok && "update" in reply) setNotice(reply.update);
+        })();
+    }, []);
+    return notice;
+}
+
+/**
+ * The one thing this popup says without being asked.
+ *
+ * What it says depends on how this copy got here, because the two readers have
+ * nothing to do with each other. A store install is updated by the store once the
+ * new version is reviewed: there is nothing for that person to do, and sending
+ * them to re-load a folder by hand would be sending them to undo a working
+ * install. A copy loaded from disk updates never, and the only thing that will
+ * ever change that is them doing it again - so it points at the steps, on their
+ * own Polaris, rather than repeating them in a 360-pixel panel.
+ */
+function UpdateBanner({
+    notice,
+    server
+}: {
+    notice: UpdateNotice | null;
+    server: string | null;
+}): React.JSX.Element | null {
+    if (!notice) return null;
+    if (notice.kind === "store") {
+        return (
+            <div className="notice small">
+                Version {notice.version} is out. Your browser installs it once the store has
+                reviewed it, so there is nothing to do here.
+            </div>
+        );
+    }
+    return (
+        <div className="notice small">
+            Version {notice.version} is out. This copy was loaded by hand, so it has to be
+            loaded again the same way.{" "}
+            <a
+                href={server ? `${server}/account/downloads` : notice.url}
+                target="_blank"
+                rel="noreferrer"
+            >
+                {server ? "The steps are on your Polaris" : "See what changed"}
+            </a>
+            .
+        </div>
+    );
+}
+
 export function App(): React.JSX.Element {
     const [status, refresh] = useStatus();
+    const update = useUpdate();
 
     // Nothing at all until the worker has answered: a popup that flashed the
     // sign-in screen at somebody whose vault is open would be lying for a frame.
     if (!status) return <main className="pad" />;
-    if (!status.server) return <Connect onDone={refresh} />;
-    if (!status.connected) return <SignIn server={status.server} onDone={refresh} />;
-    if (!status.unlocked) return <Unlock onDone={refresh} />;
-    return <Items status={status} onChange={refresh} />;
+
+    const screen = !status.server ? (
+        <Connect onDone={refresh} />
+    ) : !status.connected ? (
+        <SignIn server={status.server} onDone={refresh} />
+    ) : !status.unlocked ? (
+        <Unlock onDone={refresh} />
+    ) : (
+        <Items status={status} onChange={refresh} />
+    );
+
+    return (
+        <>
+            <UpdateBanner notice={update} server={status.server} />
+            {screen}
+        </>
+    );
 }
 
 function Problem({ text }: { text: string | null }): React.JSX.Element | null {

@@ -87,6 +87,19 @@ h2 {
     font-size: 12px;
 }
 
+/* A build newer than this one: the only thing the popup says on its own. Above
+   whichever screen is showing, including the locked one - being out of date is
+   worth knowing before the master password, not after it. */
+.notice {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+}
+
+.notice a {
+    color: var(--accent);
+}
+
 input {
     width: 100%;
     padding: 8px 10px;
