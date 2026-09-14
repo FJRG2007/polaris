@@ -13,7 +13,11 @@
 
 import { prisma } from "@polaris/db";
 import { HEALTH_PROBE_USER_AGENT, VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
-import { notifyDomainHealthChanged } from "@/lib/notifications/domain-events";
+import {
+    notifyDomainHealthChanged,
+    notifyDomainHealthChanges,
+    type DomainHealthChange
+} from "@/lib/notifications/domain-events";
 
 const PROBE_TIMEOUT_MS = 6000;
 const PROBE_CONCURRENCY = 6;
@@ -219,11 +223,20 @@ export async function probeDomain(target: ProbeTarget & { id: string }): Promise
     );
 }
 
-/** Write one probe's result and raise the alert when it crossed a threshold. */
+/**
+ * Write one probe's result and raise the alert when it crossed a threshold.
+ *
+ * `collect` is how a sweep takes the alert instead of it being sent here: every
+ * domain on a box crosses the threshold in the same pass when the connection
+ * goes, and one alert each is one per deployed service. Given a sink, the change
+ * goes into it and the pass speaks once at the end. Without one - a single domain
+ * probed on its own - nothing changes.
+ */
 async function persistHealth(
     id: string,
     previous: HealthState,
-    health: DomainHealth
+    health: DomainHealth,
+    collect?: DomainHealthChange[]
 ): Promise<DomainHealth> {
     const next = nextAlertState(previous, health, new Date());
     await prisma.domain.update({
@@ -241,11 +254,13 @@ async function persistHealth(
     // After the write, so a delivery that hangs cannot hold the streak back and alert
     // the same outage twice on the next pass.
     if (next.alert) {
-        await notifyDomainHealthChanged({
+        const change: DomainHealthChange = {
             domainId: id,
             status: next.alert,
             detail: health.detail
-        });
+        };
+        if (collect) collect.push(change);
+        else await notifyDomainHealthChanged(change);
     }
     return health;
 }
@@ -288,11 +303,15 @@ export async function probeAllDomains(): Promise<void> {
         }
     });
     let repairable = false;
+    // What crossed a threshold this pass, told at the end rather than one at a
+    // time: a connection coming back brings every domain back together, and
+    // nobody needs that news once per service.
+    const changed: DomainHealthChange[] = [];
     for (let i = 0; i < domains.length; i += PROBE_CONCURRENCY) {
         const batch = await Promise.all(
             domains.slice(i, i + PROBE_CONCURRENCY).map((domain) =>
                 checkDomain(domain)
-                    .then((health) => persistHealth(domain.id, domain, health))
+                    .then((health) => persistHealth(domain.id, domain, health, changed))
                     // Repairable only where the local edge is the one that serves the address.
                     // An app on a remote server is served by that server's own edge and is
                     // deliberately kept out of the local routing file, so it answers the same
@@ -306,6 +325,7 @@ export async function probeAllDomains(): Promise<void> {
         );
         if (batch.some(Boolean)) repairable = true;
     }
+    await notifyDomainHealthChanges(changed);
     // Once for the pass, however many names were affected: they share one routing file.
     const next = nextRepairState(repair, repairable);
     repair = next.state;

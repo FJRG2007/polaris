@@ -41,7 +41,8 @@ vi.mock("@/lib/deploy-service", () => ({
 }));
 
 vi.mock("@/lib/notifications/domain-events", () => ({
-    notifyDomainHealthChanged: async () => undefined
+    notifyDomainHealthChanged: async () => undefined,
+    notifyDomainHealthChanges: async () => undefined
 }));
 
 /** A domain of an app that runs where the caller says. */
