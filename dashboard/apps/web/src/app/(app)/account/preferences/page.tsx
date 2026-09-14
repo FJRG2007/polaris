@@ -10,16 +10,13 @@
  * somebody is reading on, not about the person.
  */
 
-import { Suspense } from "react";
-import { Skeleton } from "@polaris/ui";
-import { loadEnv } from "@polaris/config";
+import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { resolveDisplayPreferences } from "@polaris/core";
-import { DesktopDownload } from "@/components/app-download";
-import { InstallAppCard } from "@/components/installed-app";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
 import { DeviceCacheCard } from "@/components/device-cache-card";
 import { AccessibilityForm } from "@/components/accessibility-form";
+import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { saveDisplayPreferencesAction, saveTextSizeAction } from "./actions";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import {
@@ -65,17 +62,25 @@ export default async function PreferencesPage() {
                 save={saveTextSizeAction}
             />
             <SpoilersCard />
-            <InstallAppCard
-                nativeApp={
-                    // The only thing on this page that waits on GitHub, so it is the
-                    // only thing that waits: the card, and everything explaining what
-                    // the app is, is drawn before the lookup has answered.
-                    <Suspense fallback={<Skeleton className="h-8 w-56" />}>
-                        <DesktopDownload repo={loadEnv().POLARIS_REPO} />
-                    </Suspense>
-                }
-            />
             <DeviceCacheCard />
+            {/* The install offer used to be on this page, because this is where the
+                browser's own install prompt was already being held. It has moved to
+                one screen with everything else installable, and this points at it
+                rather than drawing a second copy. */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Polaris as an app</CardTitle>
+                </CardHeader>
+                <CardBody className="flex flex-col items-start gap-3">
+                    <p className="text-sm text-muted-foreground">
+                        Open Polaris in its own window, install the desktop app, or add the browser
+                        extension.
+                    </p>
+                    <Button asChild size="sm" variant="secondary">
+                        <Link href="/account/downloads">Downloads</Link>
+                    </Button>
+                </CardBody>
+            </Card>
         </div>
     );
 }

@@ -27,6 +27,7 @@ import {
     Contact,
     Container,
     Database,
+    Download,
     EyeOff,
     FileText,
     Columns3,
@@ -1116,6 +1117,34 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "calendar",
                 "text size",
                 "accessibility"
+            ]
+        },
+        // Every way of having Polaris somewhere other than a tab. One screen
+        // rather than a card under whichever page happened to build each one:
+        // somebody after "the app" was having to know that the desktop offer was
+        // under Preferences and the extension under the vault's client screen.
+        {
+            label: "Downloads",
+            href: "/account/downloads",
+            icon: Download,
+            keywords: [
+                "app",
+                "apps",
+                "desktop",
+                "windows",
+                "macos",
+                "linux",
+                "android",
+                "ios",
+                "mobile",
+                "phone",
+                "extension",
+                "chrome",
+                "firefox",
+                "install",
+                "cli",
+                "command line",
+                "tunnel"
             ]
         },
         // The microphone, the camera and everything around them. Its own screen

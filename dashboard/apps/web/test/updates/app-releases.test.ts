@@ -3,7 +3,9 @@ import {
     DESKTOP_TAG_PREFIX,
     EXTENSION_TAG_PREFIX,
     desktopDownload,
+    pickFile,
     pickRelease,
+    type AppFile,
     type ReleaseListing
 } from "../../src/lib/app-releases";
 
@@ -149,6 +151,107 @@ describe("pickRelease", () => {
             DESKTOP_TAG_PREFIX
         );
         expect(found?.version).toBe("0.2.0");
+    });
+});
+
+describe("the files on the release it chose", () => {
+    it("carries the ones that can actually be fetched", () => {
+        const found = pickRelease(
+            [
+                release({
+                    assets: [
+                        {
+                            name: "Polaris-Setup.exe",
+                            browser_download_url: "https://example.test/Polaris-Setup.exe"
+                        },
+                        {
+                            name: "Polaris-0.2.0-arm64.dmg",
+                            browser_download_url: "https://example.test/arm64.dmg"
+                        }
+                    ]
+                })
+            ],
+            DESKTOP_TAG_PREFIX
+        );
+        expect(found?.files).toEqual([
+            { name: "Polaris-Setup.exe", url: "https://example.test/Polaris-Setup.exe" },
+            { name: "Polaris-0.2.0-arm64.dmg", url: "https://example.test/arm64.dmg" }
+        ]);
+    });
+
+    it("is empty for a release that attached nothing", () => {
+        expect(pickRelease([release()], DESKTOP_TAG_PREFIX)?.files).toEqual([]);
+    });
+
+    it("drops an entry missing a name or somewhere to fetch it from", () => {
+        // Checked rather than trusted, the same as every other field here: a file
+        // with no url is a button that goes nowhere.
+        const found = pickRelease(
+            [
+                release({
+                    assets: [
+                        { name: "Polaris-Setup.exe" },
+                        { browser_download_url: "https://example.test/nameless" },
+                        { name: "", browser_download_url: "https://example.test/empty" },
+                        { name: 42, browser_download_url: "https://example.test/number" },
+                        {
+                            name: "polaris-0.2.0.AppImage",
+                            browser_download_url: "https://example.test/app.AppImage"
+                        }
+                    ]
+                })
+            ],
+            DESKTOP_TAG_PREFIX
+        );
+        expect(found?.files).toEqual([
+            { name: "polaris-0.2.0.AppImage", url: "https://example.test/app.AppImage" }
+        ]);
+    });
+
+    it("takes no files from a shape that is not a list", () => {
+        expect(pickRelease([release({ assets: "nope" })], DESKTOP_TAG_PREFIX)?.files).toEqual([]);
+    });
+});
+
+/**
+ * Picking one file out of a release.
+ *
+ * The names belong to the packagers, not to Polaris - electron-forge names the
+ * per-architecture images, WXT names the browser packages - so a screen asks for
+ * what it means and this answers with whatever matches. The case that matters is
+ * Firefox: its package and the sources archive WXT writes beside it are both zips
+ * with "firefox" nowhere near as distinguishing as it looks, and offering the
+ * sources archive as the add-on is a download that installs nothing.
+ */
+describe("pickFile", () => {
+    const files: readonly AppFile[] = [
+        { name: "polaris-0.1.0-chrome.zip", url: "https://example.test/chrome.zip" },
+        { name: "polaris-0.1.0-firefox.zip", url: "https://example.test/firefox.zip" },
+        { name: "polaris-0.1.0-sources.zip", url: "https://example.test/sources.zip" },
+        { name: "Polaris-0.2.0-arm64.dmg", url: "https://example.test/arm64.dmg" },
+        { name: "Polaris-0.2.0-x64.dmg", url: "https://example.test/x64.dmg" }
+    ];
+
+    it("matches on every term, so an architecture picks its own image", () => {
+        expect(pickFile(files, [".dmg", "arm64"])?.url).toBe("https://example.test/arm64.dmg");
+        expect(pickFile(files, [".dmg", "x64"])?.url).toBe("https://example.test/x64.dmg");
+    });
+
+    it("avoids the terms it was told to avoid", () => {
+        // Without this, "the zip for firefox" is satisfied by the sources archive
+        // on any release that lists it first.
+        expect(pickFile(files, [".zip", "firefox"], ["sources"])?.url).toBe(
+            "https://example.test/firefox.zip"
+        );
+    });
+
+    it("ignores case, because the names are not ours to spell", () => {
+        expect(pickFile(files, [".DMG", "ARM64"])?.url).toBe("https://example.test/arm64.dmg");
+    });
+
+    it("answers nothing when this release has no such file", () => {
+        expect(pickFile(files, [".deb"])).toBeNull();
+        expect(pickFile([], [".exe"])).toBeNull();
     });
 });
 

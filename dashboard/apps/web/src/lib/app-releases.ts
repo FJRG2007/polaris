@@ -50,12 +50,78 @@ export interface ReleaseListing {
     readonly draft?: unknown;
     readonly prerelease?: unknown;
     readonly published_at?: unknown;
+    /** The files attached to it. Carried in the same answer as the release, so
+     *  reading them costs no second call and no second cache. */
+    readonly assets?: unknown;
+}
+
+/** One attached file, in the two fields a download needs. */
+export interface ReleaseAsset {
+    readonly name?: unknown;
+    readonly browser_download_url?: unknown;
+}
+
+/** One file somebody can actually download. */
+export interface AppFile {
+    readonly name: string;
+    readonly url: string;
 }
 
 export interface AppDownload {
     readonly url: string;
     /** The version as the tag spells it, so a button can name what it fetches. */
     readonly version: string;
+    /**
+     * The files on it, in the order the API listed them.
+     *
+     * Here so a screen can offer the installer for the machine somebody is on
+     * instead of sending everybody to a release page to read a list of seven
+     * files and work out which one is theirs. Empty is the ordinary case for a
+     * release that attached nothing, and a screen with nothing to match falls
+     * back to the release itself.
+     */
+    readonly files: readonly AppFile[];
+}
+
+/** The attached files of one release, keeping only entries that carry both a name
+ *  and somewhere to fetch them from. */
+function filesOf(release: ReleaseListing): readonly AppFile[] {
+    if (!Array.isArray(release.assets)) return [];
+    const files: AppFile[] = [];
+    for (const asset of release.assets as readonly ReleaseAsset[]) {
+        const name = asset?.name;
+        const url = asset?.browser_download_url;
+        if (typeof name !== "string" || name === "") continue;
+        if (typeof url !== "string" || url === "") continue;
+        files.push({ name, url });
+    }
+    return files;
+}
+
+/**
+ * The one file matching every term, and none of the terms to avoid.
+ *
+ * Matched on the name rather than on a filename this module spells out, because
+ * the names are its packagers': electron-forge decides what a `.dmg` for one
+ * architecture is called, and WXT decides what a browser's package is called. A
+ * screen asks for what it means - a `.dmg` for `arm64`, a `.zip` for `firefox`
+ * that is not the `sources` one - and gets nothing if this release has no such
+ * file, which is a row that says so rather than a link to a 404.
+ */
+export function pickFile(
+    files: readonly AppFile[],
+    has: readonly string[],
+    not: readonly string[] = []
+): AppFile | null {
+    const wanted = has.map((term) => term.toLowerCase());
+    const unwanted = not.map((term) => term.toLowerCase());
+    for (const file of files) {
+        const name = file.name.toLowerCase();
+        if (!wanted.every((term) => name.includes(term))) continue;
+        if (unwanted.some((term) => name.includes(term))) continue;
+        return file;
+    }
+    return null;
 }
 
 function publishedAt(release: ReleaseListing): number {
@@ -93,7 +159,8 @@ export function pickRelease(
     if (!newest) return null;
     return {
         url: newest.html_url as string,
-        version: (newest.tag_name as string).slice(prefix.length)
+        version: (newest.tag_name as string).slice(prefix.length),
+        files: filesOf(newest)
     };
 }
 

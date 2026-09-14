@@ -9,7 +9,6 @@
  */
 
 import Link from "next/link";
-import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { getVault } from "@/lib/vault/account";
 import { requirePermission } from "@/lib/session";
@@ -18,9 +17,8 @@ import { CopyButton } from "@/components/copy-button";
 import { listVaultClients } from "@/lib/vault/devices";
 import { BitwardenMark } from "@/components/brand-icons";
 import { RelativeTime } from "@/components/relative-time";
-import { ExtensionDownload } from "@/components/app-download";
-import { ExternalLink, Puzzle, Terminal, TriangleAlert } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { ExternalLink, KeyRound, Terminal, TriangleAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -128,53 +126,44 @@ export default async function VaultClientsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Puzzle className="size-4" />
-                        Polaris&apos; own extension
+                        <KeyRound className="size-4" />
+                        Let a client in
                     </CardTitle>
                 </CardHeader>
-                <CardBody className="flex flex-col gap-4 text-sm">
+                <CardBody className="flex flex-col items-start gap-3 text-sm">
+                    <p className="text-muted-foreground">
+                        Polaris&apos; own extension does not ask for your master password. It shows a
+                        code, you approve it here in a browser that already has this vault open, and
+                        it is handed a copy of the vault key sealed so that only it can open it.
+                    </p>
+                    <p className="text-muted-foreground">
+                        It opens this screen for you. Open it yourself if the extension could not,
+                        and type the code it is showing.
+                    </p>
+                    <Button asChild size="sm" variant="secondary">
+                        <Link href="/vault/authorize">Approve a request</Link>
+                    </Button>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Polaris&apos; own extension</CardTitle>
+                </CardHeader>
+                <CardBody className="flex flex-col items-start gap-3 text-sm">
                     <p className="text-muted-foreground">
                         Built for this vault rather than adapted to it: it asks the browser for
                         permission to talk to this address and no other, fills a login without
                         holding any standing access to the pages you open, and locks itself again
                         when you stop using it.
                     </p>
-
-                    <div>
-                        <p className="font-medium">From your browser&apos;s store</p>
-                        <p className="text-muted-foreground">
-                            Not published yet. This is where it will be, and it is the one that
-                            keeps itself up to date.
-                        </p>
-                        <div className="mt-2">
-                            <Button size="sm" variant="secondary" disabled>
-                                Get it from the store
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div>
-                        <p className="font-medium">Load it yourself</p>
-                        <p className="text-muted-foreground">
-                            Unpack the file for your browser and load it: Chrome and Edge at
-                            chrome://extensions with Developer mode turned on, then Load unpacked.
-                            Firefox at about:debugging, This Firefox, then Load Temporary Add-on.
-                            Loaded this way it does not update itself, and Firefox lets it go when
-                            it closes.
-                        </p>
-                        {/* The one thing on this page that waits on GitHub, so it is
-                            the only thing that waits: what the extension is, and how
-                            to load it, is drawn without it. */}
-                        <Suspense
-                            fallback={
-                                <div className="mt-2">
-                                    <Skeleton className="h-7 w-40" />
-                                </div>
-                            }
-                        >
-                            <ExtensionDownload repo={loadEnv().POLARIS_REPO} />
-                        </Suspense>
-                    </div>
+                    <p className="text-muted-foreground">
+                        The package for your browser is under Downloads, with the desktop app and
+                        everything else installable.
+                    </p>
+                    <Button asChild size="sm" variant="secondary">
+                        <Link href="/account/downloads">Downloads</Link>
+                    </Button>
                 </CardBody>
             </Card>
 
