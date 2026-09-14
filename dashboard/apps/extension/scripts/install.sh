@@ -46,6 +46,22 @@ newest_extension_tag() {
         head -n1
 }
 
+# The Chromium package on that release, asked for rather than spelled out.
+#
+# `wxt zip` names its output after the package and the version it is building -
+# `polarisextension-0.1.0-chrome.zip` - so a filename built here is a filename
+# that is wrong the next time the version changes, and wrong in the only way
+# nobody notices until an install 404s. The release knows what it carries; this
+# asks it, the same way the dashboard's own download does.
+#
+# "chrome" alone identifies it: the other two packages are the Firefox build and
+# the sources archive Firefox's review asks for, and neither carries that word.
+chrome_asset_url() {
+    curl -fsSL "https://api.github.com/repos/$REPO/releases/tags/$1" |
+        sed -n 's/.*"browser_download_url": *"\([^"]*chrome[^"]*\.zip\)".*/\1/p' |
+        head -n1
+}
+
 main() {
     for tool in curl unzip; do
         command -v "$tool" >/dev/null 2>&1 || {
@@ -61,7 +77,11 @@ main() {
         return 1
     }
 
-    url="https://github.com/$REPO/releases/download/$tag/polaris-extension-chrome.zip"
+    url=$(chrome_asset_url "$tag")
+    [ -n "$url" ] || {
+        err "release $tag carries no Chromium package"
+        return 1
+    }
     tmp=$(mktemp -d)
     # The download and the unpack happen away from the live folder, so a failure
     # half way leaves the working copy the browser is loading exactly as it was.

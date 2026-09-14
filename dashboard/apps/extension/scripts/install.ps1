@@ -39,9 +39,10 @@ function Invoke-PolarisExtensionInstall {
     # The newest EXTENSION release, which is not the newest release. This
     # repository publishes the dashboard too and marks those as latest, so
     # `releases/latest` answers with a dashboard build carrying no extension.
+    $agent = @{ "User-Agent" = "polaris-extension-installer" }
     $tag = $env:POLARIS_EXTENSION_TAG
     if (-not $tag) {
-        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=100" -Headers @{ "User-Agent" = "polaris-extension-installer" }
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=100" -Headers $agent
         $tag = ($releases | Where-Object { $_.tag_name -like "extension-v*" } | Select-Object -First 1).tag_name
     }
     if (-not $tag) {
@@ -49,7 +50,19 @@ function Invoke-PolarisExtensionInstall {
         return
     }
 
-    $url = "https://github.com/$repo/releases/download/$tag/polaris-extension-chrome.zip"
+    # The package is asked for rather than spelled out. `wxt zip` names its
+    # output after the package and the version - polarisextension-0.1.0-chrome.zip
+    # - so a filename built here is one that breaks on the next release, and
+    # breaks as a 404 half way through an install. "chrome" identifies it: the
+    # other two packages on the release are the Firefox build and the sources
+    # archive, and neither carries that word.
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -Headers $agent
+    $asset = $release.assets | Where-Object { $_.name -like "*chrome*.zip" } | Select-Object -First 1
+    if (-not $asset) {
+        Write-Error "Release $tag carries no Chromium package."
+        return
+    }
+    $url = $asset.browser_download_url
     # Downloaded and unpacked away from the live folder, so a failure half way
     # leaves the copy the browser is loading exactly as it was.
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("polaris-extension-" + [System.Guid]::NewGuid().ToString("N"))
