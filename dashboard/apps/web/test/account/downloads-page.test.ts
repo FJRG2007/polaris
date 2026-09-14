@@ -65,18 +65,17 @@ describe("when nothing has been published", () => {
 });
 
 describe("loading it by hand", () => {
-    it("is steps, one list per browser", async () => {
+    it("is a guided sequence, not a paragraph with the steps inside it", async () => {
         const source = await page;
-        expect(source).toContain("function LoadSteps(");
-        expect(source).toContain('browser="Chrome, Edge, Brave, Opera"');
-        expect(source).toContain('browser="Firefox"');
-        expect(source).toContain('"Open chrome://extensions"');
-        expect(source).toContain('"Open about:debugging"');
+        expect(source).toContain("<ExtensionSteps />");
     });
 
-    it("still says what loading it that way costs", async () => {
+    it("no longer writes one browser's steps into the page itself", async () => {
+        // They moved into `browser-guide`, where which file and which address
+        // each browser takes can be asserted. `extension-steps` covers the rest.
         const source = await page;
-        expect(source).toContain("does not update itself");
+        expect(source).not.toContain("function LoadSteps(");
+        expect(source).not.toContain('browser="Chrome, Edge, Brave, Opera"');
     });
 });
 

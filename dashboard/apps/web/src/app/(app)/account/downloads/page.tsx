@@ -25,27 +25,13 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
+import { ExtensionSteps } from "./extension-steps";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone, Terminal } from "lucide-react";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
 import { Badge, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
-
-/** One browser's way of loading an unpacked extension, as steps rather than as a
- *  sentence with four of them in it. */
-function LoadSteps({ browser, steps }: { browser: string; steps: readonly string[] }) {
-    return (
-        <div className="rounded-md border border-border px-3 py-2.5">
-            <p className="text-xs font-medium">{browser}</p>
-            <ol className="mt-1 flex list-inside list-decimal flex-col gap-0.5 text-xs text-muted-foreground">
-                {steps.map((step) => (
-                    <li key={step}>{step}</li>
-                ))}
-            </ol>
-        </div>
-    );
-}
 
 /** The shape of a list of files, while the release is being looked up. */
 function FilesSkeleton() {
@@ -111,34 +97,12 @@ export default async function DownloadsPage() {
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
                         </Suspense>
-                        {/* Numbered, per browser, because this is somebody
-                            following steps in a window that is not this one -
-                            and a paragraph holding four of them is a paragraph
-                            they lose their place in. */}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <LoadSteps
-                                browser="Chrome, Edge, Brave, Opera"
-                                steps={[
-                                    "Unpack the .zip",
-                                    "Open chrome://extensions",
-                                    "Turn on Developer mode",
-                                    "Load unpacked, and choose the folder"
-                                ]}
-                            />
-                            <LoadSteps
-                                browser="Firefox"
-                                steps={[
-                                    "Open about:debugging",
-                                    "This Firefox",
-                                    "Load Temporary Add-on",
-                                    "Choose the .zip"
-                                ]}
-                            />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            Loaded this way it does not update itself, and Firefox lets it go when
-                            it closes.
-                        </p>
+                        {/* Guided rather than described, like the router steps in
+                            the domain setup: this is somebody working in a window
+                            that is not this one, where every value has to be
+                            exact and a paragraph holding five of them is a
+                            paragraph they lose their place in. */}
+                        <ExtensionSteps />
                     </div>
 
                     <p className="border-t border-border/60 pt-4 text-muted-foreground">
