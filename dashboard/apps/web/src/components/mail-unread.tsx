@@ -20,7 +20,7 @@
 import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
-import { canNotify, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { canNotify, closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import {
     createContext,
     useCallback,
@@ -196,6 +196,12 @@ export function MailUnreadProvider({
 }) {
     const scope = useSessionScope();
     const [unread, setUnread] = useState(initial);
+    // Nothing is waiting, so neither is the notice that said how many were. The
+    // named ones are withdrawn as each conversation is read; this is the one
+    // that stood for the rest.
+    useEffect(() => {
+        if (unread.messages === 0) closeDesktopNotice("mail:more");
+    }, [unread.messages]);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     /** What this browser has already done that the server's count predates. */
     const [drift, setDrift] = useState(0);

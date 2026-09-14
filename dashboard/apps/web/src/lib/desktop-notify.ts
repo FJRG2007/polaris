@@ -28,6 +28,20 @@
 
 import { desktopBridge } from "@/lib/desktop-bridge";
 
+/**
+ * The notices this device has drawn and not yet withdrawn, by tag.
+ *
+ * A notice about mail that has since been read is worse than no notice: it is
+ * the reader being told to go and do something they have already done. The
+ * browser keeps one on screen until somebody dismisses it, so whatever raised it
+ * has to be able to take it back - and it cannot, unless the object it was given
+ * is kept. That is this.
+ *
+ * Inside the desktop app there is nothing to keep: the app withdraws its own by
+ * tag, which is why `closeDesktopNotice` asks it first.
+ */
+const shown = new Map<string, { close: () => void }>();
+
 /** Whether this browser can do it at all. */
 export function canNotify(): boolean {
     return desktopBridge() !== null || (typeof window !== "undefined" && "Notification" in window);
@@ -76,8 +90,11 @@ export async function notifyDesktop(input: {
 }): Promise<{ close: () => void } | null> {
     const app = desktopBridge();
     if (app) {
-        const shown = await app.notify(input).catch(() => false);
-        return shown ? { close: () => void app.closeNotice(input.tag).catch(() => undefined) } : null;
+        const drawn = await app.notify(input).catch(() => false);
+        if (!drawn) return null;
+        const handle = { close: () => void app.closeNotice(input.tag).catch(() => undefined) };
+        shown.set(input.tag, handle);
+        return handle;
     }
     if (!(await mayNotify())) return null;
 
@@ -97,10 +114,37 @@ export async function notifyDesktop(input: {
             if (input.href) window.location.assign(input.href);
             notice.close();
         };
-        return { close: () => notice.close() };
+        const handle = {
+            close: () => {
+                shown.delete(input.tag);
+                notice.close();
+            }
+        };
+        // Dismissed by hand, or by the system: either way it is no longer
+        // something to withdraw.
+        notice.onclose = () => shown.delete(input.tag);
+        shown.set(input.tag, handle);
+        return handle;
     } catch {
         // Some browsers refuse to construct one outside a service worker.
         // Nothing to say about it: the in-app card is still there.
         return null;
     }
+}
+
+/**
+ * Take one back.
+ *
+ * For the thing it was about having been dealt with - a call that was answered,
+ * a message that was read - which is the only honest moment to withdraw a
+ * notice. Silent about a tag nothing drew: the caller says what happened, and
+ * whether there was a notice for it is this module's business.
+ */
+export function closeDesktopNotice(tag: string): void {
+    const app = desktopBridge();
+    if (app) void app.closeNotice(tag).catch(() => undefined);
+    const held = shown.get(tag);
+    if (!held) return;
+    shown.delete(tag);
+    held.close();
 }

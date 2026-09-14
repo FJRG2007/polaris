@@ -23,22 +23,23 @@ import { describe, expect, it } from "vitest";
 const MAIL = new URL("../../src/app/(app)/mail/", import.meta.url);
 
 const list = await readFile(new URL("mail-view.tsx", MAIL), "utf8");
-const actions = await readFile(new URL("actions.ts", MAIL), "utf8");
+const store = await readFile(new URL("message-store.ts", MAIL), "utf8");
 
 describe("fetching a body before it is asked for", () => {
-    it("has an action that keeps the body and answers nothing", () => {
-        // Nothing comes back on purpose: the body lands on the row it belongs to
-        // and the open that follows finds it there. Returning it would be sending
-        // a megabyte to a screen that has not asked for it.
-        expect(actions).toContain(
-            "export async function warmMessageAction(messageId: string): Promise<void>"
-        );
-        expect(actions).toContain("await messages.loadBody(userId, messageId);");
+    it("asks for exactly what pressing the row asks for", () => {
+        // The same request, so the press finds the answer already here rather
+        // than starting a second one - see `opening-is-not-queued`.
+        expect(store).toContain("export function warmMessage(messageId: string): Promise<void>");
+        const warm = store.slice(store.indexOf("export function warmMessage"));
+        expect(warm).toContain("readMessage(messageId)");
     });
 
     it("never surfaces a failure from something nobody asked for", () => {
-        const warm = actions.slice(actions.indexOf("export async function warmMessageAction"));
-        expect(warm.slice(0, warm.indexOf("}\n\n"))).toContain("catch {");
+        const warm = store.slice(store.indexOf("export function warmMessage"));
+        const body = warm.slice(0, warm.indexOf("\n}"));
+        // Both ways out answer with nothing: whatever is wrong with it will be
+        // wrong again, visibly, if the message is actually opened.
+        expect(body).toContain("() => undefined,");
     });
 
     it("waits for the pointer to rest", () => {
@@ -61,7 +62,7 @@ describe("fetching a body before it is asked for", () => {
         // single slot rather than opening a second connection.
         expect(list).toContain("if (fetching.current) return;");
         expect(list).toContain("while (onScreen.current && wanted.current)");
-        expect(list).toContain("await warmMessageAction(next)");
+        expect(list).toContain("await warmMessage(next);");
     });
 
     it("is reached by the pointer and by the keyboard", () => {

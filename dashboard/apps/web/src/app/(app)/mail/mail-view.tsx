@@ -53,13 +53,13 @@ import {
     type ComponentPropsWithRef,
     type RefObject
 } from "react";
+import { readMessage, warmMessage } from "./message-store";
+import { closeDesktopNotice } from "@/lib/desktop-notify";
 import {
     actOnAction,
     applyLabelAction,
     blockSenderAction,
     emptyFolderAction,
-    openMessageAction,
-    warmMessageAction,
     snoozeAction,
     syncAllAction,
     setConversationStateAction
@@ -578,7 +578,7 @@ export function MailView({
                     // the pointer passed over and left behind is not remembered
                     // as fetched when it never was.
                     warmed.current.add(next);
-                    await warmMessageAction(next).catch(() => undefined);
+                    await warmMessage(next);
                 }
             } finally {
                 fetching.current = false;
@@ -725,6 +725,10 @@ export function MailView({
         // name it by - a row still being fetched.
         if (readOnOpen === row.id || row.unreadCount === 0 || !row.leadMessageId) return;
         setReadOnOpen(row.id);
+        // And the notice the system drew about it, if it drew one. A message
+        // that has been opened is not something to go on telling somebody about,
+        // and a browser keeps a notice on screen until it is taken back.
+        closeDesktopNotice(`mail:${row.id}`);
         // The row and the rail both stop saying unread now. The mail server is
         // told in the same breath and nobody waits on it: a refusal leaves the
         // message unread, which is the truth, and the next list brings the bold
@@ -764,6 +768,9 @@ export function MailView({
                 return row ? [shown(row)] : [];
             });
             if (action === "read" || leavesTheView(action)) {
+                // Read, archived, binned: dealt with, whichever it was, so the
+                // notice about it goes with the row.
+                for (const id of aimed) closeDesktopNotice(`mail:${id}`);
                 nudgeUnread(unreadNudges(aimedRows));
             } else if (action === "unread") {
                 nudgeUnread(
@@ -1125,16 +1132,18 @@ export function MailView({
         (kind: "reply" | "reply-all" | "forward", messageId: string) => {
             if (!messageId) return;
             startBusy(async () => {
-                const outcome = await openMessageAction(messageId);
-                const said = refusalOf(outcome);
-                if (said) {
-                    toast.show({ title: said });
-                    return;
-                }
-                const envelope = "envelope" in outcome ? outcome.envelope : null;
-                const readable = "readable" in outcome ? outcome.readable : null;
-                if (!envelope) return;
-                const quoted = readable?.text ?? "";
+                const opened = await readMessage(messageId).catch((caught: unknown) => {
+                    toast.show({
+                        title:
+                            caught instanceof Error
+                                ? caught.message
+                                : "That message could not be opened."
+                    });
+                    return null;
+                });
+                if (!opened) return;
+                const envelope = opened.envelope;
+                const quoted = opened.readable.text;
                 openComposer(
                     kind === "forward"
                         ? forwardSeed(envelope, quoted)

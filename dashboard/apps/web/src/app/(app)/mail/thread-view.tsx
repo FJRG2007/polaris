@@ -53,12 +53,8 @@ import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import {
-    actOnAction,
-    applyLabelAction,
-    openMessageAction,
-    setConversationStateAction
-} from "./actions";
+import { readMessage } from "./message-store";
+import { actOnAction, applyLabelAction, setConversationStateAction } from "./actions";
 import {
     Button,
     DropdownMenu,
@@ -238,13 +234,17 @@ export function ThreadView({
             // message was just moved has none.
             if (!newest) return;
             startAnswering(async () => {
-                const outcome = await openMessageAction(newest.id);
-                const said = refusalOf(outcome);
-                if (said) {
-                    toast.show({ title: said });
-                    return;
-                }
-                const readable = "readable" in outcome ? outcome.readable : null;
+                const opened = await readMessage(newest.id).catch((caught: unknown) => {
+                    toast.show({
+                        title:
+                            caught instanceof Error
+                                ? caught.message
+                                : "That message could not be opened."
+                    });
+                    return null;
+                });
+                if (!opened) return;
+                const readable = opened.readable;
                 // The plain text, never the HTML: quoting markup into a reply is
                 // how a thread turns into unreadable nested tables. A message with
                 // no text part quotes nothing, which is honest.
@@ -699,13 +699,15 @@ function MessageCard({
         if (!open || readable) return;
         let live = true;
         void (async () => {
-            const outcome = await openMessageAction(message.id);
-            if (!live) return;
-            if ("error" in outcome && outcome.error) {
-                setFailed(outcome.error);
-                return;
+            try {
+                const opened = await readMessage(message.id);
+                if (live) setReadable(opened.readable);
+            } catch (caught) {
+                if (!live) return;
+                setFailed(
+                    caught instanceof Error ? caught.message : "That message could not be opened."
+                );
             }
-            if ("readable" in outcome && outcome.readable) setReadable(outcome.readable);
         })();
         return () => {
             live = false;
