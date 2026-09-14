@@ -27,8 +27,8 @@ import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { noteReachedFrom } from "@/lib/apps/minecraft/reach";
 import { parseJoinAddresses } from "@/lib/apps/minecraft/parse";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { accessRefusal, isAddressRule, isPlayerName, type PlayerAccess } from "@/lib/apps/minecraft/access";
 import { editionOf, getServerPlayers, runServerCommand, type MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { accessRefusal, isAddressRule, isPlayerName, missingWhitelistNames, parseWhitelistNames, type PlayerAccess } from "@/lib/apps/minecraft/access";
 
 /** How much log to read back when matching joins. A join line per player is all
  *  that is wanted, and a busy server prints a lot between them. */
@@ -94,6 +94,36 @@ export async function listPlayerAccess(ownerId: string, installedAppId: string):
     };
 }
 
+/**
+ * Put the granted players onto the game's own whitelist.
+ *
+ * `grantPlayerAccess` tells the server in the same breath, but only when it is
+ * answering - and a server that is stopped, booting, or restarting on a crash is
+ * exactly when somebody adds the friend who cannot get in. That grant was then
+ * recorded here, drawn on the screen as allowed, and never reached the game: the
+ * player stayed refused with both halves insisting they were let in.
+ *
+ * Only ever adds. A name on the game's list that Polaris does not know about was
+ * put there by somebody, and taking it away would be this quietly locking a
+ * player out rather than letting one in.
+ */
+export async function reconcileWhitelist(
+    ownerId: string,
+    installedAppId: string,
+    rules: readonly PlayerAccess[]
+): Promise<string[]> {
+    if (rules.length === 0) return [];
+    const answer = await runServerCommand(ownerId, installedAppId, ["whitelist", "list"]).catch(() => null);
+    // A reply that never came is not an empty list: adding everybody back on the
+    // strength of it would fight a server that is simply not answering yet.
+    if (answer === null) return [];
+    const missing = missingWhitelistNames(rules, parseWhitelistNames(answer));
+    for (const username of missing) {
+        await runServerCommand(ownerId, installedAppId, ["whitelist", "add", username]).catch(() => null);
+    }
+    return missing;
+}
+
 /** The rules alone, for the enforcement pass and for anything deciding a join. */
 export async function playerAccessRules(installedAppId: string): Promise<PlayerAccess[]> {
     const rows = await prisma.gamePlayerAccess.findMany({
@@ -147,7 +177,8 @@ export async function grantPlayerAccess(
         update: input.note?.trim() ? { note: input.note.trim() } : {}
     });
     // Best effort: the row is the record, and a server that is not answering yet
-    // must not fail the grant - the next enforcement pass reconciles it.
+    // must not fail the grant - `reconcileWhitelist`, which the enforcement pass
+    // runs, hands it over the next time the server is up.
     if (install.edition === "java") {
         await runServerCommand(ownerId, installedAppId, ["whitelist", "add", username]).catch(() => null);
     }
@@ -232,7 +263,16 @@ export async function enforcePlayerAddresses(ownerId: string, installedAppId: st
         getServerPlayers(ownerId, installedAppId),
         playerAccessRules(installedAppId)
     ]);
-    if (!status.answering || status.players.players.length === 0) return nothing;
+    if (!status.answering) return nothing;
+
+    // Before anything about who is on: a player granted while the server was down
+    // is only on the game's list once somebody puts them there, and nobody does.
+    // It runs whether or not the address half is enforced, because the username
+    // half always is, and whether or not anybody is playing - an empty server is
+    // the one somebody is trying to join.
+    await reconcileWhitelist(ownerId, installedAppId, rules).catch(() => []);
+
+    if (status.players.players.length === 0) return nothing;
 
     const log = await readAppRuntimeLog(install.applicationId, ownerId, JOIN_LOG_TAIL).catch(() => "");
     const addresses = parseJoinAddresses(log);

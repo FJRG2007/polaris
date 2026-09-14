@@ -18,7 +18,9 @@ import {
     addressMatches,
     isAddressRule,
     isPlayerName,
-    joinAccess
+    joinAccess,
+    missingWhitelistNames,
+    parseWhitelistNames
 } from "@/lib/apps/minecraft/access";
 
 describe("addressMatches", () => {
@@ -139,6 +141,53 @@ describe("joinAccess", () => {
         const access = joinAccess("bedrock", "Some Gamer");
         expect(access.env.ALLOW_LIST).toBe("false");
         expect(access.env.OPS).toBe("Some Gamer");
+    });
+});
+
+/**
+ * A grant that never reached the game.
+ *
+ * Adding a player tells the server in the same breath, and that breath is taken
+ * with the server down more often than not: the moment somebody registers a
+ * friend is the moment the friend cannot get in. The grant was kept, drawn as
+ * allowed, and the game's own whitelist never heard about it - so both halves
+ * said the player was welcome and the player was refused.
+ */
+describe("what the game's whitelist is missing", () => {
+    it("reads the names out of the line the server prints", () => {
+        // Colour codes and all, which is how it comes back over RCON.
+        expect(parseWhitelistNames("There are 3 whitelisted player(s): Steve, alice, Bob\x1b[0m")).toEqual([
+            "Steve",
+            "alice",
+            "Bob"
+        ]);
+    });
+
+    it("reads an empty list as empty rather than as unreadable", () => {
+        expect(parseWhitelistNames("There are no whitelisted players")).toEqual([]);
+    });
+
+    it("hands over only the names the game has not got", () => {
+        const rules = [
+            { username: "Steve", address: "any" },
+            { username: "Alice", address: "203.0.113.9" }
+        ];
+        expect(missingWhitelistNames(rules, ["steve"])).toEqual(["Alice"]);
+    });
+
+    it("does not hand the same player over twice for their second address", () => {
+        // One row per address is one person, and the game's list holds names.
+        const rules = [
+            { username: "Steve", address: "203.0.113.9" },
+            { username: "Steve", address: "198.51.100.0/24" }
+        ];
+        expect(missingWhitelistNames(rules, [])).toEqual(["Steve"]);
+    });
+
+    it("leaves alone a name somebody put on the game's list by hand", () => {
+        // Only ever adding is the whole safety of this: the other direction is
+        // Polaris quietly locking out a player it was never told about.
+        expect(missingWhitelistNames([{ username: "Steve", address: "any" }], ["Steve", "Mallory"])).toEqual([]);
     });
 });
 

@@ -168,3 +168,41 @@ export function joinAccess(edition: MinecraftEdition, player: string): JoinAcces
         note: `Only ${name} can join, as the server's operator. Add the rest from Players.`
     };
 }
+
+/**
+ * The names on the game's own whitelist, out of what `whitelist list` answered.
+ *
+ * The server prints them as one line - "There are 3 whitelisted player(s): a, b,
+ * c" - and a server with an empty list prints a sentence with no colon in it at
+ * all, which is how nothing is told apart from a reply that could not be read.
+ * RCON wraps the line in colour codes, so those come off first.
+ */
+export function parseWhitelistNames(output: string): string[] {
+    const clean = output.replace(/\x1b?\[[0-9;]*m/g, "");
+    const colon = clean.indexOf(":");
+    if (colon === -1) return [];
+    return clean
+        .slice(colon + 1)
+        .split(",")
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0);
+}
+
+/**
+ * The granted players the game's list has never been told about.
+ *
+ * One rule per address means a player who plays from two places is two rows and
+ * one name, so the same name is not handed over twice. Matched case-insensitively
+ * because the game's list answers with whatever capitalization it stored.
+ */
+export function missingWhitelistNames(rules: readonly PlayerAccess[], listed: readonly string[]): string[] {
+    const have = new Set(listed.map((name) => name.toLowerCase()));
+    const missing: string[] = [];
+    for (const rule of rules) {
+        const key = rule.username.toLowerCase();
+        if (have.has(key)) continue;
+        have.add(key);
+        missing.push(rule.username);
+    }
+    return missing;
+}
