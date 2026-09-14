@@ -26,23 +26,39 @@ const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const page = readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
 const files = readFile(`${SRC}components/app-download.tsx`, "utf8");
 
+/**
+ * The file with its line wrapping taken out.
+ *
+ * A sentence written in JSX is broken across lines by the formatter, so asking
+ * the raw file whether it still contains one passes for the wrong reason - the
+ * words are all there, only not adjacent. That is exactly how the sentence below
+ * survived a test written to see it gone, so every assertion about prose here
+ * goes through this.
+ */
+const flat = (source: string) => source.replace(/\s+/g, " ");
+
 describe("when nothing has been published", () => {
     it("says so, and says where it will appear", async () => {
-        const source = await files;
+        const source = flat(await files);
         expect(source).toContain(
             "No version has been published yet. The files appear here, one per browser, as soon as one is."
+        );
+        expect(source).toContain(
+            "No version has been published yet. Installing Polaris as an app above"
         );
     });
 
     it("no longer sends the reader to the repository to build it", async () => {
-        const source = await files;
-        expect(source).not.toContain("It is built from this repository");
+        // Said in two places, and only one of them was the download centre: the
+        // offer drawn on the preferences and clients screens carried the same
+        // instruction to go and build it from a checkout.
+        expect(flat(await files)).not.toContain("It is built from this repository");
     });
 
     it("offers no button that cannot be pressed", async () => {
         // A disabled Download implies a file that is nearly ready. There is no
         // file, and the sentence above says exactly that instead.
-        const source = await page;
+        const source = flat(await page);
         expect(source).not.toContain("Get it from the store");
         expect(source).not.toContain("<Button");
     });

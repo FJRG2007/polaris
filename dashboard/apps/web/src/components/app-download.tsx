@@ -14,8 +14,8 @@
  * the half above it does nothing but await.
  */
 
-import { Badge, Button } from "@polaris/ui";
 import { Download } from "lucide-react";
+import { Badge, Button } from "@polaris/ui";
 import {
     desktopDownload,
     extensionDownload,
@@ -79,8 +79,7 @@ export function ExtensionDownloadOffer({ download }: { download: AppDownload | n
             </div>
             {!download ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                    No package has been published yet, so there is nothing to load. It is built from
-                    this repository and released on a tag of its own.
+                    No package has been published yet, so there is nothing to load.
                 </p>
             ) : null}
         </>

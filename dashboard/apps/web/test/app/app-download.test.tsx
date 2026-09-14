@@ -122,7 +122,8 @@ describe("the desktop app's files", () => {
 
     it("offers nothing to press when nothing has been released", () => {
         const html = renderToStaticMarkup(<DesktopFilesOffer download={null} />);
-        expect(html).toContain("Not released yet");
+        expect(html).toContain("No version has been published yet");
+        expect(html).toContain("in a window of its own");
         expect(html).not.toContain("href=");
     });
 });
@@ -151,7 +152,8 @@ describe("the extension's files", () => {
 
     it("says none has been published rather than drawing empty rows", () => {
         const html = renderToStaticMarkup(<ExtensionFilesOffer download={null} />);
-        expect(html).toContain("No package has been published yet");
+        expect(html).toContain("No version has been published yet");
+        expect(html).toContain("one per browser");
         expect(html).not.toContain("href=");
     });
 });
