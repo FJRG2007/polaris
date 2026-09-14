@@ -14,6 +14,7 @@ import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
 import { setPresenceAction, setStatusAction } from "@/app/(app)/account/preferences/actions";
 import {
     Bell,
+    Download,
     CalendarClock,
     Check,
     Link2,
@@ -304,15 +305,18 @@ export function AccountMenu({
                 >
                     <Avatar person={{ id, name }} size={32} />
                 </DropdownMenuTrigger>
-                {/* A ceiling on the width, which is what makes the `truncate` below
-                    do anything. A menu sizes itself to its widest child, so a long
-                    status - or a long email - used to stretch it across the window
-                    and the clipping those spans ask for never happened. Bounded
-                    here rather than on each item, because the item that is too wide
-                    is whichever one somebody typed into next. */}
-                <DropdownMenuContent align="end" className="max-w-[18rem]">
+                {/* One width, not a ceiling it grows up to.
+                    A menu sizes itself to its widest child, so with only a
+                    maximum it was as wide as the longest thing in it - a status,
+                    an address, a "scheduled, until Friday 18:00" - and every
+                    menu was a different width from the last. Fixed at the width
+                    the rest of the menus in the product use, and everything that
+                    can be long is clipped to it. */}
+                <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
-                        <span className="block text-sm font-medium text-foreground">{name}</span>
+                        <span className="block truncate text-sm font-medium text-foreground">
+                            {name}
+                        </span>
                         <span className="block truncate">{email}</span>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -330,11 +334,20 @@ export function AccountMenu({
                                         PRESENCE_CHOICE_DOTS[choice]
                                     )}
                                 />
-                                <span className="flex-1">{PRESENCE_LABELS[choice]}</span>
+                                <span className="min-w-0 flex-1 truncate">
+                                    {PRESENCE_LABELS[choice]}
+                                </span>
                                 {shownChoice === choice && shownUntil && (
-                                    <span className="text-[0.6875rem] text-muted-foreground">
-                                        {shownByRule ? "scheduled, until " : "until "}
-                                        {endLabel(shownUntil, format)}
+                                    // The word rather than the sentence: "until"
+                                    // and the time is what somebody needs, and
+                                    // "scheduled," in front of it was three
+                                    // quarters of the row. The schedule itself is
+                                    // a press away under Every week.
+                                    <span
+                                        className="shrink-0 truncate text-[0.6875rem] text-muted-foreground"
+                                        title={shownByRule ? "On your weekly schedule" : undefined}
+                                    >
+                                        until {endLabel(shownUntil, format)}
                                     </span>
                                 )}
                                 {shownChoice === choice && (
@@ -451,6 +464,16 @@ export function AccountMenu({
                         <Link href="/account/notifications">
                             <Bell className="size-4" />
                             Notifications
+                        </Link>
+                    </DropdownMenuItem>
+                    {/* Where the apps are. It existed and was reachable from
+                        Preferences and from the vault's own client screen, which
+                        are two places somebody looking for "the Polaris apps"
+                        has no reason to open. */}
+                    <DropdownMenuItem asChild>
+                        <Link href="/account/downloads">
+                            <Download className="size-4" />
+                            Get the apps
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

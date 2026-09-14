@@ -19,8 +19,20 @@ import type { DeliveryView } from "@/lib/notification-service";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import { drawFavicon } from "@/lib/favicon";
+import { canNotify, mayNotify } from "@/lib/desktop-notify";
+import { desktopBridge } from "@/lib/desktop-bridge";
 import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
-import { Badge, Card, CardBody, CardHeader, CardTitle, SegmentedControl, Switch, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    SegmentedControl,
+    Switch,
+    cn
+} from "@polaris/ui";
 import {
     notificationSoundEnabled,
     playNotificationSound,
@@ -86,6 +98,7 @@ export function NotificationSettingsView({
                 </p>
             ) : null}
 
+            <BrowserNoticesCard />
             <SoundCard />
             <TabIconCard />
 
@@ -102,6 +115,81 @@ export function NotificationSettingsView({
             <DestinationsCard destinations={destinations} smsReady={senders.some((s) => s.status === "connected")} />
             <DeliveryLog deliveries={deliveries} />
         </div>
+    );
+}
+
+/**
+ * Whether this browser may draw a notice outside the tab.
+ *
+ * The permission was only ever asked for at the moment something was about to be
+ * shown, which is the right time to ask and the wrong time to find out the
+ * answer was no: a browser remembers a refusal for good, and nothing on any
+ * screen said that Polaris had been refused or what to do about it. So the state
+ * is said here plainly, and granting it is one press - the same prompt, asked
+ * deliberately, which is the one people say yes to.
+ *
+ * The desktop app draws its own notices through the operating system and needs
+ * no permission, so there it says so and offers nothing.
+ */
+function BrowserNoticesCard() {
+    type Standing = "app" | "granted" | "denied" | "askable" | "unsupported";
+    const [standing, setStanding] = useState<Standing>("unsupported");
+    const [asking, setAsking] = useState(false);
+
+    // Read on mount: none of this exists while the page is rendered on the
+    // server, and a card that guessed would be wrong on every second device.
+    const settle = () => {
+        if (desktopBridge()) return setStanding("app");
+        if (!canNotify()) return setStanding("unsupported");
+        const permission = Notification.permission;
+        setStanding(
+            permission === "granted" ? "granted" : permission === "denied" ? "denied" : "askable"
+        );
+    };
+    useEffect(settle, []);
+
+    const said: Record<Standing, string> = {
+        app: "The Polaris app draws these itself. Nothing to allow.",
+        granted:
+            "Polaris can tell you about a call or a message while you are on another tab.",
+        denied:
+            "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
+        askable:
+            "Let Polaris tell you about a call or a message while you are on another tab.",
+        unsupported: "This browser cannot show them."
+    };
+
+    return (
+        <Card>
+            <CardBody className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium">Browser notifications</p>
+                    <p className="text-xs text-muted-foreground">{said[standing]}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    {standing === "granted" ? (
+                        <Badge variant="success">On</Badge>
+                    ) : standing === "denied" ? (
+                        <Badge variant="warning">Blocked</Badge>
+                    ) : standing === "askable" ? (
+                        <Button
+                            size="sm"
+                            disabled={asking}
+                            onClick={() => {
+                                setAsking(true);
+                                void mayNotify().finally(() => {
+                                    setAsking(false);
+                                    settle();
+                                });
+                            }}
+                        >
+                            <Bell className="size-4 shrink-0" aria-hidden />
+                            Allow
+                        </Button>
+                    ) : null}
+                </div>
+            </CardBody>
+        </Card>
     );
 }
 
