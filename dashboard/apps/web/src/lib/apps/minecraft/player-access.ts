@@ -25,9 +25,18 @@
 import { prisma } from "@polaris/db";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { noteReachedFrom } from "@/lib/apps/minecraft/reach";
-import { parseJoinAddresses } from "@/lib/apps/minecraft/parse";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { editionOf, getServerPlayers, runServerCommand, type MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
+import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "@/lib/apps/minecraft/parse";
+import { withOfflineIdentities, withOfflineNames, withoutName } from "@/lib/apps/minecraft/offline-identity";
+import {
+    editionOf,
+    getServerPlayers,
+    runServerCommand,
+    withServerContainer,
+    type MinecraftEdition,
+    type ServerContainer
+} from "@/lib/apps/minecraft/service";
 import { accessRefusal, isAddressRule, isPlayerName, missingWhitelistNames, parseWhitelistNames, type PlayerAccess } from "@/lib/apps/minecraft/access";
 
 /** How much log to read back when matching joins. A join line per player is all
@@ -94,6 +103,152 @@ export async function listPlayerAccess(ownerId: string, installedAppId: string):
     };
 }
 
+/** Where the image keeps the server's own files. */
+const DATA_DIR = "/data";
+const WHITELIST_FILE = `${DATA_DIR}/whitelist.json`;
+const OPS_FILE = `${DATA_DIR}/ops.json`;
+const BANS_FILE = `${DATA_DIR}/banned-players.json`;
+const PROPERTIES_FILE = `${DATA_DIR}/server.properties`;
+
+/**
+ * A roster file the server keys by an identity rather than by a name.
+ *
+ * All three are the same file format and carry the same defect on a server that
+ * invents identities, but they fail in opposite directions, and the ban list is
+ * the one that matters most: a whitelist entry nothing matches keeps a welcome
+ * player out, where a ban entry nothing matches lets a banned one back in.
+ */
+export type RosterFile = "whitelist" | "ops" | "bans";
+
+const ROSTER_PATHS: Readonly<Record<RosterFile, string>> = {
+    whitelist: WHITELIST_FILE,
+    ops: OPS_FILE,
+    bans: BANS_FILE
+};
+
+/**
+ * The server answered and said no.
+ *
+ * Told apart from a server that did not answer at all, because the two deserve
+ * opposite treatment: a refusal is news the operator has to see, and silence is
+ * the ordinary case of a server that is stopped or still booting, which the
+ * enforcement pass settles by itself later.
+ */
+class WhitelistRefused extends Error {}
+
+/**
+ * Whether this server invents its players' identities instead of asking Mojang.
+ *
+ * A file that cannot be read counts as authenticating, because that is the
+ * game's own default and the command path is the right one for it. The mistake
+ * that direction is a grant that has to be retried; the other direction would
+ * rewrite a correct roster with identities the login will never compute.
+ */
+async function inventsIdentities(server: ServerContainer): Promise<boolean> {
+    // Bedrock is not this. It keeps an allow list keyed by a number Microsoft
+    // issues, in a different file, and none of the reasoning below applies to it -
+    // so every path that would write a Java roster file stops here.
+    if (server.edition !== "java") return false;
+    const properties = await readContainerFile(server, PROPERTIES_FILE);
+    if (properties === null) return false;
+    return parseProperties(properties)["online-mode"] === "false";
+}
+
+/**
+ * Put names on the game's own whitelist, in a way it will still honour after a
+ * restart.
+ *
+ * On a server with authentication off this does not ask the game to add anybody.
+ * `whitelist add` resolves the name the only way it knows - the user cache, then
+ * Mojang - and writes whichever identity that returned, which is not the one an
+ * unauthenticated login computes. The entry then names the player, lists them on
+ * every screen, and matches nobody. So the file is written here instead, from the
+ * identity the server itself will compute, and the server is told to read it
+ * again - which is what makes the player able to join without a restart.
+ */
+async function putOnWhitelist(server: ServerContainer, names: readonly string[]): Promise<string> {
+    if (names.length === 0) return "";
+    if (!(await inventsIdentities(server))) {
+        for (const name of names) {
+            const refusal = parseWhitelistRefusal(await server.say(["whitelist", "add", name]));
+            if (refusal !== null) throw new WhitelistRefused(refusal);
+        }
+        return `Added to the whitelist: ${names.join(", ")}.`;
+    }
+    const current = (await readContainerFile(server, WHITELIST_FILE)) ?? "";
+    const written = withOfflineNames(current, names);
+    if (written !== null) {
+        try {
+            await writeContainerFile(server, WHITELIST_FILE, written);
+        } catch (caught) {
+            throw new WhitelistRefused(caught instanceof Error ? caught.message : "The whitelist could not be written");
+        }
+    }
+    await server.say(["whitelist", "reload"]);
+    return `Added to the whitelist: ${names.join(", ")}.`;
+}
+
+/** Take a name off the game's own whitelist. Same split: the file is the truth on
+ *  a server that invents identities, and the command is on one that does not. */
+async function takeOffWhitelist(server: ServerContainer, name: string): Promise<string> {
+    if (!(await inventsIdentities(server))) {
+        await server.say(["whitelist", "remove", name]);
+        return `Removed ${name} from the whitelist.`;
+    }
+    const current = (await readContainerFile(server, WHITELIST_FILE)) ?? "";
+    const written = withoutName(current, name);
+    if (written !== null) await writeContainerFile(server, WHITELIST_FILE, written);
+    await server.say(["whitelist", "reload"]);
+    return `Removed ${name} from the whitelist.`;
+}
+
+/**
+ * Correct the identities in one of the server's roster files.
+ *
+ * The repair pass for a file Polaris did not write: a list built by the game's
+ * own command holds the identity Mojang answered with, which on this server
+ * matches nobody, and a list that was half-corrected holds the same player twice.
+ * Both are rewritten from the names, the only part of those files that was ever
+ * true.
+ *
+ * Does nothing at all on a server that authenticates - there the identities in
+ * those files are the ones the login uses, and rewriting them is how a whole
+ * server loses its operators.
+ *
+ * The whitelist is reloaded afterwards because the game holds it in memory; the
+ * operator list is not, because there is no command that re-reads it and the
+ * running server already has the right people opped. That file matters at the
+ * next start, which is exactly when the wrong identity would have taken their
+ * status away.
+ */
+export async function repairRosterIdentity(
+    ownerId: string,
+    installedAppId: string,
+    file: RosterFile
+): Promise<boolean> {
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!(await inventsIdentities(server))) return false;
+        const path = ROSTER_PATHS[file];
+        const current = await readContainerFile(server, path);
+        if (current === null) return false;
+        const written = withOfflineIdentities(current);
+        if (written === null) return false;
+        await writeContainerFile(server, path, written);
+        if (file === "whitelist") await server.say(["whitelist", "reload"]);
+        return true;
+    });
+}
+
+/** Put one player on the game's own whitelist, opening the server once for it. */
+export async function whitelistPlayer(ownerId: string, installedAppId: string, username: string): Promise<string> {
+    return withServerContainer(ownerId, installedAppId, (server) => putOnWhitelist(server, [username]));
+}
+
+/** Take one player off it. */
+export async function unwhitelistPlayer(ownerId: string, installedAppId: string, username: string): Promise<string> {
+    return withServerContainer(ownerId, installedAppId, (server) => takeOffWhitelist(server, username));
+}
+
 /**
  * Put the granted players onto the game's own whitelist.
  *
@@ -102,6 +257,12 @@ export async function listPlayerAccess(ownerId: string, installedAppId: string):
  * exactly when somebody adds the friend who cannot get in. That grant was then
  * recorded here, drawn on the screen as allowed, and never reached the game: the
  * player stayed refused with both halves insisting they were let in.
+ *
+ * On a server that invents its players' identities the list is compared against
+ * the file rather than against `whitelist list`, because that command answers
+ * with the names in the file and a name is exactly the part that was never
+ * wrong - the whole defect is a listed name under an identity nothing will look
+ * up. Comparing names would find nothing missing and repair nothing.
  *
  * Only ever adds. A name on the game's list that Polaris does not know about was
  * put there by somebody, and taking it away would be this quietly locking a
@@ -113,15 +274,28 @@ export async function reconcileWhitelist(
     rules: readonly PlayerAccess[]
 ): Promise<string[]> {
     if (rules.length === 0) return [];
-    const answer = await runServerCommand(ownerId, installedAppId, ["whitelist", "list"]).catch(() => null);
-    // A reply that never came is not an empty list: adding everybody back on the
-    // strength of it would fight a server that is simply not answering yet.
-    if (answer === null) return [];
-    const missing = missingWhitelistNames(rules, parseWhitelistNames(answer));
-    for (const username of missing) {
-        await runServerCommand(ownerId, installedAppId, ["whitelist", "add", username]).catch(() => null);
-    }
-    return missing;
+    // Against nothing listed, this is every granted name once - one player who
+    // plays from two places is two rules and one entry.
+    const names = missingWhitelistNames(rules, []);
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (await inventsIdentities(server)) {
+            const current = (await readContainerFile(server, WHITELIST_FILE)) ?? "";
+            const written = withOfflineNames(current, names);
+            if (written === null) return [];
+            await writeContainerFile(server, WHITELIST_FILE, written);
+            await server.say(["whitelist", "reload"]);
+            return names;
+        }
+        const answer = await server.say(["whitelist", "list"]).catch(() => null);
+        // A reply that never came is not an empty list: adding everybody back on
+        // the strength of it would fight a server that is simply not answering yet.
+        if (answer === null) return [];
+        const missing = missingWhitelistNames(rules, parseWhitelistNames(answer));
+        for (const username of missing) {
+            await server.say(["whitelist", "add", username]).catch(() => null);
+        }
+        return missing;
+    });
 }
 
 /** The rules alone, for the enforcement pass and for anything deciding a join. */
@@ -176,12 +350,16 @@ export async function grantPlayerAccess(
         // somebody is only adding an address.
         update: input.note?.trim() ? { note: input.note.trim() } : {}
     });
-    // Best effort: the row is the record, and a server that is not answering yet
-    // must not fail the grant - `reconcileWhitelist`, which the enforcement pass
-    // runs, hands it over the next time the server is up.
-    if (install.edition === "java") {
-        await runServerCommand(ownerId, installedAppId, ["whitelist", "add", username]).catch(() => null);
-    }
+    if (install.edition !== "java") return;
+    // A server that is not answering must not fail the grant: the row is the
+    // record, and `reconcileWhitelist` hands it over the next time the server is
+    // up. A server that answered and refused is the opposite - the player has
+    // been told they are on the list and the game disagrees, so that is said out
+    // loud, naming the part that did work so nobody adds them twice.
+    await whitelistPlayer(ownerId, installedAppId, username).catch((caught: unknown) => {
+        if (!(caught instanceof WhitelistRefused)) return null;
+        throw new Error(`${username} is on this server's player list, but the game would not take them: ${caught.message}`);
+    });
 }
 
 /**
@@ -215,7 +393,10 @@ export async function revokePlayerAccess(ownerId: string, installedAppId: string
     const install = await resolve(ownerId, installedAppId);
     await prisma.gamePlayerAccess.deleteMany({ where: { installedAppId, username } });
     if (install.edition === "java") {
-        await runServerCommand(ownerId, installedAppId, ["whitelist", "remove", username]).catch(() => null);
+        // Every entry under the name goes, including one a previous version of
+        // this left behind under an identity the login never matched - a player
+        // taken off the list has to be off it.
+        await unwhitelistPlayer(ownerId, installedAppId, username).catch(() => null);
     }
     await runServerCommand(ownerId, installedAppId, [
         "kick",

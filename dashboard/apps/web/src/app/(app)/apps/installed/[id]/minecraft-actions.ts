@@ -74,14 +74,7 @@ import {
     setPlayerExperience,
     withServerContainer
 } from "@/lib/apps/minecraft/service";
-import {
-    grantPlayerAccess,
-    listPlayerAccess,
-    revokePlayerAccess,
-    revokePlayerAddress,
-    setAddressBinding,
-    type PlayerAccessView
-} from "@/lib/apps/minecraft/player-access";
+import * as playerAccess from "@/lib/apps/minecraft/player-access";
 import {
     createWorldBackup,
     deleteLevel,
@@ -191,16 +184,52 @@ export async function setGamemodeAction(input: {
     }
 }
 
+/**
+ * Which roster file each verb leaves behind an entry in. The rest of them act on
+ * who is connected right now and write nothing that has to survive a restart.
+ */
+const ROSTER_WRITTEN_BY: Partial<Record<MinecraftModeration["action"], playerAccess.RosterFile>> = {
+    op: "ops",
+    deop: "ops",
+    ban: "bans",
+    pardon: "bans"
+};
+
+/**
+ * Carry one moderation out, by whichever route this server will actually honour.
+ *
+ * The two whitelist verbs do not go through the game's command at all. On a
+ * server with authentication off, `whitelist add` writes the identity Mojang
+ * answered with and the login computes a different one, so the player is listed
+ * and refused at the same time; the service writes the file instead and has the
+ * server read it again. It still uses the command on a server that authenticates,
+ * where that identity is the right one.
+ *
+ * The verbs that write a file keep using the command, and the file is corrected
+ * behind them: the running server is already right, and it is the next start that
+ * would read an entry naming the right player under an identity it will never
+ * compute - handing the server back with nobody in charge of it, or with a banned
+ * player quietly welcome again.
+ */
+async function moderationOutcome(ownerId: string, input: MinecraftModeration): Promise<string> {
+    if (input.action === "whitelist-add") {
+        return playerAccess.whitelistPlayer(ownerId, input.installedAppId, input.player);
+    }
+    if (input.action === "whitelist-remove") {
+        return playerAccess.unwhitelistPlayer(ownerId, input.installedAppId, input.player);
+    }
+    const output = await runServerCommand(ownerId, input.installedAppId, moderationArgv(input));
+    const wrote = ROSTER_WRITTEN_BY[input.action];
+    if (wrote) await playerAccess.repairRosterIdentity(ownerId, input.installedAppId, wrote).catch(() => false);
+    return output;
+}
+
 export async function moderatePlayerAction(input: MinecraftModeration): Promise<{ output?: string; error?: string }> {
     const parsed = moderationSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
-        const output = await runServerCommand(
-            access.ownerId,
-            parsed.data.installedAppId,
-            moderationArgv(parsed.data)
-        );
+        const output = await moderationOutcome(access.ownerId, parsed.data);
         await recordAudit({
             actorId: user.id,
             action: `minecraft.${parsed.data.action}`,
@@ -731,7 +760,7 @@ export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
-        await grantPlayerAccess(access.ownerId, parsed.data.installedAppId, user.id, {
+        await playerAccess.grantPlayerAccess(access.ownerId, parsed.data.installedAppId, user.id, {
             username: parsed.data.username,
             address: parsed.data.address,
             ...(parsed.data.note ? { note: parsed.data.note } : {})
@@ -790,10 +819,10 @@ export async function findMinecraftPlayerByUserAction(
 }
 
 /** The list as it stands, for a screen that is not polling the server itself. */
-export async function playerAccessAction(installedAppId: string): Promise<PlayerAccessView | null> {
+export async function playerAccessAction(installedAppId: string): Promise<playerAccess.PlayerAccessView | null> {
     try {
         const { access } = await requireGameServer("games.read", installedAppId);
-        return await listPlayerAccess(access.ownerId, installedAppId);
+        return await playerAccess.listPlayerAccess(access.ownerId, installedAppId);
     } catch {
         return null;
     }
@@ -821,7 +850,7 @@ export async function revokePlayerAccessAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        await revokePlayerAccess(access.ownerId, installedAppId, username);
+        await playerAccess.revokePlayerAccess(access.ownerId, installedAppId, username);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.access-revoke",
@@ -845,7 +874,7 @@ export async function revokePlayerAddressAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        await revokePlayerAddress(access.ownerId, installedAppId, username, address);
+        await playerAccess.revokePlayerAddress(access.ownerId, installedAppId, username, address);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.access-revoke-address",
@@ -871,7 +900,7 @@ export async function setAddressBindingAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        await setAddressBinding(access.ownerId, installedAppId, enabled);
+        await playerAccess.setAddressBinding(access.ownerId, installedAppId, enabled);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.access-binding",

@@ -11,6 +11,7 @@
  */
 
 import { runServerCommand } from "./service";
+import { repairRosterIdentity } from "./player-access";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
 import {
     grantTimeout,
@@ -21,9 +22,25 @@ import {
 
 export { readPlayerTimeouts } from "@/lib/apps/player-timeout-service";
 
+/**
+ * Say it, then make sure the server will still mean it tomorrow.
+ *
+ * Both commands write `banned-players.json`, which the server keys by the
+ * identity it resolved for the name. On a server with authentication off that is
+ * not the identity an arriving player computes, so the entry names the banned
+ * player and matches nobody: the ban holds while the server is up, because the
+ * kick already happened, and is silently gone the next time it starts. Correcting
+ * the file behind the command is what makes it a ban rather than a kick.
+ */
+async function banAndKeep(ownerId: string, installedAppId: string, argv: readonly string[]): Promise<string> {
+    const said = await runServerCommand(ownerId, installedAppId, argv);
+    await repairRosterIdentity(ownerId, installedAppId, "bans").catch(() => false);
+    return said;
+}
+
 const MINECRAFT: TimeoutCommands = {
-    ban: (ownerId, installedAppId, player, reason) => runServerCommand(ownerId, installedAppId, ["ban", player, reason]),
-    pardon: (ownerId, installedAppId, player) => runServerCommand(ownerId, installedAppId, ["pardon", player])
+    ban: (ownerId, installedAppId, player, reason) => banAndKeep(ownerId, installedAppId, ["ban", player, reason]),
+    pardon: (ownerId, installedAppId, player) => banAndKeep(ownerId, installedAppId, ["pardon", player])
 };
 
 export function timeoutPlayer(

@@ -215,3 +215,42 @@ describe("parsePlayerLevels", () => {
         expect(parse.parsePlayerLevels("Unknown or incomplete command").size).toBe(0);
     });
 });
+
+/**
+ * A refused whitelist command answers over RCON exactly like one that worked -
+ * the transport succeeded, so nothing throws, and the refusal is only in the
+ * text. Reading it wrong in either direction is a lie to the operator: miss a
+ * real refusal and the screen says a player was added who was not, invent one
+ * and a grant that worked is reported as broken.
+ */
+describe("parseWhitelistRefusal", () => {
+    it("says nothing about the answer to a command that worked", () => {
+        expect(parse.parseWhitelistRefusal("Added Alice to the whitelist")).toBeNull();
+    });
+
+    // Not a failure: the command declined to do something already done.
+    it("does not treat an already-listed player as a refusal", () => {
+        expect(parse.parseWhitelistRefusal("Player is already whitelisted")).toBeNull();
+    });
+
+    it("names the refusal when the game does not know the account", () => {
+        expect(parse.parseWhitelistRefusal("That player does not exist")).toContain("does not know that name");
+        expect(parse.parseWhitelistRefusal("No player was found")).toContain("does not know that name");
+    });
+
+    it("names the refusal when the server would not take the command", () => {
+        expect(parse.parseWhitelistRefusal("Unknown or incomplete command, see below for error")).not.toBeNull();
+    });
+
+    it("reads through the console's own colouring", () => {
+        expect(parse.parseWhitelistRefusal("[0;31mThat player does not exist")).not.toBeNull();
+    });
+
+    // Plugins reword these. An answer this does not recognise is a grant that
+    // probably worked, and reporting it as a failure would have the operator add
+    // a player who is already on the list.
+    it("invents no refusal out of wording it does not know", () => {
+        expect(parse.parseWhitelistRefusal("whitelist updated ok")).toBeNull();
+        expect(parse.parseWhitelistRefusal("")).toBeNull();
+    });
+});

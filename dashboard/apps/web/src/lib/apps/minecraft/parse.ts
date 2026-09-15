@@ -111,6 +111,31 @@ export function parseWhitelistAnswer(output: string): string[] {
     return match ? parseNameList(match[1] ?? "") : [];
 }
 
+/**
+ * Why the server would not put a name on its whitelist, or null when it did.
+ *
+ * RCON reports a refused command the same way it reports a successful one - the
+ * transport worked, so nothing throws, and the reason is only in the text. A
+ * caller that discards that text records the player as allowed and leaves them
+ * refused at the login screen with both halves insisting they are welcome.
+ *
+ * Only a refusal the server actually stated is treated as one. An answer this
+ * does not recognise is not invented into a failure: plugins reword these, and a
+ * grant that worked must not be reported as broken because the wording moved.
+ */
+export function parseWhitelistRefusal(output: string): string | null {
+    const text = stripFormatting(output).trim();
+    // Already on the list is the command declining to do something already done.
+    if (/already whitelisted/i.test(text)) return null;
+    if (/(does not exist|that player does not exist|no player was found)/i.test(text)) {
+        return "The game does not know that name. Check the spelling, or turn Mojang authentication off if this server is for cracked clients.";
+    }
+    if (/(unknown or incomplete command|incorrect argument|expected)/i.test(text)) {
+        return "This server did not understand the whitelist command.";
+    }
+    return null;
+}
+
 /** A player name as the server files record it. */
 const playerNameSchema = z.string().trim().min(1).max(32);
 
