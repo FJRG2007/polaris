@@ -63,16 +63,6 @@ export interface VaultStatus {
      */
     readonly timeoutMs: number;
     /**
-     * Whose account this is, once the worker has been able to ask.
-     *
-     * Null is three different things and the screen treats them alike: a Polaris
-     * too old to mint the credential, one that could not be reached, and a
-     * sign-in that predates it. None of them is an error worth a sentence - the
-     * vault works either way - so the popup simply says less about who is signed
-     * in rather than saying something wrong.
-     */
-    readonly account: ExtensionAccount | null;
-    /**
      * Every account signed in here, the active one included.
      *
      * Empty until something has been signed into, and one entry long for the

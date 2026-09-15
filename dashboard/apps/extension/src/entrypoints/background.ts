@@ -581,13 +581,33 @@ async function collect(): Promise<void> {
         const privateKey = asking.privateKey;
         asking = null;
         const raw = await decryptRsa(claim.wrappedKey, privateKey);
+        privateKey.fill(0);
+
+        /*
+         * Still wanted? Asked here, after the decrypt and before anything at all
+         * is written.
+         *
+         * `asking` was nulled three lines up, which is what abandoning a request
+         * looks for - so an account switch landing anywhere in that decrypt finds
+         * nothing to abandon and this loop would carry on regardless. What it
+         * would then do is the damage: `openWithKey` puts the approving account's
+         * vault key in front of whoever is there now, and `remember` writes that
+         * account's token over theirs. The same gap let `settle` below resurrect
+         * a request record that had already been cleared, so the account somebody
+         * switched INTO reported losing a request it never made.
+         *
+         * The record is the thing that says whether this is still wanted, so it
+         * is what decides. Nothing is settled on the way out: writing a state
+         * here is what put the record back.
+         */
+        const wanted = await WAITING.getValue();
+        if (!wanted || wanted.deviceCode !== still.deviceCode) return;
+
         if (!raw || !(await openWithKey(raw))) {
             // Approved, and unreadable. Nothing is kept: a session that cannot
             // decrypt anything is worse than none, because it looks signed in.
-            privateKey.fill(0);
             return settle(still, "unreadable");
         }
-        privateKey.fill(0);
 
         await remember(claim.token);
         // Kept only when the server sent one. An older Polaris does not, and an
@@ -897,10 +917,16 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
         ACCESS.setValue(null),
         WRAPPED.setValue(account.wrapped),
         ACCOUNT_KEY.setValue(account.accountKey),
+        // Only a record that carries a name is worth keeping. `readAccount` hands
+        // back whatever is held without asking the server again, so caching a
+        // half-record here - a parked account whose name never resolved, because
+        // it was set aside before any popup opened or while the server was briefly
+        // unreachable - would suppress that fetch for the rest of the session. The
+        // switcher would then show an email address forever and never correct
+        // itself, which is precisely the thing this change exists to fix. Null
+        // sends it back to the server instead.
         ACCOUNT.setValue(
-            account.name === null && account.email === null
-                ? null
-                : { name: account.name, email: account.email }
+            account.name === null ? null : { name: account.name, email: account.email }
         ),
         // The outgoing account's items are cleared rather than left to be
         // overwritten by the next sync: between the two, a list drawn from them
@@ -953,7 +979,6 @@ async function status(): Promise<messages.VaultStatus> {
         unlocked: opened !== null,
         syncedAt,
         timeoutMs: readTimeout(timeout),
-        account,
         accounts: known,
         activeId
     };
