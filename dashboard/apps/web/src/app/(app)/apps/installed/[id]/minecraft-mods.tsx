@@ -77,6 +77,10 @@ export function MinecraftMods({
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState("");
     const [results, setResults] = useState<modrinth.ModrinthProject[] | null>(null);
+    /** Whether the last browse failed rather than answered. An empty list from a
+     *  search that never happened is not an answer about what Modrinth has, and
+     *  explaining it as one sends somebody looking for a mod that is there. */
+    const [searchFailed, setSearchFailed] = useState(false);
     const [searching, setSearching] = useState(false);
     /** What is on the list, as real projects. Null until the first read answers. */
     const [onList, setOnList] = useState<InstalledRow[] | null>(null);
@@ -137,9 +141,21 @@ export function MinecraftMods({
                     projects?: modrinth.ModrinthProject[];
                     error?: string;
                 };
+                if (!response.ok) {
+                    setResults([]);
+                    setSearchFailed(true);
+                    setError(data.error ?? "Could not search Modrinth");
+                    return;
+                }
                 setResults(data.projects ?? []);
-                setError(response.ok ? null : (data.error ?? "Could not search Modrinth"));
+                setSearchFailed(false);
+                setError(null);
             } catch {
+                // Resolved to a state rather than left on the skeletons: a browse
+                // that never came back is a thing to retry, and a page loading for
+                // ever says nothing about what to do.
+                setResults([]);
+                setSearchFailed(true);
                 setError("Could not reach Modrinth");
             } finally {
                 setSearching(false);
@@ -355,11 +371,31 @@ export function MinecraftMods({
                                 <Skeleton key={row} className="h-16 w-full" />
                             ))}
                         </div>
+                    ) : searchFailed ? (
+                        <div className="flex flex-col items-center gap-2 py-6 text-center">
+                            <p className="text-sm text-muted-foreground">
+                                This is not what Modrinth has - the search did not go through.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void browse(query, category)}
+                            >
+                                <RotateCw className="size-4" />
+                                Try again
+                            </Button>
+                        </div>
                     ) : results.length === 0 ? (
+                        // A plugin server is told none of this: Modrinth files a
+                        // plugin as server-side by definition, nothing is filtered
+                        // out of a plugin search for having a client side, and a
+                        // shader was never going to be in these results anyway.
                         <p className="py-6 text-center text-sm text-muted-foreground">
-                            Nothing here matches that. Only mods that run on a server are listed, so
-                            a client-only one - a HUD, a minimap, a shader - is missing because it
-                            is installed in your own game rather than on this server.
+                            {query.trim()
+                                ? `Nothing here matches "${query.trim()}".`
+                                : `Nothing on Modrinth runs on ${loader}${version ? ` with a build for ${version}` : ""}.`}
+                            {!modrinth.isPluginLoader(loader) &&
+                                " Only mods that run on a server are listed, so a client-only one - a HUD, a minimap, a shader - is missing because it is installed in your own game rather than on this server."}
                         </p>
                     ) : (
                         <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
