@@ -24,9 +24,9 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { SessionView } from "@/lib/session-directory";
-import { BrowserMark, SystemMark } from "@/components/client-marks";
 import { addressLine, DeviceAddress } from "@/components/device-address";
 import { clientKindLabel, readClientDevice } from "@/lib/vault/client-device";
+import { BrowserMark, ClientKindMark, SystemMark } from "@/components/client-marks";
 import { History, KeyRound, Lock, LockOpen, LogOut, PanelRightOpen } from "lucide-react";
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
@@ -340,11 +340,22 @@ export function SessionsTable({
                     {clients.map((client) => {
                         const device = readClientDevice(client.name);
                         const kind = clientKindLabel(client.kind);
+                        // The browser's mark where the name gave one, and what kind
+                        // of client it is where it did not. A name that is not a
+                        // browser answers `BrowserMark` with the neutral globe, so
+                        // the phone, the desktop app and the command line would all
+                        // have drawn the same thing - and the mark is what this
+                        // column is scanned by.
+                        const glyph = device.known ? (
+                            <BrowserMark browser={device.browser} />
+                        ) : (
+                            <ClientKindMark kind={client.kind} />
+                        );
                         return (
                             <tr key={`client-${client.id}`} className="border-t border-border">
                                 <td className="w-full max-w-0 px-3 py-2">
                                     <div className="flex items-center gap-3">
-                                        <BrowserMark browser={device.browser} />
+                                        {glyph}
                                         <div className="min-w-0">
                                             <p className="flex flex-wrap items-center gap-1.5">
                                                 <span className="min-w-0 truncate font-medium">

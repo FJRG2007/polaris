@@ -26,6 +26,16 @@ export interface ClientDevice {
     readonly browser: string;
     /** The system, when the name gave one that this UI can draw. */
     readonly os: string | null;
+    /**
+     * Whether `browser` above is a browser this UI has a mark for.
+     *
+     * What a row draws hangs off this. A name that is not a browser at all - a
+     * phone, a desktop app, a command line - is handed back whole, and drawing a
+     * browser mark for it produces the one neutral glyph every unrecognised name
+     * shares. The row says what kind of client it is instead, which is the only
+     * cue left that tells those apart at a glance.
+     */
+    readonly known: boolean;
 }
 
 /**
@@ -64,7 +74,7 @@ function knownSystem(text: string): string | null {
  */
 export function readClientDevice(name: string): ClientDevice {
     const said = name.trim();
-    if (said === "") return { browser: "Unknown device", os: null };
+    if (said === "") return { browser: "Unknown device", os: null, known: false };
 
     // The last " on ", not the first: a client named "Chrome on the desk on
     // Windows" is on Windows, and the rest is what it is called.
@@ -74,9 +84,13 @@ export function readClientDevice(name: string): ClientDevice {
         const os = knownSystem(said.slice(at + " on ".length));
         // Only when the right half is a system this UI knows. Anything else and
         // the name was never two halves to begin with.
-        if (os !== null && left !== "") return { browser: knownBrowser(left) ?? left, os };
+        if (os !== null && left !== "") {
+            const browser = knownBrowser(left);
+            return { browser: browser ?? left, os, known: browser !== null };
+        }
     }
-    return { browser: knownBrowser(said) ?? said, os: null };
+    const browser = knownBrowser(said);
+    return { browser: browser ?? said, os: null, known: browser !== null };
 }
 
 /**

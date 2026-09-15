@@ -232,6 +232,24 @@ export function SessionsView({
                         }
                         onPin={(session, pinned) => void pin(session, pinned)}
                     />
+
+                    {/* The table says nothing about apps until one is connected,
+                        and the way to the screen that manages them is on a row. So
+                        with no rows this page answers neither "is anything
+                        connected" nor "where do I go about it", which is the
+                        question that brings people here. */}
+                    {clients.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                            No app is connected. The browser extension appears here once you let it
+                            in.{" "}
+                            <Link
+                                href="/vault/clients"
+                                className="underline-offset-2 hover:text-foreground hover:underline"
+                            >
+                                Connected apps
+                            </Link>
+                        </p>
+                    ) : null}
                 </CardBody>
             </Card>
 

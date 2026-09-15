@@ -33,7 +33,8 @@
 import { cn } from "@polaris/ui";
 import { mark } from "./brand-icons";
 import { useId, type SVGProps } from "react";
-import { Globe, MonitorSmartphone } from "lucide-react";
+import type { VaultClientKind } from "@polaris/core";
+import { Blocks, Globe, Monitor, MonitorSmartphone, Puzzle, Smartphone, Terminal } from "lucide-react";
 
 export function ChromeMark(props: SVGProps<SVGSVGElement>) {
     return (
@@ -298,4 +299,25 @@ export function SystemMark({ os, className }: { os: string; className?: string }
     if (os === "Linux") return <LinuxMark className={size} />;
     if (os === "Android") return <AndroidMark className={size} />;
     return <MonitorSmartphone aria-hidden className={cn(size, "text-muted-foreground")} />;
+}
+
+/**
+ * The mark for a connected client whose name gave no browser.
+ *
+ * What kind of thing it said it was, because that is the only thing left to
+ * draw: a client chooses its own name, and one that is not a browser answers
+ * `BrowserMark` with the neutral globe - the same glyph every unrecognised name
+ * gets, so a phone, a desktop app and a command line all arrive looking alike.
+ * These are plain glyphs rather than marks, and deliberately so: a kind is a
+ * fact about the client rather than a vendor, and nothing here should read as
+ * anybody's logo.
+ */
+export function ClientKindMark({ kind, className }: { kind: VaultClientKind; className?: string }) {
+    const size = cn("size-4 shrink-0 text-muted-foreground", className);
+    if (kind === "extension") return <Puzzle aria-hidden className={size} />;
+    if (kind === "browser") return <Globe aria-hidden className={size} />;
+    if (kind === "mobile") return <Smartphone aria-hidden className={size} />;
+    if (kind === "desktop") return <Monitor aria-hidden className={size} />;
+    if (kind === "cli") return <Terminal aria-hidden className={size} />;
+    return <Blocks aria-hidden className={size} />;
 }

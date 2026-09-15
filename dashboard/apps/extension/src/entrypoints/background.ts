@@ -274,6 +274,35 @@ function sweepParkedVaults(now: number): void {
 }
 
 /**
+ * The work that decides whose account this is, taken one piece at a time.
+ *
+ * Installing an account and replacing one are each several writes long with an
+ * await between every pair, and they write the same small set of items - one
+ * refresh token, one email, one set of ciphers, one key in memory. A message
+ * handler is a task of its own, so left alone they interleave, and interleaved
+ * they cross: an approval collected while somebody switches puts the approving
+ * account's token in front of the account they switched to, and its items under
+ * that account's name.
+ *
+ * Checking again on the way out cannot undo that - by then the token has been
+ * written - so the check that an approval is still wanted has to hold for the
+ * whole install rather than for the instant it was made. A turn is what makes it
+ * hold: nothing that moves the account in front can land in the middle of one.
+ *
+ * Nothing queued here waits forever. Every request in `lib/protocol` carries its
+ * own timeout, so the longest a switch sits behind a network call is that.
+ */
+let turn: Promise<unknown> = Promise.resolve();
+
+function inTurn<T>(work: () => Promise<T>): Promise<T> {
+    // Taken whether the piece before it kept or broke: one failure ends its own
+    // work rather than wedging everything queued behind it.
+    const mine = turn.then(work, work);
+    turn = mine.catch(() => undefined);
+    return mine;
+}
+
+/**
  * The two runtime hints below, neither of which the standard types know about.
  *
  * `brave` is Brave's own way of being asked, and it is the only way: Brave
@@ -585,7 +614,8 @@ async function collect(): Promise<void> {
 
         /*
          * Still wanted? Asked here, after the decrypt and before anything at all
-         * is written.
+         * is written - and asked inside a turn, so that the answer is still true
+         * by the time the last of these writes lands.
          *
          * `asking` was nulled three lines up, which is what abandoning a request
          * looks for - so an account switch landing anywhere in that decrypt finds
@@ -596,34 +626,44 @@ async function collect(): Promise<void> {
          * a request record that had already been cleared, so the account somebody
          * switched INTO reported losing a request it never made.
          *
-         * The record is the thing that says whether this is still wanted, so it
-         * is what decides. Nothing is settled on the way out: writing a state
-         * here is what put the record back.
+         * Reading the record is what says whether this is still wanted, but a
+         * read alone only answers for the instant it was made: the install that
+         * follows is four more awaits long, and a switch landing in any of them
+         * lands on an account half replaced. So the read and everything it
+         * licenses happen in one turn, which a switch cannot interleave with.
+         *
+         * Settling is inside it for the same reason. Written after the turn, a
+         * state here would put back a record the switch had just cleared, which
+         * is the resurrection above by another route.
          */
-        const wanted = await WAITING.getValue();
-        if (!wanted || wanted.deviceCode !== still.deviceCode) return;
+        await inTurn(async () => {
+            const wanted = await WAITING.getValue();
+            if (!wanted || wanted.deviceCode !== still.deviceCode) return;
 
-        if (!raw || !(await openWithKey(raw))) {
-            // Approved, and unreadable. Nothing is kept: a session that cannot
-            // decrypt anything is worse than none, because it looks signed in.
-            return settle(still, "unreadable");
-        }
+            if (!raw || !(await openWithKey(raw))) {
+                // Approved, and unreadable. Nothing is kept: a session that cannot
+                // decrypt anything is worse than none, because it looks signed in.
+                await settle(still, "unreadable");
+                return;
+            }
 
-        await remember(claim.token);
-        // Kept only when the server sent one. An older Polaris does not, and an
-        // absent credential has to read as "this server does not do that" rather
-        // than as an error on a sign-in that otherwise worked perfectly.
-        if (claim.accountKey) await ACCOUNT_KEY.setValue(claim.accountKey);
-        // The address this vault belongs to arrives with the profile, and the sync
-        // below is what records it. Nothing was typed on this way in, and `unlock`
-        // cannot stretch a master password without it.
-        await sync(true);
-        // The sync is what names this account, so only now can it be told from the
-        // rows in the list - one of which may be this same account, parked before
-        // the approval and holding a token this one has just replaced.
-        await dropParked(accounts.accountId(origin, await EMAIL.getValue()));
-        await badge();
-        return settle(still, "approved");
+            await remember(claim.token);
+            // Kept only when the server sent one. An older Polaris does not, and an
+            // absent credential has to read as "this server does not do that" rather
+            // than as an error on a sign-in that otherwise worked perfectly.
+            if (claim.accountKey) await ACCOUNT_KEY.setValue(claim.accountKey);
+            // The address this vault belongs to arrives with the profile, and the sync
+            // below is what records it. Nothing was typed on this way in, and `unlock`
+            // cannot stretch a master password without it.
+            await sync(true);
+            // The sync is what names this account, so only now can it be told from the
+            // rows in the list - one of which may be this same account, parked before
+            // the approval and holding a token this one has just replaced.
+            await dropParked(accounts.accountId(origin, await EMAIL.getValue()));
+            await badge();
+            await settle(still, "approved");
+        });
+        return;
     }
 }
 
@@ -760,6 +800,10 @@ function summarize(login: Login, vaults: ReadonlyMap<string, string>): messages.
     };
 }
 
+/** Long enough for a server on the other side of a tunnel, short enough that a
+ *  switch queued behind this one is not left sitting on it. */
+const ACCOUNT_TIMEOUT_MS = 10_000;
+
 /**
  * Whose account this is, from the credential the approval left behind.
  *
@@ -779,6 +823,7 @@ async function readAccount(): Promise<messages.ExtensionAccount | null> {
     if (!key || !origin) return null;
     try {
         const reply = await fetch(`${origin}/api/v1/me`, {
+            signal: AbortSignal.timeout(ACCOUNT_TIMEOUT_MS),
             headers: { authorization: `Bearer ${key}` },
             credentials: "omit"
         });
@@ -1482,18 +1527,22 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     };
                 }
 
-                await EMAIL.setValue(email);
-                await remember(result.token);
-                // Signed in and open in one step: the password is in hand, and
-                // asking for it again immediately would be theatre.
-                await sync(true);
-                await unlock(request.password);
-                // Signing back into an account that is still parked - which is one
-                // press, because adding an account keeps the address - would leave
-                // it in the list as well as in front, with the older token.
-                await dropParked(accounts.accountId(origin, email));
-                await badge();
-                return { ok: true, status: await status() };
+                // From here on this is the same install the approval performs, and
+                // it is interrupted by a switch in the same way: in a turn.
+                return inTurn(async (): Promise<messages.Reply> => {
+                    await EMAIL.setValue(email);
+                    await remember(result.token);
+                    // Signed in and open in one step: the password is in hand, and
+                    // asking for it again immediately would be theatre.
+                    await sync(true);
+                    await unlock(request.password);
+                    // Signing back into an account that is still parked - which is one
+                    // press, because adding an account keeps the address - would leave
+                    // it in the list as well as in front, with the older token.
+                    await dropParked(accounts.accountId(origin, email));
+                    await badge();
+                    return { ok: true, status: await status() };
+                });
             }
 
             case "authorize": {
@@ -1582,77 +1631,94 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "unlock": {
-                const opened = await unlock(request.password);
+                const opened = await inTurn(() => unlock(request.password));
                 if (!opened) return { ok: false, error: "That password did not open the vault." };
-                void sync(false);
+                // Deliberately not waited on - an unlock should not sit on the
+                // network - but still in a turn, or the items it brings down could
+                // land after a switch and be read as the incoming account's.
+                void inTurn(() => sync(false));
                 await badge();
                 return { ok: true, status: await status() };
             }
 
             case "lock":
-                open = null;
-                // The other accounts' keys with it. This is a demand rather than a
-                // deadline, and a switch that landed straight inside another vault
-                // would answer a different question than the one the button asks:
-                // being set aside is disuse, and so is being locked.
-                parkedVaults.clear();
-                await LOCK_AT.setValue(null);
+                await inTurn(async () => {
+                    open = null;
+                    // The other accounts' keys with it. This is a demand rather than a
+                    // deadline, and a switch that landed straight inside another vault
+                    // would answer a different question than the one the button asks:
+                    // being set aside is disuse, and so is being locked.
+                    parkedVaults.clear();
+                    await LOCK_AT.setValue(null);
+                });
                 await badge();
                 return { ok: true, status: await status() };
 
             case "signOut": {
-                // Which account is leaving, read before anything is cleared - its
-                // key must not stay in the map for a session that has ended.
-                const leaving = await activeAccount();
-                if (leaving) parkedVaults.delete(leaving.id);
-                // Anything in flight goes too: a request still being collected
-                // would hand this browser back into an account somebody has just
-                // signed out of.
-                await clearActive();
-                await forgetOrigin();
+                await inTurn(async () => {
+                    // Which account is leaving, read before anything is cleared - its
+                    // key must not stay in the map for a session that has ended.
+                    const leaving = await activeAccount();
+                    if (leaving) parkedVaults.delete(leaving.id);
+                    // Anything in flight goes too: a request still being collected
+                    // would hand this browser back into an account somebody has just
+                    // signed out of.
+                    await clearActive();
+                    await forgetOrigin();
 
-                // Signing out of one account is not signing out of the rest. The
-                // next one parked takes its place, because somebody with two
-                // accounts who leaves one means to be left in the other - and the
-                // alternative is a switcher that empties itself on the way past.
-                const waitingAccounts = await PARKED.getValue();
-                const next = waitingAccounts[0];
-                if (next) {
-                    await PARKED.setValue(waitingAccounts.slice(1));
-                    await makeActive(next);
-                    await sync(true);
-                }
-                await badge();
+                    // Signing out of one account is not signing out of the rest. The
+                    // one set aside most recently takes its place, because somebody
+                    // who leaves this account means to be left in the one they were
+                    // in before it - and the alternative is a switcher that empties
+                    // itself on the way past. The list is in the order accounts were
+                    // parked in, so that one is the last of it rather than the first:
+                    // taking the first drops somebody, on their third account, into
+                    // whichever they have been away from longest.
+                    const waitingAccounts = await PARKED.getValue();
+                    const next = waitingAccounts[waitingAccounts.length - 1];
+                    if (next) {
+                        await PARKED.setValue(waitingAccounts.slice(0, -1));
+                        await makeActive(next);
+                        await sync(true);
+                    }
+                    await badge();
+                });
                 return { ok: true, status: await status() };
             }
 
             case "switchAccount": {
-                const parked = await PARKED.getValue();
-                const move = accounts.takeAccount(parked, request.id);
-                // Asked for an account that is not here: a second window can have
-                // signed out of it since this popup drew its list.
-                if (!move) return { ok: false, error: "That account is not signed in here." };
-                await parkActive(move.rest);
-                await makeActive(move.taken);
-                // Its items were cleared with the switch, so they are fetched now
-                // rather than leaving somebody looking at an empty vault until
-                // they think to press Sync.
-                await sync(true);
-                await badge();
+                const moved = await inTurn(async () => {
+                    const parked = await PARKED.getValue();
+                    const move = accounts.takeAccount(parked, request.id);
+                    // Asked for an account that is not here: a second window can have
+                    // signed out of it since this popup drew its list.
+                    if (!move) return false;
+                    await parkActive(move.rest);
+                    await makeActive(move.taken);
+                    // Its items were cleared with the switch, so they are fetched now
+                    // rather than leaving somebody looking at an empty vault until
+                    // they think to press Sync.
+                    await sync(true);
+                    await badge();
+                    return true;
+                });
+                if (!moved) return { ok: false, error: "That account is not signed in here." };
                 return { ok: true, status: await status() };
             }
 
             case "addAccount": {
-                // Set aside rather than signed out: the point is a second account,
-                // and the first has to still be there to go back to.
-                await parkActive(await PARKED.getValue());
-                await clearActive();
-                // The address is deliberately kept, so this lands on "Sign in with
-                // Polaris" rather than on "which Polaris". A second account is
-                // usually on the same server, and clearing it would spend a
-                // permission prompt asking for an origin the browser has already
-                // granted - a browser allows one request per gesture.
-                await badge();
+                await inTurn(async () => {
+                    // Set aside rather than signed out: the point is a second account,
+                    // and the first has to still be there to go back to.
+                    await parkActive(await PARKED.getValue());
+                    await clearActive();
+                    // The address is deliberately kept, so this lands on "Sign in with
+                    // Polaris" rather than on "which Polaris". A second account is
+                    // usually on the same server, and clearing it would spend a
+                    // permission prompt asking for an origin the browser has already
+                    // granted - a browser allows one request per gesture.
+                    await badge();
+                });
                 return { ok: true, status: await status() };
             }
 
@@ -1667,7 +1733,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "sync":
-                return (await sync(true))
+                return (await inTurn(() => sync(true)))
                     ? { ok: true, status: await status() }
                     : { ok: false, error: "Nothing came back from that server." };
 
@@ -1741,11 +1807,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "fill":
                 return fill(request.id);
 
+            // Both end in a sync, so both write the items of whichever account was
+            // in front when they started - which has to still be the one in front
+            // when they land.
             case "save":
-                return save(request);
+                return inTurn(() => save(request));
 
             case "changePassword":
-                return changePassword(request.id, request.password);
+                return inTurn(() => changePassword(request.id, request.password));
 
             case "copy": {
                 const login = (await logins()).find((one) => one.id === request.id);
