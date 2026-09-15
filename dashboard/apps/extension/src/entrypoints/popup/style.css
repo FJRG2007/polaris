@@ -87,10 +87,48 @@ body {
     background: hsl(var(--surface));
 }
 
+/*
+ * One scrolling region, not several.
+ *
+ * The sections inside this used to scroll on their own, inside a panel that was
+ * already capped - so a list of logins was a scrollbar within a scrollbar, and
+ * which of the two moved depended on where the pointer happened to be. The panel
+ * is the thing that scrolls; everything in it is as tall as it needs to be.
+ */
 main {
     display: flex;
     flex-direction: column;
     max-height: 560px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
+}
+
+/*
+ * The scrollbar, in the popup's own colours.
+ *
+ * Left to the browser it was the operating system's: a wide grey trough against
+ * a dark panel, which is the one part of this that looked like it belonged to
+ * something else. The thumb is drawn with a border in the panel's own background
+ * rather than with padding, which is the only way to inset it in WebKit.
+ */
+main::-webkit-scrollbar {
+    width: 10px;
+}
+
+main::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+main::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border: 3px solid hsl(var(--surface));
+    border-radius: 999px;
+}
+
+main::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
 }
 
 .pad {
@@ -206,10 +244,6 @@ header {
     border-bottom: 1px solid hsl(var(--border));
 }
 
-section {
-    overflow-y: auto;
-}
-
 ul {
     list-style: none;
     margin: 0;
@@ -281,7 +315,14 @@ li {
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 100%;
+    /* As wide as what it holds, not as wide as the panel. It is a column child,
+       so it would otherwise be stretched to the full width and the hover - which
+       is how somebody sees what they are about to copy - was a band across the
+       whole popup pointing at nothing in particular. Capped so a long address
+       still truncates instead of widening the row. */
+    width: auto;
+    max-width: 100%;
+    align-self: flex-start;
     min-width: 0;
     padding: 2px 4px;
     margin-left: -4px;

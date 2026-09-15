@@ -1,3 +1,4 @@
+import Fuse from "fuse.js";
 import { storage } from "#imports";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
@@ -1746,14 +1747,38 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "items": {
-                const query = request.query.trim().toLowerCase();
+                const query = request.query.trim();
                 const all = await logins();
+                /*
+                 * Matched the way somebody actually remembers a login rather than
+                 * by a run of characters.
+                 *
+                 * A substring filter answers nothing for a letter left out, a
+                 * letter the wrong way round, or a name somebody half remembers -
+                 * "githb", "amazn", a surname where the entry is "Surname, Co" -
+                 * and those are most of what gets typed into a box this size.
+                 *
+                 * Ranked as well as filtered, so the best guess is the first row
+                 * instead of whichever was stored first. The name counts for more
+                 * than the username: two logins on one site differ by username,
+                 * but the thing being searched for is the site.
+                 *
+                 * `ignoreLocation` because a match at the end of a name is worth
+                 * as much as one at the start, and `minMatchCharLength` so a
+                 * single letter does not return the whole vault ranked by noise.
+                 */
                 const found = query
-                    ? all.filter(
-                          (login) =>
-                              login.name.toLowerCase().includes(query) ||
-                              (login.username ?? "").toLowerCase().includes(query)
-                      )
+                    ? new Fuse(all, {
+                          keys: [
+                              { name: "name", weight: 2 },
+                              { name: "username", weight: 1 }
+                          ],
+                          threshold: 0.35,
+                          ignoreLocation: true,
+                          minMatchCharLength: 2
+                      })
+                          .search(query)
+                          .map((hit) => hit.item)
                     : all;
                 {
                     const vaults = await vaultNames();
