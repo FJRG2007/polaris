@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import {
     LOCAL_SCREEN_KEY,
+    putAwayOf,
     stillShared,
     watched,
     type CallStage
@@ -80,5 +81,44 @@ describe("what putting one away is remembered about", () => {
 
     it("says nothing when nothing was put away", () => {
         expect(stillShared([], [mine, theirs])).toEqual([]);
+    });
+});
+
+/**
+ * What is said about a share nobody is watching.
+ *
+ * Putting one away took it out of the room completely, which is what gives the
+ * conversation its space back - and also what left no trace that it was still
+ * happening. A screen somebody was told about a minute ago simply was not there,
+ * and the person sharing had no way to know nobody was looking. So the room keeps
+ * a line for it, and this is where that line's contents come from.
+ */
+describe("the shares a reader is told are still going out", () => {
+    it("is the one they put away", () => {
+        expect(putAwayOf([mine, theirs], [theirs.key])).toEqual([theirs]);
+    });
+
+    it("is nothing while they are watching everything", () => {
+        expect(putAwayOf([mine, theirs], [])).toEqual([]);
+    });
+
+    it("says nothing about a share that has ended", () => {
+        // A card is a sentence in the present tense: somebody is sharing, and you
+        // are not watching. A key left over from a share that is over would put
+        // that sentence on screen about something that is not happening.
+        expect(putAwayOf([mine], [theirs.key])).toEqual([]);
+    });
+
+    it("accounts for every share exactly once, together with what is watched", () => {
+        // The property that matters rather than the arithmetic: a share is either
+        // on the stage or behind a card, never both and never neither. Neither is
+        // what the defect was - it was in the room, and then it was nowhere.
+        const room = [mine, theirs, third];
+        const away = [theirs.key];
+        const stage = watched(room, away);
+        const carded = putAwayOf(room, away);
+
+        expect([...stage, ...carded]).toHaveLength(room.length);
+        expect(carded.some((one) => stage.includes(one))).toBe(false);
     });
 });

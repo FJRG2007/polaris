@@ -202,6 +202,19 @@ export function watched(stages: readonly CallStage[], away: readonly string[]): 
 }
 
 /**
+ * The screens this reader put away that are still going out.
+ *
+ * The other half of `watched`, and deliberately not "everything not on the
+ * stage": a share that has ended is gone from the room, and saying somebody is
+ * still sharing it would be saying something that is no longer true. What this
+ * answers is the set worth telling the reader about - somebody is sharing, right
+ * now, and they cannot tell nobody is looking.
+ */
+export function putAwayOf(stages: readonly CallStage[], away: readonly string[]): CallStage[] {
+    return stages.filter((stage) => away.includes(stage.key));
+}
+
+/**
  * The put-away screens still worth remembering, once the shares have changed.
  *
  * A key outlives the share it names: a screen is keyed by whose it is, so the

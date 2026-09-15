@@ -58,10 +58,10 @@ import { HandStrip } from "./call-hands-panel";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { callBareFaces, type CallPlace } from "./call-band";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
-import { stagesOf, stagingOf, stillShared, watched } from "./call-media";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import { putAwayOf, stagesOf, stagingOf, stillShared, watched } from "./call-media";
 import {
     CAMERA_LADDER,
     LEVELS,
@@ -295,6 +295,16 @@ export function CallRoom({
      *  a screen put away is not on the stage, does not hold the panel open and
      *  does not push the faces into a strip. */
     const stages = watched(shared, away);
+    /**
+     * The screens this reader put away that are still going out.
+     *
+     * Not "everything not on the stage": a share that has ended is gone from the
+     * room altogether, and a card about one would be a card about something that
+     * is no longer happening. These are the ones still being shared, by somebody
+     * who cannot tell they are being ignored - which is the whole reason they get
+     * a card instead of disappearing.
+     */
+    const putAway = putAwayOf(shared, away);
     const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
     const live =
         focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
@@ -557,6 +567,47 @@ export function CallRoom({
                 text, and text in a ninth of a window is not readable. Side by
                 side when there are several, rather than stacked - two shares
                 stacked in a panel this tall leave each of them a strip. */}
+            {/* A share somebody put away, said out loud rather than left to
+                vanish.
+
+                Putting one away removes it from the room - that is what gives
+                the conversation its space back - but it also removed every trace
+                that it was still happening, so a screen somebody was told about
+                a minute ago simply was not there, and the person sharing had no
+                way to know nobody was looking. Every client with screens in it
+                keeps a tile for the stream with the way back on it; this is
+                that, at the size of a line rather than a picture, because the
+                reason it was put away was that pictures were taking the room. */}
+            {putAway.length > 0 && (
+                <ul className="flex shrink-0 flex-col gap-1.5">
+                    {putAway.map((stage) => (
+                        <li
+                            key={stage.key}
+                            className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
+                        >
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
+                                <EyeOff className="size-4 text-muted-foreground" aria-hidden />
+                            </span>
+                            <span className="flex min-w-0 flex-col">
+                                <span className="truncate text-sm font-medium" title={stage.name}>{stage.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Still sharing. You are not watching.
+                                </span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setAway((was) => was.filter((key) => key !== stage.key))
+                                }
+                                className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
+                            >
+                                Watch
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
             {showing.length > 0 && (
                 <div className={cn("grid min-h-0 flex-[3] gap-2", gridColumns(showing.length))}>
                     {showing.map((stage) => (
