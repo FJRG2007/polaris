@@ -53,13 +53,14 @@ import {
     type ComponentPropsWithRef,
     type RefObject
 } from "react";
-import { readMessage, warmMessage } from "./message-store";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
+import { readMessage, warmMessage } from "./message-store";
 import {
     actOnAction,
     applyLabelAction,
     blockSenderAction,
     emptyFolderAction,
+    moveToFolderAction,
     snoozeAction,
     syncAllAction,
     setConversationStateAction
@@ -208,7 +209,8 @@ export function MailView({
      * real navigation to `/mail` - see `closeOpen` - which drops the prop with
      * it.
      */
-    const openThreadId = live.get("open") ?? (path.startsWith("/mail/t/") ? openedWhenRendered : "");
+    const openThreadId =
+        live.get("open") ?? (path.startsWith("/mail/t/") ? openedWhenRendered : "");
     const category = categorised ? asCategory(live.get("tab")) : "";
     // A screen that IS one of the filters keeps its own narrowing whatever the
     // address says, exactly as the server decides it.
@@ -246,6 +248,7 @@ export function MailView({
         openComposer,
         refresh,
         refreshMailbox,
+        registerFiler,
         reloadLists,
         revision,
         shelf
@@ -740,15 +743,7 @@ export function MailView({
             action: "read",
             scope: "conversation"
         });
-    }, [
-        nudgeUnread,
-        openThread,
-        patch,
-        preferences.markRead,
-        readOnOpen,
-        shown,
-        unreadNudges
-    ]);
+    }, [nudgeUnread, openThread, patch, preferences.markRead, readOnOpen, shown, unreadNudges]);
 
     const act = useCallback(
         (action: MailAction, messageIds: readonly string[], announce: string) => {
@@ -880,6 +875,119 @@ export function MailView({
             unreadNudges
         ]
     );
+
+    /**
+     * File conversations into the folder somebody dropped them on.
+     *
+     * The rail owns the folder that was dropped on and this owns the rows, so
+     * the drop arrives here through the shell - see `registerFiler` below. What
+     * happens then is what happens for every other action on this screen: the
+     * rows go now, the counts in the rail go with them, and both come back if
+     * the mail server refuses.
+     *
+     * Dropping into the folder already being looked at is the one case that
+     * moves nothing on screen. The mail is still filed - a conversation can sit
+     * in several folders, and a merged view is showing more than this one - but
+     * hiding the rows would be the list claiming the mail had left a folder it
+     * has this moment arrived in.
+     */
+    const fileMail = useCallback(
+        (folderId: string, folderName: string, messageIds: readonly string[]) => {
+            if (messageIds.length === 0) return;
+            const aimed = threadsOf(messageIds);
+            const leaves = page.folderId !== folderId;
+            // The rows move now. A mail server is slow enough that waiting for
+            // it reads as the drop having been ignored - and a drop that looks
+            // ignored is one somebody does again.
+            if (leaves) patchUntilAnswered(aimed, { gone: true });
+
+            const aimedRows = aimed.flatMap((id) => {
+                const row = threads.find((thread) => thread.id === id);
+                return row ? [shown(row)] : [];
+            });
+            if (leaves) {
+                // Filed is dealt with, whichever folder it went to, so the
+                // notice about it goes with the row.
+                for (const id of aimed) closeDesktopNotice(`mail:${id}`);
+                nudgeUnread(unreadNudges(aimedRows));
+            }
+
+            // And the conversation being read closes, for the reason `act` gives:
+            // the row behind it has already gone, so leaving it open is somebody
+            // looking at a message that is no longer in the list it came from.
+            const leaving = leaves && openThread !== null && aimed.includes(openThread.id);
+            const reopen = leaving ? openThread.id : "";
+            if (leaving) {
+                if (preferences.afterFiling === "next") openNext(aimed);
+                else closeOpen();
+            }
+
+            startBusy(async () => {
+                const outcome = await moveToFolderAction({
+                    folderId,
+                    messageIds: [...messageIds]
+                });
+                const said = refusalOf(outcome);
+                if (said) {
+                    // Both halves back: the rows, and the reader who was taken
+                    // out of a conversation that was never actually filed.
+                    clearPatches();
+                    if (reopen) openAgain(reopen);
+                    toast.show({ title: said });
+                    return;
+                }
+                // A conversation that LEFT keeps its overlay: the list on screen
+                // was fetched before this and still holds the row, so it is let
+                // go the first time a list comes back without it.
+                inFlight.current = Object.fromEntries(
+                    Object.entries(inFlight.current).filter(([, over]) => over.gone)
+                );
+                setSelected([]);
+                toast.show({
+                    title:
+                        messageIds.length === 1
+                            ? `Moved to ${folderName}.`
+                            : `${messageIds.length} moved to ${folderName}.`
+                });
+                if (leaving) {
+                    reloadLists();
+                    return;
+                }
+                refreshMailbox();
+            });
+        },
+        [
+            clearPatches,
+            closeOpen,
+            nudgeUnread,
+            openAgain,
+            openNext,
+            openThread,
+            page.folderId,
+            patchUntilAnswered,
+            preferences.afterFiling,
+            refreshMailbox,
+            reloadLists,
+            shown,
+            threads,
+            threadsOf,
+            toast,
+            unreadNudges
+        ]
+    );
+
+    /**
+     * Do the filing for as long as this list is on screen.
+     *
+     * Handed back on the way out, so a drop onto the rail from a screen with no
+     * list is never answered by a list that has gone - which would lay an
+     * overlay over rows nothing is drawing and announce a move nobody can see.
+     * The shell files it plainly instead.
+     */
+    useEffect(() => {
+        registerFiler(fileMail);
+        return () => registerFiler(null);
+    }, [fileMail, registerFiler]);
 
     /**
      * Pin a conversation to the top, or mute it - or undo either.
@@ -1490,8 +1598,7 @@ export function MailView({
                         // situation: this list is not empty, it is not here yet.
                         <>
                             <p className="border-b border-border px-4 py-3 text-[13px] text-muted-foreground">
-                                Fetching this mailbox. Messages appear as they arrive, newest
-                                first.
+                                Fetching this mailbox. Messages appear as they arrive, newest first.
                             </p>
                             <ThreadRowsSkeleton />
                         </>

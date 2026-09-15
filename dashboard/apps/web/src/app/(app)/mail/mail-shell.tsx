@@ -20,13 +20,15 @@ import { z } from "zod";
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { MAIL_VIEWS } from "./views";
+import { refusalOf } from "./refusal";
 import { Composer } from "./composer";
 import { MailRail } from "./mail-rail";
-import { Button, PAGE_BLEED } from "@polaris/ui";
+import { moveToFolderAction } from "./actions";
 import { useMailStream } from "./use-mail-stream";
 import { Menu, PenLine, Plus } from "lucide-react";
 import { MAIL_PALETTE, coloursFor } from "./palette";
 import type { MailFolderView } from "@/lib/mailbox/views";
+import { Button, PAGE_BLEED, useToast } from "@polaris/ui";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { useNudgeMailUnread } from "@/components/mail-unread";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -138,7 +140,40 @@ export interface MailContextValue {
      * being drawn twice.
      */
     readonly askFolderRole: (missing: MissingFolderRole, retry: () => void) => void;
+    /**
+     * Put mail into a folder - what a conversation dragged onto the rail does.
+     *
+     * It lives here because the two halves of the act are in different places:
+     * the folder that was dropped on is the rail's, and the rows that have to
+     * leave the list are the list's. The rail used to do the whole thing itself,
+     * which is why a drag was the one action in Mail that was not optimistic -
+     * it had no way to move a row, so it waited for somebody's IMAP server and
+     * then re-fetched, and for that second or two the conversation sat where it
+     * had been dropped from as though nothing had happened.
+     */
+    readonly fileMail: (
+        folderId: string,
+        folderName: string,
+        messageIds: readonly string[]
+    ) => void;
+    /**
+     * Let the conversation list do that filing for as long as it is on screen.
+     *
+     * The list is what holds the rows, the overlay that hides them and the
+     * counts they are worth, so it is what can file optimistically. It registers
+     * while it is mounted and takes the registration back when it is not, which
+     * is what leaves the fallback below for the screens that have a rail and no
+     * list.
+     */
+    readonly registerFiler: (filer: MailFiler | null) => void;
 }
+
+/** What the list registers to do the filing. */
+export type MailFiler = (
+    folderId: string,
+    folderName: string,
+    messageIds: readonly string[]
+) => void;
 
 /** One folder with fewer (or more) unread than the server last said. */
 export interface UnreadNudge {
@@ -219,6 +254,7 @@ export function MailShell({
     children: ReactNode;
 }) {
     const router = useRouter();
+    const toast = useToast();
     /**
      * The rail, as it stands rather than as the server last rendered it.
      *
@@ -231,7 +267,11 @@ export function MailShell({
      * nothing - or doing it a second later - for as long as Mail was open was
      * this, and nothing else.
      */
-    const [rail, setRail] = useState({ accounts: sentAccounts, folders: sentFolders, unread: sentUnread });
+    const [rail, setRail] = useState({
+        accounts: sentAccounts,
+        folders: sentFolders,
+        unread: sentUnread
+    });
     // The server has rendered again - a mailbox added, a label written, a shelf
     // switched - and what it says now is the truth this was standing in for.
     useEffect(() => {
@@ -484,6 +524,56 @@ export function MailShell({
     );
 
     /**
+     * Whoever is able to file mail properly right now.
+     *
+     * A ref rather than state, and deliberately: this changes when a list mounts
+     * or unmounts, which is not something any screen should re-render for, and
+     * `fileMail` below reads it at the moment of the drop rather than closing
+     * over it.
+     */
+    const filer = useRef<MailFiler | null>(null);
+    const registerFiler = useCallback((next: MailFiler | null) => {
+        filer.current = next;
+    }, []);
+
+    /**
+     * File mail, the best way available.
+     *
+     * With a list on screen that is the list's own optimistic path - the rows go
+     * at once, the counts move with them, and both come back if the server
+     * refuses. With no list there is nothing to move, so this does the plain
+     * thing and says what happened. Nothing can drag mail while no list is
+     * mounted, so the fallback is a guarantee rather than a path anybody walks:
+     * a drop that quietly did nothing would be worse than a slow one.
+     */
+    const fileMail = useCallback(
+        (folderId: string, folderName: string, messageIds: readonly string[]) => {
+            if (messageIds.length === 0) return;
+            const held = filer.current;
+            if (held) {
+                held(folderId, folderName, messageIds);
+                return;
+            }
+            void (async () => {
+                const outcome = await moveToFolderAction({
+                    folderId,
+                    messageIds: [...messageIds]
+                });
+                const said = refusalOf(outcome);
+                toast.show({
+                    title:
+                        said ??
+                        (messageIds.length === 1
+                            ? `Moved to ${folderName}.`
+                            : `${messageIds.length} moved to ${folderName}.`)
+                });
+                if (!said) refreshMailbox();
+            })();
+        },
+        [refreshMailbox, toast]
+    );
+
+    /**
      * Open the composer, or say what is missing first.
      *
      * A message needs a mailbox to leave from. With none connected the composer
@@ -521,7 +611,9 @@ export function MailShell({
             accountColor,
             composing,
             openComposer,
-            askFolderRole
+            askFolderRole,
+            fileMail,
+            registerFiler
         }),
         [
             accounts,
@@ -540,7 +632,9 @@ export function MailShell({
             accountColor,
             composing,
             openComposer,
-            askFolderRole
+            askFolderRole,
+            fileMail,
+            registerFiler
         ]
     );
 

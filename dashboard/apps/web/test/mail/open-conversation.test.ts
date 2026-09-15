@@ -141,8 +141,14 @@ describe("the address stops naming what was moved", () => {
         // into the prop, and closing put it straight back. Deleting the message
         // you were reading then sat there until the next render, over somebody
         // else's IMAP server.
-        expect(view).toContain(
-            'const openThreadId = live.get("open") ?? (path.startsWith("/mail/t/") ? openedWhenRendered : "");'
+        // Matched rather than contained, and only so the line may wrap: it is
+        // one character past the formatter's width, so whether it sits on one
+        // line or two is the formatter's business and not this test's. Every
+        // other character is still pinned - what is asserted is that the live
+        // address decides, and that the prop is reached for on `/mail/t/` and
+        // nowhere else.
+        expect(view).toMatch(
+            /const openThreadId =\s+live\.get\("open"\) \?\? \(path\.startsWith\("\/mail\/t\/"\) \? openedWhenRendered : ""\);/
         );
     });
 
@@ -153,7 +159,7 @@ describe("the address stops naming what was moved", () => {
         // Both ways back - the button and the key - go through the one close,
         // because `/mail/t/<id>` has no parameter to strip and stripping one
         // there did nothing at all.
-        expect(view).toContain("onBack={layout === \"full\" ? closeOpen : undefined}");
+        expect(view).toContain('onBack={layout === "full" ? closeOpen : undefined}');
         expect(view).toContain("if (openThread) closeOpen();");
         expect(view).not.toContain("router.push(window.location.pathname");
     });
@@ -171,9 +177,7 @@ describe("the address stops naming what was moved", () => {
         // later: the list on screen was fetched BEFORE the delete and is
         // repainted from the copy this tab holds while the new one is asked
         // for, so a row let go of at the answer comes back and then goes.
-        expect(view).toContain(
-            "Object.entries(inFlight.current).filter(([, over]) => over.gone)"
-        );
+        expect(view).toContain("Object.entries(inFlight.current).filter(([, over]) => over.gone)");
         // What lets it go is the list itself, per conversation: the first one
         // that no longer has the row.
         expect(view).toContain("const here = new Set(threads.map((thread) => thread.id));");

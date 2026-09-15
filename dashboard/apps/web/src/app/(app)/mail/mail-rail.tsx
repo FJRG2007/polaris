@@ -23,21 +23,16 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
-import type { MailFolderView } from "@/lib/mailbox/views";
 import { useMail } from "./mail-shell";
 import { MAIL_PALETTE } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
 import { RefusedMailboxes } from "./refused-notice";
 import { useCallback, useMemo, useState } from "react";
+import type { MailFolderView } from "@/lib/mailbox/views";
 import { refusedMailboxHref } from "@/lib/mailbox/refusals";
-import {
-    deleteFolderAction,
-    moveToFolderAction,
-    renameFolderAction,
-    setFolderColorAction
-} from "./actions";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { deleteFolderAction, renameFolderAction, setFolderColorAction } from "./actions";
 import {
     cn,
     Button,
@@ -118,7 +113,7 @@ const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: s
 ];
 
 export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
-    const { accounts, folders, labels, unread, patchFolder } = useMail();
+    const { accounts, folders, labels, unread, patchFolder, fileMail } = useMail();
     const pathname = usePathname();
     const search = useSearchParams();
     const router = useRouter();
@@ -130,13 +125,6 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
     const { open: expanded, toggle: toggleAccount } = useMailRailOpen(accountIds);
 
-    /**
-     * File what was dragged into a folder.
-     *
-     * The server is told which messages and which folder and decides the rest:
-     * both are looked up against the person asking, so a drag can only ever move
-     * their own mail into their own folder.
-     */
     /** Give a folder a colour, or take it off. The swatch lands now and the
      *  write follows it; a refusal puts the old colour back and says why. */
     const colour = useCallback(
@@ -157,26 +145,6 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
      *  something that has just unmounted never opens. */
     const [renaming, setRenaming] = useState<MailFolderView | null>(null);
     const [deleting, setDeleting] = useState<MailFolderView | null>(null);
-
-    const fileInto = useCallback(
-        async (folderId: string, name: string, messageIds: string[]) => {
-            if (messageIds.length === 0) return;
-            const outcome = await moveToFolderAction({ folderId, messageIds });
-            const said = refusalOf(outcome);
-            if (said) {
-                toast.show({ title: said });
-                return;
-            }
-            toast.show({
-                title:
-                    messageIds.length === 1
-                        ? `Moved to ${name}.`
-                        : `${messageIds.length} moved to ${name}.`
-            });
-            router.refresh();
-        },
-        [router, toast]
-    );
 
     // The mailboxes that feed the merged views. One taken out of them still has
     // its own entry below; it just stops adding to the counts above.
@@ -299,8 +267,15 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                                 pathname === `/mail/f/${folder.id}`
                                                             }
                                                             onNavigate={onNavigate}
+                                                            // Filed through the
+                                                            // shell, not here:
+                                                            // hiding the row
+                                                            // needs the list's
+                                                            // rows and counts,
+                                                            // which the rail
+                                                            // does not hold.
                                                             onDropMail={(ids) =>
-                                                                void fileInto(
+                                                                fileMail(
                                                                     folder.id,
                                                                     folder.name,
                                                                     ids
@@ -354,17 +329,13 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                         <>
                                                             <ContextMenuSeparator />
                                                             <ContextMenuItem
-                                                                onSelect={() =>
-                                                                    setRenaming(folder)
-                                                                }
+                                                                onSelect={() => setRenaming(folder)}
                                                             >
                                                                 Rename
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
                                                                 className="text-danger"
-                                                                onSelect={() =>
-                                                                    setDeleting(folder)
-                                                                }
+                                                                onSelect={() => setDeleting(folder)}
                                                             >
                                                                 Delete
                                                             </ContextMenuItem>
@@ -474,13 +445,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
  * the form only when there is something under it: a sentence about subfolders
  * over a folder with none is noise.
  */
-function RenameFolderDialog({
-    folder,
-    onClose
-}: {
-    folder: MailFolderView;
-    onClose: () => void;
-}) {
+function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClose: () => void }) {
     const toast = useToast();
     const { patchFolder } = useMail();
     const [name, setName] = useState(folder.name);
