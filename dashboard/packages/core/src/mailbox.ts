@@ -221,6 +221,14 @@ export function addressLabel(entry: MailAddress): string {
     return local || entry.address;
 }
 
+/** What to call somebody where the address is in view as well: their name if
+ *  they gave one, otherwise the whole address. Never `addressLabel` there - a
+ *  local part drawn where a name goes reads as a name somebody chose, and the
+ *  address then sits beside it as though the two were different people. */
+export function addressName(entry: MailAddress): string {
+    return entry.name.trim() || entry.address;
+}
+
 /** Two addresses are the same person when the mailbox is the same, whatever
  *  case either was written in. Sub-addressing is deliberately kept: `a+news@`
  *  is how somebody finds out who sold their address, and folding it away would

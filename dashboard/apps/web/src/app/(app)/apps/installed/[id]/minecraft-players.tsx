@@ -452,11 +452,12 @@ export function MinecraftPlayers({
                         )}
                         {/* Outside the Java-only switch, because what it dates is
                             not Java-only: a Bedrock server that is off draws its
-                            remembered operators and allow list from the same
-                            note, and without this they read as what the server
-                            is saying right now. The one thing worse than not
-                            knowing whether a server is closed is believing the
-                            wrong thing about it. */}
+                            remembered allow list from the same note - operators
+                            it never has, being kept there by xuid rather than by
+                            name - and without this those names read as what the
+                            server is saying right now. The one thing worse than
+                            not knowing whether a server is closed is believing
+                            the wrong thing about it. */}
                         {rosterAsOf ? (
                             <span className="text-xs text-muted-foreground">
                                 As Polaris last read it,{" "}

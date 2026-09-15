@@ -99,7 +99,7 @@ export function RecipientField({
                                         : entry.address
                                 }
                             >
-                                {entry.name.trim() || entry.address}
+                                {core.addressName(entry)}
                             </span>
                             <button
                                 type="button"
@@ -198,7 +198,7 @@ export function RecipientField({
                                     }}
                                 >
                                     <span className="min-w-0 truncate text-foreground">
-                                        {entry.name.trim() || entry.address}
+                                        {core.addressName(entry)}
                                     </span>
                                     {entry.name.trim() ? (
                                         <span className="min-w-0 truncate text-[12px] text-foreground-subtle">

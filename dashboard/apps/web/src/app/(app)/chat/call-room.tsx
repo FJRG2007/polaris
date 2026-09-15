@@ -514,56 +514,36 @@ export function CallRoom({
                 the call: put the screen away, the band shrinks back, the
                 messages return, and the talking carries on.
 
-                Offered per screen and only while there is one. Named, because
-                with two people sharing "stop watching" has to say which - and
-                named for the screen rather than for what pressing it does, so
-                that the name and the pressed state are not read out saying
-                opposite things about the same button.
+                Offered per screen and only while there is one, and named for the
+                screen as well as for the act, because with two people sharing
+                "stop watching" has to say which.
 
                 Only what is being watched. A screen that was put away has a card
                 of its own below, carrying the same name and the same way back -
                 and this row used to carry one too, so the two sat one above the
                 other offering the identical act twice. What is watched is turned
-                off here; what is not is turned back on there. */}
+                off here; what is not is turned back on there. Which is also why
+                this is a plain button rather than a toggle: pressing it does not
+                flip a state in place, it hands the screen to the card below and
+                leaves the row, and a pressed state that never changes on a
+                control that disappears is read out as the opposite of what
+                happened. */}
             {stages.length > 0 && (
                 <ul className="flex shrink-0 flex-wrap items-center gap-1">
-                    {stages.map((stage) => {
-                        const put = away.includes(stage.key);
-                        return (
-                            <li key={stage.key}>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setAway((was) =>
-                                            put
-                                                ? was.filter((key) => key !== stage.key)
-                                                : [...was, stage.key]
-                                        )
-                                    }
-                                    aria-pressed={!put}
-                                    aria-label={`Watch ${stage.name}`}
-                                    title={
-                                        put
-                                            ? `Watch ${stage.name}`
-                                            : `Stop watching ${stage.name} - it keeps going, and the conversation comes back`
-                                    }
-                                    className={cn(
-                                        "flex max-w-52 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
-                                        put
-                                            ? "border-border text-muted-foreground hover:text-foreground"
-                                            : "border-border bg-muted text-foreground"
-                                    )}
-                                >
-                                    {put ? (
-                                        <EyeOff className="size-3.5 shrink-0" />
-                                    ) : (
-                                        <Eye className="size-3.5 shrink-0" />
-                                    )}
-                                    <span className="truncate">{stage.name}</span>
-                                </button>
-                            </li>
-                        );
-                    })}
+                    {stages.map((stage) => (
+                        <li key={stage.key}>
+                            <button
+                                type="button"
+                                onClick={() => setAway((was) => [...was, stage.key])}
+                                aria-label={`Stop watching ${stage.name}`}
+                                title={`Stop watching ${stage.name} - it keeps going, and the conversation comes back`}
+                                className="flex max-w-52 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-foreground transition-colors"
+                            >
+                                <Eye className="size-3.5 shrink-0" />
+                                <span className="truncate">{stage.name}</span>
+                            </button>
+                        </li>
+                    ))}
                 </ul>
             )}
 
