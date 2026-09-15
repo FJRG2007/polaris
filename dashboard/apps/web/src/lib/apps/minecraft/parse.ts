@@ -130,7 +130,9 @@ export function parseWhitelistRefusal(output: string): string | null {
     if (/(does not exist|that player does not exist|no player was found)/i.test(text)) {
         return "The game does not know that name. Check the spelling, or turn Mojang authentication off if this server is for cracked clients.";
     }
-    if (/(unknown or incomplete command|incorrect argument|expected)/i.test(text)) {
+    // The third is the parser's own wording and is kept to what it actually
+    // prints: a bare "expected" is a word an answer that worked can carry too.
+    if (/(unknown or incomplete command|incorrect argument|expected (?:whitespace|end of|quote|value|integer|float|bool|literal|string))/i.test(text)) {
         return "This server did not understand the whitelist command.";
     }
     return null;

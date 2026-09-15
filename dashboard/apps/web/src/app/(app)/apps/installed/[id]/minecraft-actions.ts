@@ -185,14 +185,23 @@ export async function setGamemodeAction(input: {
 }
 
 /**
- * Which roster file each verb leaves behind an entry in. The rest of them act on
- * who is connected right now and write nothing that has to survive a restart.
+ * Which roster file each verb leaves behind an entry in, and which way. The rest
+ * of them act on who is connected right now and write nothing that has to survive
+ * a restart.
+ *
+ * The direction decides what has to be done behind the command, because the two
+ * fail differently on a server that invents identities: a verb that writes an
+ * entry writes one nothing will match, and a verb that takes one away goes
+ * looking for it under the identity Mojang answered with and finds nothing to
+ * take.
  */
-const ROSTER_WRITTEN_BY: Partial<Record<MinecraftModeration["action"], playerAccess.RosterFile>> = {
-    op: "ops",
-    deop: "ops",
-    ban: "bans",
-    pardon: "bans"
+const ROSTER_WRITTEN_BY: Partial<
+    Record<MinecraftModeration["action"], { file: playerAccess.RosterFile; removes?: true }>
+> = {
+    op: { file: "ops" },
+    deop: { file: "ops", removes: true },
+    ban: { file: "bans" },
+    pardon: { file: "bans", removes: true }
 };
 
 /**
@@ -205,11 +214,13 @@ const ROSTER_WRITTEN_BY: Partial<Record<MinecraftModeration["action"], playerAcc
  * server read it again. It still uses the command on a server that authenticates,
  * where that identity is the right one.
  *
- * The verbs that write a file keep using the command, and the file is corrected
+ * The verbs that write a file keep using the command, and the file is settled
  * behind them: the running server is already right, and it is the next start that
  * would read an entry naming the right player under an identity it will never
  * compute - handing the server back with nobody in charge of it, or with a banned
- * player quietly welcome again.
+ * player quietly welcome again. Adding corrects the identity; taking away rewrites
+ * the file without that name, because the command looked for it under an identity
+ * the file no longer holds and a pardon nobody can carry out is a ban for good.
  */
 async function moderationOutcome(ownerId: string, input: MinecraftModeration): Promise<string> {
     if (input.action === "whitelist-add") {
@@ -220,7 +231,12 @@ async function moderationOutcome(ownerId: string, input: MinecraftModeration): P
     }
     const output = await runServerCommand(ownerId, input.installedAppId, moderationArgv(input));
     const wrote = ROSTER_WRITTEN_BY[input.action];
-    if (wrote) await playerAccess.repairRosterIdentity(ownerId, input.installedAppId, wrote).catch(() => false);
+    if (wrote) {
+        const settled = wrote.removes
+            ? playerAccess.dropFromRoster(ownerId, input.installedAppId, wrote.file, input.player)
+            : playerAccess.repairRosterIdentity(ownerId, input.installedAppId, wrote.file);
+        await settled.catch(() => false);
+    }
     return output;
 }
 

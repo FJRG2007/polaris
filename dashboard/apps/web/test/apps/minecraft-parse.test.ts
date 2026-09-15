@@ -240,6 +240,9 @@ describe("parseWhitelistRefusal", () => {
 
     it("names the refusal when the server would not take the command", () => {
         expect(parse.parseWhitelistRefusal("Unknown or incomplete command, see below for error")).not.toBeNull();
+        expect(
+            parse.parseWhitelistRefusal("Expected whitespace to end one argument, but found trailing data")
+        ).not.toBeNull();
     });
 
     it("reads through the console's own colouring", () => {
@@ -252,5 +255,12 @@ describe("parseWhitelistRefusal", () => {
     it("invents no refusal out of wording it does not know", () => {
         expect(parse.parseWhitelistRefusal("whitelist updated ok")).toBeNull();
         expect(parse.parseWhitelistRefusal("")).toBeNull();
+    });
+
+    // The word on its own belongs to the parser's complaint, not to every answer
+    // that happens to contain it - and a plugin that says this is a plugin that
+    // added the player.
+    it("reads an answer that worked as one, whatever words it used", () => {
+        expect(parse.parseWhitelistRefusal("Added Alice to the whitelist, as expected")).toBeNull();
     });
 });

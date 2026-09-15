@@ -24,7 +24,10 @@
  * Names are hashed exactly as typed. The game is case-sensitive about this -
  * "Alice" and "alice" are two different players to it - so nothing here
  * normalizes case into the hash, and matching an existing entry is the only place
- * case is ignored, because that is a file somebody else may have written.
+ * case is ignored, because that is a file somebody else may have written. An
+ * entry matched that way is rewritten under the name that was asked for, both
+ * halves of it: the identity is the hash of the name beside it, so leaving one
+ * and replacing the other is how a working entry becomes one nobody matches.
  */
 
 import { z } from "zod";
@@ -72,20 +75,35 @@ const entrySchema = z
     .object({ uuid: z.string().trim().default(""), name: z.string().trim().min(1).max(32) })
     .passthrough();
 
-/** A roster file, or nothing at all. A file the server is halfway through writing
- *  reads as empty rather than throwing - the callers all treat that as "no roster
- *  yet", which is the same thing a server that has never started has. */
-const fileSchema = z.array(entrySchema).catch([]);
+const fileSchema = z.array(entrySchema);
 
 type RosterEntry = z.infer<typeof entrySchema>;
 
-function parseRoster(content: string): RosterEntry[] {
+/**
+ * The entries in a roster file, or null when the text is not one.
+ *
+ * Blank is an empty roster - a server that has never started has no list, and
+ * neither has one nobody has added anybody to. Anything else that will not parse
+ * is a file that could not be read rather than a file with nothing in it, and the
+ * two are a whole whitelist apart: these files are rewritten by the game itself
+ * while it runs, so a read that landed between its own writes comes back as
+ * truncated JSON, and treating that as an empty list would hand back a file
+ * holding only the names Polaris was adding.
+ */
+function parseRoster(content: string): RosterEntry[] | null {
     if (content.trim().length === 0) return [];
     try {
-        return fileSchema.parse(JSON.parse(content));
+        const parsed = fileSchema.safeParse(JSON.parse(content));
+        return parsed.success ? parsed.data : null;
     } catch {
-        return [];
+        return null;
     }
+}
+
+/** Whether this text is a roster file at all, which is what says a write built
+ *  from it would replace the list rather than update it. */
+export function isReadableRoster(content: string): boolean {
+    return parseRoster(content) !== null;
 }
 
 function serialize(entries: readonly RosterEntry[]): string {
@@ -112,6 +130,7 @@ function sameName(one: string, other: string): boolean {
  */
 export function withOfflineNames(content: string, names: readonly string[]): string | null {
     const entries = parseRoster(content);
+    if (entries === null) return null;
     let changed = false;
     for (const name of names) {
         const wanted = name.trim();
@@ -124,8 +143,11 @@ export function withOfflineNames(content: string, names: readonly string[]): str
             continue;
         }
         const entry = entries[found];
-        if (!entry || entry.uuid === uuid) continue;
-        entries[found] = { ...entry, uuid };
+        if (!entry || (entry.uuid === uuid && entry.name === wanted)) continue;
+        // Both, never one: the identity is a hash of the name, so an entry
+        // carrying somebody else's spelling beside this hash is an entry the
+        // login looks up and does not find.
+        entries[found] = { ...entry, uuid, name: wanted };
         changed = true;
     }
     return changed ? serialize(entries) : null;
@@ -136,6 +158,7 @@ export function withOfflineNames(content: string, names: readonly string[]): str
  *  same player twice - once under each kind of UUID. */
 export function withoutName(content: string, name: string): string | null {
     const entries = parseRoster(content);
+    if (entries === null) return null;
     const left = entries.filter((entry) => !sameName(entry.name, name));
     return left.length === entries.length ? null : serialize(left);
 }
@@ -153,6 +176,7 @@ export function withoutName(content: string, name: string): string | null {
  */
 export function withOfflineIdentities(content: string): string | null {
     const entries = parseRoster(content);
+    if (entries === null) return null;
     const kept: RosterEntry[] = [];
     let changed = false;
     for (const entry of entries) {
@@ -175,5 +199,5 @@ export function withOfflineIdentities(content: string): string | null {
 /** The names on a roster file. Used to tell what a write would actually change
  *  before making it, and to say what a repair touched. */
 export function rosterNames(content: string): string[] {
-    return parseRoster(content).map((entry) => entry.name);
+    return parseRoster(content)?.map((entry) => entry.name) ?? [];
 }

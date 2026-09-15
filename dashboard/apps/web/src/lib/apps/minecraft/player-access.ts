@@ -26,9 +26,9 @@ import { prisma } from "@polaris/db";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { noteReachedFrom } from "@/lib/apps/minecraft/reach";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
 import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "@/lib/apps/minecraft/parse";
-import { withOfflineIdentities, withOfflineNames, withoutName } from "@/lib/apps/minecraft/offline-identity";
+import { readContainerFile, readContainerFileState, writeContainerFile } from "@/lib/apps/container-files";
+import { isReadableRoster, withOfflineIdentities, withOfflineNames, withoutName } from "@/lib/apps/minecraft/offline-identity";
 import {
     editionOf,
     getServerPlayers,
@@ -127,6 +127,58 @@ const ROSTER_PATHS: Readonly<Record<RosterFile, string>> = {
 };
 
 /**
+ * One of those files as it stands, or null when Polaris could not see it.
+ *
+ * Everything below rewrites these files whole, which makes "empty" and "could not
+ * be read" a whole roster apart - and both of them arrive as nothing. A file that
+ * is genuinely absent is an empty list, because a server nobody has whitelisted
+ * has no whitelist.json. A read that failed for any other reason, and a file that
+ * came back as something other than a roster, are a list that is still in there:
+ * the game rewrites these while it runs, so a read can land between its own
+ * writes, and a write built on that would take away every name Polaris did not
+ * put there.
+ */
+async function readRoster(server: ServerContainer, path: string): Promise<string | null> {
+    const read = await readContainerFileState(server, path);
+    if (read.state !== "read") return read.state === "missing" ? "" : null;
+    return isReadableRoster(read.content) ? read.content : null;
+}
+
+/** Said when the list could not be read, so nothing was written over it. */
+const ROSTER_UNREAD =
+    "Polaris could not read this server's player list just now, and will not write over a list it cannot see. Try again in a moment.";
+
+/** Said when the file is right and the running server has not been told. */
+const RELOAD_UNREAD = "The server did not reload its list, so it will pick this up the next time it starts.";
+
+/** Write a roster file, refusing in terms of the list rather than the shell's.
+ *  What the container printed is a command's complaint about a path; the person
+ *  reading this asked whether a player is on the server's list. */
+async function writeRoster(server: ServerContainer, path: string, content: string): Promise<void> {
+    try {
+        await writeContainerFile(server, path, content);
+    } catch {
+        throw new Error("The server's player list could not be written, so nothing on it was changed.");
+    }
+}
+
+/**
+ * Have the running server read whitelist.json again, and say whether it did.
+ *
+ * The file is the durable half and it is already written by the time this runs. A
+ * server that is not answering yet - one that is up and still generating its
+ * world - has lost nothing by not reloading, so a reload that did not happen must
+ * not be reported as a grant that did not happen either: that is the operator
+ * being told to add a player the file already lists.
+ */
+async function reloadWhitelist(server: ServerContainer): Promise<boolean> {
+    return server.say(["whitelist", "reload"]).then(
+        () => true,
+        () => false
+    );
+}
+
+/**
  * The server answered and said no.
  *
  * Told apart from a server that did not answer at all, because the two deserve
@@ -168,38 +220,36 @@ async function inventsIdentities(server: ServerContainer): Promise<boolean> {
  */
 async function putOnWhitelist(server: ServerContainer, names: readonly string[]): Promise<string> {
     if (names.length === 0) return "";
+    const added = `Added to the whitelist: ${names.join(", ")}.`;
     if (!(await inventsIdentities(server))) {
         for (const name of names) {
             const refusal = parseWhitelistRefusal(await server.say(["whitelist", "add", name]));
             if (refusal !== null) throw new WhitelistRefused(refusal);
         }
-        return `Added to the whitelist: ${names.join(", ")}.`;
+        return added;
     }
-    const current = (await readContainerFile(server, WHITELIST_FILE)) ?? "";
+    const current = await readRoster(server, WHITELIST_FILE);
+    // Not a refusal: the game was never asked. A refusal is the server saying no
+    // to a player, and this is Polaris declining to write from what it read.
+    if (current === null) throw new Error(ROSTER_UNREAD);
     const written = withOfflineNames(current, names);
-    if (written !== null) {
-        try {
-            await writeContainerFile(server, WHITELIST_FILE, written);
-        } catch (caught) {
-            throw new WhitelistRefused(caught instanceof Error ? caught.message : "The whitelist could not be written");
-        }
-    }
-    await server.say(["whitelist", "reload"]);
-    return `Added to the whitelist: ${names.join(", ")}.`;
+    if (written !== null) await writeRoster(server, WHITELIST_FILE, written);
+    return (await reloadWhitelist(server)) ? added : `${added} ${RELOAD_UNREAD}`;
 }
 
 /** Take a name off the game's own whitelist. Same split: the file is the truth on
  *  a server that invents identities, and the command is on one that does not. */
 async function takeOffWhitelist(server: ServerContainer, name: string): Promise<string> {
+    const removed = `Removed ${name} from the whitelist.`;
     if (!(await inventsIdentities(server))) {
         await server.say(["whitelist", "remove", name]);
-        return `Removed ${name} from the whitelist.`;
+        return removed;
     }
-    const current = (await readContainerFile(server, WHITELIST_FILE)) ?? "";
+    const current = await readRoster(server, WHITELIST_FILE);
+    if (current === null) throw new Error(ROSTER_UNREAD);
     const written = withoutName(current, name);
-    if (written !== null) await writeContainerFile(server, WHITELIST_FILE, written);
-    await server.say(["whitelist", "reload"]);
-    return `Removed ${name} from the whitelist.`;
+    if (written !== null) await writeRoster(server, WHITELIST_FILE, written);
+    return (await reloadWhitelist(server)) ? removed : `${removed} ${RELOAD_UNREAD}`;
 }
 
 /**
@@ -229,12 +279,47 @@ export async function repairRosterIdentity(
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (!(await inventsIdentities(server))) return false;
         const path = ROSTER_PATHS[file];
-        const current = await readContainerFile(server, path);
+        const current = await readRoster(server, path);
         if (current === null) return false;
         const written = withOfflineIdentities(current);
         if (written === null) return false;
-        await writeContainerFile(server, path, written);
-        if (file === "whitelist") await server.say(["whitelist", "reload"]);
+        await writeRoster(server, path, written);
+        if (file === "whitelist") await reloadWhitelist(server);
+        return true;
+    });
+}
+
+/**
+ * Take a name off one of the server's roster files.
+ *
+ * The other half of the repair, and the half the verbs that undo something need.
+ * `deop` and `pardon` resolve a name exactly the way `whitelist add` does - the
+ * user cache, then Mojang - so on a server that invents identities they go
+ * looking for an entry under Mojang's UUID, and a repaired file holds none. For a
+ * player the server has never seen (a ban written before they ever joined, an
+ * operator set from this panel) the command changes nothing, says so in words
+ * that read like success, and the entry stays: a banned player nobody can pardon,
+ * an operator nobody can take the level from.
+ *
+ * So the name is taken out of the file directly, which is the part of it that was
+ * ever true. Every entry under that name goes, including the duplicate a
+ * half-repaired list holds.
+ */
+export async function dropFromRoster(
+    ownerId: string,
+    installedAppId: string,
+    file: RosterFile,
+    name: string
+): Promise<boolean> {
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!(await inventsIdentities(server))) return false;
+        const path = ROSTER_PATHS[file];
+        const current = await readRoster(server, path);
+        if (current === null) return false;
+        const written = withoutName(current, name);
+        if (written === null) return false;
+        await writeRoster(server, path, written);
+        if (file === "whitelist") await reloadWhitelist(server);
         return true;
     });
 }
@@ -279,11 +364,15 @@ export async function reconcileWhitelist(
     const names = missingWhitelistNames(rules, []);
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (await inventsIdentities(server)) {
-            const current = (await readContainerFile(server, WHITELIST_FILE)) ?? "";
+            const current = await readRoster(server, WHITELIST_FILE);
+            // A list that could not be read is not an empty one, and this pass
+            // runs by itself: writing the granted names over a file nobody could
+            // see would be this quietly emptying a whitelist on a timer.
+            if (current === null) return [];
             const written = withOfflineNames(current, names);
             if (written === null) return [];
-            await writeContainerFile(server, WHITELIST_FILE, written);
-            await server.say(["whitelist", "reload"]);
+            await writeRoster(server, WHITELIST_FILE, written);
+            await reloadWhitelist(server);
             return names;
         }
         const answer = await server.say(["whitelist", "list"]).catch(() => null);

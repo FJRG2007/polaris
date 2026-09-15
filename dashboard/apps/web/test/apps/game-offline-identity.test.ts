@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import {
     isOfflineUuid,
+    isReadableRoster,
     offlineUuid,
     rosterNames,
     withOfflineIdentities,
@@ -110,10 +111,41 @@ describe("withOfflineNames", () => {
         expect(after).toHaveLength(1);
     });
 
-    // A file the server is halfway through writing must not throw a screen away.
-    it("treats an unreadable file as an empty roster", () => {
-        expect(rosterNames(withOfflineNames("{ not json", ["Steve"]) ?? "")).toEqual(["Steve"]);
+    // Matched whatever case it was written in, and then written under the name
+    // that was asked for - both halves of it. The identity is a hash of the name
+    // beside it, so replacing one and keeping the other is how a correct entry
+    // becomes a pair no login will ever compute.
+    it("leaves the name and the identity beside it agreeing", () => {
+        const before = file([{ uuid: offlineUuid("steve"), name: "steve" }]);
+        const after = JSON.parse(withOfflineNames(before, ["Steve"]) ?? "[]");
+        expect(after).toHaveLength(1);
+        expect(after[0]).toEqual({ uuid: offlineUuid("Steve"), name: "Steve" });
+        expect(offlineUuid(after[0].name)).toBe(after[0].uuid);
+    });
+
+    // A server nobody has listed anybody on has no file at all, and that is an
+    // empty roster: the first name goes onto it.
+    it("writes the first name onto a file that is not there yet", () => {
         expect(rosterNames(withOfflineNames("", ["Steve"]) ?? "")).toEqual(["Steve"]);
+    });
+
+    // The game rewrites these files while it runs, so a read can land between its
+    // own writes. Those names are not gone, they were not seen - and writing what
+    // an empty roster would produce is a whitelist holding nobody but the player
+    // being added, with everybody else quietly off the server.
+    it("writes nothing at all over a file it could not read", () => {
+        expect(withOfflineNames("{ not json", ["Steve"])).toBeNull();
+        expect(withOfflineNames('[{"uuid":"0-0-0-0-1","na', ["Steve"])).toBeNull();
+        expect(withoutName("{ not json", "Steve")).toBeNull();
+        expect(isReadableRoster('[{"uuid":"0-0-0-0-1","na')).toBe(false);
+        expect(isReadableRoster("")).toBe(true);
+    });
+
+    // One entry it cannot make sense of is still a file full of players. Reading
+    // past it would drop every one of them.
+    it("writes nothing over a file one of whose entries it could not read", () => {
+        expect(withOfflineNames('[{"uuid":"0-0-0-0-1","name":null}]', ["Steve"])).toBeNull();
+        expect(isReadableRoster('[{"uuid":"0-0-0-0-1","name":null}]')).toBe(false);
     });
 
     it("ignores a blank name rather than writing an entry for nobody", () => {
