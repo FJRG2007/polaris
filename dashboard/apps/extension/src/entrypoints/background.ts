@@ -259,6 +259,21 @@ async function touch(): Promise<void> {
 }
 
 /**
+ * Drop the parked keys whose deadline has passed.
+ *
+ * `vault()` above does this for the account in front, on every use. A parked one
+ * is used by nothing, so without a sweep its key sits in memory until somebody
+ * happens to switch back to it. The switch already refuses a vault that aged out,
+ * which makes this about retention rather than access - and retention is the half
+ * that matters for a key nobody is going to be handed anyway.
+ */
+function sweepParkedVaults(now: number): void {
+    for (const [id, held] of parkedVaults) {
+        if (hasExpired(now, held.lockAt)) parkedVaults.delete(id);
+    }
+}
+
+/**
  * The two runtime hints below, neither of which the standard types know about.
  *
  * `brave` is Brave's own way of being asked, and it is the only way: Brave
@@ -502,6 +517,28 @@ async function settle(waiting: WaitingRequest, state: AuthorizationState): Promi
 }
 
 /**
+ * Give up on the request in flight, key material included.
+ *
+ * Every way of walking away from an approval ends here, because the two halves of
+ * abandoning one are easy to do singly and wrong apart. Forgetting the request
+ * without zeroing the private half leaves live key bytes with nothing referring to
+ * them; zeroing without forgetting leaves the loop polling a code it could no
+ * longer open the answer to.
+ *
+ * What makes this more than tidiness is that the request is tied to whichever
+ * account was in front when it was opened, and nothing in the answer says so. An
+ * approval collected after the account changed is spent on the wrong one: the token
+ * that comes back is written over the incoming account's, and the key that comes
+ * back is opened as though it were theirs. So leaving an account is abandoning its
+ * pending request, in the same breath, every time.
+ */
+async function abandonRequest(): Promise<void> {
+    asking?.privateKey.fill(0);
+    asking = null;
+    await WAITING.setValue(null);
+}
+
+/**
  * Wait for somebody to approve the request, here in the worker.
  *
  * Here rather than in the popup, and that is the whole point of this function: the
@@ -561,6 +598,10 @@ async function collect(): Promise<void> {
         // below is what records it. Nothing was typed on this way in, and `unlock`
         // cannot stretch a master password without it.
         await sync(true);
+        // The sync is what names this account, so only now can it be told from the
+        // rows in the list - one of which may be this same account, parked before
+        // the approval and holding a token this one has just replaced.
+        await dropParked(accounts.accountId(origin, await EMAIL.getValue()));
         await badge();
         return settle(still, "approved");
     }
@@ -772,6 +813,10 @@ async function activeAccount(): Promise<accounts.ParkedAccount | null> {
  * person's master key opening another person's vault.
  */
 async function parkActive(rest: readonly accounts.ParkedAccount[]): Promise<void> {
+    // Before anything moves: a request opened by the account being set aside is
+    // answered into whichever account is in front when the approval lands, and
+    // that is about to stop being this one.
+    await abandonRequest();
     const active = await activeAccount();
     if (!active) {
         await PARKED.setValue([...rest]);
@@ -780,6 +825,52 @@ async function parkActive(rest: readonly accounts.ParkedAccount[]): Promise<void
     if (open) parkedVaults.set(active.id, { vault: open, lockAt: await LOCK_AT.getValue() });
     open = null;
     await PARKED.setValue(accounts.parkAccount(rest, active));
+}
+
+/**
+ * Forget the parked record for an account, and any key held with it.
+ *
+ * An account is in front or it is set aside, never both. The two ways it can end
+ * up as both are signing into an account that is already parked - which keeps the
+ * address, so it is one press away - and being switched to. Either leaves a row
+ * nothing on screen can distinguish from the active one, holding a refresh token
+ * that has been superseded, and sign-out promotes exactly that row: the account
+ * somebody just left comes straight back, with the older token.
+ */
+async function dropParked(id: string): Promise<void> {
+    parkedVaults.delete(id);
+    const move = accounts.takeAccount(await PARKED.getValue(), id);
+    if (move) await PARKED.setValue(move.rest);
+}
+
+/**
+ * Leave no session behind: every place the worker keeps one, emptied together.
+ *
+ * One list rather than two. There were two - signing out and adding an account
+ * clear the same things and differ only over the address - and the pair had
+ * already drifted apart on what they did with a request still in flight. A way out
+ * of an account that forgets one item is a browser still holding part of a session
+ * nobody is in.
+ *
+ * The address is deliberately not here, because it is the one thing the two ways
+ * out disagree about: signing out forgets it, adding an account keeps it so the
+ * second sign-in lands on the button rather than back at the address.
+ */
+async function clearActive(): Promise<void> {
+    open = null;
+    await abandonRequest();
+    await Promise.all([
+        LOCK_AT.setValue(null),
+        REFRESH.setValue(null),
+        ACCESS.setValue(null),
+        WRAPPED.setValue(null),
+        CIPHERS.setValue(null),
+        SYNCED_AT.setValue(null),
+        REVISION.setValue(null),
+        EMAIL.setValue(null),
+        ACCOUNT_KEY.setValue(null),
+        ACCOUNT.setValue(null)
+    ]);
 }
 
 /**
@@ -819,6 +910,10 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
         REVISION.setValue(null),
         LOCK_AT.setValue(alive ? (held?.lockAt ?? null) : null)
     ]);
+    // Whatever else named this account in the list goes with the switch. The
+    // caller has usually taken it out already; what this catches is a row left
+    // over from a sign-in that never went past here.
+    await dropParked(account.id);
 }
 
 async function status(): Promise<messages.VaultStatus> {
@@ -1368,6 +1463,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // asking for it again immediately would be theatre.
                 await sync(true);
                 await unlock(request.password);
+                // Signing back into an account that is still parked - which is one
+                // press, because adding an account keeps the address - would leave
+                // it in the list as well as in front, with the older token.
+                await dropParked(accounts.accountId(origin, email));
                 await badge();
                 return { ok: true, status: await status() };
             }
@@ -1453,9 +1552,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "authorizeCancel": {
                 // The key material goes with the request: somebody who cancelled is
                 // not waiting on it, and the loop stops on its next look.
-                asking?.privateKey.fill(0);
-                asking = null;
-                await WAITING.setValue(null);
+                await abandonRequest();
                 return { ok: true };
             }
 
@@ -1469,35 +1566,25 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "lock":
                 open = null;
+                // The other accounts' keys with it. This is a demand rather than a
+                // deadline, and a switch that landed straight inside another vault
+                // would answer a different question than the one the button asks:
+                // being set aside is disuse, and so is being locked.
+                parkedVaults.clear();
                 await LOCK_AT.setValue(null);
                 await badge();
                 return { ok: true, status: await status() };
 
             case "signOut": {
-                open = null;
-                // Including anything in flight: a request still being collected
-                // would hand this browser back into an account somebody has just
-                // signed out of.
-                asking?.privateKey.fill(0);
-                asking = null;
                 // Which account is leaving, read before anything is cleared - its
                 // key must not stay in the map for a session that has ended.
                 const leaving = await activeAccount();
                 if (leaving) parkedVaults.delete(leaving.id);
-                await Promise.all([
-                    WAITING.setValue(null),
-                    LOCK_AT.setValue(null),
-                    REFRESH.setValue(null),
-                    ACCESS.setValue(null),
-                    WRAPPED.setValue(null),
-                    CIPHERS.setValue(null),
-                    SYNCED_AT.setValue(null),
-                    REVISION.setValue(null),
-                    EMAIL.setValue(null),
-                    ACCOUNT_KEY.setValue(null),
-                    ACCOUNT.setValue(null),
-                    forgetOrigin()
-                ]);
+                // Anything in flight goes too: a request still being collected
+                // would hand this browser back into an account somebody has just
+                // signed out of.
+                await clearActive();
+                await forgetOrigin();
 
                 // Signing out of one account is not signing out of the rest. The
                 // next one parked takes its place, because somebody with two
@@ -1534,19 +1621,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // Set aside rather than signed out: the point is a second account,
                 // and the first has to still be there to go back to.
                 await parkActive(await PARKED.getValue());
-                await Promise.all([
-                    WAITING.setValue(null),
-                    LOCK_AT.setValue(null),
-                    REFRESH.setValue(null),
-                    ACCESS.setValue(null),
-                    WRAPPED.setValue(null),
-                    CIPHERS.setValue(null),
-                    SYNCED_AT.setValue(null),
-                    REVISION.setValue(null),
-                    EMAIL.setValue(null),
-                    ACCOUNT_KEY.setValue(null),
-                    ACCOUNT.setValue(null)
-                ]);
+                await clearActive();
                 // The address is deliberately kept, so this lands on "Sign in with
                 // Polaris" rather than on "which Polaris". A second account is
                 // usually on the same server, and clearing it would spend a
@@ -1806,6 +1881,10 @@ export default defineBackground(() => {
             // `vault()` is what locks it; this only has to notice that it did, so
             // the badge stops offering counts for a vault nobody can read.
             if (!(await vault()) && wasOpen) await badge();
+            // The accounts set aside keep their own deadlines, and nothing else
+            // ever looks at them: a switch that never comes refuses an expired
+            // vault it is not holding, which is not the same as not holding it.
+            sweepParkedVaults(Date.now());
             // And a request somebody went off to approve is collected by a loop in
             // this worker, which a recycle takes with it. Restarted here so it
             // reaches an answer - it finds the private half gone and says so -
