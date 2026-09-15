@@ -1,21 +1,27 @@
 // @vitest-environment jsdom
 
 /**
- * The line of people under the subject, read as a sentence.
+ * The people under the subject, as two labelled rows.
  *
- * The comma between two recipients belongs to the chip that carries the address
- * - see `address-chip-separator`. That leaves the composition itself to be
- * pinned here: the comma before "copy to" is the same punctuation, and a message
- * delivered blind has no chip to carry one, so the words have to.
+ * It used to be one sentence - "to a, b, copy to c" - which read as prose and
+ * needed punctuation between its two halves to make sense. Two rows with their
+ * labels in a column is what a mail client does, and it is also what gives a long
+ * list somewhere to be folded: a fold in the middle of a sentence is a sentence
+ * that stops.
+ *
+ * So what is pinned here is the shape: each row labelled, commas only between the
+ * addresses of one row and never trailing, a message delivered blind saying so
+ * rather than showing a gap, and a list past a few people folded behind a count
+ * that opens it.
  */
 
 import * as core from "@polaris/core";
 import { ToastProvider } from "@polaris/ui";
 import { ThreadView } from "@/app/(app)/mail/thread-view";
-import { cleanup, render, screen } from "@testing-library/react";
 import type { MailViewContext } from "@/app/(app)/mail/mail-view";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined })
@@ -117,8 +123,7 @@ function message(
     };
 }
 
-/** The recipient line of the one open message, as somebody reads it. */
-function line(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]): string {
+function draw(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]): void {
     render(
         <ToastProvider>
             <ThreadView
@@ -129,8 +134,12 @@ function line(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]):
             />
         </ToastProvider>
     );
-    const found = screen.getByText("to").parentElement;
-    if (!found) throw new Error("The recipient line is not inside anything");
+}
+
+/** One row of the header, read the way somebody reads it. */
+function row(label: string): string {
+    const found = screen.getByText(label).parentElement;
+    if (!found) throw new Error(`The "${label}" row is not inside anything`);
     return found.textContent ?? "";
 }
 
@@ -138,25 +147,50 @@ function line(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]):
 const BEA = { name: "bea@example.test", address: "bea@example.test" };
 const CARL = { name: "carl@example.test", address: "carl@example.test" };
 const DORA = { name: "dora@example.test", address: "dora@example.test" };
+const ELI = { name: "eli@example.test", address: "eli@example.test" };
+const FRAN = { name: "fran@example.test", address: "fran@example.test" };
 
-describe("the recipient line", () => {
+describe("the row of people a message went to", () => {
     it("separates two recipients with a comma and stops at the last", () => {
-        expect(line([BEA, CARL], [])).toBe("tobea@example.test,carl@example.test");
+        draw([BEA, CARL], []);
+        expect(row("to")).toBe("tobea@example.test,carl@example.test");
     });
 
-    it("keeps the comma before the copy list", () => {
-        expect(line([BEA], [CARL])).toBe("tobea@example.test,copy tocarl@example.test");
+    it("says so when the message was delivered blind", () => {
+        // The To line is empty because nobody was disclosed, which is a fact
+        // about the message rather than something missing from it.
+        draw([], [CARL]);
+        expect(row("to")).toBe("toundisclosed recipients");
+    });
+});
+
+describe("the copy list", () => {
+    it("is a row of its own, labelled, rather than the tail of a sentence", () => {
+        draw([BEA], [CARL]);
+        expect(row("to")).toBe("tobea@example.test");
+        expect(row("copy to")).toBe("copy tocarl@example.test");
     });
 
-    it("keeps it for a message delivered blind, which has no chip to carry one", () => {
-        // The To line is empty, so nothing in it holds the punctuation that
-        // belongs between the two halves of the sentence.
-        expect(line([], [CARL, DORA])).toBe(
-            "toundisclosed recipients,copy tocarl@example.test,dora@example.test"
-        );
+    it("is absent entirely when nobody was copied", () => {
+        draw([BEA], []);
+        expect(screen.queryByText("copy to")).toBeNull();
+    });
+});
+
+describe("a list longer than the header should carry", () => {
+    it("folds the rest behind a count", () => {
+        draw([BEA, CARL, DORA, ELI, FRAN], []);
+        const line = row("to");
+        expect(line).toContain("+2 more");
+        expect(line).not.toContain("eli@example.test");
     });
 
-    it("leaves the words alone where there is no copy list", () => {
-        expect(line([], [])).toBe("toundisclosed recipients");
+    it("opens it where somebody asks", () => {
+        draw([BEA, CARL, DORA, ELI, FRAN], []);
+        fireEvent.click(screen.getByText("+2 more"));
+        const line = row("to");
+        expect(line).toContain("eli@example.test");
+        expect(line).toContain("fran@example.test");
+        expect(line).not.toContain("more");
     });
 });

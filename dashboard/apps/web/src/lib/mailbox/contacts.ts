@@ -133,6 +133,54 @@ export async function suggestContacts(
         .map((row) => ({ address: row.address, name: row.name }));
 }
 
+/**
+ * The names this mailbox already knows for a set of addresses.
+ *
+ * Half of what arrives names nobody: a `To` or `Cc` header is usually bare
+ * addresses, because the sending client had no reason to write anybody's name
+ * into it. Shown as they arrive, the header read as a row of usernames - the part
+ * before the `@`, with a capital letter nowhere in sight - for people the reader
+ * corresponds with daily and whose names are on the screen behind it, taken from
+ * the `From` of their own messages.
+ *
+ * So this is a lookup rather than a guess. It answers only what somebody has
+ * actually been told: an address nobody has ever written under a name is absent
+ * here, and the screen shows the address rather than inventing something from it.
+ *
+ * Hidden contacts are included deliberately. Hiding somebody takes them out of
+ * completion - it is not a decision to stop knowing who they are, and a message
+ * they are on should still say so.
+ */
+export async function namesFor(
+    accountIds: readonly string[],
+    addresses: readonly string[]
+): Promise<Map<string, string>> {
+    const wanted = [
+        ...new Set(addresses.map((address) => address.trim().toLowerCase()).filter(Boolean))
+    ];
+    if (wanted.length === 0 || accountIds.length === 0) return new Map();
+    const rows = await prisma.mailContact.findMany({
+        where: { accountId: { in: [...accountIds] }, address: { in: wanted } },
+        select: { address: true, name: true, sentCount: true, receivedCount: true }
+    });
+
+    // The same person can be known to two mailboxes under two names - a work
+    // address that signs itself one way and a personal one another. The name from
+    // the mailbox that has actually corresponded with them wins, ranked the same
+    // way completion ranks them, so the two screens never disagree about who
+    // somebody is.
+    const best = new Map<string, { name: string; weight: number }>();
+    for (const row of rows) {
+        const name = row.name.trim();
+        if (!name) continue;
+        const key = row.address.trim().toLowerCase();
+        const weight = row.sentCount * SENT_WEIGHT + row.receivedCount;
+        const held = best.get(key);
+        if (!held || weight > held.weight) best.set(key, { name, weight });
+    }
+    return new Map([...best].map(([address, held]) => [address, held.name]));
+}
+
 /** Take somebody out of completion without forgetting they exist, so they do
  *  not come back the next time they send something. */
 export async function hideContact(accountId: string, address: string): Promise<void> {

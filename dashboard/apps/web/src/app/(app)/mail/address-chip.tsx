@@ -117,7 +117,18 @@ export function AddressChip({
                         }}
                         aria-label={`Copy ${entry.address}`}
                         title={`Copy ${entry.address}`}
-                        className="shrink-0 rounded p-0.5 text-foreground-subtle opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/address:opacity-100"
+                        // `self-center` because the row aligns on the text
+                        // baseline and this button holds only an icon: a box with
+                        // no text in it has no baseline of its own to sit on, so
+                        // it hung below the address it belongs to.
+                        //
+                        // `-ml-1` for the same reason the comma has it. The row
+                        // sets a gap between everything in the chip, and this
+                        // control is transparent rather than absent - so that gap
+                        // was drawn twice around something nobody can see, which
+                        // is the hole that opened up between one address and the
+                        // next.
+                        className="-ml-1 shrink-0 self-center rounded p-0.5 text-foreground-subtle opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/address:opacity-100"
                     >
                         {copied ? (
                             <Check className="size-3 shrink-0 text-success" aria-hidden />

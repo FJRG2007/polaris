@@ -17,6 +17,7 @@
 import Fuse from "fuse.js";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { namesFor } from "./contacts";
 import { addressesFrom } from "./json";
 import type { Prisma } from "@polaris/db";
 import { unifiedAccountIds } from "./access";
@@ -526,7 +527,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         orderBy: { sentAt: "asc" }
     });
 
-    return messages.map((message) => ({
+    const rows = messages.map((message) => ({
         id: message.id,
         accountId: message.accountId,
         folderId: message.folderId,
@@ -554,6 +555,54 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
             inline: file.inline,
             contentId: file.contentId
         }))
+    }));
+
+    return withKnownNames(rows);
+}
+
+/**
+ * The people on these messages, named the way this mailbox already knows them.
+ *
+ * A `To` or `Cc` header usually carries bare addresses: the client that sent it
+ * had no reason to write anybody's name into it. Drawn as they arrive, the line
+ * under the subject read as a row of usernames - the part before the `@` - for
+ * people whose names are on the screen behind it, taken from the `From` of their
+ * own messages.
+ *
+ * Filled in from the address book rather than invented from the address, so what
+ * is shown is something somebody was actually told. An address nobody has ever
+ * written under a name keeps its address, which reads as what it is.
+ *
+ * One query for the whole conversation, and only when something is missing a
+ * name. This is the path that opens one conversation - never a list - so the cost
+ * is one lookup per open, and a failure costs the names and not the screen.
+ */
+async function withKnownNames(messages: MailMessageView[]): Promise<MailMessageView[]> {
+    const nameless = messages.flatMap((message) =>
+        [...message.from, ...message.to, ...message.cc]
+            .filter((entry) => entry.name.trim() === "")
+            .map((entry) => entry.address)
+    );
+    if (nameless.length === 0) return messages;
+
+    const known = await namesFor(
+        [...new Set(messages.map((message) => message.accountId))],
+        nameless
+    ).catch(() => new Map<string, string>());
+    if (known.size === 0) return messages;
+
+    const named = (list: readonly core.MailAddress[]): core.MailAddress[] =>
+        list.map((entry) => {
+            if (entry.name.trim() !== "") return entry;
+            const found = known.get(entry.address.trim().toLowerCase());
+            return found ? { ...entry, name: found } : entry;
+        });
+
+    return messages.map((message) => ({
+        ...message,
+        from: named(message.from),
+        to: named(message.to),
+        cc: named(message.cc)
     }));
 }
 
