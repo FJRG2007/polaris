@@ -315,13 +315,18 @@ function mentionSuggestion(
         shouldShow: ({ query }) => queryFits(char, query),
         items: async ({ query }) => {
             if (!queryFits(char, query)) return [];
-            // First, and without waiting for anything: they are a fixed pair, and
-            // somebody typing "@ev" is not going to want a person called Evan
-            // ahead of the mention they were reaching for.
+            // The room mentions go after the people rather than above them.
+            //
+            // Naming somebody is what a mention is for nearly every time one is
+            // typed, and a fixed pair pinned to the top pushed the first real
+            // name down a list this size - so the common case paid for the rare
+            // one, and the rare one is the one everybody already knows the
+            // spelling of. They are still here, and typing enough of "everyone",
+            // "all" or "here" still narrows the list to them.
             const named = rooms && char === "@" ? roomMatches(query) : [];
             searching = true;
             try {
-                return [...named, ...(await search(kinds, query))];
+                return [...(await search(kinds, query)), ...named];
             } finally {
                 searching = false;
             }
