@@ -1,6 +1,7 @@
 import { storage } from "#imports";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
+import * as accounts from "@/lib/accounts";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
@@ -126,6 +127,31 @@ const ACCOUNT_KEY = storage.defineItem<string | null>("session:vault.accountKey"
 const ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("session:vault.account", {
     fallback: null
 });
+/**
+ * The other accounts this browser is signed in to, waiting to be switched back to.
+ *
+ * Session storage, because each one carries a refresh token and that is the rule
+ * every credential here follows: the browser closing takes them, exactly as it
+ * takes the active account's own. So a restart signs out of all of them rather
+ * than of one, which is the same promise made the same number of times.
+ *
+ * What is NOT in here is any vault key. Those stay in memory, in `parkedVaults`
+ * below, for the same reason the active one does.
+ */
+const PARKED = storage.defineItem<accounts.ParkedAccount[]>("session:vault.parked", {
+    fallback: []
+});
+
+/**
+ * Each parked account's open vault, and the deadline it was parked with.
+ *
+ * Memory only, beside `open`, and holding several is the same posture as holding
+ * one: nothing is at rest, and a recycled worker drops all of them together. The
+ * deadline travels with the key so that being set aside does not exempt a vault
+ * from its own timeout - sitting in this map is the purest disuse there is, and a
+ * vault that aged out while parked comes back locked rather than open.
+ */
+const parkedVaults = new Map<string, { vault: OpenVault; lockAt: number | null }>();
 /**
  * Sites this extension is to keep out of.
  *
@@ -629,15 +655,121 @@ async function readAccount(): Promise<messages.ExtensionAccount | null> {
     }
 }
 
+/**
+ * The account in front, as a record that can be set aside.
+ *
+ * Null when there is no session to park - no address, or no token - which is the
+ * state right after signing out and while somebody is adding their second account.
+ */
+async function activeAccount(): Promise<accounts.ParkedAccount | null> {
+    const [origin, email, refresh, wrapped, accountKey, who] = await Promise.all([
+        currentOrigin(),
+        EMAIL.getValue(),
+        REFRESH.getValue(),
+        WRAPPED.getValue(),
+        ACCOUNT_KEY.getValue(),
+        ACCOUNT.getValue()
+    ]);
+    if (!origin || !refresh) return null;
+    return {
+        id: accounts.accountId(origin, email),
+        origin,
+        email,
+        name: who?.name ?? null,
+        refresh,
+        wrapped,
+        accountKey
+    };
+}
+
+/**
+ * Set the account in front aside, keys included, leaving `rest` parked beside it.
+ *
+ * The vault key moves to `parkedVaults` and `open` is dropped in the same breath,
+ * because the one thing that must never happen here is the outgoing account's key
+ * still being live when the incoming account's items are read - that is one
+ * person's master key opening another person's vault.
+ */
+async function parkActive(rest: readonly accounts.ParkedAccount[]): Promise<void> {
+    const active = await activeAccount();
+    if (!active) {
+        await PARKED.setValue([...rest]);
+        return;
+    }
+    if (open) parkedVaults.set(active.id, { vault: open, lockAt: await LOCK_AT.getValue() });
+    open = null;
+    await PARKED.setValue(accounts.parkAccount(rest, active));
+}
+
+/**
+ * Put a parked account in front, in every place the worker reads one from.
+ *
+ * This is the whole switch. Nothing else in this file knows there is more than
+ * one account: every read goes on asking the same storage items it always has,
+ * and this is what changes what they answer.
+ */
+async function makeActive(account: accounts.ParkedAccount): Promise<void> {
+    const held = parkedVaults.get(account.id);
+    parkedVaults.delete(account.id);
+    // A vault that ran out of time while it was parked comes back locked. Being
+    // set aside is disuse, and the timeout is not suspended by looking away.
+    const alive = held !== undefined && !hasExpired(Date.now(), held.lockAt);
+    open = alive ? (held?.vault ?? null) : null;
+
+    await Promise.all([
+        rememberOrigin(account.origin),
+        EMAIL.setValue(account.email),
+        REFRESH.setValue(account.refresh),
+        // Dropped rather than carried: an access token belongs to the stretch of
+        // session it was minted for, and a fresh one is one refresh away.
+        ACCESS.setValue(null),
+        WRAPPED.setValue(account.wrapped),
+        ACCOUNT_KEY.setValue(account.accountKey),
+        ACCOUNT.setValue(
+            account.name === null && account.email === null
+                ? null
+                : { name: account.name, email: account.email }
+        ),
+        // The outgoing account's items are cleared rather than left to be
+        // overwritten by the next sync: between the two, a list drawn from them
+        // would be one account's logins shown under another's name.
+        CIPHERS.setValue(null),
+        SYNCED_AT.setValue(null),
+        REVISION.setValue(null),
+        LOCK_AT.setValue(alive ? (held?.lockAt ?? null) : null)
+    ]);
+}
+
 async function status(): Promise<messages.VaultStatus> {
-    const [server, email, refreshToken, syncedAt, timeout, opened] = await Promise.all([
+    const [server, email, refreshToken, syncedAt, timeout, opened, parked] = await Promise.all([
         currentOrigin(),
         EMAIL.getValue(),
         REFRESH.getValue(),
         SYNCED_AT.getValue(),
         TIMEOUT.getValue(),
-        vault()
+        vault(),
+        PARKED.getValue()
     ]);
+    // Only worth asking for once there is a session to ask about: a browser that
+    // has not been let in yet would spend a request on every poll of a screen
+    // that is showing it the sign-in button.
+    const account = refreshToken === null ? null : await readAccount();
+    const activeId =
+        server !== null && refreshToken !== null ? accounts.accountId(server, email) : null;
+
+    // The parked ones first and the active one last, so the list keeps the order
+    // accounts were set aside in rather than reshuffling under somebody's cursor
+    // every time they switch.
+    const known: messages.AccountRef[] = parked.map((one) => ({
+        id: one.id,
+        name: one.name,
+        email: one.email,
+        origin: one.origin
+    }));
+    if (server !== null && activeId !== null) {
+        known.push({ id: activeId, name: account?.name ?? null, email, origin: server });
+    }
+
     return {
         server,
         email,
@@ -645,10 +777,9 @@ async function status(): Promise<messages.VaultStatus> {
         unlocked: opened !== null,
         syncedAt,
         timeoutMs: readTimeout(timeout),
-        // Only worth asking for once there is a session to ask about: a browser
-        // that has not been let in yet would spend a request on every poll of a
-        // screen that is showing it the sign-in button.
-        account: refreshToken === null ? null : await readAccount()
+        account,
+        accounts: known,
+        activeId
     };
 }
 
@@ -890,6 +1021,7 @@ async function fill(id: string): Promise<messages.Reply> {
 const USES_VAULT = new Set<messages.Request["kind"]>([
     "signIn",
     "unlock",
+    "switchAccount",
     "sync",
     "items",
     "itemsFor",
@@ -1260,13 +1392,17 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 await badge();
                 return { ok: true, status: await status() };
 
-            case "signOut":
+            case "signOut": {
                 open = null;
                 // Including anything in flight: a request still being collected
                 // would hand this browser back into an account somebody has just
                 // signed out of.
                 asking?.privateKey.fill(0);
                 asking = null;
+                // Which account is leaving, read before anything is cleared - its
+                // key must not stay in the map for a session that has ended.
+                const leaving = await activeAccount();
+                if (leaving) parkedVaults.delete(leaving.id);
                 await Promise.all([
                     WAITING.setValue(null),
                     LOCK_AT.setValue(null),
@@ -1281,8 +1417,73 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     ACCOUNT.setValue(null),
                     forgetOrigin()
                 ]);
+
+                // Signing out of one account is not signing out of the rest. The
+                // next one parked takes its place, because somebody with two
+                // accounts who leaves one means to be left in the other - and the
+                // alternative is a switcher that empties itself on the way past.
+                const waitingAccounts = await PARKED.getValue();
+                const next = waitingAccounts[0];
+                if (next) {
+                    await PARKED.setValue(waitingAccounts.slice(1));
+                    await makeActive(next);
+                    await sync(true);
+                }
                 await badge();
                 return { ok: true, status: await status() };
+            }
+
+            case "switchAccount": {
+                const parked = await PARKED.getValue();
+                const move = accounts.takeAccount(parked, request.id);
+                // Asked for an account that is not here: a second window can have
+                // signed out of it since this popup drew its list.
+                if (!move) return { ok: false, error: "That account is not signed in here." };
+                await parkActive(move.rest);
+                await makeActive(move.taken);
+                // Its items were cleared with the switch, so they are fetched now
+                // rather than leaving somebody looking at an empty vault until
+                // they think to press Sync.
+                await sync(true);
+                await badge();
+                return { ok: true, status: await status() };
+            }
+
+            case "addAccount": {
+                // Set aside rather than signed out: the point is a second account,
+                // and the first has to still be there to go back to.
+                await parkActive(await PARKED.getValue());
+                await Promise.all([
+                    WAITING.setValue(null),
+                    LOCK_AT.setValue(null),
+                    REFRESH.setValue(null),
+                    ACCESS.setValue(null),
+                    WRAPPED.setValue(null),
+                    CIPHERS.setValue(null),
+                    SYNCED_AT.setValue(null),
+                    REVISION.setValue(null),
+                    EMAIL.setValue(null),
+                    ACCOUNT_KEY.setValue(null),
+                    ACCOUNT.setValue(null)
+                ]);
+                // The address is deliberately kept, so this lands on "Sign in with
+                // Polaris" rather than on "which Polaris". A second account is
+                // usually on the same server, and clearing it would spend a
+                // permission prompt asking for an origin the browser has already
+                // granted - a browser allows one request per gesture.
+                await badge();
+                return { ok: true, status: await status() };
+            }
+
+            case "forgetServer": {
+                // Refused while somebody is signed in, because the session would be
+                // left with no address to reach its own server at.
+                if (await REFRESH.getValue()) {
+                    return { ok: false, error: "Sign out of this account first." };
+                }
+                await forgetOrigin();
+                return { ok: true, status: await status() };
+            }
 
             case "sync":
                 return (await sync(true))

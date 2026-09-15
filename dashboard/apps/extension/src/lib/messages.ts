@@ -72,6 +72,16 @@ export interface VaultStatus {
      * in rather than saying something wrong.
      */
     readonly account: ExtensionAccount | null;
+    /**
+     * Every account signed in here, the active one included.
+     *
+     * Empty until something has been signed into, and one entry long for the
+     * person who only ever has one - which is why the popup draws nothing for it
+     * rather than an empty list with a heading.
+     */
+    readonly accounts: readonly AccountRef[];
+    /** Which of them is in front, or null while none is. */
+    readonly activeId: string | null;
 }
 
 /** The person this extension is signed in as, as little of them as the popup
@@ -79,6 +89,21 @@ export interface VaultStatus {
 export interface ExtensionAccount {
     readonly name: string | null;
     readonly email: string | null;
+}
+
+/**
+ * One account in the switcher.
+ *
+ * No credential of any kind: this crosses to the popup, and what the popup needs
+ * is enough to name a row and to say which row was pressed. The token that makes
+ * the switch possible stays in the worker, and the id is what connects the two.
+ */
+export interface AccountRef {
+    readonly id: string;
+    readonly name: string | null;
+    readonly email: string | null;
+    /** Shown when there is no name and no email, and to tell two servers apart. */
+    readonly origin: string;
 }
 
 export type Request =
@@ -160,7 +185,32 @@ export type Request =
      * here carries the old password: the worker reads it from what it already
      * holds, so the popup never needs to have seen it to replace it.
      */
-    | { readonly kind: "changePassword"; readonly id: string; readonly password: string };
+    | { readonly kind: "changePassword"; readonly id: string; readonly password: string }
+    /**
+     * Put another account in front, out of the ones already signed in here.
+     *
+     * The id names it; nothing else crosses. What the worker does with it is a
+     * swap - the account in front is set aside with its keys, and this one takes
+     * its place - so this is the only message that changes whose vault every other
+     * message in this file is about.
+     */
+    | { readonly kind: "switchAccount"; readonly id: string }
+    /**
+     * Set the account in front aside and start signing into another one.
+     *
+     * Not a sign-out: what is wanted is a second account, and the first stays in
+     * the switcher to go back to. The address is kept, because the second account
+     * is usually on the same Polaris and clearing it would spend a permission
+     * prompt on a server the browser has already granted.
+     */
+    | { readonly kind: "addAccount" }
+    /**
+     * Forget which Polaris this is, so another address can be typed.
+     *
+     * Refused while an account is signed in, since that would leave a session with
+     * no address to reach its own server at.
+     */
+    | { readonly kind: "forgetServer" };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }

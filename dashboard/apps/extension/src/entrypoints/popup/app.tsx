@@ -2,8 +2,9 @@ import { TIMEOUT_CHOICES } from "@/lib/lock";
 import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
+import { accountHost, describeAccount } from "@/lib/accounts";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askBackground, type ItemSummary, type VaultStatus } from "@/lib/messages";
+import { askBackground, type ItemSummary, type Request, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
 // product's domain logic, and pulling it in for one function put a quarter of a
 // megabyte of zod schemas, CIDR arithmetic and camera geometry into a popup that
@@ -128,6 +129,11 @@ export function App(): React.JSX.Element {
         <>
             <UpdateBanner notice={update} server={status.server} />
             {screen}
+            {/* Under whichever screen is showing, rather than only over the item
+                list. A vault that is locked, and an account just set aside to add
+                another, are exactly the moments somebody needs the way back - and
+                those are the screens the list would otherwise be missing from. */}
+            <Accounts status={status} onChange={refresh} />
         </>
     );
 }
@@ -406,6 +412,16 @@ function SignIn({
                     </p>
                     <button className="ghost" onClick={() => setTyping(true)}>
                         Use the master password
+                    </button>
+                    {/* The way to a different server. Off the main path, because
+                        most people have one Polaris - but without it, setting an
+                        account aside to add another would strand somebody on
+                        whichever address they happened to name first. */}
+                    <button
+                        className="ghost"
+                        onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}
+                    >
+                        Use a different Polaris
                     </button>
                 </>
             )}
@@ -958,27 +974,107 @@ function Timeout({
 }
 
 /**
- * Who this extension is signed in as.
+ * Which account this is, and the way to another one.
  *
- * The question the popup could not answer: it knew how to read a vault and not
- * whose account the vault was on, so the only way to find out was to open the
- * dashboard and look. One approval now hands back a credential for the account
- * as well, and this is what it is for.
+ * Two things the popup could not do, which turn out to be one thing. It knew how
+ * to read a vault and not whose account the vault was on, so the only way to find
+ * out was to open the dashboard and look. And it could hold exactly one account at
+ * a time, so reaching the second meant signing out of the first, naming the server
+ * again, and approving again - for an account it had been signed into ten seconds
+ * earlier.
  *
- * Absent rather than wrong when there is nothing to say. A Polaris older than
- * that credential, one that could not be reached, and a session that predates it
- * all arrive here as null, and none of them is worth a sentence - the vault
- * works the same either way.
+ * So the line says who is in front, and opening it lists everyone else signed in
+ * here. Switching is one press. Adding one sets the current account aside rather
+ * than ending it, which is the difference between a second account and a
+ * replacement.
+ *
+ * What a row is called comes from `lib/accounts`, not from here, because the same
+ * fallback - name, then email, then the server's host - has to hold for a Polaris
+ * too old to name its own account. A row nobody can identify is not a row.
  */
-function Account({ account }: { account: VaultStatus["account"] }): React.JSX.Element | null {
-    if (!account) return null;
-    const who = account.name ?? account.email;
-    if (!who) return null;
+function Accounts({
+    status,
+    onChange
+}: {
+    status: VaultStatus;
+    onChange: () => Promise<void>;
+}): React.JSX.Element | null {
+    const [open, setOpen] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [refused, setRefused] = useState<string | null>(null);
+
+    // Nothing at all before anything has been signed into. Otherwise this is the
+    // one thing that would appear on a first run, saying nothing, above a form
+    // still asking which Polaris this is.
+    if (status.accounts.length === 0) return null;
+
+    const active = status.accounts.find((one) => one.id === status.activeId) ?? null;
+    const others = status.accounts.filter((one) => one.id !== status.activeId);
+
+    const act = async (request: Request): Promise<void> => {
+        setBusy(true);
+        setRefused(null);
+        const reply = await askBackground(request);
+        setBusy(false);
+        if (!reply.ok) {
+            setRefused(reply.error);
+            return;
+        }
+        setOpen(false);
+        await onChange();
+    };
+
     return (
-        <div className="row">
-            <span className="muted small" title={account.email ?? undefined}>
-                Signed in as <span className="who-name">{who}</span>
+        <div className="row wrap">
+            <span className="muted small">
+                {active ? (
+                    <>
+                        Signed in as{" "}
+                        <span className="who-name" title={active.email ?? undefined}>
+                            {describeAccount(active)}
+                        </span>
+                    </>
+                ) : (
+                    "Signing in to another account"
+                )}
             </span>
+            <div className="acts">
+                <button className="ghost" disabled={busy} onClick={() => setOpen(!open)}>
+                    {open ? "Hide" : others.length > 0 ? `Switch (${others.length})` : "Accounts"}
+                </button>
+            </div>
+            {open ? (
+                <ul className="accounts">
+                    {others.map((one) => (
+                        <li key={one.id}>
+                            <button
+                                className="account"
+                                disabled={busy}
+                                title={`Switch to ${describeAccount(one)}`}
+                                onClick={() => void act({ kind: "switchAccount", id: one.id })}
+                            >
+                                <span className="shown">{describeAccount(one)}</span>
+                                <span className="account-where">{accountHost(one.origin)}</span>
+                            </button>
+                        </li>
+                    ))}
+                    {/* Only where there is an account to set aside. With none in
+                        front, the screen above this already IS the way in, and a
+                        button offering to start another one goes nowhere. */}
+                    {active ? (
+                        <li>
+                            <button
+                                className="account"
+                                disabled={busy}
+                                onClick={() => void act({ kind: "addAccount" })}
+                            >
+                                Add another account
+                            </button>
+                        </li>
+                    ) : null}
+                </ul>
+            ) : null}
+            <Problem text={refused} />
         </div>
     );
 }
@@ -1216,8 +1312,6 @@ function Items({
             />
 
             <Generator onUse={setOffered} />
-
-            <Account account={status.account} />
 
             <Timeout status={status} onChange={onChange} />
 

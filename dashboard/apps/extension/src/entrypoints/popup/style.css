@@ -393,6 +393,53 @@ footer {
     color: hsl(var(--foreground));
 }
 
+/* The other accounts signed in here, opened from the line above. Closed by
+   default: most people have one, and a list of one is furniture. */
+.accounts {
+    flex: 1 1 100%;
+    margin-top: 4px;
+}
+
+/* The rows are buttons rather than list items, so the separators and padding the
+   login list gives an `li` would be drawn twice here. */
+.accounts li {
+    padding: 0;
+    border-bottom: 0;
+}
+
+.account {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+    background: transparent;
+    color: hsl(var(--foreground));
+    font: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    text-align: left;
+}
+
+.account:hover:not(:disabled),
+.account:focus-visible {
+    background: hsl(var(--elevated));
+}
+
+/* Which server a row is on, when the name above it does not say. Allowed to
+   shrink away before the name does, for the reason `.vault` is. */
+.account-where {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-left: auto;
+    color: hsl(var(--muted-foreground));
+}
+
 /* A one-time code: read off the screen as often as it is copied, so it is shown
    in full and the whole line copies it. */
 .code {
