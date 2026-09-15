@@ -58,12 +58,29 @@ afterEach(cleanup);
 
 const TEXT = "hello world";
 
+/** Every range the menu asked to be taken out, and every span it marked. */
+interface Done {
+    readonly deleted: { from: number; to: number }[];
+    readonly marked: { from: number; to: number; command: string }[];
+}
+
 /**
  * An editor whose selection moves without React hearing about it, which is what a
  * mouse drag across a real one does.
+ *
+ * Its text is replaceable, because the other thing that happens behind the menu's
+ * back is the document itself being swapped: the menu holds the focus, and a
+ * blurred surface is the one a value from the server is allowed to replace.
  */
-function standIn(): { editor: Editor; select: (from: number, to: number) => void } {
+function standIn(): {
+    editor: Editor;
+    select: (from: number, to: number) => void;
+    replace: (text: string) => void;
+    done: Done;
+} {
     const selection = { from: 1, to: 1 };
+    const done: Done = { deleted: [], marked: [] };
+    let text = TEXT;
     const editor = {
         isDestroyed: false,
         state: {
@@ -72,13 +89,32 @@ function standIn(): { editor: Editor; select: (from: number, to: number) => void
             },
             doc: {
                 // Document positions start at one, so the slice sits one to the left.
-                textBetween: (from: number, to: number) => TEXT.slice(from - 1, to - 1)
+                textBetween: (from: number, to: number) => text.slice(from - 1, to - 1),
+                get content() {
+                    return { size: text.length + 1 };
+                }
             }
         },
         chain: () => {
+            let at = { from: 0, to: 0 };
+            const mark = (command: string) => () => {
+                done.marked.push({ ...at, command });
+                return chain;
+            };
             const chain = {
                 focus: () => chain,
-                deleteRange: () => chain,
+                deleteRange: (range: { from: number; to: number }) => {
+                    done.deleted.push(range);
+                    return chain;
+                },
+                setTextSelection: (range: { from: number; to: number }) => {
+                    at = range;
+                    return chain;
+                },
+                toggleBold: mark("toggleBold"),
+                toggleItalic: mark("toggleItalic"),
+                toggleStrike: mark("toggleStrike"),
+                toggleCode: mark("toggleCode"),
                 run: () => true
             };
             return chain;
@@ -89,7 +125,11 @@ function standIn(): { editor: Editor; select: (from: number, to: number) => void
         select: (from, to) => {
             selection.from = from;
             selection.to = to;
-        }
+        },
+        replace: (next) => {
+            text = next;
+        },
+        done
     };
 }
 
@@ -101,12 +141,29 @@ function draw(editor: Editor): void {
     );
 }
 
-/** Right-press the writing surface, and hand back the row that copies. */
-async function openCopy(): Promise<HTMLElement> {
+/** Right-press the writing surface. */
+async function openMenu(): Promise<void> {
     await act(async () => {
         fireEvent.contextMenu(screen.getByTestId("surface"));
     });
-    return screen.getByRole("menuitem", { name: /^Copy/ });
+}
+
+/** A row of the open menu, by the label it carries. */
+function row(name: RegExp): HTMLElement {
+    return screen.getByRole("menuitem", { name });
+}
+
+/** Press a row and let the clipboard answer it. */
+async function press(name: RegExp): Promise<void> {
+    await act(async () => {
+        fireEvent.click(row(name));
+    });
+}
+
+/** Right-press the writing surface, and hand back the row that copies. */
+async function openCopy(): Promise<HTMLElement> {
+    await openMenu();
+    return row(/^Copy/);
 }
 
 describe("copying out of the right-press menu", () => {
@@ -143,5 +200,72 @@ describe("copying out of the right-press menu", () => {
         const { editor } = standIn();
         draw(editor);
         expect((await openCopy()).getAttribute("aria-disabled")).toBe("true");
+    });
+});
+
+/**
+ * The other half of a captured span: it is a pair of absolute positions, and the
+ * document underneath it is free to move while the clipboard is being written.
+ * The menu holds the focus, and a blurred surface is precisely the one the editor
+ * lets a value from the server replace, so this is the ordinary case rather than
+ * an exotic one. What the numbers no longer describe must be left alone.
+ */
+describe("cutting out of the right-press menu", () => {
+    it("takes out the span it was opened over", async () => {
+        const { editor, select, done } = standIn();
+        draw(editor);
+        select(1, 6);
+        await openMenu();
+        await press(/^Cut/);
+        expect(done.deleted).toEqual([{ from: 1, to: 6 }]);
+    });
+
+    it("leaves the text alone when the document moved while the clipboard answered", async () => {
+        const { editor, select, replace, done } = standIn();
+        draw(editor);
+        select(1, 6);
+        await openMenu();
+        writeText.mockImplementationOnce(async () => {
+            replace("a description saved from somewhere else");
+            return undefined;
+        });
+        await press(/^Cut/);
+        expect(done.deleted).toEqual([]);
+    });
+
+    it("leaves the text alone when the document no longer reaches that far", async () => {
+        const { editor, select, replace, done } = standIn();
+        draw(editor);
+        select(1, 6);
+        await openMenu();
+        // Shorter than the span: deleting by these positions is what threw.
+        writeText.mockImplementationOnce(async () => {
+            replace("hi");
+            return undefined;
+        });
+        await press(/^Cut/);
+        expect(done.deleted).toEqual([]);
+    });
+});
+
+describe("marking out of the right-press menu", () => {
+    it("marks the span it was opened over, not the caret it was left with", async () => {
+        const { editor, select, done } = standIn();
+        draw(editor);
+        select(1, 6);
+        await openMenu();
+        select(1, 1);
+        await press(/^Bold/);
+        expect(done.marked).toEqual([{ from: 1, to: 6, command: "toggleBold" }]);
+    });
+
+    it("marks nothing once the document moved under the span", async () => {
+        const { editor, select, replace, done } = standIn();
+        draw(editor);
+        select(1, 6);
+        await openMenu();
+        replace("hi");
+        await press(/^Italic/);
+        expect(done.marked).toEqual([]);
     });
 });

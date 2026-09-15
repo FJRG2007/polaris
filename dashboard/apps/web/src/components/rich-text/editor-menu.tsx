@@ -60,11 +60,44 @@ export interface ListAction {
     readonly run: (items: readonly string[]) => Promise<boolean>;
 }
 
+/**
+ * A stretch of the document, and how it read at the moment it was taken.
+ *
+ * The text is what makes the positions safe to use later: they are absolute, and
+ * a document that changed under them points them at something else entirely.
+ */
+interface Span {
+    readonly from: number;
+    readonly to: number;
+    readonly text: string;
+}
+
+/** A stretch of the document as it reads right now. */
+function spanAt(editor: Editor, from: number, to: number): Span {
+    return { from, to, text: editor.state.doc.textBetween(from, to, "\n", " ") };
+}
+
+/**
+ * Whether a span still holds what it held when it was taken.
+ *
+ * Everything the menu does to the document is done to positions captured when it
+ * opened, and the wait in between is long enough to lose them: a menu holds the
+ * focus, and a blurred surface is exactly the one the editor lets a value from
+ * the server replace - see the content effect in `rich-text-editor.tsx`. So by
+ * the time a clipboard write or a subtask round trip answers, those numbers can
+ * address a different document: a delete takes out an arbitrary stretch of it,
+ * or throws for a position past its end. Anything the numbers no longer describe
+ * is left alone, which costs somebody a second cut and never costs them text.
+ */
+function stillReads(editor: Editor, span: Span): boolean {
+    if (editor.isDestroyed) return false;
+    if (span.to > editor.state.doc.content.size) return false;
+    return editor.state.doc.textBetween(span.from, span.to, "\n", " ") === span.text;
+}
+
 /** The list items covered by the selection, and the span they occupy. Null when
  *  the selection is empty or touches no list at all. */
-export function selectedListItems(
-    editor: Editor
-): { items: string[]; from: number; to: number } | null {
+export function selectedListItems(editor: Editor): (Span & { items: string[] }) | null {
     const { from, to } = editor.state.selection;
     if (from === to) return null;
     const items: string[] = [];
@@ -78,7 +111,7 @@ export function selectedListItems(
         end = Math.max(end, pos + node.nodeSize);
     });
     if (items.length === 0 || end < 0) return null;
-    return { items, from: start, to: end };
+    return { items, ...spanAt(editor, start, end) };
 }
 
 /**
@@ -88,10 +121,12 @@ export function selectedListItems(
  * React watches - see where this is filled in.
  */
 interface Opened {
-    readonly from: number;
-    readonly to: number;
-    readonly list: { items: string[]; from: number; to: number } | null;
+    readonly selection: Span;
+    readonly list: ReturnType<typeof selectedListItems>;
 }
+
+/** The marks a row can carry, named the way the editor names them. */
+type MarkCommand = "toggleBold" | "toggleItalic" | "toggleStrike" | "toggleCode";
 
 function Item({
     label,
@@ -170,7 +205,7 @@ export function EditorMenu({
      */
     const [opened, setOpened] = useState<Opened | null>(null);
     const list = opened?.list ?? null;
-    const marks = opened !== null && opened.from !== opened.to;
+    const marks = opened !== null && opened.selection.from !== opened.selection.to;
 
     /**
      * What the clipboard holds, read when the menu opens and never before: a page
@@ -180,11 +215,20 @@ export function EditorMenu({
     const [pending, setPending] = useState<string | null>(null);
     const keys = modifierKey();
 
-    /** The selection as text, which is what goes on the clipboard. Read from the
-     *  span the menu was opened over, so what a cut takes out is exactly what was
-     *  put on the clipboard. */
-    const selectedText = (): string =>
-        opened ? editor.state.doc.textBetween(opened.from, opened.to, "\n", " ") : "";
+    /**
+     * A mark over the span the menu was opened over, rather than over whatever is
+     * selected by the time the row is pressed.
+     *
+     * The same reason the rest of the menu works from a captured span: the menu
+     * holds the focus, and on a surface that lets its selection go with the focus
+     * a live toggle arms a mark at the caret instead of formatting the words
+     * somebody selected - a press that appears to do nothing at all.
+     */
+    const mark = (command: MarkCommand) => () => {
+        if (!opened || !stillReads(editor, opened.selection)) return;
+        const { from, to } = opened.selection;
+        editor.chain().focus().setTextSelection({ from, to })[command]().run();
+    };
 
     async function put(text: string): Promise<boolean> {
         try {
@@ -205,9 +249,9 @@ export function EditorMenu({
                     setOpened(null);
                     return;
                 }
+                const { from, to } = editor.state.selection;
                 setOpened({
-                    from: editor.state.selection.from,
-                    to: editor.state.selection.to,
+                    selection: spanAt(editor, from, to),
                     list: listAction ? selectedListItems(editor) : null
                 });
                 void navigator.clipboard
@@ -225,13 +269,17 @@ export function EditorMenu({
                     icon={<Scissors className="size-3.5" />}
                     onSelect={() => {
                         if (!opened) return;
-                        const { from, to } = opened;
-                        void put(selectedText()).then((written) => {
-                            // Only once it is somewhere else. Text cut onto a
+                        const span = opened.selection;
+                        void put(span.text).then((written) => {
+                            // Only once it is somewhere else, and only while the
+                            // span still reads as it did. Text cut onto a
                             // clipboard that refused it is text that is gone.
-                            if (written && !editor.isDestroyed) {
-                                editor.chain().focus().deleteRange({ from, to }).run();
-                            }
+                            if (!written || !stillReads(editor, span)) return;
+                            editor
+                                .chain()
+                                .focus()
+                                .deleteRange({ from: span.from, to: span.to })
+                                .run();
                         });
                     }}
                 />
@@ -240,7 +288,7 @@ export function EditorMenu({
                     keys={`${keys}+C`}
                     disabled={!marks}
                     icon={<Copy className="size-3.5" />}
-                    onSelect={() => void put(selectedText())}
+                    onSelect={() => void put(opened?.selection.text ?? "")}
                 />
                 <Item
                     label={pending === "" ? "Nothing to paste" : "Paste"}
@@ -260,22 +308,22 @@ export function EditorMenu({
                         <Item
                             label="Bold"
                             icon={<Bold className="size-3.5" />}
-                            onSelect={() => editor.chain().focus().toggleBold().run()}
+                            onSelect={mark("toggleBold")}
                         />
                         <Item
                             label="Italic"
                             icon={<Italic className="size-3.5" />}
-                            onSelect={() => editor.chain().focus().toggleItalic().run()}
+                            onSelect={mark("toggleItalic")}
                         />
                         <Item
                             label="Strikethrough"
                             icon={<Strikethrough className="size-3.5" />}
-                            onSelect={() => editor.chain().focus().toggleStrike().run()}
+                            onSelect={mark("toggleStrike")}
                         />
                         <Item
                             label="Code"
                             icon={<Code className="size-3.5" />}
-                            onSelect={() => editor.chain().focus().toggleCode().run()}
+                            onSelect={mark("toggleCode")}
                         />
                         <ContextMenuSeparator />
                     </>
@@ -310,10 +358,11 @@ export function EditorMenu({
                             icon={<ListTree className="size-3.5" />}
                             onSelect={() => {
                                 void listAction.run(list.items).then((moved) => {
-                                    // Only once they exist somewhere else. A list
-                                    // taken out of the text after a refused write
-                                    // is work that no longer exists anywhere.
-                                    if (!moved || editor.isDestroyed) return;
+                                    // Only once they exist somewhere else, and
+                                    // only while the span still reads as it did. A
+                                    // list taken out of the text after a refused
+                                    // write is work that no longer exists anywhere.
+                                    if (!moved || !stillReads(editor, list)) return;
                                     editor
                                         .chain()
                                         .focus()
