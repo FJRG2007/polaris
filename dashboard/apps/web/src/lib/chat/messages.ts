@@ -27,6 +27,7 @@ import {
     type ChatReferenceView
 } from "./references";
 import { announceRoomMention } from "./room-mentions";
+import { mentionsReader, readerTeams } from "./notify";
 import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
@@ -90,6 +91,22 @@ export interface ChatMessageView {
      * wrote, and hiding it would tell the reader something they were not told.
      */
     readonly blocked: boolean;
+    /**
+     * Whether this message names this reader - them, a team of theirs, or the
+     * room.
+     *
+     * Per reader, like `starred` and `blocked` above, and for the same reason:
+     * everybody else sees an ordinary message with an ordinary mention in it,
+     * because to them that is what it is. The one person named sees it marked, so
+     * that scrolling back through a busy room they can find the thing that was
+     * actually addressed to them.
+     *
+     * Decided here rather than in the browser so it agrees with the notification
+     * that was - or was not - sent about the same message. Two answers to "does
+     * this name me" is how a room ends up highlighting what it did not tell
+     * anybody about.
+     */
+    readonly mentionsYou: boolean;
     /**
      * What this message points at inside Polaris, resolved for this reader.
      *
@@ -1554,6 +1571,36 @@ export async function decorateMessages(
     );
     const quotes = new Map(quoted.map((row) => [row.id, row]));
     const kept = new Set(stars.map((row) => row.messageId));
+    /**
+     * The messages on this page that name the reader.
+     *
+     * Worked out once for the page rather than once per message: the teams behind
+     * a `@team` are a query, and the parse behind the rest is the expensive part
+     * of answering at all. A page where nothing carries an `@` or an address pays
+     * for neither, which is nearly every page.
+     *
+     * The same function the notifications are decided with, deliberately. Two
+     * answers to "does this name me" is how a room ends up marking a message it
+     * never told anybody about, or telling somebody about one it then draws like
+     * any other.
+     *
+     * Not the reader's own messages: naming yourself is not being named, and a
+     * deleted one has no body left to be named in.
+     */
+    const worthParsing = rows.some(
+        (row) => row.body.includes("@") || row.body.includes("polaris:")
+    );
+    const teams = worthParsing ? await readerTeams(actor.id) : new Set<string>();
+    const mentioned = new Set(
+        rows
+            .filter(
+                (row) =>
+                    row.deletedAt === null &&
+                    row.authorId !== actor.id &&
+                    mentionsReader(row.body, actor.id, teams)
+            )
+            .map((row) => row.id)
+    );
     const onMessageFiles = new Map<string, ChatAttachmentView[]>();
     for (const file of files) {
         const bucket = onMessageFiles.get(file.messageId) ?? [];
@@ -1608,6 +1655,7 @@ export async function decorateMessages(
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
         blocked: row.authorId !== null && shut.has(row.authorId),
+        mentionsYou: mentioned.has(row.id),
         references: (pointedAt.get(row.id) ?? [])
             .map((key) => references.get(key))
             .filter((found): found is ChatReferenceView => found !== undefined),

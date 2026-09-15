@@ -50,6 +50,10 @@ export function draftMessage(facts: {
         // Nobody blocks themselves, and the menu that would offer it does not
         // appear on your own row.
         blocked: false,
+        // Naming yourself is not being named. The server keeps to the same rule,
+        // so this is what comes back a moment from now as well rather than a
+        // guess that gets corrected on screen.
+        mentionsYou: false,
         // Resolved by the server on the reload a moment from now. A draft that
         // guessed would draw a card and then replace it with a different one.
         references: [],

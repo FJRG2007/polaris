@@ -361,6 +361,12 @@ export function MessageList({
                         id={`message-${message.id}`}
                         className={cn(
                             "transition-colors duration-500",
+                            // Only the person named sees this. To everybody else
+                            // it is an ordinary message with an ordinary mention
+                            // in it, which is exactly what it is to them - and a
+                            // room where every mention of anybody was highlighted
+                            // for everybody would be a room of highlights.
+                            message.mentionsYou && "border-l-2 border-warning bg-warning/10",
                             message.id === highlightId && "bg-primary/10"
                         )}
                     >
