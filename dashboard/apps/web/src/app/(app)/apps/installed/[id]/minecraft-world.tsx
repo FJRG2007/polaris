@@ -679,6 +679,7 @@ function BackupScheduleCard({
     const [keepLast, setKeepLast] = useState(0);
     const [budgetGb, setBudgetGb] = useState("");
     const [notify, setNotify] = useState(true);
+    const [onShutdown, setOnShutdown] = useState(true);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -690,6 +691,7 @@ function BackupScheduleCard({
         setKeepLast(saved.keepLast);
         setBudgetGb(saved.maxBytes > 0 ? String(Math.round((saved.maxBytes / GIB) * 10) / 10) : "");
         setNotify(saved.notifyOnFailure);
+        setOnShutdown(saved.onShutdown);
     }, [saved]);
 
     const maxBytes = Math.round((Number.parseFloat(budgetGb) || 0) * GIB);
@@ -704,7 +706,8 @@ function BackupScheduleCard({
         (every !== saved.every ||
             keepLast !== saved.keepLast ||
             maxBytes !== saved.maxBytes ||
-            notify !== saved.notifyOnFailure);
+            notify !== saved.notifyOnFailure ||
+            onShutdown !== saved.onShutdown);
 
     async function save(): Promise<void> {
         setPending(true);
@@ -714,7 +717,8 @@ function BackupScheduleCard({
             every,
             keepLast,
             maxBytes,
-            notifyOnFailure: notify
+            notifyOnFailure: notify,
+            onShutdown
         });
         setPending(false);
         if (result.error) setError(result.error);
@@ -784,6 +788,21 @@ function BackupScheduleCard({
                                             ? ` - they take up ${formatBytes(view.backupBytes)} now`
                                             : ""
                                     }. The newest copy is never deleted.`}
+                            </span>
+                        </label>
+
+                        <label className="flex cursor-pointer items-start gap-2 text-sm">
+                            <Checkbox
+                                checked={onShutdown}
+                                onChange={(event) => setOnShutdown(event.target.checked)}
+                                className="mt-0.5"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                                <span className="font-medium">Copy the world before stopping</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Taken after the server saves and before the container goes down, so the copy holds
+                                    the last thing that happened rather than the last scheduled one.
+                                </span>
                             </span>
                         </label>
 

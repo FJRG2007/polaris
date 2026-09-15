@@ -39,6 +39,7 @@ import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
 import { useGamePresence } from "@/components/use-game-presence";
+import { MinecraftJoinPassword } from "./minecraft-join-password";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
@@ -471,6 +472,16 @@ export function MinecraftPanel({
                         settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
                         playersOnline={status?.players.online ?? 0}
                         running={isRunning}
+                        onSaved={reloadSettings}
+                    />
+                    {/* Beside the authentication switch rather than on the Mods
+                        screen: it is the answer to what that switch gives up, and
+                        nobody looking for it would think to search a marketplace. */}
+                    <MinecraftJoinPassword
+                        installedAppId={installedAppId}
+                        projects={settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""}
+                        software={settings.find((setting) => setting.key === "TYPE")?.value ?? ""}
+                        playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}
                     />
                     {/* The firewall guards HTTP and a game server is not HTTP, so

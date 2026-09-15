@@ -32,12 +32,27 @@ describe("reading a stored policy", () => {
     });
 
     it("takes a whole policy back unchanged", () => {
-        const stored = { every: "daily", keepLast: 3, maxBytes: 1024, notifyOnFailure: false };
+        const stored = { every: "daily", keepLast: 3, maxBytes: 1024, notifyOnFailure: false, onShutdown: false };
         expect(policy.readBackupPolicy({ backupPolicy: stored })).toEqual(stored);
     });
 
     it("is the default for a server nobody has configured", () => {
         expect(policy.readBackupPolicy({})).toEqual(policy.DEFAULT_BACKUP_POLICY);
+    });
+
+    // The whole point of the default: a server created before any of this existed
+    // has no `backupPolicy` key at all, and it has to end up with copies being
+    // taken rather than with the old "off".
+    it("puts a server that predates the setting on a schedule", () => {
+        expect(policy.readBackupPolicy({}).every).not.toBe("off");
+        expect(policy.readBackupPolicy({}).onShutdown).toBe(true);
+        expect(policy.readBackupPolicy({ backupPolicy: { keepLast: 3 } }).every).not.toBe("off");
+    });
+
+    it("keeps a shutdown copy turned off when that is what was stored", () => {
+        expect(policy.readBackupPolicy({ backupPolicy: { onShutdown: false } }).onShutdown).toBe(false);
+        // Not a boolean is not an answer, so the default stands.
+        expect(policy.readBackupPolicy({ backupPolicy: { onShutdown: "yes" } }).onShutdown).toBe(true);
     });
 });
 
@@ -45,7 +60,8 @@ describe("whether a copy is due", () => {
     const daily = { ...policy.DEFAULT_BACKUP_POLICY, every: "daily" as const };
 
     it("is never due while the schedule is off", () => {
-        expect(policy.backupDue(policy.DEFAULT_BACKUP_POLICY, null, NOW)).toBe(false);
+        const off = { ...policy.DEFAULT_BACKUP_POLICY, every: "off" as const };
+        expect(policy.backupDue(off, null, NOW)).toBe(false);
     });
 
     it("is due at once for a server with no copy at all", () => {
@@ -124,7 +140,7 @@ describe("which copies are pruned", () => {
 
 describe("what the screen says", () => {
     it("has no next time while the schedule is off", () => {
-        expect(policy.nextBackupAt(policy.DEFAULT_BACKUP_POLICY, null)).toBeNull();
+        expect(policy.nextBackupAt({ ...policy.DEFAULT_BACKUP_POLICY, every: "off" }, null)).toBeNull();
     });
 
     it("counts the next one from the newest archive", () => {

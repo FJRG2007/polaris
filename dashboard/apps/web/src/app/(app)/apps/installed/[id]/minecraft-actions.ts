@@ -1162,7 +1162,8 @@ const backupPolicySchema = z.object({
     keepLast: z.number().int().min(0).max(MAX_KEEP_LAST),
     /** 0 means no size limit. */
     maxBytes: z.number().int().min(0).max(MAX_BACKUP_BYTES),
-    notifyOnFailure: z.boolean()
+    notifyOnFailure: z.boolean(),
+    onShutdown: z.boolean()
 });
 
 export type BackupPolicyInput = z.infer<typeof backupPolicySchema>;

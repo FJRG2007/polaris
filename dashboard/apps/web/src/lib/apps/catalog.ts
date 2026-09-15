@@ -536,6 +536,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     group: "Players"
                 },
                 {
+                    // Security rather than Players: it is the setting that decides
+                    // whether a name proves anything at all, and an operator looking
+                    // for how the server is closed should not find it filed beside
+                    // the render distance.
                     key: "ONLINE_MODE",
                     label: "Mojang authentication",
                     help: "Off lets cracked clients in, and anyone can claim any username.",
@@ -545,7 +549,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                         { value: "false", label: "Not required" }
                     ],
                     tunable: true,
-                    group: "Players"
+                    group: "Security"
                 },
                 {
                     // A new server is reachable the moment it boots, and an open one
@@ -742,7 +746,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                         { value: "false", label: "Not required" }
                     ],
                     tunable: true,
-                    group: "Players"
+                    group: "Security"
                 }
             ],
             volumes: [{ name: "data", mountPath: "/data", label: "World data" }],

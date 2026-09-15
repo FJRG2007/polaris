@@ -28,14 +28,31 @@ export interface BackupPolicy {
     readonly maxBytes: number;
     /** Whether a scheduled backup that fails is worth telling somebody about. */
     readonly notifyOnFailure: boolean;
+    /** Whether to take one on the way down, before the container stops. */
+    readonly onShutdown: boolean;
 }
 
-/** Off, and sensible the moment it is turned on. */
+/**
+ * On, because a server whose backups are off is one nobody turned them on for.
+ *
+ * This used to be "off" with sensible numbers waiting behind it, which reads as
+ * caution and is not: the operator who needed a backup is the one who never
+ * opened this screen, and the copies that would have saved them were never taken.
+ * The cost of the other default is a daily archive next to the world and seven of
+ * them kept; the cost of this one was somebody's map.
+ *
+ * Every field falls back independently, so a server created before this existed
+ * adopts it without a migration - `.env` is never reconciled on a limited install,
+ * and a default that only reached new servers would be a feature switched off
+ * everywhere it matters. The sweep reads this directly, so nothing else has to
+ * run for the schedule to start.
+ */
 export const DEFAULT_BACKUP_POLICY: BackupPolicy = {
-    every: "off",
+    every: "daily",
     keepLast: 7,
     maxBytes: 0,
-    notifyOnFailure: true
+    notifyOnFailure: true,
+    onShutdown: true
 };
 
 /** The most archives anyone is asked to reason about, and the largest budget
@@ -87,7 +104,8 @@ export function readBackupPolicy(config: Record<string, unknown>): BackupPolicy 
         notifyOnFailure:
             typeof held.notifyOnFailure === "boolean"
                 ? held.notifyOnFailure
-                : DEFAULT_BACKUP_POLICY.notifyOnFailure
+                : DEFAULT_BACKUP_POLICY.notifyOnFailure,
+        onShutdown: typeof held.onShutdown === "boolean" ? held.onShutdown : DEFAULT_BACKUP_POLICY.onShutdown
     };
 }
 
