@@ -442,29 +442,27 @@ export function MinecraftPlayers({
                 toolbar={
                     <>
                         {!bedrock && (
-                            <>
-                                <WhitelistSwitch
-                                    installedAppId={installedAppId}
-                                    enforced={roster?.whitelistEnforced ?? false}
-                                    disabled={roster === null || !answering}
-                                    onError={setError}
-                                    onChanged={onChanged}
-                                />
-                                {/* Said out loud whenever the switch is showing
-                                    Polaris's note rather than the server's own
-                                    answer. Without it the position is read as
-                                    what the world is set to right now, and the
-                                    one thing worse than not knowing whether a
-                                    server is closed is believing the wrong
-                                    thing about it. */}
-                                {rosterAsOf ? (
-                                    <span className="text-xs text-muted-foreground">
-                                        As Polaris last read it,{" "}
-                                        {relativeTime(rosterAsOf, format, "at an unknown time")}
-                                    </span>
-                                ) : null}
-                            </>
+                            <WhitelistSwitch
+                                installedAppId={installedAppId}
+                                enforced={roster?.whitelistEnforced ?? false}
+                                disabled={roster === null || !answering}
+                                onError={setError}
+                                onChanged={onChanged}
+                            />
                         )}
+                        {/* Outside the Java-only switch, because what it dates is
+                            not Java-only: a Bedrock server that is off draws its
+                            remembered operators and allow list from the same
+                            note, and without this they read as what the server
+                            is saying right now. The one thing worse than not
+                            knowing whether a server is closed is believing the
+                            wrong thing about it. */}
+                        {rosterAsOf ? (
+                            <span className="text-xs text-muted-foreground">
+                                As Polaris last read it,{" "}
+                                {relativeTime(rosterAsOf, format, "at an unknown time")}
+                            </span>
+                        ) : null}
                         <Button
                             onClick={() => {
                                 setFormError(null);

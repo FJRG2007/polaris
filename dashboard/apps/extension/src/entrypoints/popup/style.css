@@ -239,8 +239,21 @@ button.ghost:hover:not(:disabled) {
     border-color: hsl(var(--border-strong));
 }
 
+/*
+ * The search box, which stays where it is.
+ *
+ * It sits inside the one thing that scrolls, so on a vault of any size it used
+ * to leave with the list - and it is autofocused, so somebody typing watched the
+ * field they were typing into scroll away. Pinned rather than moved out of the
+ * scroller: it keeps its place in the document, and the list passes underneath
+ * it.
+ */
 header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     padding: 12px 16px;
+    background: hsl(var(--surface));
     border-bottom: 1px solid hsl(var(--border));
 }
 

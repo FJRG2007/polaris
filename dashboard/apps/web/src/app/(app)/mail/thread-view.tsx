@@ -89,6 +89,21 @@ import {
     UserRoundX
 } from "lucide-react";
 
+/**
+ * What to call somebody in this pane.
+ *
+ * A name where the header carried one, and otherwise the whole address.
+ * `core.addressLabel` falls back to the part before the `@`, which reads as a
+ * name somebody chose - so an unnamed sender said "ana" while the chip beneath
+ * it said "ana@example.test", and the two disagreed about one person on one
+ * screen. That fallback is right where it is used elsewhere - a list row, a
+ * notification, somewhere only one spelling is ever shown - and wrong here,
+ * where both are in view at once.
+ */
+function named(entry: core.MailAddress): string {
+    return entry.name.trim() || entry.address;
+}
+
 export function ThreadView({
     thread,
     messages,
@@ -888,7 +903,7 @@ function MessageCard({
                                     : "font-semibold text-foreground"
                             )}
                         >
-                            {sender ? core.addressLabel(sender) : "(nobody)"}
+                            {sender ? named(sender) : "(nobody)"}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
                             {message.snippet}
@@ -950,7 +965,7 @@ function MessageCard({
                                     <BellOff className="size-3.5 shrink-0" aria-hidden />
                                     <span className="min-w-0 flex-1">
                                         {sender
-                                            ? `${core.addressLabel(sender)} sends this as a mailing list.`
+                                            ? `${named(sender)} sends this as a mailing list.`
                                             : "This arrived as a mailing list."}
                                     </span>
                                     <UnsubscribeButton
@@ -959,9 +974,7 @@ function MessageCard({
                                             kind: readable.unsubscribeKind,
                                             url: readable.unsubscribe,
                                             source: readable.unsubscribeSource || "header",
-                                            sender: sender
-                                                ? core.addressLabel(sender)
-                                                : "this sender",
+                                            sender: sender ? named(sender) : "this sender",
                                             messageId: message.id
                                         }}
                                     />

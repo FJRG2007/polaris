@@ -518,10 +518,16 @@ export function CallRoom({
                 with two people sharing "stop watching" has to say which - and
                 named for the screen rather than for what pressing it does, so
                 that the name and the pressed state are not read out saying
-                opposite things about the same button. */}
-            {shared.length > 0 && (
+                opposite things about the same button.
+
+                Only what is being watched. A screen that was put away has a card
+                of its own below, carrying the same name and the same way back -
+                and this row used to carry one too, so the two sat one above the
+                other offering the identical act twice. What is watched is turned
+                off here; what is not is turned back on there. */}
+            {stages.length > 0 && (
                 <ul className="flex shrink-0 flex-wrap items-center gap-1">
-                    {shared.map((stage) => {
+                    {stages.map((stage) => {
                         const put = away.includes(stage.key);
                         return (
                             <li key={stage.key}>
