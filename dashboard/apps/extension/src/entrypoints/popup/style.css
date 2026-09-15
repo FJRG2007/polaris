@@ -387,6 +387,12 @@ footer {
     font-size: 12px;
 }
 
+/* Whose account this is. The name carries the weight; the words around it are
+   the label, so they stay muted and it does not. */
+.who-name {
+    color: hsl(var(--foreground));
+}
+
 /* A one-time code: read off the screen as often as it is copied, so it is shown
    in full and the whole line copies it. */
 .code {

@@ -957,6 +957,32 @@ function Timeout({
     );
 }
 
+/**
+ * Who this extension is signed in as.
+ *
+ * The question the popup could not answer: it knew how to read a vault and not
+ * whose account the vault was on, so the only way to find out was to open the
+ * dashboard and look. One approval now hands back a credential for the account
+ * as well, and this is what it is for.
+ *
+ * Absent rather than wrong when there is nothing to say. A Polaris older than
+ * that credential, one that could not be reached, and a session that predates it
+ * all arrive here as null, and none of them is worth a sentence - the vault
+ * works the same either way.
+ */
+function Account({ account }: { account: VaultStatus["account"] }): React.JSX.Element | null {
+    if (!account) return null;
+    const who = account.name ?? account.email;
+    if (!who) return null;
+    return (
+        <div className="row">
+            <span className="muted small" title={account.email ?? undefined}>
+                Signed in as <span className="who-name">{who}</span>
+            </span>
+        </div>
+    );
+}
+
 function Items({
     status,
     onChange
@@ -1190,6 +1216,8 @@ function Items({
             />
 
             <Generator onUse={setOffered} />
+
+            <Account account={status.account} />
 
             <Timeout status={status} onChange={onChange} />
 

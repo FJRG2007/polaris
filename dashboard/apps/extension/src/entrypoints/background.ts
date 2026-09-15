@@ -114,6 +114,19 @@ const ACCOUNT_KEY = storage.defineItem<string | null>("session:vault.accountKey"
     fallback: null
 });
 /**
+ * Who the credential above says this is, once it has been asked.
+ *
+ * Cached because the popup reads the status on every open and after every
+ * action, and the answer changes when somebody signs out rather than minute to
+ * minute - asking the server each time would be a request per keystroke in the
+ * search box. Session storage, next to the credential it came from: it is not a
+ * secret, but it is meaningless without one, and keeping them together means
+ * one thing to clear rather than two to remember.
+ */
+const ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("session:vault.account", {
+    fallback: null
+});
+/**
  * Sites this extension is to keep out of.
  *
  * Local rather than session, because it is an instruction rather than a
@@ -579,6 +592,43 @@ function summarize(login: Login, vaults: ReadonlyMap<string, string>): messages.
     };
 }
 
+/**
+ * Whose account this is, from the credential the approval left behind.
+ *
+ * Asked once and kept. A failure is not cached, so a server that was briefly
+ * unreachable is asked again next time rather than leaving the popup permanently
+ * unable to name its own account - and a success is, so opening the popup
+ * twenty times is one request rather than twenty.
+ *
+ * `/api/v1/me` needs no scope: holding a usable credential is already the proof
+ * of the identity it reports. Nothing here can fail loudly - an extension that
+ * cannot say who it is still fills logins perfectly well.
+ */
+async function readAccount(): Promise<messages.ExtensionAccount | null> {
+    const held = await ACCOUNT.getValue();
+    if (held) return held;
+    const [key, origin] = await Promise.all([ACCOUNT_KEY.getValue(), currentOrigin()]);
+    if (!key || !origin) return null;
+    try {
+        const reply = await fetch(`${origin}/api/v1/me`, {
+            headers: { authorization: `Bearer ${key}` },
+            credentials: "omit"
+        });
+        if (!reply.ok) return null;
+        const body = (await reply.json()) as { user?: { name?: unknown; email?: unknown } };
+        const name = typeof body.user?.name === "string" ? body.user.name : null;
+        const email = typeof body.user?.email === "string" ? body.user.email : null;
+        // Neither half is worth keeping on its own account of nothing: a record
+        // with two nulls in it says the same as no record and costs a read.
+        if (name === null && email === null) return null;
+        const account: messages.ExtensionAccount = { name, email };
+        await ACCOUNT.setValue(account);
+        return account;
+    } catch {
+        return null;
+    }
+}
+
 async function status(): Promise<messages.VaultStatus> {
     const [server, email, refreshToken, syncedAt, timeout, opened] = await Promise.all([
         currentOrigin(),
@@ -594,7 +644,11 @@ async function status(): Promise<messages.VaultStatus> {
         connected: refreshToken !== null,
         unlocked: opened !== null,
         syncedAt,
-        timeoutMs: readTimeout(timeout)
+        timeoutMs: readTimeout(timeout),
+        // Only worth asking for once there is a session to ask about: a browser
+        // that has not been let in yet would spend a request on every poll of a
+        // screen that is showing it the sign-in button.
+        account: refreshToken === null ? null : await readAccount()
     };
 }
 
@@ -1224,6 +1278,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     REVISION.setValue(null),
                     EMAIL.setValue(null),
                     ACCOUNT_KEY.setValue(null),
+                    ACCOUNT.setValue(null),
                     forgetOrigin()
                 ]);
                 await badge();
