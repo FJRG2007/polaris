@@ -17,8 +17,9 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
+import { RelativeTime } from "@/components/relative-time";
 import type { WorldRules } from "@/lib/apps/minecraft/rules-service";
+import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import { DIFFICULTIES, ruleGroups, normalizeRuleValue, type GameRule } from "@/lib/apps/minecraft/rules";
 import { readWorldRulesAction, setWorldDifficultyAction, setWorldRuleAction } from "./minecraft-actions";
@@ -170,7 +171,7 @@ export function MinecraftRules({
                             <Select
                                 className="w-40"
                                 aria-label="Difficulty"
-                                disabled={!canManage || busy === "difficulty"}
+                                disabled={!canManage || busy === "difficulty" || !rules.answering}
                                 value={rules.difficulty ?? ""}
                                 onValueChange={(value) => void applyDifficulty(value)}
                                 options={[
@@ -188,7 +189,15 @@ export function MinecraftRules({
                         <Card>
                             <CardBody className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
                                 <Info className="size-4 shrink-0" aria-hidden />
-                                <span>{reason}</span>
+                                <span>
+                                    {reason}
+                                    {rules.asOf ? (
+                                        <>
+                                            {" "}
+                                            Read <RelativeTime iso={rules.asOf} />.
+                                        </>
+                                    ) : null}
+                                </span>
                             </CardBody>
                         </Card>
                     )}
@@ -216,7 +225,11 @@ export function MinecraftRules({
                                                 unknown={rules.values[rule.id] === undefined}
                                                 first={index === 0}
                                                 busy={busy === rule.id}
-                                                disabled={!canManage || rules.values[rule.id] === undefined}
+                                                disabled={
+                                                    !canManage ||
+                                                    !rules.answering ||
+                                                    rules.values[rule.id] === undefined
+                                                }
                                                 onChange={(value) => void apply(rule, value)}
                                             />
                                         ))}

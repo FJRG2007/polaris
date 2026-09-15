@@ -13,13 +13,13 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
-import { GAME_MODES } from "@/lib/apps/minecraft/players";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
 import { clearCrashLoop } from "@/lib/apps/games-health";
+import { GAME_MODES } from "@/lib/apps/minecraft/players";
 import { applyWorldSchedule } from "@/lib/backups/manage";
-import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
+import { runFivemCommand } from "@/lib/apps/fivem/service";
 import { findGameIdentity } from "@/lib/apps/game-identity";
 import { isAddressRule } from "@/lib/apps/minecraft/access";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
@@ -34,15 +34,15 @@ import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { writeContainerFile } from "@/lib/container-files-service";
 import type { InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { DIFFICULTIES, isDifficulty } from "@/lib/apps/minecraft/rules";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
 import { readMinecraftStats } from "@/lib/apps/minecraft/stats-service";
-import { runFivemCommand } from "@/lib/apps/fivem/service";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import { setGameHostname, setGameRouted } from "@/lib/apps/minecraft/address";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
-import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "@/lib/apps/minecraft/experience";
+import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
@@ -51,7 +51,13 @@ import { resetMinecraftServerSchema, type ResetMinecraftServerInput } from "@/li
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import { readLiveInventory, readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
-import { readRulesFor, setWorldDifficulty, setWorldRule, type WorldRules } from "@/lib/apps/minecraft/rules-service";
+import {
+    readRulesFor,
+    rememberDifficulty,
+    setWorldDifficulty,
+    setWorldRule,
+    type WorldRules
+} from "@/lib/apps/minecraft/rules-service";
 import {
     clearItem,
     clearSlot,
@@ -1472,6 +1478,12 @@ export async function updateServerSettingsAction(
         });
         if (vars.length === 0) throw new Error("Nothing to save");
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
+        // The same value the Rules screen shows. Both screens write the difficulty
+        // and they disagreed in whichever direction you were not looking.
+        const difficulty = vars.find((entry) => entry.key === "DIFFICULTY")?.value;
+        if (difficulty && isDifficulty(difficulty)) {
+            await rememberDifficulty(parsed.data.installedAppId, difficulty);
+        }
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
@@ -1541,6 +1553,32 @@ export async function setWorldRuleAction(
     }
 }
 
+/**
+ * The environment the container is built with, brought into line with a value
+ * that is already in force.
+ *
+ * Deliberately no redeploy: the change has happened, nobody is disconnected, and
+ * all this does is stop the next restart handing the world back the difficulty it
+ * was first built with. Without it the two disagree the moment somebody uses this
+ * screen - which is exactly what was reported: Rules said normal and Settings
+ * still said easy.
+ */
+async function writeDifficultyEnv(
+    install: { applicationId: string | null; catalogId: string },
+    ownerId: string,
+    difficulty: string
+): Promise<void> {
+    if (!install.applicationId) return;
+    const manifest = findApp(install.catalogId);
+    const field = manifest ? tunableEnvVars(manifest).find((entry) => entry.key === "DIFFICULTY") : undefined;
+    // A catalog that does not declare it, or declares it as something this value
+    // does not fit, is not a thing to force: the live change stands on its own.
+    if (!field || !isAllowedEnvValue(field, difficulty)) return;
+    await setEnvVars("application", install.applicationId, ownerId, [
+        { key: "DIFFICULTY", value: difficulty, isSecret: false }
+    ]);
+}
+
 /** The difficulty, live. `server.properties` carries one too, and changing that
  *  one rebuilds the container - this does not. */
 export async function setWorldDifficultyAction(
@@ -1554,6 +1592,16 @@ export async function setWorldDifficultyAction(
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         await setWorldDifficulty(access.ownerId, parsed.data.installedAppId, parsed.data.difficulty);
+        // After the live change, and reported separately: the difficulty they
+        // asked for is in force either way, and what a failure here costs is the
+        // next restart rather than this one.
+        try {
+            await writeDifficultyEnv(access.install, access.ownerId, parsed.data.difficulty);
+        } catch {
+            return {
+                error: "The difficulty changed, but Polaris could not store it - a restart will put it back."
+            };
+        }
         await recordAudit({
             actorId: user.id,
             action: "minecraft.difficulty",

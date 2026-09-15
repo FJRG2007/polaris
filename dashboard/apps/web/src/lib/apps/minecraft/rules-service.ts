@@ -12,13 +12,23 @@
  * two dozen SSH handshakes for one screen - so the commands are handed to a
  * single shell inside the container and the replies come back together. The rule
  * names are this module's own constants, never anything a caller supplied.
+ *
+ * **What the server last said is kept.** A stopped server answers nothing, and a
+ * screen of empty switches says "this world has no rules" when what is true is
+ * "nobody can ask right now". So every answer is written to the install's own
+ * config blob and handed back when the server cannot be reached, marked with when
+ * it was read and with everything on the screen locked - a remembered value is
+ * something to look at, never something to appear to change.
  */
 
+import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { withServerContainer, type ServerContainer } from "./service";
+import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import {
     GAME_RULES,
     findRule,
+    isDifficulty,
     normalizeRuleValue,
     parseDifficulty,
     parseGameRules,
@@ -41,6 +51,18 @@ export interface WorldRules {
      * not a daemon error about a container id they have never seen.
      */
     readonly reason: string | null;
+    /**
+     * When these values were read, for values that are remembered rather than
+     * current. Null means the server answered just now.
+     */
+    readonly asOf: string | null;
+    /**
+     * Whether the game itself answered, which is the same question as whether
+     * anything here can be changed. A server that is off, and a Bedrock one that
+     * cannot be asked from here, both answer nothing - and a screen that offered
+     * to change a rule in either case would be offering something that fails.
+     */
+    readonly answering: boolean;
 }
 
 /** A rule name is only ever one of ours, and this is what says so out loud before
@@ -60,7 +82,13 @@ function assertKnownRuleNames(): void {
  */
 export async function readWorldRules(server: ServerContainer): Promise<WorldRules> {
     if (server.edition !== "java") {
-        return { values: {}, difficulty: null, reason: "Bedrock keeps its rules inside the world rather than answering for them." };
+        return {
+            values: {},
+            difficulty: null,
+            reason: "Bedrock keeps its rules inside the world rather than answering for them.",
+            asOf: null,
+            answering: false
+        };
     }
     assertKnownRuleNames();
     const script = [...GAME_RULES.map((rule) => `rcon-cli gamerule ${rule.id}`), "rcon-cli difficulty"].join(
@@ -75,7 +103,13 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
     if (values.size === 0) {
         const said = output.trim().replace(/\s+/g, " ").slice(0, 200);
         if (!said || /connection refused/i.test(said)) {
-            return { values: {}, difficulty: null, reason: "Start the server to read what these are set to." };
+            return {
+                values: {},
+                difficulty: null,
+                reason: "Start the server to read what these are set to.",
+                asOf: null,
+                answering: false
+            };
         }
         // It answered, and refused every one of them. Seen on Minecraft 26.2, which
         // will not read a rule back the way every release before it did - so the
@@ -91,26 +125,152 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
             return {
                 values: {},
                 difficulty: parseDifficulty(output),
-                reason: "This server's version will not say what a rule is set to. Setting one still works."
+                reason: "This server's version will not say what a rule is set to. Setting one still works.",
+                asOf: null,
+                answering: true
             };
         }
-        return { values: {}, difficulty: parseDifficulty(output), reason: `The server answered: ${said}` };
+        // Whatever this is, it is not the game talking. The container being down is
+        // one way here: the daemon answers in place of the server and names an id
+        // nobody has ever seen, and quoting it back was this screen's own bug - the
+        // reader gets a sentence about their server instead.
+        return {
+            values: {},
+            difficulty: parseDifficulty(output),
+            reason: "The server is not answering, so what these are set to cannot be read right now.",
+            asOf: null,
+            answering: false
+        };
     }
-    return { values: Object.fromEntries(values), difficulty: parseDifficulty(output), reason: null };
+    return {
+        values: Object.fromEntries(values),
+        difficulty: parseDifficulty(output),
+        reason: null,
+        asOf: null,
+        answering: true
+    };
 }
 
-/** The same, opening the machine for it. */
+/**
+ * Where the last answer is kept.
+ *
+ * The install's own config blob, which is the game-servers app's store rather
+ * than Polaris's: an optional app keeps its own notes, and they go when the
+ * install does.
+ */
+const REMEMBERED_KEY = "minecraftRules";
+
+interface RememberedRules {
+    readonly values: Record<string, string>;
+    readonly difficulty: Difficulty | null;
+    /** When the server said this, as an ISO instant. */
+    readonly at: string;
+}
+
+/**
+ * The last answer this server gave, or null when it has never given one.
+ *
+ * Everything read back is checked against the catalogue as it is now: this was
+ * written by an older Polaris, against an older world, and a rule that has since
+ * been dropped or a value that is no longer legal must not reach a screen as
+ * though the server had just said it.
+ */
+async function remembered(installedAppId: string): Promise<RememberedRules | null> {
+    const row = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { config: true }
+    });
+    const stored = readInstallConfig(row?.config)[REMEMBERED_KEY];
+    if (typeof stored !== "object" || stored === null || Array.isArray(stored)) return null;
+    const blob = stored as Partial<RememberedRules>;
+    if (typeof blob.at !== "string" || !blob.at) return null;
+    const values: Record<string, string> = {};
+    for (const [id, value] of Object.entries(blob.values ?? {})) {
+        const rule = findRule(id);
+        if (!rule || typeof value !== "string") continue;
+        if (normalizeRuleValue(rule, value) === null) continue;
+        values[id] = value;
+    }
+    const difficulty = isDifficulty(blob.difficulty) ? blob.difficulty : null;
+    if (Object.keys(values).length === 0 && !difficulty) return null;
+    return { values, difficulty, at: blob.at };
+}
+
+/**
+ * Keep what the server just said.
+ *
+ * Merged rather than replaced, and for the same reason the config blob itself
+ * merges: a single rule being set must not delete the two dozen that were read a
+ * minute earlier.
+ */
+async function remember(
+    installedAppId: string,
+    next: { values?: Record<string, string>; difficulty?: Difficulty | null }
+): Promise<void> {
+    const before = await remembered(installedAppId);
+    const blob: RememberedRules = {
+        values: { ...(before?.values ?? {}), ...(next.values ?? {}) },
+        difficulty: next.difficulty === undefined ? (before?.difficulty ?? null) : next.difficulty,
+        at: new Date().toISOString()
+    };
+    await patchInstallConfig(installedAppId, { [REMEMBERED_KEY]: blob });
+}
+
+/** Keeping a note is never worth failing the thing it is a note about. */
+async function rememberQuietly(
+    installedAppId: string,
+    next: { values?: Record<string, string>; difficulty?: Difficulty | null }
+): Promise<void> {
+    await remember(installedAppId, next).catch(() => undefined);
+}
+
+/** The difficulty, remembered from wherever it was changed - the settings form
+ *  writes the same value into the container's environment and would otherwise
+ *  leave this screen showing the one before it. */
+export async function rememberDifficulty(installedAppId: string, difficulty: Difficulty): Promise<void> {
+    await rememberQuietly(installedAppId, { difficulty });
+}
+
+/**
+ * The same, opening the machine for it.
+ *
+ * A server that is off cannot be opened at all, and the daemon says so by naming a
+ * container id nobody has ever seen. That is not an answer to put on a screen, and
+ * it is not a reason to withhold the rules either: they are the game's, they are in
+ * Polaris, and the only thing a stopped server changes is that none of them can be
+ * read or set right now - so what it last said is what the screen shows, locked and
+ * dated.
+ */
 export async function readRulesFor(ownerId: string, installedAppId: string): Promise<WorldRules> {
-    // A server that is off cannot be opened at all, and the daemon says so by
-    // naming a container id nobody has ever seen. That is not an answer to put on
-    // a screen, and it is not a reason to withhold the rules either: they are the
-    // game's, they are in Polaris, and the only thing a stopped server changes is
-    // that none of them can be read or set right now.
-    return withServerContainer(ownerId, installedAppId, readWorldRules).catch(() => ({
-        values: {},
-        difficulty: null,
-        reason: "The server is stopped, so its rules cannot be read or changed yet."
-    }));
+    const live = await withServerContainer(ownerId, installedAppId, readWorldRules).catch(() => null);
+    if (live && (Object.keys(live.values).length > 0 || live.difficulty)) {
+        await rememberQuietly(installedAppId, { values: live.values, difficulty: live.difficulty });
+        return live;
+    }
+    const kept = await remembered(installedAppId).catch(() => null);
+    if (kept) {
+        return {
+            values: kept.values,
+            difficulty: kept.difficulty,
+            // A server that is up but will not read a rule back keeps its own
+            // explanation: those values are old, and setting one still works.
+            reason:
+                live?.answering === true
+                    ? live.reason
+                    : "The server is not running. These are the values Polaris last read from it, and nothing here can be changed until it starts.",
+            asOf: kept.at,
+            answering: live?.answering === true
+        };
+    }
+    return (
+        live ?? {
+            values: {},
+            difficulty: null,
+            reason: "The server is stopped, so its rules cannot be read or changed yet.",
+            asOf: null,
+            answering: false
+        }
+    );
 }
 
 /**
@@ -139,6 +299,7 @@ export async function setWorldRule(
         const trimmed = stripFormatting(reply).trim().replace(/\s+/g, " ").slice(0, 160);
         throw new Error(trimmed ? `The server refused it: ${trimmed}` : "The server did not accept that");
     }
+    await rememberQuietly(installedAppId, { values: { [rule.id]: said } });
     return said;
 }
 
@@ -152,4 +313,5 @@ export async function setWorldDifficulty(
         if (server.edition !== "java") throw new Error("Bedrock servers cannot be asked this from here");
         return server.say(["difficulty", difficulty]);
     });
+    await rememberQuietly(installedAppId, { difficulty });
 }
