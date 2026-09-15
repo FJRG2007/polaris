@@ -95,6 +95,11 @@ interface ServerReading {
      *  to arrive without a reload. Null until the first poll answers. */
     reach: GameReachAdvice | null;
     roster: MinecraftRoster | null;
+    /** When that roster was read, for a server that is no longer answering. Null
+     *  while it is, which is what "this is current" looks like - the screen only
+     *  says a date when what it is showing is Polaris's note rather than the
+     *  server's answer. */
+    rosterAsOf: string | null;
     firewall: MinecraftFirewall | null;
     access: PlayerAccessView | null;
     /** Who arrived and who left, as far back as the log reaches. */
@@ -169,6 +174,7 @@ export function MinecraftPanel({
         status: null,
         reach: null,
         roster: null,
+        rosterAsOf: null,
         firewall: null,
         access: game?.playerAccess ?? null,
         sessions: [],
@@ -197,6 +203,7 @@ export function MinecraftPanel({
                 status?: MinecraftStatus;
                 reach?: GameReachAdvice | null;
                 roster?: MinecraftRoster;
+                rosterAsOf?: string | null;
                 firewall?: MinecraftFirewall;
                 access?: PlayerAccessView;
                 sessions?: PlayerSessionEvent[];
@@ -218,6 +225,12 @@ export function MinecraftPanel({
                 // to the page's: the warning would flicker on every failed read.
                 reach: data.reach ?? current.reach,
                 roster: data.roster ?? (wantsRoster ? current.roster : null),
+                // Taken as it was sent rather than defaulted against what is
+                // held: null is a real answer here - it means the roster above
+                // came from the server just now - and `??` would read it as
+                // "nothing said" and leave yesterday's date under today's
+                // roster.
+                rosterAsOf: wantsRoster ? (data.rosterAsOf ?? null) : null,
                 firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
                 // Read on every poll, not only the moderation screen's, because the
                 // overview says whether anybody can join at all.
@@ -377,6 +390,7 @@ export function MinecraftPanel({
                     installedAppId={installedAppId}
                     status={status}
                     roster={reading.roster}
+                    rosterAsOf={reading.rosterAsOf}
                     access={reading.access}
                     sessions={reading.sessions}
                     seen={reading.seen}

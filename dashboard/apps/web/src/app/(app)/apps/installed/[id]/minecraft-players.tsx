@@ -21,11 +21,11 @@ import * as actions from "./minecraft-actions";
 import { relativeTime } from "@/lib/relative-time";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
+import type { PlayerSeen } from "@/lib/apps/games-activity";
 import { useDisplayFormat } from "@/components/display-format";
 import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { PlayerSeen } from "@/lib/apps/games-activity";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
@@ -101,6 +101,7 @@ export function MinecraftPlayers({
     installedAppId,
     status,
     roster,
+    rosterAsOf,
     access,
     sessions,
     seen,
@@ -113,6 +114,15 @@ export function MinecraftPlayers({
     installedAppId: string;
     status: MinecraftStatus | null;
     roster: MinecraftRoster | null;
+    /**
+     * When that roster was read, for a server that has since stopped answering.
+     *
+     * Null while it is answering, which is what "this is current" looks like. The
+     * roster itself comes out of files inside the container, so a stopped server
+     * has none - and a whitelist drawn as off because nobody could be asked says
+     * the opposite of the truth about a server that is closed by default.
+     */
+    rosterAsOf: string | null;
     /** Who may connect and from where - the list the server is actually closed by. */
     access: PlayerAccessView | null;
     /** Who arrived and who left, out of the server's log. */
@@ -136,6 +146,10 @@ export function MinecraftPlayers({
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     const [confirm, confirmElement] = useConfirm();
+    // How this reader has asked for times to be written. Held here as well as in
+    // the row below, because the toolbar now says when a remembered roster was
+    // read, and that is a time like any other on this screen.
+    const format = useDisplayFormat();
     // What the operator has just changed, shown until the server's own answer
     // catches up. Keyed by the same lowercase name the lists are folded on.
     const [applied, setApplied] = useState<Map<string, Partial<PlayerEntry>>>(new Map());
@@ -428,13 +442,28 @@ export function MinecraftPlayers({
                 toolbar={
                     <>
                         {!bedrock && (
-                            <WhitelistSwitch
-                                installedAppId={installedAppId}
-                                enforced={roster?.whitelistEnforced ?? false}
-                                disabled={roster === null || !answering}
-                                onError={setError}
-                                onChanged={onChanged}
-                            />
+                            <>
+                                <WhitelistSwitch
+                                    installedAppId={installedAppId}
+                                    enforced={roster?.whitelistEnforced ?? false}
+                                    disabled={roster === null || !answering}
+                                    onError={setError}
+                                    onChanged={onChanged}
+                                />
+                                {/* Said out loud whenever the switch is showing
+                                    Polaris's note rather than the server's own
+                                    answer. Without it the position is read as
+                                    what the world is set to right now, and the
+                                    one thing worse than not knowing whether a
+                                    server is closed is believing the wrong
+                                    thing about it. */}
+                                {rosterAsOf ? (
+                                    <span className="text-xs text-muted-foreground">
+                                        As Polaris last read it,{" "}
+                                        {relativeTime(rosterAsOf, format, "at an unknown time")}
+                                    </span>
+                                ) : null}
+                            </>
                         )}
                         <Button
                             onClick={() => {

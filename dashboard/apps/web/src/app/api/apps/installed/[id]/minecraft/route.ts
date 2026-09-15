@@ -5,6 +5,7 @@ import { readLastSeen } from "@/lib/apps/games-activity-service";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "@/lib/apps/minecraft/queue-service";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
+import { rememberRoster, rememberedRoster } from "@/lib/apps/minecraft/roster-memory";
 import { readPlayerTimeouts, sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { enforcePlayerAddresses, listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import {
@@ -74,8 +75,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // that grants them is also when the due ones are lifted.
             wantsRoster && status.answering ? sweepTimeouts(server.ownerId, id).catch(() => 0) : 0
         ] as const);
-        const [roster, firewall] = gathered;
+        const [live, firewall] = gathered;
         const sessions = gathered[3];
+        /*
+         * What the server last said about who may play on it.
+         *
+         * The roster is read out of files inside the container, so a server that
+         * is off has none - and the screen drew the whitelist switch as off,
+         * which is not "we could not ask" but the opposite of the truth for a
+         * server that is closed by default and lets nobody in who is not listed.
+         *
+         * Written whenever the server does answer and read back only when it does
+         * not. Nothing becomes editable by being remembered: the screen's controls
+         * are gated on whether the server is answering, not on whether a roster
+         * arrived.
+         */
+        if (live) await rememberRoster(id, live).catch(() => undefined);
+        const kept = wantsRoster && !live ? await rememberedRoster(id).catch(() => null) : null;
+        const roster = live ?? kept?.roster ?? null;
         const timeouts = wantsRoster ? await readPlayerTimeouts(id).catch(() => []) : [];
         // When Polaris last watched each of them, for the rows the log no longer
         // reaches back to: it holds only the tail that was asked for and starts
@@ -139,6 +156,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             status,
             reach,
             roster,
+            // When that roster was read, for the screen to say so. Null while the
+            // server is answering, which is what "this is current" looks like.
+            rosterAsOf: kept?.at ?? null,
             firewall,
             access,
             sessions,
