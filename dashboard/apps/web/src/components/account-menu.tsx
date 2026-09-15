@@ -59,6 +59,15 @@ import {
 } from "@polaris/ui";
 
 /**
+ * How close two presses on the face have to be to count as one gesture.
+ *
+ * A little more generous than the platform's own double-click, deliberately: the
+ * first press opens a menu, and somebody who sees it appear hesitates before the
+ * second.
+ */
+const DOUBLE_PRESS_MS = 600;
+
+/**
  * The personal account dropdown. Only per-user items live here; administration
  * (users, policies, domains, integrations, updates, ...) moved to the dedicated
  * Management app in the switcher, so this menu stays about "you", not the system.
@@ -100,6 +109,17 @@ export function AccountMenu({
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
+    /**
+     * When this face was last pressed, for recognising the second press of a
+     * double without the browser's help.
+     *
+     * `dblclick` cannot do it here. A browser fires that event only when both
+     * presses land on the same element, and the first press opens a menu that is
+     * anchored over the face it came from - so whether the second press reaches
+     * the face or the menu depends on where there was room to put the menu. That
+     * is exactly why it worked some of the time and not the rest.
+     */
+    const lastPress = useRef(0);
     const [chosen, setChosen] = useState(presence);
     const [until, setUntil] = useState(presenceUntil);
     const [byRule, setByRule] = useState(presenceScheduled);
@@ -290,7 +310,19 @@ export function AccountMenu({
                     // press the item named after the thing you just pressed is a step
                     // that exists for no reason. The menu opens and closes under the
                     // two presses, which is what every double-click on a menu does.
-                    onDoubleClick={() => {
+                    onPointerDown={(event) => {
+                        // Primary button only. A right press opens this same menu
+                        // through `onContextMenu` below, and letting it count
+                        // towards a double would take somebody to their account
+                        // for pressing twice with two different buttons.
+                        if (event.button !== 0) return;
+                        const now = Date.now();
+                        const quick = now - lastPress.current <= DOUBLE_PRESS_MS;
+                        // Cleared on the press that completes a gesture, so three
+                        // presses are a double and then a single rather than two
+                        // overlapping doubles.
+                        lastPress.current = quick ? 0 : now;
+                        if (!quick) return;
                         setOpen(false);
                         router.push("/account");
                     }}
