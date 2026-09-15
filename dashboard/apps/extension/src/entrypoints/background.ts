@@ -258,19 +258,100 @@ async function touch(): Promise<void> {
     await LOCK_AT.setValue(deadlineFrom(Date.now(), await TIMEOUT.getValue()));
 }
 
-/** This browser, named so a session list is readable by the person who owns it. */
+/**
+ * The two runtime hints below, neither of which the standard types know about.
+ *
+ * `brave` is Brave's own way of being asked, and it is the only way: Brave
+ * deliberately reports itself as Chrome everywhere else, so a session list built
+ * from the user agent cannot tell the two apart and is not supposed to be able to.
+ */
+interface BrowserHints {
+    readonly brave?: { readonly isBrave?: () => Promise<boolean> };
+    readonly userAgentData?: {
+        readonly brands?: readonly { readonly brand: string }[];
+        readonly platform?: string;
+    };
+}
+
+/**
+ * Which browser this actually is, spelled the way the dashboard spells it.
+ *
+ * The build target answers for three of them, because a Firefox build only ever
+ * runs in Firefox. It does NOT answer for the rest: one chrome-target build runs
+ * in Chrome, Brave, Vivaldi, Edge and Opera alike, which is why somebody running
+ * Brave was shown "Chrome extension" in their own session list - the name was the
+ * build, not the browser.
+ *
+ * Every check degrades to Chrome rather than failing. A browser that will not say
+ * what it is still has a vault to sign in to, and the name is a label on a row.
+ */
+async function browserName(): Promise<string> {
+    const target = import.meta.env.BROWSER;
+    if (target === "firefox") return "Firefox";
+    if (target === "safari") return "Safari";
+    if (target === "opera") return "Opera";
+    if (target === "edge") return "Edge";
+
+    const hints = navigator as unknown as BrowserHints;
+    try {
+        if (await hints.brave?.isBrave?.()) return "Brave";
+    } catch {
+        // Brave's own check refusing to answer is not worth failing a sign-in for.
+    }
+
+    const brands = hints.userAgentData?.brands ?? [];
+    const claims = (word: string): boolean =>
+        brands.some((entry) => entry.brand.toLowerCase().includes(word)) ||
+        navigator.userAgent.toLowerCase().includes(word);
+    // Order matters only in that Chrome is last: every one of these reports a
+    // Chrome-shaped user agent as well as its own name.
+    if (claims("edg")) return "Edge";
+    if (claims("opr") || claims("opera")) return "Opera";
+    if (claims("vivaldi")) return "Vivaldi";
+    return "Chrome";
+}
+
+/** Which system this is on, in the spelling the dashboard's marks match. */
+function systemName(): string | null {
+    const hints = navigator as unknown as BrowserHints;
+    const stated: Record<string, string> = {
+        windows: "Windows",
+        macos: "macOS",
+        linux: "Linux",
+        android: "Android",
+        ios: "iOS"
+    };
+    const platform = hints.userAgentData?.platform?.trim().toLowerCase();
+    if (platform && stated[platform]) return stated[platform];
+
+    // Android before Linux and the phones before macOS: each of those user agents
+    // contains the other's word, so the looser test has to come second.
+    const agent = navigator.userAgent;
+    if (/windows/i.test(agent)) return "Windows";
+    if (/iphone|ipad|ipod/i.test(agent)) return "iOS";
+    if (/android/i.test(agent)) return "Android";
+    if (/mac os x|macintosh/i.test(agent)) return "macOS";
+    if (/linux|x11/i.test(agent)) return "Linux";
+    return null;
+}
+
+/**
+ * This browser, named so a session list is readable by the person who owns it.
+ *
+ * "Brave on Windows" rather than "Chrome extension". The word "extension" is
+ * gone from the name on purpose: the dashboard already has a column saying what
+ * kind of client a row is, and repeating it here left no room for the one thing
+ * the name could say that nothing else knew - which browser it is.
+ */
 async function device(): Promise<{ identifier: string; name: string }> {
     let identifier = await DEVICE.getValue();
     if (!identifier) {
         identifier = crypto.randomUUID();
         await DEVICE.setValue(identifier);
     }
-    const named: Record<string, string> = {
-        firefox: "Firefox extension",
-        edge: "Edge extension",
-        opera: "Opera extension"
-    };
-    return { identifier, name: named[import.meta.env.BROWSER] ?? "Chrome extension" };
+    const browser = await browserName();
+    const system = systemName();
+    return { identifier, name: system === null ? browser : `${browser} on ${system}` };
 }
 
 /** A live access token, refreshed when it is close to expiring. */

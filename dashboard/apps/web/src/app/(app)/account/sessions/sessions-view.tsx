@@ -21,7 +21,6 @@ import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import { TrustedDevicesCard } from "./trusted-devices-card";
 import { describeSignIn, signInSummary } from "@polaris/core";
-import { ConnectedClientsCard } from "./connected-clients-card";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import {
@@ -70,10 +69,10 @@ export function SessionsView({
     /** Browsers allowed to skip the second-factor challenge. Empty on an account
      *  that has never armed one, which is when the card stays away. */
     trusted: TrustedDeviceRow[];
-    /** Apps signed in to the vault - the extension, and anything else that was
-     *  let in. Unlike the list above, this one is drawn even when it is empty:
-     *  "is my extension connected" is the question that brings somebody here,
-     *  and a page that answers it with silence is the reason it was asked. */
+    /** Apps signed in to this account - the extension, and anything else that was
+     *  let in. They belong in the table above rather than in a card of their own:
+     *  the extension is this account signed in from the same machine as the row
+     *  beside it, and listing it separately said it was something external. */
     clients: VaultClientRow[];
 }) {
     const router = useRouter();
@@ -224,6 +223,7 @@ export function SessionsView({
 
                     <SessionsTable
                         sessions={active}
+                        clients={clients}
                         busyId={busyId}
                         emptyLabel="Nothing is signed in."
                         activityHref={(session) => `/account/activity?session=${session.id}`}
@@ -234,8 +234,6 @@ export function SessionsView({
                     />
                 </CardBody>
             </Card>
-
-            <ConnectedClientsCard clients={clients} />
 
             {trusted.length > 0 ? <TrustedDevicesCard devices={trusted} /> : null}
 

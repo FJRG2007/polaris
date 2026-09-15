@@ -21,11 +21,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInSummary } from "@polaris/core";
 import { Badge, Button, cn } from "@polaris/ui";
-import { History, KeyRound, Lock, LockOpen, LogOut } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
+import type { VaultClientRow } from "@/lib/vault/devices";
 import type { SessionView } from "@/lib/session-directory";
 import { BrowserMark, SystemMark } from "@/components/client-marks";
 import { addressLine, DeviceAddress } from "@/components/device-address";
+import { clientKindLabel, readClientDevice } from "@/lib/vault/client-device";
+import { History, KeyRound, Lock, LockOpen, LogOut, PanelRightOpen } from "lucide-react";
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
@@ -48,7 +50,13 @@ export function sessionOrigin(session: SessionView): string {
  * does one an administrator is reading, since the history behind that link is
  * the account holder's own and this reader is not them.
  */
-export function AuthorizedBy({ session, ownHistory }: { session: SessionView; ownHistory: boolean }) {
+export function AuthorizedBy({
+    session,
+    ownHistory
+}: {
+    session: SessionView;
+    ownHistory: boolean;
+}) {
     const authorizer = session.authorizedBy;
     if (!authorizer) return null;
     const how = session.signIn.method === "qr-code" ? "Code scanned by" : "Allowed by";
@@ -82,7 +90,15 @@ export function AuthorizedBy({ session, ownHistory }: { session: SessionView; ow
  * Where no version was claimed nothing is drawn: a dash would read as a version
  * that is missing rather than one that was never sent.
  */
-function ClientCell({ mark, name, version }: { mark: ReactNode; name: string; version: string | null }) {
+function ClientCell({
+    mark,
+    name,
+    version
+}: {
+    mark: ReactNode;
+    name: string;
+    version: string | null;
+}) {
     return (
         <span className="flex items-center gap-2">
             {mark}
@@ -94,6 +110,7 @@ function ClientCell({ mark, name, version }: { mark: ReactNode; name: string; ve
 
 export function SessionsTable({
     sessions,
+    clients = [],
     busyId,
     activityHref,
     onRevoke,
@@ -102,6 +119,20 @@ export function SessionsTable({
     compact = false
 }: {
     sessions: SessionView[];
+    /**
+     * The apps signed in to this account, listed beside the browsers that are.
+     *
+     * They were a card of their own underneath, which said they were something
+     * else - the extension is not an external service, it is this account signed
+     * in from the same machine as the row above it. A client is a different
+     * credential from a session, so the row carries no Sign out: ending one takes
+     * the vault key with it, which is not the act the button above it performs.
+     *
+     * What they cannot report is an address, because nothing about a client is
+     * observed - it says what it is and that is all there is. Those columns say
+     * so rather than being left blank.
+     */
+    clients?: VaultClientRow[];
     /** The session with an action in flight, or "all" while every other one ends. */
     busyId: string | null;
     /** Where this session's history is read. Left out where the reader has no
@@ -143,17 +174,25 @@ export function SessionsTable({
                                     one of them. They arrive before the address: what
                                     it is is asked more often than where it was. */}
                                 <th className="hidden px-3 py-2 font-medium md:table-cell">App</th>
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">System</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
-                                <th className="hidden px-3 py-2 font-medium xl:table-cell">Domain</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Last active</th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">
+                                    System
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                    Address
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">
+                                    Domain
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                    Last active
+                                </th>
                             </>
                         )}
                         <th className="px-3 py-2" />
                     </tr>
                 </thead>
                 <tbody>
-                    {sessions.length === 0 ? (
+                    {sessions.length === 0 && clients.length === 0 ? (
                         <tr>
                             <td
                                 colSpan={compact ? 2 : 7}
@@ -166,7 +205,10 @@ export function SessionsTable({
                         sessions.map((session) => (
                             <tr
                                 key={session.id}
-                                className={cn("border-t border-border", busyId === session.id && "opacity-60")}
+                                className={cn(
+                                    "border-t border-border",
+                                    busyId === session.id && "opacity-60"
+                                )}
                             >
                                 <td className="w-full max-w-0 px-3 py-2">
                                     <div className="flex items-center gap-3">
@@ -179,11 +221,15 @@ export function SessionsTable({
                                                 {/* min-w-0: a truncating flex item still refuses to
                                                     shrink past its text without it, which is what
                                                     widens the row on a phone. */}
-                                                <span className="min-w-0 truncate font-medium">{session.name}</span>
+                                                <span className="min-w-0 truncate font-medium">
+                                                    {session.name}
+                                                </span>
                                                 <span className="min-w-0 truncate text-muted-foreground">
                                                     {session.device}
                                                 </span>
-                                                {session.current ? <Badge variant="primary">This device</Badge> : null}
+                                                {session.current ? (
+                                                    <Badge variant="primary">This device</Badge>
+                                                ) : null}
                                                 {session.locked ? <Badge>Locked</Badge> : null}
                                                 {/* How it got in, beside what it is: the two questions a
                                                     person scanning this list is asking at once. */}
@@ -191,8 +237,7 @@ export function SessionsTable({
                                                 {/* Only where it is actually on. A
                                                     badge on every row saying a session
                                                     is not pinned is a column of "no". */}
-                                                {(session.pinToAddress ??
-                                                    session.pinnedByRule) ? (
+                                                {(session.pinToAddress ?? session.pinnedByRule) ? (
                                                     <Badge title="This session only works from the address it was opened at">
                                                         Address-locked
                                                     </Badge>
@@ -209,7 +254,8 @@ export function SessionsTable({
                                             </p>
                                             {compact ? (
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    Last active <RelativeTime iso={session.lastSeenAt} />
+                                                    Last active{" "}
+                                                    <RelativeTime iso={session.lastSeenAt} />
                                                 </p>
                                             ) : null}
                                             {/* Whether this reader may open a session's
@@ -242,7 +288,9 @@ export function SessionsTable({
                                             <DeviceAddress address={session} />
                                         </td>
                                         <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                            <span className="block truncate">{session.host ?? "Not recorded"}</span>
+                                            <span className="block truncate">
+                                                {session.host ?? "Not recorded"}
+                                            </span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <RelativeTime iso={session.lastSeenAt} />
@@ -284,6 +332,99 @@ export function SessionsTable({
                             </tr>
                         ))
                     )}
+                    {/* The apps, under the browsers and in the same columns. What
+                        a client reports is a name and a type, so the device column
+                        is read back out of that name - which is how a row says
+                        Brave rather than the build target the extension was
+                        compiled for. */}
+                    {clients.map((client) => {
+                        const device = readClientDevice(client.name);
+                        const kind = clientKindLabel(client.kind);
+                        return (
+                            <tr key={`client-${client.id}`} className="border-t border-border">
+                                <td className="w-full max-w-0 px-3 py-2">
+                                    <div className="flex items-center gap-3">
+                                        <BrowserMark browser={device.browser} />
+                                        <div className="min-w-0">
+                                            <p className="flex flex-wrap items-center gap-1.5">
+                                                <span className="min-w-0 truncate font-medium">
+                                                    {device.browser}
+                                                </span>
+                                                {device.os ? (
+                                                    <span className="min-w-0 truncate text-muted-foreground">
+                                                        {device.os}
+                                                    </span>
+                                                ) : null}
+                                                <Badge variant="neutral">{kind}</Badge>
+                                            </p>
+                                            {/* The columns the narrow layouts drop,
+                                                folded back in, exactly as the rows
+                                                above fold theirs. */}
+                                            <p
+                                                className={cn(
+                                                    "truncate text-xs text-muted-foreground",
+                                                    !compact && "lg:hidden"
+                                                )}
+                                            >
+                                                {client.label} - last active{" "}
+                                                <RelativeTime iso={client.lastSeenAt} />
+                                            </p>
+                                        </div>
+                                    </div>
+                                </td>
+                                {compact ? null : (
+                                    <>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                            {kind}
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                            {device.os ? (
+                                                <ClientCell
+                                                    mark={<SystemMark os={device.os} />}
+                                                    name={device.os}
+                                                    version={null}
+                                                />
+                                            ) : (
+                                                <span className="text-muted-foreground">
+                                                    Not recorded
+                                                </span>
+                                            )}
+                                        </td>
+                                        {/* Nothing observes a client, so there is no
+                                            address and no name it arrived on. Said
+                                            rather than left blank: an empty cell
+                                            reads as a value that went missing. */}
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            Not recorded
+                                        </td>
+                                        <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
+                                            <span className="block truncate">Not recorded</span>
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <RelativeTime iso={client.lastSeenAt} />
+                                        </td>
+                                    </>
+                                )}
+                                <td className="px-3 py-2">
+                                    <div className="flex justify-end gap-1">
+                                        {/* Disconnecting is not signing out, so it
+                                            is not a one-press twin of the button on
+                                            the rows above. It leads to the screen
+                                            where that act is explained. */}
+                                        <Button variant="ghost" size="icon" asChild>
+                                            <Link
+                                                href="/vault/clients"
+                                                title="Manage connected apps"
+                                                aria-label={`Manage ${device.browser}`}
+                                            >
+                                                <PanelRightOpen className="size-4" />
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>
@@ -318,7 +459,11 @@ function PinButton({
               ? "Locked to the address it was opened at"
               : "Not locked, whatever your account setting says";
     const then =
-        next === true ? "lock it" : next === false ? "leave it unlocked" : "follow your account setting";
+        next === true
+            ? "lock it"
+            : next === false
+              ? "leave it unlocked"
+              : "follow your account setting";
 
     return (
         <Button
