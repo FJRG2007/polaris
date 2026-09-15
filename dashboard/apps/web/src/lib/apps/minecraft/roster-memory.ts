@@ -90,9 +90,51 @@ export async function rememberedRoster(installedAppId: string): Promise<Remember
     };
 }
 
-/** Keep what the server just said. Never worth failing a poll over: this is a
- *  note about the answer, not the answer. */
+/** How long a roster that has not changed may go unwritten. `at` is what the
+ *  screen reads out as when Polaris last managed to ask, so an unchanged answer
+ *  is written down rarely rather than never - long enough that a poll is not a
+ *  write, short enough that the date under a server which has just stopped is
+ *  not out by more than somebody would notice. */
+const REFRESH_MS = 10 * 60 * 1000;
+
+/** Whether two rosters say the same thing about who may play. Names compared as
+ *  the sets they are: a server listing the same people in another order has not
+ *  changed anything, and a write for that would be a write for nothing.
+ *
+ *  Compared as JSON rather than as text joined by a separator. A ban carries a
+ *  reason somebody typed, and any separator chosen here is one a reason is
+ *  allowed to contain - which would read two different bans as the same ban and
+ *  leave the change unwritten. */
+function sameRoster(left: MinecraftRoster, right: MinecraftRoster): boolean {
+    const same = (one: readonly string[], two: readonly string[]): boolean =>
+        one.length === two.length &&
+        JSON.stringify([...one].sort()) === JSON.stringify([...two].sort());
+    const asText = (ban: BanEntry): string => JSON.stringify([ban.name, ban.reason, ban.source]);
+    return (
+        left.whitelistEnforced === right.whitelistEnforced &&
+        same(left.ops, right.ops) &&
+        same(left.whitelist, right.whitelist) &&
+        same(left.bans.map(asText), right.bans.map(asText))
+    );
+}
+
+/**
+ * Keep what the server just said. Never worth failing a poll over: this is a
+ * note about the answer, not the answer.
+ *
+ * Written only when the answer has changed, or when the note is old enough that
+ * its date would mislead. The screen behind this polls every twelve seconds per
+ * reader, and the note lives in the install's config blob - one column several
+ * other things merge their own keys into, a read and then a write apiece. Kept
+ * unconditional, every open screen rewrote that whole column four hundred times
+ * an hour, and each rewrite was a window for two of those writers to land on
+ * each other.
+ */
 export async function rememberRoster(installedAppId: string, roster: MinecraftRoster): Promise<void> {
+    const kept = await rememberedRoster(installedAppId);
+    if (kept && sameRoster(kept.roster, roster) && Date.now() - Date.parse(kept.at) < REFRESH_MS) {
+        return;
+    }
     await patchInstallConfig(installedAppId, {
         [REMEMBERED_KEY]: {
             at: new Date().toISOString(),

@@ -100,6 +100,10 @@ interface ServerReading {
      *  says a date when what it is showing is Polaris's note rather than the
      *  server's answer. */
     rosterAsOf: string | null;
+    /** When a roster last arrived from a server that was answering. Never drawn;
+     *  it is what dates the roster above once the server stops and Polaris has no
+     *  note of its own to read - which is what a failed write leaves behind. */
+    rosterSeenAt: string | null;
     firewall: MinecraftFirewall | null;
     access: PlayerAccessView | null;
     /** Who arrived and who left, as far back as the log reaches. */
@@ -175,6 +179,7 @@ export function MinecraftPanel({
         reach: null,
         roster: null,
         rosterAsOf: null,
+        rosterSeenAt: null,
         firewall: null,
         access: game?.playerAccess ?? null,
         sessions: [],
@@ -230,7 +235,24 @@ export function MinecraftPanel({
                 // came from the server just now - and `??` would read it as
                 // "nothing said" and leave yesterday's date under today's
                 // roster.
-                rosterAsOf: wantsRoster ? (data.rosterAsOf ?? null) : null,
+                //
+                // A poll that carried no roster at all is the exception, because
+                // what is drawn then is the one kept from the poll before and is
+                // old by definition. Polaris's own note dates it when there is
+                // one; when there is not - the note is written best effort, and
+                // a failed write is silent - this falls back to when this screen
+                // last saw a live one. A stale roster with no date under it is
+                // the whole failure this set out to remove.
+                rosterAsOf: !wantsRoster
+                    ? null
+                    : data.roster
+                      ? (data.rosterAsOf ?? null)
+                      : (data.rosterAsOf ?? current.rosterAsOf ?? current.rosterSeenAt),
+                rosterSeenAt: !wantsRoster
+                    ? null
+                    : data.roster && !data.rosterAsOf
+                      ? (data.now ?? new Date().toISOString())
+                      : current.rosterSeenAt,
                 firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
                 // Read on every poll, not only the moderation screen's, because the
                 // overview says whether anybody can join at all.

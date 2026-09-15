@@ -667,6 +667,66 @@ type Shown =
     | { readonly kind: "message"; readonly message: MailMessageView }
     | { readonly kind: "gap"; readonly count: number };
 
+/** How many of a list are drawn before the rest are folded away. Most messages
+ *  have one or two recipients; past three a header stops being a line somebody
+ *  reads and becomes something they scroll. */
+const SHOWN_RECIPIENTS = 3;
+
+/**
+ * One side of the header: who it went to, or who was copied.
+ *
+ * A row of its own with its own label, rather than one sentence carrying both.
+ * As a sentence it read as prose - "to a, b, copy to c" - which is why it needed
+ * punctuation between the two halves, and why a long list had nowhere to be
+ * folded without the fold landing mid-phrase. Two labelled rows is what every
+ * mail client does, and the labels line up in a column so the eye finds the
+ * addresses at the same place on both.
+ *
+ * A component rather than a function of the card, so that each row folds on its
+ * own: one flag shared between the two meant opening a long `to` list also
+ * unfolded the copy list underneath it. And it folds back, which a count that
+ * only ever opened did not - once it was gone there was nothing left to close
+ * the row with.
+ */
+function RecipientRow({
+    label,
+    people,
+    /** What to say where there is nobody, for a list whose emptiness is a fact
+     *  about the message rather than something missing from it. */
+    empty
+}: {
+    label: string;
+    people: readonly core.MailAddress[];
+    empty?: string;
+}) {
+    const [all, setAll] = useState(false);
+    const long = people.length > SHOWN_RECIPIENTS;
+    const drawn = all || !long ? people : people.slice(0, SHOWN_RECIPIENTS);
+    const hidden = people.length - drawn.length;
+    return (
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-1">
+            <span className="w-14 shrink-0 text-foreground-subtle/70">{label}</span>
+            {people.length === 0 && empty ? <span>{empty}</span> : null}
+            {drawn.map((entry, index) => (
+                <AddressChip
+                    key={`${entry.address}-${index}`}
+                    entry={entry}
+                    after={index < drawn.length - 1 ? "," : ""}
+                />
+            ))}
+            {long ? (
+                <button
+                    type="button"
+                    className="shrink-0 rounded underline-offset-2 hover:text-foreground hover:underline"
+                    onClick={() => setAll((was) => !was)}
+                >
+                    {all ? "Show fewer" : `+${hidden} more`}
+                </button>
+            ) : null}
+        </p>
+    );
+}
+
 function MessageCard({
     message,
     open,
@@ -763,49 +823,6 @@ function MessageCard({
     }, [open, markRead, message.id, message.seen, onRead, readAlready, refreshMailbox]);
 
     const sender = message.from[0];
-    // How many of a list are drawn before the rest are folded away. Most messages
-    // have one or two recipients; past three a header stops being a line somebody
-    // reads and becomes something they scroll.
-    const SHOWN = 3;
-    const [allRecipients, setAllRecipients] = useState(false);
-
-    /**
-     * One side of the header: who it went to, or who was copied.
-     *
-     * A row of its own with its own label, rather than one sentence carrying both.
-     * As a sentence it read as prose - "to a, b, copy to c" - which is why it
-     * needed punctuation between the two halves, and why a long list had nowhere
-     * to be folded without the fold landing mid-phrase. Two labelled rows is what
-     * every mail client does, and the labels line up in a column so the eye finds
-     * the addresses at the same place on both.
-     */
-    const recipientRow = (label: string, people: readonly core.MailAddress[], empty?: string) => {
-        const folded = !allRecipients && people.length > SHOWN;
-        const drawn = folded ? people.slice(0, SHOWN) : people;
-        const hidden = people.length - drawn.length;
-        return (
-            <p className="flex min-w-0 flex-wrap items-baseline gap-x-1">
-                <span className="w-14 shrink-0 text-foreground-subtle/70">{label}</span>
-                {people.length === 0 && empty ? <span>{empty}</span> : null}
-                {drawn.map((entry, index) => (
-                    <AddressChip
-                        key={`${entry.address}-${index}`}
-                        entry={entry}
-                        after={index < drawn.length - 1 ? "," : ""}
-                    />
-                ))}
-                {hidden > 0 ? (
-                    <button
-                        type="button"
-                        className="shrink-0 rounded underline-offset-2 hover:text-foreground hover:underline"
-                        onClick={() => setAllRecipients(true)}
-                    >
-                        +{hidden} more
-                    </button>
-                ) : null}
-            </p>
-        );
-    };
 
     return (
         <li className="rounded-md border border-border bg-card">
@@ -851,8 +868,14 @@ function MessageCard({
                             addresses goes to the chip, which is what knows where
                             it actually ends; see `after` in `address-chip`. */}
                         <div className="mt-0.5 flex flex-col gap-0.5 text-[12px] text-foreground-subtle">
-                            {recipientRow("to", message.to, "undisclosed recipients")}
-                            {message.cc.length > 0 ? recipientRow("copy to", message.cc) : null}
+                            <RecipientRow
+                                label="to"
+                                people={message.to}
+                                empty="undisclosed recipients"
+                            />
+                            {message.cc.length > 0 ? (
+                                <RecipientRow label="copy to" people={message.cc} />
+                            ) : null}
                         </div>
                     </div>
                 ) : (

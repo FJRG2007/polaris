@@ -366,7 +366,7 @@ export function MessageList({
                             // in it, which is exactly what it is to them - and a
                             // room where every mention of anybody was highlighted
                             // for everybody would be a room of highlights.
-                            message.mentionsYou && "border-l-2 border-warning bg-warning/10",
+                            message.mentionsYou && "border-l-2 border-warning bg-warning-soft",
                             message.id === highlightId && "bg-primary/10"
                         )}
                     >

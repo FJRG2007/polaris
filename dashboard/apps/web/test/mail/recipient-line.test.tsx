@@ -164,6 +164,22 @@ describe("the row of people a message went to", () => {
     });
 });
 
+describe("a recipient nobody has ever put a name to", () => {
+    it("is drawn as the address rather than as the part before the @", () => {
+        // The reported one. A local part standing where a name goes reads as a
+        // name, and the address then sat beside it as though the two were two
+        // different people. The names that can be filled in are, from the address
+        // book, before a header ever reaches this component.
+        draw([{ name: "", address: "ana@example.test" }], []);
+        expect(row("to")).toBe("toana@example.test");
+    });
+
+    it("is drawn once where the name it arrived with is the address", () => {
+        draw([BEA], []);
+        expect(row("to")).toBe("tobea@example.test");
+    });
+});
+
 describe("the copy list", () => {
     it("is a row of its own, labelled, rather than the tail of a sentence", () => {
         draw([BEA], [CARL]);
@@ -192,5 +208,26 @@ describe("a list longer than the header should carry", () => {
         expect(line).toContain("eli@example.test");
         expect(line).toContain("fran@example.test");
         expect(line).not.toContain("more");
+    });
+
+    it("folds it back again", () => {
+        // The count was the only way in and it disappeared on the way through, so
+        // a header opened by a misclick stayed open.
+        draw([BEA, CARL, DORA, ELI, FRAN], []);
+        fireEvent.click(screen.getByText("+2 more"));
+        fireEvent.click(screen.getByText("Show fewer"));
+        const line = row("to");
+        expect(line).toContain("+2 more");
+        expect(line).not.toContain("eli@example.test");
+    });
+
+    it("leaves the other row folded when one of them is opened", () => {
+        // One flag shared between the two rows meant opening a long To list also
+        // unfolded the copies underneath it.
+        draw([BEA, CARL, DORA, ELI, FRAN], [BEA, CARL, DORA, ELI, FRAN]);
+        fireEvent.click(screen.getAllByText("+2 more")[0]!);
+        expect(row("to")).toContain("eli@example.test");
+        expect(row("copy to")).toContain("+2 more");
+        expect(row("copy to")).not.toContain("eli@example.test");
     });
 });

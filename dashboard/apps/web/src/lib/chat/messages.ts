@@ -13,11 +13,11 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
-import { blockedBy } from "@/lib/blocks";
-import { clearFriendNoticeAbout } from "@/lib/friends-service";
 import { nicknamesFor } from "@/lib/contact-names";
+import { clearFriendNoticeAbout } from "@/lib/friends-service";
 import { referenceFromUrl } from "@/components/rich-text/references";
 import {
     anyAbsolute,
@@ -27,13 +27,13 @@ import {
     type ChatReferenceView
 } from "./references";
 import { announceRoomMention } from "./room-mentions";
+import { pollsFor, type ChatPollView } from "./polls";
 import { mentionsReader, readerTeams } from "./notify";
 import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
-import { pollsFor, type ChatPollView } from "./polls";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
     ChatAccessError,
@@ -1579,10 +1579,15 @@ export async function decorateMessages(
      * of answering at all. A page where nothing carries an `@` or an address pays
      * for neither, which is nearly every page.
      *
-     * The same function the notifications are decided with, deliberately. Two
-     * answers to "does this name me" is how a room ends up marking a message it
-     * never told anybody about, or telling somebody about one it then draws like
-     * any other.
+     * The same function the notifications are decided with, deliberately: two
+     * answers to "does this name me" is how a room ends up telling somebody
+     * about a message it then draws like every other one.
+     *
+     * What is deliberately not carried over is the gating around that function.
+     * A notification is held back by a mute, by a block, by being away when an
+     * `@here` went out; the mark is not. A mark is not an interruption - it is
+     * what makes the message findable once somebody does scroll back to it, and
+     * the reader who muted the room is exactly who will be scrolling.
      *
      * Not the reader's own messages: naming yourself is not being named, and a
      * deleted one has no body left to be named in.

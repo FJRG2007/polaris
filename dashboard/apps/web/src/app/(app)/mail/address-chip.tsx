@@ -67,7 +67,12 @@ export function AddressChip({
     const { openComposer } = useMail();
     const [copied, setCopied] = useState(false);
 
-    const label = core.addressLabel(entry);
+    // What they are called, or the address itself where nobody ever said. Never
+    // the part before the `@`: a local part drawn where a name goes reads as a
+    // name, and the address then sat beside it as though the two were different
+    // people. The names that can be filled in are, from the address book, before
+    // the header ever reaches here - see `withKnownNames`.
+    const label = entry.name.trim() || entry.address;
     // The address, unless it is what the label already says.
     const second = core.sameAddress(label, entry.address) ? "" : entry.address;
 

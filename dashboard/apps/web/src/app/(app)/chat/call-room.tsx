@@ -561,12 +561,6 @@ export function CallRoom({
                 </ul>
             )}
 
-            {/* The screens, which are the thing everybody is looking at while
-                they are there. Above the faces and across the whole width rather
-                than in a tile the size of a head: a shared screen is usually
-                text, and text in a ninth of a window is not readable. Side by
-                side when there are several, rather than stacked - two shares
-                stacked in a panel this tall leave each of them a strip. */}
             {/* A share somebody put away, said out loud rather than left to
                 vanish.
 
@@ -608,6 +602,12 @@ export function CallRoom({
                 </ul>
             )}
 
+            {/* The screens, which are the thing everybody is looking at while
+                they are there. Above the faces and across the whole width rather
+                than in a tile the size of a head: a shared screen is usually
+                text, and text in a ninth of a window is not readable. Side by
+                side when there are several, rather than stacked - two shares
+                stacked in a panel this tall leave each of them a strip. */}
             {showing.length > 0 && (
                 <div className={cn("grid min-h-0 flex-[3] gap-2", gridColumns(showing.length))}>
                     {showing.map((stage) => (

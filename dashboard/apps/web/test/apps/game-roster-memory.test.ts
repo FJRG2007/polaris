@@ -19,12 +19,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** The install's config column, which is where the answer is kept. */
 let stored: string | null = null;
 
+/** How many times that column has been rewritten. The screen behind this polls
+ *  every twelve seconds per reader, so how often it writes is as much a part of
+ *  the behaviour as what it writes. */
+let writes = 0;
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
             findUnique: async () => ({ config: stored }),
             update: async (args: { data: { config: string } }) => {
                 stored = args.data.config;
+                writes += 1;
                 return {};
             }
         }
@@ -42,6 +48,7 @@ function storeRoster(roster: Record<string, unknown>, at = "2026-09-01T10:00:00.
 
 beforeEach(() => {
     stored = null;
+    writes = 0;
 });
 
 describe("a server that has never answered", () => {
@@ -97,6 +104,74 @@ describe("what a server said, once it is off", () => {
         expect(kept?.roster.ops).toEqual([]);
         expect(kept?.roster.whitelist).toEqual(["ada"]);
         expect(kept?.roster.whitelistEnforced).toBe(false);
+    });
+});
+
+describe("an answer that has not changed since the last poll", () => {
+    const ROSTER = {
+        ops: ["ada"],
+        whitelist: ["ada", "grace"],
+        bans: [],
+        whitelistEnforced: true
+    };
+
+    it("is not written down again", async () => {
+        // The config column is one blob several other things merge their own keys
+        // into, a read and then a write apiece. Writing it on every poll rewrote
+        // all of it for nothing, and gave two of those writers a window to land
+        // on each other.
+        await rememberRoster(SERVER, ROSTER);
+        expect(writes).toBe(1);
+
+        await rememberRoster(SERVER, ROSTER);
+        await rememberRoster(SERVER, { ...ROSTER });
+        expect(writes).toBe(1);
+    });
+
+    it("is the same answer whatever order the server listed people in", async () => {
+        await rememberRoster(SERVER, ROSTER);
+        await rememberRoster(SERVER, { ...ROSTER, whitelist: ["grace", "ada"] });
+        expect(writes).toBe(1);
+    });
+
+    it("is written again once its date has aged enough to mislead", async () => {
+        // `at` is read out as when Polaris last managed to ask. Left alone
+        // forever it would date a server that stopped a minute ago to whenever
+        // its roster was last edited, which is the opposite of what it says.
+        storeRoster(ROSTER, "2020-01-01T00:00:00.000Z");
+        await rememberRoster(SERVER, ROSTER);
+        expect(writes).toBe(1);
+    });
+});
+
+describe("an answer that has changed", () => {
+    it("is written down", async () => {
+        await rememberRoster(SERVER, {
+            ops: ["ada"],
+            whitelist: [],
+            bans: [],
+            whitelistEnforced: true
+        });
+        // The field somebody could be hurt by missing: a whitelist that has just
+        // been switched off has to reach the note, however recently it was written.
+        await rememberRoster(SERVER, {
+            ops: ["ada"],
+            whitelist: [],
+            bans: [],
+            whitelistEnforced: false
+        });
+        expect(writes).toBe(2);
+        expect((await rememberedRoster(SERVER))?.roster.whitelistEnforced).toBe(false);
+    });
+
+    it("is written down for a ban nobody had before", async () => {
+        const base = { ops: [], whitelist: ["ada"], bans: [], whitelistEnforced: true };
+        await rememberRoster(SERVER, base);
+        await rememberRoster(SERVER, {
+            ...base,
+            bans: [{ name: "mallory", reason: "griefing", source: "console" }]
+        });
+        expect(writes).toBe(2);
     });
 });
 
