@@ -18,28 +18,43 @@
  * which is strictly better than no server.
  */
 
+import * as fivemAccess from "@/lib/apps/fivem/access";
 import { installApp } from "@/lib/apps/install-service";
 import { joinAccess } from "@/lib/apps/minecraft/access";
 import { allocateArkPorts } from "@/lib/apps/ark/create";
 import { allocateFivemPort } from "@/lib/apps/fivem/create";
-import * as fivemAccess from "@/lib/apps/fivem/access";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
+import { normalizeIdentifier } from "@/lib/apps/fivem/players";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { ALLOW_LIST_KEY, withPlayer } from "@/lib/apps/ark/access";
 import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
-import { normalizeIdentifier } from "@/lib/apps/fivem/players";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
-import { expectedFivemMemoryMb, fivemServerEnv, FIVEM_CATALOG_ID, FIVEM_CONTAINER_PORT } from "@/lib/apps/fivem/config";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
-import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
-import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import {
+    commonVersions,
+    knownUnsupported,
+    wantsLatest
+} from "@/lib/apps/minecraft/blueprint-version";
+import {
+    expectedFivemMemoryMb,
+    fivemServerEnv,
+    FIVEM_CATALOG_ID,
+    FIVEM_CONTAINER_PORT
+} from "@/lib/apps/fivem/config";
+import {
+    formatProjectList,
+    isPluginLoader,
+    loaderForType,
+    parseProjectList,
+    projectSlug
+} from "@/lib/apps/minecraft/modrinth";
 import type {
     CreateArkServerInput,
     CreateFivemServerInput,
@@ -160,7 +175,9 @@ export async function minecraftShapeEnv(
 ): Promise<Map<string, string>> {
     const env = new Map(current);
     const map = mapFor(blueprint, shape.mapId);
-    const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(() => []);
+    const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(
+        () => []
+    );
     const pinned = pinnedRelease(map);
     const asked = (shape.version ?? "").trim();
     // A map pinned to a release is not a preference that a picker can override:
@@ -168,7 +185,9 @@ export async function minecraftShapeEnv(
     // are that release's syntax, so the alternative to refusing here is a server
     // that boots, loads the world, and silently does none of what the map does.
     if (pinned && !wantsLatest(asked) && asked !== pinned) {
-        throw new Error(`${map?.name} only plays on Minecraft ${pinned}, so the server has to be built on it.`);
+        throw new Error(
+            `${map?.name} only plays on Minecraft ${pinned}, so the server has to be built on it.`
+        );
     }
     const wanted = pinned ?? (wantsLatest(asked) ? null : asked);
     if (wanted && knownUnsupported(versions, wanted)) {
@@ -213,10 +232,17 @@ export async function minecraftShapeEnv(
     env.set(seedEnvKey(edition), generated ? chosen || randomSeed() : "");
     for (const [key, value] of Object.entries(
         map?.generator
-            ? levelTypeEnv(edition, map.generator.levelType, DEFAULT_BIOME, map.generator.settings ?? "")
+            ? levelTypeEnv(
+                  edition,
+                  map.generator.levelType,
+                  DEFAULT_BIOME,
+                  map.generator.settings ?? ""
+              )
             : levelTypeEnv(
                   edition,
-                  generated ? (shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE) : DEFAULT_LEVEL_TYPE,
+                  generated
+                      ? (shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE)
+                      : DEFAULT_LEVEL_TYPE,
                   generated ? (shape.biome ?? DEFAULT_BIOME) : DEFAULT_BIOME
               )
     )) {
@@ -225,17 +251,29 @@ export async function minecraftShapeEnv(
 
     // Only the Java image runs a JVM to give a heap to.
     if (edition === "java") {
-        env.set("MEMORY", formatMemory(recommendedMemoryMb(shape.concurrentPlayers, blueprint.weight)));
+        env.set(
+            "MEMORY",
+            formatMemory(recommendedMemoryMb(shape.concurrentPlayers, blueprint.weight))
+        );
         // What the operator chose, then what the blueprint insists on: a blueprint
         // that needs Paper is not a suggestion, it is what its plugins load into.
-        env.set("TYPE", blueprint.software ?? shape.software ?? "PAPER");
-        env.set("MODRINTH_PROJECTS", projectList(blueprint, env.get("MODRINTH_PROJECTS"), shape.crossplay, map));
+        const software = blueprint.software ?? shape.software ?? "PAPER";
+        env.set("TYPE", software);
+        env.set(
+            "MODRINTH_PROJECTS",
+            protectionFor(
+                edition,
+                software,
+                projectList(blueprint, env.get("MODRINTH_PROJECTS"), shape.crossplay, map)
+            )
+        );
     }
     for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
     // Last, over the blueprint's own: where the two disagree the map is the one
     // that has to be right, because it is the thing people will be standing in.
     for (const [key, value] of Object.entries(map?.env ?? {})) env.set(key, value);
-    for (const [key, value] of Object.entries(resourcePackEnv(map, env.get("RESOURCE_PACK")))) env.set(key, value);
+    for (const [key, value] of Object.entries(resourcePackEnv(map, env.get("RESOURCE_PACK"))))
+        env.set(key, value);
     return env;
 }
 
@@ -250,8 +288,12 @@ export async function minecraftShapeEnv(
  * cannot identify, so leaving it behind is every player fetching it again on
  * every join.
  */
-function resourcePackEnv(map: WorldMap | undefined, current: string | undefined): Record<string, string> {
-    if (map?.resourcePack) return { RESOURCE_PACK: map.resourcePack.url, RESOURCE_PACK_SHA1: map.resourcePack.sha1 };
+function resourcePackEnv(
+    map: WorldMap | undefined,
+    current: string | undefined
+): Record<string, string> {
+    if (map?.resourcePack)
+        return { RESOURCE_PACK: map.resourcePack.url, RESOURCE_PACK_SHA1: map.resourcePack.sha1 };
     return isMapResourcePack(current) ? { RESOURCE_PACK: "", RESOURCE_PACK_SHA1: "" } : {};
 }
 
@@ -259,7 +301,8 @@ function resourcePackEnv(map: WorldMap | undefined, current: string | undefined)
 export function blueprintFor(edition: "java" | "bedrock", blueprintId: string): GameBlueprint {
     const blueprint = findBlueprint(blueprintId);
     if (!blueprint) throw new Error("Unknown blueprint");
-    if (!blueprint.editions.includes(edition)) throw new Error("That blueprint is not available for this edition");
+    if (!blueprint.editions.includes(edition))
+        throw new Error("That blueprint is not available for this edition");
     return blueprint;
 }
 
@@ -334,7 +377,11 @@ async function createMinecraftServer(
     const install = await installApp(
         ownerId,
         actorId,
-        { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
+        {
+            ...base,
+            name: input.name,
+            env: [...env.entries()].map(([key, value]) => ({ key, value }))
+        },
         extra ? { extra } : undefined
     );
 
@@ -390,17 +437,24 @@ async function createArkServer(
     // Only the values the operator actually chose. An empty string here is not the
     // same as an unset variable: the image writes each one it holds onto the
     // server's command line, and an empty mod list arrives as a bare `?GameModIds`.
-    const env = new Map(base.env.filter((entry) => entry.value.length > 0).map((entry) => [entry.key, entry.value]));
+    const env = new Map(
+        base.env.filter((entry) => entry.value.length > 0).map((entry) => [entry.key, entry.value])
+    );
     // Minted here rather than by the install's `generated` path, which produces 48
     // hex characters - a length ARK refuses at the enablecheats prompt, leaving the
     // server's own admin locked out of it. Same shape as the join password, which
     // is a shape the game demonstrably takes.
-    for (const [key, value] of Object.entries(arkServerEnv(input, ports, mintJoinPassword()))) env.set(key, value);
+    for (const [key, value] of Object.entries(arkServerEnv(input, ports, mintJoinPassword())))
+        env.set(key, value);
 
     const install = await installApp(
         ownerId,
         actorId,
-        { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
+        {
+            ...base,
+            name: input.name,
+            env: [...env.entries()].map(([key, value]) => ({ key, value }))
+        },
         {
             primary: { host: ports.game, container: ports.game, protocol: "udp" },
             extra: [
@@ -465,15 +519,23 @@ async function createFivemServer(
     // Only the values the operator actually chose, plus the two the server cannot
     // start without. An empty string is not the same as an unset variable here:
     // the image's own entrypoint branches on whether each is set at all.
-    const env = new Map(base.env.filter((entry) => entry.value.length > 0).map((entry) => [entry.key, entry.value]));
-    for (const [key, value] of Object.entries(fivemServerEnv(input.licenseKey, mintConsolePassword()))) {
+    const env = new Map(
+        base.env.filter((entry) => entry.value.length > 0).map((entry) => [entry.key, entry.value])
+    );
+    for (const [key, value] of Object.entries(
+        fivemServerEnv(input.licenseKey, mintConsolePassword())
+    )) {
         env.set(key, value);
     }
 
     const install = await installApp(
         ownerId,
         actorId,
-        { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
+        {
+            ...base,
+            name: input.name,
+            env: [...env.entries()].map(([key, value]) => ({ key, value }))
+        },
         {
             // One number published twice. A FiveM client begins over TCP and plays
             // over UDP, on the same port, and an address carries only the one.
@@ -484,7 +546,10 @@ async function createFivemServer(
 
     const now = new Date().toISOString();
     const owner = input.ownerIdentifier
-        ? { identifier: normalizeIdentifier(input.ownerIdentifier), label: input.ownerLabel?.trim() || "You" }
+        ? {
+              identifier: normalizeIdentifier(input.ownerIdentifier),
+              label: input.ownerLabel?.trim() || "You"
+          }
         : null;
     await patchInstallConfig(install.installedAppId, {
         [fivemAccess.ALLOW_LIST_KEY]: owner ? fivemAccess.withAllowed([], owner, now) : [],
@@ -540,11 +605,17 @@ export async function blueprintVersions(
     // Asked about the software the plugins will actually be loaded into, because
     // that is what decides whether a build for a release exists at all.
     const loader = loaderForType(blueprint.software ?? software ?? "PAPER");
-    return commonVersions(requiredProjects(blueprint, crossplay, map?.projects), loader ?? undefined);
+    return commonVersions(
+        requiredProjects(blueprint, crossplay, map?.projects),
+        loader ?? undefined
+    );
 }
 
 /** The newest release a blueprint can run on, or null when nothing constrains it. */
-export async function blueprintVersion(blueprint: GameBlueprint, crossplay = false): Promise<string | null> {
+export async function blueprintVersion(
+    blueprint: GameBlueprint,
+    crossplay = false
+): Promise<string | null> {
     return (await blueprintVersions(blueprint, crossplay))[0] ?? null;
 }
 
@@ -558,8 +629,80 @@ function projectList(
     map?: WorldMap
 ): string {
     const projects = new Set(parseProjectList(current ?? ""));
-    for (const project of requiredProjects(blueprint, crossplay, map?.projects)) projects.add(project);
+    for (const project of requiredProjects(blueprint, crossplay, map?.projects))
+        projects.add(project);
     return formatProjectList([...projects]);
+}
+
+/**
+ * What a modded server is given instead of the plugins.
+ *
+ * Claims, and only claims. A claim is the answer to the thing people actually
+ * lose a server over - somebody walks into a base that is not theirs and empties
+ * it - and this one carries no dependencies at all, which is what makes it safe
+ * to hand every server without asking.
+ *
+ * Nothing here is an anticheat, because for a modded server there is none to
+ * give: every anticheat worth the name is a Bukkit plugin, and the one project
+ * claiming to cover NeoForge ships a Sponge jar and requires PacketEvents, which
+ * publishes no build for it. A required dependency the image cannot resolve ends
+ * the boot rather than skipping the mod, so naming one here would trade a server
+ * with no anticheat for a server that does not start.
+ *
+ * Block history is left out for the same reason and not for want of a candidate:
+ * GriefLogger fits and is widely run, but it requires two libraries, and "?" only
+ * ever made the project itself skippable - never what it cannot run without. It
+ * is a good thing to install deliberately, on a release somebody has checked, and
+ * a bad thing to seed onto every server on every release.
+ */
+const MODDED_PROTECTION = ["open-parties-and-claims?"] as const;
+
+/** The projects the manifest seeds only onto a server that runs plugins, as
+ *  slugs - read from the manifest rather than repeated here, so the seed and the
+ *  thing that takes it away again cannot drift apart. */
+function seededPlugins(edition: "java" | "bedrock"): Set<string> {
+    const manifest = findApp(TEMPLATE_BY_EDITION[edition]);
+    const field = (manifest?.template?.env ?? []).find(
+        (entry) => entry.key === "MODRINTH_PROJECTS" && entry.pluginServersOnly
+    );
+    return new Set(
+        parseProjectList(field?.default ?? "")
+            .map(projectSlug)
+            .filter((slug): slug is string => slug !== null)
+            .map((slug) => slug.toLowerCase())
+    );
+}
+
+/**
+ * The protection a server actually gets, once its software is known.
+ *
+ * The manifest already says its protection seed is for servers that run plugins,
+ * and an install assembled from manifest defaults honours that. This path is not
+ * assembled that way: it builds the environment itself and passes the mod list
+ * explicitly, which downstream is indistinguishable from a value the operator
+ * typed - and a typed value is kept, deliberately. So a modded server created
+ * here was handed three Bukkit plugins: two that Modrinth has never heard of for
+ * it, and one jar it cannot boot on.
+ *
+ * Only what Polaris seeded is taken back. Anything else on the list belongs to
+ * whoever put it there, which on a modded server is every mod on it.
+ */
+export function protectionFor(
+    edition: "java" | "bedrock",
+    software: string,
+    current: string
+): string {
+    const loader = loaderForType(software);
+    if (loader && isPluginLoader(loader)) return current;
+    const seeded = seededPlugins(edition);
+    const modded = new Set(MODDED_PROTECTION.map((entry) => projectSlug(entry)?.toLowerCase()));
+    const kept = parseProjectList(current).filter((entry) => {
+        const slug = projectSlug(entry)?.toLowerCase();
+        // The modded set is appended below, so an entry already naming one of them
+        // is dropped here rather than written twice with two different suffixes.
+        return slug === undefined || slug === null || (!seeded.has(slug) && !modded.has(slug));
+    });
+    return formatProjectList([...kept, ...MODDED_PROTECTION]);
 }
 
 /**
@@ -594,7 +737,11 @@ const RETIRED_PROJECTS = ["floodgate"] as const;
  */
 export const OWNED_PROJECTS: readonly string[] = [
     ...new Set(
-        [...GAME_BLUEPRINTS.flatMap((blueprint) => blueprint.projects), ...CROSSPLAY_PROJECTS, ...RETIRED_PROJECTS]
+        [
+            ...GAME_BLUEPRINTS.flatMap((blueprint) => blueprint.projects),
+            ...CROSSPLAY_PROJECTS,
+            ...RETIRED_PROJECTS
+        ]
             .map(projectSlug)
             .filter((slug): slug is string => slug !== null)
             .map((slug) => slug.toLowerCase())

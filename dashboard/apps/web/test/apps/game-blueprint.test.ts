@@ -15,7 +15,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { entryReleaseType, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import { commonVersions, knownUnsupported } from "@/lib/apps/minecraft/blueprint-version";
 import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@/lib/apps/games-create";
-import { CROSSPLAY_PROJECTS, GAME_BLUEPRINTS, findBlueprint } from "@/lib/apps/minecraft/blueprints";
+import {
+    CROSSPLAY_PROJECTS,
+    GAME_BLUEPRINTS,
+    findBlueprint
+} from "@/lib/apps/minecraft/blueprints";
 
 /** Minecraft's releases as the tag endpoint gives them: newest first, and with
  *  the snapshots a blueprint must never pin mixed in. */
@@ -123,6 +127,80 @@ describe("what a blueprint installs", () => {
     });
 });
 
+describe("the protection a server is seeded with", () => {
+    /** What the create path actually starts from. `defaultInstallInput` fills every
+     *  prompted field with its manifest default, and the mod list is a prompted
+     *  field - so the seed is already in the map before software is chosen, and it
+     *  is chosen in the same form. */
+    const SEED = "grimac?:alpha,coreprotect?,luckperms?";
+
+    it("keeps it on a server that runs plugins", async () => {
+        const env = await envFor("survival", { software: "PAPER" }, { MODRINTH_PROJECTS: SEED });
+        const projects = env.get("MODRINTH_PROJECTS") ?? "";
+        expect(projects).toContain("grimac");
+        expect(projects).toContain("coreprotect");
+    });
+
+    it("takes it off a server that runs mods", async () => {
+        // Grim, CoreProtect and LuckPerms are Bukkit plugins, and Modrinth has no
+        // build of any of them for a modded server. Seeded onto one anyway, two sit
+        // on the Mods screen as projects Modrinth has never heard of and the third
+        // installs a jar the server cannot boot on - which the manifest answers with
+        // `pluginServersOnly`. That answer is applied where an install is assembled
+        // from manifest defaults, and this path does not arrive there that way: it
+        // builds the environment itself and passes the key explicitly, which reads
+        // downstream as a value the operator typed, and a typed value is kept.
+        const env = await envFor("survival", { software: "NEOFORGE" }, { MODRINTH_PROJECTS: SEED });
+        const projects = env.get("MODRINTH_PROJECTS") ?? "";
+        expect(projects).not.toContain("grimac");
+        expect(projects).not.toContain("coreprotect");
+        expect(projects).not.toContain("luckperms");
+    });
+
+    it("gives a modded server the protection it can actually run", async () => {
+        // Not the same protection, because it cannot be: what a modded server can
+        // have is claims, and claims are what stops the loss people actually report
+        // - somebody walking into a base that is not theirs.
+        const env = await envFor("survival", { software: "NEOFORGE" }, { MODRINTH_PROJECTS: SEED });
+        expect(env.get("MODRINTH_PROJECTS")).toContain("open-parties-and-claims");
+    });
+
+    it("seeds nothing a modded server cannot resolve on its own", async () => {
+        // The rule that keeps this from becoming the bug it replaced: "?" makes the
+        // project skippable and never what it requires, so a seeded project with a
+        // required dependency is a boot that ends on any release the dependency has
+        // no build for.
+        const env = await envFor("survival", { software: "NEOFORGE" }, { MODRINTH_PROJECTS: SEED });
+        for (const entry of (env.get("MODRINTH_PROJECTS") ?? "").split(",")) {
+            if (entry.trim()) expect(entry).toContain("?");
+        }
+    });
+
+    it("does not write the same protection twice", async () => {
+        const env = await envFor(
+            "survival",
+            { software: "NEOFORGE" },
+            { MODRINTH_PROJECTS: "open-parties-and-claims" }
+        );
+        const names = (env.get("MODRINTH_PROJECTS") ?? "")
+            .split(",")
+            .filter((entry) => entry.includes("open-parties-and-claims"));
+        expect(names).toHaveLength(1);
+    });
+
+    it("leaves a mod the operator chose alone on either", async () => {
+        // The rule is about what Polaris seeds, never about what somebody added:
+        // a modded server carrying mods is the ordinary case, and stripping the
+        // list rather than the seed would uninstall them.
+        const env = await envFor(
+            "survival",
+            { software: "NEOFORGE" },
+            { MODRINTH_PROJECTS: `${SEED},corpse:beta` }
+        );
+        expect(env.get("MODRINTH_PROJECTS")).toContain("corpse");
+    });
+});
+
 describe("the release a blueprint is built on", () => {
     it("pins the newest one every plugin has a build for", async () => {
         const env = await envFor("bedwars");
@@ -138,7 +216,9 @@ describe("the release a blueprint is built on", () => {
     });
 
     it("refuses a release the blueprint's plugins cannot run on", async () => {
-        await expect(envFor("bedwars", { version: "1.21.6" })).rejects.toThrow(/nothing built for Minecraft 1\.21\.6/);
+        await expect(envFor("bedwars", { version: "1.21.6" })).rejects.toThrow(
+            /nothing built for Minecraft 1\.21\.6/
+        );
     });
 
     it("takes one they can", async () => {
@@ -184,7 +264,9 @@ describe("the release a blueprint is built on", () => {
         // a required entry - has nothing to install there.
         asked = [];
         await envFor("shrinking-world");
-        expect(asked.some((url) => url.includes("/version?loaders=") && url.includes("paper"))).toBe(true);
+        expect(
+            asked.some((url) => url.includes("/version?loaders=") && url.includes("paper"))
+        ).toBe(true);
         expect(asked.some((url) => /\/project\/[^/]+$/.test(url))).toBe(false);
     });
 });
@@ -196,9 +278,9 @@ describe("the world a blueprint opens on", () => {
     });
 
     it("lets the operator override it", async () => {
-        expect((await envFor("bedwars", { levelType: "minecraft:amplified" })).get("LEVEL_TYPE")).toBe(
-            "minecraft:amplified"
-        );
+        expect(
+            (await envFor("bedwars", { levelType: "minecraft:amplified" })).get("LEVEL_TYPE")
+        ).toBe("minecraft:amplified");
     });
 
     it("writes the seed every time, and never leaves the last one behind", async () => {
@@ -210,7 +292,9 @@ describe("the world a blueprint opens on", () => {
         // is somewhere between unset, empty and zero - and zero is a real seed
         // that hands everybody the same world. One is minted instead.
         expect(rolled).toMatch(/^-?[0-9]+$/);
-        expect((await envFor("survival", { seed: "spawn island" })).get("SEED")).toBe("spawn island");
+        expect((await envFor("survival", { seed: "spawn island" })).get("SEED")).toBe(
+            "spawn island"
+        );
     });
 
     it("gives two servers two different worlds", async () => {
@@ -246,7 +330,9 @@ describe("resetting a server onto another blueprint", () => {
     });
 
     it("survives a list that names a file rather than a project", () => {
-        expect(withoutBlueprintProjects("@/data/projects.txt,bedwars1058")).toBe("@/data/projects.txt");
+        expect(withoutBlueprintProjects("@/data/projects.txt,bedwars1058")).toBe(
+            "@/data/projects.txt"
+        );
     });
 });
 
