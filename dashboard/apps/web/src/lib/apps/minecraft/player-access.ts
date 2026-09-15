@@ -271,22 +271,24 @@ async function takeOffWhitelist(server: ServerContainer, name: string): Promise<
  * next start, which is exactly when the wrong identity would have taken their
  * status away.
  */
+async function repairOnContainer(server: ServerContainer, file: RosterFile): Promise<boolean> {
+    if (!(await inventsIdentities(server))) return false;
+    const path = ROSTER_PATHS[file];
+    const current = await readRoster(server, path);
+    if (current === null) return false;
+    const written = withOfflineIdentities(current);
+    if (written === null) return false;
+    await writeRoster(server, path, written);
+    if (file === "whitelist") await reloadWhitelist(server);
+    return true;
+}
+
 export async function repairRosterIdentity(
     ownerId: string,
     installedAppId: string,
     file: RosterFile
 ): Promise<boolean> {
-    return withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!(await inventsIdentities(server))) return false;
-        const path = ROSTER_PATHS[file];
-        const current = await readRoster(server, path);
-        if (current === null) return false;
-        const written = withOfflineIdentities(current);
-        if (written === null) return false;
-        await writeRoster(server, path, written);
-        if (file === "whitelist") await reloadWhitelist(server);
-        return true;
-    });
+    return withServerContainer(ownerId, installedAppId, (server) => repairOnContainer(server, file));
 }
 
 /**
@@ -305,23 +307,25 @@ export async function repairRosterIdentity(
  * ever true. Every entry under that name goes, including the duplicate a
  * half-repaired list holds.
  */
+async function dropOnContainer(server: ServerContainer, file: RosterFile, name: string): Promise<boolean> {
+    if (!(await inventsIdentities(server))) return false;
+    const path = ROSTER_PATHS[file];
+    const current = await readRoster(server, path);
+    if (current === null) return false;
+    const written = withoutName(current, name);
+    if (written === null) return false;
+    await writeRoster(server, path, written);
+    if (file === "whitelist") await reloadWhitelist(server);
+    return true;
+}
+
 export async function dropFromRoster(
     ownerId: string,
     installedAppId: string,
     file: RosterFile,
     name: string
 ): Promise<boolean> {
-    return withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!(await inventsIdentities(server))) return false;
-        const path = ROSTER_PATHS[file];
-        const current = await readRoster(server, path);
-        if (current === null) return false;
-        const written = withoutName(current, name);
-        if (written === null) return false;
-        await writeRoster(server, path, written);
-        if (file === "whitelist") await reloadWhitelist(server);
-        return true;
-    });
+    return withServerContainer(ownerId, installedAppId, (server) => dropOnContainer(server, file, name));
 }
 
 /** Put one player on the game's own whitelist, opening the server once for it. */
@@ -332,6 +336,65 @@ export async function whitelistPlayer(ownerId: string, installedAppId: string, u
 /** Take one player off it. */
 export async function unwhitelistPlayer(ownerId: string, installedAppId: string, username: string): Promise<string> {
     return withServerContainer(ownerId, installedAppId, (server) => takeOffWhitelist(server, username));
+}
+
+/** What a roster verb does to a file: which one, and in which direction. */
+interface RosterWrite {
+    readonly file: RosterFile;
+    /** True when the verb takes a name off rather than putting one on. */
+    readonly removes: boolean;
+}
+
+const ROSTER_WRITES: Readonly<Record<string, RosterWrite>> = {
+    op: { file: "ops", removes: false },
+    deop: { file: "ops", removes: true },
+    ban: { file: "bans", removes: false },
+    pardon: { file: "bans", removes: true }
+};
+
+/**
+ * Which roster file a verb leaves an entry in, or null for one that does not.
+ *
+ * Said once, here, because three callers ask it - the moderation action, the
+ * queue that applies a decision later, and the timeout service - and a verb
+ * classified differently in two of them is the defect this module exists to fix,
+ * reappearing on whichever path nobody was looking at.
+ */
+export function rosterWriteFor(verb: string): RosterWrite | null {
+    return ROSTER_WRITES[verb] ?? null;
+}
+
+/**
+ * Carry out one moderation verb on a server that is already open.
+ *
+ * The single place that knows how each verb has to reach an unauthenticated
+ * server, so that every caller gets the same answer: the whitelist verbs write
+ * the file instead of asking the game, and the verbs that leave an entry behind
+ * keep using the command and have the file settled behind them.
+ *
+ * Takes the container rather than opening one because the callers that queue work
+ * up apply it in a loop - a decision per waiting row - and opening a connection
+ * for each would be a handshake per player on a machine that may be across an SSH
+ * link. `argv` is the command the caller would otherwise have run, so a verb this
+ * has no opinion about still goes through untouched.
+ */
+export async function applyOnContainer(
+    server: ServerContainer,
+    verb: string,
+    name: string,
+    argv: readonly string[]
+): Promise<string> {
+    if (verb === "whitelist-add") return putOnWhitelist(server, [name]);
+    if (verb === "whitelist-remove") return takeOffWhitelist(server, name);
+    const said = await server.say(argv);
+    const wrote = rosterWriteFor(verb);
+    if (wrote) {
+        const settled = wrote.removes
+            ? dropOnContainer(server, wrote.file, name)
+            : repairOnContainer(server, wrote.file);
+        await settled.catch(() => false);
+    }
+    return said;
 }
 
 /**

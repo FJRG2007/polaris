@@ -185,59 +185,23 @@ export async function setGamemodeAction(input: {
 }
 
 /**
- * Which roster file each verb leaves behind an entry in, and which way. The rest
- * of them act on who is connected right now and write nothing that has to survive
- * a restart.
- *
- * The direction decides what has to be done behind the command, because the two
- * fail differently on a server that invents identities: a verb that writes an
- * entry writes one nothing will match, and a verb that takes one away goes
- * looking for it under the identity Mojang answered with and finds nothing to
- * take.
- */
-const ROSTER_WRITTEN_BY: Partial<
-    Record<MinecraftModeration["action"], { file: playerAccess.RosterFile; removes?: true }>
-> = {
-    op: { file: "ops" },
-    deop: { file: "ops", removes: true },
-    ban: { file: "bans" },
-    pardon: { file: "bans", removes: true }
-};
-
-/**
  * Carry one moderation out, by whichever route this server will actually honour.
  *
- * The two whitelist verbs do not go through the game's command at all. On a
- * server with authentication off, `whitelist add` writes the identity Mojang
- * answered with and the login computes a different one, so the player is listed
- * and refused at the same time; the service writes the file instead and has the
- * server read it again. It still uses the command on a server that authenticates,
- * where that identity is the right one.
+ * How each verb has to reach an unauthenticated server is decided in
+ * `player-access`, not here, and this opens the server once and hands it over.
+ * Three paths carry these verbs out - this one, the queue that applies a decision
+ * the server was not up to hear, and the timeout service - and a verb treated
+ * differently on one of them is the original defect reappearing on whichever path
+ * nobody was looking at.
  *
- * The verbs that write a file keep using the command, and the file is settled
- * behind them: the running server is already right, and it is the next start that
- * would read an entry naming the right player under an identity it will never
- * compute - handing the server back with nobody in charge of it, or with a banned
- * player quietly welcome again. Adding corrects the identity; taking away rewrites
- * the file without that name, because the command looked for it under an identity
- * the file no longer holds and a pardon nobody can carry out is a ban for good.
+ * One connection rather than two: the command and the file that has to be settled
+ * behind it used to open the container separately, which on a server registered
+ * across an SSH link is two handshakes for one button.
  */
 async function moderationOutcome(ownerId: string, input: MinecraftModeration): Promise<string> {
-    if (input.action === "whitelist-add") {
-        return playerAccess.whitelistPlayer(ownerId, input.installedAppId, input.player);
-    }
-    if (input.action === "whitelist-remove") {
-        return playerAccess.unwhitelistPlayer(ownerId, input.installedAppId, input.player);
-    }
-    const output = await runServerCommand(ownerId, input.installedAppId, moderationArgv(input));
-    const wrote = ROSTER_WRITTEN_BY[input.action];
-    if (wrote) {
-        const settled = wrote.removes
-            ? playerAccess.dropFromRoster(ownerId, input.installedAppId, wrote.file, input.player)
-            : playerAccess.repairRosterIdentity(ownerId, input.installedAppId, wrote.file);
-        await settled.catch(() => false);
-    }
-    return output;
+    return withServerContainer(ownerId, input.installedAppId, (server) =>
+        playerAccess.applyOnContainer(server, input.action, input.player, moderationArgv(input))
+    );
 }
 
 export async function moderatePlayerAction(input: MinecraftModeration): Promise<{ output?: string; error?: string }> {

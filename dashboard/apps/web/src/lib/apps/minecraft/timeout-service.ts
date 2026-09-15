@@ -10,9 +10,9 @@
  * command at all.
  */
 
-import { runServerCommand } from "./service";
+import { withServerContainer } from "./service";
+import { applyOnContainer } from "./player-access";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
-import { dropFromRoster, repairRosterIdentity } from "./player-access";
 import {
     grantTimeout,
     liftTimeout as liftPlayerTimeout,
@@ -23,39 +23,32 @@ import {
 export { readPlayerTimeouts } from "@/lib/apps/player-timeout-service";
 
 /**
- * Say it, then make sure the server will still mean it tomorrow.
+ * Say it, and leave the server still meaning it tomorrow.
  *
- * `ban` writes `banned-players.json`, which the server keys by the identity it
- * resolved for the name. On a server with authentication off that is not the
- * identity an arriving player computes, so the entry names the banned player and
- * matches nobody: the ban holds while the server is up, because the kick already
- * happened, and is silently gone the next time it starts. Correcting the file
- * behind the command is what makes it a ban rather than a kick.
- */
-async function banAndKeep(ownerId: string, installedAppId: string, argv: readonly string[]): Promise<string> {
-    const said = await runServerCommand(ownerId, installedAppId, argv);
-    await repairRosterIdentity(ownerId, installedAppId, "bans").catch(() => false);
-    return said;
-}
-
-/**
- * Lift it, and make sure the file agrees.
+ * Both verbs write `banned-players.json`, which the server keys by the identity
+ * it resolved for the name. On a server with authentication off that is not the
+ * identity an arriving player computes, and the two fail in opposite directions:
+ * a ban holds only while the server is up, because the kick already happened, and
+ * is silently gone the next time it starts; a pardon goes looking for an entry
+ * under an identity the corrected file no longer holds, finds nothing, and says
+ * so in words that read like success - a timeout that cannot be lifted, which is
+ * a permanent ban with a countdown drawn next to it.
  *
- * `pardon` resolves the name the same way `ban` did, so once the entry has been
- * corrected to the identity this server computes there is nothing there for the
- * command to find - and a timeout that cannot be lifted is a permanent ban with a
- * countdown drawn next to it. The name comes out of the file instead, which is
- * what the sweep that ends a timeout by itself needs too.
+ * Which is why neither is spelled out here. `applyOnContainer` is the one place
+ * that knows what each verb has to do on such a server, shared with the
+ * moderation screen and with the queue, so this cannot drift away from them. One
+ * connection covers the command and the file behind it.
  */
-async function pardonAndKeep(ownerId: string, installedAppId: string, player: string): Promise<string> {
-    const said = await runServerCommand(ownerId, installedAppId, ["pardon", player]);
-    await dropFromRoster(ownerId, installedAppId, "bans", player).catch(() => false);
-    return said;
+function onServer(ownerId: string, installedAppId: string, verb: string, player: string, argv: string[]) {
+    return withServerContainer(ownerId, installedAppId, (server) =>
+        applyOnContainer(server, verb, player, argv)
+    );
 }
 
 const MINECRAFT: TimeoutCommands = {
-    ban: (ownerId, installedAppId, player, reason) => banAndKeep(ownerId, installedAppId, ["ban", player, reason]),
-    pardon: (ownerId, installedAppId, player) => pardonAndKeep(ownerId, installedAppId, player)
+    ban: (ownerId, installedAppId, player, reason) =>
+        onServer(ownerId, installedAppId, "ban", player, ["ban", player, reason]),
+    pardon: (ownerId, installedAppId, player) => onServer(ownerId, installedAppId, "pardon", player, ["pardon", player])
 };
 
 export function timeoutPlayer(

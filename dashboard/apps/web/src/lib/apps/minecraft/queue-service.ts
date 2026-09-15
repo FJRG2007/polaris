@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { applyOnContainer } from "./player-access";
 import { giveItem, giveToSlot } from "./item-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import {
@@ -247,5 +248,10 @@ async function apply(
     }
     const argv = commandFor(action.username, action.payload);
     if (!argv) throw new Error("Nothing to run");
-    await server.say(argv);
+    // Not `server.say` directly: a queued decision is applied when the server can
+    // finally hear it, which on a server that invents its players' identities is
+    // exactly when the raw command writes an entry the login will never match.
+    // This is the path the original report came in on - the player was added while
+    // the server was down.
+    await applyOnContainer(server, action.payload.kind, action.username, argv);
 }
