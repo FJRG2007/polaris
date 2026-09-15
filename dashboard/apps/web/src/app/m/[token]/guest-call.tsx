@@ -15,11 +15,11 @@
 import { useEffect, useState } from "react";
 import { Loader2, Video } from "lucide-react";
 import { useCall } from "@/app/(app)/chat/use-call";
-import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { CallAudio } from "@/app/(app)/chat/call-audio";
-import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { PublicShell } from "@/components/public-shell";
+import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
+import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import {
     joinAsGuestAction,
@@ -70,9 +70,8 @@ export function GuestCall({
     // Let in, heard the moment it happens. The poll below still runs and is what
     // catches a refusal - which the stream does not carry - and a stream that
     // never opened.
-    useLobbyAdmission(
-        seat?.admission === "waiting" ? seat.meetingId : null,
-        () => setSeat((current) => (current ? { ...current, admission: "admitted" } : current))
+    useLobbyAdmission(seat?.admission === "waiting" ? seat.meetingId : null, () =>
+        setSeat((current) => (current ? { ...current, admission: "admitted" } : current))
     );
 
     // Waiting at the door, asked for as well as listened for.
@@ -199,7 +198,9 @@ function GuestRoom({
                     somebody - the tiles carry the picture and nothing else. */}
                 <CallAudio call={call} />
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />
+                    {/* A room, like a voice channel: the call takes the width and
+                        the conversation is beside it rather than under it. */}
+                    <CallRoom place="room" meetingId={meetingId} call={call} onLeave={onLeave} />
                 </div>
                 {/* The same column an account gets. A guest is in the same room, not
                     a lesser copy of it - and they are the person most likely to be

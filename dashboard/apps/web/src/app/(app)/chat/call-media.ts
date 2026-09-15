@@ -10,9 +10,9 @@
  * with nothing on screen saying why.
  */
 
-import { withCameraDevice } from "./camera-device";
 import type { CallDevice } from "./call-state";
 import { micConstraints } from "./mic-cleanup";
+import { withCameraDevice } from "./camera-device";
 
 /**
  * Open what this browser can, and say what it could not.
@@ -54,7 +54,11 @@ export async function openMedia(
         // The camera is the likelier of the two to be busy, and the one nobody
         // needs. Try again without it before giving up on being heard.
         try {
-            return { stream: await ask(true, false), note: refused(first, "camera"), denied: false };
+            return {
+                stream: await ask(true, false),
+                note: refused(first, "camera"),
+                denied: false
+            };
         } catch (second) {
             try {
                 return {
@@ -181,6 +185,34 @@ export function stagesOf(room: {
         });
     }
     return stages;
+}
+
+/**
+ * The screens this reader has not put away.
+ *
+ * Somebody putting a screen up decides how much room the call takes on
+ * everybody else's, and on a small one that is all of it. Putting one away is
+ * the way out that is not leaving the call, and it has to work by removing the
+ * screen from the room rather than by hiding it: everything downstream - whether
+ * anything is staged, how tall the panel is, whether the faces are a strip -
+ * reads the list, so a screen that is still on it is still holding the room open.
+ */
+export function watched(stages: readonly CallStage[], away: readonly string[]): CallStage[] {
+    return stages.filter((stage) => !away.includes(stage.key));
+}
+
+/**
+ * The put-away screens still worth remembering, once the shares have changed.
+ *
+ * A key outlives the share it names: a screen is keyed by whose it is, so the
+ * same person sharing a second time arrives under the same key as the share that
+ * was put away. Left alone, that is a decision made about something that is over
+ * quietly hiding something new - somebody shares, and one person in the call
+ * never sees it and is never told. Dropping keys whose share has ended means
+ * putting one away lasts exactly as long as the thing it was about.
+ */
+export function stillShared(away: readonly string[], stages: readonly CallStage[]): string[] {
+    return away.filter((key) => stages.some((stage) => stage.key === key));
 }
 
 /** How the room is laid out around whatever is being watched. */

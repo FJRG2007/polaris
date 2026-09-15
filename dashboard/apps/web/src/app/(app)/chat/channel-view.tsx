@@ -30,7 +30,6 @@ import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { channelDraftKey } from "./drafts";
 import { posterFor } from "./video-poster";
-import { callBandHeight } from "./call-band";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
@@ -49,6 +48,7 @@ import type * as messagesLib from "@/lib/chat/messages";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { callBandHeight, type CallPlace } from "./call-band";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
@@ -1407,6 +1407,11 @@ export function ChannelView({
      *  see `call-band`, which is where the reasoning lives. */
     const directCall = channel?.kind === "dm" || channel?.kind === "group";
 
+    /** Which of the three this is, worked out once. It decides both how much of
+     *  the column the call takes and how the people in it are drawn, and those
+     *  two answers must not be able to disagree with each other. */
+    const callPlace: CallPlace = voiceRoom ? "room" : directCall ? "direct" : "channel";
+
     /**
      * The conversation itself: what has been said, and the box to say more in.
      *
@@ -1792,13 +1797,11 @@ export function ChannelView({
                             // How much of the column this is allowed to take -
                             // see `call-band`, which is where the reasoning
                             // lives.
-                            callBandHeight(
-                                voiceRoom ? "room" : directCall ? "direct" : "channel",
-                                staged
-                            )
+                            callBandHeight(callPlace, staged)
                         )}
                     >
                         <CallRoom
+                            place={callPlace}
                             call={call}
                             meetingId={inCall}
                             viewerId={viewerId}

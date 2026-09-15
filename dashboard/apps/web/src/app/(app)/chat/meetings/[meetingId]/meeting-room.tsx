@@ -19,20 +19,20 @@
  * this only decides what is worth drawing.
  */
 
+import { runAction } from "@/lib/run-action";
+import { useAppUrl } from "@/components/app-url";
 import { copyText } from "@/app/(app)/chat/links";
 import { CallRoom } from "@/app/(app)/chat/call-room";
-import { runAction } from "@/lib/run-action";
 import { useCallHold } from "@/app/(app)/chat/call-hold";
-import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
-import { useAppUrl } from "@/components/app-url";
-import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import type { MeetingSummary } from "@/lib/chat/meetings";
+import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { useRouter, useSearchParams } from "next/navigation";
+import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { MeetingDetailsDialog } from "../meeting-details-dialog";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { Crown, Link2, LogOut, Loader2, Pencil, UserMinus, UserPlus, Video } from "lucide-react";
 import {
     Button,
@@ -200,11 +200,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     )}
                     {host && (
                         <>
-                            <Button
-                                size="xs"
-                                variant="secondary"
-                                onClick={() => setInviting(true)}
-                            >
+                            <Button size="xs" variant="secondary" onClick={() => setInviting(true)}>
                                 <UserPlus className="size-3.5" />
                                 Invite
                             </Button>
@@ -230,7 +226,10 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 </header>
 
                 {error && (
-                    <p role="alert" className="border-b border-border px-4 py-2 text-sm text-danger">
+                    <p
+                        role="alert"
+                        className="border-b border-border px-4 py-2 text-sm text-danger"
+                    >
                         {error}
                     </p>
                 )}
@@ -238,6 +237,9 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 {inCall ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                         <CallRoom
+                            // A room: the call has the width and the meeting's
+                            // chat is down the side, not underneath it.
+                            place="room"
                             call={call}
                             meetingId={meetingId}
                             viewerId={viewerId}

@@ -34,16 +34,16 @@
  * is instant and nobody else is told.
  */
 
-import { NoAudioNotice } from "./no-audio-notice";
 import type { CallState } from "./use-call";
 import * as actions from "./meeting-actions";
 import { useHeldCall } from "./call-session";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { NOISE_LEVELS } from "./mic-cleanup";
 import { searchPeopleAction } from "./actions";
+import { NoAudioNotice } from "./no-audio-notice";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
-import { NOISE_LEVELS } from "./mic-cleanup";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
     REACTIONS,
@@ -53,13 +53,14 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
-import { CallDiagnosisPanel } from "./call-diagnosis-panel";
-import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
+import type { CallPlace } from "./call-band";
 import { useSpeakers } from "./speaker-device";
-import { useZoomPan } from "@/components/use-zoom-pan";
-import { stagesOf, stagingOf } from "./call-media";
-import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { HandStrip } from "./call-hands-panel";
+import { useZoomPan } from "@/components/use-zoom-pan";
+import { CallDiagnosisPanel } from "./call-diagnosis-panel";
+import { stagesOf, stagingOf, stillShared, watched } from "./call-media";
+import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
+import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     CAMERA_LADDER,
@@ -74,6 +75,8 @@ import {
     ChevronUp,
     Circle,
     Expand,
+    Eye,
+    EyeOff,
     Hand,
     Headphones,
     HeadphoneOff,
@@ -130,6 +133,7 @@ import {
  */
 export function CallRoom({
     meetingId,
+    place,
     call,
     onLeave,
     onMoved,
@@ -141,6 +145,17 @@ export function CallRoom({
     viewerId
 }: {
     meetingId: string;
+    /**
+     * Where this call is being drawn, which decides both how much of the column
+     * it is worth and what the people in it look like - see `call-band`.
+     *
+     * A room is somewhere somebody walked into: the call is the point, the
+     * conversation sits beside it, and the faces are the furniture. A call
+     * started inside a conversation is the other way round - it is happening
+     * over the top of something somebody was reading, so the people in it are a
+     * row of faces rather than a wall of empty rectangles.
+     */
+    place: CallPlace;
     call: CallState;
     onLeave: () => void;
     /** Told when bringing somebody in has taken the call somewhere else - a
@@ -246,12 +261,40 @@ export function CallRoom({
 
     /** Every screen being shared into this room, this browser's own included -
      *  see `stagesOf`, which is where the reasoning lives. */
-    const stages = stagesOf({
+    const shared = stagesOf({
         localScreen: call.localScreen,
         participantId: call.participantId,
         screens: call.screens,
         nameOf: (personId) => nameOf(admitted, personId)
     });
+
+    /**
+     * Screens this reader has put away.
+     *
+     * One person deciding to share decides what is on everybody's screen, and on
+     * a small one that is the entire window: the call claims the height a
+     * picture needs and the conversation underneath goes with it. Putting the
+     * share away is how somebody says they would rather keep reading - the panel
+     * falls back to a band, the messages come back, and they are still in the
+     * call and still being heard.
+     *
+     * Held per screen rather than as one flag, because putting away what one
+     * person is showing says nothing about the next person who shares. Keys
+     * whose share has ended are dropped as it ends, so somebody who stops
+     * sharing and starts again is watched again - a decision about a share that
+     * is over must not quietly hide the next one.
+     */
+    const [away, setAway] = useState<readonly string[]>([]);
+    const sharedKeys = shared.map((stage) => stage.key).join(" ");
+    const [knownKeys, setKnownKeys] = useState(sharedKeys);
+    if (knownKeys !== sharedKeys) {
+        setKnownKeys(sharedKeys);
+        setAway((was) => stillShared(was, shared));
+    }
+    /** What is left to draw, which is what the rest of the room is built from:
+     *  a screen put away is not on the stage, does not hold the panel open and
+     *  does not push the faces into a strip. */
+    const stages = watched(shared, away);
     const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
     const live =
         focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
@@ -260,6 +303,21 @@ export function CallRoom({
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
     const { showing, staged, enlarged } = stagingOf(stages, live);
+
+    /**
+     * Whether the people in this call are drawn as faces rather than as tiles.
+     *
+     * A room is somewhere somebody walked into and the call is what the column
+     * is for, so the grid of tiles is the room. A call inside a conversation is
+     * happening over the top of something somebody was reading, and there a wall
+     * of head-sized rectangles is mostly empty panel taking the space the
+     * conversation was using - most of a call is spent with the cameras off.
+     *
+     * Not while something is being watched: the faces are already a strip along
+     * the bottom then, which is the same idea, and swapping the strip for a
+     * different one would move everything under a screen somebody is reading.
+     */
+    const bareFaces = place !== "room" && !staged;
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
@@ -431,6 +489,61 @@ export function CallRoom({
                 </ul>
             )}
 
+            {/* Whether to watch what is being shared.
+
+                Somebody putting a screen up decides how much room the call
+                takes on everybody else's screen, and on a small one that is all
+                of it - the panel grows for the picture and the conversation
+                underneath goes with it. This is the way out that is not leaving
+                the call: put the screen away, the band shrinks back, the
+                messages return, and the talking carries on.
+
+                Offered per screen and only while there is one. Named, because
+                with two people sharing "stop watching" has to say which. */}
+            {shared.length > 0 && (
+                <ul className="flex shrink-0 flex-wrap items-center gap-1">
+                    {shared.map((stage) => {
+                        const put = away.includes(stage.key);
+                        return (
+                            <li key={stage.key}>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setAway((was) =>
+                                            put
+                                                ? was.filter((key) => key !== stage.key)
+                                                : [...was, stage.key]
+                                        )
+                                    }
+                                    aria-pressed={!put}
+                                    aria-label={
+                                        put ? `Watch ${stage.name}` : `Stop watching ${stage.name}`
+                                    }
+                                    title={
+                                        put
+                                            ? `Watch ${stage.name}`
+                                            : `Stop watching ${stage.name} - it keeps going, and the conversation comes back`
+                                    }
+                                    className={cn(
+                                        "flex max-w-52 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                                        put
+                                            ? "border-border text-muted-foreground hover:text-foreground"
+                                            : "border-border bg-muted text-foreground"
+                                    )}
+                                >
+                                    {put ? (
+                                        <EyeOff className="size-3.5 shrink-0" />
+                                    ) : (
+                                        <Eye className="size-3.5 shrink-0" />
+                                    )}
+                                    <span className="truncate">{stage.name}</span>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+
             {/* The screens, which are the thing everybody is looking at while
                 they are there. Above the faces and across the whole width rather
                 than in a tile the size of a head: a shared screen is usually
@@ -511,7 +624,46 @@ export function CallRoom({
                 name, because they are the only room left to give it: the tile
                 asked to be bigger, and the strip along the bottom is the last
                 thing between it and the whole panel. */}
-            {!enlarged && (
+            {!enlarged && bareFaces && (
+                <ul className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-3 py-1">
+                    <Face
+                        name="You"
+                        personId={mine?.userId ?? viewerId ?? null}
+                        speaking={
+                            call.participantId !== null &&
+                            call.speaking.has(call.participantId) &&
+                            call.micOn
+                        }
+                        muted={!call.micOn}
+                        deafened={call.deafened}
+                        hand={call.handRaised}
+                        handPlace={
+                            queued && call.participantId
+                                ? (places.get(call.participantId) ?? null)
+                                : null
+                        }
+                        reactions={reactionsFor(call.participantId)}
+                    />
+                    {(admitted ?? [])
+                        .filter((person) => person.id !== call.participantId)
+                        .map((person) => (
+                            <Face
+                                key={person.id}
+                                name={person.name}
+                                personId={person.userId ?? null}
+                                guest={person.guest}
+                                speaking={call.speaking.has(person.id)}
+                                muted={call.states.get(person.id)?.muted}
+                                deafened={call.states.get(person.id)?.deafened}
+                                hand={call.states.get(person.id)?.hand}
+                                handPlace={queued ? (places.get(person.id) ?? null) : null}
+                                reactions={reactionsFor(person.id)}
+                            />
+                        ))}
+                </ul>
+            )}
+
+            {!enlarged && !bareFaces && (
                 <div
                     className={cn(
                         "grid min-h-0 gap-2",
@@ -1059,6 +1211,93 @@ function clock(seconds: number): string {
 /** How big the face in an empty tile is. One size for every tile: a grid where
  *  the faces are different sizes reads as a mistake. */
 const AVATAR_SIZE = 72;
+
+/**
+ * One person in a call that is not a room.
+ *
+ * Everything a tile says about somebody is still said here, because it is all
+ * still true: the ring while they are talking, the raised hand and its place in
+ * the queue, what they reacted with, and why they cannot be heard. What is
+ * dropped is the frame around it - which in a call with the cameras off is a
+ * rectangle drawn around an avatar and nothing else.
+ *
+ * No video. A tile earns its frame by sometimes holding a picture; this is for
+ * the calls where the question is who is here and who is talking, and the
+ * moment a picture is worth the room - somebody shares a screen, somebody is
+ * enlarged - the room goes back to tiles and the strip.
+ */
+function Face({
+    name,
+    personId,
+    guest = false,
+    speaking = false,
+    muted = false,
+    deafened = false,
+    hand = false,
+    handPlace = null,
+    reactions = []
+}: {
+    name: string;
+    personId: string | null;
+    guest?: boolean;
+    speaking?: boolean;
+    muted?: boolean;
+    deafened?: boolean;
+    hand?: boolean;
+    handPlace?: number | null;
+    reactions?: readonly ShownReaction[];
+}) {
+    return (
+        <li className="flex w-20 shrink-0 flex-col items-center gap-1">
+            <span className="relative">
+                <Avatar
+                    size={AVATAR_SIZE}
+                    person={{ id: personId, name }}
+                    className={cn(
+                        "transition-shadow duration-fast",
+                        speaking && "ring-2 ring-success"
+                    )}
+                />
+                {hand && (
+                    <span
+                        className="call-hand-up pointer-events-none absolute -left-1 -top-1 flex items-center gap-1 rounded-full bg-warning py-0.5 pl-1 pr-1.5 text-[0.6875rem] font-semibold text-warning-foreground shadow-sm"
+                        aria-label={handPlace ? `Hand up, ${handPlace} in the queue` : "Hand up"}
+                    >
+                        <Hand className="size-3.5 shrink-0" />
+                        {handPlace !== null && <span>{handPlace}</span>}
+                    </span>
+                )}
+                {reactions.length > 0 && (
+                    <span
+                        className="pointer-events-none absolute inset-x-0 -bottom-2 flex justify-center gap-1 text-xl"
+                        aria-live="polite"
+                    >
+                        {reactions.map((shown) => (
+                            <span key={shown.id} aria-label={REACTION_LABELS[shown.reaction]}>
+                                {REACTION_GLYPHS[shown.reaction]}
+                            </span>
+                        ))}
+                    </span>
+                )}
+            </span>
+            <span className="flex max-w-full items-center gap-1 text-xs">
+                <span className="truncate">{name}</span>
+                {/* Deafened wins the space, for the reason a tile gives it:
+                    somebody who is not listening is not reached by talking
+                    louder, and their microphone being off follows from it. */}
+                {deafened ? (
+                    <HeadphoneOff
+                        className="size-3 shrink-0 text-danger"
+                        aria-label="Not listening"
+                    />
+                ) : muted ? (
+                    <MicOff className="size-3 shrink-0 text-danger" aria-label="Microphone off" />
+                ) : null}
+            </span>
+            {guest && <span className="text-[0.6875rem] text-muted-foreground">guest</span>}
+        </li>
+    );
+}
 
 function Tile({
     stream,
