@@ -53,10 +53,10 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
-import type { CallPlace } from "./call-band";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
 import { useZoomPan } from "@/components/use-zoom-pan";
+import { callBareFaces, type CallPlace } from "./call-band";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { stagesOf, stagingOf, stillShared, watched } from "./call-media";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
@@ -305,19 +305,25 @@ export function CallRoom({
     const { showing, staged, enlarged } = stagingOf(stages, live);
 
     /**
-     * Whether the people in this call are drawn as faces rather than as tiles.
+     * Whether there is a camera sending anywhere in this call, this browser's
+     * own included - the picture somebody checks their own framing in is as much
+     * a picture as anybody else's.
      *
-     * A room is somewhere somebody walked into and the call is what the column
-     * is for, so the grid of tiles is the room. A call inside a conversation is
-     * happening over the top of something somebody was reading, and there a wall
-     * of head-sized rectangles is mostly empty panel taking the space the
-     * conversation was using - most of a call is spent with the cameras off.
-     *
-     * Not while something is being watched: the faces are already a strip along
-     * the bottom then, which is the same idea, and swapping the strip for a
-     * different one would move everything under a screen somebody is reading.
+     * Asked of the tracks rather than of a flag, because for everybody else
+     * there is no flag to ask: nothing is announced about a camera, and a
+     * participant is only given a stream while something of theirs is live - see
+     * `resort` in `use-sfu-call`. A track that has arrived but is not yet
+     * carrying frames counts too, since the tile it lands in draws their face
+     * until it does, which is the wait the faces cannot draw at all.
      */
-    const bareFaces = place !== "room" && !staged;
+    const pictures =
+        call.cameraOn ||
+        [...call.remote.values()].some((stream) => stream.getVideoTracks().length > 0);
+
+    /** Whether the people in this call are drawn as faces rather than as tiles -
+     *  see `call-band`, which owns both of the questions `place` answers and is
+     *  where the reasoning lives. */
+    const bareFaces = callBareFaces(place, staged, pictures);
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
@@ -499,7 +505,10 @@ export function CallRoom({
                 messages return, and the talking carries on.
 
                 Offered per screen and only while there is one. Named, because
-                with two people sharing "stop watching" has to say which. */}
+                with two people sharing "stop watching" has to say which - and
+                named for the screen rather than for what pressing it does, so
+                that the name and the pressed state are not read out saying
+                opposite things about the same button. */}
             {shared.length > 0 && (
                 <ul className="flex shrink-0 flex-wrap items-center gap-1">
                     {shared.map((stage) => {
@@ -516,9 +525,7 @@ export function CallRoom({
                                         )
                                     }
                                     aria-pressed={!put}
-                                    aria-label={
-                                        put ? `Watch ${stage.name}` : `Stop watching ${stage.name}`
-                                    }
+                                    aria-label={`Watch ${stage.name}`}
                                     title={
                                         put
                                             ? `Watch ${stage.name}`
@@ -643,6 +650,7 @@ export function CallRoom({
                                 : null
                         }
                         reactions={reactionsFor(call.participantId)}
+                        sameRoom={call.audioRole !== null}
                     />
                     {(admitted ?? [])
                         .filter((person) => person.id !== call.participantId)
@@ -658,6 +666,13 @@ export function CallRoom({
                                 hand={call.states.get(person.id)?.hand}
                                 handPlace={queued ? (places.get(person.id) ?? null) : null}
                                 reactions={reactionsFor(person.id)}
+                                {...combining(person.id)}
+                                // The same key a tile uses, so turning somebody
+                                // down in a conversation and turning them down
+                                // in a room are the one decision: their account
+                                // where they have one, their seat where they do
+                                // not.
+                                volumeKey={person.userId ?? person.id}
                             />
                         ))}
                 </ul>
@@ -1213,18 +1228,134 @@ function clock(seconds: number): string {
 const AVATAR_SIZE = 72;
 
 /**
+ * What right-clicking somebody offers, wherever they are drawn.
+ *
+ * Its own component because the two ways a person is drawn are not two kinds of
+ * person: turning somebody down, silencing them, and combining audio with them
+ * are decisions about the person rather than about the rectangle they happen to
+ * be in. Held on the tile alone, they were quietly gone from every call drawn as
+ * faces - a stored volume still applied on playback, so the controls vanished
+ * while their effects stayed, which is the way for this to go wrong silently.
+ *
+ * Absent only where there is no volume to set, which is your own picture: it is
+ * never played back here.
+ */
+function PersonMenu({
+    name,
+    volumeKey,
+    onCombine,
+    onAskCombine,
+    combineAsked = false,
+    children
+}: {
+    name: string;
+    /** Who this volume is remembered against: their account where they have one,
+     *  their seat where they do not. */
+    volumeKey: string;
+    /** Go quiet and listen through this person's device, and ask them to go
+     *  quiet and listen through this one - see `call-combine`. */
+    onCombine?: () => void;
+    onAskCombine?: () => void;
+    combineAsked?: boolean;
+    children: React.ReactNode;
+}) {
+    const [volume, setVolume] = useCallVolume(volumeKey);
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+            <ContextMenuContent className="w-56">
+                <ContextMenuLabel>{name}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                    onSelect={(event) => {
+                        // The menu would otherwise close on the press that moved
+                        // the slider, which is the one control here that is used
+                        // by dragging rather than by choosing.
+                        event.preventDefault();
+                    }}
+                    className="flex-col items-stretch gap-1.5"
+                >
+                    <span className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Volume</span>
+                        <span
+                            className={cn(
+                                "tabular-nums",
+                                volume > DEFAULT_VOLUME && "font-medium text-warning"
+                            )}
+                        >
+                            {Math.round(volume * 100)}%
+                        </span>
+                    </span>
+                    <input
+                        type="range"
+                        min={0}
+                        max={MAX_VOLUME}
+                        step={0.05}
+                        value={volume}
+                        aria-label={`How loud ${name} is`}
+                        onChange={(event) => setVolume(Number(event.target.value))}
+                        className="w-full accent-primary"
+                    />
+                    {/* Where they were sent, marked on a track that runs past
+                        it. Without it there is nothing on screen to find your
+                        way back to, and "as loud as they actually are" is the
+                        one position on this slider anybody looks for. Pressing
+                        it is how you get there. */}
+                    <button
+                        type="button"
+                        onClick={() => setVolume(DEFAULT_VOLUME)}
+                        disabled={volume === DEFAULT_VOLUME}
+                        className="self-start text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
+                    >
+                        {volume === DEFAULT_VOLUME
+                            ? "As they were sent"
+                            : "Back to how they were sent"}
+                    </button>
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
+                    {volume === 0 ? (
+                        <Volume2 className="size-3.5" />
+                    ) : (
+                        <VolumeX className="size-3.5" />
+                    )}
+                    {volume === 0 ? "Let them through" : "Silence them for you"}
+                </ContextMenuItem>
+
+                {/* The way to combine with somebody this browser did not hear -
+                    across a big room, on a laptop with the volume down, or on a
+                    machine where listening for the room is switched off. */}
+                {(onCombine || onAskCombine) && <ContextMenuSeparator />}
+                {onCombine && (
+                    <ContextMenuItem onSelect={onCombine}>
+                        <Headphones className="size-3.5" />
+                        Use their audio
+                    </ContextMenuItem>
+                )}
+                {onAskCombine && (
+                    <ContextMenuItem onSelect={onAskCombine} disabled={combineAsked}>
+                        <Users className="size-3.5" />
+                        {combineAsked ? "Asked to combine" : "Ask them to combine audio"}
+                    </ContextMenuItem>
+                )}
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+
+/**
  * One person in a call that is not a room.
  *
  * Everything a tile says about somebody is still said here, because it is all
  * still true: the ring while they are talking, the raised hand and its place in
- * the queue, what they reacted with, and why they cannot be heard. What is
- * dropped is the frame around it - which in a call with the cameras off is a
- * rectangle drawn around an avatar and nothing else.
+ * the queue, what they reacted with, why they cannot be heard, and what
+ * right-clicking them offers. What is dropped is the frame around it - which in
+ * a call with the cameras off is a rectangle drawn around an avatar and nothing
+ * else.
  *
- * No video. A tile earns its frame by sometimes holding a picture; this is for
- * the calls where the question is who is here and who is talking, and the
- * moment a picture is worth the room - somebody shares a screen, somebody is
- * enlarged - the room goes back to tiles and the strip.
+ * No video, and nothing here has to hold one: a camera sending anywhere in the
+ * call is a picture worth the room, so the room is back to tiles and the strip
+ * before there is anything for a face to draw - see `callBareFaces`.
  */
 function Face({
     name,
@@ -1233,9 +1364,14 @@ function Face({
     speaking = false,
     muted = false,
     deafened = false,
+    sameRoom = false,
     hand = false,
     handPlace = null,
-    reactions = []
+    reactions = [],
+    onCombine,
+    onAskCombine,
+    combineAsked = false,
+    volumeKey
 }: {
     name: string;
     personId: string | null;
@@ -1243,11 +1379,24 @@ function Face({
     speaking?: boolean;
     muted?: boolean;
     deafened?: boolean;
+    /** Whether this person is sitting in the same room as the reader, sharing
+     *  one microphone between their devices - see `call-combine`. Said here for
+     *  the reason a tile says it: otherwise they are somebody muted for no
+     *  reason anybody can see. */
+    sameRoom?: boolean;
     hand?: boolean;
     handPlace?: number | null;
     reactions?: readonly ShownReaction[];
+    onCombine?: () => void;
+    onAskCombine?: () => void;
+    combineAsked?: boolean;
+    /** Who this face's volume is remembered against. Absent on your own, which
+     *  has no volume to set - it is never played back. */
+    volumeKey?: string;
 }) {
-    return (
+    const [volume] = useCallVolume(volumeKey ?? "");
+
+    const face = (
         <li className="flex w-20 shrink-0 flex-col items-center gap-1">
             <span className="relative">
                 <Avatar
@@ -1293,9 +1442,39 @@ function Face({
                 ) : muted ? (
                     <MicOff className="size-3 shrink-0 text-danger" aria-label="Microphone off" />
                 ) : null}
+                {/* Said for the same reason a tile says it: somebody turned all
+                    the way down is somebody this reader cannot hear, and with
+                    nothing on screen saying so it reads as a person who has
+                    stopped talking. */}
+                {volumeKey && volume === 0 && (
+                    <VolumeX
+                        className="size-3 shrink-0 text-danger"
+                        aria-label="Silenced for you"
+                    />
+                )}
+                {sameRoom && (
+                    <Users
+                        className="size-3 shrink-0 text-primary"
+                        aria-label="Sharing a room's microphone"
+                    />
+                )}
             </span>
             {guest && <span className="text-[0.6875rem] text-muted-foreground">guest</span>}
         </li>
+    );
+
+    if (!volumeKey) return face;
+
+    return (
+        <PersonMenu
+            name={name}
+            volumeKey={volumeKey}
+            onCombine={onCombine}
+            onAskCombine={onAskCombine}
+            combineAsked={combineAsked}
+        >
+            {face}
+        </PersonMenu>
     );
 }
 
@@ -1386,7 +1565,9 @@ function Tile({
     /** Pushing into the picture. Held for every tile and used by the ones that
      *  say so - a face in a grid of eight is not a thing anybody zooms. */
     const look = useZoomPan();
-    const [volume, setVolume] = useCallVolume(volumeKey ?? "");
+    /** Read for the name plate only. Changing it is the menu's, which is shared
+     *  with the faces - see `PersonMenu`. */
+    const [volume] = useCallVolume(volumeKey ?? "");
 
     /**
      * Full screen, on the tile rather than on the video inside it.
@@ -1705,84 +1886,15 @@ function Tile({
     if (!volumeKey) return tile;
 
     return (
-        <ContextMenu>
-            <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
-            <ContextMenuContent className="w-56">
-                <ContextMenuLabel>{name}</ContextMenuLabel>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                    onSelect={(event) => {
-                        // The menu would otherwise close on the press that moved
-                        // the slider, which is the one control here that is used
-                        // by dragging rather than by choosing.
-                        event.preventDefault();
-                    }}
-                    className="flex-col items-stretch gap-1.5"
-                >
-                    <span className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Volume</span>
-                        <span
-                            className={cn(
-                                "tabular-nums",
-                                volume > DEFAULT_VOLUME && "font-medium text-warning"
-                            )}
-                        >
-                            {Math.round(volume * 100)}%
-                        </span>
-                    </span>
-                    <input
-                        type="range"
-                        min={0}
-                        max={MAX_VOLUME}
-                        step={0.05}
-                        value={volume}
-                        aria-label={`How loud ${name} is`}
-                        onChange={(event) => setVolume(Number(event.target.value))}
-                        className="w-full accent-primary"
-                    />
-                    {/* Where they were sent, marked on a track that runs past
-                        it. Without it there is nothing on screen to find your
-                        way back to, and "as loud as they actually are" is the
-                        one position on this slider anybody looks for. Pressing
-                        it is how you get there. */}
-                    <button
-                        type="button"
-                        onClick={() => setVolume(DEFAULT_VOLUME)}
-                        disabled={volume === DEFAULT_VOLUME}
-                        className="self-start text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
-                    >
-                        {volume === DEFAULT_VOLUME
-                            ? "As they were sent"
-                            : "Back to how they were sent"}
-                    </button>
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
-                    {volume === 0 ? (
-                        <Volume2 className="size-3.5" />
-                    ) : (
-                        <VolumeX className="size-3.5" />
-                    )}
-                    {volume === 0 ? "Let them through" : "Silence them for you"}
-                </ContextMenuItem>
-
-                {/* The way to combine with somebody this browser did not hear -
-                    across a big room, on a laptop with the volume down, or on a
-                    machine where listening for the room is switched off. */}
-                {(onCombine || onAskCombine) && <ContextMenuSeparator />}
-                {onCombine && (
-                    <ContextMenuItem onSelect={onCombine}>
-                        <Headphones className="size-3.5" />
-                        Use their audio
-                    </ContextMenuItem>
-                )}
-                {onAskCombine && (
-                    <ContextMenuItem onSelect={onAskCombine} disabled={combineAsked}>
-                        <Users className="size-3.5" />
-                        {combineAsked ? "Asked to combine" : "Ask them to combine audio"}
-                    </ContextMenuItem>
-                )}
-            </ContextMenuContent>
-        </ContextMenu>
+        <PersonMenu
+            name={name}
+            volumeKey={volumeKey}
+            onCombine={onCombine}
+            onAskCombine={onAskCombine}
+            combineAsked={combineAsked}
+        >
+            {tile}
+        </PersonMenu>
     );
 }
 

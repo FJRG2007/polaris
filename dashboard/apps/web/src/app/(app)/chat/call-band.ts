@@ -35,6 +35,33 @@ export type CallPlace =
     | "channel";
 
 /**
+ * Whether the people in the call are drawn as faces rather than as tiles.
+ *
+ * The same question as the height, asked about the people instead of the panel,
+ * and answered from the same fact: a room is what the column is for, so the grid
+ * of tiles is the room. A call inside a conversation is happening over the top of
+ * something somebody was reading, and there a wall of head-sized rectangles is
+ * mostly empty panel taking the space the conversation was using - most of a call
+ * is spent with the cameras off.
+ *
+ * Only while there is nothing to look at, which is the half a picture decides. A
+ * face is an avatar and no video element, so a room drawn as faces while somebody
+ * has a camera on is a call that draws nobody's picture, local or remote, with
+ * "Stop video" on the bar under it and nothing on screen saying why. So a live
+ * camera counts exactly as a watched screen does: the moment there is a picture
+ * worth the room, the room goes back to tiles.
+ *
+ * @param staged Whether a shared screen - or a face somebody asked to see bigger
+ *   - currently has the big place.
+ * @param pictures Whether any camera in the call is sending, this browser's own
+ *   included.
+ */
+export function callBareFaces(place: CallPlace, staged: boolean, pictures: boolean): boolean {
+    if (place === "room") return false;
+    return !staged && !pictures;
+}
+
+/**
  * The height the call is drawn at.
  *
  * `staged` is whether a shared screen - or a face somebody asked to see bigger -
