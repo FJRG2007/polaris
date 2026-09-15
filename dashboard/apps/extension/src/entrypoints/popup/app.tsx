@@ -371,7 +371,11 @@ function SignIn({
                     <input
                         type="password"
                         value={password}
-                        placeholder="Master password"
+                        // Named. Beside an email field, under a heading that says
+                        // "Sign in", "Master password" is read as the Polaris
+                        // account's password - which is not what opens this and
+                        // not what is being asked for.
+                        placeholder="Vault master password"
                         onChange={(event) => setPassword(event.target.value)}
                         onKeyDown={(event) => event.key === "Enter" && void signIn()}
                     />
@@ -404,14 +408,20 @@ function SignIn({
                 <>
                     <Problem text={error} />
                     <button disabled={busy} onClick={() => void ask()}>
-                        {busy ? "Asking" : "Sign in with Polaris"}
+                        {busy ? "Asking" : "Connect to your vault"}
                     </button>
+                    {/* What it needs, before what it does. The requirement was the
+                        last clause of the sentence, under a button that said "Sign
+                        in with Polaris" - so this read as signing in to Polaris,
+                        and the vault turned up as a surprise on the other tab.
+                        What this connects to is the password vault; saying so is
+                        not a smaller promise, it is the true one. */}
                     <p className="muted small">
-                        A tab opens on your dashboard. Approve it there, with your vault unlocked,
-                        and the key arrives sealed so that only this extension can open it.
+                        Approving happens on your dashboard, with your vault open. A tab opens
+                        there; the key comes back sealed, so only this extension can open it.
                     </p>
                     <button className="ghost" onClick={() => setTyping(true)}>
-                        Use the master password
+                        Type your vault password instead
                     </button>
                     {/* The way to a different server. Off the main path, because
                         most people have one Polaris - but without it, setting an
@@ -448,12 +458,12 @@ function Unlock({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element 
 
     return (
         <main className="pad">
-            <h1>Locked</h1>
+            <h1>Vault locked</h1>
             <input
                 autoFocus
                 type="password"
                 value={password}
-                placeholder="Master password"
+                placeholder="Vault master password"
                 onChange={(event) => setPassword(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && void unlock()}
             />
