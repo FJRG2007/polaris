@@ -47,14 +47,14 @@ const FileViewer = dynamic(
     () => import("@/app/(app)/drive/file-viewer").then((module) => module.FileViewer),
     { ssr: false }
 );
+import { readMessage } from "./message-store";
 import type { MailViewContext } from "./mail-view";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { readMessage } from "./message-store";
 import { actOnAction, applyLabelAction, setConversationStateAction } from "./actions";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
     Button,
     DropdownMenu,
@@ -567,7 +567,9 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { muted: !thread.muted },
-                            thread.muted ? "Unmuted." : "Muted. New messages in it will not be announced."
+                            thread.muted
+                                ? "Unmuted."
+                                : "Muted. New messages in it will not be announced."
                         )
                     }
                 >
@@ -579,9 +581,7 @@ function ConversationMenu({
                     {thread.muted ? "Unmute" : "Mute"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                    onSelect={() =>
-                        window.open(`/mail/print/${thread.id}`, "_blank", "noopener")
-                    }
+                    onSelect={() => window.open(`/mail/print/${thread.id}`, "_blank", "noopener")}
                 >
                     <Printer className="size-3.5 shrink-0" aria-hidden />
                     Print
@@ -810,21 +810,32 @@ function MessageCard({
                                 // rather than a gap. "to nobody" read as a bug.
                                 <span>undisclosed recipients</span>
                             ) : (
+                                // The comma goes to the chip, which is what knows
+                                // where it actually ends - see `after`. The last
+                                // of the To list still takes one when a copy list
+                                // follows it, because the comma before "copy to"
+                                // is the same punctuation and had the same gap.
                                 message.to.map((entry, index) => (
-                                    <span key={`${entry.address}-${index}`} className="min-w-0">
-                                        <AddressChip entry={entry} />
-                                        {index < message.to.length - 1 ? "," : ""}
-                                    </span>
+                                    <AddressChip
+                                        key={`${entry.address}-${index}`}
+                                        entry={entry}
+                                        after={
+                                            index < message.to.length - 1 || message.cc.length > 0
+                                                ? ","
+                                                : ""
+                                        }
+                                    />
                                 ))
                             )}
                             {message.cc.length > 0 ? (
                                 <>
-                                    <span>, copy to</span>
+                                    <span>copy to</span>
                                     {message.cc.map((entry, index) => (
-                                        <span key={`${entry.address}-${index}`} className="min-w-0">
-                                            <AddressChip entry={entry} />
-                                            {index < message.cc.length - 1 ? "," : ""}
-                                        </span>
+                                        <AddressChip
+                                            key={`${entry.address}-${index}`}
+                                            entry={entry}
+                                            after={index < message.cc.length - 1 ? "," : ""}
+                                        />
                                     ))}
                                 </>
                             ) : null}
@@ -1009,14 +1020,18 @@ function MessageCard({
                                         eleven scans on it. Only offered when there
                                         is more than one: an archive of one file is
                                         a file with an extra step. */}
-                                    {message.attachments.filter((file) => !file.inline).length > 1 ? (
+                                    {message.attachments.filter((file) => !file.inline).length >
+                                    1 ? (
                                         <li className="flex items-center">
                                             <a
                                                 href={`/api/mail/zip/${message.id}`}
                                                 className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
                                                 download
                                             >
-                                                <Download className="size-3.5 shrink-0" aria-hidden />
+                                                <Download
+                                                    className="size-3.5 shrink-0"
+                                                    aria-hidden
+                                                />
                                                 Save all as a .zip
                                             </a>
                                         </li>

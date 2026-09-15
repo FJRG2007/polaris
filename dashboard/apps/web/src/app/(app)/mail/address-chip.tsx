@@ -43,11 +43,24 @@ export function AddressChip({
      *  to a mailbox. */
     accountId,
     onBlock,
+    after,
     className
 }: {
     entry: core.MailAddress;
     accountId?: string;
     onBlock?: (accountId: string, address: string) => void;
+    /**
+     * What follows this address in a list of them - the comma between two
+     * recipients.
+     *
+     * It belongs to the chip rather than to whoever is drawing the list, because
+     * the chip does not end where it appears to: the copy button after the
+     * address is only transparent, never absent, so it holds its width whether
+     * or not anybody is pointing at it. A comma written after the chip was
+     * therefore a comma written after an invisible button, sitting a clear gap
+     * away from the address it belongs to - and wrapping onto its own line.
+     */
+    after?: string;
     className?: string;
 }) {
     const toast = useToast();
@@ -76,13 +89,22 @@ export function AddressChip({
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
-                <span className={cn("group/address inline-flex min-w-0 items-baseline gap-1", className)}>
+                <span
+                    className={cn(
+                        "group/address inline-flex min-w-0 items-baseline gap-1",
+                        className
+                    )}
+                >
                     <span className="truncate" title={entry.address}>
                         {label}
                     </span>
                     {second ? (
                         <span className="min-w-0 truncate text-foreground-subtle">{second}</span>
                     ) : null}
+                    {/* Against the address rather than spaced off it: the row
+                        sets a gap between everything in the chip, and a comma is
+                        punctuation on the preceding word, not another item. */}
+                    {after ? <span className="-ml-1 shrink-0">{after}</span> : null}
                     {/* Under the pointer, and reachable from the keyboard: the
                         chip is in a header somebody tabs through, and a control
                         that only exists on hover is one nobody using a keyboard
