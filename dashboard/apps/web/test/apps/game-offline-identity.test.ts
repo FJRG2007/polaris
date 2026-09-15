@@ -116,11 +116,35 @@ describe("withOfflineNames", () => {
     // beside it, so replacing one and keeping the other is how a correct entry
     // becomes a pair no login will ever compute.
     it("leaves the name and the identity beside it agreeing", () => {
-        const before = file([{ uuid: offlineUuid("steve"), name: "steve" }]);
+        const before = file([{ uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "steve" }]);
         const after = JSON.parse(withOfflineNames(before, ["Steve"]) ?? "[]");
         expect(after).toHaveLength(1);
         expect(after[0]).toEqual({ uuid: offlineUuid("Steve"), name: "Steve" });
         expect(offlineUuid(after[0].name)).toBe(after[0].uuid);
+    });
+
+    // The server keys its rosters by the identity it computes, and it computes a
+    // different one for each spelling. A row that already carries its own is a
+    // player who can join right now, so renaming it to serve a request about
+    // another spelling is that player locked out of a list still bearing a name
+    // that looks like theirs.
+    it("adds a spelling beside a working one rather than renaming it", () => {
+        const before = file([{ uuid: offlineUuid("steve"), name: "steve" }]);
+        const after = JSON.parse(withOfflineNames(before, ["Steve"]) ?? "[]");
+        expect(after).toEqual([
+            { uuid: offlineUuid("steve"), name: "steve" },
+            { uuid: offlineUuid("Steve"), name: "Steve" }
+        ]);
+    });
+
+    // Two spellings on the list, one of them broken. The request is about the
+    // working one and must find it, not the broken row it case-matches.
+    it("prefers the exact spelling over a broken one that only matches case", () => {
+        const before = file([
+            { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "Steve" },
+            { uuid: offlineUuid("steve"), name: "steve" }
+        ]);
+        expect(withOfflineNames(before, ["steve"])).toBeNull();
     });
 
     // A server nobody has listed anybody on has no file at all, and that is an
@@ -177,6 +201,17 @@ describe("withoutName", () => {
         ]);
         expect(rosterNames(withoutName(before, "Steve") ?? "")).toEqual([]);
     });
+
+    // The ban list is where this costs the most. Two spellings are two players to
+    // the server, so lifting one on the strength of the other is a ban silently
+    // gone - and a name typed in another case is a known way round an offline ban.
+    it("leaves another spelling that is a working identity of its own", () => {
+        const before = file([
+            { uuid: offlineUuid("Steve"), name: "Steve" },
+            { uuid: offlineUuid("steve"), name: "steve" }
+        ]);
+        expect(rosterNames(withoutName(before, "Steve") ?? "")).toEqual(["steve"]);
+    });
 });
 
 describe("withOfflineIdentities", () => {
@@ -207,6 +242,20 @@ describe("withOfflineIdentities", () => {
     it("leaves a file that is already correct alone", () => {
         const before = file([{ uuid: offlineUuid("Steve"), name: "Steve" }]);
         expect(withOfflineIdentities(before)).toBeNull();
+    });
+
+    // Two spellings are two players, and the repair pass reaches the ban list.
+    // Collapsing them there is one of two bans lifted by a sweep nobody ran.
+    it("keeps two spellings of a name as the two players the server sees", () => {
+        const before = file([
+            { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "Steve" },
+            { uuid: "853c80ef-3c37-49fd-aa49-938b674adae6", name: "steve" }
+        ]);
+        const after = JSON.parse(withOfflineIdentities(before) ?? "");
+        expect(after).toEqual([
+            { uuid: offlineUuid("Steve"), name: "Steve" },
+            { uuid: offlineUuid("steve"), name: "steve" }
+        ]);
     });
 
     it("has nothing to say about an empty or unreadable file", () => {

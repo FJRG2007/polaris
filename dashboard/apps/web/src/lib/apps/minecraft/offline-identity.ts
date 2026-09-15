@@ -23,9 +23,20 @@
  *
  * Names are hashed exactly as typed. The game is case-sensitive about this -
  * "Alice" and "alice" are two different players to it - so nothing here
- * normalizes case into the hash, and matching an existing entry is the only place
- * case is ignored, because that is a file somebody else may have written. An
- * entry matched that way is rewritten under the name that was asked for, both
+ * normalizes case into the hash.
+ *
+ * Case is ignored in exactly one place, and only over the entries where ignoring
+ * it is safe. `whitelist add alice` makes the server write Mojang's canonical
+ * spelling, so a row saying "Alice" may well be the broken remains of a request
+ * about "alice" and has to be matched and repaired rather than duplicated. But a
+ * row whose UUID already is the hash of the name beside it is not broken: it is a
+ * player this server can match right now, and folding it into another spelling
+ * would rename a working entry, which on `whitelist.json` locks that player out
+ * and on `banned-players.json` lifts their ban. So a case-insensitive match only
+ * ever reaches a row the login could not match anyway - `isOwnIdentity` is the
+ * line, and rows on the right side of it are left to stand as their own player.
+ *
+ * An entry matched that way is rewritten under the name that was asked for, both
  * halves of it: the identity is the hash of the name beside it, so leaving one
  * and replacing the other is how a working entry becomes one nobody matches.
  */
@@ -115,6 +126,42 @@ function sameName(one: string, other: string): boolean {
 }
 
 /**
+ * Whether this row already is what the login computes for the name beside it.
+ *
+ * The one test that separates a player from a leftover. A row that passes is a
+ * player this server matches today, whatever its spelling; a row that fails names
+ * somebody the login looks for and never finds, which is the entire defect this
+ * module repairs. Only the second kind may be matched across a difference in
+ * case, because only the second kind costs nobody anything to be wrong about.
+ */
+function isOwnIdentity(entry: RosterEntry): boolean {
+    return entry.uuid === offlineUuid(entry.name.trim());
+}
+
+/**
+ * Whether a request about `name` means this row.
+ *
+ * Exactly the name, or a spelling of it on a row that is broken anyway.
+ */
+function refersTo(entry: RosterEntry, name: string): boolean {
+    if (entry.name.trim() === name.trim()) return true;
+    return !isOwnIdentity(entry) && sameName(entry.name, name);
+}
+
+/**
+ * Where that name sits in the file, or -1.
+ *
+ * Exact spellings are looked for across the whole file before any broken row is
+ * considered, so a list holding both "alice" (working) and "Alice" (broken)
+ * answers a request about "alice" with the row that is actually hers.
+ */
+function indexOfName(entries: readonly RosterEntry[], name: string): number {
+    const exact = entries.findIndex((entry) => entry.name.trim() === name.trim());
+    if (exact !== -1) return exact;
+    return entries.findIndex((entry) => refersTo(entry, name));
+}
+
+/**
  * The file with these names on it, each under the identity this server will
  * actually compute, or null when it already says exactly that.
  *
@@ -127,6 +174,10 @@ function sameName(one: string, other: string): boolean {
  * whatever else it carried. That is the repair for a list that was built by the
  * command this replaces: the name is present, the UUID beside it is Mojang's, and
  * the player it names cannot get in.
+ *
+ * A row that is already correct under another spelling is not that entry, and is
+ * left alone - "Alice" arriving at a list holding a working "alice" is a second
+ * player being added, not the first one being renamed.
  */
 export function withOfflineNames(content: string, names: readonly string[]): string | null {
     const entries = parseRoster(content);
@@ -136,7 +187,7 @@ export function withOfflineNames(content: string, names: readonly string[]): str
         const wanted = name.trim();
         if (wanted.length === 0) continue;
         const uuid = offlineUuid(wanted);
-        const found = entries.findIndex((entry) => sameName(entry.name, wanted));
+        const found = indexOfName(entries, wanted);
         if (found === -1) {
             entries.push({ uuid, name: wanted });
             changed = true;
@@ -153,13 +204,22 @@ export function withOfflineNames(content: string, names: readonly string[]): str
     return changed ? serialize(entries) : null;
 }
 
-/** The file without that name, or null when it was not on it. Every entry under
- *  the name goes, because a list built by the command this replaces can hold the
- *  same player twice - once under each kind of UUID. */
+/**
+ * The file without that name, or null when it was not on it.
+ *
+ * Every entry under the name goes, because a list built by the command this
+ * replaces can hold the same player twice - once under each kind of UUID - and
+ * leaving either behind is a player half off the list.
+ *
+ * A differently-spelled row that is already a working identity of its own stays.
+ * Removing it would be this taking one name off a ban list and quietly taking a
+ * second player's ban with it, which is the direction that cannot be undone by
+ * asking again.
+ */
 export function withoutName(content: string, name: string): string | null {
     const entries = parseRoster(content);
     if (entries === null) return null;
-    const left = entries.filter((entry) => !sameName(entry.name, name));
+    const left = entries.filter((entry) => !refersTo(entry, name));
     return left.length === entries.length ? null : serialize(left);
 }
 
@@ -173,6 +233,12 @@ export function withoutName(content: string, name: string): string | null {
  *
  * Duplicates collapse onto the first entry, which is the one carrying whatever
  * else was set - an operator's level lives on the row somebody actually opped.
+ * A duplicate is the same name written twice, which is what a half-repaired list
+ * holds, and not two spellings of it: those hash to two identities the server
+ * keeps apart, so collapsing them would decide that "Alice" and "alice" are one
+ * player at the moment nobody is watching. Both are repaired and both are kept,
+ * and that is deliberately the permissive answer on a whitelist and the strict
+ * one on a ban list - the direction each has to fail in.
  */
 export function withOfflineIdentities(content: string): string | null {
     const entries = parseRoster(content);
@@ -181,7 +247,7 @@ export function withOfflineIdentities(content: string): string | null {
     let changed = false;
     for (const entry of entries) {
         const uuid = offlineUuid(entry.name.trim());
-        const seen = kept.findIndex((held) => sameName(held.name, entry.name));
+        const seen = kept.findIndex((held) => held.name.trim() === entry.name.trim());
         if (seen !== -1) {
             changed = true;
             continue;

@@ -479,6 +479,7 @@ export function MinecraftPanel({
                         nobody looking for it would think to search a marketplace. */}
                     <MinecraftJoinPassword
                         installedAppId={installedAppId}
+                        edition={game?.edition ?? status?.edition ?? "java"}
                         projects={settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""}
                         software={settings.find((setting) => setting.key === "TYPE")?.value ?? ""}
                         playersOnline={status?.players.online ?? 0}

@@ -283,14 +283,6 @@ async function repairOnContainer(server: ServerContainer, file: RosterFile): Pro
     return true;
 }
 
-export async function repairRosterIdentity(
-    ownerId: string,
-    installedAppId: string,
-    file: RosterFile
-): Promise<boolean> {
-    return withServerContainer(ownerId, installedAppId, (server) => repairOnContainer(server, file));
-}
-
 /**
  * Take a name off one of the server's roster files.
  *
@@ -317,15 +309,6 @@ async function dropOnContainer(server: ServerContainer, file: RosterFile, name: 
     await writeRoster(server, path, written);
     if (file === "whitelist") await reloadWhitelist(server);
     return true;
-}
-
-export async function dropFromRoster(
-    ownerId: string,
-    installedAppId: string,
-    file: RosterFile,
-    name: string
-): Promise<boolean> {
-    return withServerContainer(ownerId, installedAppId, (server) => dropOnContainer(server, file, name));
 }
 
 /** Put one player on the game's own whitelist, opening the server once for it. */
@@ -355,12 +338,13 @@ const ROSTER_WRITES: Readonly<Record<string, RosterWrite>> = {
 /**
  * Which roster file a verb leaves an entry in, or null for one that does not.
  *
- * Said once, here, because three callers ask it - the moderation action, the
- * queue that applies a decision later, and the timeout service - and a verb
- * classified differently in two of them is the defect this module exists to fix,
- * reappearing on whichever path nobody was looking at.
+ * Said once, here, and read only by `applyOnContainer` - which is itself the one
+ * thing the moderation action, the queue that applies a decision later and the
+ * timeout service all go through. Keeping it that way is the point: a verb
+ * classified differently on two of those paths is the defect this module exists
+ * to fix, reappearing on whichever one nobody was looking at.
  */
-export function rosterWriteFor(verb: string): RosterWrite | null {
+function rosterWriteFor(verb: string): RosterWrite | null {
     return ROSTER_WRITES[verb] ?? null;
 }
 

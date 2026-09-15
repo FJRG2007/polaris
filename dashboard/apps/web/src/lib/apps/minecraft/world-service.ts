@@ -21,8 +21,8 @@
 import * as world from "./world";
 import { prisma } from "@polaris/db";
 import * as policy from "./backup-policy";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { OWNED_PROJECTS } from "@/lib/apps/games-create";
-import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { createNotification } from "@/lib/notification-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
@@ -849,10 +849,10 @@ export interface BackupSweep {
  * Take the copies that are due across an owner's servers, and prune what has
  * fallen out of retention.
  *
- * Swept from the cron and again whenever the screen is read, exactly as the
- * schedules are: an instance with no cron configured should still keep the
- * backups it was promised while somebody is looking, and the cron is what makes
- * that true at four in the morning too.
+ * Run from the cron (`game-world-backups`), which is the only thing that runs
+ * it and has to stay that way: the schedule on the Backups card is drawn from
+ * the same policy this reads, so a schedule nothing sweeps is a screen telling
+ * an operator a copy is coming that nobody is ever going to take.
  *
  * A server that is stopped is skipped rather than failed. `docker exec` needs a
  * container that is up, so a stopped server cannot be archived at all - and a
@@ -866,8 +866,12 @@ export async function sweepWorldBackups(ownerId: string, now: Date = new Date())
     });
     const swept: BackupSweep[] = [];
     for (const install of installs) {
-        const manifest = findApp(install.catalogId);
-        if (!manifest || !appHasCapability(manifest, "game-server")) continue;
+        // Minecraft, not every game server. This whole file archives a Minecraft
+        // world out of a Minecraft image, and an ARK or FiveM install carries the
+        // same capability - so a wider filter would walk those every pass, fail on
+        // a level directory they do not have, and raise a notification about it
+        // each time. What backs those up is their own service, not this one.
+        if (gameOfServer(install.catalogId)?.id !== "minecraft") continue;
         const rules = policy.readBackupPolicy(readInstallConfig(install.config));
         if (rules.every === "off") continue;
         const done = await sweepOne(ownerId, install, rules, now);
@@ -903,8 +907,12 @@ async function sweepOne(
         });
     } catch (caught) {
         const message = caught instanceof Error ? caught.message : "The backup did not run";
-        // A server that is simply off is not a failure worth waking anybody for.
-        if (/start the server first|not been deployed/i.test(message)) return null;
+        // A server that is simply off is not a failure worth waking anybody for,
+        // and neither is one that has nothing to copy yet: a server created a
+        // minute ago is still generating its world, and this pass comes round
+        // every ten minutes - so the alternative is a notification that repeats
+        // until the world exists, about a server doing exactly what it should.
+        if (/start the server first|not been deployed|no world to back up/i.test(message)) return null;
         if (rules.notifyOnFailure) {
             await createNotification({
                 userId: ownerId,

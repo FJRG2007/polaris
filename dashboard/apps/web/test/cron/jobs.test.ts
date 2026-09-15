@@ -91,6 +91,10 @@ describe("the work Polaris runs on a schedule", () => {
             "domain-health",
             "game-health",
             "game-schedules",
+            // Two runners would each archive the same world with `tar`, inside
+            // the same container, onto the same disk - and the copy that is worth
+            // having is the one the server was not busy competing with.
+            "game-world-backups",
             "home-availability",
             "home-recording",
             "home-retention",

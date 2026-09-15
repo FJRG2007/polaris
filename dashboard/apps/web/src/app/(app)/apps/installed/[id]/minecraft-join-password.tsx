@@ -21,6 +21,12 @@
  * of the ones offered here install on their own, with nothing else to add
  * alongside them, which matters because a dependency that cannot be resolved is a
  * server that does not come back up.
+ *
+ * Java only, and the card says so on Bedrock rather than going quiet. Bedrock
+ * loads neither plugins nor mods and has no Modrinth list at all, so there is
+ * nothing here to offer it - but its own authentication switch sits on this same
+ * screen, and telling that operator to "switch to Paper, or to a mod loader"
+ * would be advice about software their edition does not have.
  */
 
 import { useConfirm } from "@/components/confirm-dialog";
@@ -28,6 +34,7 @@ import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { useEffect, useState, useTransition } from "react";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import { updateServerSettingsAction } from "./minecraft-actions";
+import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 const PROJECTS_KEY = "MODRINTH_PROJECTS";
@@ -55,12 +62,15 @@ function listed(projects: string, slug: string): boolean {
 
 export function MinecraftJoinPassword({
     installedAppId,
+    edition,
     projects,
     software,
     playersOnline,
     onSaved
 }: {
     installedAppId: string;
+    /** Which Minecraft this is. Bedrock takes none of this, and is told so. */
+    edition: MinecraftEdition;
     /** `MODRINTH_PROJECTS` as it stands, which is the only record of what is on. */
     projects: string;
     /** The server's `TYPE`, which decides whether it takes plugins or mods. */
@@ -71,7 +81,8 @@ export function MinecraftJoinPassword({
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-    const guard = guardFor(software);
+    const java = edition === "java";
+    const guard = java ? guardFor(software) : null;
     const [on, setOn] = useState(false);
 
     // Held in state so the switch answers the press immediately, and taken from
@@ -135,7 +146,13 @@ export function MinecraftJoinPassword({
                     has only a name to go on and anyone who knows a listed name can use it.
                 </p>
 
-                {guard === null ? (
+                {!java ? (
+                    <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                        Bedrock has no equivalent. It loads neither plugins nor mods, so the player
+                        list and the addresses it is bound to are what closes this server.
+                    </p>
+                ) : guard === null ? (
                     <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                         This server runs neither plugins nor mods, so there is nothing to install.
@@ -151,17 +168,22 @@ export function MinecraftJoinPassword({
 
                 {error && <p className="text-sm text-danger">{error}</p>}
 
-                <div className="flex justify-end">
-                    <Button
-                        size="sm"
-                        variant={on ? "outline" : "primary"}
-                        disabled={pending || guard === null}
-                        onClick={() => apply(!on)}
-                    >
-                        {pending && <Loader2 className="size-4 animate-spin" />}
-                        {on ? "Turn off" : "Turn on"}
-                    </Button>
-                </div>
+                {/* No button at all on Bedrock rather than one that can never be
+                    pressed: there is nothing behind it to install, and a disabled
+                    control reads as something the reader is one step away from. */}
+                {java && (
+                    <div className="flex justify-end">
+                        <Button
+                            size="sm"
+                            variant={on ? "outline" : "primary"}
+                            disabled={pending || guard === null}
+                            onClick={() => apply(!on)}
+                        >
+                            {pending && <Loader2 className="size-4 animate-spin" />}
+                            {on ? "Turn off" : "Turn on"}
+                        </Button>
+                    </div>
+                )}
             </CardBody>
         </Card>
     );

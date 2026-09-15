@@ -47,6 +47,7 @@ import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
+import { sweepWorldBackups } from "@/lib/apps/minecraft/world-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
 import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
 import { ensureManagedCertificates } from "@/lib/tls/managed-certificates";
@@ -188,6 +189,31 @@ async function runGameActivity(): Promise<{
         }
     }
     return { started, stopped, arrived, left };
+}
+
+/**
+ * Take the world copies that are due, across every owner.
+ *
+ * Its own job rather than a line in `backups`: that one is driven by
+ * `nextDueAt` on a protected resource, and a game world is not one - the
+ * schedule lives in the install's own config and the only thing that says when
+ * the last copy was taken is the archive sitting next to the world. Without
+ * this the schedule on the Backups card is a date nothing ever acts on, which is
+ * worse than no schedule at all.
+ */
+async function runWorldBackups(): Promise<{ taken: number; pruned: number; failed: number }> {
+    let taken = 0;
+    let pruned = 0;
+    let failed = 0;
+    for (const ownerId of await ownersWithApps()) {
+        const swept = await sweepWorldBackups(ownerId).catch(() => []);
+        for (const server of swept) {
+            if (server.name) taken += 1;
+            if (server.error) failed += 1;
+            pruned += server.pruned.length;
+        }
+    }
+    return { taken, pruned, failed };
 }
 
 async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
@@ -551,6 +577,19 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // stopped twice and somebody told twice.
         leaseMs: 5 * MINUTE,
         run: runGameHealth
+    },
+    {
+        key: "game-world-backups",
+        // Every ten minutes, and the schedule itself decides whether anything is
+        // due - the shortest one on offer is hourly, so this is only ever asking a
+        // question it usually answers no to, and it makes a daily copy land within
+        // ten minutes of when the card said it would.
+        everyMs: Number(process.env.POLARIS_GAME_BACKUP_SWEEP_MS) || 10 * MINUTE,
+        // Leased, and for longer than the gap: this archives a world with `tar`
+        // inside the container, and two runners doing that at once is two copies
+        // of the same world competing for the same disk.
+        leaseMs: 30 * MINUTE,
+        run: runWorldBackups
     },
     {
         key: "game-reach",

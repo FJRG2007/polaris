@@ -62,6 +62,10 @@ const COMMAND_TIMEOUT_MS = 15_000;
  *  script into the console. */
 const MAX_COMMAND_LENGTH = 512;
 
+/** More words than any command the panel builds, and far fewer than a list
+ *  somebody assembled. */
+const MAX_COMMAND_ARGUMENTS = 24;
+
 export interface MinecraftStatus {
     /** Which Minecraft this is; the screens offer what the edition supports. */
     readonly edition: MinecraftEdition;
@@ -199,6 +203,23 @@ function assertSafeArgument(value: string): void {
 }
 
 /**
+ * The same, over a whole command, asserted where every command actually leaves.
+ *
+ * On the way out rather than on the callers, because there is more than one way
+ * in and only one way out: a moderation verb reaches the game through
+ * `ServerContainer.say` as well as through `runServerCommand`, and a reason
+ * field is trimmed at its ends and may still carry a newline in the middle. On
+ * Bedrock a command is written to the server's console, so that newline is a
+ * second console line: a line of the reader's choosing, run by a server that
+ * only meant to say why somebody was banned. Moderating and using the console
+ * are two separate permissions, and this is what keeps them that way.
+ */
+function assertSafeCommand(argv: readonly string[]): void {
+    if (argv.length === 0 || argv.length > MAX_COMMAND_ARGUMENTS) throw new Error("That command is not valid");
+    for (const argument of argv) assertSafeArgument(argument);
+}
+
+/**
  * Run one server command and hand back what the server said. `argv` is the
  * command as the server sees it ("whitelist", "add", "Alice"), not a line to be
  * split - so a player name with a space in it can never become two arguments.
@@ -208,8 +229,7 @@ export async function runServerCommand(
     installedAppId: string,
     argv: readonly string[]
 ): Promise<string> {
-    if (argv.length === 0 || argv.length > 24) throw new Error("That command is not valid");
-    for (const argument of argv) assertSafeArgument(argument);
+    assertSafeCommand(argv);
     const install = await resolveInstall(ownerId, installedAppId);
     return execCommand(install, ownerId, argv);
 }
@@ -240,6 +260,7 @@ async function sendGameCommand(
     install: MinecraftInstall,
     argv: readonly string[]
 ): Promise<string> {
+    assertSafeCommand(argv);
     const command = install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
     const result = await withTimeout(
         ports.runIn(install.container, command),

@@ -20,11 +20,17 @@
  */
 
 import { prisma } from "@polaris/db";
+import { withTimeout } from "@polaris/core";
 import { saveArkWorld } from "@/lib/apps/ark/service";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { readBackupPolicy } from "@/lib/apps/minecraft/backup-policy";
 import { createWorldBackup, flushWorldForStop } from "@/lib/apps/minecraft/world-service";
+
+/** How long the stop waits for that copy before going ahead without it. Long
+ *  enough for any world somebody is playing on, short enough that a button press
+ *  never looks like it did nothing. */
+const SHUTDOWN_BACKUP_MS = Number(process.env.POLARIS_GAME_SHUTDOWN_BACKUP_MS) || 90_000;
 
 /**
  * A copy on the way down.
@@ -40,6 +46,13 @@ import { createWorldBackup, flushWorldForStop } from "@/lib/apps/minecraft/world
  * Best effort like everything else on this path - a server that cannot be reached
  * has nothing to copy, and a backup must never be the reason a stop does not
  * happen.
+ *
+ * Which is why it is bounded. `tar` over a multi-gigabyte world on a machine
+ * across an SSH link takes as long as it takes, and every caller of this is a
+ * person who pressed Stop or Redeploy and is watching a button spin. Failing
+ * covers a copy that went wrong; only a bound covers one that is merely slow.
+ * What is given up when the bound is reached is a backup, and what is kept is the
+ * stop - which is the order this function already promised.
  */
 async function backUpBeforeStop(
     ownerId: string,
@@ -47,7 +60,11 @@ async function backUpBeforeStop(
     config: string | null
 ): Promise<void> {
     if (!readBackupPolicy(readInstallConfig(config)).onShutdown) return;
-    await createWorldBackup(ownerId, installedAppId);
+    await withTimeout(
+        createWorldBackup(ownerId, installedAppId),
+        SHUTDOWN_BACKUP_MS,
+        "The backup was still running when the server had to stop"
+    );
 }
 
 export async function flushGameWorld(ownerId: string, installedAppId: string): Promise<void> {
