@@ -106,7 +106,10 @@ export function categoriesForLoader(loader: string): readonly ModrinthCategory[]
 /** Whether a category tag is one this loader is actually browsed by. Checked on
  *  the server, because it goes into a query to somebody else's API. */
 export function isCategoryFor(loader: string, category: string): boolean {
-    return category.length === 0 || categoriesForLoader(loader).some((entry) => entry.value === category);
+    return (
+        category.length === 0 ||
+        categoriesForLoader(loader).some((entry) => entry.value === category)
+    );
 }
 
 export interface ModrinthProject {
@@ -209,7 +212,9 @@ export async function searchModrinth(
     });
     if (query.trim().length > 0) params.set("query", query.trim());
 
-    const parsed = searchResponseSchema.safeParse(await modrinthJson(`${modrinthApi}/search?${params.toString()}`).catch(() => null));
+    const parsed = searchResponseSchema.safeParse(
+        await modrinthJson(`${modrinthApi}/search?${params.toString()}`).catch(() => null)
+    );
     return parsed.success ? parsed.data.hits.map(hitToProject) : [];
 }
 
@@ -267,9 +272,12 @@ export async function readInstalledProjects(
     const found = new Map<string, z.infer<typeof projectSchema>>();
     if (askable.length > 0) {
         const parsed = projectsSchema.safeParse(
-            await modrinthJson(`${modrinthApi}/projects?ids=${encodeURIComponent(JSON.stringify(askable))}`).catch(() => null)
+            await modrinthJson(
+                `${modrinthApi}/projects?ids=${encodeURIComponent(JSON.stringify(askable))}`
+            ).catch(() => null)
         );
-        if (parsed.success) for (const project of parsed.data) found.set(project.slug.toLowerCase(), project);
+        if (parsed.success)
+            for (const project of parsed.data) found.set(project.slug.toLowerCase(), project);
     }
 
     const pinned = (version ?? "").trim();
@@ -308,19 +316,21 @@ export async function readInstalledProjects(
     });
 }
 
-const versionSchema = z.array(
-    z.object({
-        dependencies: z
-            .array(
-                z.object({
-                    project_id: z.string().max(64).nullish().catch(null),
-                    dependency_type: z.string().max(32).catch("")
-                })
-            )
-            .max(64)
-            .catch([])
-    })
-).max(50);
+const versionSchema = z
+    .array(
+        z.object({
+            dependencies: z
+                .array(
+                    z.object({
+                        project_id: z.string().max(64).nullish().catch(null),
+                        dependency_type: z.string().max(32).catch("")
+                    })
+                )
+                .max(64)
+                .catch([])
+        })
+    )
+    .max(50);
 
 /** Two projects on the same list that their own publishers say cannot both be
  *  installed. */
@@ -341,14 +351,19 @@ export interface ModrinthConflict {
  * blocking the screen, because the screen still has to let somebody take
  * something off a list.
  */
-export async function readConflicts(slugs: readonly string[], loader: string): Promise<ModrinthConflict[]> {
+export async function readConflicts(
+    slugs: readonly string[],
+    loader: string
+): Promise<ModrinthConflict[]> {
     const asked = slugs.map(projectSlug).filter((slug): slug is string => slug !== null);
     if (asked.length < 2) return [];
 
     // Dependencies are recorded by project id, and the list here is slugs, so the
     // two have to be mapped onto each other before any of it means anything.
     const listed = projectsSchema.safeParse(
-        await modrinthJson(`${modrinthApi}/projects?ids=${encodeURIComponent(JSON.stringify(asked))}`).catch(() => null)
+        await modrinthJson(
+            `${modrinthApi}/projects?ids=${encodeURIComponent(JSON.stringify(asked))}`
+        ).catch(() => null)
     );
     if (!listed.success) return [];
     const slugById = new Map(listed.data.map((entry) => [entry.id, entry.slug]));
@@ -499,7 +514,10 @@ export function formatProjectList(projects: readonly string[]): string {
  */
 export function pinnedBuild(entry: string): string | null {
     const { parts } = splitEntry(entry);
-    return parts.find((part) => !(RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())) ?? null;
+    return (
+        parts.find((part) => !(RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())) ??
+        null
+    );
 }
 
 /**
@@ -512,7 +530,9 @@ export function pinnedBuild(entry: string): string | null {
  */
 export function repinEntry(entry: string, build: string): string {
     const { slug, optional, parts } = splitEntry(entry);
-    const kept = parts.filter((part) => (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase()));
+    const kept = parts.filter((part) =>
+        (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())
+    );
     return [`${slug}${optional ? "?" : ""}`, ...kept, build].join(":");
 }
 
@@ -527,13 +547,45 @@ const buildSchema = z
     .max(50);
 
 /**
+ * The newest build of one project this server would actually take, or null.
+ *
+ * "Would take" is three questions asked together, because a project can publish
+ * for the loader, publish for the release, and still only ever publish it as an
+ * alpha the entry does not admit - and any one of those alone is a build the next
+ * restart refuses.
+ *
+ * Shared by the two callers that need the same answer for different reasons:
+ * offering a newer build to move a pin onto, and deciding whether a required
+ * dependency can be installed on this server at all. They were the same three
+ * checks, and the second one only exists because the first already had them.
+ */
+async function admittedBuild(
+    slug: string,
+    loader: string,
+    version: string,
+    release: ReleaseType
+): Promise<string | null> {
+    const builds = buildSchema.safeParse(
+        await modrinthJson(
+            `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
+        ).catch(() => null)
+    );
+    if (!builds.success) return null;
+    // Newest first is Modrinth's own order.
+    const admitted = builds.data.find(
+        (build) =>
+            build.version_number.length > 0 &&
+            admitsBuild(release, build.version_type) &&
+            (!VERSION.test(version) || build.game_versions.includes(version))
+    );
+    return admitted?.version_number ?? null;
+}
+
+/**
  * The newest build each pinned entry could move to, or nothing.
  *
  * Asked only about the entries that are pinned, which is usually none of them - an
- * unpinned list costs no requests at all. The build has to be one this server would
- * actually accept: the right loader, the release this server runs, and a type the
- * entry admits, or the offer is to move somebody onto something their next restart
- * would refuse to install.
+ * unpinned list costs no requests at all.
  */
 export async function newestBuilds(
     entries: readonly string[],
@@ -546,21 +598,170 @@ export async function newestBuilds(
         const slug = projectSlug(entry);
         const pin = pinnedBuild(entry);
         if (!slug || !pin) continue;
-        const builds = buildSchema.safeParse(
-            await modrinthJson(
-                `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
-            ).catch(() => null)
-        );
-        if (!builds.success) continue;
-        const admitted = builds.data.find(
-            (build) =>
-                build.version_number.length > 0 &&
-                admitsBuild(entryReleaseType(entry), build.version_type) &&
-                (!VERSION.test(wanted) || build.game_versions.includes(wanted))
-        );
-        // Newest first is Modrinth's own order. Nothing to say when the pin is
-        // already it.
-        if (admitted && admitted.version_number !== pin) newest.set(entry, admitted.version_number);
+        const build = await admittedBuild(slug, loader, wanted, entryReleaseType(entry));
+        // Nothing to say when the pin is already the newest it could be on.
+        if (build !== null && build !== pin) newest.set(entry, build);
     }
     return newest;
+}
+
+/** A project on the list, and something its publisher says it cannot run without. */
+export interface ModrinthRequirement {
+    /** The project that needs it. */
+    readonly slug: string;
+    /** What it needs. */
+    readonly needs: string;
+    /** And what that is called, for a sentence somebody reads. */
+    readonly needsTitle: string;
+    /**
+     * Whether that dependency has a build this server would take.
+     *
+     * False is the whole reason this exists. The image treats a required
+     * dependency it cannot resolve as a reason to END THE BOOT - not as a mod to
+     * skip - so a project whose dependency has no build for this loader is not a
+     * missing feature, it is a server that restarts until something stops it.
+     * Dynamic Lights requires Fabric API, Fabric API has no NeoForge build, and
+     * that is exactly what it did: nine restarts and a stopped server, from one
+     * press of Add.
+     *
+     * The `?` that marks an entry optional does not help here and it is worth
+     * knowing why: it makes the PROJECT skippable when no build is found for it,
+     * and says nothing about the dependencies it drags in.
+     */
+    readonly available: boolean;
+    /** Whether it is already on the list, so nothing offers to add it twice. */
+    readonly onList: boolean;
+}
+
+/**
+ * What the projects on a list require, and whether this server can have it.
+ *
+ * The other half of `readConflicts`: the same walk over the same declarations,
+ * reading the dependencies a publisher marks `required` rather than the ones they
+ * mark `incompatible`. Both are the publisher's own statement rather than anything
+ * inferred here, which is what makes either worth putting on a screen.
+ *
+ * Bounded by construction: one request for the list, one per project for its
+ * newest release, one for all the dependency names together, and one per distinct
+ * dependency to see whether it has a build. A dependency two projects share is
+ * asked about once.
+ *
+ * Best effort throughout, like the conflicts. A lookup that fails reports nothing
+ * rather than blocking a screen whose whole job is letting somebody change a list.
+ */
+export async function readRequirements(
+    entries: readonly string[],
+    loader: string,
+    version: string | null
+): Promise<ModrinthRequirement[]> {
+    const asked = entries.map(projectSlug).filter((slug): slug is string => slug !== null);
+    if (asked.length === 0) return [];
+
+    const listed = projectsSchema.safeParse(
+        await modrinthJson(
+            `${modrinthApi}/projects?ids=${encodeURIComponent(JSON.stringify(asked))}`
+        ).catch(() => null)
+    );
+    if (!listed.success) return [];
+    const onList = new Set(listed.data.map((project) => project.slug.toLowerCase()));
+    const wanted = (version ?? "").trim();
+
+    // Which entry each project came from, so a dependency is judged by the same
+    // release type the entry that needs it asks for.
+    const entryFor = new Map<string, string>();
+    for (const entry of entries) {
+        const slug = projectSlug(entry);
+        if (slug) entryFor.set(slug.toLowerCase(), entry);
+    }
+
+    const needed: { by: string; id: string; release: ReleaseType }[] = [];
+    for (const project of listed.data) {
+        const entry = entryFor.get(project.slug.toLowerCase()) ?? project.slug;
+        const versions = versionSchema.safeParse(
+            await modrinthJson(
+                `${modrinthApi}/project/${encodeURIComponent(project.slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
+            ).catch(() => null)
+        );
+        if (!versions.success) continue;
+        // The newest release only, for the reason `readConflicts` gives: what a
+        // project needed two years ago is not what it needs today.
+        for (const dependency of versions.data[0]?.dependencies ?? []) {
+            if (dependency.dependency_type !== "required" || !dependency.project_id) continue;
+            needed.push({
+                by: project.slug,
+                id: dependency.project_id,
+                release: entryReleaseType(entry)
+            });
+        }
+    }
+    if (needed.length === 0) return [];
+
+    // Dependencies are recorded by id; their names come in one request rather than
+    // one each.
+    const ids = [...new Set(needed.map((one) => one.id))].slice(0, 100);
+    const deps = projectsSchema.safeParse(
+        await modrinthJson(
+            `${modrinthApi}/projects?ids=${encodeURIComponent(JSON.stringify(ids))}`
+        ).catch(() => null)
+    );
+    if (!deps.success) return [];
+    const projectById = new Map(deps.data.map((project) => [project.id, project]));
+
+    const buildable = new Map<string, boolean>();
+    const seen = new Set<string>();
+    const found: ModrinthRequirement[] = [];
+    for (const one of needed) {
+        const dependency = projectById.get(one.id);
+        if (!dependency) continue;
+        const pair = `${one.by}\n${dependency.slug}`;
+        if (seen.has(pair)) continue;
+        seen.add(pair);
+        if (!buildable.has(dependency.slug)) {
+            const build = await admittedBuild(dependency.slug, loader, wanted, one.release);
+            buildable.set(dependency.slug, build !== null);
+        }
+        found.push({
+            slug: one.by,
+            needs: dependency.slug,
+            needsTitle: dependency.title || dependency.slug,
+            available: buildable.get(dependency.slug) ?? false,
+            onList: onList.has(dependency.slug.toLowerCase())
+        });
+    }
+    return found;
+}
+
+/**
+ * What one project on the list still needs.
+ *
+ * Pure, and kept apart from the walk that fetched it: what a row draws is a
+ * question about an answer rather than another question for Modrinth. It is also
+ * the half that can be asserted without a network.
+ *
+ * Only what is missing. A dependency already on the list is a row of its own and
+ * needs no second mention beside the thing that wanted it.
+ */
+export function neededBy(
+    requires: readonly ModrinthRequirement[],
+    slug: string
+): ModrinthRequirement[] {
+    const want = slug.toLowerCase();
+    return requires.filter((need) => need.slug.toLowerCase() === want && !need.onList);
+}
+
+/**
+ * Which projects on the list cannot run without this one.
+ *
+ * What makes a row explain itself. A dependency that arrived because something
+ * else required it is otherwise a mod nobody remembers choosing - and the first
+ * thing anybody does with one of those is take it off, which breaks the mod they
+ * did choose.
+ */
+export function requiredBy(requires: readonly ModrinthRequirement[], slug: string): string[] {
+    const want = slug.toLowerCase();
+    return [
+        ...new Set(
+            requires.filter((need) => need.needs.toLowerCase() === want).map((need) => need.slug)
+        )
+    ];
 }

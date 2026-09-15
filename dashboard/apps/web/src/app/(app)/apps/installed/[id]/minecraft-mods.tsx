@@ -36,17 +36,7 @@ import {
     Trash2,
     TriangleAlert
 } from "lucide-react";
-import {
-    categoriesForLoader,
-    formatProjectList,
-    loaderForType,
-    parseProjectList,
-    projectSlug,
-    repinEntry,
-    type InstalledProject,
-    type ModrinthConflict,
-    type ModrinthProject
-} from "@/lib/apps/minecraft/modrinth";
+import * as modrinth from "@/lib/apps/minecraft/modrinth";
 
 const PROJECTS_KEY = "MODRINTH_PROJECTS";
 const DEPENDENCIES_KEY = "MODRINTH_DOWNLOAD_DEPENDENCIES";
@@ -75,30 +65,49 @@ export function MinecraftMods({
     const projectsSetting = settings.find((setting) => setting.key === PROJECTS_KEY);
     const dependenciesSetting = settings.find((setting) => setting.key === DEPENDENCIES_KEY);
     const serverType = settings.find((setting) => setting.key === "TYPE")?.value ?? "";
-    const loader = loaderForType(serverType);
+    const loader = modrinth.loaderForType(serverType);
     const version = pinnedVersion(settings.find((setting) => setting.key === VERSION_KEY)?.value);
 
     const installed = useMemo(
-        () => parseProjectList(projectsSetting?.value ?? ""),
+        () => modrinth.parseProjectList(projectsSetting?.value ?? ""),
         [projectsSetting?.value]
     );
     const [projects, setProjects] = useState<string[]>(installed);
     const [dependencies, setDependencies] = useState(dependenciesSetting?.value ?? "required");
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState("");
-    const [results, setResults] = useState<ModrinthProject[] | null>(null);
+    const [results, setResults] = useState<modrinth.ModrinthProject[] | null>(null);
     const [searching, setSearching] = useState(false);
     /** What is on the list, as real projects. Null until the first read answers. */
     const [onList, setOnList] = useState<InstalledRow[] | null>(null);
-    const [conflicts, setConflicts] = useState<ModrinthConflict[]>([]);
+    const [conflicts, setConflicts] = useState<modrinth.ModrinthConflict[]>([]);
+    /** What the things on the list cannot run without, and whether this server can
+     *  have it. A required dependency with no build here ends the boot rather than
+     *  being skipped, so this is the difference between a warning and nine
+     *  restarts - see `readRequirements`. */
+    const [requires, setRequires] = useState<modrinth.ModrinthRequirement[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
 
-    const categories = useMemo(() => (loader ? categoriesForLoader(loader) : []), [loader]);
+    const categories = useMemo(
+        () => (loader ? modrinth.categoriesForLoader(loader) : []),
+        [loader]
+    );
     const changed =
-        formatProjectList(projects) !== formatProjectList(installed) ||
+        modrinth.formatProjectList(projects) !== modrinth.formatProjectList(installed) ||
         dependencies !== (dependenciesSetting?.value ?? "required");
+
+    /**
+     * Requirements this server cannot satisfy, which is a stop rather than a
+     * warning.
+     *
+     * The image ends the boot on a required dependency it cannot resolve - it does
+     * not skip the mod and carry on - so a list with one of these on it is not a
+     * server missing a feature, it is a server that restarts until something stops
+     * it. That is not a thing to let somebody save and find out about from a log.
+     */
+    const blocking = requires.filter((need) => !need.available);
 
     /** Everything the server has to be described by, on every request: what it
      *  runs, what release it is on, and what it is already carrying. */
@@ -125,7 +134,7 @@ export function MinecraftMods({
                     { cache: "no-store" }
                 );
                 const data = (await response.json()) as {
-                    projects?: ModrinthProject[];
+                    projects?: modrinth.ModrinthProject[];
                     error?: string;
                 };
                 setResults(data.projects ?? []);
@@ -151,6 +160,7 @@ export function MinecraftMods({
             if (!loader || entries.length === 0) {
                 setOnList([]);
                 setConflicts([]);
+                setRequires([]);
                 return;
             }
             try {
@@ -161,10 +171,12 @@ export function MinecraftMods({
                 if (!response.ok) return;
                 const data = (await response.json()) as {
                     projects?: InstalledRow[];
-                    conflicts?: ModrinthConflict[];
+                    conflicts?: modrinth.ModrinthConflict[];
+                    requires?: modrinth.ModrinthRequirement[];
                 };
                 setOnList(data.projects ?? []);
                 setConflicts(data.conflicts ?? []);
+                setRequires(data.requires ?? []);
             } catch {
                 // The list still renders from what is on screen; only the titles
                 // and the warnings are missing, and the next edit asks again.
@@ -224,7 +236,7 @@ export function MinecraftMods({
         }
         startTransition(async () => {
             const result = await updateServerSettingsAction(installedAppId, [
-                { key: PROJECTS_KEY, value: formatProjectList(projects) },
+                { key: PROJECTS_KEY, value: modrinth.formatProjectList(projects) },
                 { key: DEPENDENCIES_KEY, value: dependencies }
             ]);
             if (result.error) {
@@ -264,6 +276,18 @@ export function MinecraftMods({
                 entries={projects}
                 projects={onList}
                 conflicts={conflicts}
+                requires={requires}
+                onAddNeeded={(slugs) =>
+                    setProjects((current) => [
+                        ...current,
+                        ...slugs
+                            .filter(
+                                (slug) =>
+                                    !current.some((entry) => modrinth.projectSlug(entry) === slug)
+                            )
+                            .map((slug) => `${slug}?`)
+                    ])
+                }
                 version={version}
                 dependencies={dependencies}
                 dependencyOptions={
@@ -273,7 +297,9 @@ export function MinecraftMods({
                 onRemove={(entry, title) => void removeProject(entry, title)}
                 onRepin={(entry, build) =>
                     setProjects((current) =>
-                        current.map((item) => (item === entry ? repinEntry(item, build) : item))
+                        current.map((item) =>
+                            item === entry ? modrinth.repinEntry(item, build) : item
+                        )
                     )
                 }
             />
@@ -340,14 +366,18 @@ export function MinecraftMods({
                                     key={project.slug}
                                     installedAppId={installedAppId}
                                     project={project}
-                                    added={projects.some((entry) => projectSlug(entry) === project.slug)}
+                                    added={projects.some(
+                                        (entry) => modrinth.projectSlug(entry) === project.slug
+                                    )}
                                     // Added optional, because the image treats a
                                     // project it cannot find a build for as a
                                     // reason to end the boot: one mod that only
                                     // publishes betas for this release, and the
                                     // server restarts until it is stopped for it.
                                     // Optional makes that a skipped mod instead.
-                                    onAdd={() => setProjects((current) => [...current, `${project.slug}?`])}
+                                    onAdd={() =>
+                                        setProjects((current) => [...current, `${project.slug}?`])
+                                    }
                                 />
                             ))}
                         </ul>
@@ -355,11 +385,36 @@ export function MinecraftMods({
                 </CardBody>
             </Card>
 
-            <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                    {changed ? "Changes apply on the next restart." : "Nothing to apply."}
-                </p>
-                <Button onClick={() => void save()} disabled={pending || !changed}>
+            {/* Stuck to the bottom of the view rather than sitting at the end of
+                the page. What is between the list and this button is the whole of
+                Modrinth, so somebody who added a mod scrolled a catalogue past the
+                only control that applies it - and the change sat there unsaved,
+                looking installed. A fixed position further up would have the same
+                problem at a different scroll depth; being always on screen is the
+                only answer that holds however long the page gets. */}
+            <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-2 border-t border-border bg-surface/95 px-1 py-3 backdrop-blur">
+                {/* What is wrong outranks what would happen, because one of them
+                    stops the other from happening at all. */}
+                {blocking.length > 0 ? (
+                    <p className="text-xs text-danger">
+                        {blocking[0]?.slug} needs {blocking[0]?.needsTitle}, which has no build for
+                        this server. Take it off the list, or the server will restart until it is
+                        stopped.
+                    </p>
+                ) : (
+                    <p className="text-xs text-muted-foreground">
+                        {changed ? "Changes apply on the next restart." : "Nothing to apply."}
+                    </p>
+                )}
+                <Button
+                    onClick={() => void save()}
+                    disabled={pending || !changed || blocking.length > 0}
+                    title={
+                        blocking.length > 0
+                            ? `${blocking[0]?.needsTitle} cannot be installed on this server`
+                            : undefined
+                    }
+                >
                     {pending ? (
                         <Loader2 className="size-4 animate-spin" />
                     ) : (
@@ -414,7 +469,7 @@ function ProjectCard({
     onAdd
 }: {
     installedAppId: string;
-    project: ModrinthProject;
+    project: modrinth.ModrinthProject;
     added: boolean;
     onAdd: () => void;
 }) {
@@ -471,7 +526,7 @@ function ProjectCard({
  */
 /** An installed entry as this screen reads it back: what Modrinth knows, plus what
  *  the entry is pinned to and the newer build it could move to. */
-interface InstalledRow extends InstalledProject {
+interface InstalledRow extends modrinth.InstalledProject {
     readonly pinned?: string | null;
     readonly newest?: string | null;
 }
@@ -481,6 +536,8 @@ function InstalledList({
     entries,
     projects,
     conflicts,
+    requires,
+    onAddNeeded,
     onRepin,
     version,
     dependencies,
@@ -491,7 +548,12 @@ function InstalledList({
     installedAppId: string;
     entries: readonly string[];
     projects: InstalledRow[] | null;
-    conflicts: readonly ModrinthConflict[];
+    conflicts: readonly modrinth.ModrinthConflict[];
+    /** What the things on the list cannot run without - see `readRequirements`. */
+    requires: readonly modrinth.ModrinthRequirement[];
+    /** Put the dependencies on the list too. Offered rather than done silently: a
+     *  list that grew by itself is a list nobody can account for later. */
+    onAddNeeded: (slugs: readonly string[]) => void;
     /** Move a pinned entry onto a newer build. */
     onRepin: (entry: string, build: string) => void;
     version: string;
@@ -547,6 +609,10 @@ function InstalledList({
                     <ul className="flex flex-col gap-2">
                         {projects.map((project) => {
                             const clashes = conflictsFor(project.slug);
+                            // Both ends of the same answer: what this row still
+                            // needs, and what would break if it were taken off.
+                            const needs = modrinth.neededBy(requires, project.slug);
+                            const neededFor = modrinth.requiredBy(requires, project.slug);
                             return (
                                 <li
                                     key={project.entry}
@@ -617,6 +683,49 @@ function InstalledList({
                                                     <TriangleAlert className="size-3" /> clashes
                                                     with {clashes.join(", ")}
                                                 </Badge>
+                                            )}
+                                            {/* Why this row is here, when it is here
+                                                for something other than itself. The
+                                                first thing anybody does with a mod
+                                                they do not remember choosing is take
+                                                it off. */}
+                                            {neededFor.length > 0 && (
+                                                <Badge
+                                                    variant="neutral"
+                                                    title={`${neededFor.join(", ")} cannot run without it`}
+                                                >
+                                                    needed by {neededFor.join(", ")}
+                                                </Badge>
+                                            )}
+                                            {/* What it needs and has not got. The
+                                                one that cannot be had at all is a
+                                                different thing from the one that is
+                                                simply not on the list yet: the first
+                                                ends the boot, the second is a press
+                                                away. */}
+                                            {needs.map((need) =>
+                                                need.available ? (
+                                                    <button
+                                                        key={need.needs}
+                                                        type="button"
+                                                        onClick={() => onAddNeeded([need.needs])}
+                                                        title={`${project.title} needs ${need.needsTitle}. Add it to the list.`}
+                                                    >
+                                                        <Badge variant="primary">
+                                                            <Plus className="size-3" /> needs{" "}
+                                                            {need.needsTitle}
+                                                        </Badge>
+                                                    </button>
+                                                ) : (
+                                                    <Badge
+                                                        key={need.needs}
+                                                        variant="danger"
+                                                        title={`${need.needsTitle} has no build for this server, and ${project.title} will not start without it`}
+                                                    >
+                                                        <TriangleAlert className="size-3" /> needs{" "}
+                                                        {need.needsTitle}, which has no build here
+                                                    </Badge>
+                                                )
                                             )}
                                         </div>
                                     </div>

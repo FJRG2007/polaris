@@ -7,6 +7,7 @@ import {
     pinnedBuild,
     readConflicts,
     readInstalledProjects,
+    readRequirements,
     searchModrinth
 } from "@/lib/apps/minecraft/modrinth";
 
@@ -51,7 +52,10 @@ const installedSchema = searchSchema.extend({
  * Proxied so the browser never calls a third party directly, and gated on the
  * same permission as the rest of the app - the results end up in an install.
  */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     // Against the server the search is for, not against the instance: the results
     // end up in one install's mod list, so the grant that matters is the one on it.
     const { id } = await params;
@@ -67,7 +71,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const installed = url.searchParams.get("installed");
     if (installed !== null) {
         const parsed = installedSchema.safeParse({ ...asked, installed });
-        if (!parsed.success) return NextResponse.json({ error: "Could not read this server's list" }, { status: 400 });
+        if (!parsed.success)
+            return NextResponse.json(
+                { error: "Could not read this server's list" },
+                { status: 400 }
+            );
         const entries = parsed.data.installed
             .split(/[,\n]/)
             .map((entry) => entry.trim())
@@ -80,10 +88,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // other, and whether an entry nailed to one build has been left behind by a
         // newer one. The last costs nothing on a list where nothing is pinned,
         // which is most lists.
-        const [projects, conflicts, newest] = await Promise.all([
+        const [projects, conflicts, newest, requires] = await Promise.all([
             readInstalledProjects(entries, parsed.data.loader, parsed.data.version || null),
             readConflicts(entries, parsed.data.loader).catch(() => []),
-            newestBuilds(entries, parsed.data.loader, parsed.data.version || null).catch(() => new Map())
+            newestBuilds(entries, parsed.data.loader, parsed.data.version || null).catch(
+                () => new Map()
+            ),
+            // And what each of them cannot run without. A required dependency with
+            // no build for this server is not a mod that gets skipped - it is a
+            // boot that ends, and a server that restarts until it is stopped.
+            readRequirements(entries, parsed.data.loader, parsed.data.version || null).catch(
+                () => []
+            )
         ]);
         return NextResponse.json({
             projects: projects.map((project) => ({
@@ -91,7 +107,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
                 pinned: pinnedBuild(project.entry),
                 newest: newest.get(project.entry) ?? null
             })),
-            conflicts
+            conflicts,
+            requires
         });
     }
 
