@@ -285,7 +285,7 @@ export function CallRoom({
      * is over must not quietly hide the next one.
      */
     const [away, setAway] = useState<readonly string[]>([]);
-    const sharedKeys = shared.map((stage) => stage.key).join(" ");
+    const sharedKeys = shared.map((stage) => stage.key).join("|");
     const [knownKeys, setKnownKeys] = useState(sharedKeys);
     if (knownKeys !== sharedKeys) {
         setKnownKeys(sharedKeys);
@@ -631,8 +631,15 @@ export function CallRoom({
                 name, because they are the only room left to give it: the tile
                 asked to be bigger, and the strip along the bottom is the last
                 thing between it and the whole panel. */}
+            {/* Bounded and scrolled, the way both tile layouts already are. A
+                row of faces that cannot shrink is the one child of a capped band
+                that can grow past it: eight people in a group call wrap to a
+                second row, and that row plus the control bar under it spill over
+                the conversation the band exists to leave room for - taking the
+                Leave button with them, which is the failure the comment below
+                the bar already records. */}
             {!enlarged && bareFaces && (
-                <ul className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-3 py-1">
+                <ul className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-3 overflow-y-auto overscroll-contain py-1">
                     <Face
                         name="You"
                         personId={mine?.userId ?? viewerId ?? null}
