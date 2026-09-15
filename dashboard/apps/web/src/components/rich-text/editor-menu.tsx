@@ -81,6 +81,18 @@ export function selectedListItems(
     return { items, from: start, to: end };
 }
 
+/**
+ * What the menu is about: the span it was opened over, and the list inside it.
+ *
+ * Captured rather than read back, because an editor's selection is not something
+ * React watches - see where this is filled in.
+ */
+interface Opened {
+    readonly from: number;
+    readonly to: number;
+    readonly list: { items: string[]; from: number; to: number } | null;
+}
+
 function Item({
     label,
     icon,
@@ -141,11 +153,24 @@ export function EditorMenu({
     onPaste?: (text: string) => void;
     children: ReactNode;
 }) {
-    // Read when the menu opens rather than on every render: the selection changes
-    // with every keystroke, and the menu is only ever asked about the one that
-    // was there when it was opened.
-    const list = listAction ? selectedListItems(editor) : null;
-    const marks = !editor.state.selection.empty;
+    /**
+     * The selection as it was when the menu opened.
+     *
+     * Held in state rather than read while rendering, and that is the whole of
+     * why the menu works: `useEditor` re-renders nothing when a selection changes
+     * - tiptap does not do that unless it is asked to, since it would cost a
+     * render on every keystroke - so a value read during render is the one from
+     * whenever React last happened to run. Selecting a word with the mouse runs
+     * no render at all, so the menu opened still believing nothing was selected:
+     * Copy and Cut drawn disabled, the marks missing altogether, and a press on
+     * Copy doing nothing whatsoever, because a disabled item takes no pointer.
+     *
+     * Null while the menu is closed, which is what keeps it current: it is
+     * written on the way open, from the editor as it is at that moment.
+     */
+    const [opened, setOpened] = useState<Opened | null>(null);
+    const list = opened?.list ?? null;
+    const marks = opened !== null && opened.from !== opened.to;
 
     /**
      * What the clipboard holds, read when the menu opens and never before: a page
@@ -155,11 +180,11 @@ export function EditorMenu({
     const [pending, setPending] = useState<string | null>(null);
     const keys = modifierKey();
 
-    /** The selection as text, which is what goes on the clipboard. */
-    const selectedText = (): string => {
-        const { from, to } = editor.state.selection;
-        return editor.state.doc.textBetween(from, to, "\n", " ");
-    };
+    /** The selection as text, which is what goes on the clipboard. Read from the
+     *  span the menu was opened over, so what a cut takes out is exactly what was
+     *  put on the clipboard. */
+    const selectedText = (): string =>
+        opened ? editor.state.doc.textBetween(opened.from, opened.to, "\n", " ") : "";
 
     async function put(text: string): Promise<boolean> {
         try {
@@ -177,8 +202,14 @@ export function EditorMenu({
             onOpenChange={(open) => {
                 if (!open) {
                     setPending(null);
+                    setOpened(null);
                     return;
                 }
+                setOpened({
+                    from: editor.state.selection.from,
+                    to: editor.state.selection.to,
+                    list: listAction ? selectedListItems(editor) : null
+                });
                 void navigator.clipboard
                     ?.readText()
                     .then((text) => setPending(text))
@@ -193,12 +224,13 @@ export function EditorMenu({
                     disabled={!marks}
                     icon={<Scissors className="size-3.5" />}
                     onSelect={() => {
-                        const text = selectedText();
-                        void put(text).then((written) => {
+                        if (!opened) return;
+                        const { from, to } = opened;
+                        void put(selectedText()).then((written) => {
                             // Only once it is somewhere else. Text cut onto a
                             // clipboard that refused it is text that is gone.
                             if (written && !editor.isDestroyed) {
-                                editor.chain().focus().deleteSelection().run();
+                                editor.chain().focus().deleteRange({ from, to }).run();
                             }
                         });
                     }}
