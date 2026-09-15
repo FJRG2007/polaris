@@ -1478,13 +1478,16 @@ export async function updateServerSettingsAction(
         });
         if (vars.length === 0) throw new Error("Nothing to save");
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
+        if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
         // The same value the Rules screen shows. Both screens write the difficulty
-        // and they disagreed in whichever direction you were not looking.
+        // and they disagreed in whichever direction you were not looking - but only
+        // once the container has actually been rebuilt onto it. Saved without a
+        // restart it is a value the world picks up whenever it next starts, and the
+        // Rules screen must not date it as one the server is playing under.
         const difficulty = vars.find((entry) => entry.key === "DIFFICULTY")?.value;
-        if (difficulty && isDifficulty(difficulty)) {
+        if (restart && difficulty && isDifficulty(difficulty)) {
             await rememberDifficulty(parsed.data.installedAppId, difficulty);
         }
-        if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
@@ -1592,6 +1595,16 @@ export async function setWorldDifficultyAction(
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         await setWorldDifficulty(access.ownerId, parsed.data.installedAppId, parsed.data.difficulty);
+        // Recorded the moment it is in force, and before anything that can fail
+        // afterwards. The world is being played under it from here on, so whether
+        // the record exists must not depend on the housekeeping below succeeding.
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.difficulty",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { difficulty: parsed.data.difficulty }
+        });
         // After the live change, and reported separately: the difficulty they
         // asked for is in force either way, and what a failure here costs is the
         // next restart rather than this one.
@@ -1602,13 +1615,6 @@ export async function setWorldDifficultyAction(
                 error: "The difficulty changed, but Polaris could not store it - a restart will put it back."
             };
         }
-        await recordAudit({
-            actorId: user.id,
-            action: "minecraft.difficulty",
-            targetType: "installedApp",
-            targetId: parsed.data.installedAppId,
-            metadata: { difficulty: parsed.data.difficulty }
-        });
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change the difficulty" };

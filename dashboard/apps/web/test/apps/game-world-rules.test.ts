@@ -22,12 +22,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** The install's config column, which is where the last answer is kept. */
 let stored: string | null = null;
 
+/** How many times it has been written. The column is shared with everything else
+ *  about the install, so writing to it is a thing worth counting. */
+let writes = 0;
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
             findUnique: async () => ({ config: stored }),
             update: async (args: { data: { config: string } }) => {
                 stored = args.data.config;
+                writes += 1;
                 return {};
             }
         }
@@ -52,7 +57,7 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
     }
 }));
 
-const { readRulesFor, readWorldRules, setWorldDifficulty, setWorldRule } = await import(
+const { readRulesFor, readWorldRules, rememberDifficulty, setWorldDifficulty, setWorldRule } = await import(
     "@/lib/apps/minecraft/rules-service"
 );
 
@@ -68,6 +73,7 @@ const ANSWERED = [
 
 beforeEach(() => {
     stored = null;
+    writes = 0;
     talking = ANSWERED;
 });
 
@@ -162,5 +168,104 @@ describe("a change made while the server is up", () => {
 
         talking = null;
         expect((await readRulesFor(OWNER, SERVER)).difficulty).toBe("hard");
+    });
+});
+
+describe("what is kept, and how old it says it is", () => {
+    it("keeps a difficulty a later read did not name", async () => {
+        await readRulesFor(OWNER, SERVER);
+
+        // Rules came back and no difficulty line did. That is the server not
+        // saying, never the world having none - so the last one it gave stands.
+        talking = "Gamerule keepInventory is currently set to: false";
+        expect((await readRulesFor(OWNER, SERVER)).values.keepInventory).toBe("false");
+
+        talking = null;
+        expect((await readRulesFor(OWNER, SERVER)).difficulty).toBe("normal");
+    });
+
+    it("does not date old values by when a different one was written", async () => {
+        stored = JSON.stringify({
+            minecraftRules: {
+                values: { keepInventory: "true", fallDamage: "false" },
+                at: "2026-09-01T10:00:00.000Z"
+            }
+        });
+
+        talking = "Gamerule keepInventory is now set to: false";
+        await setWorldRule(OWNER, SERVER, "keepInventory", "false");
+
+        talking = null;
+        const kept = await readRulesFor(OWNER, SERVER);
+        expect(kept.values.keepInventory).toBe("false");
+        // The other one was read a fortnight ago and still was a moment ago. A
+        // blob written a field at a time is only as fresh as its stalest part,
+        // and the screen puts this date beside all of it.
+        expect(kept.asOf).toBe("2026-09-01T10:00:00.000Z");
+    });
+
+    it("does not date an old difficulty by a rule being set", async () => {
+        stored = JSON.stringify({
+            minecraftRules: { values: {}, difficulty: "hard", at: "2026-09-01T10:00:00.000Z" }
+        });
+
+        talking = "Gamerule keepInventory is now set to: false";
+        await setWorldRule(OWNER, SERVER, "keepInventory", "false");
+
+        talking = null;
+        const kept = await readRulesFor(OWNER, SERVER);
+        expect(kept.difficulty).toBe("hard");
+        expect(kept.asOf).toBe("2026-09-01T10:00:00.000Z");
+    });
+
+    it("does not date old values by a difficulty saved in Settings", async () => {
+        // The reported shape of it: a server down for days, somebody saves the
+        // difficulty on the other screen, and the rules it last gave start
+        // claiming they were read seconds ago from a server nobody has reached.
+        stored = JSON.stringify({
+            minecraftRules: {
+                values: { keepInventory: "true", fallDamage: "false" },
+                at: "2026-09-01T10:00:00.000Z"
+            }
+        });
+
+        await rememberDifficulty(SERVER, "hard");
+
+        talking = null;
+        const kept = await readRulesFor(OWNER, SERVER);
+        expect(kept.difficulty).toBe("hard");
+        expect(kept.values.keepInventory).toBe("true");
+        expect(kept.asOf).toBe("2026-09-01T10:00:00.000Z");
+    });
+
+    it("writes nothing when a read only confirms what is already kept", async () => {
+        await readRulesFor(OWNER, SERVER);
+        const settled = writes;
+
+        await readRulesFor(OWNER, SERVER);
+        await readRulesFor(OWNER, SERVER);
+        // This column carries everything else about the install too, and each
+        // write of it is a read and a replace. A screen being looked at is not a
+        // reason to join that queue.
+        expect(writes).toBe(settled);
+    });
+});
+
+describe("a server that answers but will not read a rule back", () => {
+    it("shows what was kept, dated, with setting one still open", async () => {
+        await readRulesFor(OWNER, SERVER);
+
+        // Minecraft 26.2: it sets a rule perfectly well and refuses to say what
+        // one is currently.
+        talking = "Incorrect argument for command\ngamerule keepInventory<--[HERE]";
+        const rules = await readRulesFor(OWNER, SERVER);
+
+        expect(rules.values.keepInventory).toBe("true");
+        expect(rules.difficulty).toBe("normal");
+        // Both halves matter. The controls work, so the screen must not lock
+        // them - and the positions are old, so it is given the date that says so
+        // rather than letting them pass for a reading.
+        expect(rules.answering).toBe(true);
+        expect(rules.asOf).toBeTruthy();
     });
 });

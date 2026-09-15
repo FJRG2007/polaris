@@ -160,11 +160,49 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
  */
 const REMEMBERED_KEY = "minecraftRules";
 
+/** The difficulty's key among the reading times, which it shares with the rule
+ *  ids. No rule is spelled this way, so nothing collides. */
+const DIFFICULTY_FIELD = "difficulty";
+
+/**
+ * How far a reading time may drift before a read that confirms what is already
+ * kept is worth writing again.
+ *
+ * Reading runs on every view of the screen and this note lives in the blob
+ * everything else about the install merges into, so confirming what is already
+ * there must not put a read path in that queue of writers. The date is only ever
+ * shown once the server has stopped answering, where being a few minutes out
+ * changes nothing about what it tells the reader.
+ */
+const RESTAMP_AFTER_MS = 5 * 60_000;
+
 interface RememberedRules {
     readonly values: Record<string, string>;
     readonly difficulty: Difficulty | null;
-    /** When the server said this, as an ISO instant. */
+    /** The oldest of `times`: a blob written a field at a time is only as fresh as
+     *  its stalest part, and that is all a screen showing the whole of it may
+     *  claim. */
     readonly at: string;
+    /**
+     * When each field last came from the server, by rule id and by
+     * `DIFFICULTY_FIELD`. A blob written by an older Polaris carries none, and
+     * everything in it is as old as `at`.
+     */
+    readonly times?: Record<string, string>;
+}
+
+/** An instant as stored, or null for anything that is not one. This is a JSON
+ *  column older code wrote, so nothing out of it is taken on trust. */
+function readInstant(value: unknown): string | null {
+    return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+function oldestOf(times: Record<string, string>): string | null {
+    let found: string | null = null;
+    for (const time of Object.values(times)) {
+        if (found === null || Date.parse(time) < Date.parse(found)) found = time;
+    }
+    return found;
 }
 
 /**
@@ -183,17 +221,25 @@ async function remembered(installedAppId: string): Promise<RememberedRules | nul
     const stored = readInstallConfig(row?.config)[REMEMBERED_KEY];
     if (typeof stored !== "object" || stored === null || Array.isArray(stored)) return null;
     const blob = stored as Partial<RememberedRules>;
-    if (typeof blob.at !== "string" || !blob.at) return null;
+    const at = readInstant(blob.at);
+    if (!at) return null;
+    const storedTimes: Record<string, unknown> =
+        typeof blob.times === "object" && blob.times !== null && !Array.isArray(blob.times)
+            ? (blob.times as Record<string, unknown>)
+            : {};
     const values: Record<string, string> = {};
+    const times: Record<string, string> = {};
     for (const [id, value] of Object.entries(blob.values ?? {})) {
         const rule = findRule(id);
         if (!rule || typeof value !== "string") continue;
         if (normalizeRuleValue(rule, value) === null) continue;
         values[id] = value;
+        times[id] = readInstant(storedTimes[id]) ?? at;
     }
     const difficulty = isDifficulty(blob.difficulty) ? blob.difficulty : null;
+    if (difficulty) times[DIFFICULTY_FIELD] = readInstant(storedTimes[DIFFICULTY_FIELD]) ?? at;
     if (Object.keys(values).length === 0 && !difficulty) return null;
-    return { values, difficulty, at: blob.at };
+    return { values, difficulty, at: oldestOf(times) ?? at, times };
 }
 
 /**
@@ -201,25 +247,60 @@ async function remembered(installedAppId: string): Promise<RememberedRules | nul
  *
  * Merged rather than replaced, and for the same reason the config blob itself
  * merges: a single rule being set must not delete the two dozen that were read a
- * minute earlier.
+ * minute earlier. Each field carries its own reading time for that same reason -
+ * stamping the whole blob on a one-field write is how values read three days ago
+ * come to claim on screen that they were read just now.
+ *
+ * A difficulty is only ever given, never taken away: the type says so, because
+ * the one caller holding a `Difficulty | null` is a live read that parsed rules
+ * and no difficulty line, and letting its null through here would erase a
+ * perfectly good remembered one.
+ *
+ * Nothing is written when nothing would change and the times are not drifting.
  */
 async function remember(
     installedAppId: string,
-    next: { values?: Record<string, string>; difficulty?: Difficulty | null }
+    next: { values?: Record<string, string>; difficulty?: Difficulty }
 ): Promise<void> {
     const before = await remembered(installedAppId);
-    const blob: RememberedRules = {
-        values: { ...(before?.values ?? {}), ...(next.values ?? {}) },
-        difficulty: next.difficulty === undefined ? (before?.difficulty ?? null) : next.difficulty,
-        at: new Date().toISOString()
-    };
+    const now = Date.now();
+    const stamp = new Date(now).toISOString();
+    const values = { ...(before?.values ?? {}), ...(next.values ?? {}) };
+    const difficulty = next.difficulty ?? before?.difficulty ?? null;
+    if (Object.keys(values).length === 0 && !difficulty) return;
+
+    // Only the fields this call actually read carry a new time. Everything merged
+    // in from the blob before keeps the one it had, being exactly as old as it was
+    // a moment ago.
+    const read = new Set(Object.keys(next.values ?? {}));
+    if (next.difficulty !== undefined) read.add(DIFFICULTY_FIELD);
+
+    const same =
+        before !== null &&
+        before.difficulty === difficulty &&
+        Object.keys(values).length === Object.keys(before.values).length &&
+        Object.entries(values).every(([id, value]) => before.values[id] === value);
+    const fresh = [...read].every((field) => {
+        const time = before?.times?.[field];
+        return time !== undefined && now - Date.parse(time) <= RESTAMP_AFTER_MS;
+    });
+    if (same && fresh) return;
+
+    const times: Record<string, string> = {};
+    for (const id of Object.keys(values)) times[id] = read.has(id) ? stamp : (before?.times?.[id] ?? stamp);
+    if (difficulty) {
+        times[DIFFICULTY_FIELD] = read.has(DIFFICULTY_FIELD)
+            ? stamp
+            : (before?.times?.[DIFFICULTY_FIELD] ?? stamp);
+    }
+    const blob: RememberedRules = { values, difficulty, at: oldestOf(times) ?? stamp, times };
     await patchInstallConfig(installedAppId, { [REMEMBERED_KEY]: blob });
 }
 
 /** Keeping a note is never worth failing the thing it is a note about. */
 async function rememberQuietly(
     installedAppId: string,
-    next: { values?: Record<string, string>; difficulty?: Difficulty | null }
+    next: { values?: Record<string, string>; difficulty?: Difficulty }
 ): Promise<void> {
     await remember(installedAppId, next).catch(() => undefined);
 }
@@ -243,15 +324,20 @@ export async function rememberDifficulty(installedAppId: string, difficulty: Dif
  */
 export async function readRulesFor(ownerId: string, installedAppId: string): Promise<WorldRules> {
     const live = await withServerContainer(ownerId, installedAppId, readWorldRules).catch(() => null);
-    if (live && (Object.keys(live.values).length > 0 || live.difficulty)) {
-        await rememberQuietly(installedAppId, { values: live.values, difficulty: live.difficulty });
+    if (live && Object.keys(live.values).length > 0) {
+        await rememberQuietly(installedAppId, { values: live.values, difficulty: live.difficulty ?? undefined });
         return live;
     }
+    // It read no rules back, which does not mean it said nothing: a server that
+    // will not answer for a rule still answers for the difficulty. That is worth
+    // keeping on its own, and it is not worth throwing away the rules kept from
+    // when the server was more forthcoming.
+    if (live?.difficulty) await rememberQuietly(installedAppId, { difficulty: live.difficulty });
     const kept = await remembered(installedAppId).catch(() => null);
     if (kept) {
         return {
             values: kept.values,
-            difficulty: kept.difficulty,
+            difficulty: live?.difficulty ?? kept.difficulty,
             // A server that is up but will not read a rule back keeps its own
             // explanation: those values are old, and setting one still works.
             reason:

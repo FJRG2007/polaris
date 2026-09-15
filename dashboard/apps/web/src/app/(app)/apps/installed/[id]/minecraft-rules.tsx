@@ -24,6 +24,11 @@ import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@po
 import { DIFFICULTIES, ruleGroups, normalizeRuleValue, type GameRule } from "@/lib/apps/minecraft/rules";
 import { readWorldRulesAction, setWorldDifficultyAction, setWorldRuleAction } from "./minecraft-actions";
 
+/** What a control says when its position is Polaris's note of an earlier reading
+ *  and the control still works, which is the one case where it would otherwise
+ *  read as what the world is being played under right now. */
+const REMEMBERED_NOTE = "This is the value Polaris last read, not one the server confirmed just now.";
+
 export function MinecraftRules({
     installedAppId,
     canManage
@@ -108,6 +113,11 @@ export function MinecraftRules({
     // rules the game has, and a daemon error naming a container id is not an
     // answer to put in front of anybody.
     const reason = rules?.reason ?? null;
+    // Positions Polaris kept rather than read just now. A server that is off locks
+    // the whole screen and the card above says why; one that is up and simply will
+    // not read a rule back leaves every control working and every position beside
+    // it looking like a reading, and that is where each row has to say it is not.
+    const remembered = Boolean(rules?.asOf) && rules?.answering === true;
 
     // Every rule when the server said nothing, and only the ones it answered for
     // when it did. A rule a server has never heard of is a switch that fails every
@@ -167,6 +177,9 @@ export function MinecraftRules({
                                 <p className="text-xs text-muted-foreground">
                                     Peaceful removes hostile mobs and stops hunger draining.
                                 </p>
+                                {remembered && rules.difficulty ? (
+                                    <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
+                                ) : null}
                             </div>
                             <Select
                                 className="w-40"
@@ -223,6 +236,7 @@ export function MinecraftRules({
                                                 rule={rule}
                                                 value={rules.values[rule.id] ?? ""}
                                                 unknown={rules.values[rule.id] === undefined}
+                                                remembered={remembered}
                                                 first={index === 0}
                                                 busy={busy === rule.id}
                                                 disabled={
@@ -248,6 +262,7 @@ function RuleRow({
     rule,
     value,
     unknown = false,
+    remembered = false,
     first,
     busy,
     disabled,
@@ -258,6 +273,9 @@ function RuleRow({
     /** The server would not say what this is set to. The row still draws - the
      *  rule exists and applies - but nothing here should look like a reading. */
     unknown?: boolean;
+    /** The position is the last one Polaris read rather than one the server just
+     *  gave, and the control beside it still works. */
+    remembered?: boolean;
     /** The first row carries no divider above it. */
     first: boolean;
     busy: boolean;
@@ -282,11 +300,13 @@ function RuleRow({
                     {busy ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" /> : null}
                 </p>
                 {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
-                {unknown && (
+                {unknown ? (
                     <p className="text-xs text-warning">
                         This server will not say what it is set to, so this is not its current value.
                     </p>
-                )}
+                ) : remembered ? (
+                    <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
+                ) : null}
             </div>
             {rule.type === "boolean" ? (
                 <Switch
