@@ -763,6 +763,7 @@ function MessageCard({
     }, [open, markRead, message.id, message.seen, onRead, readAlready, refreshMailbox]);
 
     const sender = message.from[0];
+    const copyComma = message.cc.length > 0 ? "," : "";
 
     return (
         <li className="rounded-md border border-border bg-card">
@@ -808,7 +809,7 @@ function MessageCard({
                                 // A message delivered with nobody in its To line
                                 // is a blind copy, which is a fact about it
                                 // rather than a gap. "to nobody" read as a bug.
-                                <span>undisclosed recipients</span>
+                                <span>undisclosed recipients{copyComma}</span>
                             ) : (
                                 // The comma goes to the chip, which is what knows
                                 // where it actually ends - see `after`. The last
@@ -819,11 +820,7 @@ function MessageCard({
                                     <AddressChip
                                         key={`${entry.address}-${index}`}
                                         entry={entry}
-                                        after={
-                                            index < message.to.length - 1 || message.cc.length > 0
-                                                ? ","
-                                                : ""
-                                        }
+                                        after={index < message.to.length - 1 ? "," : copyComma}
                                     />
                                 ))
                             )}
