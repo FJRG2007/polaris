@@ -357,7 +357,9 @@ export function MinecraftMods({
                         </div>
                     ) : results.length === 0 ? (
                         <p className="py-6 text-center text-sm text-muted-foreground">
-                            Nothing on Modrinth matches that for this server.
+                            Nothing here matches that. Only mods that run on a server are listed, so
+                            a client-only one - a HUD, a minimap, a shader - is missing because it
+                            is installed in your own game rather than on this server.
                         </p>
                     ) : (
                         <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
