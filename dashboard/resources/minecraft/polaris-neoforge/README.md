@@ -13,6 +13,12 @@ Players use:
 
 A password with spaces or symbols goes in double quotes.
 
+Until they log in, a player's screen is dark with what to type in the middle of
+it, and they cannot move, chat, use other commands or be hurt. Before any of
+that, Polaris is asked whether the name is on the server's player list (and from
+that network, when the list binds names to networks); a name that is not is
+turned away before it can register.
+
 ## Configuration
 
 Polaris writes these when the server's join-password card switches the mod on.
