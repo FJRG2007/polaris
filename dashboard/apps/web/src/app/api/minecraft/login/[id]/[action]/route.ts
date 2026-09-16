@@ -111,7 +111,10 @@ export async function POST(
                     service.isRegistered(server, body.data.player),
                     service.joinRefusal(server, body.data.player, body.data.address)
                 ]);
-                return reply(200, turnedAway ? { registered, refused: turnedAway } : { registered });
+                return reply(
+                    200,
+                    turnedAway ? { registered, refused: turnedAway } : { registered }
+                );
             }
             case "register": {
                 const body = BODIES.register.safeParse(json);

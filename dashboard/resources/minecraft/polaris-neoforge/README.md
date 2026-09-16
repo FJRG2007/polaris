@@ -24,11 +24,11 @@ turned away before it can register.
 Polaris writes these when the server's join-password card switches the mod on.
 The mod does nothing unless `POLARIS_LOGIN` is `on`.
 
-| Variable | Meaning |
-| --- | --- |
-| `POLARIS_LOGIN` | `on` to ask for passwords |
-| `POLARIS_URL` | The Polaris the server asks |
-| `POLARIS_SERVER_ID` | This server's id in Polaris |
+| Variable               | Meaning                           |
+| ---------------------- | --------------------------------- |
+| `POLARIS_LOGIN`        | `on` to ask for passwords         |
+| `POLARIS_URL`          | The Polaris the server asks       |
+| `POLARIS_SERVER_ID`    | This server's id in Polaris       |
 | `POLARIS_SERVER_TOKEN` | What the server proves it is with |
 
 With `online-mode=true` the mod asks for nothing: Mojang already checks who
