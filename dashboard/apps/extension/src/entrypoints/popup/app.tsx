@@ -263,7 +263,9 @@ function SignIn({
         }
     };
 
-    const leave = async (request: { kind: "signOut" } | { kind: "forgetServer" }): Promise<void> => {
+    const leave = async (
+        request: { kind: "signOut" } | { kind: "forgetServer" }
+    ): Promise<void> => {
         setError(null);
         const reply = await askBackground(request);
         if (!reply.ok) setError(reply.error);

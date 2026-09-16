@@ -644,7 +644,10 @@ export function CallRoom({
                                     <EyeOff className="size-4 text-muted-foreground" aria-hidden />
                                 </span>
                                 <span className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm font-medium" title={stage.name}>
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        title={stage.name}
+                                    >
                                         {stage.name}
                                     </span>
                                     <span className="text-xs text-muted-foreground">

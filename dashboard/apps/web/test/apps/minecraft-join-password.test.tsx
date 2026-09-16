@@ -42,7 +42,9 @@ describe("the modded project's commands", () => {
         expect(screen.getByText(/\/trigger register set 1234/)).toBeTruthy();
         expect(screen.getByText(/\/trigger login set 1234/)).toBeTruthy();
         expect(
-            screen.getByText(/registers the password 1, and the next login says the password is wrong/)
+            screen.getByText(
+                /registers the password 1, and the next login says the password is wrong/
+            )
         ).toBeTruthy();
     });
 
