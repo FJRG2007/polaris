@@ -64,11 +64,22 @@ export function rememberCall(
 ): void {
     if (typeof window === "undefined") return;
     try {
+        if (reason === "leaving" && offeredNote()) return;
         const note: Note = { session, video, viewerId, reason, at: Date.now() };
         window.sessionStorage.setItem(KEY, JSON.stringify(note));
     } catch {
         // Storage refused - a browser with it off, or a full quota. The reload
         // still happens; it just does not carry the call.
+    }
+}
+
+/** Whether the update banner has already written down a call that still counts. */
+function offeredNote(): boolean {
+    try {
+        const note = JSON.parse(window.sessionStorage.getItem(KEY) ?? "null") as Partial<Note> | null;
+        return !!note && note.reason !== "leaving" && typeof note.at === "number" && Date.now() - note.at <= WINDOW_MS;
+    } catch {
+        return false;
     }
 }
 

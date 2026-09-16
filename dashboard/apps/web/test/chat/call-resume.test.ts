@@ -129,4 +129,21 @@ describe("the note a page leaves on its way out", () => {
         loadedBy("navigate");
         expect(takeRememberedCall(VIEWER)?.session).toEqual(SESSION);
     });
+
+    it("does not overwrite the update banner's note as the page is left", () => {
+        rememberCall(SESSION, true, VIEWER);
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        loadedBy("navigate");
+        expect(takeRememberedCall(VIEWER)).toEqual({ session: SESSION, video: true });
+    });
+
+    it("replaces a banner note that has gone stale", () => {
+        rememberCall(SESSION, true, VIEWER);
+        const raw = JSON.parse(storage.getItem("polaris.call.resume")!) as { at: number };
+        raw.at = Date.now() - 10 * 60 * 1000;
+        storage.setItem("polaris.call.resume", JSON.stringify(raw));
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        loadedBy("navigate");
+        expect(takeRememberedCall(VIEWER)).toBeNull();
+    });
 });

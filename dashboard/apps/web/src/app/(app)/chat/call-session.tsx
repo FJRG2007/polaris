@@ -112,7 +112,8 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     const current = useRef({ session, withVideo });
     current.current = { session, withVideo };
     useEffect(() => {
-        const note = () => {
+        const note = (event: PageTransitionEvent) => {
+            if (event.persisted) return;
             const { session: on, withVideo: video } = current.current;
             if (on) rememberCall(on, video, viewerId, "leaving");
         };
