@@ -13,6 +13,7 @@
  * entry somebody made more specific than Polaris knows how to.
  */
 
+import { findApp } from "@/lib/apps/catalog";
 import { describe, expect, it, vi } from "vitest";
 import { protectionFor } from "@/lib/apps/games-create";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
@@ -22,7 +23,9 @@ import {
     joinGuardEntry,
     joinGuardFor,
     joinGuardSlugs,
-    JOIN_GUARD_SLUGS
+    JOIN_GUARD_SLUGS,
+    PROJECTS_KEY,
+    SOFTWARE_KEY
 } from "@/lib/apps/minecraft/join-guard";
 
 /** The slugs on a list, lowercased, suffixes and pins dropped. */
@@ -285,5 +288,30 @@ describe("reconciling the guard on a settings save", () => {
     it("writes nothing when the guard already suits the new software", async () => {
         const read = reader();
         expect(await guardForSave([{ key: "TYPE", value: "PURPUR" }], read)).toBeNull();
+    });
+});
+
+/**
+ * The one spelling of the key that is not an import.
+ *
+ * The manifest declares `MODRINTH_PROJECTS` as a literal and has to: it is the
+ * catalog, and making a generic catalog import a Minecraft module to name one of
+ * its own fields points the dependency the wrong way. So the two are held
+ * together here instead. It matters because an undeclared key is dropped in
+ * silence at install time - a manifest and a constant that disagree would not
+ * fail to compile, they would produce servers with no mod list at all.
+ */
+describe("the key the manifest declares", () => {
+    it("is the one the code reads and writes", () => {
+        const declared = (findApp("minecraft")?.template?.env ?? []).map((entry) => entry.key);
+        expect(declared).toContain(PROJECTS_KEY);
+    });
+
+    it("holds for the software key too, which is what triggers the move", () => {
+        // `guardForSave` watches this key to decide a save changed the software.
+        // Declared under another name, every such save would look like it changed
+        // nothing and the guard would never follow the server across.
+        const declared = (findApp("minecraft")?.template?.env ?? []).map((entry) => entry.key);
+        expect(declared).toContain(SOFTWARE_KEY);
     });
 });

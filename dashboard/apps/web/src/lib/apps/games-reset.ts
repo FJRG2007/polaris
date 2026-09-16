@@ -22,6 +22,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { findMap, pinnedRelease } from "@/lib/apps/minecraft/maps";
 import { editionOf } from "@/lib/apps/minecraft/service";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
@@ -101,11 +102,11 @@ export async function resetMinecraftServer(
 
     const vars = await listEnvVars("application", install.applicationId, ownerId);
     const current = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
-    const crossplay = hasCrossplay(current.get("MODRINTH_PROJECTS"));
+    const crossplay = hasCrossplay(current.get(PROJECTS_KEY));
     // Stripped before the shape is applied, not after: the shape puts the new
     // blueprint's plugins back, and taking them out afterwards would take out the
     // ones it had just added.
-    current.set("MODRINTH_PROJECTS", withoutBlueprintProjects(current.get("MODRINTH_PROJECTS")));
+    current.set(PROJECTS_KEY, withoutBlueprintProjects(current.get(PROJECTS_KEY)));
 
     const levelType = input.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE;
     const env = await minecraftShapeEnv(
@@ -149,7 +150,7 @@ export async function resetMinecraftServer(
     await setAsideRetiredPlugins(
         ownerId,
         installedAppId,
-        parseProjectList(env.get("MODRINTH_PROJECTS") ?? "")
+        parseProjectList(env.get(PROJECTS_KEY) ?? "")
             .map(projectSlug)
             .filter((slug): slug is string => slug !== null)
     );
@@ -187,7 +188,9 @@ export async function resetMinecraftServer(
     // never on a map that runs on whatever is newest - there the old worlds are
     // merely old, and they stay listed and switchable where their owner left
     // them.
-    const worldsAside = pinnedRelease(mapped) ? await setAsideOtherLevels(ownerId, installedAppId) : null;
+    const worldsAside = pinnedRelease(mapped)
+        ? await setAsideOtherLevels(ownerId, installedAppId)
+        : null;
 
     // The map, and the restart that puts all of this on the server. Generating a
     // new level is the same act as the New world button and it is the same code:

@@ -11,8 +11,15 @@ import { prisma } from "@polaris/db";
 import { listEnvVars } from "@/lib/env-var-service";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { readInstallConfig } from "@/lib/apps/install-config";
+import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
-import { BLUEPRINT_KEY, MAP_KEY, RELEASE_KEY, blueprintFor, minecraftShapeEnv } from "@/lib/apps/games-create";
+import {
+    BLUEPRINT_KEY,
+    MAP_KEY,
+    RELEASE_KEY,
+    blueprintFor,
+    minecraftShapeEnv
+} from "@/lib/apps/games-create";
 import {
     readTemplateSettings,
     templateSettings,
@@ -24,7 +31,10 @@ import {
 const TEMPLATE_LIMIT = 40;
 
 /** Everything this person has saved, newest first. */
-export async function listServerTemplates(ownerId: string, game?: string): Promise<ServerTemplateView[]> {
+export async function listServerTemplates(
+    ownerId: string,
+    game?: string
+): Promise<ServerTemplateView[]> {
     const rows = await prisma.serverTemplate
         .findMany({
             where: { ownerId, ...(game ? { game } : {}) },
@@ -97,18 +107,21 @@ export async function saveServerAsTemplate(
     if (!install?.applicationId) return { error: "This server has not been deployed yet" };
 
     const kept = await prisma.serverTemplate.count({ where: { ownerId } }).catch(() => 0);
-    if (kept >= TEMPLATE_LIMIT) return { error: `You can keep ${TEMPLATE_LIMIT} templates. Delete one first.` };
+    if (kept >= TEMPLATE_LIMIT)
+        return { error: `You can keep ${TEMPLATE_LIMIT} templates. Delete one first.` };
 
     const game = gameOfServer(install.catalogId)?.id ?? "minecraft";
     const config = readInstallConfig(install.config);
-    const blueprintId = typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : "survival";
+    const blueprintId =
+        typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : "survival";
     const mapId = typeof config[MAP_KEY] === "string" ? (config[MAP_KEY] as string) : "";
-    const version = typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string) : "LATEST";
+    const version =
+        typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string) : "LATEST";
 
     const vars = await listEnvVars("application", install.applicationId, ownerId).catch(() => []);
     const built = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
     const edition = install.catalogId.includes("bedrock") ? "bedrock" : "java";
-    const crossplay = hasCrossplay(built.get("MODRINTH_PROJECTS"));
+    const crossplay = hasCrossplay(built.get(PROJECTS_KEY));
     const players = Number(built.get("MAX_PLAYERS")) || 8;
 
     // What a fresh one of this kind would be given. Built here and thrown away -

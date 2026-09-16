@@ -41,11 +41,9 @@ import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { useEffect, useState, useTransition } from "react";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
-import { joinGuardFor, joinGuardSlugs } from "@/lib/apps/minecraft/join-guard";
+import { joinGuardFor, joinGuardSlugs, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
-
-const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /** Whether an entry names one of those projects, whatever version or suffix it
  *  was written with. */

@@ -40,6 +40,7 @@ import { applyPendingArkRules } from "@/lib/apps/ark/settings-service";
 import { syncMinecraftRoutes } from "@/lib/apps/minecraft/router-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
+import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { readInstallConfig, type InstallConfig } from "@/lib/apps/install-config";
 import { getServerMetrics, peekServerMetrics } from "@/lib/server-metrics-service";
@@ -65,11 +66,11 @@ const SLOTS_VAR = "MAX_PLAYERS";
 const RELEASE_VAR = "VERSION";
 
 /** What it runs the release on: Paper, Fabric, Vanilla. */
-const SOFTWARE_VAR = "TYPE";
+const SOFTWARE_VAR = SOFTWARE_KEY;
 
 /** The plugin list, which is where a Java server's crossplay lives: Bedrock
  *  clients get in because Geyser is installed, not because a setting says so. */
-const CROSSPLAY_VAR = "MODRINTH_PROJECTS";
+const CROSSPLAY_VAR = PROJECTS_KEY;
 
 /** `PAPER` as somebody writes it. The setting is an option list of shouted words,
  *  and a table is not the place to shout. */
@@ -325,7 +326,11 @@ export async function listGameServerFacts(
             // The setting, or what the install recorded when it was created for a
             // game that keeps its slot count in a file rather than in the
             // environment. FiveM is that game.
-            slots: Number.isFinite(slots) ? slots : typeof config.slots === "number" ? config.slots : null,
+            slots: Number.isFinite(slots)
+                ? slots
+                : typeof config.slots === "number"
+                  ? config.slots
+                  : null,
             release: releaseOf(config, env.get(RELEASE_VAR)),
             software: (env.get(SOFTWARE_VAR) ?? "").trim()
                 ? titleCase((env.get(SOFTWARE_VAR) as string).trim())

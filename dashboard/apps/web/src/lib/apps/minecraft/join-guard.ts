@@ -169,8 +169,25 @@ export function guardMovedTo(projects: string, software: string): string | null 
     return next === formatProjectList(entries) ? null : next;
 }
 
-/** The environment key the project list is saved under. */
+/**
+ * The environment key the project list is saved under.
+ *
+ * Named here because the guard is decided here, but the list is not only the
+ * guard's: it is every mod and plugin the image installs, and it is also where
+ * the answer to "do Bedrock clients join this one" is written. Anything writing
+ * it is writing all of that at once, which is why the paths that touch it add
+ * and remove single entries rather than composing a list of their own.
+ */
 export const PROJECTS_KEY = "MODRINTH_PROJECTS";
+
+/**
+ * The environment key the server's software is saved under.
+ *
+ * Beside the one above for the same reason: the reconciliation reads both, and a
+ * key spelled out in one subsystem and aliased in another is a rename that
+ * typechecks while half the code goes on watching a setting nobody writes.
+ */
+export const SOFTWARE_KEY = "TYPE";
 
 /**
  * The project list a settings save has to write alongside itself, or null when
@@ -185,7 +202,7 @@ export async function guardForSave(
     vars: readonly { key: string; value: string }[],
     readProjects: () => Promise<string>
 ): Promise<string | null> {
-    const software = vars.find((entry) => entry.key === "TYPE")?.value;
+    const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
     if (!software || vars.some((entry) => entry.key === PROJECTS_KEY)) return null;
     return guardMovedTo(await readProjects(), software);
 }

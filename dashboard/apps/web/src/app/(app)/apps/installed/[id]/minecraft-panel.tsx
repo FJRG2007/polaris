@@ -35,6 +35,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { PlayerSeen } from "@/lib/apps/games-activity";
 import { MinecraftAppearance } from "./minecraft-appearance";
+import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
@@ -53,15 +54,15 @@ import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { Badge, Button, Card, CardBody, cn, ScrollRow, Skeleton } from "@polaris/ui";
 import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
-import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import type {
+    MinecraftFirewall,
+    MinecraftRoster,
+    MinecraftStatus
+} from "@/lib/apps/minecraft/service";
 
 /** Mods are managed on their own screen, so their variables are not repeated as
  *  raw fields on Settings. */
 const MODS_GROUP = "Mods";
-
-/** The setting that lists what the image installs, which is also where the answer
- *  to "do Bedrock clients join this one" is written. */
-const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /** The description has an editor of its own - a preview, a colour toolbar and the
  *  centring - so it is not also offered as a raw text field two cards below, where
@@ -158,7 +159,9 @@ export function MinecraftPanel({
     // reload, a shared link and the browser's back button all agree with the tabs.
     const tab = useMemo(() => {
         const base = `/apps/installed/${installedAppId}`;
-        const slug = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
+        const slug = pathname.startsWith(base)
+            ? pathname.slice(base.length).replace(/^\//, "")
+            : "";
         // A screen this viewer does not hold falls back to the overview rather than
         // rendering empty. The route already refuses it; this is what keeps a
         // history entry from an earlier, wider grant from landing on nothing.
@@ -364,7 +367,10 @@ export function MinecraftPanel({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <ScrollRow as="nav" className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm">
+            <ScrollRow
+                as="nav"
+                className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm"
+            >
                 {tabs.map((entry) => (
                     // A real href, so a screen can be middle-clicked, opened in a
                     // new tab and copied; the plain click is taken over to keep the
@@ -426,7 +432,10 @@ export function MinecraftPanel({
             )}
             {tab === "world" && <MinecraftWorld installedAppId={installedAppId} name={name} />}
             {tab === "rules" && (
-                <MinecraftRules installedAppId={installedAppId} canManage={held.includes("games.manage")} />
+                <MinecraftRules
+                    installedAppId={installedAppId}
+                    canManage={held.includes("games.manage")}
+                />
             )}
             {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
             {tab === "usage" &&
@@ -480,8 +489,12 @@ export function MinecraftPanel({
                     <MinecraftJoinPassword
                         installedAppId={installedAppId}
                         edition={game?.edition ?? status?.edition ?? "java"}
-                        projects={settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""}
-                        software={settings.find((setting) => setting.key === "TYPE")?.value ?? ""}
+                        projects={
+                            settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""
+                        }
+                        software={
+                            settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? ""
+                        }
                         playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}
                     />
@@ -583,9 +596,11 @@ function ConnectCard({
     const [saved, setSaved] = useState<string | null>(null);
     const [fixing, setFixing] = useState(false);
     const [fixed, setFixed] = useState<string | null>(null);
-    const software = settings.find((setting) => setting.key === "TYPE");
+    const software = settings.find((setting) => setting.key === SOFTWARE_KEY);
     const version = settings.find((setting) => setting.key === "VERSION");
-    const softwareLabel = software?.options?.find((option) => option.value === software.value)?.label ?? software?.value;
+    const softwareLabel =
+        software?.options?.find((option) => option.value === software.value)?.label ??
+        software?.value;
 
     /**
      * Move the settings the server cannot read out of the way, and start it.
@@ -623,7 +638,9 @@ function ConnectCard({
                         <Skeleton className="h-7 w-48" />
                     ) : status.address ? (
                         <div className="flex items-center gap-2">
-                            <code className="truncate font-mono text-lg" title={status.address}>{status.address}</code>
+                            <code className="truncate font-mono text-lg" title={status.address}>
+                                {status.address}
+                            </code>
                             <CopyButton value={status.address} label="Copy the server address" />
                         </div>
                     ) : (
@@ -642,7 +659,11 @@ function ConnectCard({
                         // The world, the configs and the plugin folders, in the same
                         // explorer every other file in Polaris is browsed from.
                         <Link href={`/drive?c=container:${applicationId}&p=/data`}>
-                            <Button size="sm" variant="secondary" title="Browse this server's files in Drive">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                title="Browse this server's files in Drive"
+                            >
                                 <FolderOpen className="size-4" /> Files
                             </Button>
                         </Link>
@@ -655,7 +676,11 @@ function ConnectCard({
                             disabled={saving || !(status?.answering ?? false)}
                             title="Write the world to disk now"
                         >
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Save className="size-4" />
+                            )}
                             Save world
                         </Button>
                     )}
@@ -671,13 +696,17 @@ function ConnectCard({
                     <div className="flex w-full items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
                         <div className="flex flex-col items-start gap-1 text-xs">
-                            <p className="font-medium text-foreground">This server keeps failing to start</p>
+                            <p className="font-medium text-foreground">
+                                This server keeps failing to start
+                            </p>
                             <p className="text-muted-foreground">
-                                It restarted {status.crashLoop.restarts} times without starting, so it has been
-                                stopped.
+                                It restarted {status.crashLoop.restarts} times without starting, so
+                                it has been stopped.
                             </p>
                             {status.crashLoop.cause && (
-                                <p className="font-mono text-muted-foreground">{status.crashLoop.cause}</p>
+                                <p className="font-mono text-muted-foreground">
+                                    {status.crashLoop.cause}
+                                </p>
                             )}
                             {status.crashLoop.advice && (
                                 <p className="text-muted-foreground">{status.crashLoop.advice}</p>
@@ -697,7 +726,11 @@ function ConnectCard({
                                         Reset the settings and start it
                                     </button>
                                 )}
-                                <button type="button" onClick={onOpenConsole} className="text-primary hover:underline">
+                                <button
+                                    type="button"
+                                    onClick={onOpenConsole}
+                                    className="text-primary hover:underline"
+                                >
                                     Read the console
                                 </button>
                             </div>
@@ -716,9 +749,10 @@ function ConnectCard({
                         <div className="flex flex-col items-start gap-1 text-xs">
                             <p className="font-medium text-foreground">Nobody can join yet</p>
                             <p className="text-muted-foreground">
-                                No player is registered, so the server refuses everyone - including you. Add your{" "}
-                                {access.edition === "bedrock" ? "gamertag" : "Minecraft username"} and the address you
-                                play from, then connect on the address above.
+                                No player is registered, so the server refuses everyone - including
+                                you. Add your{" "}
+                                {access.edition === "bedrock" ? "gamertag" : "Minecraft username"}{" "}
+                                and the address you play from, then connect on the address above.
                             </p>
                             <button
                                 type="button"
@@ -748,7 +782,10 @@ function ConnectCard({
                                 </ul>
                             )}
                             {reach.forward && (
-                                <Link href="/admin/domains#game-ports" className="w-fit text-primary hover:underline">
+                                <Link
+                                    href="/admin/domains#game-ports"
+                                    className="w-fit text-primary hover:underline"
+                                >
                                     Open the router walkthrough
                                 </Link>
                             )}
@@ -770,7 +807,10 @@ function ConnectCard({
  * ARK, a Minecraft reading names which edition it is, and that is not something to
  * guess at from a frame.
  */
-function withPresence(status: MinecraftStatus | null, presence: ServerPresence | null): MinecraftStatus | null {
+function withPresence(
+    status: MinecraftStatus | null,
+    presence: ServerPresence | null
+): MinecraftStatus | null {
     if (!status || !presence) return status;
     return {
         ...status,
@@ -809,7 +849,8 @@ function StatusBadge({ status, running }: { status: MinecraftStatus | null; runn
     if (label === null) return <Skeleton className="h-6 w-20" />;
     if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting") return <Badge className="border-warning-edge text-warning">Starting</Badge>;
+    if (label === "Starting")
+        return <Badge className="border-warning-edge text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;
     return (
         <Badge className="border-success-edge text-success">
@@ -846,7 +887,10 @@ function OverviewTab({
     onOpenPlayers: () => void;
 }) {
     const shown = useMemo(
-        () => settings.filter((setting) => ["DIFFICULTY", "MODE", "MAX_PLAYERS", "MEMORY", "MOTD"].includes(setting.key)),
+        () =>
+            settings.filter((setting) =>
+                ["DIFFICULTY", "MODE", "MAX_PLAYERS", "MEMORY", "MOTD"].includes(setting.key)
+            ),
         [settings]
     );
     const blueprint = findBlueprint(blueprintId ?? "");
@@ -854,7 +898,12 @@ function OverviewTab({
     // A map is the game on the servers that have one, so the blueprint's note
     // about the plugin it replaced would be describing something that is not here.
     const note = map
-        ? { title: map.name, text: map.setup, docs: map.source, docsLabel: "Where this map came from" }
+        ? {
+              title: map.name,
+              text: map.setup,
+              docs: map.source,
+              docsLabel: "Where this map came from"
+          }
         : blueprint?.setup
           ? {
                 title: `${blueprint.name}: what is left to do`,
@@ -901,9 +950,13 @@ function OverviewTab({
                     {status === null ? (
                         <Skeleton className="h-8 w-full" />
                     ) : !status.answering ? (
-                        <p className="text-sm text-muted-foreground">{status.message ?? "The server is not answering."}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {status.message ?? "The server is not answering."}
+                        </p>
                     ) : status.players.players.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Nobody is playing right now.</p>
+                        <p className="text-sm text-muted-foreground">
+                            Nobody is playing right now.
+                        </p>
                     ) : (
                         <div className="flex flex-wrap gap-1">
                             {status.players.players.map((player) => (
@@ -935,7 +988,11 @@ function OverviewTab({
                         <dl className="flex flex-col gap-1 text-sm">
                             <div className="flex items-baseline justify-between gap-3">
                                 <dt className="text-muted-foreground">Processor</dt>
-                                <dd>{status.cpuPercent === null ? "-" : `${status.cpuPercent.toFixed(1)}%`}</dd>
+                                <dd>
+                                    {status.cpuPercent === null
+                                        ? "-"
+                                        : `${status.cpuPercent.toFixed(1)}%`}
+                                </dd>
                             </div>
                             <div className="flex items-baseline justify-between gap-3">
                                 <dt className="text-muted-foreground">Memory</dt>
@@ -959,11 +1016,15 @@ function OverviewTab({
                             // with nothing carrying the rest hides exactly what an
                             // operator opened the overview to read.
                             const value =
-                                setting.options?.find((option) => option.value === setting.value)?.label ??
+                                setting.options?.find((option) => option.value === setting.value)
+                                    ?.label ??
                                 setting.value ??
                                 "-";
                             return (
-                                <div key={setting.key} className="flex items-baseline justify-between gap-3">
+                                <div
+                                    key={setting.key}
+                                    className="flex items-baseline justify-between gap-3"
+                                >
                                     <dt className="text-muted-foreground">{setting.label}</dt>
                                     <dd className="truncate text-right" title={value}>
                                         {value}
