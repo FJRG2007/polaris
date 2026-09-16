@@ -42,7 +42,7 @@
 
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
@@ -85,7 +85,7 @@ export function MinecraftJoinPassword({
 }) {
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    const [pending, setPending] = useState(false);
     const java = edition === "java";
     const guard = java ? joinGuardFor(software) : null;
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
@@ -112,9 +112,29 @@ export function MinecraftJoinPassword({
             ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
             : "The server restarts to apply it.";
 
+    /**
+     * Run one of the switches, busy until it settles.
+     *
+     * Not a React transition: both switches ask for confirmation first, and a
+     * state update made inside a transition is held until the transition ends -
+     * so the dialog never appeared, and the button spun forever waiting on an
+     * answer nobody could give. A failure that is not an answer (a request the
+     * server could not match, a dropped connection) is said, not swallowed.
+     */
+    async function run(task: () => Promise<void>): Promise<void> {
+        setPending(true);
+        try {
+            await task();
+        } catch {
+            setError("Polaris did not answer. Reload the page and try again.");
+        } finally {
+            setPending(false);
+        }
+    }
+
     function switchMod(wanted: boolean): void {
         setError(null);
-        startTransition(async () => {
+        void run(async () => {
             const asked = await confirm({
                 title: wanted ? "Restart onto Polaris login?" : "Restart to stop asking?",
                 description: wanted
@@ -138,7 +158,7 @@ export function MinecraftJoinPassword({
     function apply(wanted: boolean): void {
         if (!guard) return;
         setError(null);
-        startTransition(async () => {
+        void run(async () => {
             // Asked before the operator is asked anything, because the answer that
             // matters is whether this server can load it at all - and finding that
             // out after the restart means a server that came up without it while
