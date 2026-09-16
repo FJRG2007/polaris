@@ -204,7 +204,8 @@ function RemoteAudio({
         // constructor is not defined everywhere this component is rendered, and a
         // reference error here would take the whole call screen down with it.
         const source = audio.srcObject as MediaStream | null;
-        const tracks = typeof source?.getAudioTracks === "function" ? source.getAudioTracks() : null;
+        const tracks =
+            typeof source?.getAudioTracks === "function" ? source.getAudioTracks() : null;
         if (!source || tracks?.length === 0) {
             onPlayState(id, false, start);
             return;
