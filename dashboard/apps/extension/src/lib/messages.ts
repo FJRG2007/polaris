@@ -108,12 +108,6 @@ export interface AccountRef {
 export type Request =
     | { readonly kind: "status" }
     | { readonly kind: "connect"; readonly typed: string }
-    | {
-          readonly kind: "signIn";
-          readonly email: string;
-          readonly password: string;
-          readonly code?: string;
-      }
     /**
      * Ask the server to let this extension in, and open the page that decides.
      *
@@ -240,7 +234,7 @@ export type Reply =
           readonly pollMs: number;
       }
     | { readonly ok: true }
-    | { readonly ok: false; readonly error: string; readonly needsCode?: boolean };
+    | { readonly ok: false; readonly error: string };
 
 /**
  * Ask the background worker something, from the popup.

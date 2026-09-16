@@ -26,6 +26,7 @@
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
+import { usePaneCeiling } from "./pane-room";
 import { Crown, Users, X } from "lucide-react";
 import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
@@ -370,6 +371,10 @@ export function ChannelMembers({
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
     const heading = `Members${loading ? "" : ` - ${members.length}`}`;
     const [width, setWidth] = useState(MEMBERS_PANE.fallback);
+    // What the row can actually spare, which is not the same as what this list
+    // may be: a remembered width from a wider window would otherwise arrive here
+    // and take it out of the conversation.
+    const { ceiling, measure } = usePaneCeiling(MEMBERS_PANE);
 
     // Above the two early returns below, and deliberately: a hook that only runs
     // on some renders is a crash the first time this panel is closed or drawn on
@@ -385,6 +390,10 @@ export function ChannelMembers({
         forgetPaneSize("members");
         setWidth(MEMBERS_PANE.fallback);
     }, []);
+
+    /** What is on screen: what somebody chose, held to what there is room for.
+     *  The choice itself is left alone, so it comes back with the room. */
+    const drawn = Math.min(width, ceiling);
 
     if (!open) return null;
 
@@ -414,24 +423,25 @@ export function ChannelMembers({
     }
 
     return (
-        // A little wider than it was and still narrower than the profile beside
-        // a direct message: this is a list of names, which wraps badly and reads
-        // fine narrow, where that one carries sentences. Every pixel either
-        // takes comes off the conversation, so the wider step waits for a window
-        // with room for it - the same breakpoint the profile uses.
+        // Narrower than the profile beside a direct message by default: this is
+        // a list of names, which wraps badly and reads fine narrow, where that
+        // one carries sentences. Every pixel it takes comes off the
+        // conversation, so where the line sits is left to whoever is reading
+        // rather than guessed from the width of the window.
         <>
             <ResizeHandle
                 axis="x"
                 side="end"
-                size={width}
+                size={drawn}
                 min={MEMBERS_PANE.min}
-                max={MEMBERS_PANE.max}
+                max={ceiling}
                 onChange={resize}
                 onReset={reset}
                 label="Members list width"
             />
             <aside
-                style={{ "--members-pane": `${width}px` } as CSSProperties}
+                ref={measure}
+                style={{ "--members-pane": `${drawn}px` } as CSSProperties}
                 className="flex shrink-0 flex-col border-l border-border w-[var(--members-pane)]"
             >
                 <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">

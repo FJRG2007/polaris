@@ -132,7 +132,7 @@ export function ResizeHandle({
             // on a focused divider belongs to whatever else is listening for it.
             event.preventDefault();
         },
-        [axis, max, min, onChange, size]
+        [axis, max, min, onChange, size, towards]
     );
 
     return (

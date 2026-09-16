@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
+import { usePaneCeiling } from "./pane-room";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import type { PollDraft } from "./poll-dialog";
@@ -63,6 +64,10 @@ export function ThreadPanel({
 }) {
     const { may } = useChat();
     const [width, setWidth] = useState(THREAD_PANE.fallback);
+    // What the row can actually spare, which is not the same as what a thread may
+    // be: a remembered width from a wider window, or a second panel opened beside
+    // this one, is how the conversation gets squeezed to nothing.
+    const { ceiling, measure } = usePaneCeiling(THREAD_PANE);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [error, setError] = useState("");
     /** Somebody to drop into the reply being written. The thread has its own box,
@@ -83,6 +88,10 @@ export function ThreadPanel({
         forgetPaneSize("thread");
         setWidth(THREAD_PANE.fallback);
     }, []);
+
+    /** What is on screen: what somebody chose, held to what there is room for.
+     *  The choice itself is left alone, so it comes back with the room. */
+    const drawn = Math.min(width, ceiling);
 
     const load = useCallback(async () => {
         const result = await actions.readThreadAction(root.id);
@@ -124,16 +133,17 @@ export function ThreadPanel({
             <ResizeHandle
                 axis="x"
                 side="end"
-                size={width}
+                size={drawn}
                 min={THREAD_PANE.min}
-                max={THREAD_PANE.max}
+                max={ceiling}
                 onChange={resize}
                 onReset={reset}
                 label="Thread width"
                 className="hidden md:block"
             />
             <aside
-                style={{ "--thread-pane": `${width}px` } as CSSProperties}
+                ref={measure}
+                style={{ "--thread-pane": `${drawn}px` } as CSSProperties}
                 className="flex w-full shrink-0 flex-col border-l border-border md:w-[var(--thread-pane)]"
             >
                 <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">

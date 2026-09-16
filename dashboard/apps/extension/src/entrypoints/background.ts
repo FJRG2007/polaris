@@ -13,7 +13,7 @@ import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
-import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
+import { deriveMasterKey, stretchMasterKey } from "@polaris/vault-crypto";
 import {
     decrypt,
     decryptRsa,
@@ -207,7 +207,11 @@ type AuthorizationState =
     | "lost"
     | "unreadable"
     /** Approved, and without the account credential this extension is now only
-     *  useful with - a Polaris too old to mint one, or one that failed to. */
+     *  useful with. Which of the reasons it was is not knowable from here: a
+     *  Polaris too old to mint one, an account no longer allowed to use the
+     *  vault, and a mint that simply failed all arrive as the same absent
+     *  field - so what is said about it names the possibilities rather than
+     *  picking one. */
     | "accountless";
 
 /** A request in flight, and what has become of it. */
@@ -657,7 +661,7 @@ async function collect(): Promise<void> {
             // anywhere from and that asking again cannot mend, since the same
             // half of a sign-in comes back every time. Refused before the vault
             // is opened or a token written, it leaves whatever was already here
-            // untouched and says which Polaris has to be updated.
+            // untouched.
             if (!claim.accountKey) {
                 await settle(still, "accountless");
                 return;
@@ -1291,7 +1295,6 @@ async function fill(id: string): Promise<messages.Reply> {
  * it is there to measure.
  */
 const USES_VAULT = new Set<messages.Request["kind"]>([
-    "signIn",
     "unlock",
     "switchAccount",
     "sync",
@@ -1513,64 +1516,6 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, status: await status() };
             }
 
-            case "signIn": {
-                const origin = await currentOrigin();
-                if (!origin) return { ok: false, error: "Say which Polaris this is first." };
-                const base = vaultBase(origin);
-                const email = request.email.trim().toLowerCase();
-                const settings = await protocol.prelogin(base, email);
-                if (!settings) return { ok: false, error: "That server did not answer." };
-
-                const masterKey = await deriveMasterKey(request.password, email, settings);
-                const hash = await masterPasswordHash(masterKey, request.password);
-                const result = await protocol.signIn(base, {
-                    email,
-                    masterPasswordHash: hash,
-                    device: await device(),
-                    twoFactorToken: request.code
-                });
-                if (!result.ok) {
-                    if (result.kind === "two_factor") {
-                        return {
-                            ok: false,
-                            error: "Enter the code from your authenticator.",
-                            needsCode: true
-                        };
-                    }
-                    if (result.kind === "rate_limited") {
-                        const minutes = Math.ceil(result.retryAfterMs / 60_000);
-                        return {
-                            ok: false,
-                            error: `Too many attempts. Try again in ${minutes} minutes.`
-                        };
-                    }
-                    if (result.kind === "unreachable") {
-                        return { ok: false, error: "That server could not be reached." };
-                    }
-                    return {
-                        ok: false,
-                        error: "That address and password did not open the vault."
-                    };
-                }
-
-                // From here on this is the same install the approval performs, and
-                // it is interrupted by a switch in the same way: in a turn.
-                return inTurn(async (): Promise<messages.Reply> => {
-                    await EMAIL.setValue(email);
-                    await remember(result.token);
-                    // Signed in and open in one step: the password is in hand, and
-                    // asking for it again immediately would be theatre.
-                    await sync(true);
-                    await unlock(request.password);
-                    // Signing back into an account that is still parked - which is one
-                    // press, because adding an account keeps the address - would leave
-                    // it in the list as well as in front, with the older token.
-                    await dropParked(accounts.accountId(origin, email));
-                    await badge();
-                    return { ok: true, status: await status() };
-                });
-            }
-
             case "authorize": {
                 const origin = await currentOrigin();
                 if (!origin) return { ok: false, error: "Say which Polaris this is first." };
@@ -1647,9 +1592,13 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     return { ok: false, error: "What came back could not be opened. Ask again." };
                 }
                 if (state === "accountless") {
+                    // What came back cannot say why the account half was missing,
+                    // so this does not guess: naming the update alone would send
+                    // somebody whose account simply lost vault access round the
+                    // same refusal forever, updating something already current.
                     return {
                         ok: false,
-                        error: "That Polaris signed in to the vault but not to your account. It needs updating before this extension can be used - update it from Settings in Polaris, then ask again."
+                        error: "That approval carried the vault but not your account. Update Polaris from Settings, and if it refuses again, check your account is still allowed to use the vault."
                     };
                 }
                 return { ok: true, waiting: state, userCode, pollMs };

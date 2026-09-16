@@ -18,6 +18,7 @@
 
 import { ServerRail } from "./server-rail";
 import { ChatSidebar } from "./chat-sidebar";
+import { usePaneCeiling } from "./pane-room";
 import { usePathname } from "next/navigation";
 import { useChatStream } from "./use-chat-stream";
 import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
@@ -70,6 +71,11 @@ function ChatColumns({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const { refresh, viewerId } = useChat();
     const [listWidth, setListWidth] = useState(LIST_PANE.fallback);
+    // What the window can actually spare, which is not the same as what the list
+    // may be: the ceiling below was written for the narrowest screen this is
+    // drawn on at all, and a width remembered from a wide one arrives on that
+    // screen unchanged.
+    const { ceiling, measure } = usePaneCeiling(LIST_PANE);
 
     // Read after the first paint rather than during it. There is no localStorage
     // on the server, so a width taken during render would be the fallback there
@@ -90,6 +96,10 @@ function ChatColumns({ children }: { children: ReactNode }) {
         forgetPaneSize("list");
         setListWidth(LIST_PANE.fallback);
     }, []);
+
+    /** What is on screen: what somebody chose, held to what there is room for.
+     *  The choice itself is left alone, so it comes back with the room. */
+    const drawn = Math.min(listWidth, ceiling);
     // Inside a conversation on a phone the list steps aside; on anything wider
     // both are shown, which is why this decides a class rather than a render.
     const inConversation = pathname.startsWith("/chat/c/");
@@ -134,7 +144,8 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 the whole screen and a remembered desktop width would be wrong in
                 both directions. */}
             <div
-                style={{ "--chat-list": `${listWidth}px` } as CSSProperties}
+                ref={measure}
+                style={{ "--chat-list": `${drawn}px` } as CSSProperties}
                 className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 w-full shrink-0 flex-col border-r border-border md:w-[var(--chat-list)]`}
             >
                 <ChatSidebar />
@@ -143,9 +154,9 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 is always the whole screen, so there is no line to move. */}
             <ResizeHandle
                 axis="x"
-                size={listWidth}
+                size={drawn}
                 min={LIST_PANE.min}
-                max={LIST_PANE.max}
+                max={ceiling}
                 onChange={resize}
                 onReset={reset}
                 label="Conversation list width"
