@@ -76,8 +76,15 @@ export function rememberCall(
 /** Whether the update banner has already written down a call that still counts. */
 function offeredNote(): boolean {
     try {
-        const note = JSON.parse(window.sessionStorage.getItem(KEY) ?? "null") as Partial<Note> | null;
-        return !!note && note.reason !== "leaving" && typeof note.at === "number" && Date.now() - note.at <= WINDOW_MS;
+        const note = JSON.parse(
+            window.sessionStorage.getItem(KEY) ?? "null"
+        ) as Partial<Note> | null;
+        return (
+            !!note &&
+            note.reason !== "leaving" &&
+            typeof note.at === "number" &&
+            Date.now() - note.at <= WINDOW_MS
+        );
     } catch {
         return false;
     }
@@ -89,7 +96,9 @@ function offeredNote(): boolean {
  * Removed as it is read, whether or not it is used: a note that is left behind
  * is a note that fires on the next reload too.
  */
-export function takeRememberedCall(viewerId: string): { session: CallSession; video: boolean } | null {
+export function takeRememberedCall(
+    viewerId: string
+): { session: CallSession; video: boolean } | null {
     if (typeof window === "undefined") return null;
     let raw: string | null = null;
     try {
@@ -103,7 +112,12 @@ export function takeRememberedCall(viewerId: string): { session: CallSession; vi
     try {
         const note = JSON.parse(raw) as Partial<Note>;
         const session = note.session;
-        if (!session || typeof session.meetingId !== "string" || typeof session.channelId !== "string") return null;
+        if (
+            !session ||
+            typeof session.meetingId !== "string" ||
+            typeof session.channelId !== "string"
+        )
+            return null;
         if (note.viewerId !== viewerId) return null;
         if (typeof note.at !== "number" || Date.now() - note.at > WINDOW_MS) return null;
         if (note.reason === "leaving" && !reloaded()) return null;
