@@ -38,9 +38,23 @@ export interface JoinGuard {
     /** The Modrinth slug, as it appears on the mod list. */
     readonly slug: string;
     readonly entry: JoinGuardEntry;
-    /** Slugs this guard took over from, which a server may still carry from
-     *  before the swap. They count as this guard being on, and are taken off the
-     *  list wherever this one is. */
+    /**
+     * Slugs this guard took over from, which a server may still carry from
+     * before the swap.
+     *
+     * They count as this guard being on, everywhere. What they are not is
+     * replaced: a server already carrying one keeps it, and the current slug is
+     * not seeded beside it, because the two keep their passwords in different
+     * places - swapping one for the other under a server that was working locks
+     * every player out until they register again. So an older server is left on
+     * what it has, and only turning the guard off, or moving the server to the
+     * other loader, takes it off the list.
+     *
+     * The cost is that an older slug keeps whatever coverage it had. A reset onto
+     * a release it has no build for is a server that comes up with no guard, and
+     * the entry being optional is what makes that quiet - the same caveat
+     * `joinGuardEntry` carries, reached by a different road.
+     */
     readonly replaces: readonly string[];
 }
 
