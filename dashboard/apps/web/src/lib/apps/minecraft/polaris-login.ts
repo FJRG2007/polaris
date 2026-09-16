@@ -169,7 +169,8 @@ export function modMovedTo(
         const mods = env.get(MODS_KEY) ?? "";
         const listed = modEntries(mods).find(isModEntry) ?? "";
         if (listed.endsWith(`/${file}`)) return null;
-        const base = listed.slice(0, listed.lastIndexOf(MOD_PATH));
+        const at = listed.lastIndexOf(MOD_PATH);
+        const base = at > 0 ? listed.slice(0, at) : "";
         if (base) return new Map([[MODS_KEY, withMod(mods, modUrl(base, file))]]);
     }
     return disableEnv(env);

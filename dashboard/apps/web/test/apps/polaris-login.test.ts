@@ -133,6 +133,16 @@ describe("moving a server that runs it", () => {
         ]);
         expect(login.modMovedTo(stale, "NEOFORGE", "1.21.4")?.get("MODS")).toBe(URL);
     });
+
+    it("takes it off when the build it names is not served from here", () => {
+        const foreign = new Map([
+            ...on,
+            ["MODS", "https://mods.example/polaris-neoforge-1.21.1.jar"]
+        ]);
+        const env = login.modMovedTo(foreign, "NEOFORGE", "1.21.4");
+        expect(env?.get("POLARIS_LOGIN")).toBe("off");
+        expect(env?.get("MODS")).toBe("");
+    });
 });
 
 describe("whether the panel should raise the alarm", () => {

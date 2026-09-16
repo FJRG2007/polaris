@@ -45,7 +45,7 @@ import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "@/lib/apps/minecraft/experience";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
-import { guardForSave, PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
+import { guardForSave, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";

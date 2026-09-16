@@ -23,8 +23,18 @@ const TTL_MS = 30_000;
 const cache = new Map<string, { value: string; at: number }>();
 
 /** One generated variable of an installed app, decrypted, or null when the app
- *  has no such variable. */
+ *  has no such variable or it cannot be read. */
 export async function installEnvSecret(
+    applicationId: string,
+    ownerId: string,
+    key: string
+): Promise<string | null> {
+    return readInstallEnvSecret(applicationId, ownerId, key).catch(() => null);
+}
+
+/** Like `installEnvSecret`, but a failed read throws instead of reading as a
+ *  missing variable, for a caller that must tell the two apart. */
+export async function readInstallEnvSecret(
     applicationId: string,
     ownerId: string,
     key: string
@@ -32,10 +42,10 @@ export async function installEnvSecret(
     const cacheKey = `${applicationId}:${key}`;
     const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
-    const vars = await listEnvVars("application", applicationId, ownerId).catch(() => []);
+    const vars = await listEnvVars("application", applicationId, ownerId);
     const row = vars.find((item) => item.key === key);
     if (!row) return null;
-    const value = row.isSecret ? await revealEnvVar(row.id, ownerId).catch(() => null) : row.value;
+    const value = row.isSecret ? await revealEnvVar(row.id, ownerId) : row.value;
     if (!value) return null;
     cache.set(cacheKey, { value, at: Date.now() });
     return value;

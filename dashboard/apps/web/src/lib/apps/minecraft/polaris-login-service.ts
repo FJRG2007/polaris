@@ -13,7 +13,7 @@
 import { prisma } from "@polaris/db";
 import * as polarisLogin from "./polaris-login";
 import { appBaseUrl } from "@/lib/domain-service";
-import { installEnvSecret } from "@/lib/apps/install-secret";
+import { readInstallEnvSecret } from "@/lib/apps/install-secret";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -27,11 +27,14 @@ export interface ModServer {
 }
 
 /**
- * The server a request is from, when it carries that server's token.
+ * The server a request is from, when it carries that server's token and still
+ * has the mod switched on.
  *
  * An unknown server and a wrong token are the same answer, so the endpoint does
  * not tell a stranger which ids exist. Digested before comparing, so the
- * comparison is over two buffers of equal length whatever was presented.
+ * comparison is over two buffers of equal length whatever was presented. A
+ * lookup that fails throws rather than reading as a wrong token, because the mod
+ * takes a refusal to mean the link is broken.
  */
 export async function authorizeMod(
     request: Request,
@@ -45,7 +48,11 @@ export async function authorizeMod(
         select: { applicationId: true, ownerId: true }
     });
     if (!install?.applicationId) return null;
-    const token = await installEnvSecret(
+    const vars = await listEnvVars("application", install.applicationId, install.ownerId);
+    if (!polarisLogin.loginOn(new Map(vars.map((entry) => [entry.key, entry.value ?? ""])))) {
+        return null;
+    }
+    const token = await readInstallEnvSecret(
         install.applicationId,
         install.ownerId,
         polarisLogin.TOKEN_KEY
@@ -227,7 +234,7 @@ export async function loginState(
     applicationId: string,
     ownerId: string
 ): Promise<LoginState> {
-    const [vars, install, checkIn, players] = await Promise.all([
+    const [vars, install, checkIn, players, deployment] = await Promise.all([
         listEnvVars("application", applicationId, ownerId),
         prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } }),
         prisma.minecraftLoginCheckIn.findUnique({ where: { installedAppId } }),
@@ -235,17 +242,26 @@ export async function loginState(
             where: { installedAppId },
             orderBy: { displayName: "asc" },
             select: { displayName: true, createdAt: true, lastLoginAt: true }
+        }),
+        prisma.deployment.findFirst({
+            where: { deployableType: "application", deployableId: applicationId },
+            orderBy: { createdAt: "desc" },
+            select: { finishedAt: true }
         })
     ]);
     const env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
-    const upSince = onlineSince(install?.config ?? null);
+    const now = new Date();
+    const upSince = latest(
+        onlineSince(install?.config ?? null),
+        deployment ? (deployment.finishedAt ?? now) : null
+    );
     return {
         on: polarisLogin.loginOn(env),
         build: polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
         health: polarisLogin.loginHealth({
             seenAt: checkIn?.seenAt ?? null,
             upSince,
-            now: new Date()
+            now
         }),
         seenAt: checkIn?.seenAt.toISOString() ?? null,
         modVersion: checkIn?.modVersion ?? null,
@@ -255,6 +271,12 @@ export async function loginState(
             lastLoginAt: row.lastLoginAt?.toISOString() ?? null
         }))
     };
+}
+
+/** The later of two moments, or null when the server is not up at all. */
+function latest(onlineAt: Date | null, deployedAt: Date | null): Date | null {
+    if (!onlineAt) return null;
+    return deployedAt && deployedAt > onlineAt ? deployedAt : onlineAt;
 }
 
 /** When the server's current run began, as the activity sweep recorded it. */
@@ -295,7 +317,7 @@ export async function setLogin(
             );
         }
         const token =
-            (await installEnvSecret(applicationId, ownerId, polarisLogin.TOKEN_KEY)) ??
+            (await readInstallEnvSecret(applicationId, ownerId, polarisLogin.TOKEN_KEY)) ??
             randomBytes(32).toString("hex");
         writes = polarisLogin.enableEnv({
             current,

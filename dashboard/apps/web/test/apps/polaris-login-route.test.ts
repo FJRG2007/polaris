@@ -91,13 +91,21 @@ vi.mock("@/lib/rate-limit-service", () => ({
     resetRateLimit: vi.fn(async (key: string) => void counters.delete(key))
 }));
 
-vi.mock("@/lib/apps/install-secret", () => ({
-    installEnvSecret: vi.fn(async (applicationId: string) =>
-        applicationId === `app-${SERVER}` ? TOKEN : "another-token"
+const secrets = vi.hoisted(() => ({
+    read: vi.fn(
+        async (applicationId: string): Promise<string | null> =>
+            applicationId.endsWith("0001") ? "server-token" : "another-token"
     )
 }));
+vi.mock("@/lib/apps/install-secret", () => ({ readInstallEnvSecret: secrets.read }));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example" }));
-vi.mock("@/lib/env-var-service", () => ({ listEnvVars: vi.fn(), setEnvVars: vi.fn() }));
+
+const switchedOn = [
+    { key: "MODS", value: "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar" },
+    { key: "POLARIS_LOGIN", value: "on" }
+];
+const env = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock("@/lib/env-var-service", () => ({ listEnvVars: env.list, setEnvVars: vi.fn() }));
 
 const route = await import("../../src/app/api/minecraft/login/[id]/[action]/route");
 
@@ -117,6 +125,8 @@ beforeEach(() => {
     logins.clear();
     checkIns.clear();
     counters.clear();
+    env.list.mockReset();
+    env.list.mockResolvedValue(switchedOn);
 });
 
 describe("who may ask", () => {
@@ -136,6 +146,18 @@ describe("who may ask", () => {
             expect(response.status).toBe(401);
             expect(await response.json()).toEqual({ error: "unauthorized" });
         }
+    });
+
+    it("refuses a server that has the mod switched off", async () => {
+        env.list.mockResolvedValue([{ key: "POLARIS_LOGIN", value: "off" }]);
+        expect((await ask("status", { player: "Steve" })).status).toBe(401);
+    });
+
+    it("does not read a failed lookup as a broken link", async () => {
+        secrets.read.mockRejectedValueOnce(new Error("decrypt failed"));
+        await expect(ask("status", { player: "Steve" })).rejects.toThrow("decrypt failed");
+        env.list.mockRejectedValueOnce(new Error("database down"));
+        await expect(ask("status", { player: "Steve" })).rejects.toThrow("database down");
     });
 
     it("refuses a request with no token", async () => {
