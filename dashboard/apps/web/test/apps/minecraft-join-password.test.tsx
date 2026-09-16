@@ -204,24 +204,33 @@ describe("Polaris login", () => {
         players: [{ name: "Steve", createdAt: new Date().toISOString(), lastLoginAt: null }]
     };
 
-    it("is offered where there is a build, and says who registers again", async () => {
+    it("is the only login shown where there is a build, and says who registers again", async () => {
         vi.mocked(loginActions.loginStateAction).mockResolvedValue({
             state: { ...OFF, build: "polaris-neoforge-1.21.4.jar" }
         });
         neoforge();
-        expect(await screen.findByText("Use Polaris login")).toBeTruthy();
+        expect(await screen.findByText(/Uses Polaris login/)).toBeTruthy();
         expect(screen.getByText(/every player/)).toBeTruthy();
-        // A server already on the Modrinth project keeps it until somebody switches.
-        expect(screen.getByText(/\/trigger register set 1234/)).toBeTruthy();
+        // The Modrinth guard still on the server is what Turn on replaces, not a
+        // second choice.
+        expect(screen.queryByText("Use Polaris login")).toBeNull();
+        expect(screen.queryByText(/\/trigger register set 1234/)).toBeNull();
+        expect(screen.queryByText("On")).toBeNull();
+        expect(screen.getByRole("button", { name: "Turn on" })).toBeTruthy();
     });
 
-    it("says what it costs before it is turned on", async () => {
+    it("says what it costs before it replaces the Modrinth guard", async () => {
         vi.mocked(loginActions.loginStateAction).mockResolvedValue({
             state: { ...OFF, build: "polaris-neoforge-1.21.4.jar" }
         });
         neoforge();
-        fireEvent.click(await screen.findByRole("button", { name: "Use Polaris login" }));
-        await waitFor(() => expect(loginActions.setLoginAction).toHaveBeenCalled());
+        fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+        await waitFor(() =>
+            expect(loginActions.setLoginAction).toHaveBeenCalledWith({
+                installedAppId: "server-1",
+                on: true
+            })
+        );
         const asked = confirm.mock.calls[0]?.[0].description ?? "";
         expect(asked).toMatch(/nobody can join and it does not start/);
         expect(asked).toMatch(/passwords kept by auth stop working/);
