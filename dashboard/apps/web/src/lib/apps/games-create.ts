@@ -38,7 +38,8 @@ import {
     joinGuardEntry,
     joinGuardFor,
     joinGuardSlugs,
-    JOIN_GUARD_SLUGS
+    JOIN_GUARD_SLUGS,
+    PROJECTS_KEY
 } from "@/lib/apps/minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
@@ -266,11 +267,11 @@ export async function minecraftShapeEnv(
         const software = blueprint.software ?? shape.software ?? "PAPER";
         env.set("TYPE", software);
         env.set(
-            "MODRINTH_PROJECTS",
+            PROJECTS_KEY,
             protectionFor(
                 edition,
                 software,
-                projectList(blueprint, env.get("MODRINTH_PROJECTS"), shape.crossplay, map)
+                projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map)
             )
         );
     }
@@ -669,7 +670,7 @@ const MODDED_PROTECTION = ["open-parties-and-claims?"] as const;
 function seededPlugins(edition: "java" | "bedrock"): Set<string> {
     const manifest = findApp(TEMPLATE_BY_EDITION[edition]);
     const field = (manifest?.template?.env ?? []).find(
-        (entry) => entry.key === "MODRINTH_PROJECTS" && entry.pluginServersOnly
+        (entry) => entry.key === PROJECTS_KEY && entry.pluginServersOnly
     );
     return new Set(
         parseProjectList(field?.default ?? "")

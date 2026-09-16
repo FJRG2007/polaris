@@ -11,6 +11,7 @@ import { prisma } from "@polaris/db";
 import { listEnvVars } from "@/lib/env-var-service";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { readInstallConfig } from "@/lib/apps/install-config";
+import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { BLUEPRINT_KEY, MAP_KEY, RELEASE_KEY, blueprintFor, minecraftShapeEnv } from "@/lib/apps/games-create";
 import {
@@ -108,7 +109,7 @@ export async function saveServerAsTemplate(
     const vars = await listEnvVars("application", install.applicationId, ownerId).catch(() => []);
     const built = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
     const edition = install.catalogId.includes("bedrock") ? "bedrock" : "java";
-    const crossplay = hasCrossplay(built.get("MODRINTH_PROJECTS"));
+    const crossplay = hasCrossplay(built.get(PROJECTS_KEY));
     const players = Number(built.get("MAX_PLAYERS")) || 8;
 
     // What a fresh one of this kind would be given. Built here and thrown away -

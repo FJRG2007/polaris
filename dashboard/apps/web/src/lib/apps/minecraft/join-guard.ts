@@ -181,6 +181,15 @@ export function guardMovedTo(projects: string, software: string): string | null 
 export const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /**
+ * The environment key the server's software is saved under.
+ *
+ * Beside the one above for the same reason: the reconciliation reads both, and a
+ * key spelled out in one subsystem and aliased in another is a rename that
+ * typechecks while half the code goes on watching a setting nobody writes.
+ */
+export const SOFTWARE_KEY = "TYPE";
+
+/**
  * The project list a settings save has to write alongside itself, or null when
  * it has to write none.
  *
