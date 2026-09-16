@@ -21,12 +21,12 @@ import * as chat from "@/lib/chat/chat-service";
 import * as meetings from "@/lib/chat/meetings";
 import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
-import { requirePermission } from "@/lib/session";
 import { mayRing } from "@/lib/privacy-service";
-import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
+import { requirePermission } from "@/lib/session";
 import { createNotification } from "@/lib/notification-service";
-import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
+import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
+import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 
 /**
