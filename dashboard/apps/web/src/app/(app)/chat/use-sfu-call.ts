@@ -100,20 +100,39 @@ const LISTEN_AFTER_MS = 400;
 /**
  * How many times in a row the seat may fail to be kept before this stops asking.
  *
- * A beat that never gives up sounds harmless and is not. It is submitted to the
- * page this tab was loaded from, naming a handler that build minted, so a deploy
- * landing under an open call makes every beat a 404 - forever, ten seconds apart,
- * until somebody closes the tab. On this instance the firewall did the closing:
- * it read the flood as somebody trying URLs and banned the address, which took
- * the entire dashboard away from a signed-in person in the middle of a call.
+ * A beat that never gives up sounds harmless and is not: on this instance the
+ * firewall once read a flood of failing beats as somebody trying URLs and banned
+ * the address, which took the entire dashboard away from a signed-in person in
+ * the middle of a call.
+ *
+ * The beat goes to a route (`seatUrl`), not a server action. An action is named
+ * by an id the build that served the page minted, so a Polaris update under an
+ * open call made every beat a 404, the tabs gave up, and the new server swept
+ * everybody off the roster and ended the call. The route is the same in every
+ * build, so an update no longer fails the beat at all.
  *
  * Three, so half a minute of failure ends it. A blip shorter than that recovers
- * on the next beat; anything longer is a tab that has lost its server, and the
- * honest thing is to stop rather than to keep insisting on a seat nobody is
- * recording. Polaris is already offering that tab the reload, and taking it walks
- * back into the call.
+ * on the next beat; anything longer is a tab that has lost its server or its seat.
  */
 const KEEPALIVE_GIVE_UP = 3;
+
+/** Where this browser holds its seat in a call: POST to keep it, DELETE to give
+ *  it back. */
+function seatUrl(meetingId: string): string {
+    return `/api/chat/meetings/${encodeURIComponent(meetingId)}/seat`;
+}
+
+/** Keep the seat, failing on anything but a success so the beat can count it. */
+async function keepSeat(meetingId: string): Promise<void> {
+    const response = await fetch(seatUrl(meetingId), { method: "POST", cache: "no-store" });
+    if (!response.ok) throw new Error(`seat ${response.status}`);
+}
+
+/** Give the seat back. `keepalive`, so it is still sent from a tab that is
+ *  closing. */
+function leaveSeat(meetingId: string): void {
+    void fetch(seatUrl(meetingId), { method: "DELETE", keepalive: true }).catch(() => undefined);
+}
 
 /**
  * The client for the media server, fetched at the moment a call needs it.
@@ -1551,8 +1570,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
             let missed = 0;
             beat = setInterval(() => {
-                void actions
-                    .keepSeatAction(inCall)
+                void keepSeat(inCall)
                     .then(() => {
                         missed = 0;
                     })
@@ -1599,7 +1617,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // phone that just took the call is sitting in, and handing it back
             // struck that phone off the roster mid-call, with a heartbeat that
             // could never revive it and a reload the only way back in.
-            if (!displaced.current) void actions.leaveCallAction(inCall);
+            if (!displaced.current) leaveSeat(inCall);
         };
     }, [
         forget,

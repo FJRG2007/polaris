@@ -28,7 +28,7 @@ import { useChatStream } from "./use-chat-stream";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
-import { takeRememberedCall } from "./call-resume";
+import { rememberCall, takeRememberedCall } from "./call-resume";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
@@ -87,12 +87,12 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     }, [refreshPresence, session?.meetingId]);
 
     /**
-     * The call this tab was on before it reloaded to pick up an update.
+     * The call this tab was on before it reloaded.
      *
-     * Read once, on the way in, and removed as it is read. Only the update
-     * banner ever leaves one - a reload somebody typed is a reload they meant,
-     * and walking back into a call they had stepped away from would be a
-     * microphone opening itself.
+     * Read once, on the way in, and removed as it is read. Written by the update
+     * banner, and by the page itself as it is left mid-call - which `call-resume`
+     * only honours when the page was reloaded, so walking away and back is still
+     * leaving.
      *
      * Whether the room is still there is not asked: entering it answers that,
      * and a room that has since ended is a state the provider already knows how
@@ -102,6 +102,23 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
         const back = takeRememberedCall(viewerId);
         if (back) enter(back.session, back.video);
     }, [enter, viewerId]);
+
+    /**
+     * A reload in the middle of a call is a refresh, not a hang-up.
+     *
+     * Written as the page is left, from whatever the call is at that moment;
+     * whether it is acted on is decided when the next page loads.
+     */
+    const current = useRef({ session, withVideo });
+    current.current = { session, withVideo };
+    useEffect(() => {
+        const note = () => {
+            const { session: on, withVideo: video } = current.current;
+            if (on) rememberCall(on, video, viewerId, "leaving");
+        };
+        window.addEventListener("pagehide", note);
+        return () => window.removeEventListener("pagehide", note);
+    }, [viewerId]);
 
     /**
      * The call ended, so this browser is no longer in one.

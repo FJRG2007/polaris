@@ -284,16 +284,9 @@ export async function claimCallAction(meetingId: string, deviceId: string): Prom
     meetings.claimCall(meetingId, seat.participantId, String(deviceId).slice(0, 100));
 }
 
-/** Still here. */
-export async function keepSeatAction(meetingId: string): Promise<void> {
-    const seat = await resolveSeat(meetingId);
-    if (seat) await meetings.keepSeat(seat);
-}
-
-export async function leaveCallAction(meetingId: string): Promise<void> {
-    const seat = await resolveSeat(meetingId);
-    if (seat) await meetings.leave(seat);
-}
+// Keeping and giving back a seat are a route (`api/chat/meetings/[id]/seat`),
+// not actions here: an action's id changes with every build, and a heartbeat
+// that fails after an update ends the call for everybody on it.
 
 export async function admitAction(
     meetingId: string,
