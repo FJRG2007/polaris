@@ -171,6 +171,38 @@ export function guardMovedTo(projects: string, software: string): string | null 
 }
 
 /**
+ * Login projects Polaris does not manage, by slug - each one checked on Modrinth
+ * as a project that runs on the server.
+ *
+ * A server carrying one of these was closed by somebody on purpose, with passwords
+ * kept somewhere Polaris never reads. Polaris neither seeds its own login beside
+ * it nor offers to replace it: two logins is a player asked twice, and replacing
+ * it is every player registering again, which is not Polaris's call to make.
+ */
+export const FOREIGN_LOGIN_SLUGS: readonly string[] = ["easyauth", "basic-login", "simple-auth"];
+
+/** The foreign login a project list carries, or null. */
+export function foreignLogin(projects: string): string | null {
+    for (const entry of parseProjectList(projects)) {
+        const slug = projectSlug(entry)?.toLowerCase();
+        if (typeof slug === "string" && FOREIGN_LOGIN_SLUGS.includes(slug)) return slug;
+    }
+    return null;
+}
+
+/**
+ * The Polaris login build a server should run by default, or null.
+ *
+ * Polaris login is the login wherever it has a build for the server's software
+ * and release, unless the server already has a login Polaris does not manage.
+ * Everywhere else the project guard above stays the answer.
+ */
+export function defaultModFor(env: ReadonlyMap<string, string>): string | null {
+    if (foreignLogin(env.get(PROJECTS_KEY) ?? "") !== null) return null;
+    return polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
+}
+
+/**
  * The environment key the project list is saved under.
  *
  * Named here because the guard is decided here, but the list is not only the

@@ -17,7 +17,7 @@ import { readInstallEnvSecret } from "@/lib/apps/install-secret";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { PROJECTS_KEY, SOFTWARE_KEY, withJoinGuard } from "./join-guard";
+import { foreignLogin, PROJECTS_KEY, SOFTWARE_KEY, withJoinGuard } from "./join-guard";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 
 /** The server a mod request speaks for. */
@@ -223,6 +223,8 @@ export interface LoginState {
     readonly on: boolean;
     /** The build this server would get, or null when there is none for it. */
     readonly build: string | null;
+    /** A login Polaris does not manage that the server already carries. */
+    readonly foreign: string | null;
     readonly health: polarisLogin.LoginHealth;
     readonly seenAt: string | null;
     readonly modVersion: string | null;
@@ -258,6 +260,7 @@ export async function loginState(
     return {
         on: polarisLogin.loginOn(env),
         build: polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
+        foreign: foreignLogin(env.get(PROJECTS_KEY) ?? ""),
         health: polarisLogin.loginHealth({
             seenAt: checkIn?.seenAt ?? null,
             upSince,
@@ -311,6 +314,12 @@ export async function setLogin(
             current.get(SOFTWARE_KEY) ?? "",
             current.get("VERSION") ?? ""
         );
+        const foreign = foreignLogin(current.get(PROJECTS_KEY) ?? "");
+        if (foreign !== null) {
+            throw new Error(
+                `This server logs players in with ${foreign}, which Polaris does not manage. Remove it from the Mods screen first.`
+            );
+        }
         if (build === null) {
             throw new Error(
                 "Polaris login has no build for this server's software and release. It needs NeoForge on Minecraft 1.21.4."

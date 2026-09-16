@@ -19,7 +19,6 @@
  */
 
 import * as fivemAccess from "@/lib/apps/fivem/access";
-import { installApp } from "@/lib/apps/install-service";
 import { joinAccess } from "@/lib/apps/minecraft/access";
 import { allocateArkPorts } from "@/lib/apps/ark/create";
 import { allocateFivemPort } from "@/lib/apps/fivem/create";
@@ -35,7 +34,15 @@ import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
 import * as polarisLogin from "@/lib/apps/minecraft/polaris-login";
-import { PROJECTS_KEY, SOFTWARE_KEY, withJoinGuard } from "@/lib/apps/minecraft/join-guard";
+import { randomBytes, randomUUID } from "node:crypto";
+import { appBaseUrl } from "@/lib/domain-service";
+import { installApp, type InstallSeed } from "@/lib/apps/install-service";
+import {
+    defaultModFor,
+    PROJECTS_KEY,
+    SOFTWARE_KEY,
+    withJoinGuard
+} from "@/lib/apps/minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
@@ -369,6 +376,12 @@ async function createMinecraftServer(
         env.set(key, value);
     }
 
+    // Polaris login, wherever this software and release have a build. Last over
+    // the template for the same reason as the access above: a login is not a
+    // preference a saved server passes on, and the template may carry the project
+    // guard this replaces.
+    const seed = await loginSeed(env);
+
     // Crossplay is Geyser listening on the Bedrock port inside the same container,
     // so that port has to be published as well - one service, two doors. Geyser's
     // own default is 19132; the host side takes the next free one.
@@ -390,7 +403,8 @@ async function createMinecraftServer(
             name: input.name,
             env: [...env.entries()].map(([key, value]) => ({ key, value }))
         },
-        extra ? { extra } : undefined
+        extra ? { extra } : undefined,
+        seed
     );
 
     // Which game this server was built to play and on what, so its own page can
@@ -415,6 +429,40 @@ async function createMinecraftServer(
         srv: input.edition === "java"
     });
     return { installedAppId: install.installedAppId, hostname };
+}
+
+/**
+ * What a new server needs to run Polaris login from its first boot, or undefined
+ * when it will not run it.
+ *
+ * The mod names its server by the install's id and proves it with a token, and
+ * neither exists until the install does - so the id is chosen here and the
+ * install is created with it. The project guard comes off the list in the same
+ * step, since two logins would ask a player twice.
+ */
+async function loginSeed(env: Map<string, string>): Promise<InstallSeed | undefined> {
+    const file = defaultModFor(env);
+    if (file === null) return undefined;
+    const installedAppId = randomUUID();
+    const written = polarisLogin.enableEnv({
+        current: env,
+        baseUrl: await appBaseUrl(),
+        installedAppId,
+        file,
+        token: randomBytes(32).toString("hex")
+    });
+    env.set(
+        PROJECTS_KEY,
+        withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? "", true)
+    );
+    return {
+        installedAppId,
+        env: [...written].map(([key, value]) => ({
+            key,
+            value,
+            isSecret: key === polarisLogin.TOKEN_KEY
+        }))
+    };
 }
 
 /**

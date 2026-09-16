@@ -29,9 +29,12 @@
  * being the only way the guard ever got installed, because a switch only protects
  * the servers whose owner went looking for it.
  *
- * On NeoForge 1.21.4 the card also offers Polaris's own login mod, which is never
- * the default - see `minecraft-polaris-login`. While it is on, it is the guard
- * this card describes and the one Turn off takes away.
+ * Where Polaris's own login mod has a build (NeoForge 1.21.4 today) it is the
+ * login this card turns on, unless the server already has a login Polaris does
+ * not manage - see `minecraft-polaris-login`. A server still on the Modrinth
+ * project is offered the switch rather than moved, because moving it makes every
+ * player register again. While the mod is on, it is the guard this card
+ * describes and the one Turn off takes away.
  *
  * Java only, and the card says so on Bedrock rather than going quiet. Bedrock
  * loads neither plugins nor mods and has no Modrinth list at all, so there is
@@ -93,6 +96,8 @@ export function MinecraftJoinPassword({
     const modCapable = java && modrinth.loaderForType(software) === "neoforge";
     const login = useLoginState(installedAppId, modCapable);
     const modOn = login.state?.on === true;
+    /** Polaris login is what this server should use, when it is not on already. */
+    const preferMod = Boolean(login.state?.build) && !login.state?.foreign;
 
     // Held in state so the switch answers the press immediately, and taken from
     // the server again whenever its answer changes underneath - the Mods screen
@@ -239,6 +244,13 @@ export function MinecraftJoinPassword({
                         state={login.state}
                         onChanged={() => void login.reload()}
                     />
+                ) : preferMod && listed === null ? (
+                    <p className="text-xs text-muted-foreground">
+                        Uses Polaris login: players get <span className="font-mono">/register</span>{" "}
+                        and <span className="font-mono">/login</span> with text passwords, kept in
+                        Polaris so you can reset one here. While the server cannot reach Polaris,
+                        nobody can join and the server does not start.
+                    </p>
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
@@ -283,7 +295,7 @@ export function MinecraftJoinPassword({
                                 )}
                             </p>
                         )}
-                        {login.state?.build && (
+                        {preferMod && listed !== null && (
                             <LoginOffer
                                 replacing={listed}
                                 disabled={pending}
@@ -306,7 +318,13 @@ export function MinecraftJoinPassword({
                             size="sm"
                             variant={on ? "outline" : "primary"}
                             disabled={pending || guard === null || !login.loaded}
-                            onClick={() => (modOn ? switchMod(false) : apply(!on))}
+                            onClick={() =>
+                                modOn
+                                    ? switchMod(false)
+                                    : !on && preferMod
+                                      ? switchMod(true)
+                                      : apply(!on)
+                            }
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             {on ? "Turn off" : "Turn on"}

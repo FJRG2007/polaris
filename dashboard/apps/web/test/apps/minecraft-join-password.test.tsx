@@ -40,6 +40,7 @@ vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
 const OFF: LoginState = {
     on: false,
     build: null,
+    foreign: null,
     health: "waiting",
     seenAt: null,
     modVersion: null,
@@ -206,7 +207,7 @@ describe("Polaris login", () => {
         neoforge();
         expect(await screen.findByText("Use Polaris login")).toBeTruthy();
         expect(screen.getByText(/every player/)).toBeTruthy();
-        // The default is still the Modrinth project.
+        // A server already on the Modrinth project keeps it until somebody switches.
         expect(screen.getByText(/\/trigger register set 1234/)).toBeTruthy();
     });
 
@@ -220,6 +221,32 @@ describe("Polaris login", () => {
         const asked = confirm.mock.calls[0]?.[0].description ?? "";
         expect(asked).toMatch(/nobody can join and it does not start/);
         expect(asked).toMatch(/passwords kept by auth stop working/);
+    });
+
+    it("is what Turn on installs where there is a build and nothing is on", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar" }
+        });
+        neoforge("");
+        expect(await screen.findByText(/Uses Polaris login/)).toBeTruthy();
+        expect(screen.queryByText(/\/trigger/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+        await waitFor(() =>
+            expect(loginActions.setLoginAction).toHaveBeenCalledWith({
+                installedAppId: "server-1",
+                on: true
+            })
+        );
+    });
+
+    it("leaves a server with a login Polaris does not manage alone", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar", foreign: "basic-login" }
+        });
+        neoforge("basic-login?");
+        await screen.findByText(/starts without it/);
+        expect(screen.queryByText("Use Polaris login")).toBeNull();
+        expect(screen.queryByText(/Uses Polaris login/)).toBeNull();
     });
 
     it("is not offered without a build", async () => {

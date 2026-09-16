@@ -110,11 +110,26 @@ export interface InstallPorts {
     readonly extra?: readonly { host: number; container: number; protocol?: "tcp" | "udp" }[];
 }
 
+/**
+ * What a server-side caller decided before the install exists.
+ *
+ * The form's values are filtered against the manifest, which is right for a
+ * form. This is not a form: it is Polaris itself, wiring an app to something
+ * that needs the install's own id before the first boot - Polaris login's server
+ * id and token - so it is written as given, and never reachable from a request.
+ */
+export interface InstallSeed {
+    /** The id the install is created with. */
+    readonly installedAppId: string;
+    readonly env: readonly { key: string; value: string; isSecret: boolean }[];
+}
+
 export async function installApp(
     ownerId: string,
     actorId: string,
     input: AppInstallInput,
-    ports?: InstallPorts
+    ports?: InstallPorts,
+    seed?: InstallSeed
 ): Promise<{ installedAppId: string; applicationId: string | null }> {
     const app = findApp(input.catalogId);
     if (!app) throw new Error("Unknown app");
@@ -270,6 +285,9 @@ export async function installApp(
         });
         envByKey.set("BRIDGE_PORT", { value: String(bridgePort), isSecret: false });
     }
+    for (const entry of seed?.env ?? []) {
+        envByKey.set(entry.key, { value: entry.value, isSecret: entry.isSecret });
+    }
     const vars = [...envByKey.entries()].map(([key, meta]) => ({
         key,
         value: meta.value,
@@ -303,6 +321,7 @@ export async function installApp(
 
     const installed = await prisma.installedApp.create({
         data: {
+            ...(seed ? { id: seed.installedAppId } : {}),
             catalogId: app.id,
             ownerId,
             name,
