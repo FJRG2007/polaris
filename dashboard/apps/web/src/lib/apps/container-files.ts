@@ -63,25 +63,39 @@ export async function readContainerFile(server: ServerContainer, path: string): 
 }
 
 /**
- * Write one of the server's files, keeping who owns it.
+ * Write one of the server's files, keeping who owns it, in one step.
  *
- * `cat tmp > file` rather than `mv`: moving a file replaces it with one owned by
- * whoever ran the command, and the game's account then cannot rewrite its own
- * settings when it shuts down. Pouring into the existing file leaves the owner and
- * the mode exactly as they were.
+ * The file is built beside the real one and then moved onto it. A move within a
+ * directory is a rename: no reader ever sees half of it, and nothing is destroyed
+ * until the new contents are complete on disk. That matters more than it used to,
+ * because the files coming through here now include the ones the server is closed
+ * by - and a `whitelist.json` caught halfway through a write is every player on it
+ * locked out of a server that says they are welcome.
+ *
+ * Pouring into the existing file instead (`cat tmp > file`) truncates it before
+ * writing a byte, so a command that dies midway - a container stopping, a
+ * connection dropping, a full disk - leaves a short file or an empty one. The
+ * reason it was written that way is real, though: a plain `mv` hands the file to
+ * whoever ran the command, and the game's own account then cannot rewrite its
+ * settings when it shuts down. So the owner and mode are copied onto the new file
+ * from the one it replaces before the move, and taken from the folder when there
+ * is nothing there to copy from.
  */
 export async function writeContainerFile(server: ServerContainer, path: string, content: string): Promise<void> {
     assertSafePath(path);
     const encoded = Buffer.from(content, "utf8").toString("base64");
     const temporary = `${path}.polaris-new`;
+    // Ownership is copied rather than asked for with --reference, which busybox
+    // does not carry. Never fatal: a file written but left owned by the wrong
+    // account is a problem the next boot may survive, where refusing the write is
+    // one it certainly will not.
+    const takeOwner = `chown "$(stat -c %u:%g ${path})" ${temporary} || true; chmod "$(stat -c %a ${path})" ${temporary} || true`;
+    const inheritOwner = `chown "$(stat -c %u:%g "$(dirname ${path})")" ${temporary} || true`;
     const script = [
         `mkdir -p "$(dirname ${path})"`,
         `printf %s ${encoded} | base64 -d > ${temporary}`,
-        // Created rather than truncated only when it was not there at all, and then
-        // handed to whoever owns the folder around it.
-        `[ -f ${path} ] || { : > ${path}; chown "$(stat -c %u:%g "$(dirname ${path})")" ${path} || true; }`,
-        `cat ${temporary} > ${path}`,
-        `rm -f ${temporary}`
+        `if [ -f ${path} ]; then ${takeOwner}; else ${inheritOwner}; fi`,
+        `mv -f ${temporary} ${path}`
     ].join(" && ");
     const result = await server.run(["sh", "-c", script]);
     if (result.code !== 0) {

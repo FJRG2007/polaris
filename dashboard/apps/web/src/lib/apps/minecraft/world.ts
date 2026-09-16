@@ -481,6 +481,30 @@ export function parseSeedReply(output: string): string | null {
     return match ? (match[1] as string) : null;
 }
 
+/**
+ * Bytes free where the copies go, out of `df -Pk`.
+ *
+ * Read from the last line that looks like a filesystem rather than from a fixed
+ * row, because the header is a line too and a long device name is what `-P`
+ * exists to stop wrapping onto its own. A column that is not a number is how the
+ * header tells itself apart.
+ *
+ * Null means the question could not be answered, which callers have to treat as
+ * "no reason to refuse" rather than as "no space": an image without `df` must not
+ * become a server that cannot be backed up.
+ */
+export function parseFreeSpace(output: string): number | null {
+    for (const line of output.split("\n").reverse()) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 5) continue;
+        const used = Number.parseInt(fields[2] as string, 10);
+        const available = Number.parseInt(fields[3] as string, 10);
+        if (!Number.isFinite(used) || !Number.isFinite(available)) continue;
+        return available * 1024;
+    }
+    return null;
+}
+
 /** Lines of a `ls -1A` listing, without the blanks. */
 export function parseListing(output: string): string[] {
     return output

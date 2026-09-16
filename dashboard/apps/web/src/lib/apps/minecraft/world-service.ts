@@ -21,6 +21,7 @@
 import * as world from "./world";
 import { prisma } from "@polaris/db";
 import * as policy from "./backup-policy";
+import { formatBytes } from "@polaris/core";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { OWNED_PROJECTS } from "@/lib/apps/games-create";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
@@ -313,6 +314,40 @@ export async function createWorldBackup(ownerId: string, installedAppId: string)
 /** The archive itself, on a container that is already open. Shared by the button
  *  and by the sweep, so a scheduled copy and one somebody asked for are the same
  *  act rather than two that drift. */
+/**
+ * Refuse a copy that would fill the disk the world is living on.
+ *
+ * The archives sit beside the world, on its own volume, which is the cheap part
+ * of this design and also its one sharp edge: the thing a backup protects is the
+ * first thing lost when the copy of it fills the disk. A Minecraft server on a
+ * full disk does not stop politely - the world stops being writable and what goes
+ * is whatever was in memory.
+ *
+ * Measured against the world uncompressed, which is deliberately pessimistic: the
+ * archive will be a fraction of it, so the check leaves the difference as
+ * headroom rather than computing a margin nobody can justify.
+ *
+ * Anything it cannot measure is not a refusal. An image without `df`, a `du` that
+ * complained because the server wrote a region mid-walk - neither is evidence the
+ * disk is full, and a backup refused on no evidence is the outcome this is here to
+ * prevent, arrived at from the other side.
+ */
+async function assertRoomToCopy(server: ServerContainer, dirs: readonly string[]): Promise<void> {
+    const [measured, free] = await Promise.all([
+        server.run(["du", "-sk", "--", ...dirs.map((dir) => `${world.DATA_DIR}/${dir}`)]),
+        server.run(["df", "-Pk", world.BACKUP_DIR])
+    ]);
+    if (free.code !== 0) return;
+    const available = world.parseFreeSpace(free.output);
+    if (available === null) return;
+    let wanted = 0;
+    for (const bytes of world.parseDuLines(measured.output).values()) wanted += bytes;
+    if (wanted === 0 || available >= wanted) return;
+    throw new Error(
+        `There is not enough room beside the world to copy it - ${formatBytes(available)} free, and the world is ${formatBytes(wanted)}. Delete a backup or two, or lower how many are kept.`
+    );
+}
+
 async function writeBackup(ownerId: string, server: ServerContainer): Promise<WorldBackup> {
     const { level } = await readWorldSettings(ownerId, server.applicationId, server.edition);
     const listing = await server.runOk(
@@ -326,14 +361,26 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     }
 
     await server.runOk(["mkdir", "-p", "--", world.BACKUP_DIR], "Could not create the backup folder");
+    await assertRoomToCopy(server, dirs);
     await holdSave(server);
     const at = new Date();
     const name = world.backupName(at);
+    // Written beside its own name and moved onto it, never straight onto it. The
+    // stop that asks for one of these bounds how long it will wait, and a bound
+    // that fires does not stop `tar` - the container is still writing when the
+    // wait gives up, so an archive written in place survives as a truncated file
+    // carrying a real backup's name. `listBackups` would then call it the newest
+    // copy: the next scheduled one is suppressed for a whole day, and it spends a
+    // slot in what is kept. The listing only matches `*.tar.gz`, so a partial file
+    // under this name is invisible to it, and the move is what publishes the copy.
+    const partial = `${world.BACKUP_DIR}/${name}.part`;
     try {
-        await server.runOk(
-            ["tar", "-czf", `${world.BACKUP_DIR}/${name}`, "-C", world.DATA_DIR, ...dirs],
-            "Could not write the backup"
-        );
+        await server.runOk(["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs], "Could not write the backup");
+        await server.runOk(["mv", "--", partial, `${world.BACKUP_DIR}/${name}`], "Could not write the backup");
+    } catch (caught) {
+        // A world big enough to run out of disk leaves the half of it that fit.
+        await server.run(["rm", "-f", "--", partial]);
+        throw caught;
     } finally {
         await resumeSave(server);
     }

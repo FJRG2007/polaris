@@ -33,9 +33,9 @@ import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { useEffect, useState, useTransition } from "react";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
-import { updateServerSettingsAction } from "./minecraft-actions";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
 
 const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
@@ -96,6 +96,20 @@ export function MinecraftJoinPassword({
         if (!guard) return;
         setError(null);
         startTransition(async () => {
+            // Asked before the operator is asked anything, because the answer that
+            // matters is whether this server can load it at all - and finding that
+            // out after the restart means finding it out from a server that is
+            // down. Only on the way in: taking a project off the list cannot fail
+            // for want of a build.
+            if (wanted) {
+                const fit = await projectFitsAction({ installedAppId, slug: guard });
+                if (!fit.fits) {
+                    setError(
+                        `${guard} has no build for the release this server runs${fit.version ? ` (${fit.version})` : ""}. Turning this on would stop the server rather than close it.`
+                    );
+                    return;
+                }
+            }
             const said =
                 playersOnline > 0
                     ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`

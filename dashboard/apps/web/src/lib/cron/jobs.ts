@@ -201,11 +201,36 @@ async function runGameActivity(): Promise<{
  * this the schedule on the Backups card is a date nothing ever acts on, which is
  * worse than no schedule at all.
  */
-async function runWorldBackups(): Promise<{ taken: number; pruned: number; failed: number }> {
+/** How long one pass may spend starting copies. Half the lease, so the copy that
+ *  was in flight when the budget ran out still has room to finish inside it. */
+const WORLD_BACKUP_BUDGET_MS = 10 * MINUTE;
+
+async function runWorldBackups(): Promise<{
+    taken: number;
+    pruned: number;
+    failed: number;
+    left: number;
+}> {
+    const owners = await ownersWithApps();
+    // Bounded like the sibling sweep, and for the reason its lease exists: `tar`
+    // over a world takes as long as the world is big, a pass walks every owner,
+    // and a pass that outlives the scheduler's own stuck-after mark releases the
+    // lease and the guard together - which starts a second runner archiving the
+    // same world the first one is still archiving. The budget is what keeps the
+    // pass inside its lease; an owner it did not reach is reached ten minutes
+    // later, because the schedule is re-read from what is on disk every time.
+    const until = Date.now() + WORLD_BACKUP_BUDGET_MS;
     let taken = 0;
     let pruned = 0;
     let failed = 0;
-    for (const ownerId of await ownersWithApps()) {
+    let left = 0;
+    for (const [index, ownerId] of owners.entries()) {
+        // Before the work rather than after it: a budget can decide what not to
+        // start, and must never cut a copy already being written in half.
+        if (Date.now() >= until) {
+            left = owners.length - index;
+            break;
+        }
         const swept = await sweepWorldBackups(ownerId).catch(() => []);
         for (const server of swept) {
             if (server.name) taken += 1;
@@ -213,7 +238,7 @@ async function runWorldBackups(): Promise<{ taken: number; pruned: number; faile
             pruned += server.pruned.length;
         }
     }
-    return { taken, pruned, failed };
+    return { taken, pruned, failed, left };
 }
 
 async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
@@ -587,8 +612,11 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: Number(process.env.POLARIS_GAME_BACKUP_SWEEP_MS) || 10 * MINUTE,
         // Leased, and for longer than the gap: this archives a world with `tar`
         // inside the container, and two runners doing that at once is two copies
-        // of the same world competing for the same disk.
-        leaseMs: 30 * MINUTE,
+        // of the same world competing for the same disk. Twice the pass's own
+        // budget, and under the scheduler's stuck-after mark - a lease as long as
+        // that mark expires both guards at once, which is the second runner this
+        // is here to prevent.
+        leaseMs: 20 * MINUTE,
         run: runWorldBackups
     },
     {

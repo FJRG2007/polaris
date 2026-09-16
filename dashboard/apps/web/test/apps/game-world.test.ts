@@ -149,6 +149,22 @@ describe("reading what the container said", () => {
         expect(sizes.get("/data/world_nether")).toBe(2048 * 1024);
     });
 
+    // The figure a backup is refused on, so both directions matter: reading it
+    // wrong low refuses a copy there was room for, and failing to read it at all
+    // has to mean "no reason to refuse" rather than "no space".
+    it("reads the free space out of df, past its header", () => {
+        const output = [
+            "Filesystem     1024-blocks      Used Available Capacity Mounted on",
+            "/dev/sda1        103080888   6717480  91103024       7% /data"
+        ].join("\n");
+        expect(world.parseFreeSpace(output)).toBe(91103024 * 1024);
+    });
+
+    it("has no answer when nothing in the output is a filesystem", () => {
+        expect(world.parseFreeSpace("df: applet not found")).toBeNull();
+        expect(world.parseFreeSpace("")).toBeNull();
+    });
+
     it("reads archives newest first and drops anything that is not one", () => {
         const rows = world.parseBackupList(
             [

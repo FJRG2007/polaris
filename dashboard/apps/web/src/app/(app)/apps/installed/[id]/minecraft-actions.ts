@@ -13,7 +13,6 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
-import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
 import { clearCrashLoop } from "@/lib/apps/games-health";
@@ -26,10 +25,12 @@ import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import type { PlayerStats } from "@/lib/apps/games-activity";
 import { requireGameServer } from "@/lib/apps/install-access";
+import { loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { patchInstallConfig } from "@/lib/apps/install-config";
+import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { writeContainerFile } from "@/lib/container-files-service";
@@ -49,6 +50,7 @@ import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/mine
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { resetMinecraftServerSchema, type ResetMinecraftServerInput } from "@/lib/apps/games-schema";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
+import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { readLiveInventory, readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import {
@@ -1449,6 +1451,53 @@ export async function sendConsoleCommandAction(
  * redeploy. Which is why this says so on the button rather than pretending the
  * change is instant.
  */
+const projectFitSchema = z.object({
+    installedAppId: z.string().uuid(),
+    /** A Modrinth slug, which is what the URL of a project is made of. */
+    slug: z
+        .string()
+        .trim()
+        .min(1)
+        .max(64)
+        .regex(/^[A-Za-z0-9_-]+$/, "That is not a project")
+});
+
+/**
+ * Whether this server could actually load that project.
+ *
+ * Asked before a restart rather than discovered after one. A project with no
+ * build for this server's software and release does not fail when it is added to
+ * the list - it fails minutes later, on a server that is already down, in a log
+ * nobody has open, and the operator is left with a restart that appears to have
+ * eaten their server.
+ *
+ * Nothing is refused on an answer nobody has. Modrinth being unreachable, a
+ * server pinned to no particular release, and software that loads nothing at all
+ * are all "not known to be wrong", which is what `knownUnsupported` means by
+ * positively: refusing a change because an index was down would be the worse
+ * failure of the two.
+ */
+export async function projectFitsAction(input: {
+    installedAppId: string;
+    slug: string;
+}): Promise<{ fits: boolean; version?: string; error?: string }> {
+    const parsed = projectFitSchema.safeParse(input);
+    if (!parsed.success) {
+        return { fits: false, error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    }
+    try {
+        const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        if (!access.install.applicationId) return { fits: true };
+        const env = await listEnvVars("application", access.install.applicationId, access.ownerId);
+        const loader = loaderForType(env.find((entry) => entry.key === "TYPE")?.value ?? "");
+        const version = env.find((entry) => entry.key === "VERSION")?.value ?? "";
+        if (!loader || wantsLatest(version)) return { fits: true };
+        return { fits: !knownUnsupported(await commonVersions([parsed.data.slug], loader), version), version };
+    } catch {
+        return { fits: true };
+    }
+}
+
 /**
  * Save settings, and optionally restart so they take effect now.
  *
