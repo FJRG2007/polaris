@@ -206,6 +206,7 @@ jobs:
           file: dashboard/docker/Dockerfile
           build-args: |
             POLARIS_BUILD_SHA=${{ github.sha }}
+            NODE_BUILD_OPTIONS=--max-old-space-size=8192
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=true
