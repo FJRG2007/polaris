@@ -54,6 +54,15 @@ export interface VaultStatus {
     readonly email: string | null;
     /** Signed in, in the sense that there is a token: the vault may still be locked. */
     readonly connected: boolean;
+    /**
+     * Whether this session also carries a Polaris account credential.
+     *
+     * One approval on the dashboard leaves both behind - the vault's key and the
+     * account's - so a session that came that way is signed in to Polaris as well
+     * as to the vault. A vault opened by typing the master password has only the
+     * first, and the extension has no idea whose account it is sitting on.
+     */
+    readonly polarisSession: boolean;
     readonly unlocked: boolean;
     /** When the items last came down, for the line that says so. */
     readonly syncedAt: number | null;

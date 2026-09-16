@@ -989,15 +989,17 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
 }
 
 async function status(): Promise<messages.VaultStatus> {
-    const [server, email, refreshToken, syncedAt, timeout, opened, parked] = await Promise.all([
-        currentOrigin(),
-        EMAIL.getValue(),
-        REFRESH.getValue(),
-        SYNCED_AT.getValue(),
-        TIMEOUT.getValue(),
-        vault(),
-        PARKED.getValue()
-    ]);
+    const [server, email, refreshToken, syncedAt, timeout, opened, parked, accountKey] =
+        await Promise.all([
+            currentOrigin(),
+            EMAIL.getValue(),
+            REFRESH.getValue(),
+            SYNCED_AT.getValue(),
+            TIMEOUT.getValue(),
+            vault(),
+            PARKED.getValue(),
+            ACCOUNT_KEY.getValue()
+        ]);
     // Only worth asking for once there is a session to ask about: a browser that
     // has not been let in yet would spend a request on every poll of a screen
     // that is showing it the sign-in button.
@@ -1022,6 +1024,10 @@ async function status(): Promise<messages.VaultStatus> {
         server,
         email,
         connected: refreshToken !== null,
+        // Only ever left behind by an approval on the dashboard. A vault opened
+        // with the master password alone has a token and no account, which is the
+        // state the popup now refuses to go any further from.
+        polarisSession: accountKey !== null,
         unlocked: opened !== null,
         syncedAt,
         timeoutMs: readTimeout(timeout),

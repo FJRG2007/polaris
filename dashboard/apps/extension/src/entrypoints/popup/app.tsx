@@ -117,7 +117,13 @@ export function App(): React.JSX.Element {
 
     const screen = !status.server ? (
         <Connect onDone={refresh} />
-    ) : !status.connected ? (
+    ) : // Signing in to the Polaris account is the way in, and the vault is what
+    // is behind it - not the other way round, and not an alternative to it. A
+    // session with a vault token and no account credential is one that was
+    // opened by typing the master password before this was required; it goes
+    // back through the approval rather than carrying on, because the extension
+    // has no idea whose account it is sitting on until it does.
+    !status.connected || !status.polarisSession ? (
         <SignIn server={status.server} onDone={refresh} />
     ) : !status.unlocked ? (
         <Unlock onDone={refresh} />
@@ -408,7 +414,7 @@ function SignIn({
                 <>
                     <Problem text={error} />
                     <button disabled={busy} onClick={() => void ask()}>
-                        {busy ? "Asking" : "Connect to your vault"}
+                        {busy ? "Asking" : "Sign in to Polaris"}
                     </button>
                     {/* What it needs, before what it does. The requirement was the
                         last clause of the sentence, under a button that said "Sign
@@ -417,12 +423,16 @@ function SignIn({
                         What this connects to is the password vault; saying so is
                         not a smaller promise, it is the true one. */}
                     <p className="muted small">
-                        Approving happens on your dashboard, with your vault open. A tab opens
-                        there; the key comes back sealed, so only this extension can open it.
+                        Approving happens on your dashboard, with your vault open. It signs this
+                        extension in to your account and hands the vault key over sealed, so only
+                        this extension can open it.
                     </p>
-                    <button className="ghost" onClick={() => setTyping(true)}>
-                        Type your vault password instead
-                    </button>
+                    {/* The master password is no longer a way in, and the button
+                        that offered it is gone rather than left to fail: it opens
+                        the vault without signing in to the account, which is the
+                        state the popup now sends back here. It is still what
+                        unlocks a vault that has been left alone - that is the
+                        screen after this one. */}
                     {/* The way to a different server. Off the main path, because
                         most people have one Polaris - but without it, setting an
                         account aside to add another would strand somebody on
