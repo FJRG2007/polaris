@@ -134,6 +134,13 @@ export function enableEnv(input: {
     ]);
 }
 
+/** Those writes as environment variables, with the token kept secret. */
+export function envWrites(
+    writes: ReadonlyMap<string, string>
+): { key: string; value: string; isSecret: boolean }[] {
+    return [...writes].map(([key, value]) => ({ key, value, isSecret: key === TOKEN_KEY }));
+}
+
 /** What turning it off writes. The token stays: it is worthless without the
  *  switch, and keeping it means turning it back on changes nothing a running
  *  server holds. */

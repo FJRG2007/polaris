@@ -352,16 +352,26 @@ configured means the machine's own address, as before.
   `updateServerSettingsAction` on a Settings save - except the save that is
   itself writing `MODRINTH_PROJECTS`, which is the join-password card's own
   toggle and is left to do that alone.
-- **Polaris login, opt-in.** The Modrinth guards leave NeoForge with `/trigger`
-  and numeric passwords, so Polaris ships its own server-side mod
-  (`resources/minecraft/polaris-neoforge`, built into the dashboard image and
-  served at `/api/minecraft/mod/<file>`). The join-password card offers it on a
-  server whose software and release have a build (`MOD_BUILDS` in
-  `lib/apps/minecraft/polaris-login.ts`; NeoForge 1.21.4 today); nothing turns it
-  on by default. Switching it on writes `MODS` (the jar's URL), `POLARIS_LOGIN`,
-  `POLARIS_URL`, `POLARIS_SERVER_ID` and a secret `POLARIS_SERVER_TOKEN`, and takes
-  the Modrinth guard off the list, since the two keep passwords in different
-  places. The mod keeps nothing: every join asks
+- **Polaris login, the default where it has a build.** The Modrinth guards
+  leave NeoForge with `/trigger` and numeric passwords, so Polaris ships its
+  own server-side mod (`resources/minecraft/polaris-neoforge`, built into the
+  dashboard image and served at `/api/minecraft/mod/<file>`). A new server
+  whose software and release have a build (`MOD_BUILDS` in
+  `lib/apps/minecraft/polaris-login.ts`; NeoForge 1.21.4 today) is created
+  with it on and without the Modrinth guard: the install is created with an
+  id chosen up front (`InstallSeed`), because the mod names its server by
+  that id. That needs a public address (`publicAppUrl`), since the server
+  fetches the jar from it and does not start without it; a LAN-only install
+  keeps the Modrinth guard and is offered the switch. The join-password
+  card's Turn on installs it on such a server too. A server that already
+  carries a login Polaris does not manage (`FOREIGN_LOGIN_SLUGS`) gets
+  neither (`withJoinGuard` seeds no guard beside it, and the card offers no
+  Turn on), and an existing server on the Modrinth guard is offered the
+  switch rather than moved, since switching makes every player register
+  again. Switching it on writes `MODS` (the jar's URL), `POLARIS_LOGIN`,
+  `POLARIS_URL`, `POLARIS_SERVER_ID` and a secret `POLARIS_SERVER_TOKEN`,
+  and takes the Modrinth guard off the list, since the two keep passwords in
+  different places. The mod keeps nothing: every join asks
   `/api/minecraft/login/<server>/<action>` (`hello`, `status`, `register`,
   `login`, `password`), which checks the token and throttles per player and, for
   failures, per server. Passwords are salted scrypt in `MinecraftLogin`, and the

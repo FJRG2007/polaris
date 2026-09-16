@@ -18,6 +18,8 @@ import { describe, expect, it, vi } from "vitest";
 import { protectionFor } from "@/lib/apps/games-create";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import {
+    defaultModFor,
+    foreignLogin,
     guardAsTemplate,
     guardForSave,
     guardMovedTo,
@@ -369,6 +371,49 @@ describe("a template made from a server running Polaris login", () => {
     it("leaves a server without it alone", () => {
         const plain = new Map([["MODRINTH_PROJECTS", "create?"]]);
         expect(guardAsTemplate(plain)).toEqual(plain);
+    });
+});
+
+/**
+ * Polaris login is the login wherever it has a build, except on a server that
+ * already has a login Polaris does not manage.
+ */
+describe("which servers get Polaris login by default", () => {
+    const env = (projects: string, type = "NEOFORGE", version = "1.21.4") =>
+        new Map([
+            ["TYPE", type],
+            ["VERSION", version],
+            ["MODRINTH_PROJECTS", projects]
+        ]);
+
+    it("is a server with a build", () => {
+        expect(defaultModFor(env("open-parties-and-claims?,auth?"))).toBe(
+            "polaris-neoforge-1.21.4.jar"
+        );
+    });
+
+    it("is not one without a build", () => {
+        expect(defaultModFor(env("", "NEOFORGE", "LATEST"))).toBeNull();
+        expect(defaultModFor(env("", "PAPER"))).toBeNull();
+    });
+
+    it("is not one that logs players in some other way", () => {
+        for (const slug of ["easyauth", "basic-login", "simple-auth"]) {
+            expect(defaultModFor(env(`${slug}?`)), slug).toBeNull();
+            expect(foreignLogin(`create?,${slug}:1.0`)).toBe(slug);
+        }
+        expect(foreignLogin("auth?,simple-login?")).toBeNull();
+    });
+
+    it("seeds no project guard beside a login Polaris does not manage", () => {
+        for (const software of ["NEOFORGE", "PAPER"]) {
+            const list = protectionFor("java", software, "easyauth?,auth?,simple-login?");
+            expect(slugs(list), software).toContain("easyauth");
+            expect(
+                slugs(list).some((slug) => JOIN_GUARD_SLUGS.includes(slug)),
+                software
+            ).toBe(false);
+        }
     });
 });
 

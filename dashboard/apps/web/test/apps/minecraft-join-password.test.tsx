@@ -16,6 +16,7 @@
 import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoginState } from "@/lib/apps/minecraft/polaris-login-service";
+import * as actions from "@/app/(app)/apps/installed/[id]/minecraft-actions";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
 import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
@@ -40,6 +41,8 @@ vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
 const OFF: LoginState = {
     on: false,
     build: null,
+    foreign: null,
+    reachable: true,
     health: "waiting",
     seenAt: null,
     modVersion: null,
@@ -170,10 +173,12 @@ describe("what the card says happens when there is no build", () => {
 /**
  * Polaris's own login mod on the card.
  *
- * Offered where there is a build and never the default, and once it is on it is
- * the guard the card describes: its commands, whether the server can still reach
- * Polaris, and a Turn off that takes the mod away rather than a Modrinth project
- * the server does not have.
+ * Offered where there is a build, and what Turn on installs once Polaris is
+ * reachable and the server carries no login Polaris does not manage; a server
+ * still on the Modrinth project is offered the switch instead. Once it is on it
+ * is the guard the card describes: its commands, whether the server can still
+ * reach Polaris, and a Turn off that takes the mod away rather than a Modrinth
+ * project the server does not have.
  */
 describe("Polaris login", () => {
     function neoforge(projects = "auth?") {
@@ -206,7 +211,7 @@ describe("Polaris login", () => {
         neoforge();
         expect(await screen.findByText("Use Polaris login")).toBeTruthy();
         expect(screen.getByText(/every player/)).toBeTruthy();
-        // The default is still the Modrinth project.
+        // A server already on the Modrinth project keeps it until somebody switches.
         expect(screen.getByText(/\/trigger register set 1234/)).toBeTruthy();
     });
 
@@ -222,10 +227,64 @@ describe("Polaris login", () => {
         expect(asked).toMatch(/passwords kept by auth stop working/);
     });
 
+    it("is what Turn on installs where there is a build and nothing is on", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar" }
+        });
+        neoforge("");
+        expect(await screen.findByText(/Uses Polaris login/)).toBeTruthy();
+        expect(screen.queryByText(/\/trigger/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+        await waitFor(() =>
+            expect(loginActions.setLoginAction).toHaveBeenCalledWith({
+                installedAppId: "server-1",
+                on: true
+            })
+        );
+    });
+
+    it("leaves a server with a login Polaris does not manage alone", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar", foreign: "basic-login" }
+        });
+        neoforge("basic-login?");
+        await screen.findByText(/which Polaris does not manage/);
+        expect(screen.queryByText("Use Polaris login")).toBeNull();
+        expect(screen.queryByText(/Uses Polaris login/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
+    });
+
+    it("installs the Modrinth project where Polaris has no public address", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar", reachable: false }
+        });
+        neoforge("");
+        await screen.findByText(/starts without it/);
+        expect(screen.queryByText(/Uses Polaris login/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+        await waitFor(() => expect(actions.projectFitsAction).toHaveBeenCalled());
+        expect(loginActions.setLoginAction).not.toHaveBeenCalled();
+    });
+
     it("is not offered without a build", async () => {
         neoforge();
         await screen.findByText(/starts without it/);
         expect(screen.queryByText("Use Polaris login")).toBeNull();
+    });
+
+    it("offers no Turn on beside a plugin server's own login", () => {
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects="simple-auth?"
+                software="PAPER"
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+        expect(screen.getByText(/which Polaris does not manage/)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
     });
 
     it("is never asked about on a plugin server", () => {

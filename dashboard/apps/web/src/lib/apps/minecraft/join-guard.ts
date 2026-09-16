@@ -171,6 +171,38 @@ export function guardMovedTo(projects: string, software: string): string | null 
 }
 
 /**
+ * Login projects Polaris does not manage, by slug - each one checked on Modrinth
+ * as a project that runs on the server.
+ *
+ * A server carrying one of these was closed by somebody on purpose, with passwords
+ * kept somewhere Polaris never reads. Polaris neither seeds its own login beside
+ * it nor offers to replace it: two logins is a player asked twice, and replacing
+ * it is every player registering again, which is not Polaris's call to make.
+ */
+export const FOREIGN_LOGIN_SLUGS: readonly string[] = ["easyauth", "basic-login", "simple-auth"];
+
+/** The foreign login a project list carries, or null. */
+export function foreignLogin(projects: string): string | null {
+    for (const entry of parseProjectList(projects)) {
+        const slug = projectSlug(entry)?.toLowerCase();
+        if (typeof slug === "string" && FOREIGN_LOGIN_SLUGS.includes(slug)) return slug;
+    }
+    return null;
+}
+
+/**
+ * The Polaris login build a server should run by default, or null.
+ *
+ * Polaris login is the login wherever it has a build for the server's software
+ * and release, unless the server already has a login Polaris does not manage.
+ * Everywhere else the project guard above stays the answer.
+ */
+export function defaultModFor(env: ReadonlyMap<string, string>): string | null {
+    if (foreignLogin(env.get(PROJECTS_KEY) ?? "") !== null) return null;
+    return polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
+}
+
+/**
  * The environment key the project list is saved under.
  *
  * Named here because the guard is decided here, but the list is not only the
@@ -211,7 +243,8 @@ export const SOFTWARE_KEY = "TYPE";
  *
  * A server running Polaris's own login mod (`modOn`) gets no project at all, and
  * loses any it has: that mod is its guard, and a project beside it is a second
- * login keeping its passwords somewhere else.
+ * login keeping its passwords somewhere else. So does a server carrying a login
+ * Polaris does not manage (`foreignLogin`), for the same reason.
  *
  * A default, not a policy: this runs where Polaris decides what a server starts
  * life with - a new one, and a reset, which is a server starting again - and where
@@ -221,8 +254,9 @@ export const SOFTWARE_KEY = "TYPE";
  * it back, along with everything else a fresh server is given.
  */
 export function withJoinGuard(current: string, software: string, modOn = false): string {
-    const guard = modOn ? null : joinGuardFor(software);
-    const wanted = modOn ? null : joinGuardEntry(software);
+    const none = modOn || foreignLogin(current) !== null;
+    const guard = none ? null : joinGuardFor(software);
+    const wanted = none ? null : joinGuardEntry(software);
     const own = guard === null ? [] : joinGuardSlugs(guard);
     // A password project for the other loader, whoever put it there: usually left
     // over from the software being changed, and at best a project with almost no
@@ -238,6 +272,27 @@ export function withJoinGuard(current: string, software: string, modOn = false):
     if (wanted === null) return formatProjectList(kept);
     const already = kept.some((entry) => own.includes(projectSlug(entry)?.toLowerCase() ?? ""));
     return formatProjectList(already ? kept : [...kept, wanted]);
+}
+
+/**
+ * Everything turning Polaris login on writes, the project list included.
+ *
+ * One answer for the two places that do it - a new server and the card's switch -
+ * so a server created with the mod and one switched onto it cannot differ.
+ */
+export function enableLogin(
+    input: Parameters<typeof polarisLogin.enableEnv>[0]
+): Map<string, string> {
+    const writes = polarisLogin.enableEnv(input);
+    writes.set(
+        PROJECTS_KEY,
+        withJoinGuard(
+            input.current.get(PROJECTS_KEY) ?? "",
+            input.current.get(SOFTWARE_KEY) ?? "",
+            true
+        )
+    );
+    return writes;
 }
 
 /**

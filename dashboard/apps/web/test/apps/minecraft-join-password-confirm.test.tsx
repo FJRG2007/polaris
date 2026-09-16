@@ -29,6 +29,8 @@ vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
 const OFF = {
     on: false,
     build: "polaris-neoforge-1.21.4.jar",
+    foreign: null,
+    reachable: true,
     health: "waiting" as const,
     seenAt: null,
     modVersion: null,
