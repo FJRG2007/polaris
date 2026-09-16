@@ -61,7 +61,15 @@ import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { putAwayOf, stagesOf, stagingOf, stillShared, watched } from "./call-media";
+import {
+    arrivedKeys,
+    LOCAL_SCREEN_KEY,
+    putAwayOf,
+    stagesOf,
+    stagingOf,
+    stillShared,
+    watched
+} from "./call-media";
 import {
     CAMERA_LADDER,
     LEVELS,
@@ -286,10 +294,26 @@ export function CallRoom({
      */
     const [away, setAway] = useState<readonly string[]>([]);
     const sharedKeys = shared.map((stage) => stage.key).join("|");
-    const [knownKeys, setKnownKeys] = useState(sharedKeys);
+    const [knownKeys, setKnownKeys] = useState(place === "direct" ? "" : sharedKeys);
     if (knownKeys !== sharedKeys) {
+        const before = knownKeys.length > 0 ? knownKeys.split("|") : [];
         setKnownKeys(sharedKeys);
-        setAway((was) => stillShared(was, shared));
+        setAway((was) => {
+            const kept = stillShared(was, shared);
+            // In a direct message a screen is offered rather than taken. The
+            // panel there is a band over the conversation it was started from,
+            // so a screen arriving into it takes the whole thing before anybody
+            // has said they want to watch anything - and the way back was a
+            // control that only exists once it has already happened. Everywhere
+            // else there is room to spare and a share goes straight up.
+            //
+            // Not this browser's own: somebody who just pressed Share knows what
+            // they shared, and offering it back to them as something to open is
+            // a question with one answer.
+            if (place !== "direct") return kept;
+            const offered = arrivedKeys(before, shared).filter((key) => key !== LOCAL_SCREEN_KEY);
+            return [...kept, ...offered.filter((key) => !kept.includes(key))];
+        });
     }
     /** What is left to draw, which is what the rest of the room is built from:
      *  a screen put away is not on the stage, does not hold the panel open and
@@ -334,6 +358,17 @@ export function CallRoom({
      *  see `call-band`, which owns both of the questions `place` answers and is
      *  where the reasoning lives. */
     const bareFaces = callBareFaces(place, staged, pictures);
+    /**
+     * Whether the people are drawn under whatever is being watched.
+     *
+     * Everywhere with room for it, yes - a strip of faces under a shared screen
+     * is how anybody knows who is still there. In a direct message the panel is
+     * a band a few hundred pixels tall, and a screen worth opening plus a strip
+     * of heads under it leaves neither of them a usable size: the screen is the
+     * thing somebody chose to look at, so it gets the band, and the faces come
+     * back the moment it is closed.
+     */
+    const peopleShown = !enlarged && !(place === "direct" && staged);
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
@@ -558,33 +593,79 @@ export function CallRoom({
                 keeps a tile for the stream with the way back on it; this is
                 that, at the size of a line rather than a picture, because the
                 reason it was put away was that pictures were taking the room. */}
+            {/* Two shapes, because in a direct message these are not the same
+                thing. Everywhere else this list is what is left after somebody
+                decided they would rather have the room back, and a line is the
+                right size for a decision already made. In a direct message a
+                share arrives here instead of on the stage, so the same list is
+                an offer nobody has answered yet - and an offer reads as a card
+                beside the people, the way every client draws one, rather than as
+                a row of small print above them. */}
             {putAway.length > 0 && (
-                <ul className="flex shrink-0 flex-col gap-1.5">
-                    {putAway.map((stage) => (
-                        <li
-                            key={stage.key}
-                            className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
-                        >
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
-                                <EyeOff className="size-4 text-muted-foreground" aria-hidden />
-                            </span>
-                            <span className="flex min-w-0 flex-col">
-                                <span className="truncate text-sm font-medium" title={stage.name}>{stage.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                    Still sharing. You are not watching.
-                                </span>
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setAway((was) => was.filter((key) => key !== stage.key))
-                                }
-                                className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
+                <ul
+                    className={cn(
+                        "shrink-0",
+                        place === "direct"
+                            ? "flex flex-wrap items-stretch gap-2"
+                            : "flex flex-col gap-1.5"
+                    )}
+                >
+                    {putAway.map((stage) =>
+                        place === "direct" ? (
+                            <li key={stage.key}>
+                                {/* The whole card, not a button inside it: what
+                                    somebody is reaching for is the screen, and a
+                                    target the size of a word inside a target the
+                                    size of a card is the smaller of the two. */}
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setAway((was) => was.filter((key) => key !== stage.key))
+                                    }
+                                    title={`Watch ${stage.name}`}
+                                    className="flex h-24 w-40 flex-col items-center justify-center gap-1.5 rounded-md border border-border bg-muted/40 px-3 text-center transition-colors hover:border-border-strong hover:bg-card-hover"
+                                >
+                                    <MonitorUp
+                                        className="size-5 shrink-0 text-muted-foreground"
+                                        aria-hidden
+                                    />
+                                    <span className="w-full truncate text-xs font-medium">
+                                        {stage.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">Watch</span>
+                                </button>
+                            </li>
+                        ) : (
+                            <li
+                                key={stage.key}
+                                className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
                             >
-                                Watch
-                            </button>
-                        </li>
-                    ))}
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
+                                    <EyeOff className="size-4 text-muted-foreground" aria-hidden />
+                                </span>
+                                <span className="flex min-w-0 flex-col">
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        title={stage.name}
+                                    >
+                                        {stage.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Still sharing. You are not watching.
+                                    </span>
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setAway((was) => was.filter((key) => key !== stage.key))
+                                    }
+                                    className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
+                                >
+                                    Watch
+                                </button>
+                            </li>
+                        )
+                    )}
                 </ul>
             )}
 
@@ -675,7 +756,7 @@ export function CallRoom({
                 the conversation the band exists to leave room for - taking the
                 Leave button with them, which is the failure the comment below
                 the bar already records. */}
-            {!enlarged && bareFaces && (
+            {peopleShown && bareFaces && (
                 <ul className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-3 overflow-y-auto overscroll-contain py-1">
                     <Face
                         name="You"
@@ -722,7 +803,7 @@ export function CallRoom({
                 </ul>
             )}
 
-            {!enlarged && !bareFaces && (
+            {peopleShown && !bareFaces && (
                 <div
                     className={cn(
                         "grid min-h-0 gap-2",

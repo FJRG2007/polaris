@@ -13,7 +13,7 @@ import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
-import { deriveMasterKey, masterPasswordHash, stretchMasterKey } from "@polaris/vault-crypto";
+import { deriveMasterKey, stretchMasterKey } from "@polaris/vault-crypto";
 import {
     decrypt,
     decryptRsa,
@@ -199,7 +199,20 @@ const WAITING = storage.defineItem<WaitingRequest | null>("session:vault.waiting
 });
 
 /** Where the collection of an approval stands, as the worker's own loop left it. */
-type AuthorizationState = "pending" | "approved" | "denied" | "expired" | "lost" | "unreadable";
+type AuthorizationState =
+    | "pending"
+    | "approved"
+    | "denied"
+    | "expired"
+    | "lost"
+    | "unreadable"
+    /** Approved, and without the account credential this extension is now only
+     *  useful with. Which of the reasons it was is not knowable from here: a
+     *  Polaris too old to mint one, an account no longer allowed to use the
+     *  vault, and a mint that simply failed all arrive as the same absent
+     *  field - so what is said about it names the possibilities rather than
+     *  picking one. */
+    | "accountless";
 
 /** A request in flight, and what has become of it. */
 interface WaitingRequest {
@@ -641,6 +654,19 @@ async function collect(): Promise<void> {
             const wanted = await WAITING.getValue();
             if (!wanted || wanted.deviceCode !== still.deviceCode) return;
 
+            // First, because it is the one refusal that costs nothing: signing in
+            // to the account is the way in here and the vault is what is behind
+            // it, so an approval carrying only the vault is one this extension
+            // cannot use. Kept, it would be a session the popup refuses to go
+            // anywhere from and that asking again cannot mend, since the same
+            // half of a sign-in comes back every time. Refused before the vault
+            // is opened or a token written, it leaves whatever was already here
+            // untouched.
+            if (!claim.accountKey) {
+                await settle(still, "accountless");
+                return;
+            }
+
             if (!raw || !(await openWithKey(raw))) {
                 // Approved, and unreadable. Nothing is kept: a session that cannot
                 // decrypt anything is worse than none, because it looks signed in.
@@ -649,10 +675,7 @@ async function collect(): Promise<void> {
             }
 
             await remember(claim.token);
-            // Kept only when the server sent one. An older Polaris does not, and an
-            // absent credential has to read as "this server does not do that" rather
-            // than as an error on a sign-in that otherwise worked perfectly.
-            if (claim.accountKey) await ACCOUNT_KEY.setValue(claim.accountKey);
+            await ACCOUNT_KEY.setValue(claim.accountKey);
             // The address this vault belongs to arrives with the profile, and the sync
             // below is what records it. Nothing was typed on this way in, and `unlock`
             // cannot stretch a master password without it.
@@ -989,15 +1012,17 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
 }
 
 async function status(): Promise<messages.VaultStatus> {
-    const [server, email, refreshToken, syncedAt, timeout, opened, parked] = await Promise.all([
-        currentOrigin(),
-        EMAIL.getValue(),
-        REFRESH.getValue(),
-        SYNCED_AT.getValue(),
-        TIMEOUT.getValue(),
-        vault(),
-        PARKED.getValue()
-    ]);
+    const [server, email, refreshToken, syncedAt, timeout, opened, parked, accountKey] =
+        await Promise.all([
+            currentOrigin(),
+            EMAIL.getValue(),
+            REFRESH.getValue(),
+            SYNCED_AT.getValue(),
+            TIMEOUT.getValue(),
+            vault(),
+            PARKED.getValue(),
+            ACCOUNT_KEY.getValue()
+        ]);
     // Only worth asking for once there is a session to ask about: a browser that
     // has not been let in yet would spend a request on every poll of a screen
     // that is showing it the sign-in button.
@@ -1022,6 +1047,10 @@ async function status(): Promise<messages.VaultStatus> {
         server,
         email,
         connected: refreshToken !== null,
+        // Only ever left behind by an approval on the dashboard. A vault opened
+        // with the master password alone has a token and no account, which is the
+        // state the popup now refuses to go any further from.
+        polarisSession: accountKey !== null,
         unlocked: opened !== null,
         syncedAt,
         timeoutMs: readTimeout(timeout),
@@ -1266,7 +1295,6 @@ async function fill(id: string): Promise<messages.Reply> {
  * it is there to measure.
  */
 const USES_VAULT = new Set<messages.Request["kind"]>([
-    "signIn",
     "unlock",
     "switchAccount",
     "sync",
@@ -1488,64 +1516,6 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, status: await status() };
             }
 
-            case "signIn": {
-                const origin = await currentOrigin();
-                if (!origin) return { ok: false, error: "Say which Polaris this is first." };
-                const base = vaultBase(origin);
-                const email = request.email.trim().toLowerCase();
-                const settings = await protocol.prelogin(base, email);
-                if (!settings) return { ok: false, error: "That server did not answer." };
-
-                const masterKey = await deriveMasterKey(request.password, email, settings);
-                const hash = await masterPasswordHash(masterKey, request.password);
-                const result = await protocol.signIn(base, {
-                    email,
-                    masterPasswordHash: hash,
-                    device: await device(),
-                    twoFactorToken: request.code
-                });
-                if (!result.ok) {
-                    if (result.kind === "two_factor") {
-                        return {
-                            ok: false,
-                            error: "Enter the code from your authenticator.",
-                            needsCode: true
-                        };
-                    }
-                    if (result.kind === "rate_limited") {
-                        const minutes = Math.ceil(result.retryAfterMs / 60_000);
-                        return {
-                            ok: false,
-                            error: `Too many attempts. Try again in ${minutes} minutes.`
-                        };
-                    }
-                    if (result.kind === "unreachable") {
-                        return { ok: false, error: "That server could not be reached." };
-                    }
-                    return {
-                        ok: false,
-                        error: "That address and password did not open the vault."
-                    };
-                }
-
-                // From here on this is the same install the approval performs, and
-                // it is interrupted by a switch in the same way: in a turn.
-                return inTurn(async (): Promise<messages.Reply> => {
-                    await EMAIL.setValue(email);
-                    await remember(result.token);
-                    // Signed in and open in one step: the password is in hand, and
-                    // asking for it again immediately would be theatre.
-                    await sync(true);
-                    await unlock(request.password);
-                    // Signing back into an account that is still parked - which is one
-                    // press, because adding an account keeps the address - would leave
-                    // it in the list as well as in front, with the older token.
-                    await dropParked(accounts.accountId(origin, email));
-                    await badge();
-                    return { ok: true, status: await status() };
-                });
-            }
-
             case "authorize": {
                 const origin = await currentOrigin();
                 if (!origin) return { ok: false, error: "Say which Polaris this is first." };
@@ -1620,6 +1590,16 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 }
                 if (state === "unreadable") {
                     return { ok: false, error: "What came back could not be opened. Ask again." };
+                }
+                if (state === "accountless") {
+                    // What came back cannot say why the account half was missing,
+                    // so this does not guess: naming the update alone would send
+                    // somebody whose account simply lost vault access round the
+                    // same refusal forever, updating something already current.
+                    return {
+                        ok: false,
+                        error: "That approval carried the vault but not your account. Update Polaris from Settings, and if it refuses again, check your account is still allowed to use the vault."
+                    };
                 }
                 return { ok: true, waiting: state, userCode, pollMs };
             }

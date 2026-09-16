@@ -68,9 +68,61 @@ export function callBareFaces(place: CallPlace, staged: boolean, pictures: boole
  * currently has the big place in the room.
  */
 export function callBandHeight(place: CallPlace, staged: boolean): string {
+    const cap = bandCap(place, staged);
     // A room has nothing above or below it to share the column with, staged or
     // not: the conversation is beside it.
-    if (place === "room") return "flex-1";
-    if (staged) return "max-h-[78%]";
-    return place === "direct" ? "max-h-[40%]" : "max-h-[60%]";
+    return cap === null ? "flex-1" : BAND_CLASS[cap];
 }
+
+/**
+ * The same limit in pixels, for whoever has to work in them.
+ *
+ * A share is not something a divider can be dragged against. Given a ceiling of
+ * its own, a handle knows nothing about the class holding the panel down: past
+ * the point where the share has stopped the panel it goes on counting, and every
+ * pixel between the two is a drag that moves nothing on the way out and nothing
+ * on the way back, with the number read out to a screen reader belonging to a
+ * panel that is not this size.
+ *
+ * `column` is the height the call is being drawn in, measured. Nothing to measure
+ * yet - and a room, which has no share to speak of - leaves the blunt limit, which
+ * is all there is to hold a drag to until the column is known.
+ */
+export function callBandLimit(
+    place: CallPlace,
+    staged: boolean,
+    column: number,
+    bounds: { readonly min: number; readonly max: number }
+): number {
+    const share = callBandShare(place, staged);
+    if (share === null || !Number.isFinite(column) || column <= 0) return bounds.max;
+    // Never under the floor: a column too short for the smallest usable call is a
+    // reason to stop the drag, not to hand back a limit below the one it starts at.
+    return Math.max(bounds.min, Math.min(bounds.max, Math.round(column * share)));
+}
+
+/** The cap as the share of the column it is. */
+function callBandShare(place: CallPlace, staged: boolean): number | null {
+    const cap = bandCap(place, staged);
+    return cap === null ? null : BAND_SHARE[cap];
+}
+
+/** Which of the three caps applies, asked once so that the class and the number
+ *  below it cannot be answering different questions. */
+function bandCap(place: CallPlace, staged: boolean): keyof typeof BAND_SHARE | null {
+    if (place === "room") return null;
+    if (staged) return "staged";
+    return place === "direct" ? "direct" : "channel";
+}
+
+/** The caps, as the share of the column each one is. */
+const BAND_SHARE = { direct: 0.4, channel: 0.6, staged: 0.78 } as const;
+
+/** And as the classes that carry them. Written out rather than built from the
+ *  numbers above, because these are the strings the stylesheet is generated
+ *  from - a class assembled at runtime is one nobody wrote any CSS for. */
+const BAND_CLASS = {
+    direct: "max-h-[40%]",
+    channel: "max-h-[60%]",
+    staged: "max-h-[78%]"
+} as const;

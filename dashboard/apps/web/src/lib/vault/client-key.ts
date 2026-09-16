@@ -70,9 +70,8 @@ export function clientKeyName(deviceName: string): string {
     const full = said === "" ? "Polaris client" : `Polaris client - ${said}`;
     // Three characters back, not one: the ellipsis is three. Reserving one put
     // the name two over the schema's limit, which would have thrown inside
-    // `createApiKey` - and since that call cannot be allowed to fail an approval,
-    // the credential would simply never have been issued to any client whose name
-    // ran long, with nothing anywhere saying so.
+    // `createApiKey` - so every client whose name ran long would have had its
+    // approval fail on the length of a label nobody chose.
     return full.length > NAME_MAX ? `${full.slice(0, NAME_MAX - 3).trimEnd()}...` : full;
 }
 
@@ -80,9 +79,15 @@ export function clientKeyName(deviceName: string): string {
  * Issue the credential for a client that has just been let in.
  *
  * Null rather than a throw when the account holds nothing this could carry -
- * somebody whose `vault.use` was taken away between asking and approving. The
- * vault half of the exchange is still valid, and it must not be taken down by
- * this half failing.
+ * somebody whose `vault.use` was taken away between asking and approving. That
+ * is a refusal, and it is the whole of what null means here.
+ *
+ * A credential that could not be written, on the other hand, throws. The two
+ * used to arrive as the same absent field, and a client that cannot use an
+ * approval without this was then told its account had lost vault access when
+ * what had really happened was a failed write it could simply have asked again
+ * after. Nothing downstream can tell them apart once they have been flattened,
+ * so they are not flattened.
  */
 export async function issueClientKey(
     userId: string,
@@ -114,8 +119,8 @@ export async function issueClientKey(
         deniedUserAgents: [],
         // A client left in a browser nobody opens again should stop answering.
         expiresInDays: 90
-    }).catch(() => null);
-    return created?.secret ?? null;
+    });
+    return created.secret;
 }
 
 /** The scope this issues, so a caller can assert it without restating it. */

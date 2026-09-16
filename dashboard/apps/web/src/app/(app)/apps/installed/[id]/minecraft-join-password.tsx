@@ -173,11 +173,40 @@ export function MinecraftJoinPassword({
                         Switch it to Paper, or to a mod loader, from Settings first.
                     </p>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
-                        Installs <span className="font-mono">{guard}</span> from Modrinth, which the
-                        Mods screen shows afterwards like anything else on the list. If it cannot be
-                        installed the server says so on startup rather than starting without it.
-                    </p>
+                    <>
+                        <p className="text-xs text-muted-foreground">
+                            Installs <span className="font-mono">{guard}</span> from Modrinth, which
+                            the Mods screen shows afterwards like anything else on the list. If it
+                            cannot be installed the server says so on startup rather than starting
+                            without it.
+                        </p>
+                        {/* The commands, because nobody reading this is the person who
+                            will need them: the player is in the game, locked out, with
+                            no way to find out what to type. Only the modded one is
+                            spelled out - those commands were read off a running server.
+                            The plugin's own are not repeated here unverified. */}
+                        {guard === GUARD_BY_KIND.mod ? (
+                            <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                                Players register with{" "}
+                                <span className="font-mono">/trigger register set 1234</span> and
+                                come back with{" "}
+                                <span className="font-mono">/trigger login set 1234</span>. The
+                                password can only be a number: this runs as a data pack, and the
+                                only thing vanilla lets an unauthenticated player send the server is
+                                a scoreboard value. Writing{" "}
+                                <span className="font-mono">/trigger register</span> without{" "}
+                                <span className="font-mono">set</span> does not fail - it registers
+                                the password 1, and the next login says the password is wrong.
+                            </p>
+                        ) : (
+                            <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                                Players register on their first join with the commands{" "}
+                                <span className="font-mono">{guard}</span> documents on its Modrinth
+                                page. Tell them before turning this on: nobody can look that up from
+                                inside the server they have just been locked out of.
+                            </p>
+                        )}
+                    </>
                 )}
 
                 {error && <p className="text-sm text-danger">{error}</p>}

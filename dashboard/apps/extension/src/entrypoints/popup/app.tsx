@@ -117,8 +117,14 @@ export function App(): React.JSX.Element {
 
     const screen = !status.server ? (
         <Connect onDone={refresh} />
-    ) : !status.connected ? (
-        <SignIn server={status.server} onDone={refresh} />
+    ) : // Signing in to the Polaris account is the way in, and the vault is what
+    // is behind it - not the other way round, and not an alternative to it. A
+    // session with a vault token and no account credential is one that was
+    // opened by typing the master password before this was required; it goes
+    // back through the approval rather than carrying on, because the extension
+    // has no idea whose account it is sitting on until it does.
+    !status.connected || !status.polarisSession ? (
+        <SignIn server={status.server} connected={status.connected} onDone={refresh} />
     ) : !status.unlocked ? (
         <Unlock onDone={refresh} />
     ) : (
@@ -215,52 +221,33 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
 }
 
 /**
- * Signing in, which is two ways of proving the same thing.
+ * Signing in, which is asking Polaris itself.
  *
- * The offered one asks Polaris itself: a tab opens on the dashboard, somebody who
- * is already signed in and has their vault open says yes, and the key arrives
- * sealed to a pair this extension made for the exchange. Nothing is typed here.
- * That is a higher bar than the alternative, not a lower one - it needs a session
- * AND an unlocked vault, where a password is just the password.
+ * A tab opens on the dashboard, somebody who is already signed in and has their
+ * vault open says yes, and the keys arrive sealed to a pair this extension made
+ * for the exchange. Nothing is typed here. That is a higher bar than typing a
+ * password, not a lower one - it needs a session AND an unlocked vault, where a
+ * password is only the password.
  *
- * The master password is still offered underneath, because the first way needs a
- * dashboard somebody can reach right now, and a browser on a machine where that is
- * not true would otherwise have no way in at all.
+ * The only way in, rather than the first of two. The master password opens a
+ * vault and says nothing about whose account it belongs to, so a browser let in
+ * that way is signed in to nothing this extension can name - which is why the
+ * button offering it is gone. It still unlocks a vault that has locked itself,
+ * and that is the screen after this one.
  */
 function SignIn({
     server,
+    connected,
     onDone
 }: {
     server: string;
+    connected: boolean;
     onDone: () => Promise<void>;
 }): React.JSX.Element {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [code, setCode] = useState("");
-    const [needsCode, setNeedsCode] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
-    const [typing, setTyping] = useState(false);
     /** The request in flight: the code to show, and how often to ask about it. */
     const [waiting, setWaiting] = useState<{ userCode: string; pollMs: number } | null>(null);
-
-    const signIn = async (): Promise<void> => {
-        setBusy(true);
-        setError(null);
-        const reply = await askBackground({
-            kind: "signIn",
-            email,
-            password,
-            code: code.trim() === "" ? undefined : code.trim()
-        });
-        setBusy(false);
-        if (!reply.ok) {
-            setError(reply.error);
-            if (reply.needsCode) setNeedsCode(true);
-            return;
-        }
-        await onDone();
-    };
 
     const ask = async (): Promise<void> => {
         setBusy(true);
@@ -274,6 +261,15 @@ function SignIn({
         if ("waiting" in reply && reply.userCode) {
             setWaiting({ userCode: reply.userCode, pollMs: reply.pollMs });
         }
+    };
+
+    const leave = async (
+        request: { kind: "signOut" } | { kind: "forgetServer" }
+    ): Promise<void> => {
+        setError(null);
+        const reply = await askBackground(request);
+        if (!reply.ok) setError(reply.error);
+        await onDone();
     };
 
     /**
@@ -359,81 +355,38 @@ function SignIn({
         <main className="pad">
             <h1>Sign in</h1>
             <p className="muted">{new URL(server).host}</p>
-            {typing ? (
-                <>
-                    <input
-                        autoFocus
-                        type="email"
-                        value={email}
-                        placeholder="you@example.com"
-                        onChange={(event) => setEmail(event.target.value)}
-                    />
-                    <input
-                        type="password"
-                        value={password}
-                        // Named. Beside an email field, under a heading that says
-                        // "Sign in", "Master password" is read as the Polaris
-                        // account's password - which is not what opens this and
-                        // not what is being asked for.
-                        placeholder="Vault master password"
-                        onChange={(event) => setPassword(event.target.value)}
-                        onKeyDown={(event) => event.key === "Enter" && void signIn()}
-                    />
-                    {needsCode ? (
-                        <input
-                            autoFocus
-                            inputMode="numeric"
-                            value={code}
-                            placeholder="Code from your authenticator"
-                            onChange={(event) => setCode(event.target.value)}
-                            onKeyDown={(event) => event.key === "Enter" && void signIn()}
-                        />
-                    ) : null}
-                    <Problem text={error} />
-                    <button
-                        disabled={busy || email.trim() === "" || password === ""}
-                        onClick={() => void signIn()}
-                    >
-                        {busy ? "Opening" : "Unlock"}
-                    </button>
-                    <p className="muted small">
-                        The master password never leaves this browser. It is turned into a key here,
-                        and what goes out cannot be turned back into it.
-                    </p>
-                    <button className="ghost" onClick={() => setTyping(false)}>
-                        Ask Polaris instead
-                    </button>
-                </>
+            <Problem text={error} />
+            <button disabled={busy} onClick={() => void ask()}>
+                {busy ? "Asking" : "Sign in to Polaris"}
+            </button>
+            {/* What it needs, before what it does. The requirement was the last
+                clause of the sentence, under a button that said "Sign in with
+                Polaris" - so this read as signing in to Polaris, and the vault
+                turned up as a surprise on the other tab. What this connects to is
+                the password vault; saying so is not a smaller promise, it is the
+                true one. */}
+            <p className="muted small">
+                Approving happens on your dashboard, with your vault open. It signs this extension
+                in to your account and hands the vault key over sealed, so only this extension can
+                open it.
+            </p>
+            {/* The master password is no longer a way in, and the button that
+                offered it is gone rather than left to fail: it opens the vault
+                without signing in to the account, which is the state the popup now
+                sends back here. It is still what unlocks a vault that has been
+                left alone - that is the screen after this one. */}
+            {/* The way to a different server. Off the main path, because most
+                people have one Polaris - but without it, setting an account aside
+                to add another would strand somebody on whichever address they
+                happened to name first. */}
+            {connected ? (
+                <button className="ghost" onClick={() => void leave({ kind: "signOut" })}>
+                    Sign out
+                </button>
             ) : (
-                <>
-                    <Problem text={error} />
-                    <button disabled={busy} onClick={() => void ask()}>
-                        {busy ? "Asking" : "Connect to your vault"}
-                    </button>
-                    {/* What it needs, before what it does. The requirement was the
-                        last clause of the sentence, under a button that said "Sign
-                        in with Polaris" - so this read as signing in to Polaris,
-                        and the vault turned up as a surprise on the other tab.
-                        What this connects to is the password vault; saying so is
-                        not a smaller promise, it is the true one. */}
-                    <p className="muted small">
-                        Approving happens on your dashboard, with your vault open. A tab opens
-                        there; the key comes back sealed, so only this extension can open it.
-                    </p>
-                    <button className="ghost" onClick={() => setTyping(true)}>
-                        Type your vault password instead
-                    </button>
-                    {/* The way to a different server. Off the main path, because
-                        most people have one Polaris - but without it, setting an
-                        account aside to add another would strand somebody on
-                        whichever address they happened to name first. */}
-                    <button
-                        className="ghost"
-                        onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}
-                    >
-                        Use a different Polaris
-                    </button>
-                </>
+                <button className="ghost" onClick={() => void leave({ kind: "forgetServer" })}>
+                    Use a different Polaris
+                </button>
             )}
         </main>
     );
