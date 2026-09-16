@@ -126,16 +126,14 @@ FROM gradle:9.2.1-jdk21 AS minecraft-mods
 
 WORKDIR /mods/polaris-neoforge
 COPY resources/minecraft/polaris-neoforge/ ./
-RUN gradle --no-daemon -q build     && mkdir -p /out     && cp "build/libs/polaris-$(sed -n 's/^mod_version=//p' gradle.properties).jar" /out/polaris-neoforge-1.21.4.jar
+RUN gradle --no-daemon -q build \
+    && mkdir -p /out \
+    && cp "build/libs/polaris-$(sed -n 's/^mod_version=//p' gradle.properties).jar" /out/polaris-neoforge-1.21.4.jar
 
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
 # ---------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
-
-# Commit this image was built from, passed by CI. Surfaced by the update checker
-# so the dashboard can report how far behind the release branch it is.
-ARG POLARIS_BUILD_SHA=""
 
 ENV NODE_ENV=production \
     # Next standalone server binds these; 0.0.0.0 so the proxy can reach it.
@@ -144,8 +142,7 @@ ENV NODE_ENV=production \
     # SMB (NTLM) auth needs MD4, which OpenSSL 3 gates behind the legacy provider;
     # without this the SMB client throws ERR_OSSL_EVP_UNSUPPORTED as an uncaught
     # exception and takes the whole web process down.
-    NODE_OPTIONS=--openssl-legacy-provider \
-    POLARIS_BUILD_SHA=$POLARIS_BUILD_SHA
+    NODE_OPTIONS=--openssl-legacy-provider
 
 # openssl for the Prisma engines; ca-certificates for TLS to Postgres; smbclient
 # so Polaris can enumerate and reach SMB shares (e.g. a UniFi UNAS) itself -
@@ -159,6 +156,16 @@ RUN apt-get update \
 # Prisma CLI, pinned to the version used by @polaris/db, so `migrate deploy`
 # in the entrypoint matches the generated client and committed migrations.
 RUN npm install -g prisma@6.2.1
+
+# Commit this image was built from, passed by CI. Surfaced by the update checker
+# so the dashboard can report how far behind the release branch it is.
+#
+# Declared here, after the system packages and the Prisma CLI, not above them: a
+# build argument is part of the cache key of every RUN after it, and this one
+# changes with every commit. Declared first, it rebuilt those two layers - over
+# 400 MB - on every build, and every Update downloaded them again for nothing.
+ARG POLARIS_BUILD_SHA=""
+ENV POLARIS_BUILD_SHA=$POLARIS_BUILD_SHA
 
 WORKDIR /app
 
