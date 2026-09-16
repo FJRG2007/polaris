@@ -26,6 +26,7 @@ export { DnsRecordTable, type DnsRecordRow, type DnsRecordStatus } from "./compo
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
 export { EmptyState } from "./components/empty-state";
+export { ResizeHandle } from "./components/resize-handle";
 export { ScrollRow } from "./components/scroll-row";
 export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./components/bone-skeleton";
 export { Checkbox, type CheckboxProps } from "./components/checkbox";

@@ -54,9 +54,10 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
-import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
+import { forgetPaneSize, storedPaneSize, writePaneSize } from "./pane-preferences";
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Button, ConfirmDeleteDialog, EmptyState, ResizeHandle, Skeleton, cn } from "@polaris/ui";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -213,6 +214,19 @@ export function ChannelView({
     // rather than this screen guessing: what is being watched depends on what
     // somebody in there asked for. It goes back on its own when they stop.
     const [staged, setStaged] = useState(false);
+    /**
+     * How tall the call is drawn, when somebody has decided for themselves.
+     *
+     * Null until they have, which is not the same as a number: the sizes in
+     * `call-band` are a share of the column and they stay right as the window
+     * changes, so a reader who has never touched the divider keeps them rather
+     * than being pinned to whatever the pixels came to once.
+     *
+     * The cap stays either way. The class that carries it is still on the panel,
+     * so a height set here is bounded by the same share it always was - dragging
+     * decides inside the limit, it does not replace it.
+     */
+    const [bandHeight, setBandHeight] = useState<number | null>(null);
 
     const scroller = useRef<HTMLDivElement>(null);
     // The end of the list, scrolled to rather than computed. `scrollTop =
@@ -1411,6 +1425,35 @@ export function ChannelView({
      *  the column the call takes and how the people in it are drawn, and those
      *  two answers must not be able to disagree with each other. */
     const callPlace: CallPlace = voiceRoom ? "room" : directCall ? "direct" : "channel";
+    // Kept per place, because they are different questions: how much of a direct
+    // message a call may take is not how much of a channel it may take, and
+    // somebody who sized one has said nothing about the other.
+    const bandPane = `call.${callPlace}`;
+    // A floor low enough to be the bar of controls and the faces, and a ceiling
+    // that only exists to stop a drag running away - the share in `call-band` is
+    // the real limit and it is still on the element.
+    const BAND = { min: 140, max: 720, fallback: 260 };
+
+    // Read after the first paint and again whenever the place changes. Null when
+    // nobody has ever dragged this one, which is what leaves the share in charge.
+    useEffect(() => {
+        setBandHeight(storedPaneSize(bandPane, BAND));
+        // The bounds are a literal and stable; the pane key is what this follows.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bandPane]);
+
+    const resizeBand = useCallback(
+        (size: number) => {
+            setBandHeight(size);
+            writePaneSize(bandPane, size);
+        },
+        [bandPane]
+    );
+
+    const resetBand = useCallback(() => {
+        forgetPaneSize(bandPane);
+        setBandHeight(null);
+    }, [bandPane]);
 
     /**
      * The conversation itself: what has been said, and the box to say more in.
@@ -1792,6 +1835,10 @@ export function ChannelView({
 
                 {inCall && (
                     <div
+                        // Only once somebody has dragged it. Until then the share
+                        // decides, which is what keeps it right as the window
+                        // changes rather than pinned to one window's pixels.
+                        style={bandHeight === null ? undefined : { height: bandHeight }}
                         className={cn(
                             "flex min-h-0 shrink-0 flex-col border-b border-border",
                             // How much of the column this is allowed to take -
@@ -1827,6 +1874,21 @@ export function ChannelView({
                             }}
                         />
                     </div>
+                )}
+
+                {/* Only where there is something to divide. A voice room is the
+                    column - the conversation is beside it, not under it - so
+                    there is no line between two things to move. */}
+                {inCall && callPlace !== "room" && (
+                    <ResizeHandle
+                        axis="y"
+                        size={bandHeight ?? BAND.fallback}
+                        min={BAND.min}
+                        max={BAND.max}
+                        onChange={resizeBand}
+                        onReset={resetBand}
+                        label="Call height"
+                    />
                 )}
 
                 {/* Down the side in a voice room - see `conversation`. */}
