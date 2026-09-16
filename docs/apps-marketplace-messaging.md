@@ -373,7 +373,9 @@ configured means the machine's own address, as before.
   files it copied itself (one manifest per list), so it never touches what
   `MODRINTH_PROJECTS` installed. `guardForSave` and `minecraftShapeEnv` take the
   mod off a server moved to software or a release it has no build for, and seed
-  that software's project guard in its place.
+  that software's project guard in its place. `guardAsTemplate` does the same
+  unconditionally when a server carrying it is saved as a template, since the
+  mod's id and token are that server's alone and a template copies neither.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before
