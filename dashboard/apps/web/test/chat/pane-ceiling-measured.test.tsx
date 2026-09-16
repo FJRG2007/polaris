@@ -12,9 +12,9 @@
  * no test noticing.
  */
 
+import { usePaneCeiling } from "@/app/(app)/chat/pane-room";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { usePaneCeiling } from "@/app/(app)/chat/pane-room";
 
 const BOUNDS = { min: 280, max: 560 };
 
@@ -103,5 +103,54 @@ describe("the ceiling on a drawn screen", () => {
         // invented from one would shrink a panel for no reason.
         render(<Row beside={340} grows={false} />);
         expect(screen.getByText(`ceiling ${BOUNDS.max}`)).toBeTruthy();
+    });
+});
+
+/**
+ * The conversation list's row, which is not that shape.
+ *
+ * Its growing neighbour is the whole content column, and the thread and members
+ * panels are inside that column with dividers of their own. So the room the list
+ * may grow into is not the column's width - most of it is already spoken for.
+ */
+function NestedRow({ column, conversation }: { column: number; conversation: number }) {
+    const { ceiling, measure } = usePaneCeiling(BOUNDS);
+    return (
+        <div style={{ display: "flex" }}>
+            <aside ref={measure} data-width={560}>
+                <span>ceiling {ceiling}</span>
+            </aside>
+            <div
+                data-width={column}
+                style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}
+            >
+                <div data-width={column} style={{ flexGrow: 1, display: "flex" }}>
+                    <div data-width={conversation} style={{ flexGrow: 1 }}>
+                        conversation
+                    </div>
+                    <aside data-width={240} style={{ flexGrow: 0 }}>
+                        members
+                    </aside>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+describe("a panel whose neighbour holds other panels", () => {
+    // 560 of list and 900 of content column, but 240 of that column is the
+    // members list and only 340 of it is conversation. Measuring the column says
+    // there are 1100 pixels to play with and hands back the stated ceiling;
+    // measuring what actually yields says 540, which is the true one. The
+    // difference is a conversation drawn under its floor with nobody having
+    // touched a divider.
+    it("measures what actually yields, not the column in between", () => {
+        render(<NestedRow column={900} conversation={340} />);
+        expect(screen.getByText("ceiling 540")).toBeTruthy();
+    });
+
+    it("still stops at the floor when the conversation inside is already small", () => {
+        render(<NestedRow column={900} conversation={80} />);
+        expect(screen.getByText(`ceiling ${BOUNDS.min}`)).toBeTruthy();
     });
 });

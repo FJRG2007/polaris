@@ -113,11 +113,37 @@ function drawn(element: HTMLElement): boolean {
     return element.isConnected && window.getComputedStyle(element).display !== "none";
 }
 
-/** The sibling that takes whatever the row has left. */
-function growing(row: HTMLElement, panel: HTMLElement | null): HTMLElement | null {
-    for (const child of Array.from(row.children)) {
-        if (child === panel || !(child instanceof HTMLElement)) continue;
+/** The one child that takes whatever is left, ignoring the panel itself. */
+function growingChild(parent: HTMLElement, skip: HTMLElement | null): HTMLElement | null {
+    for (const child of Array.from(parent.children)) {
+        if (child === skip || !(child instanceof HTMLElement)) continue;
         if (window.getComputedStyle(child).flexGrow !== "0") return child;
     }
     return null;
+}
+
+/**
+ * The element that actually absorbs whatever this panel does not take.
+ *
+ * Not the row's own growing child, which is only the same thing when that child
+ * is the conversation. For the conversation list it is the whole content column,
+ * and the thread and members panels live inside that column with handles of
+ * their own - so measuring it counts room another panel has already claimed as
+ * slack this one may grow into. At 1024 with the members column open at its
+ * default and a width remembered from a wider monitor, that arithmetic left the
+ * conversation below its floor with nobody having dragged anything.
+ *
+ * So the search keeps going down. Descending through a column is safe because
+ * every child of one spans its full width; width is only ever divided at a row,
+ * and there the growing child is by definition the one the slack comes out of.
+ * It stops at the first element with nothing growing inside it, which is the
+ * conversation from either row.
+ */
+function growing(row: HTMLElement, panel: HTMLElement | null): HTMLElement | null {
+    let found = growingChild(row, panel);
+    if (!found) return null;
+    for (let deeper = growingChild(found, null); deeper; deeper = growingChild(found, null)) {
+        found = deeper;
+    }
+    return found;
 }
