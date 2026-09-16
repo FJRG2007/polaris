@@ -12,6 +12,7 @@
         "zip": "wxt zip",
         "zip:firefox": "wxt zip -b firefox",
         "typecheck": "wxt prepare && tsc --noEmit",
+        "pretest": "wxt prepare",
         "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
