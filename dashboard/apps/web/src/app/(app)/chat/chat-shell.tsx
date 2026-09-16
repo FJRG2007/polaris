@@ -22,7 +22,7 @@ import { usePathname } from "next/navigation";
 import { useChatStream } from "./use-chat-stream";
 import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
 import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
-import { forgetPaneSize, readPaneSize, writePaneSize } from "./pane-preferences";
+import { forgetPaneSize, readPaneSize, savePaneSize } from "./pane-preferences";
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 /**
@@ -80,8 +80,10 @@ function ChatColumns({ children }: { children: ReactNode }) {
     const resize = useCallback((size: number) => {
         setListWidth(size);
         // Written as it moves, not on release: a drag that ends by closing the
-        // tab is still a decision somebody made.
-        writePaneSize("list", size);
+        // tab is still a decision somebody made. Settled rather than written on
+        // the spot - see `savePaneSize`, which is what keeps that true without a
+        // synchronous write for every pixel of the drag.
+        savePaneSize("list", size);
     }, []);
 
     const reset = useCallback(() => {

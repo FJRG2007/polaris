@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { callBandHeight, callBareFaces } from "@/app/(app)/chat/call-band";
+import { callBandHeight, callBandLimit, callBareFaces } from "@/app/(app)/chat/call-band";
 
 /** The cap as a percentage, so an assertion can read as a size rather than as a
  *  class name. */
@@ -76,5 +76,48 @@ describe("whether the people are faces or tiles", () => {
     it("is tiles while a screen is being watched, which is the strip", () => {
         expect(callBareFaces("direct", true, false)).toBe(false);
         expect(callBareFaces("channel", true, false)).toBe(false);
+    });
+});
+
+describe("the same limit in pixels, for the divider", () => {
+    const BOUNDS = { min: 140, max: 720 };
+
+    it("is the share of the column the class holds the panel to", () => {
+        // The defect this pins down: the divider was held to 720 while the class
+        // stopped a direct call at two fifths of a 900px column, so everything
+        // above 360 was a drag that moved nothing on the way out and nothing on
+        // the way back, and said a height on screen that was not this one.
+        expect(callBandLimit("direct", false, 900, BOUNDS)).toBe(
+            Math.round(900 * (cap(callBandHeight("direct", false)) / 100))
+        );
+        expect(callBandLimit("channel", false, 900, BOUNDS)).toBe(
+            Math.round(900 * (cap(callBandHeight("channel", false)) / 100))
+        );
+    });
+
+    it("follows the screen somebody put up, exactly as the height does", () => {
+        expect(callBandLimit("direct", true, 900, BOUNDS)).toBe(
+            Math.round(900 * (cap(callBandHeight("direct", true)) / 100))
+        );
+        expect(callBandLimit("direct", true, 900, BOUNDS)).toBeGreaterThan(
+            callBandLimit("direct", false, 900, BOUNDS)
+        );
+    });
+
+    it("never hands back less than a call can be used at", () => {
+        // A column too short for the smallest usable call is a reason to stop the
+        // drag, not to hand the handle a ceiling under its own floor.
+        expect(callBandLimit("direct", false, 200, BOUNDS)).toBe(BOUNDS.min);
+    });
+
+    it("holds a very tall column to the blunt limit", () => {
+        expect(callBandLimit("channel", false, 4000, BOUNDS)).toBe(BOUNDS.max);
+    });
+
+    it("leaves the blunt limit where there is nothing to work from", () => {
+        // Before the first measurement, and in a room, which has no share.
+        expect(callBandLimit("direct", false, 0, BOUNDS)).toBe(BOUNDS.max);
+        expect(callBandLimit("direct", false, Number.NaN, BOUNDS)).toBe(BOUNDS.max);
+        expect(callBandLimit("room", false, 900, BOUNDS)).toBe(BOUNDS.max);
     });
 });

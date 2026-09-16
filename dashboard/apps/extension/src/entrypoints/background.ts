@@ -199,7 +199,16 @@ const WAITING = storage.defineItem<WaitingRequest | null>("session:vault.waiting
 });
 
 /** Where the collection of an approval stands, as the worker's own loop left it. */
-type AuthorizationState = "pending" | "approved" | "denied" | "expired" | "lost" | "unreadable";
+type AuthorizationState =
+    | "pending"
+    | "approved"
+    | "denied"
+    | "expired"
+    | "lost"
+    | "unreadable"
+    /** Approved, and without the account credential this extension is now only
+     *  useful with - a Polaris too old to mint one, or one that failed to. */
+    | "accountless";
 
 /** A request in flight, and what has become of it. */
 interface WaitingRequest {
@@ -641,6 +650,19 @@ async function collect(): Promise<void> {
             const wanted = await WAITING.getValue();
             if (!wanted || wanted.deviceCode !== still.deviceCode) return;
 
+            // First, because it is the one refusal that costs nothing: signing in
+            // to the account is the way in here and the vault is what is behind
+            // it, so an approval carrying only the vault is one this extension
+            // cannot use. Kept, it would be a session the popup refuses to go
+            // anywhere from and that asking again cannot mend, since the same
+            // half of a sign-in comes back every time. Refused before the vault
+            // is opened or a token written, it leaves whatever was already here
+            // untouched and says which Polaris has to be updated.
+            if (!claim.accountKey) {
+                await settle(still, "accountless");
+                return;
+            }
+
             if (!raw || !(await openWithKey(raw))) {
                 // Approved, and unreadable. Nothing is kept: a session that cannot
                 // decrypt anything is worse than none, because it looks signed in.
@@ -649,10 +671,7 @@ async function collect(): Promise<void> {
             }
 
             await remember(claim.token);
-            // Kept only when the server sent one. An older Polaris does not, and an
-            // absent credential has to read as "this server does not do that" rather
-            // than as an error on a sign-in that otherwise worked perfectly.
-            if (claim.accountKey) await ACCOUNT_KEY.setValue(claim.accountKey);
+            await ACCOUNT_KEY.setValue(claim.accountKey);
             // The address this vault belongs to arrives with the profile, and the sync
             // below is what records it. Nothing was typed on this way in, and `unlock`
             // cannot stretch a master password without it.
@@ -1626,6 +1645,12 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 }
                 if (state === "unreadable") {
                     return { ok: false, error: "What came back could not be opened. Ask again." };
+                }
+                if (state === "accountless") {
+                    return {
+                        ok: false,
+                        error: "That Polaris signed in to the vault but not to your account. It needs updating before this extension can be used - update it from Settings in Polaris, then ask again."
+                    };
                 }
                 return { ok: true, waiting: state, userCode, pollMs };
             }

@@ -58,17 +58,11 @@ export function readPaneSize(
     pane: string,
     bounds: { readonly min: number; readonly max: number; readonly fallback: number }
 ): number {
-    try {
-        const raw = window.localStorage.getItem(keyFor(pane));
-        if (!raw) return clamp(bounds.fallback, bounds.min, bounds.max);
-        const parsed = sizeSchema.safeParse(Number(raw));
-        if (!parsed.success) return clamp(bounds.fallback, bounds.min, bounds.max);
-        return clamp(parsed.data, bounds.min, bounds.max);
-    } catch {
-        // Private browsing refuses the read outright. A panel that opens at its
-        // usual width is a smaller loss than a screen that will not open.
-        return clamp(bounds.fallback, bounds.min, bounds.max);
-    }
+    // The same read, and the same reasons to refuse one - a value nobody wrote,
+    // a value that is not a size, a browser that will not be read from at all.
+    // What separates the two is only what is said when there is no answer, so
+    // the key, the parse and the limits are decided in one place.
+    return storedPaneSize(pane, bounds) ?? clamp(bounds.fallback, bounds.min, bounds.max);
 }
 
 /**
@@ -94,8 +88,7 @@ export function storedPaneSize(
     }
 }
 
-/** Remember it, as it is dragged rather than on the way out: a tab that is closed
- *  or navigated away from never gets a last word. */
+/** Remember it, now. */
 export function writePaneSize(pane: string, size: number): void {
     try {
         window.localStorage.setItem(keyFor(pane), String(Math.round(size)));
@@ -104,8 +97,81 @@ export function writePaneSize(pane: string, size: number): void {
     }
 }
 
+/**
+ * How long after the last move the size is actually written.
+ *
+ * Short enough that letting go of the divider and closing the tab in the same
+ * breath still keeps it, long enough that a drag is one write rather than one per
+ * frame of it.
+ */
+const SETTLE_MS = 200;
+
+/** What a drag has moved but nothing has written yet, by panel. */
+const pending = new Map<string, number>();
+let settling: number | null = null;
+let watching = false;
+
+/**
+ * Write whatever a drag left behind, now.
+ *
+ * Exported because the way out of a page is not a pause: a tab being closed or
+ * hidden gets no quiet moment afterwards for a timer to fire in, so the listeners
+ * below call this and the last position is kept rather than lost with the timer.
+ */
+export function flushPaneSizes(): void {
+    const held = [...pending];
+    pending.clear();
+    for (const [pane, size] of held) writePaneSize(pane, size);
+}
+
+/** Once, and only from a browser: the two moments a page stops being able to
+ *  finish anything it has put off. `pagehide` covers the tab going away, hidden
+ *  covers a phone where that is the only one of the two that is ever fired. */
+function watchForTheWayOut(): void {
+    if (watching) return;
+    try {
+        window.addEventListener("pagehide", flushPaneSizes);
+        window.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden") flushPaneSizes();
+        });
+        // Only once both are on, so that a browser which refused them is asked
+        // again on the next drag rather than written off for the whole visit.
+        watching = true;
+    } catch {
+        // Nothing to hang the listeners on. The write below still happens; only
+        // the last few hundred milliseconds of a drag are at risk.
+    }
+}
+
+/**
+ * Remember it, as it is dragged rather than on the way out: a tab that is closed
+ * or navigated away from never gets a last word.
+ *
+ * Held for a moment first, because a divider reports every pixel it moves and
+ * `localStorage` is written on the same thread that is drawing the drag - one
+ * synchronous write per frame, for a number only the last of which anybody will
+ * ever read back.
+ */
+export function savePaneSize(pane: string, size: number): void {
+    pending.set(pane, size);
+    watchForTheWayOut();
+    try {
+        if (settling !== null) window.clearTimeout(settling);
+        settling = window.setTimeout(() => {
+            settling = null;
+            flushPaneSizes();
+        }, SETTLE_MS);
+    } catch {
+        // No timer to wait on, so there is nothing to wait for.
+        flushPaneSizes();
+    }
+}
+
 /** Forget it, which is what a double press on the divider means. */
 export function forgetPaneSize(pane: string): void {
+    // Before the storage, because a drag ending in a double press leaves a size
+    // held here that would otherwise be written back moments after the reset.
+    pending.delete(pane);
     try {
         window.localStorage.removeItem(keyFor(pane));
     } catch {
