@@ -30,6 +30,7 @@ const rowKey = (where: { installedAppId_username: { installedAppId: string; user
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
+            findUnique: vi.fn(async () => ({ config: JSON.stringify({ bindAddresses: bound.value }) })),
             findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
                 where.id === SERVER || where.id === OTHER
                     ? { applicationId: `app-${where.id}`, ownerId: "owner" }
@@ -81,6 +82,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+const rules = vi.hoisted(() => ({ value: [] as { username: string; address: string }[] }));
+const bound = vi.hoisted(() => ({ value: true }));
+vi.mock("@/lib/apps/minecraft/player-access", () => ({
+    playerAccessRules: vi.fn(async () => rules.value)
+}));
+
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: vi.fn(async (key: string, limit: number) => {
         const row = counters.get(key) ?? { count: 0, windowStart: new Date() };
@@ -122,6 +129,8 @@ function ask(action: string, body: unknown, options: { id?: string; token?: stri
 }
 
 beforeEach(() => {
+    rules.value = [];
+    bound.value = true;
     logins.clear();
     checkIns.clear();
     counters.clear();
@@ -279,5 +288,53 @@ describe("checking in", () => {
     it("records what the mod is and what it runs on", async () => {
         expect((await ask("hello", { mod: "0.1.0", minecraft: "1.21.4" })).status).toBe(200);
         expect(checkIns.get(SERVER)).toMatchObject({ modVersion: "0.1.0", gameVersion: "1.21.4" });
+    });
+});
+
+/**
+ * The server's player list, asked before anybody can register a password. A name
+ * that is not on it is turned away with the sentence the mod kicks them with.
+ */
+describe("the player list", () => {
+    it("lets anybody through while the list is empty", async () => {
+        const body = await (await ask("status", { player: "Steve", address: "203.0.113.9" })).json();
+        expect(body).toEqual({ registered: false });
+    });
+
+    it("turns away a name that is not on it, on every question", async () => {
+        rules.value = [{ username: "Alex", address: "any" }];
+        const status = await (await ask("status", { player: "Steve", address: "203.0.113.9" })).json();
+        expect(status.refused).toMatch(/not on this server's player list/);
+
+        const registered = await ask("register", { player: "Steve", password: "correct horse" });
+        expect(registered.status).toBe(403);
+        expect((await registered.json()).refused).toMatch(/player list/);
+        expect(logins.size).toBe(0);
+
+        const login = await ask("login", { player: "Steve", password: "correct horse" });
+        expect((await login.json()).refused).toMatch(/player list/);
+    });
+
+    it("lets a listed name in from its own network", async () => {
+        rules.value = [{ username: "steve", address: "203.0.113.0/24" }];
+        const body = await (await ask("status", { player: "Steve", address: "203.0.113.9" })).json();
+        expect(body.refused).toBeUndefined();
+        expect((await ask("register", { player: "Steve", password: "correct horse" })).status).toBe(200);
+    });
+
+    it("turns a listed name away from another network, unless the list is not bound", async () => {
+        rules.value = [{ username: "Steve", address: "203.0.113.0/24" }];
+        const away = await (await ask("status", { player: "Steve", address: "198.51.100.7" })).json();
+        expect(away.refused).toMatch(/different network/);
+
+        bound.value = false;
+        const unbound = await (await ask("status", { player: "Steve", address: "198.51.100.7" })).json();
+        expect(unbound.refused).toBeUndefined();
+    });
+
+    it("judges a name alone when the address is not one", async () => {
+        rules.value = [{ username: "Steve", address: "203.0.113.0/24" }];
+        const body = await (await ask("status", { player: "Steve", address: "local" })).json();
+        expect(body.refused).toBeUndefined();
     });
 });

@@ -375,7 +375,7 @@ configured means the machine's own address, as before.
   `/api/minecraft/login/<server>/<action>` (`hello`, `status`, `register`,
   `login`, `password`), which checks the token and throttles per player and, for
   failures, per server. Passwords are salted scrypt in `MinecraftLogin`, and the
-  card lists them with a reset per player. It fails closed: a server that cannot
+  card lists them with a reset per player. Every question about a player also carries the address they connect from, and the route answers `refused` for a name the server's player list does not allow (`accessRefusal`, the same rule the log-reading pass enforces), so the mod turns it away before it can register. It fails closed: a server that cannot
   reach Polaris refuses every player with a message saying so, and because the
   image downloads `MODS` on every boot, it does not start either. The mod checks
   in every minute (`MinecraftLoginCheckIn`), and the card shows a server that has
