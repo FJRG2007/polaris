@@ -16,8 +16,8 @@
 import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoginState } from "@/lib/apps/minecraft/polaris-login-service";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import * as actions from "@/app/(app)/apps/installed/[id]/minecraft-actions";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
 import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
 
@@ -173,10 +173,12 @@ describe("what the card says happens when there is no build", () => {
 /**
  * Polaris's own login mod on the card.
  *
- * Offered where there is a build and never the default, and once it is on it is
- * the guard the card describes: its commands, whether the server can still reach
- * Polaris, and a Turn off that takes the mod away rather than a Modrinth project
- * the server does not have.
+ * Offered where there is a build, and what Turn on installs once Polaris is
+ * reachable and the server carries no login Polaris does not manage; a server
+ * still on the Modrinth project is offered the switch instead. Once it is on it
+ * is the guard the card describes: its commands, whether the server can still
+ * reach Polaris, and a Turn off that takes the mod away rather than a Modrinth
+ * project the server does not have.
  */
 describe("Polaris login", () => {
     function neoforge(projects = "auth?") {
