@@ -1527,6 +1527,7 @@ function Face({
                 <Avatar
                     size={AVATAR_SIZE}
                     person={{ id: personId, name }}
+                    callBadge={deafened ? "deafened" : muted ? "muted" : null}
                     className={cn(
                         "transition-shadow duration-fast",
                         speaking && "ring-2 ring-success"
@@ -1556,17 +1557,8 @@ function Face({
             </span>
             <span className="flex max-w-full items-center gap-1 text-xs">
                 <span className="truncate">{name}</span>
-                {/* Deafened wins the space, for the reason a tile gives it:
-                    somebody who is not listening is not reached by talking
-                    louder, and their microphone being off follows from it. */}
-                {deafened ? (
-                    <HeadphoneOff
-                        className="size-3 shrink-0 text-danger"
-                        aria-label="Not listening"
-                    />
-                ) : muted ? (
-                    <MicOff className="size-3 shrink-0 text-danger" aria-label="Microphone off" />
-                ) : null}
+                {/* Muted and deafened are on the face itself, the way a voice
+                    channel shows them - see `callBadge`. */}
                 {/* Said for the same reason a tile says it: somebody turned all
                     the way down is somebody this reader cannot hear, and with
                     nothing on screen saying so it reads as a person who has
@@ -1881,6 +1873,7 @@ function Tile({
                     <Avatar
                         size={AVATAR_SIZE}
                         person={{ id: personId ?? null, name }}
+                        callBadge={deafened ? "deafened" : muted ? "muted" : null}
                         className={cn(
                             "transition-shadow duration-fast",
                             speaking && "ring-2 ring-success"
@@ -1928,11 +1921,13 @@ function Tile({
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
                 {sharing && <span className="text-primary">sharing</span>}
-                {/* Drawn because this person cannot be heard, yours included.
-                    Deafened wins the space: somebody who is not listening is not
-                    reached by talking louder, and their microphone being off
-                    follows from it anyway. */}
-                {deafened ? (
+                {/* Drawn because this person cannot be heard, yours included -
+                    and only while the picture is a video: with the camera off
+                    the face carries it instead (see `callBadge`). Deafened wins
+                    the space: somebody who is not listening is not reached by
+                    talking louder, and their microphone being off follows from
+                    it anyway. */}
+                {blank ? null : deafened ? (
                     <HeadphoneOff className="size-3 text-danger" aria-label="Not listening" />
                 ) : muted ? (
                     <MicOff className="size-3 text-danger" aria-label="Microphone off" />

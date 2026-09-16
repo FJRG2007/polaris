@@ -17,7 +17,7 @@
 
 import { cn } from "@polaris/ui";
 import { useState, type CSSProperties } from "react";
-import { Volume2 } from "lucide-react";
+import { HeadphoneOff, MicOff, Volume2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
@@ -113,7 +113,9 @@ export function photoOpens(input: {
 export function initials(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return "?";
-    return (parts.length === 1 ? parts[0]!.slice(0, 2) : `${parts[0]![0]}${parts[1]![0]}`).toUpperCase();
+    return (
+        parts.length === 1 ? parts[0]!.slice(0, 2) : `${parts[0]![0]}${parts[1]![0]}`
+    ).toUpperCase();
 }
 
 /**
@@ -152,7 +154,8 @@ export function Avatar({
     status = true,
     presence,
     decoration: chosen,
-    openable = false
+    openable = false,
+    callBadge
 }: {
     person: AvatarPerson;
     size?: number;
@@ -194,6 +197,17 @@ export function Avatar({
      *  tells them apart before either name is read. */
     square?: boolean;
     /**
+     * The face as drawn inside a call, the way a voice channel draws it.
+     *
+     * Everybody in the room is on the call, so the badge that says so - and the
+     * presence dot beside it - says nothing there. What is worth a mark on a
+     * face in a call is whether they can be heard: a crossed-out microphone, or
+     * crossed-out headphones when they are not listening either, and nothing at
+     * all when they are simply there. Passing it, `null` included, is what makes
+     * this a face in a call.
+     */
+    callBadge?: "muted" | "deafened" | null;
+    /**
      * Whether to draw the dot that says where they are, and the badge that says
      * they are on a call.
      *
@@ -208,7 +222,8 @@ export function Avatar({
     const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
     // Nothing is asked when the caller has already answered - and a guest has no
     // id to ask about in the first place.
-    const known = usePresence(presence || !status || square ? null : person.id);
+    const inRoom = callBadge !== undefined;
+    const known = usePresence(presence || !status || square || inRoom ? null : person.id);
     /**
      * The ring somebody chose, if they chose one.
      *
@@ -374,11 +389,31 @@ export function Avatar({
               )
             : null;
 
+    // In a call, the mark is whether they can be heard, and only when they
+    // cannot - see `callBadge`.
+    if (inRoom && callBadge && size >= PRESENCE_FLOOR) {
+        const Icon = callBadge === "deafened" ? HeadphoneOff : MicOff;
+        const words = callBadge === "deafened" ? "Not listening" : "Microphone off";
+        return (
+            <span className="relative inline-flex h-fit shrink-0 align-middle">
+                {shown}
+                {viewer}
+                <span
+                    aria-label={words}
+                    title={words}
+                    className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-danger text-danger-foreground ring-2 ring-background"
+                    style={{ width: dotSize(size) + 6, height: dotSize(size) + 6 }}
+                >
+                    <Icon className="size-full p-0.5" />
+                </span>
+            </span>
+        );
+    }
     // Nothing until it is known: a grey dot that turns green a moment later
     // reads as somebody's status changing rather than as an answer arriving.
     // And nothing on a face too small to carry one - below this the dot is
     // larger than the initials it covers.
-    if (!where || size < PRESENCE_FLOOR) {
+    if (!where || inRoom || size < PRESENCE_FLOOR) {
         return viewer ? (
             <>
                 {shown}
