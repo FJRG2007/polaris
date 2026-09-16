@@ -101,6 +101,9 @@ export interface ChatChange {
         readonly meetingId: string;
         readonly state: CallState;
         readonly count: number;
+        /** Only somebody's mute or deafen changed: a roster redraws, nothing
+         *  about who is in the call does. */
+        readonly voice?: true;
     };
 }
 

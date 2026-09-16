@@ -419,7 +419,7 @@ async function setVoiceState(
         },
         data: { muted: voice.muted, deafened: voice.deafened }
     });
-    if (changed.count > 0) await announceCall(seat.meetingId, "moved", "");
+    if (changed.count > 0) await announceCall(seat.meetingId, "moved", "", undefined, true);
 }
 
 /**
@@ -898,7 +898,8 @@ async function announceCall(
     meetingId: string,
     state: CallState,
     actorId: string,
-    actorName?: string
+    actorName?: string,
+    voice?: true
 ): Promise<void> {
     const meeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
@@ -910,7 +911,12 @@ async function announceCall(
         kind: "call",
         actorId,
         actorName,
-        call: { meetingId, state, count: state === "ended" ? 0 : await admittedCount(meetingId) }
+        call: {
+            meetingId,
+            state,
+            count: state === "ended" ? 0 : await admittedCount(meetingId),
+            ...(voice ? { voice } : {})
+        }
     });
 }
 

@@ -120,7 +120,7 @@ describe("a seat's microphone and headphones", () => {
             expect.objectContaining({
                 channelId: "c1",
                 kind: "call",
-                call: { meetingId: "m1", state: "moved", count: 2 }
+                call: { meetingId: "m1", state: "moved", count: 2, voice: true }
             })
         ]);
     });

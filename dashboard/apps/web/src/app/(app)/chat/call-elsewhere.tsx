@@ -66,7 +66,7 @@ export function CallElsewhere() {
     useChatStream(
         useCallback(
             (frame) => {
-                if (frame.kind === "call") look();
+                if (frame.kind === "call" && !frame.voice) look();
             },
             [look]
         )

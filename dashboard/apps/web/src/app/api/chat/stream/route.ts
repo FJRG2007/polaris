@@ -204,7 +204,8 @@ export async function GET(request: Request): Promise<Response> {
                                 count: change.call.count,
                                 userId: change.actorId,
                                 name: change.actorName ?? "",
-                                ...(change.movedTo ? { movedTo: change.movedTo } : {})
+                                ...(change.movedTo ? { movedTo: change.movedTo } : {}),
+                                ...(change.call.voice ? { voice: true } : {})
                             });
                         }
                         return;
