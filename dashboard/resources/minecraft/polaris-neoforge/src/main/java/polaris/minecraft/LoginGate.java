@@ -53,10 +53,11 @@ import polaris.minecraft.PolarisClient.Reply;
  * {@code /login} and {@code /register}: no chat, no other command, no blocks, no
  * items, no attacks. Before any of that, Polaris is asked whether the name is on
  * the server's player list at all, and from that network - a name that is not is
- * turned away before it can register a password for somebody else's account. Passwords are never kept here - every one is checked by
- * Polaris - so a server that cannot reach Polaris lets nobody through. That is the
- * point: the alternative is letting anybody through on a name, which is the gap
- * this closes. It is said to the player and written to the log each time.
+ * turned away before it can register a password for somebody else's account.
+ * Passwords are never kept here - every one is checked by Polaris - so a server
+ * that cannot reach Polaris lets nobody through. That is the point: the
+ * alternative is letting anybody through on a name, which is the gap this
+ * closes. It is said to the player and written to the log each time.
  *
  * All state lives on the server thread. Answers from Polaris arrive on the HTTP
  * client's threads and are handed back with {@code server.execute} before they

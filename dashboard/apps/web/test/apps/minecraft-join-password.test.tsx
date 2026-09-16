@@ -175,10 +175,10 @@ describe("what the card says happens when there is no build", () => {
  *
  * Offered where there is a build, and what Turn on installs once Polaris is
  * reachable and the server carries no login Polaris does not manage; a server
- * still on the Modrinth project is offered the switch instead. Once it is on it
- * is the guard the card describes: its commands, whether the server can still
- * reach Polaris, and a Turn off that takes the mod away rather than a Modrinth
- * project the server does not have.
+ * still on the Modrinth project has it replaced instead, not offered as a
+ * second choice. Once it is on it is the guard the card describes: its
+ * commands, whether the server can still reach Polaris, and a Turn off that
+ * takes the mod away rather than a Modrinth project the server does not have.
  */
 describe("Polaris login", () => {
     function neoforge(projects = "auth?") {

@@ -29,12 +29,14 @@
  * being the only way the guard ever got installed, because a switch only protects
  * the servers whose owner went looking for it.
  *
- * Where Polaris's own login mod has a build (NeoForge 1.21.4 today) it is the
- * login this card turns on, unless the server already has a login Polaris does
- * not manage - see `minecraft-polaris-login`. A server still on the Modrinth
- * project is offered the switch rather than moved, because moving it makes every
- * player register again. While the mod is on, it is the guard this card
- * describes and the one Turn off takes away.
+ * Where Polaris's own login mod has a build (NeoForge 1.21.4 today) and Polaris
+ * has a public address, it is the only login this card manages, unless the
+ * server already has a login Polaris does not manage - see
+ * `minecraft-polaris-login`. A server still on the Modrinth project is not
+ * offered a second choice: Turn on replaces it directly, and says so, because
+ * replacing it makes every player register again. Without a public address the
+ * card keeps the Modrinth behaviour below instead. While the mod is on, it is
+ * the guard this card describes and the one Turn off takes away.
  *
  * Java only, and the card says so on Bedrock rather than going quiet. Bedrock
  * loads neither plugins nor mods and has no Modrinth list at all, so there is
@@ -43,9 +45,9 @@
  * would be advice about software their edition does not have.
  */
 
+import { useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
-import { useState } from "react";
 import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
