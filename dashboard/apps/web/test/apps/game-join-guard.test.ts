@@ -142,12 +142,19 @@ describe("what a new server's project list comes out with", () => {
         expect(guardsOn(protectionFor("java", "PAPER", ""))).toEqual([joinGuardFor("PAPER")!.slug]);
     });
 
-    it("replaces the plugin guard it used to seed instead of adding a second", () => {
-        // Servers created before the swap carry the old slug. A reset must not
-        // leave them with two login plugins.
-        const list = protectionFor("java", "PAPER", "coreprotect?,mylogin?");
-        expect(guardsOn(list)).toEqual([joinGuardFor("PAPER")!.slug]);
+    it("keeps the plugin guard it used to seed instead of adding a second", () => {
+        // Servers created before the swap carry the old slug, and their players
+        // registered with it. A reset must not leave them with two login plugins,
+        // nor move them to one where whoever joins first sets the password.
+        const list = protectionFor("java", "PAPER", "coreprotect?,mylogin");
+        expect(guardsOn(list)).toEqual(["mylogin"]);
+        expect(parseProjectList(list)).toContain("mylogin");
         expect(slugs(list)).toContain("coreprotect");
+    });
+
+    it("takes the mod guard off a server moved to plugins", () => {
+        const list = protectionFor("java", "PAPER", "auth?");
+        expect(guardsOn(list)).toEqual([joinGuardFor("PAPER")!.slug]);
     });
 
     it("takes the old plugin guard off a server moved to mods", () => {
