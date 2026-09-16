@@ -296,9 +296,6 @@ export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, s
     const copy = new Map(env);
     if (!polarisLogin.loginOn(env)) return copy;
     copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(env.get(polarisLogin.MODS_KEY) ?? ""));
-    copy.set(
-        PROJECTS_KEY,
-        withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? "")
-    );
+    copy.set(PROJECTS_KEY, withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? ""));
     return copy;
 }
