@@ -262,8 +262,34 @@ export function withOfflineIdentities(content: string): string | null {
     return changed ? serialize(kept) : null;
 }
 
-/** The names on a roster file. Used to tell what a write would actually change
- *  before making it, and to say what a repair touched. */
+/**
+ * The file without the rows only a server that invents identities could match,
+ * or null when it holds none of them.
+ *
+ * The way back. Everything above writes identities a server computes when
+ * authentication is off, and authentication is a setting an operator can turn
+ * back on from the Settings screen - at which point the login asks Mojang, gets
+ * a version 4 UUID, and finds a file holding version 3 ones for every name on
+ * it. The names are all still there, so the game's own `whitelist list` reports
+ * a full list and nothing anywhere says why every one of those players is being
+ * refused. That is the original defect exactly, arrived at from the other side,
+ * and on a server whose only screen for this shows them all as allowed.
+ *
+ * Only rows carrying an invented identity go, and only for the names the caller
+ * is about to put back through the game itself. A row a server actually matches
+ * is never touched, and neither is one naming somebody Polaris was not asked
+ * about - taking that away would be this deciding, with no instruction from
+ * anybody, that a player an operator listed is not listed any more.
+ */
+export function withoutInventedIdentities(content: string, names: readonly string[]): string | null {
+    const entries = parseRoster(content);
+    if (entries === null) return null;
+    const wanted = new Set(names.map((name) => name.trim().toLowerCase()));
+    const left = entries.filter((entry) => !(isOfflineUuid(entry.uuid) && wanted.has(entry.name.trim().toLowerCase())));
+    return left.length === entries.length ? null : serialize(left);
+}
+
+/** The names on a roster file, in the order the file holds them. */
 export function rosterNames(content: string): string[] {
     return parseRoster(content)?.map((entry) => entry.name) ?? [];
 }

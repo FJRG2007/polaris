@@ -28,7 +28,7 @@ import { noteReachedFrom } from "@/lib/apps/minecraft/reach";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "@/lib/apps/minecraft/parse";
 import { readContainerFile, readContainerFileState, writeContainerFile } from "@/lib/apps/container-files";
-import { isReadableRoster, withOfflineIdentities, withOfflineNames, withoutName } from "@/lib/apps/minecraft/offline-identity";
+import { isReadableRoster, withOfflineIdentities, withOfflineNames, withoutInventedIdentities, withoutName } from "@/lib/apps/minecraft/offline-identity";
 import {
     editionOf,
     getServerPlayers,
@@ -311,6 +311,37 @@ async function dropOnContainer(server: ServerContainer, file: RosterFile, name: 
     return true;
 }
 
+/**
+ * Take the identities this server can no longer match back off its whitelist.
+ *
+ * The repair above only runs one way. A server whose authentication was off had
+ * its whitelist written from the identities the login invents, and that setting
+ * is a switch on the Settings screen: turned back on, every one of those entries
+ * names a player under a UUID Mojang will never answer with, and every one of
+ * them is refused. Nothing notices, because the thing that would - the pass
+ * below - asks the game for the names on its list, and the names were never the
+ * part that was wrong.
+ *
+ * So the rows that can no longer match are taken out and the server is told to
+ * read the file again, which leaves those players missing from its list and lets
+ * the ordinary `whitelist add` put them back under the identity Mojang issues.
+ * Only the names this pass is about to add back, so a listed player is never off
+ * the list for longer than the command that follows.
+ *
+ * Nobody is put off a server by this. A player whose only entry is one the login
+ * cannot compute is a player who could not have got on in the first place.
+ */
+async function shedInventedWhitelist(server: ServerContainer, names: readonly string[]): Promise<void> {
+    const current = await readRoster(server, WHITELIST_FILE);
+    // Same rule as everywhere else here: a list that could not be read is not one
+    // to write over.
+    if (current === null) return;
+    const written = withoutInventedIdentities(current, names);
+    if (written === null) return;
+    await writeRoster(server, WHITELIST_FILE, written);
+    await reloadWhitelist(server);
+}
+
 /** Put one player on the game's own whitelist, opening the server once for it. */
 export async function whitelistPlayer(ownerId: string, installedAppId: string, username: string): Promise<string> {
     return withServerContainer(ownerId, installedAppId, (server) => putOnWhitelist(server, [username]));
@@ -422,6 +453,10 @@ export async function reconcileWhitelist(
             await reloadWhitelist(server);
             return names;
         }
+        // Before asking what it has: a name listed under an identity this server
+        // stopped being able to compute is a name the answer still carries, and
+        // comparing names would find nothing missing and repair nothing.
+        await shedInventedWhitelist(server, names).catch(() => undefined);
         const answer = await server.say(["whitelist", "list"]).catch(() => null);
         // A reply that never came is not an empty list: adding everybody back on
         // the strength of it would fight a server that is simply not answering yet.

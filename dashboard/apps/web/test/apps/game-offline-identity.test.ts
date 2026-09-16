@@ -22,6 +22,7 @@ import {
     rosterNames,
     withOfflineIdentities,
     withOfflineNames,
+    withoutInventedIdentities,
     withoutName
 } from "@/lib/apps/minecraft/offline-identity";
 
@@ -262,5 +263,53 @@ describe("withOfflineIdentities", () => {
         expect(withOfflineIdentities("")).toBeNull();
         expect(withOfflineIdentities("[]")).toBeNull();
         expect(withOfflineIdentities("not json at all")).toBeNull();
+    });
+});
+
+/**
+ * The way back, for a server whose authentication was turned on again.
+ *
+ * The repair above only runs in one direction, and the setting it keys off is a
+ * switch on the Settings screen. Flipped back, every entry Polaris wrote names a
+ * player under an identity the login stops computing - so the file lists them,
+ * the screen lists them, `whitelist list` lists them, and the server refuses
+ * every one of them.
+ */
+describe("withoutInventedIdentities", () => {
+    it("takes out the rows the authenticated login can no longer match", () => {
+        const before = file([
+            { uuid: offlineUuid("Steve"), name: "Steve" },
+            { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "Alice" }
+        ]);
+        expect(rosterNames(withoutInventedIdentities(before, ["Steve", "Alice"]) ?? "")).toEqual(["Alice"]);
+    });
+
+    // Removing it is only ever the first half of putting the player back through
+    // the game itself, so a name nobody is about to re-add is a name that stays.
+    it("leaves a stranded row for somebody Polaris was not asked about", () => {
+        const before = file([
+            { uuid: offlineUuid("Steve"), name: "Steve" },
+            { uuid: offlineUuid("Alice"), name: "Alice" }
+        ]);
+        expect(rosterNames(withoutInventedIdentities(before, ["Steve"]) ?? "")).toEqual(["Alice"]);
+    });
+
+    it("matches the name however it was spelled in the request", () => {
+        const before = file([{ uuid: offlineUuid("Steve"), name: "Steve" }]);
+        expect(rosterNames(withoutInventedIdentities(before, ["steve"]) ?? "")).toEqual([]);
+    });
+
+    // The pass that calls this runs every couple of minutes against every server,
+    // and these files are rewritten by the game while it runs - so a file with
+    // nothing to correct has to come back as nothing to write.
+    it("says nothing about a file holding only identities Mojang issued", () => {
+        const before = file([{ uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "Steve" }]);
+        expect(withoutInventedIdentities(before, ["Steve"])).toBeNull();
+    });
+
+    it("says nothing about an empty or unreadable file", () => {
+        expect(withoutInventedIdentities("", ["Steve"])).toBeNull();
+        expect(withoutInventedIdentities("[]", ["Steve"])).toBeNull();
+        expect(withoutInventedIdentities("half a file {", ["Steve"])).toBeNull();
     });
 });

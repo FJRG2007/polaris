@@ -128,6 +128,11 @@ async function ownersWithApps(): Promise<string[]> {
     return rows.map((row) => row.ownerId);
 }
 
+/** How long one activity pass may spend starting owners. Half the lease, so the
+ *  owner still being walked when it runs out has as long again to finish inside
+ *  it. */
+const GAME_ACTIVITY_BUDGET_MS = 10 * MINUTE;
+
 async function runFirewall(): Promise<{
     servers: number;
     banned: number;
@@ -163,12 +168,32 @@ async function runGameActivity(): Promise<{
     stopped: number;
     arrived: number;
     left: number;
+    skipped: number;
 }> {
+    const owners = await ownersWithApps();
+    // Bounded like the backup sweep, and now for the same reason: a scheduled
+    // stop writes the world out and takes a copy of it first, which is `tar` over
+    // a whole world inside the container and is allowed ninety seconds per server
+    // before it gives up. Four servers going quiet on the same night is six
+    // minutes in one pass, and a pass that outlives its lease releases it - which
+    // starts a second runner that re-reads who is playing and opens a second visit
+    // for everybody already on, the exact duplicate this job's lease exists to
+    // prevent. An owner this pass did not reach is reached on the next tick, a
+    // minute later, from the same state on disk.
+    const until = Date.now() + GAME_ACTIVITY_BUDGET_MS;
     let started = 0;
     let stopped = 0;
     let arrived = 0;
     let left = 0;
-    for (const ownerId of await ownersWithApps()) {
+    let skipped = 0;
+    for (const [index, ownerId] of owners.entries()) {
+        // Before the owner rather than during them: a budget may decide what not
+        // to begin, and must never leave a server stopped without the copy that
+        // was the reason for stopping it slowly.
+        if (Date.now() >= until) {
+            skipped = owners.length - index;
+            break;
+        }
         const now = new Date();
         const activity = await sweepGameActivity(ownerId, now).catch(() => null);
         const swept = await sweepGameSchedules(ownerId, now, {
@@ -188,7 +213,7 @@ async function runGameActivity(): Promise<{
             stopped += swept.stopped;
         }
     }
-    return { started, stopped, arrived, left };
+    return { started, stopped, arrived, left, skipped };
 }
 
 /**
@@ -582,7 +607,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // schedule decision was harmless and a duplicate history is not: two
         // runners write two readings a millisecond apart and open a second visit
         // for everybody already on.
-        leaseMs: 5 * MINUTE,
+        //
+        // Longer than the cadence by a wide margin, because a stop on this path
+        // writes the world out and copies it before the container goes down, and
+        // that is minutes rather than seconds on a world people have been playing.
+        // The lease is only held while a pass is actually in flight, so a normal
+        // one - which is over in seconds - still runs every minute; what this
+        // buys is that a slow one is not overtaken by the next. Twice the pass's
+        // own budget, and under the scheduler's stuck-after mark.
+        leaseMs: 20 * MINUTE,
         run: runGameActivity
     },
     {

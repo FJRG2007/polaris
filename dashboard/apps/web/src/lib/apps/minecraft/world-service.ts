@@ -35,6 +35,16 @@ import { withServerContainer, type MinecraftEdition, type ServerContainer } from
  *  there is nothing to wait on - only a pause long enough to be worth having. */
 const BEDROCK_SAVE_HOLD_MS = 1500;
 
+/** What an archive is called while it is still being written. Deliberately not a
+ *  name the listing matches, so a copy only counts once it is whole. */
+const STAGING_SUFFIX = ".part";
+
+/** How long a staging file has to have sat untouched before it is somebody's
+ *  leftover rather than somebody's copy. A running `tar` writes to its own
+ *  staging file the whole time, so this is only ever reached by one whose writer
+ *  is gone. */
+const STAGING_STALE_MINUTES = 60;
+
 /** Paths per `du` call. The daemon takes 32 argv elements and three are spent on
  *  the command itself, so this leaves room without ever being the thing that
  *  fails. */
@@ -348,6 +358,50 @@ async function assertRoomToCopy(server: ServerContainer, dirs: readonly string[]
     );
 }
 
+/**
+ * Throw away staging files nothing is going to finish.
+ *
+ * The archive below is written beside its name and moved onto it, which means a
+ * copy that never got to the move leaves the half of it that was written - and
+ * the path that bounds how long it will wait is the one most likely to: the
+ * stop gives up on the wait, takes the container down, and `tar` is killed
+ * mid-write with nothing left running to tidy up after it.
+ *
+ * Nothing else would ever see it. The listing only matches `*.tar.gz`, so a
+ * staging file is not a backup to prune, does not count against the size the
+ * operator asked to keep, and has no delete button - it is a multi-gigabyte
+ * file on the world's own volume that only grows, one per interrupted stop, and
+ * the room check below is what eventually refuses every copy because of it.
+ *
+ * Swept here, before that check, so the space comes back in time to be used by
+ * the copy being taken. Only files nothing has touched for an hour: a `tar` that
+ * is still running writes to its staging file continuously, so a recent one
+ * belongs to a copy in flight - a manual backup taken while a scheduled one is
+ * running - and deleting that is breaking the copy it was about to publish.
+ */
+async function sweepStagedBackups(server: ServerContainer): Promise<void> {
+    await server
+        .run([
+            "find",
+            world.BACKUP_DIR,
+            "-maxdepth",
+            "1",
+            "-type",
+            "f",
+            "-name",
+            `*.tar.gz${STAGING_SUFFIX}`,
+            "-mmin",
+            `+${STAGING_STALE_MINUTES}`,
+            "-exec",
+            "rm",
+            "-f",
+            "--",
+            "{}",
+            "+"
+        ])
+        .catch(() => undefined);
+}
+
 async function writeBackup(ownerId: string, server: ServerContainer): Promise<WorldBackup> {
     const { level } = await readWorldSettings(ownerId, server.applicationId, server.edition);
     const listing = await server.runOk(
@@ -361,6 +415,7 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     }
 
     await server.runOk(["mkdir", "-p", "--", world.BACKUP_DIR], "Could not create the backup folder");
+    await sweepStagedBackups(server);
     await assertRoomToCopy(server, dirs);
     await holdSave(server);
     const at = new Date();
@@ -373,13 +428,17 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     // copy: the next scheduled one is suppressed for a whole day, and it spends a
     // slot in what is kept. The listing only matches `*.tar.gz`, so a partial file
     // under this name is invisible to it, and the move is what publishes the copy.
-    const partial = `${world.BACKUP_DIR}/${name}.part`;
+    const partial = `${world.BACKUP_DIR}/${name}${STAGING_SUFFIX}`;
     try {
         await server.runOk(["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs], "Could not write the backup");
         await server.runOk(["mv", "--", partial, `${world.BACKUP_DIR}/${name}`], "Could not write the backup");
     } catch (caught) {
         // A world big enough to run out of disk leaves the half of it that fit.
-        await server.run(["rm", "-f", "--", partial]);
+        // Never fatal, and never the error reported: the container this would run
+        // in is often the one that just went down, and its refusal landing here
+        // would replace the reason the copy actually failed with a complaint about
+        // a container nobody asked about. What it misses, the sweep above takes.
+        await server.run(["rm", "-f", "--", partial]).catch(() => undefined);
         throw caught;
     } finally {
         await resumeSave(server);
@@ -927,11 +986,47 @@ export async function sweepWorldBackups(ownerId: string, now: Date = new Date())
     return swept;
 }
 
+/** Where the reason for the last failure somebody was told about is kept, so the
+ *  next pass can tell news from the same news again. */
+const BACKUP_FAILURE_KEY = "backupFailure";
+
+/**
+ * Whether this failure is worth waking somebody for, and remember that it was.
+ *
+ * The sweep comes round every ten minutes and a copy stays due until one
+ * succeeds, so anything that does not fix itself - no room left beside the
+ * world, a permission the image does not have, a `tar` that will not run -
+ * fails on every pass from now until somebody acts on it. Notified once per
+ * pass that is a hundred and forty-four identical warnings a day per server,
+ * which is not a louder version of the first one: it is what teaches an
+ * operator to swipe this type away without reading it, and the next one is
+ * about a different server.
+ *
+ * So the reason is remembered and only a different one is news. A failure that
+ * clears is forgotten on the next copy that works, which is what makes the same
+ * reason worth saying again if it comes back.
+ *
+ * Failing to write that down is not a reason to stay silent - the notification
+ * is the point and the bookkeeping is not - so it falls back to saying it.
+ */
+async function noteBackupFailure(install: { id: string; config: string | null }, message: string): Promise<boolean> {
+    if (readInstallConfig(install.config)[BACKUP_FAILURE_KEY] === message) return false;
+    await patchInstallConfig(install.id, { [BACKUP_FAILURE_KEY]: message }).catch(() => undefined);
+    return true;
+}
+
+/** Forget the last failure, so one that comes back is said out loud again. */
+async function forgetBackupFailure(install: { id: string; config: string | null }): Promise<void> {
+    const remembered = readInstallConfig(install.config)[BACKUP_FAILURE_KEY];
+    if (remembered === undefined || remembered === null) return;
+    await patchInstallConfig(install.id, { [BACKUP_FAILURE_KEY]: null }).catch(() => undefined);
+}
+
 /** One server's turn, which never throws: a sweep walks every server the owner
  *  has, and one that cannot be reached must not end the walk. */
 async function sweepOne(
     ownerId: string,
-    install: { id: string; name: string },
+    install: { id: string; name: string; config: string | null },
     rules: policy.BackupPolicy,
     now: Date
 ): Promise<BackupSweep | null> {
@@ -945,6 +1040,7 @@ async function sweepOne(
                 return { installedAppId: install.id, name: null, pruned: await pruneBackups(server, rules), error: null };
             }
             const taken = await writeBackup(ownerId, server);
+            await forgetBackupFailure(install);
             return {
                 installedAppId: install.id,
                 name: taken.name,
@@ -960,7 +1056,7 @@ async function sweepOne(
         // every ten minutes - so the alternative is a notification that repeats
         // until the world exists, about a server doing exactly what it should.
         if (/start the server first|not been deployed|no world to back up/i.test(message)) return null;
-        if (rules.notifyOnFailure) {
+        if (rules.notifyOnFailure && (await noteBackupFailure(install, message))) {
             await createNotification({
                 userId: ownerId,
                 type: "games.backup-failed",
