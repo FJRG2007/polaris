@@ -14,7 +14,7 @@ import { setUserRoleAction } from "../actions";
 import { CapabilitiesCard } from "./capabilities-card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
-import type { AccessExplanation } from "@/lib/access-explain-service";
+import type { AccessExplanation, ResourceGrantView } from "@/lib/access-explain-service";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Checkbox, Select, Skeleton } from "@polaris/ui";
@@ -255,7 +255,32 @@ function ResourcesCard({
     const display = useDisplayFormat();
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    const [pending, setPending] = useState(false);
+
+    async function remove(grant: ResourceGrantView): Promise<void> {
+        setError(null);
+        setPending(true);
+        try {
+            const ok = await confirm({
+                title: "Remove this access",
+                description: `They lose ${grant.resourceLabel} the next time a page loads. Nothing else about their account changes.`,
+                confirmLabel: "Remove",
+                danger: true
+            });
+            if (!ok) return;
+            const result = await removeUserGrantAction(userId, grant.id, `${grant.kind}:${grant.resourceId}`);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            onChanged();
+        } catch (cause) {
+            console.error(cause);
+            setError("Polaris did not answer. Reload the page and try again.");
+        } finally {
+            setPending(false);
+        }
+    }
 
     return (
         <Card>
@@ -311,27 +336,7 @@ function ResourcesCard({
                                         disabled={pending}
                                         aria-label={`Remove their access to ${grant.resourceLabel}`}
                                         title={`Remove their access to ${grant.resourceLabel}`}
-                                        onClick={() =>
-                                            startTransition(async () => {
-                                                const ok = await confirm({
-                                                    title: "Remove this access",
-                                                    description: `They lose ${grant.resourceLabel} the next time a page loads. Nothing else about their account changes.`,
-                                                    confirmLabel: "Remove",
-                                                    danger: true
-                                                });
-                                                if (!ok) return;
-                                                const result = await removeUserGrantAction(
-                                                    userId,
-                                                    grant.id,
-                                                    `${grant.kind}:${grant.resourceId}`
-                                                );
-                                                if (result.error) {
-                                                    setError(result.error);
-                                                    return;
-                                                }
-                                                onChanged();
-                                            })
-                                        }
+                                        onClick={() => void remove(grant)}
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>

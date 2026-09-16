@@ -125,7 +125,8 @@ export function MinecraftJoinPassword({
         setPending(true);
         try {
             await task();
-        } catch {
+        } catch (cause) {
+            console.error(cause);
             setError("Polaris did not answer. Reload the page and try again.");
         } finally {
             setPending(false);
