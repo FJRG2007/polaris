@@ -14,9 +14,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
-import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
 
 vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
     projectFitsAction: vi.fn(),
@@ -84,5 +84,54 @@ describe("the plugin project", () => {
         // repeated here would keep passing after the two had drifted apart.
         expect(screen.getAllByText(joinGuardFor("PAPER")!.slug).length).toBeGreaterThan(0);
         expect(screen.queryByText(/\/trigger/)).toBeNull();
+    });
+});
+
+/**
+ * What the card promises about a release the project has no build for.
+ *
+ * The entry is seeded optional, so the image skips it and starts the server
+ * without it. The card used to say the opposite - that the server would say so
+ * on startup rather than start without it - which was true while the entry was
+ * required and became false the moment it stopped being. That is the worst
+ * direction for this particular sentence to be wrong in: it is a security switch,
+ * the screen says On either way, and somebody reading that line would have no
+ * reason to go and check.
+ */
+describe("what the card says happens when there is no build", () => {
+    function cardFor(software: string) {
+        cleanup();
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects=""
+                software={software}
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+    }
+
+    it("says the server starts without it", () => {
+        for (const software of ["PAPER", "NEOFORGE"]) {
+            cardFor(software);
+            expect(screen.getByText(/starts without it/), software).toBeTruthy();
+        }
+    });
+
+    it("never claims the server refuses to start instead", () => {
+        for (const software of ["PAPER", "NEOFORGE"]) {
+            cardFor(software);
+            expect(screen.queryByText(/rather than starting without it/), software).toBeNull();
+        }
+    });
+
+    it("tells the reader where to confirm it actually installed", () => {
+        // The cost of seeding it optional is a screen that can say On while
+        // nothing was installed. The only honest answer is to say where the
+        // server's own answer is.
+        cardFor("PAPER");
+        expect(screen.getByText(/check the Mods screen/)).toBeTruthy();
     });
 });

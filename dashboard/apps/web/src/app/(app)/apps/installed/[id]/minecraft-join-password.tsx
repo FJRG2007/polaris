@@ -39,9 +39,9 @@
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { useEffect, useState, useTransition } from "react";
-import { joinGuardFor, joinGuardSlugs } from "@/lib/apps/minecraft/join-guard";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { joinGuardFor, joinGuardSlugs } from "@/lib/apps/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
 
@@ -104,7 +104,7 @@ export function MinecraftJoinPassword({
                 const fit = await projectFitsAction({ installedAppId, slug: guard.slug });
                 if (!fit.fits) {
                     setError(
-                        `${guard.slug} has no build for the release this server runs${fit.version ? ` (${fit.version})` : ""}. Turning this on would stop the server rather than close it.`
+                        `${guard.slug} has no build for the release this server runs${fit.version ? ` (${fit.version})` : ""}. The server would start without it and nobody would be asked for a password, so this is left off rather than left looking on.`
                     );
                     return;
                 }
@@ -173,9 +173,10 @@ export function MinecraftJoinPassword({
                     <>
                         <p className="text-xs text-muted-foreground">
                             Installs <span className="font-mono">{guard.slug}</span> from Modrinth,
-                            which the Mods screen shows afterwards like anything else on the list.
-                            If it cannot be installed the server says so on startup rather than
-                            starting without it.
+                            which the Mods screen shows afterwards like anything else on the list. A
+                            release it has no build for is skipped and the server starts without it
+                            rather than failing to start, so check the Mods screen once the server
+                            is back up.
                         </p>
                         {/* The commands, because nobody reading this is the person who
                             will need them: the player is in the game, locked out, with
