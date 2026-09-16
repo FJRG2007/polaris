@@ -220,8 +220,11 @@ export function MeetingChat({
                             <li key={line.id} className="flex gap-2">
                                 <Avatar
                                     size={22}
+                                    // Here or gone from this room, never the
+                                    // presence store's answer: inside a call its
+                                    // "on a call" badge says nothing.
                                     presence={
-                                        present.has(line.participantId) ? "online" : undefined
+                                        present.has(line.participantId) ? "online" : "offline"
                                     }
                                     person={{
                                         // Null for a guest, deliberately. There
