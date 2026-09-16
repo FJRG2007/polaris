@@ -27,6 +27,7 @@ import type { PlayerStats } from "@/lib/apps/games-activity";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { resetMinecraftServer } from "@/lib/apps/games-reset";
+import { guardForSave, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { patchInstallConfig } from "@/lib/apps/install-config";
@@ -48,11 +49,32 @@ import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-s
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
-import { resetMinecraftServerSchema, type ResetMinecraftServerInput } from "@/lib/apps/games-schema";
-import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
-import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
-import { readLiveInventory, readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
-import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
+import {
+    resetMinecraftServerSchema,
+    type ResetMinecraftServerInput
+} from "@/lib/apps/games-schema";
+import {
+    MAX_IDLE_MINUTES,
+    MIN_IDLE_MINUTES,
+    type GameSchedule
+} from "@/lib/apps/minecraft/schedule";
+import {
+    commonVersions,
+    knownUnsupported,
+    wantsLatest
+} from "@/lib/apps/minecraft/blueprint-version";
+import {
+    readLiveInventory,
+    readSnapshot,
+    writeSnapshot
+} from "@/lib/apps/minecraft/inventory-service";
+import {
+    envFormatHint,
+    findApp,
+    isAllowedEnvValue,
+    normalizeEnvValue,
+    tunableEnvVars
+} from "@/lib/apps/catalog";
 import {
     readRulesFor,
     rememberDifficulty,
@@ -96,7 +118,16 @@ const playerNameSchema = z
 
 const moderationSchema = z.object({
     installedAppId: z.string().uuid(),
-    action: z.enum(["op", "deop", "kick", "ban", "pardon", "kill", "whitelist-add", "whitelist-remove"]),
+    action: z.enum([
+        "op",
+        "deop",
+        "kick",
+        "ban",
+        "pardon",
+        "kill",
+        "whitelist-add",
+        "whitelist-remove"
+    ]),
     player: playerNameSchema,
     /** Shown to the player being kicked or banned. */
     reason: z.string().trim().max(200).optional()
@@ -119,7 +150,9 @@ const consoleSchema = z.object({
 
 const settingsSchema = z.object({
     installedAppId: z.string().uuid(),
-    values: z.array(z.object({ key: z.string().trim().min(1).max(128), value: z.string().max(4096) })).max(64)
+    values: z
+        .array(z.object({ key: z.string().trim().min(1).max(128), value: z.string().max(4096) }))
+        .max(64)
 });
 
 /** The command each moderation action sends, as argv. */
@@ -159,9 +192,13 @@ export async function setGamemodeAction(input: {
     mode: string;
 }): Promise<{ applied?: number; error?: string }> {
     const parsed = gamemodeSchema.safeParse({ ...input, players: [...input.players] });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         let applied = 0;
         for (const player of parsed.data.players) {
             const done = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
@@ -182,7 +219,9 @@ export async function setGamemodeAction(input: {
         });
         return { applied };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -206,11 +245,17 @@ async function moderationOutcome(ownerId: string, input: MinecraftModeration): P
     );
 }
 
-export async function moderatePlayerAction(input: MinecraftModeration): Promise<{ output?: string; error?: string }> {
+export async function moderatePlayerAction(
+    input: MinecraftModeration
+): Promise<{ output?: string; error?: string }> {
     const parsed = moderationSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         const output = await moderationOutcome(access.ownerId, parsed.data);
         await recordAudit({
             actorId: user.id,
@@ -221,14 +266,20 @@ export async function moderatePlayerAction(input: MinecraftModeration): Promise<
         });
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
 /** A namespaced item id as the game writes it, with the namespace optional
  *  because `give Alice stone` is what an operator types. The pattern is the one
  *  the picker offers ids against, so the form cannot propose what this refuses. */
-const itemIdSchema = z.string().trim().toLowerCase().regex(ITEM_ID_PATTERN, "An item looks like minecraft:stone");
+const itemIdSchema = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(ITEM_ID_PATTERN, "An item looks like minecraft:stone");
 
 /** Where to send somebody: another player, or three coordinates - each an
  *  absolute number or a `~` offset, which is how the game reads them. */
@@ -275,7 +326,8 @@ export async function givePlayerItemAction(
     input: GiveItemInput
 ): Promise<{ output?: string; error?: string; queued?: true }> {
     const parsed = giveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -292,7 +344,13 @@ export async function givePlayerItemAction(
             });
             return { queued: true };
         }
-        const { given, output } = await giveItem(access.ownerId, installedAppId, player, item, count);
+        const { given, output } = await giveItem(
+            access.ownerId,
+            installedAppId,
+            player,
+            item,
+            count
+        );
         await recordAudit({
             actorId: user.id,
             action: "minecraft.give",
@@ -302,7 +360,9 @@ export async function givePlayerItemAction(
         });
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -328,7 +388,8 @@ export async function setPlayerExperienceAction(
     input: ExperienceInput
 ): Promise<{ output?: string; error?: string }> {
     const parsed = experienceSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, mode, amount, unit } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -347,7 +408,9 @@ export async function setPlayerExperienceAction(
         });
         return { output };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -366,9 +429,12 @@ export async function recentItemsAction(installedAppId: string): Promise<{ items
 }
 
 /** Move a player to another player, or to a place. */
-export async function teleportPlayerAction(input: TeleportInput): Promise<{ output?: string; error?: string }> {
+export async function teleportPlayerAction(
+    input: TeleportInput
+): Promise<{ output?: string; error?: string }> {
     const parsed = teleportSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, destination } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -388,7 +454,9 @@ export async function teleportPlayerAction(input: TeleportInput): Promise<{ outp
         });
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -422,18 +490,23 @@ export async function readPlayerInventoryAction(
     installedAppId: string,
     player: string
 ): Promise<{ reading?: InventoryReading; error?: string }> {
-    const parsed = z.object({ installedAppId: z.string().uuid(), player: playerNameSchema }).safeParse({
-        installedAppId,
-        player
-    });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
+        .safeParse({
+            installedAppId,
+            player
+        });
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         // One handshake for the whole read. A bag too big for a single RCON reply
         // is read a stack at a time, and forty of those through `runServerCommand`
         // would be forty connections to the machine.
-        const reading = await withServerContainer(access.ownerId, parsed.data.installedAppId, (server) =>
-            readLiveInventory(server.say, parsed.data.player)
+        const reading = await withServerContainer(
+            access.ownerId,
+            parsed.data.installedAppId,
+            (server) => readLiveInventory(server.say, parsed.data.player)
         );
         // An empty bag and a reply that was never an inventory both read as no
         // items, and they are not the same thing to tell somebody checking what a
@@ -469,9 +542,12 @@ export async function readPlayerInventoryAction(
         }
         // A live reading is also worth keeping: this is the one moment the bag is
         // known, and the next person to ask will be asking about somebody offline.
-        await writeSnapshot(parsed.data.installedAppId, parsed.data.player, reading.items, new Date()).catch(
-            () => undefined
-        );
+        await writeSnapshot(
+            parsed.data.installedAppId,
+            parsed.data.player,
+            reading.items,
+            new Date()
+        ).catch(() => undefined);
         return {
             reading: {
                 items: reading.items,
@@ -482,7 +558,9 @@ export async function readPlayerInventoryAction(
             }
         };
     } catch (caught) {
-        const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player).catch(() => null);
+        const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player).catch(
+            () => null
+        );
         if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
         return {
             error:
@@ -508,7 +586,8 @@ export async function readPlayerPositionAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
         .safeParse({ installedAppId, player });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const output = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
@@ -520,7 +599,9 @@ export async function readPlayerPositionAction(
         ]);
         const coordinates = parsePosition(stripFormatting(output));
         if (coordinates === null) {
-            return { error: "The server did not report a position - the player has to be on the server" };
+            return {
+                error: "The server did not report a position - the player has to be on the server"
+            };
         }
         const dimension = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
             "data",
@@ -560,7 +641,8 @@ export async function readPlayerRecordAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
         .safeParse({ installedAppId, player });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const [record, stats] = await Promise.all([
@@ -571,14 +653,19 @@ export async function readPlayerRecordAction(
         ]);
         return { record, stats };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read this player's history" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not read this player's history"
+        };
     }
 }
 
 /** Ban a player for a while, and let Polaris lift it. */
-export async function timeoutPlayerAction(input: TimeoutInput): Promise<{ until?: string; error?: string }> {
+export async function timeoutPlayerAction(
+    input: TimeoutInput
+): Promise<{ until?: string; error?: string }> {
     const parsed = timeoutSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, minutes, reason } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -592,19 +679,30 @@ export async function timeoutPlayerAction(input: TimeoutInput): Promise<{ until?
         });
         return { until: entry.until };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
 /** End one early. */
-export async function liftTimeoutAction(installedAppId: string, player: string): Promise<{ error?: string }> {
-    const parsed = z.object({ installedAppId: z.string().uuid(), player: playerNameSchema }).safeParse({
-        installedAppId,
-        player
-    });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+export async function liftTimeoutAction(
+    installedAppId: string,
+    player: string
+): Promise<{ error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
+        .safeParse({
+            installedAppId,
+            player
+        });
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         await liftTimeout(access.ownerId, parsed.data.installedAppId, parsed.data.player);
         await recordAudit({
             actorId: user.id,
@@ -634,7 +732,11 @@ const scheduleSchema = z.object({
          *  name that looks right and does not exist would silently be read as UTC,
          *  and the schedule would fire at the wrong hour with nothing to show for
          *  it. */
-        timezone: z.string().min(1).max(64).refine(isKnownTimezone, "That is not a time zone this server knows"),
+        timezone: z
+            .string()
+            .min(1)
+            .max(64)
+            .refine(isKnownTimezone, "That is not a time zone this server knows"),
         otherwise: z.enum(["on", "off", "sleep"]),
         idleMinutes: z.number().int().min(MIN_IDLE_MINUTES).max(MAX_IDLE_MINUTES),
         windows: z.array(scheduleWindowSchema).max(24),
@@ -681,9 +783,12 @@ export interface GameScheduleInput {
 }
 
 /** Save when a server should be up, and when it may go quiet. */
-export async function saveGameScheduleAction(input: GameScheduleInput): Promise<{ error?: string }> {
+export async function saveGameScheduleAction(
+    input: GameScheduleInput
+): Promise<{ error?: string }> {
     const parsed = scheduleSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         // The schedule is written straight to the install's config, so nothing else
         // on the way would refuse a server this person may not touch.
@@ -694,7 +799,10 @@ export async function saveGameScheduleAction(input: GameScheduleInput): Promise<
             action: "games.schedule",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { enabled: parsed.data.schedule.enabled, windows: parsed.data.schedule.windows.length }
+            metadata: {
+                enabled: parsed.data.schedule.enabled,
+                windows: parsed.data.schedule.windows.length
+            }
         });
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
@@ -717,7 +825,9 @@ export async function setWhitelistEnforcedAction(
         ]);
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the whitelist" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change the whitelist"
+        };
     }
 }
 
@@ -737,11 +847,17 @@ export type PlayerAccessInput = z.infer<typeof accessSchema>;
  * it is the full manage grant rather than the moderator one: moderating decides
  * who is thrown out today, this decides who can ever get in.
  */
-export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise<{ error?: string }> {
+export async function grantPlayerAccessAction(
+    input: PlayerAccessInput
+): Promise<{ error?: string }> {
     const parsed = accessSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await playerAccess.grantPlayerAccess(access.ownerId, parsed.data.installedAppId, user.id, {
             username: parsed.data.username,
             address: parsed.data.address,
@@ -785,7 +901,8 @@ export async function findMinecraftPlayerByUserAction(
     try {
         await requireGameServer("games.manage", installedAppId);
         const found = await findGameIdentity(parsed.data, "minecraft");
-        if (!found) return { error: "Nobody here goes by that. Check the username or the email address." };
+        if (!found)
+            return { error: "Nobody here goes by that. Check the username or the email address." };
         if (!found.identity) {
             return {
                 error: `${found.name} has not linked a Minecraft account yet. They can do it under Connected accounts.`
@@ -801,7 +918,9 @@ export async function findMinecraftPlayerByUserAction(
 }
 
 /** The list as it stands, for a screen that is not polling the server itself. */
-export async function playerAccessAction(installedAppId: string): Promise<playerAccess.PlayerAccessView | null> {
+export async function playerAccessAction(
+    installedAppId: string
+): Promise<playerAccess.PlayerAccessView | null> {
     try {
         const { access } = await requireGameServer("games.read", installedAppId);
         return await playerAccess.listPlayerAccess(access.ownerId, installedAppId);
@@ -866,7 +985,9 @@ export async function revokePlayerAddressAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove that address" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not remove that address"
+        };
     }
 }
 
@@ -977,11 +1098,15 @@ export async function renameGameServerAction(
     name: string
 ): Promise<{ name?: string; error?: string }> {
     const parsed = z.string().trim().min(1, "Give the server a name").max(60).safeParse(name);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That name will not do" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That name will not do" };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const install = access.install;
-        await prisma.installedApp.update({ where: { id: install.id }, data: { name: parsed.data } });
+        await prisma.installedApp.update({
+            where: { id: install.id },
+            data: { name: parsed.data }
+        });
         await recordAudit({
             actorId: user.id,
             action: "games.rename",
@@ -1011,7 +1136,10 @@ const MAX_ICON_BYTES = 512 * 1024;
 const iconSchema = z.object({
     installedAppId: z.string().uuid(),
     /** The PNG, base64 encoded, already scaled to 64x64 by the browser. */
-    png: z.string().min(1).max(Math.ceil((MAX_ICON_BYTES * 4) / 3) + 64)
+    png: z
+        .string()
+        .min(1)
+        .max(Math.ceil((MAX_ICON_BYTES * 4) / 3) + 64)
 });
 
 /**
@@ -1029,9 +1157,13 @@ export async function setServerIconAction(input: {
     png: string;
 }): Promise<{ error?: string }> {
     const parsed = iconSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That image will not do" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That image will not do" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const bytes = Buffer.from(parsed.data.png, "base64");
         if (bytes.length === 0) throw new Error("That image is empty");
         if (bytes.length > MAX_ICON_BYTES) throw new Error("That image is too large");
@@ -1044,7 +1176,9 @@ export async function setServerIconAction(input: {
         if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
         await writeContainerFile(access.install.applicationId, access.ownerId, ICON_PATH, bytes);
         // What the panel shows without reaching into the container for it.
-        await patchInstallConfig(parsed.data.installedAppId, { iconSetAt: new Date().toISOString() });
+        await patchInstallConfig(parsed.data.installedAppId, {
+            iconSetAt: new Date().toISOString()
+        });
         await recordAudit({
             actorId: user.id,
             action: "games.icon",
@@ -1073,7 +1207,9 @@ function pngSize(bytes: Buffer): { width: number; height: number } | null {
 }
 
 /** Hand the firewall's blocked addresses to the server's own ban list. */
-export async function applyFirewallBansAction(installedAppId: string): Promise<{ banned?: number; error?: string }> {
+export async function applyFirewallBansAction(
+    installedAppId: string
+): Promise<{ banned?: number; error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
         const banned = await applyFirewallBans(access.ownerId, installedAppId);
@@ -1093,7 +1229,9 @@ export async function applyFirewallBansAction(installedAppId: string): Promise<{
 }
 
 /** Flush the world to disk, for before a backup or a restart. */
-export async function saveWorldAction(installedAppId: string): Promise<{ output?: string; error?: string }> {
+export async function saveWorldAction(
+    installedAppId: string
+): Promise<{ output?: string; error?: string }> {
     try {
         const { access } = await requireGameServer("games.moderate", installedAppId);
         const output = await runServerCommand(access.ownerId, installedAppId, ["save-all"]);
@@ -1117,12 +1255,22 @@ const worldNameSchema = z.object({
     installedAppId: z.string().uuid(),
     /** A level as it is named on disk. Re-checked in the service against the same
      *  rule, since this decides a path inside the container. */
-    level: z.string().trim().min(1).max(64).refine(isLevelName, "That is not a world on this server")
+    level: z
+        .string()
+        .trim()
+        .min(1)
+        .max(64)
+        .refine(isLevelName, "That is not a world on this server")
 });
 
 const backupNameSchema = z.object({
     installedAppId: z.string().uuid(),
-    name: z.string().trim().min(1).max(64).refine(isBackupName, "That is not a backup of this server")
+    name: z
+        .string()
+        .trim()
+        .min(1)
+        .max(64)
+        .refine(isBackupName, "That is not a backup of this server")
 });
 
 const newWorldSchema = z.object({
@@ -1140,7 +1288,9 @@ const newWorldSchema = z.object({
 export type NewWorldInput = z.infer<typeof newWorldSchema>;
 
 /** Copy the world into an archive on the server. */
-export async function backUpWorldAction(installedAppId: string): Promise<{ name?: string; error?: string }> {
+export async function backUpWorldAction(
+    installedAppId: string
+): Promise<{ name?: string; error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const backup = await createWorldBackup(access.ownerId, installedAppId);
@@ -1171,9 +1321,12 @@ const backupPolicySchema = z.object({
 export type BackupPolicyInput = z.infer<typeof backupPolicySchema>;
 
 /** How often this server's world is copied, and how much of it is kept. */
-export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<{ error?: string }> {
+export async function saveBackupPolicyAction(
+    input: BackupPolicyInput
+): Promise<{ error?: string }> {
     const parsed = backupPolicySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, ...rules } = parsed.data;
     try {
         // The policy is written straight to the install's config, so nothing else
@@ -1184,7 +1337,12 @@ export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<
         // takes these copies reads plans now, so a schedule saved only into this
         // app's config would be a control that looks like it works and does
         // nothing. Both screens end up describing the same plan.
-        await applyWorldSchedule(access.install.ownerId, installedAppId, access.install.name, rules).catch(() => undefined);
+        await applyWorldSchedule(
+            access.install.ownerId,
+            installedAppId,
+            access.install.name,
+            rules
+        ).catch(() => undefined);
         await recordAudit({
             actorId: user.id,
             action: "games.backup-policy",
@@ -1194,16 +1352,25 @@ export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the backup schedule" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not save the backup schedule"
+        };
     }
 }
 
 /** Take an archive off the server. */
-export async function deleteWorldBackupAction(installedAppId: string, name: string): Promise<{ error?: string }> {
+export async function deleteWorldBackupAction(
+    installedAppId: string,
+    name: string
+): Promise<{ error?: string }> {
     const parsed = backupNameSchema.safeParse({ installedAppId, name });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await deleteWorldBackup(access.ownerId, parsed.data.installedAppId, parsed.data.name);
         await recordAudit({
             actorId: user.id,
@@ -1224,9 +1391,13 @@ export async function restoreWorldBackupAction(
     name: string
 ): Promise<{ level?: string; error?: string }> {
     const parsed = backupNameSchema.safeParse({ installedAppId, name });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const restored = await restoreWorldBackup(
             access.ownerId,
             parsed.data.installedAppId,
@@ -1243,7 +1414,9 @@ export async function restoreWorldBackupAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return { level: restored.level };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not restore that backup" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not restore that backup"
+        };
     }
 }
 
@@ -1260,7 +1433,9 @@ export async function restoreWorldBackupAction(
  * Nothing is deleted. What moves lands in a folder beside the world, so an
  * operator who had tuned something has it.
  */
-export async function resetServerConfigAction(installedAppId: string): Promise<{ moved?: boolean; error?: string }> {
+export async function resetServerConfigAction(
+    installedAppId: string
+): Promise<{ moved?: boolean; error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
@@ -1280,16 +1455,25 @@ export async function resetServerConfigAction(installedAppId: string): Promise<{
         revalidatePath(`/apps/installed/${installedAppId}`);
         return { moved: aside !== null };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not reset the server's settings" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "Could not reset the server's settings"
+        };
     }
 }
 
 /** Generate a new map, optionally carrying what every player is holding. */
-export async function newWorldAction(input: NewWorldInput): Promise<{ level?: string; carried?: boolean; error?: string }> {
+export async function newWorldAction(
+    input: NewWorldInput
+): Promise<{ level?: string; carried?: boolean; error?: string }> {
     const parsed = newWorldSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const created = await newWorld(
             access.ownerId,
             parsed.data.installedAppId,
@@ -1306,7 +1490,11 @@ export async function newWorldAction(input: NewWorldInput): Promise<{ level?: st
             action: "games.world-new",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { level: created.level, seeded: Boolean(parsed.data.seed), keptPlayers: created.carried }
+            metadata: {
+                level: created.level,
+                seeded: Boolean(parsed.data.seed),
+                keptPlayers: created.carried
+            }
         });
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return { level: created.level, carried: created.carried };
@@ -1328,9 +1516,13 @@ export async function resetGameServerAction(
     input: ResetMinecraftServerInput
 ): Promise<{ level?: string; version?: string; carried?: boolean; error?: string }> {
     const parsed = resetMinecraftServerSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const { installedAppId, ...shape } = parsed.data;
         const done = await resetMinecraftServer(access.ownerId, installedAppId, user.id, shape);
         await recordAudit({
@@ -1359,11 +1551,18 @@ export async function resetGameServerAction(
 }
 
 /** Boot the server onto a map it already has. */
-export async function switchWorldAction(installedAppId: string, level: string): Promise<{ error?: string }> {
+export async function switchWorldAction(
+    installedAppId: string,
+    level: string
+): Promise<{ error?: string }> {
     const parsed = worldNameSchema.safeParse({ installedAppId, level });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await switchLevel(access.ownerId, parsed.data.installedAppId, parsed.data.level, user.id);
         await recordAudit({
             actorId: user.id,
@@ -1380,11 +1579,18 @@ export async function switchWorldAction(installedAppId: string, level: string): 
 }
 
 /** Delete a map the server is not on. */
-export async function deleteWorldAction(installedAppId: string, level: string): Promise<{ error?: string }> {
+export async function deleteWorldAction(
+    installedAppId: string,
+    level: string
+): Promise<{ error?: string }> {
     const parsed = worldNameSchema.safeParse({ installedAppId, level });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await deleteLevel(access.ownerId, parsed.data.installedAppId, parsed.data.level);
         await recordAudit({
             actorId: user.id,
@@ -1405,13 +1611,17 @@ export async function sendConsoleCommandAction(
     line: string
 ): Promise<{ output?: string; error?: string }> {
     const parsed = consoleSchema.safeParse({ installedAppId, line });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That command is not valid" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That command is not valid" };
     try {
         // The console runs any command the server takes, op included, so it is not
         // the moderator grant - but it is no longer the full one either. Somebody
         // who should run commands and not rebuild the server has a grant of their
         // own now, and everybody who could manage still holds it.
-        const { user, access } = await requireGameServer("games.console", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.console",
+            parsed.data.installedAppId
+        );
         // Recorded before it runs, and recorded whatever it does.
         //
         // Every other thing this screen can do to a server leaves a line in the
@@ -1437,10 +1647,17 @@ export async function sendConsoleCommandAction(
                 ? await runArkCommand(access.ownerId, parsed.data.installedAppId, typed)
                 : game === "fivem"
                   ? await runFivemCommand(access.ownerId, parsed.data.installedAppId, typed)
-                  : await runConsoleLine(access.ownerId, parsed.data.installedAppId, parsed.data.line);
+                  : await runConsoleLine(
+                        access.ownerId,
+                        parsed.data.installedAppId,
+                        parsed.data.line
+                    );
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that command" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "The server did not accept that command"
+        };
     }
 }
 
@@ -1483,7 +1700,10 @@ export async function projectFitsAction(input: {
 }): Promise<{ fits: boolean; version?: string; error?: string }> {
     const parsed = projectFitSchema.safeParse(input);
     if (!parsed.success) {
-        return { fits: false, error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return {
+            fits: false,
+            error: parsed.error.issues[0]?.message ?? "Check the details and try again"
+        };
     }
     try {
         const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
@@ -1492,7 +1712,10 @@ export async function projectFitsAction(input: {
         const loader = loaderForType(env.find((entry) => entry.key === "TYPE")?.value ?? "");
         const version = env.find((entry) => entry.key === "VERSION")?.value ?? "";
         if (!loader || wantsLatest(version)) return { fits: true };
-        return { fits: !knownUnsupported(await commonVersions([parsed.data.slug], loader), version), version };
+        return {
+            fits: !knownUnsupported(await commonVersions([parsed.data.slug], loader), version),
+            version
+        };
     } catch {
         return { fits: true };
     }
@@ -1514,9 +1737,13 @@ export async function updateServerSettingsAction(
     restart = true
 ): Promise<{ error?: string }> {
     const parsed = settingsSchema.safeParse({ installedAppId, values });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const install = access.install;
         if (!install.applicationId) throw new Error("This server has not been deployed yet");
         const manifest = findApp(install.catalogId);
@@ -1532,10 +1759,24 @@ export async function updateServerSettingsAction(
             // A declared field whose value does not fit is said out loud rather
             // than dropped. Dropping it is how a setting looks saved, is not, and
             // the server it feeds restarts forever on the old value.
-            if (!isAllowedEnvValue(field, value)) throw new Error(`${field.label}: ${envFormatHint(field)}`);
+            if (!isAllowedEnvValue(field, value))
+                throw new Error(`${field.label}: ${envFormatHint(field)}`);
             return [{ key: entry.key, value, isSecret: Boolean(field.secret) }];
         });
         if (vars.length === 0) throw new Error("Nothing to save");
+
+        // Changing the software changes what the server can load, and the
+        // password project is the one thing on the list that was closing it. A
+        // plugin does not load on a mod loader, so a server moved across would
+        // have come up with nobody asked for a password and nothing saying so -
+        // the entry is optional, which is exactly what makes it quiet.
+        const applicationId = install.applicationId;
+        const moved = await guardForSave(vars, async () => {
+            const current = await listEnvVars("application", applicationId, access.ownerId);
+            return current.find((entry) => entry.key === PROJECTS_KEY)?.value ?? "";
+        });
+        if (moved !== null) vars.push({ key: PROJECTS_KEY, value: moved, isSecret: false });
+
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
         // The same value the Rules screen shows. Both screens write the difficulty
@@ -1595,7 +1836,10 @@ export async function setWorldRuleAction(
         .safeParse({ installedAppId, rule, value });
     if (!parsed.success) return { error: "Check the value and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const applied = await setWorldRule(
             access.ownerId,
             parsed.data.installedAppId,
@@ -1632,7 +1876,9 @@ async function writeDifficultyEnv(
 ): Promise<void> {
     if (!install.applicationId) return;
     const manifest = findApp(install.catalogId);
-    const field = manifest ? tunableEnvVars(manifest).find((entry) => entry.key === "DIFFICULTY") : undefined;
+    const field = manifest
+        ? tunableEnvVars(manifest).find((entry) => entry.key === "DIFFICULTY")
+        : undefined;
     // A catalog that does not declare it, or declares it as something this value
     // does not fit, is not a thing to force: the live change stands on its own.
     if (!field || !isAllowedEnvValue(field, difficulty)) return;
@@ -1652,8 +1898,15 @@ export async function setWorldDifficultyAction(
         .safeParse({ installedAppId, difficulty });
     if (!parsed.success) return { error: "That is not a difficulty" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
-        await setWorldDifficulty(access.ownerId, parsed.data.installedAppId, parsed.data.difficulty);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        await setWorldDifficulty(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.difficulty
+        );
         // Recorded the moment it is in force, and before anything that can fail
         // afterwards. The world is being played under it from here on, so whether
         // the record exists must not depend on the housekeeping below succeeding.
@@ -1676,7 +1929,9 @@ export async function setWorldDifficultyAction(
         }
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the difficulty" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change the difficulty"
+        };
     }
 }
 
@@ -1706,11 +1961,15 @@ const moveSchema = z.object({
 export type MoveSlotInput = z.infer<typeof moveSchema>;
 
 /** Move a stack from one slot to another, swapping with what is in the way. */
-export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ error?: string; }> {
+export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ error?: string }> {
     const parsed = moveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         await moveStack(
             access.ownerId,
             parsed.data.installedAppId,
@@ -1746,7 +2005,9 @@ export type SlotItemInput = z.infer<typeof slotItemSchema>;
 /** Whether this player is standing on the server right now. */
 async function isOnline(ownerId: string, installedAppId: string, player: string): Promise<boolean> {
     const status = await getServerPlayers(ownerId, installedAppId).catch(() => null);
-    return status?.players.players.some((name) => name.toLowerCase() === player.toLowerCase()) === true;
+    return (
+        status?.players.players.some((name) => name.toLowerCase() === player.toLowerCase()) === true
+    );
 }
 
 /**
@@ -1756,9 +2017,12 @@ async function isOnline(ownerId: string, installedAppId: string, player: string)
  * an operator deciding at four in the afternoon should not have to come back and
  * remember it.
  */
-export async function setInventorySlotAction(input: SlotItemInput): Promise<{ queued?: true; error?: string; }> {
+export async function setInventorySlotAction(
+    input: SlotItemInput
+): Promise<{ queued?: true; error?: string }> {
     const parsed = slotItemSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, slot, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -1781,7 +2045,9 @@ export async function setInventorySlotAction(input: SlotItemInput): Promise<{ qu
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not put that in the slot" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not put that in the slot"
+        };
     }
 }
 
@@ -1790,14 +2056,27 @@ export async function clearInventorySlotAction(
     installedAppId: string,
     player: string,
     slot: number
-): Promise<{ error?: string; }> {
+): Promise<{ error?: string }> {
     const parsed = z
-        .object({ installedAppId: z.string().uuid(), player: playerNameSchema, slot: z.number().int() })
+        .object({
+            installedAppId: z.string().uuid(),
+            player: playerNameSchema,
+            slot: z.number().int()
+        })
         .safeParse({ installedAppId, player, slot });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
-        await clearSlot(access.ownerId, parsed.data.installedAppId, parsed.data.player, parsed.data.slot);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
+        await clearSlot(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.player,
+            parsed.data.slot
+        );
         await recordAudit({
             actorId: user.id,
             action: "minecraft.inventory-clear",
@@ -1825,9 +2104,10 @@ const takeSchema = z.object({
  *  player is not on. */
 export async function clearPlayerItemAction(
     input: z.infer<typeof takeSchema>
-): Promise<{ queued?: true; output?: string; error?: string; }> {
+): Promise<{ queued?: true; output?: string; error?: string }> {
     const parsed = takeSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -1855,7 +2135,9 @@ export async function clearPlayerItemAction(
 }
 
 /** What is still waiting on this server, for the screen that shows it. */
-export async function pendingActionsAction(installedAppId: string): Promise<{ pending: QueuedAction[]; }> {
+export async function pendingActionsAction(
+    installedAppId: string
+): Promise<{ pending: QueuedAction[] }> {
     try {
         await requireGameServer("games.read", installedAppId);
         return { pending: await pendingFor(installedAppId) };
@@ -1865,7 +2147,10 @@ export async function pendingActionsAction(installedAppId: string): Promise<{ pe
 }
 
 /** Change your mind about something that was waiting. */
-export async function cancelQueuedActionAction(installedAppId: string, id: string): Promise<{ error?: string; }> {
+export async function cancelQueuedActionAction(
+    installedAppId: string,
+    id: string
+): Promise<{ error?: string }> {
     const parsed = z
         .object({ installedAppId: z.string().uuid(), id: z.string().uuid() })
         .safeParse({ installedAppId, id });

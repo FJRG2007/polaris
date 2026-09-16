@@ -339,6 +339,19 @@ configured means the machine's own address, as before.
   The plugin names ProtocolLib as a soft dependency and does not hide the
   password from the server log without it; Modrinth does not carry ProtocolLib,
   so the card says so rather than promising a hidden log it cannot deliver.
+- **Follows the server when its software changes, not only when it is built.**
+  `TYPE` is a Settings field like any other, so an operator can move a server
+  between loaders long after it was created - and a plugin does not load on a
+  mod loader or the reverse, so the guard it closed with stops being a guard
+  the moment the software does. `guardMovedTo` in `join-guard.ts` keeps the
+  on/off state true across that move instead of dropping it: on stays on, now
+  on the slug the new loader can load, off stays off, and software that loads
+  neither (Vanilla) leaves the list untouched so a round trip through it does
+  not erase the one record that the server was ever closed. It runs from the
+  three places `TYPE` can change - `protectionFor` on create and on reset, and
+  `updateServerSettingsAction` on a Settings save - except the save that is
+  itself writing `MODRINTH_PROJECTS`, which is the join-password card's own
+  toggle and is left to do that alone.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before

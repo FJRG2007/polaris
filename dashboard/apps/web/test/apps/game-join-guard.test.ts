@@ -13,10 +13,12 @@
  * entry somebody made more specific than Polaris knows how to.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { protectionFor } from "@/lib/apps/games-create";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import {
+    guardForSave,
+    guardMovedTo,
     joinGuardEntry,
     joinGuardFor,
     joinGuardSlugs,
@@ -169,5 +171,119 @@ describe("which slugs count as the guard being on", () => {
         expect(joinGuardSlugs(joinGuardFor("PAPER")!)).toContain("mylogin");
         expect(joinGuardSlugs(joinGuardFor("NEOFORGE")!)).not.toContain("mylogin");
         expect(JOIN_GUARD_SLUGS).toContain("mylogin");
+    });
+});
+
+/**
+ * A server whose software is changed after it was built.
+ *
+ * The guard is the one thing on the mod list that was closing the server, and it
+ * is the one thing a change of software silently invalidates: a plugin does not
+ * load on a mod loader, the entry is optional so the image skips it rather than
+ * complaining, and the server comes back up with nobody asked for a password.
+ * Nothing on screen would have said so.
+ *
+ * What it must not do is decide for the operator. Whether a server asks for a
+ * password is their answer, and changing the software is not them changing it -
+ * in either direction.
+ */
+describe("moving the guard when the software changes", () => {
+    const plugin = joinGuardFor("PAPER")!.slug;
+    const mod = joinGuardFor("NEOFORGE")!.slug;
+
+    it("swaps the plugin for the mod on the way to a mod loader", () => {
+        const moved = guardMovedTo(`coreprotect?,${plugin}?`, "NEOFORGE");
+        expect(moved).not.toBeNull();
+        expect(guardsOn(moved!)).toEqual([mod]);
+        expect(slugs(moved!)).toContain("coreprotect");
+    });
+
+    it("swaps the mod for the plugin on the way back", () => {
+        const moved = guardMovedTo(`${mod}?`, "PAPER");
+        expect(guardsOn(moved!)).toEqual([plugin]);
+    });
+
+    it("leaves a server that never asked for a password alone", () => {
+        // The half that keeps this from being a decision Polaris makes: no guard
+        // on the list is an answer, and a change of software is not a request to
+        // start asking.
+        expect(guardMovedTo("coreprotect?,luckperms?", "NEOFORGE")).toBeNull();
+        expect(guardMovedTo("", "PAPER")).toBeNull();
+    });
+
+    it("says nothing when the guard already suits the software", () => {
+        // Null rather than the same list back, so the caller writes nothing at
+        // all on the saves that are not a change of software - which is almost
+        // all of them.
+        expect(guardMovedTo(`coreprotect?,${plugin}?`, "PAPER")).toBeNull();
+        expect(guardMovedTo(`${mod}?`, "FABRIC")).toBeNull();
+    });
+
+    it("counts a legacy slug as already suiting a plugin server", () => {
+        // The same rule `replaces` states: an older server keeps what it has,
+        // because the two projects hold their passwords in different places.
+        expect(guardMovedTo("mylogin?", "PAPER")).toBeNull();
+    });
+
+    it("moves a legacy slug off a server that is no longer a plugin server", () => {
+        const moved = guardMovedTo("mylogin?", "NEOFORGE");
+        expect(slugs(moved!)).not.toContain("mylogin");
+        expect(guardsOn(moved!)).toEqual([mod]);
+    });
+
+    it("leaves the guard on software that can load neither", () => {
+        // Vanilla installs nothing from the list, so the entry costs nothing
+        // there, and it is the only record that the server was closed.
+        expect(guardMovedTo(`coreprotect?,${plugin}?`, "VANILLA")).toBeNull();
+    });
+
+    it("puts the guard back on a server moved to Vanilla and off again", () => {
+        const list = `coreprotect?,${plugin}?`;
+        expect(guardMovedTo(list, "VANILLA")).toBeNull();
+        expect(guardMovedTo(list, "PAPER")).toBeNull();
+        expect(guardsOn(guardMovedTo(list, "NEOFORGE")!)).toEqual([mod]);
+    });
+});
+
+/**
+ * Which settings saves move the guard. The card that turns the password off
+ * writes the project list itself, and a save that is not a change of software
+ * has nothing to move - neither may reach for the current list at all.
+ */
+describe("reconciling the guard on a settings save", () => {
+    const plugin = joinGuardFor("PAPER")!.slug;
+    const mod = joinGuardFor("NEOFORGE")!.slug;
+    const listed = `coreprotect?,${plugin}?`;
+
+    const reader = () => vi.fn(async () => listed);
+
+    it("moves the guard when the save changes the software", async () => {
+        const read = reader();
+        const moved = await guardForSave([{ key: "TYPE", value: "NEOFORGE" }], read);
+        expect(guardsOn(moved!)).toEqual([mod]);
+        expect(read).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the card's Turn off alone", async () => {
+        const read = reader();
+        const vars = [
+            { key: "TYPE", value: "NEOFORGE" },
+            { key: "MODRINTH_PROJECTS", value: "coreprotect?" }
+        ];
+        expect(await guardForSave(vars, read)).toBeNull();
+        expect(await guardForSave([{ key: "MODRINTH_PROJECTS", value: "" }], read)).toBeNull();
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it("does not read the list on a save that keeps the software", async () => {
+        const read = reader();
+        expect(await guardForSave([{ key: "DIFFICULTY", value: "hard" }], read)).toBeNull();
+        expect(await guardForSave([{ key: "TYPE", value: "" }], read)).toBeNull();
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing when the guard already suits the new software", async () => {
+        const read = reader();
+        expect(await guardForSave([{ key: "TYPE", value: "PURPUR" }], read)).toBeNull();
     });
 });
