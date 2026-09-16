@@ -329,11 +329,16 @@ configured means the machine's own address, as before.
   decides which, so the create path, the Mods list and the join-password card on
   the server's panel never disagree; a server already carrying `mylogin`, the
   plugin this replaced, is read as already having it rather than being given a
-  second. It is appended to `MODRINTH_PROJECTS` like anything else, so turning it
-  off from the Mods screen or the card keeps it off. The plugin names
-  ProtocolLib as a soft dependency and does not hide the password from the
-  server log without it; Modrinth does not carry ProtocolLib, so the card says so
-  rather than promising a hidden log it cannot deliver.
+  second. It is appended to `MODRINTH_PROJECTS` as an optional (`?`) entry, so
+  turning it off from the Mods screen or the card keeps it off, and a release
+  the project has no build for is skipped rather than stopping the server - the
+  card names that possibility and points at the Mods screen instead of claiming
+  every boot installs it. Turning it on is checked up front instead: the card
+  asks whether the release fits before writing the entry, and if it does not it
+  says the server would start unprotected rather than that the boot would fail.
+  The plugin names ProtocolLib as a soft dependency and does not hide the
+  password from the server log without it; Modrinth does not carry ProtocolLib,
+  so the card says so rather than promising a hidden log it cannot deliver.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before
