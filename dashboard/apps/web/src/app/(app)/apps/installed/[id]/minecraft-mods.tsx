@@ -21,7 +21,7 @@
  */
 
 import { useConfirm } from "@/components/confirm-dialog";
-import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
+import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
@@ -64,7 +64,7 @@ export function MinecraftMods({
 }) {
     const projectsSetting = settings.find((setting) => setting.key === PROJECTS_KEY);
     const dependenciesSetting = settings.find((setting) => setting.key === DEPENDENCIES_KEY);
-    const serverType = settings.find((setting) => setting.key === "TYPE")?.value ?? "";
+    const serverType = settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? "";
     const loader = modrinth.loaderForType(serverType);
     const version = pinnedVersion(settings.find((setting) => setting.key === VERSION_KEY)?.value);
 

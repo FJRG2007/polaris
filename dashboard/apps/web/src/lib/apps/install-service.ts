@@ -21,6 +21,7 @@ import type { AppInstallInput } from "@/lib/apps/install-schema";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { isPluginLoader, loaderForType } from "@/lib/apps/minecraft/modrinth";
+import { SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
 import { MAIL_SERVER_APP, uninstallRefusal as mailServerUninstallRefusal } from "@/lib/mail-server/app-install";
@@ -214,7 +215,7 @@ export async function installApp(
     // two reported on screen as projects Modrinth had never heard of, and one jar
     // the server could not boot on. Anything the operator typed is theirs and stays.
     const typedKeys = new Set(input.env.map((entry) => entry.key));
-    const software = envByKey.get("TYPE")?.value ?? "";
+    const software = envByKey.get(SOFTWARE_KEY)?.value ?? "";
     const loader = loaderForType(software);
     if (!loader || !isPluginLoader(loader)) {
         for (const declared of template.env ?? []) {

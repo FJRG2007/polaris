@@ -35,7 +35,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { PlayerSeen } from "@/lib/apps/games-activity";
 import { MinecraftAppearance } from "./minecraft-appearance";
-import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
+import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
@@ -478,7 +478,7 @@ export function MinecraftPanel({
                         installedAppId={installedAppId}
                         edition={game?.edition ?? status?.edition ?? "java"}
                         projects={settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""}
-                        software={settings.find((setting) => setting.key === "TYPE")?.value ?? ""}
+                        software={settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? ""}
                         playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}
                     />
@@ -580,7 +580,7 @@ function ConnectCard({
     const [saved, setSaved] = useState<string | null>(null);
     const [fixing, setFixing] = useState(false);
     const [fixed, setFixed] = useState<string | null>(null);
-    const software = settings.find((setting) => setting.key === "TYPE");
+    const software = settings.find((setting) => setting.key === SOFTWARE_KEY);
     const version = settings.find((setting) => setting.key === "VERSION");
     const softwareLabel = software?.options?.find((option) => option.value === software.value)?.label ?? software?.value;
 

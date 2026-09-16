@@ -202,7 +202,7 @@ export async function guardForSave(
     vars: readonly { key: string; value: string }[],
     readProjects: () => Promise<string>
 ): Promise<string | null> {
-    const software = vars.find((entry) => entry.key === "TYPE")?.value;
+    const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
     if (!software || vars.some((entry) => entry.key === PROJECTS_KEY)) return null;
     return guardMovedTo(await readProjects(), software);
 }
