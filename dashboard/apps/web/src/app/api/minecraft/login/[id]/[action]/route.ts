@@ -5,6 +5,9 @@
  * token its environment carries. Every answer is about that server's players and
  * nobody else's.
  *
+ * A player the server's list does not allow is answered with `refused`, the
+ * sentence the mod kicks them with, on every question about them.
+ *
  * The status codes are the mod's vocabulary, and it tells the player what each
  * one means - so a wrong password and a wrong token are different codes (403 and
  * 401), and neither is ever the other.
@@ -30,12 +33,15 @@ const chosen = z
     .max(login.MAX_PASSWORD, `A password can have at most ${login.MAX_PASSWORD} characters`)
     .regex(/^[^\p{Cc}]+$/u, "A password cannot contain control characters");
 const label = z.string().trim().min(1).max(32);
+/** Where the player connects from, as the server saw it. Checked for being an
+ *  address where it is used. */
+const address = z.string().trim().max(64).optional();
 
 const BODIES = {
     hello: z.object({ mod: label, minecraft: label }),
-    status: z.object({ player }),
-    register: z.object({ player, password: chosen }),
-    login: z.object({ player, password: given }),
+    status: z.object({ player, address }),
+    register: z.object({ player, address, password: chosen }),
+    login: z.object({ player, address, password: given }),
     password: z.object({ player, current: given, next: chosen })
 } as const;
 
@@ -101,13 +107,24 @@ export async function POST(
             case "status": {
                 const body = BODIES.status.safeParse(json);
                 if (!body.success) return invalid(body.error);
-                return reply(200, {
-                    registered: await service.isRegistered(server, body.data.player)
-                });
+                const [registered, turnedAway] = await Promise.all([
+                    service.isRegistered(server, body.data.player),
+                    service.joinRefusal(server, body.data.player, body.data.address)
+                ]);
+                return reply(
+                    200,
+                    turnedAway ? { registered, refused: turnedAway } : { registered }
+                );
             }
             case "register": {
                 const body = BODIES.register.safeParse(json);
                 if (!body.success) return invalid(body.error);
+                const turnedAway = await service.joinRefusal(
+                    server,
+                    body.data.player,
+                    body.data.address
+                );
+                if (turnedAway) return reply(403, { error: "not-listed", refused: turnedAway });
                 const created = await service.register(
                     server,
                     body.data.player,
@@ -118,6 +135,12 @@ export async function POST(
             case "login": {
                 const body = BODIES.login.safeParse(json);
                 if (!body.success) return invalid(body.error);
+                const turnedAway = await service.joinRefusal(
+                    server,
+                    body.data.player,
+                    body.data.address
+                );
+                if (turnedAway) return reply(403, { error: "not-listed", refused: turnedAway });
                 return refused(
                     await service.checkPassword(server, body.data.player, body.data.password)
                 );

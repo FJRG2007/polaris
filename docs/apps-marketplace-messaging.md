@@ -362,21 +362,33 @@ configured means the machine's own address, as before.
   id chosen up front (`InstallSeed`), because the mod names its server by
   that id. That needs a public address (`publicAppUrl`), since the server
   fetches the jar from it and does not start without it; a LAN-only install
-  keeps the Modrinth guard and is offered the switch. The join-password
-  card's Turn on installs it on such a server too. A server that already
-  carries a login Polaris does not manage (`FOREIGN_LOGIN_SLUGS`) gets
-  neither (`withJoinGuard` seeds no guard beside it, and the card offers no
-  Turn on), and an existing server on the Modrinth guard is offered the
-  switch rather than moved, since switching makes every player register
-  again. Switching it on writes `MODS` (the jar's URL), `POLARIS_LOGIN`,
+  keeps the Modrinth guard instead, and `setLogin` refuses to switch it on
+  later for the same reason. Where a public address exists, the
+  join-password card's Turn on installs it on such a server too, and it is
+  the only login the card manages there: a Modrinth guard still on the
+  server is shown as what Turn on replaces, with a warning that every
+  player registers again, rather than offered as a second choice. A server
+  that already carries a login Polaris does not manage
+  (`FOREIGN_LOGIN_SLUGS`) gets neither (`withJoinGuard` seeds no guard
+  beside it, and the card offers no Turn on). Switching it on writes
+  `MODS` (the jar's URL), `POLARIS_LOGIN`,
   `POLARIS_URL`, `POLARIS_SERVER_ID` and a secret `POLARIS_SERVER_TOKEN`,
   and takes the Modrinth guard off the list, since the two keep passwords in
   different places. The mod keeps nothing: every join asks
   `/api/minecraft/login/<server>/<action>` (`hello`, `status`, `register`,
   `login`, `password`), which checks the token and throttles per player and, for
   failures, per server. Passwords are salted scrypt in `MinecraftLogin`, and the
-  card lists them with a reset per player. It fails closed: a server that cannot
-  reach Polaris refuses every player with a message saying so, and because the
+  card lists them with a reset per player. Every question about a player also
+  carries the address they connect from, and a name the server's player list
+  does not allow is answered `refused` - `status` still answers 200, with
+  `refused` alongside `registered`, and `register`/`login` answer 403 with
+  `error: "not-listed"` - using `accessRefusal` (the same rule the
+  log-reading pass enforces), so the mod turns it away before it can
+  register. A server with no rules at all lets everyone through, a rule
+  that binds a name to a network only applies while `bindAddresses` is on,
+  and an address that is not actually one is judged on the name alone. It
+  fails closed: a server that cannot reach Polaris refuses every player
+  with a message saying so, and because the
   image downloads `MODS` on every boot, it does not start either. The mod checks
   in every minute (`MinecraftLoginCheckIn`), and the card shows a server that has
   been up for three minutes without checking in as an outage. `MODS` only prunes

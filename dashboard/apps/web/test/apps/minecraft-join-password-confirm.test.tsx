@@ -66,7 +66,7 @@ function card(software: string, projects: string) {
 describe("asking before a restart", () => {
     it("shows the dialog for Polaris login, and switches on its answer", async () => {
         card("NEOFORGE", "auth?");
-        fireEvent.click(await screen.findByRole("button", { name: "Use Polaris login" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
         const dialog = await screen.findByRole("dialog");
         fireEvent.click(within(dialog).getByRole("button", { name: "Use Polaris login" }));
         await waitFor(() =>
@@ -90,7 +90,7 @@ describe("asking before a restart", () => {
             new Error("server action not found")
         );
         card("NEOFORGE", "auth?");
-        fireEvent.click(await screen.findByRole("button", { name: "Use Polaris login" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
         const dialog = await screen.findByRole("dialog");
         fireEvent.click(within(dialog).getByRole("button", { name: "Use Polaris login" }));
         expect(await screen.findByText(/Polaris did not answer/)).toBeTruthy();

@@ -3,12 +3,12 @@
 /**
  * Polaris's own login mod, inside the join-password card.
  *
- * Offered only where a build exists (NeoForge 1.21.4 today). Where Polaris has a
- * public address it is what a new server gets and what the card's Turn on
- * installs; a server already on the Modrinth project is offered the switch. It
- * gives players real commands and text passwords where the modded project only
- * has `/trigger` and numbers, and it keeps the passwords here, where a forgotten
- * one can be reset.
+ * Where a build exists (NeoForge 1.21.4 today) and Polaris has a public address,
+ * it is the only login the card manages: what a new server gets, and what Turn
+ * on installs - replacing a Modrinth guard the server still carries. It gives
+ * players real commands and text passwords where the modded project only has
+ * `/trigger` and numbers, and it keeps the passwords here, where a forgotten one
+ * can be reset.
  *
  * What it costs is said before it is turned on: the mod asks Polaris on every
  * join, so a server that cannot reach Polaris lets nobody in, and does not start.
@@ -60,41 +60,6 @@ export function useLoginState(installedAppId: string, enabled: boolean) {
     }, [installedAppId, reload]);
 
     return { state, loaded: !enabled || loaded, error, reload: invalidate };
-}
-
-/** What the card offers a server that could run the mod and does not. */
-export function LoginOffer({
-    replacing,
-    disabled,
-    onUse
-}: {
-    /** The Modrinth guard this would replace, when one is on. */
-    replacing: string | null;
-    disabled: boolean;
-    onUse: () => void;
-}) {
-    return (
-        <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2">
-            <p className="text-sm font-medium">Polaris login (new)</p>
-            <p className="text-xs text-muted-foreground">
-                Real commands and text passwords, kept in Polaris so you can reset one here. The
-                server asks Polaris on every join: while it cannot reach Polaris, nobody can join
-                and the server does not start.
-                {replacing && (
-                    <>
-                        {" "}
-                        Replaces <span className="font-mono">{replacing}</span>, so every player
-                        registers again.
-                    </>
-                )}
-            </p>
-            <div className="flex justify-end">
-                <Button size="sm" variant="outline" disabled={disabled} onClick={onUse}>
-                    Use Polaris login
-                </Button>
-            </div>
-        </div>
-    );
 }
 
 /** What the card shows while the mod is on. */

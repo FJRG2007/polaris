@@ -17,8 +17,14 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundClearTitlesPacket;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -42,12 +48,16 @@ import polaris.minecraft.PolarisClient.Reply;
 /**
  * Holds every player who joins until they have given their password.
  *
- * A held player stands where they joined, cannot be hurt, and can do nothing but
+ * A held player stands where they joined, in the dark, with what to type in the
+ * middle of the screen. They cannot be hurt, and can do nothing but
  * {@code /login} and {@code /register}: no chat, no other command, no blocks, no
- * items, no attacks. Passwords are never kept here - every one is checked by
- * Polaris - so a server that cannot reach Polaris lets nobody through. That is the
- * point: the alternative is letting anybody through on a name, which is the gap
- * this closes. It is said to the player and written to the log each time.
+ * items, no attacks. Before any of that, Polaris is asked whether the name is on
+ * the server's player list at all, and from that network - a name that is not is
+ * turned away before it can register a password for somebody else's account.
+ * Passwords are never kept here - every one is checked by Polaris - so a server
+ * that cannot reach Polaris lets nobody through. That is the point: the
+ * alternative is letting anybody through on a name, which is the gap this
+ * closes. It is said to the player and written to the log each time.
  *
  * All state lives on the server thread. Answers from Polaris arrive on the HTTP
  * client's threads and are handed back with {@code server.execute} before they
@@ -59,6 +69,9 @@ final class LoginGate {
     private static final int LOGIN_TICKS = 60 * SECOND;
     private static final int HEARTBEAT_TICKS = 60 * SECOND;
     private static final int REMINDER_TICKS = 3 * SECOND;
+    /** How long the title stays up. Longer than the reminder, which puts it back
+     *  before it fades. */
+    private static final int TITLE_TICKS = 5 * SECOND;
     private static final int MAX_WRONG = 3;
     private static final int MIN_PASSWORD = 6;
     private static final int MAX_PASSWORD = 64;
@@ -93,6 +106,9 @@ final class LoginGate {
          *  enough that subtracting it from the tick cannot overflow. */
         long remindedAt = -REMINDER_TICKS;
         String kick;
+        /** Whether the darkness on their screen is this gate's, and so this gate's
+         *  to lift. */
+        boolean darkened;
 
         Held(Vec3 anchor, long deadline) {
             this.anchor = anchor;
@@ -120,6 +136,12 @@ final class LoginGate {
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
+        // Players are saved after this event, and the logout that would have
+        // lifted the darkness finds nothing held by then.
+        for (Map.Entry<UUID, Held> entry : held.entrySet()) {
+            ServerPlayer player = event.getServer().getPlayerList().getPlayer(entry.getKey());
+            if (player != null) lighten(player, entry.getValue());
+        }
         held.clear();
         server = null;
     }
@@ -138,6 +160,8 @@ final class LoginGate {
                 player.connection.disconnect(Component.literal(waiting.kick));
             } else if (tick > waiting.deadline && !waiting.busy) {
                 player.connection.disconnect(Component.literal("You took too long to log in."));
+            } else if (tick % (TITLE_TICKS - SECOND) == 0) {
+                titleFor(player, waiting);
             }
         }
     }
@@ -176,14 +200,20 @@ final class LoginGate {
 
     @SubscribeEvent
     public void onJoin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!guarding || !(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!guarding) {
+            clearOurs(player);
+            return;
+        }
         Held waiting = new Held(player.position(), tick + LOGIN_TICKS);
         held.put(player.getUUID(), waiting);
         if (config.state() != PolarisConfig.State.ON) {
+            clearOurs(player);
             waiting.kick = NOT_SET_UP;
             return;
         }
-        tell(player, "Checking your account with Polaris...");
+        darken(player, waiting);
+        title(player, "Checking your account", "One moment");
         waiting.busy = true;
         ask(player, waiting, "status", identity(player), (current, reply) -> {
             waiting.busy = false;
@@ -193,6 +223,8 @@ final class LoginGate {
                 waiting.kick = UNLINKED;
             } else if (reply.status() != 200) {
                 waiting.kick = "Polaris could not check your account (HTTP " + reply.status() + "). Try again in a minute.";
+            } else if (!reply.text("refused").isEmpty()) {
+                waiting.kick = reply.text("refused");
             } else {
                 waiting.registered = reply.flag("registered");
                 prompt(current, waiting);
@@ -202,11 +234,22 @@ final class LoginGate {
 
     @SubscribeEvent
     public void onLeave(PlayerEvent.PlayerLoggedOutEvent event) {
-        held.remove(event.getEntity().getUUID());
+        Held waiting = held.remove(event.getEntity().getUUID());
+        // Lifted before the player is saved, or they would wake up in the dark on
+        // their next join with nothing to say it was this gate's.
+        if (waiting != null && event.getEntity() instanceof ServerPlayer player) lighten(player, waiting);
+    }
+
+    /** The title for what this player has to do next, sent again before it fades. */
+    private static void titleFor(ServerPlayer player, Held waiting) {
+        if (waiting.registered == null) return;
+        if (waiting.registered) title(player, "Log in", "/login <password>");
+        else title(player, "Choose a password", "/register <password> <password>");
     }
 
     private void prompt(ServerPlayer player, Held waiting) {
         long seconds = Math.max(0, (waiting.deadline - tick) / SECOND);
+        titleFor(player, waiting);
         if (Boolean.TRUE.equals(waiting.registered)) {
             tell(player, "Log in with /login <password>. You have " + seconds + " seconds.");
         } else {
@@ -216,8 +259,50 @@ final class LoginGate {
     }
 
     private void release(ServerPlayer player, String message) {
-        held.remove(player.getUUID());
+        Held waiting = held.remove(player.getUUID());
+        if (waiting != null) lighten(player, waiting);
+        player.connection.send(new ClientboundClearTitlesPacket(true));
         player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.GREEN));
+    }
+
+    /** What to do, in the middle of the screen. Sent again by every reminder, so it
+     *  never fades while the player is still waiting. */
+    private static void title(ServerPlayer player, String title, String subtitle) {
+        player.connection.send(new ClientboundSetTitlesAnimationPacket(0, TITLE_TICKS, 10));
+        player.connection.send(new ClientboundSetSubtitleTextPacket(
+                Component.literal(subtitle).withStyle(ChatFormatting.YELLOW)));
+        player.connection.send(new ClientboundSetTitleTextPacket(
+                Component.literal(title).withStyle(ChatFormatting.GOLD)));
+    }
+
+    /**
+     * Dark until they are in: the world is not theirs to look at yet.
+     *
+     * An endless blindness with no particles and no icon is the mark this gate
+     * leaves, and the only one it takes away again - so a player who arrives
+     * already wearing one it left (a crash before they were saved) is lifted as
+     * well, and a blindness they got some other way is left alone.
+     */
+    private static void darken(ServerPlayer player, Held waiting) {
+        MobEffectInstance current = player.getEffect(MobEffects.BLINDNESS);
+        if (current != null && !isOurs(current)) return;
+        player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, MobEffectInstance.INFINITE_DURATION, 0, false, false, false));
+        waiting.darkened = true;
+    }
+
+    private static void lighten(ServerPlayer player, Held waiting) {
+        if (waiting.darkened) clearOurs(player);
+        waiting.darkened = false;
+    }
+
+    /** Lifts this gate's darkness, and only this gate's. */
+    private static void clearOurs(ServerPlayer player) {
+        MobEffectInstance current = player.getEffect(MobEffects.BLINDNESS);
+        if (current != null && isOurs(current)) player.removeEffect(MobEffects.BLINDNESS);
+    }
+
+    private static boolean isOurs(MobEffectInstance effect) {
+        return effect.isInfiniteDuration() && !effect.isVisible() && !effect.showIcon() && effect.getAmplifier() == 0;
     }
 
     // ------------------------------------------------------------------ commands
@@ -268,6 +353,8 @@ final class LoginGate {
             waiting.busy = false;
             if (!reply.reached()) {
                 tell(current, UNREACHABLE);
+            } else if (!reply.text("refused").isEmpty()) {
+                waiting.kick = reply.text("refused");
             } else if (reply.status() == 200) {
                 release(current, "Password set. Welcome!");
             } else if (reply.status() == 409) {
@@ -290,6 +377,10 @@ final class LoginGate {
             waiting.busy = false;
             if (!reply.reached()) {
                 tell(current, UNREACHABLE);
+                return;
+            }
+            if (!reply.text("refused").isEmpty()) {
+                waiting.kick = reply.text("refused");
                 return;
             }
             switch (reply.status()) {
@@ -381,6 +472,9 @@ final class LoginGate {
     private static JsonObject identity(ServerPlayer player) {
         JsonObject body = new JsonObject();
         body.addProperty("player", player.getGameProfile().getName());
+        // Where they connect from, so Polaris can hold the name to the network it
+        // is registered to, as the server's player list does.
+        body.addProperty("address", player.getIpAddress());
         return body;
     }
 

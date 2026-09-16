@@ -29,12 +29,14 @@
  * being the only way the guard ever got installed, because a switch only protects
  * the servers whose owner went looking for it.
  *
- * Where Polaris's own login mod has a build (NeoForge 1.21.4 today) it is the
- * login this card turns on, unless the server already has a login Polaris does
- * not manage - see `minecraft-polaris-login`. A server still on the Modrinth
- * project is offered the switch rather than moved, because moving it makes every
- * player register again. While the mod is on, it is the guard this card
- * describes and the one Turn off takes away.
+ * Where Polaris's own login mod has a build (NeoForge 1.21.4 today) and Polaris
+ * has a public address, it is the only login this card manages, unless the
+ * server already has a login Polaris does not manage - see
+ * `minecraft-polaris-login`. A server still on the Modrinth project is not
+ * offered a second choice: Turn on replaces it directly, and says so, because
+ * replacing it makes every player register again. Without a public address the
+ * card keeps the Modrinth behaviour below instead. While the mod is on, it is
+ * the guard this card describes and the one Turn off takes away.
  *
  * Java only, and the card says so on Bedrock rather than going quiet. Bedrock
  * loads neither plugins nor mods and has no Modrinth list at all, so there is
@@ -43,9 +45,9 @@
  * would be advice about software their edition does not have.
  */
 
+import { useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
-import { useState } from "react";
 import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
@@ -57,7 +59,7 @@ import {
     joinGuardSlugs,
     PROJECTS_KEY
 } from "@/lib/apps/minecraft/join-guard";
-import { LoginDetails, LoginOffer, LoginSkeleton, useLoginState } from "./minecraft-polaris-login";
+import { LoginDetails, LoginSkeleton, useLoginState } from "./minecraft-polaris-login";
 
 /** Whether an entry names one of those projects, whatever version or suffix it
  *  was written with. */
@@ -119,6 +121,12 @@ export function MinecraftJoinPassword({
     }
     const installed = on && listed !== null ? listed : guard?.slug;
     const locked = foreign !== null && !on;
+    /**
+     * What the switch is about. Where Polaris login applies it is the only login
+     * this card manages: a Modrinth guard still on the server is described as
+     * what Turn on replaces, not offered as a second choice.
+     */
+    const shownOn = preferMod ? modOn : on;
 
     const restartNote =
         playersOnline > 0
@@ -222,7 +230,7 @@ export function MinecraftJoinPassword({
                 <CardTitle className="flex items-center gap-2">
                     <KeyRound className="size-4 text-primary" />
                     Password on join
-                    {on && <Badge variant="success">On</Badge>}
+                    {shownOn && <Badge variant="success">On</Badge>}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
@@ -258,13 +266,27 @@ export function MinecraftJoinPassword({
                         which Polaris does not manage. Remove it from the Mods screen to use a login
                         from here instead.
                     </p>
-                ) : preferMod && listed === null ? (
-                    <p className="text-xs text-muted-foreground">
-                        Uses Polaris login: players get <span className="font-mono">/register</span>{" "}
-                        and <span className="font-mono">/login</span> with text passwords, kept in
-                        Polaris so you can reset one here. While the server cannot reach Polaris,
-                        nobody can join and the server does not start.
-                    </p>
+                ) : preferMod ? (
+                    <>
+                        <p className="text-xs text-muted-foreground">
+                            Uses Polaris login: players get{" "}
+                            <span className="font-mono">/register</span> and{" "}
+                            <span className="font-mono">/login</span> with text passwords, kept in
+                            Polaris so you can reset one here. While the server cannot reach
+                            Polaris, nobody can join and the server does not start.
+                        </p>
+                        {listed !== null && (
+                            <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                <span>
+                                    Players still log in with{" "}
+                                    <span className="font-mono">{listed}</span> and numeric
+                                    passwords. Turning this on replaces it, and every player
+                                    registers again.
+                                </span>
+                            </p>
+                        )}
+                    </>
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
@@ -309,13 +331,6 @@ export function MinecraftJoinPassword({
                                 )}
                             </p>
                         )}
-                        {offerMod && listed !== null && (
-                            <LoginOffer
-                                replacing={listed}
-                                disabled={pending}
-                                onUse={() => switchMod(true)}
-                            />
-                        )}
                     </>
                 )}
 
@@ -330,18 +345,14 @@ export function MinecraftJoinPassword({
                     <div className="flex justify-end">
                         <Button
                             size="sm"
-                            variant={on ? "outline" : "primary"}
+                            variant={shownOn ? "outline" : "primary"}
                             disabled={pending || guard === null || !login.loaded}
                             onClick={() =>
-                                modOn
-                                    ? switchMod(false)
-                                    : !on && preferMod
-                                      ? switchMod(true)
-                                      : apply(!on)
+                                modOn ? switchMod(false) : preferMod ? switchMod(true) : apply(!on)
                             }
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            {on ? "Turn off" : "Turn on"}
+                            {shownOn ? "Turn off" : "Turn on"}
                         </Button>
                     </div>
                 )}

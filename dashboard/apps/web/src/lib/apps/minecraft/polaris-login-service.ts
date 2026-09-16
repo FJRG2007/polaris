@@ -10,9 +10,12 @@
  * Server-only.
  */
 
+import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
+import { accessRefusal } from "./access";
+import { readInstallConfig } from "@/lib/apps/install-config";
 import * as polarisLogin from "./polaris-login";
-import { appBaseUrl, publicAppUrl } from "@/lib/domain-service";
+import { publicAppUrl } from "@/lib/domain-service";
 import { readInstallEnvSecret } from "@/lib/apps/install-secret";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
@@ -76,6 +79,40 @@ export async function recordCheckIn(
 }
 
 const key = (name: string) => name.toLowerCase();
+
+/**
+ * Why this player may not join, or null when they may.
+ *
+ * The server's player list, held by Polaris: the name has to be on it, and when
+ * the list binds names to networks, from one of the networks it names. Asked by
+ * the mod before a player can do anything, so a name that is not on the list is
+ * turned away before it can register a password for somebody else's account -
+ * rather than kicked a minute later by the pass that reads the log.
+ *
+ * The same two exceptions as that pass. A server with no rules at all has a list
+ * nobody set up, not one that says "nobody". And an address that is not an
+ * address is judged on the name alone, as a join line that scrolled out is.
+ */
+export async function joinRefusal(
+    server: ModServer,
+    player: string,
+    address: string | undefined
+): Promise<string | null> {
+    // Imported when asked: the rules live beside the code that reaches the
+    // server, which this route never needs.
+    const { playerAccessRules } = await import("./player-access");
+    const [rules, install] = await Promise.all([
+        playerAccessRules(server.installedAppId),
+        prisma.installedApp.findUnique({
+            where: { id: server.installedAppId },
+            select: { config: true }
+        })
+    ]);
+    if (rules.length === 0) return null;
+    const bound = readInstallConfig(install?.config).bindAddresses !== false;
+    const from = bound && address && isIP(address) ? address : null;
+    return accessRefusal(player, from, rules);
+}
 
 export async function isRegistered(server: ModServer, player: string): Promise<boolean> {
     const row = await prisma.minecraftLogin.findUnique({
@@ -330,12 +367,22 @@ export async function setLogin(
                 "Polaris login has no build for this server's software and release. It needs NeoForge on Minecraft 1.21.4."
             );
         }
+        // The server downloads the mod from this address and asks it on every
+        // join, and a LAN-only name does not resolve inside a container - where
+        // there is no public one, switching this on would be a server that never
+        // starts.
+        const baseUrl = await publicAppUrl();
+        if (baseUrl === null) {
+            throw new Error(
+                "Polaris login needs this Polaris to have a public address: the server downloads the mod from it and asks it on every join."
+            );
+        }
         const token =
             (await readInstallEnvSecret(applicationId, ownerId, polarisLogin.TOKEN_KEY)) ??
             randomBytes(32).toString("hex");
         writes = enableLogin({
             current,
-            baseUrl: await appBaseUrl(),
+            baseUrl,
             installedAppId,
             file: build,
             token
