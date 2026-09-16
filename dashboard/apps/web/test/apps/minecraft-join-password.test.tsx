@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
+import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
 
 vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
     projectFitsAction: vi.fn(),
@@ -78,7 +79,10 @@ describe("the plugin project", () => {
         );
 
         expect(screen.getByText(/documents on its Modrinth page/)).toBeTruthy();
-        expect(screen.getAllByText("mylogin").length).toBeGreaterThan(0);
+        // Read from the module rather than written out, because the point of the
+        // assertion is that the card names whatever is actually seeded - a slug
+        // repeated here would keep passing after the two had drifted apart.
+        expect(screen.getAllByText(joinGuardFor("PAPER")!.slug).length).toBeGreaterThan(0);
         expect(screen.queryByText(/\/trigger/)).toBeNull();
     });
 });

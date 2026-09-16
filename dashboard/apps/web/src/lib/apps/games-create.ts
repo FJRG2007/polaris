@@ -34,6 +34,7 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
+import { joinGuardEntry, JOIN_GUARD_SLUGS } from "@/lib/apps/minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
@@ -693,7 +694,7 @@ export function protectionFor(
     current: string
 ): string {
     const loader = loaderForType(software);
-    if (loader && isPluginLoader(loader)) return current;
+    if (loader && isPluginLoader(loader)) return withJoinGuard(current, software);
     const seeded = seededPlugins(edition);
     const modded = new Set(MODDED_PROTECTION.map((entry) => projectSlug(entry)?.toLowerCase()));
     const kept = parseProjectList(current).filter((entry) => {
@@ -702,7 +703,43 @@ export function protectionFor(
         // is dropped here rather than written twice with two different suffixes.
         return slug === undefined || slug === null || (!seeded.has(slug) && !modded.has(slug));
     });
-    return formatProjectList([...kept, ...MODDED_PROTECTION]);
+    return withJoinGuard(formatProjectList([...kept, ...MODDED_PROTECTION]), software);
+}
+
+/**
+ * The same list with the password-on-join project on it.
+ *
+ * Every server gets this, rather than the operator finding the switch: a server
+ * with Mojang authentication off has only a name to go on, so anybody who learns
+ * a name that is on the player list can wear it. That is worth closing by
+ * default, and a default is the only version of it that protects the servers
+ * whose owner never opened the screen.
+ *
+ * Appended rather than forced. An entry already naming the guard is left exactly
+ * as it was written, because a pinned version or a dropped `"?"` is somebody
+ * saying something more specific than this function knows.
+ *
+ * A default, not a policy: this runs where Polaris decides what a server starts
+ * life with - a new one, and a reset, which is a server starting again. Turning
+ * it off afterwards is the Mods screen and the join-password card, and both write
+ * the list straight out without coming through here, so an operator who takes it
+ * off keeps it off. A reset puts it back, along with everything else a fresh
+ * server is given.
+ */
+function withJoinGuard(current: string, software: string): string {
+    const wanted = joinGuardEntry(software);
+    const slug = wanted === null ? null : projectSlug(wanted)?.toLowerCase();
+    // The guard for a loader this server no longer runs, which is left over from
+    // the software being changed. A plugin on a modded server is not a weaker
+    // guard than the right one - it is a jar the server cannot load, exactly like
+    // the protection plugins stripped above, and the operator never chose it.
+    const kept = parseProjectList(current).filter((entry) => {
+        const listed = projectSlug(entry)?.toLowerCase();
+        return typeof listed !== "string" || listed === slug || !JOIN_GUARD_SLUGS.includes(listed);
+    });
+    if (wanted === null) return formatProjectList(kept);
+    const already = kept.some((entry) => projectSlug(entry)?.toLowerCase() === slug);
+    return formatProjectList(already ? kept : [...kept, wanted]);
 }
 
 /**
