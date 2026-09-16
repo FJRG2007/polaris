@@ -68,4 +68,10 @@ describe("the roster outside a call", () => {
         render(<VoiceStateIcons person={{ muted: true, deafened: false }} />);
         expect(screen.getByLabelText("Microphone off")).toBeTruthy();
     });
+
+    it("draws a guest from the name they gave, asking for no picture", () => {
+        const { container } = render(<CallRoster people={[person("s2", "Visitor", false, false)]} />);
+        expect(screen.getByText("Visitor")).toBeTruthy();
+        expect(container.querySelector("img")).toBeNull();
+    });
 });

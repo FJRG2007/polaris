@@ -53,8 +53,9 @@ export function CallRoster({ people }: { people: readonly VoicePresence[] }) {
                 >
                     <Avatar
                         size={24}
-                        // A guest has no account; their seat is who they are.
-                        person={{ id: person.userId ?? person.id, name: person.name }}
+                        // A guest has no account, so no picture to ask for:
+                        // the initials of the name they gave.
+                        person={{ id: person.userId, name: person.name }}
                         callBadge={callBadgeOf(person)}
                     />
                     <span className="max-w-32 truncate">

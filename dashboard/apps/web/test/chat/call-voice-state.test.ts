@@ -20,6 +20,7 @@ interface Row {
 }
 
 let rows: Row[] = [];
+const listed: Record<string, unknown>[] = [];
 const published: unknown[] = [];
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
@@ -58,8 +59,30 @@ vi.mock("@polaris/db", () => ({
                 channel: { kind: "text" }
             }),
             findFirst: async () => ({ id: "m1" }),
-            updateMany: async () => ({ count: 0 })
+            updateMany: async () => ({ count: 0 }),
+            // A meeting on a link: no conversation, one account and one guest.
+            findMany: async ({ where }: { where: Record<string, unknown> }) => {
+                listed.push(where);
+                return [
+                    {
+                        id: "m2",
+                        hostId: "host",
+                        title: "Standup",
+                        guestToken: "t",
+                        requireAccount: false,
+                        approveGuests: true,
+                        scheduledAt: null,
+                        startedAt: new Date(),
+                        invites: [],
+                        participants: [
+                            { id: "s1", name: "Host", userId: "host", muted: false, deafened: false },
+                            { id: "s2", name: "Visitor", userId: null, muted: true, deafened: false }
+                        ]
+                    }
+                ];
+            }
         },
+        user: { findMany: async () => [{ id: "host", name: "Host" }] },
         meetingParticipant: {
             count: async ({ where }: { where: Record<string, unknown> }) =>
                 rows.filter((row) => matches(row, where)).length,
@@ -145,5 +168,16 @@ describe("a seat's microphone and headphones", () => {
             ["p1", false],
             ["p2", true]
         ]);
+    });
+
+    it("lists a link meeting's people, guests included, only for its host and invitees", async () => {
+        const [meeting] = await meetings.listMeetings({ id: "host" } as never);
+        expect(meeting?.people).toEqual([
+            { id: "s1", name: "Host", userId: "host", muted: false, deafened: false },
+            { id: "s2", name: "Visitor", userId: null, muted: true, deafened: false }
+        ]);
+        expect(listed.at(-1)).toMatchObject({
+            OR: [{ hostId: "host" }, { invites: { some: { userId: "host" } } }]
+        });
     });
 });

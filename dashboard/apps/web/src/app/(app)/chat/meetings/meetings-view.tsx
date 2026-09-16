@@ -24,6 +24,7 @@ import type { MeetingSummary } from "@/lib/chat/meetings";
 import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { useDisplayFormat } from "@/components/display-format";
 import { MeetingDetailsDialog } from "./meeting-details-dialog";
+import { CallRoster } from "@/app/(app)/chat/call-roster";
 import { Calendar, Link2, Loader2, Pencil, Plus, Users, Video } from "lucide-react";
 import { createMeetingAction, listMeetingsAction } from "@/app/(app)/chat/meeting-actions";
 import {
@@ -135,6 +136,11 @@ export function MeetingsView() {
                                                     <span>Polaris accounts only</span>
                                                 )}
                                             </span>
+                                            {meeting.people.length > 0 && (
+                                                <span className="mt-2 block">
+                                                    <CallRoster people={meeting.people} />
+                                                </span>
+                                            )}
                                         </span>
 
                                         {meeting.guestToken && (

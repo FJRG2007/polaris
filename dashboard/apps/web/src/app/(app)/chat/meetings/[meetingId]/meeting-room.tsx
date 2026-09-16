@@ -26,6 +26,7 @@ import { CallRoom } from "@/app/(app)/chat/call-room";
 import { useCallHold } from "@/app/(app)/chat/call-hold";
 import type { MeetingSummary } from "@/lib/chat/meetings";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
+import { CallRoster } from "@/app/(app)/chat/call-roster";
 import { useRouter, useSearchParams } from "next/navigation";
 import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -91,6 +92,15 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     useEffect(() => {
         void load();
     }, [load]);
+
+    // Who is in the room, kept current for somebody looking at it from outside.
+    // A meeting belongs to no conversation, so nothing is announced to this
+    // screen when somebody walks in or mutes; it asks instead.
+    useEffect(() => {
+        if (inCall) return;
+        const timer = setInterval(() => void load(), OUTSIDE_POLL_MS);
+        return () => clearInterval(timer);
+    }, [inCall, load]);
 
     const join = useCallback(async () => {
         setJoining(true);
@@ -258,6 +268,9 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                                   ? `${about.present} in the room.`
                                   : "Nobody is in here yet."}
                         </p>
+                        {!waiting && about && about.people.length > 0 && (
+                            <CallRoster people={about.people} />
+                        )}
                         <Button disabled={joining || waiting} onClick={() => void join()}>
                             {(joining || waiting) && <Loader2 className="size-4 animate-spin" />}
                             {waiting ? "Waiting to be let in" : "Join"}
@@ -333,6 +346,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
 /** How often the lobby asks whether it has been let in. Often enough not to feel
  *  stuck, rarely enough that a forgotten tab is not a load. */
 const LOBBY_POLL_MS = 3000;
+/** How often the room is re-read by somebody outside it, for who is in there. */
+const OUTSIDE_POLL_MS = 8000;
 
 /**
  * The host's own controls.
