@@ -25,6 +25,7 @@ import { blueprintVersions, createGameServer } from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { clearGameServerPrefs, setGameServerPref } from "@/lib/apps/games-prefs";
+import { clearLogins } from "@/lib/apps/minecraft/polaris-login-service";
 import { isTemplateName, type ServerTemplateView } from "@/lib/apps/game-templates";
 import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
@@ -344,11 +345,13 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
         // keeping copies of, and the decisions still waiting for players who will
         // never join it again.
         // Including where it sat on somebody's list: a favourite of a server that
-        // is gone is a row nothing will ever read again.
+        // is gone is a row nothing will ever read again - and the passwords its
+        // players set, which nothing can ask about any more.
         await Promise.all([
             clearSnapshots(installedAppId),
             clearQueue(installedAppId),
-            clearGameServerPrefs(installedAppId)
+            clearGameServerPrefs(installedAppId),
+            clearLogins(installedAppId)
         ]);
         await recordAudit({
             actorId: user.id,

@@ -34,14 +34,8 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
-import {
-    joinGuardEntry,
-    joinGuardFor,
-    joinGuardSlugs,
-    JOIN_GUARD_SLUGS,
-    PROJECTS_KEY,
-    SOFTWARE_KEY
-} from "@/lib/apps/minecraft/join-guard";
+import * as polarisLogin from "@/lib/apps/minecraft/polaris-login";
+import { PROJECTS_KEY, SOFTWARE_KEY, withJoinGuard } from "@/lib/apps/minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
@@ -267,12 +261,18 @@ export async function minecraftShapeEnv(
         // that needs Paper is not a suggestion, it is what its plugins load into.
         const software = blueprint.software ?? shape.software ?? "PAPER";
         env.set(SOFTWARE_KEY, software);
+        // Polaris's login mod, on a server being reset that already runs it: kept
+        // when it has a build for where the server is going, taken off when it
+        // does not - and then the project guard below takes its place.
+        const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
+        for (const [key, value] of mod ?? []) env.set(key, value);
         env.set(
             PROJECTS_KEY,
             protectionFor(
                 edition,
                 software,
-                projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map)
+                projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map),
+                polarisLogin.loginOn(env)
             )
         );
     }
@@ -695,14 +695,18 @@ function seededPlugins(edition: "java" | "bedrock"): Set<string> {
  * Only what Polaris seeded is taken back, plus a password project meant for the
  * other loader (see `withJoinGuard`). Anything else on the list belongs to
  * whoever put it there, which on a modded server is every mod on it.
+ *
+ * `modOn` is a server closed by Polaris's own login mod, which takes no password
+ * project beside it.
  */
 export function protectionFor(
     edition: "java" | "bedrock",
     software: string,
-    current: string
+    current: string,
+    modOn = false
 ): string {
     const loader = loaderForType(software);
-    if (loader && isPluginLoader(loader)) return withJoinGuard(current, software);
+    if (loader && isPluginLoader(loader)) return withJoinGuard(current, software, modOn);
     const seeded = seededPlugins(edition);
     const modded = new Set(MODDED_PROTECTION.map((entry) => projectSlug(entry)?.toLowerCase()));
     const kept = parseProjectList(current).filter((entry) => {
@@ -711,48 +715,7 @@ export function protectionFor(
         // is dropped here rather than written twice with two different suffixes.
         return slug === undefined || slug === null || (!seeded.has(slug) && !modded.has(slug));
     });
-    return withJoinGuard(formatProjectList([...kept, ...MODDED_PROTECTION]), software);
-}
-
-/**
- * The same list with the password-on-join project on it.
- *
- * Every server gets this, rather than the operator finding the switch: a server
- * with Mojang authentication off has only a name to go on, so anybody who learns
- * a name that is on the player list can wear it. That is worth closing by
- * default, and a default is the only version of it that protects the servers
- * whose owner never opened the screen.
- *
- * Appended rather than forced. An entry already naming the guard, or the project
- * it replaced, is left exactly as it was written, because a pinned version, a
- * dropped `"?"` or an older project players already registered with is somebody
- * saying something more specific than this function knows.
- *
- * A default, not a policy: this runs where Polaris decides what a server starts
- * life with - a new one, and a reset, which is a server starting again. Turning
- * it off afterwards is the Mods screen and the join-password card, and both write
- * the list straight out without coming through here, so an operator who takes it
- * off keeps it off. A reset puts it back, along with everything else a fresh
- * server is given.
- */
-function withJoinGuard(current: string, software: string): string {
-    const guard = joinGuardFor(software);
-    const wanted = joinGuardEntry(software);
-    const own = guard === null ? [] : joinGuardSlugs(guard);
-    // A password project for the other loader, whoever put it there: usually left
-    // over from the software being changed, and at best a project with almost no
-    // builds for this loader. Kept, it would sit beside the guard seeded below and
-    // give players two logins, so a reset takes it off like the protection
-    // plugins stripped above.
-    const kept = parseProjectList(current).filter((entry) => {
-        const listed = projectSlug(entry)?.toLowerCase();
-        return (
-            typeof listed !== "string" || own.includes(listed) || !JOIN_GUARD_SLUGS.includes(listed)
-        );
-    });
-    if (wanted === null) return formatProjectList(kept);
-    const already = kept.some((entry) => own.includes(projectSlug(entry)?.toLowerCase() ?? ""));
-    return formatProjectList(already ? kept : [...kept, wanted]);
+    return withJoinGuard(formatProjectList([...kept, ...MODDED_PROTECTION]), software, modOn);
 }
 
 /**

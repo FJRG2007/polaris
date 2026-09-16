@@ -1765,17 +1765,18 @@ export async function updateServerSettingsAction(
         });
         if (vars.length === 0) throw new Error("Nothing to save");
 
-        // Changing the software changes what the server can load, and the
-        // password project is the one thing on the list that was closing it. A
-        // plugin does not load on a mod loader, so a server moved across would
-        // have come up with nobody asked for a password and nothing saying so -
-        // the entry is optional, which is exactly what makes it quiet.
+        // Changing the software or the release changes what the server can load,
+        // and the password guard is the one thing on it that was closing it. A
+        // plugin does not load on a mod loader, and Polaris's login mod only on
+        // the release it was built for, so a server moved across would have come
+        // up with nobody asked for a password and nothing saying so - or, for the
+        // mod, not come up at all.
         const applicationId = install.applicationId;
         const moved = await guardForSave(vars, async () => {
             const current = await listEnvVars("application", applicationId, access.ownerId);
-            return current.find((entry) => entry.key === PROJECTS_KEY)?.value ?? "";
+            return new Map(current.map((entry) => [entry.key, entry.value ?? ""]));
         });
-        if (moved !== null) vars.push({ key: PROJECTS_KEY, value: moved, isSecret: false });
+        for (const entry of moved) vars.push({ ...entry, isSecret: false });
 
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
