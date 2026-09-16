@@ -72,25 +72,34 @@ function view() {
 describe("removing access to one thing", () => {
     it("shows the dialog, and removes on its answer", async () => {
         view();
-        fireEvent.click(await screen.findByRole("button", { name: "Remove their access to Survival" }));
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Remove their access to Survival" })
+        );
         const dialog = await screen.findByRole("dialog");
         fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
         await waitFor(() =>
-            expect(actions.removeUserGrantAction).toHaveBeenCalledWith("user-1", "grant-1", "install:server-1")
+            expect(actions.removeUserGrantAction).toHaveBeenCalledWith(
+                "user-1",
+                "grant-1",
+                "install:server-1"
+            )
         );
     });
 
     it("says so when the removal fails, instead of spinning", async () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
-        vi.mocked(actions.removeUserGrantAction).mockRejectedValue(new Error("server action not found"));
+        vi.mocked(actions.removeUserGrantAction).mockRejectedValue(
+            new Error("server action not found")
+        );
         view();
-        fireEvent.click(await screen.findByRole("button", { name: "Remove their access to Survival" }));
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Remove their access to Survival" })
+        );
         const dialog = await screen.findByRole("dialog");
         fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
         expect(await screen.findByText(/Polaris did not answer/)).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Remove their access to Survival" })).toHaveProperty(
-            "disabled",
-            false
-        );
+        expect(
+            screen.getByRole("button", { name: "Remove their access to Survival" })
+        ).toHaveProperty("disabled", false);
     });
 });

@@ -84,7 +84,9 @@ describe("asking before a restart", () => {
 
     it("says so when the switch fails, instead of spinning", async () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
-        vi.mocked(loginActions.setLoginAction).mockRejectedValue(new Error("server action not found"));
+        vi.mocked(loginActions.setLoginAction).mockRejectedValue(
+            new Error("server action not found")
+        );
         card("NEOFORGE", "auth?");
         fireEvent.click(await screen.findByRole("button", { name: "Use Polaris login" }));
         const dialog = await screen.findByRole("dialog");
