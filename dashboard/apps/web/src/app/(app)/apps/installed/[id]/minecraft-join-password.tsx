@@ -20,7 +20,14 @@
  * a plugin has no build for a modded server and a mod has none for Paper. Both
  * of the ones offered here install on their own, with nothing else to add
  * alongside them, which matters because a dependency that cannot be resolved is a
- * server that does not come back up.
+ * server that does not come back up. `join-guard` makes that choice, and it makes
+ * it for the create path too, so what this screen calls On is the same project a
+ * new server already arrived with.
+ *
+ * A new server has it on already. This screen is where it is turned off, and
+ * where somebody arriving at an older server turns it on - the switch stopped
+ * being the only way the guard ever got installed, because a switch only protects
+ * the servers whose owner went looking for it.
  *
  * Java only, and the card says so on Bedrock rather than going quiet. Bedrock
  * loads neither plugins nor mods and has no Modrinth list at all, so there is
@@ -32,6 +39,7 @@
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { useEffect, useState, useTransition } from "react";
+import { joinGuardFor, joinGuardSlugs } from "@/lib/apps/minecraft/join-guard";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
@@ -39,25 +47,11 @@ import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actio
 
 const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
-/** The plugin for a server that runs plugins, and the mod for one that runs mods.
- *  Both install with no dependencies of their own on every release they publish,
- *  which is what makes them safe to add behind one switch. */
-const GUARD_BY_KIND = { plugin: "mylogin", mod: "auth" } as const;
-
-/** What this server could install, or null when it can install nothing at all -
- *  a vanilla server loads neither plugins nor mods. */
-function guardFor(software: string): string | null {
-    const loader = modrinth.loaderForType(software);
-    if (!loader) return null;
-    return modrinth.isPluginLoader(loader) ? GUARD_BY_KIND.plugin : GUARD_BY_KIND.mod;
-}
-
-/** Whether the list already carries that project, whatever version or suffix the
- *  entry was written with. */
-function listed(projects: string, slug: string): boolean {
-    return modrinth
-        .parseProjectList(projects)
-        .some((entry) => modrinth.projectSlug(entry)?.toLowerCase() === slug);
+/** Whether an entry names one of those projects, whatever version or suffix it
+ *  was written with. */
+function names(entry: string, slugs: readonly string[]): boolean {
+    const slug = modrinth.projectSlug(entry)?.toLowerCase();
+    return typeof slug === "string" && slugs.includes(slug);
 }
 
 export function MinecraftJoinPassword({
@@ -82,14 +76,19 @@ export function MinecraftJoinPassword({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const java = edition === "java";
-    const guard = java ? guardFor(software) : null;
+    const guard = java ? joinGuardFor(software) : null;
     const [on, setOn] = useState(false);
 
     // Held in state so the switch answers the press immediately, and taken from
     // the server again whenever its answer changes underneath - the Mods screen
     // edits the same list.
     useEffect(() => {
-        setOn(guard !== null && listed(projects, guard));
+        setOn(
+            guard !== null &&
+                modrinth
+                    .parseProjectList(projects)
+                    .some((entry) => names(entry, joinGuardSlugs(guard)))
+        );
     }, [projects, guard]);
 
     function apply(wanted: boolean): void {
@@ -102,10 +101,10 @@ export function MinecraftJoinPassword({
             // down. Only on the way in: taking a project off the list cannot fail
             // for want of a build.
             if (wanted) {
-                const fit = await projectFitsAction({ installedAppId, slug: guard });
+                const fit = await projectFitsAction({ installedAppId, slug: guard.slug });
                 if (!fit.fits) {
                     setError(
-                        `${guard} has no build for the release this server runs${fit.version ? ` (${fit.version})` : ""}. Turning this on would stop the server rather than close it.`
+                        `${guard.slug} has no build for the release this server runs${fit.version ? ` (${fit.version})` : ""}. Turning this on would stop the server rather than close it.`
                     );
                     return;
                 }
@@ -127,10 +126,8 @@ export function MinecraftJoinPassword({
             if (!asked) return;
 
             const entries = modrinth.parseProjectList(projects);
-            const without = entries.filter(
-                (entry) => modrinth.projectSlug(entry)?.toLowerCase() !== guard
-            );
-            const next = wanted ? [...without, guard] : without;
+            const without = entries.filter((entry) => !names(entry, joinGuardSlugs(guard)));
+            const next = wanted ? [...without, `${guard.slug}?`] : without;
             const result = await updateServerSettingsAction(installedAppId, [
                 { key: PROJECTS_KEY, value: modrinth.formatProjectList(next) }
             ]);
@@ -175,17 +172,17 @@ export function MinecraftJoinPassword({
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
-                            Installs <span className="font-mono">{guard}</span> from Modrinth, which
-                            the Mods screen shows afterwards like anything else on the list. If it
-                            cannot be installed the server says so on startup rather than starting
-                            without it.
+                            Installs <span className="font-mono">{guard.slug}</span> from Modrinth,
+                            which the Mods screen shows afterwards like anything else on the list.
+                            If it cannot be installed the server says so on startup rather than
+                            starting without it.
                         </p>
                         {/* The commands, because nobody reading this is the person who
                             will need them: the player is in the game, locked out, with
                             no way to find out what to type. Only the modded one is
                             spelled out - those commands were read off a running server.
                             The plugin's own are not repeated here unverified. */}
-                        {guard === GUARD_BY_KIND.mod ? (
+                        {guard.entry === "trigger" ? (
                             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                                 Players register with{" "}
                                 <span className="font-mono">/trigger register set 1234</span> and
@@ -201,9 +198,12 @@ export function MinecraftJoinPassword({
                         ) : (
                             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                                 Players register on their first join with the commands{" "}
-                                <span className="font-mono">{guard}</span> documents on its Modrinth
-                                page. Tell them before turning this on: nobody can look that up from
-                                inside the server they have just been locked out of.
+                                <span className="font-mono">{guard.slug}</span> documents on its
+                                Modrinth page. Tell them before turning this on: nobody can look
+                                that up from inside the server they have just been locked out of.
+                                Their password can appear in the server log, which the Console
+                                screen shows - it is hidden only by a library Modrinth does not
+                                carry, so treat these as passwords for this server and nothing else.
                             </p>
                         )}
                     </>

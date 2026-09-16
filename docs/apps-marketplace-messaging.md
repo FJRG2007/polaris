@@ -40,8 +40,9 @@ document is the source of truth; keep it current as phases land.
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
 (scan a QR); Discord bot token; Slack bot token + MESSAGING_SLACK_SIGNING_SECRET
-+ Events webhook. All channels also need the bridge running (MESSAGING_BRIDGE_URL/
-TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
+
+- Events webhook. All channels also need the bridge running (MESSAGING_BRIDGE_URL/
+  TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
 
 ## Known follow-ups (deferred, not silently dropped)
 
@@ -93,16 +94,16 @@ TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
 
 ## Reuse map (do not reinvent)
 
-| Need | Reuse |
-| --- | --- |
-| Install/run an app | Deploy: compose templates on `DeployTarget` -> `RuntimePorts` (`lib/deploy/runtime.ts`), engine driver from `@polaris/deploy` |
-| Server + storage picker | Deploy target picker + `Volume`/NAS `StorageMount` (`deploy-volume-service.ts`) |
-| Store channel/provider secrets | `Integration` envelope-encryption pattern (AES-256-GCM, `encryptedSecret`/`secretNonce`/`secretKeyId`) |
-| Catalog-as-code | `lib/integrations/registry.ts` shape (static typed array + DB row for install state) |
-| Live inbox transport | Ticket-authed WebSocket sidecar (`ws-server.mjs` + `DeployTicket` + subprotocol token) |
-| Generic app dashboard | Deploy panels: logs, metrics, terminal, files |
-| Auth on routes/actions | `requirePermission()` from `lib/session.ts` |
-| Input validation | Zod schemas in `packages/core/src/schemas/`, shared client+server |
+| Need                           | Reuse                                                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Install/run an app             | Deploy: compose templates on `DeployTarget` -> `RuntimePorts` (`lib/deploy/runtime.ts`), engine driver from `@polaris/deploy` |
+| Server + storage picker        | Deploy target picker + `Volume`/NAS `StorageMount` (`deploy-volume-service.ts`)                                               |
+| Store channel/provider secrets | `Integration` envelope-encryption pattern (AES-256-GCM, `encryptedSecret`/`secretNonce`/`secretKeyId`)                        |
+| Catalog-as-code                | `lib/integrations/registry.ts` shape (static typed array + DB row for install state)                                          |
+| Live inbox transport           | Ticket-authed WebSocket sidecar (`ws-server.mjs` + `DeployTicket` + subprotocol token)                                        |
+| Generic app dashboard          | Deploy panels: logs, metrics, terminal, files                                                                                 |
+| Auth on routes/actions         | `requirePermission()` from `lib/session.ts`                                                                                   |
+| Input validation               | Zod schemas in `packages/core/src/schemas/`, shared client+server                                                             |
 
 ## Architecture
 
@@ -169,15 +170,15 @@ bridge service (`services/messaging-bridge/src/adapters/`):
 
 Capability matrix:
 
-| Platform / provider | Native buttons | Native selects | Poll | Runtime | Cost |
-| --- | --- | --- | --- | --- | --- |
-| Telegram (Bot API) | yes | yes | yes | no browser | free |
-| Discord (bot) | yes | yes | n/a | gateway | free |
-| Discord `discord-webhook` | no (-> numbered text) | no | n/a | send-only HTTP | free |
-| Slack (Block Kit) | yes | yes | n/a | Events API | free |
-| Slack `slack-webhook` | no (-> numbered text) | no | n/a | send-only HTTP | free |
-| WhatsApp `whatsapp-web` | no (-> Poll/menu) | no (-> Poll/menu) | yes | Puppeteer | free + number |
-| WhatsApp `whatsapp-cloud` | yes | yes (list) | n/a | webhook | paid + number |
+| Platform / provider       | Native buttons        | Native selects    | Poll | Runtime        | Cost          |
+| ------------------------- | --------------------- | ----------------- | ---- | -------------- | ------------- |
+| Telegram (Bot API)        | yes                   | yes               | yes  | no browser     | free          |
+| Discord (bot)             | yes                   | yes               | n/a  | gateway        | free          |
+| Discord `discord-webhook` | no (-> numbered text) | no                | n/a  | send-only HTTP | free          |
+| Slack (Block Kit)         | yes                   | yes               | n/a  | Events API     | free          |
+| Slack `slack-webhook`     | no (-> numbered text) | no                | n/a  | send-only HTTP | free          |
+| WhatsApp `whatsapp-web`   | no (-> Poll/menu)     | no (-> Poll/menu) | yes  | Puppeteer      | free + number |
+| WhatsApp `whatsapp-cloud` | yes                   | yes (list)        | n/a  | webhook        | paid + number |
 
 The `discord-webhook` and `slack-webhook` providers are send-only incoming-webhook
 adapters (no bot, no gateway/socket, so no receive) for one-way alerts to a channel
@@ -320,6 +321,20 @@ configured means the machine's own address, as before.
   permission plugin both are administered through (luckperms) installed on the
   first boot. Each carries `?` so a Minecraft release they have no build for yet
   warns instead of stopping the server.
+- **A password on top of the whitelist, by default.** With Mojang authentication
+  off, a name on the whitelist is the only thing standing between a stranger and
+  the account - so every new Java server (and a reset one) is seeded a project
+  that asks a first-time joiner for a password: `simple-login` for a server that
+  loads plugins, the `auth` data pack for one that loads mods, neither for
+  vanilla or Bedrock. `lib/apps/minecraft/join-guard.ts` is the one place that
+  decides which, so the create path, the Mods list and the join-password card on
+  the server's panel never disagree; a server already carrying `mylogin`, the
+  plugin this replaced, is read as already having it rather than being given a
+  second. It is appended to `MODRINTH_PROJECTS` like anything else, so turning it
+  off from the Mods screen or the card keeps it off. The plugin names
+  ProtocolLib as a soft dependency and does not hide the password from the
+  server log without it; Modrinth does not carry ProtocolLib, so the card says so
+  rather than promising a hidden log it cannot deliver.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before

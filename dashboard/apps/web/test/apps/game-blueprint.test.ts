@@ -12,6 +12,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { joinGuardEntry } from "@/lib/apps/minecraft/join-guard";
 import { entryReleaseType, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import { commonVersions, knownUnsupported } from "@/lib/apps/minecraft/blueprint-version";
 import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@/lib/apps/games-create";
@@ -309,8 +310,13 @@ describe("the world a blueprint opens on", () => {
         const env = await envFor("bedwars", {}, { MODRINTH_PROJECTS: "grimac?,coreprotect?" });
         expect(env.get("TYPE")).toBe("PAPER");
         // The entry keeps the release type it was declared with, so the image
-        // applies the same rule the version was resolved under.
-        expect(env.get("MODRINTH_PROJECTS")).toBe("grimac?,coreprotect?,bedwars1058:beta");
+        // applies the same rule the version was resolved under. The guard comes
+        // last because every server is given one - it is not part of this
+        // blueprint, and naming it from the module keeps this from being a second
+        // place the slug has to be kept true.
+        expect(env.get("MODRINTH_PROJECTS")).toBe(
+            `grimac?,coreprotect?,bedwars1058:beta,${joinGuardEntry("PAPER")}`
+        );
         // A heavier game for the same number of players gets a heavier heap.
         expect(env.get("MEMORY")).toBe("3G");
     });
