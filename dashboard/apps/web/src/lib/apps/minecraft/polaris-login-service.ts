@@ -317,7 +317,12 @@ export async function loginState(
         seenAt: checkIn?.seenAt.toISOString() ?? null,
         modVersion,
         currentVersion,
-        outdated: polarisLogin.modOutdated({ on, health, running: modVersion, current: currentVersion }),
+        outdated: polarisLogin.modOutdated({
+            on,
+            health,
+            running: modVersion,
+            current: currentVersion
+        }),
         players: players.map((row) => ({
             name: row.displayName,
             createdAt: row.createdAt.toISOString(),

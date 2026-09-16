@@ -54,7 +54,12 @@ describe("downloading the mod", () => {
     });
 
     it("serves nothing that is not a build, by any name", async () => {
-        for (const file of ["polaris-neoforge-1.21.1.jar", "../secrets.jar", "x.jar", `${JAR}.version`]) {
+        for (const file of [
+            "polaris-neoforge-1.21.1.jar",
+            "../secrets.jar",
+            "x.jar",
+            `${JAR}.version`
+        ]) {
             expect((await route.GET(request("GET"), params(file))).status, file).toBe(404);
             expect((await route.HEAD(request("HEAD"), params(file))).status, file).toBe(404);
         }

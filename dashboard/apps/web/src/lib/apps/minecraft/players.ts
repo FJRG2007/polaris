@@ -120,7 +120,8 @@ export function foldPlayers(
     // any of its lists still mentions them.
     for (const event of sessions) upsert(event.name, {});
     // So is somebody who set a password on it.
-    for (const entry of passwords) upsert(entry.name, { password: { lastLoginAt: entry.lastLoginAt } });
+    for (const entry of passwords)
+        upsert(entry.name, { password: { lastLoginAt: entry.lastLoginAt } });
 
     const history = sessionsByPlayer(sessions);
     for (const [key, entry] of byKey) {
@@ -165,5 +166,8 @@ function watched(activity: PlayerActivity, seen: PlayerSeen | null): PlayerActiv
     if (activity.lastSeen) return activity;
     const last = seen?.lastSeen ?? seen?.since ?? null;
     if (!last) return activity;
-    return { presence: activity.presence === "never" ? "offline" : activity.presence, lastSeen: last };
+    return {
+        presence: activity.presence === "never" ? "offline" : activity.presence,
+        lastSeen: last
+    };
 }

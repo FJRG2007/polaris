@@ -90,7 +90,11 @@ describe("foldPlayers", () => {
             roster({ bans: [{ name: "Griefer", reason: "Blew up spawn" }] }),
             access([])
         );
-        expect(folded[0]).toMatchObject({ name: "Griefer", banned: true, banReason: "Blew up spawn" });
+        expect(folded[0]).toMatchObject({
+            name: "Griefer",
+            banned: true,
+            banReason: "Blew up spawn"
+        });
     });
 
     // The gap the player list exists to close: the game knows the name, Polaris
@@ -131,14 +135,20 @@ describe("foldPlayers", () => {
             lastLoginAt: "2026-08-13T20:00:00.000Z"
         });
         // Somebody who only set a password is still somebody this server knows.
-        expect(folded.find((row) => row.name === "Newcomer")?.password).toEqual({ lastLoginAt: null });
+        expect(folded.find((row) => row.name === "Newcomer")?.password).toEqual({
+            lastLoginAt: null
+        });
         expect(foldPlayers(status(["Steve"]), roster(), access([]))[0]?.password).toBeNull();
     });
 
     it("lists a registered player who has never connected", () => {
         const folded = foldPlayers(status([]), roster(), access([rule("Alex", "203.0.113.0/24")]));
         expect(folded).toHaveLength(1);
-        expect(folded[0]).toMatchObject({ name: "Alex", online: false, addresses: ["203.0.113.0/24"] });
+        expect(folded[0]).toMatchObject({
+            name: "Alex",
+            online: false,
+            addresses: ["203.0.113.0/24"]
+        });
     });
 
     // Online first because they are who something can be done about right now,
@@ -166,21 +176,43 @@ describe("foldPlayers", () => {
                 lastSeen: "2026-08-10T20:00:00.000Z"
             }
         };
-        const folded = foldPlayers(status([]), roster({ whitelist: ["Alex"] }), access([]), [], NOW, seen);
-        expect(folded[0]).toMatchObject({ presence: "offline", lastSeen: "2026-08-10T20:00:00.000Z" });
+        const folded = foldPlayers(
+            status([]),
+            roster({ whitelist: ["Alex"] }),
+            access([]),
+            [],
+            NOW,
+            seen
+        );
+        expect(folded[0]).toMatchObject({
+            presence: "offline",
+            lastSeen: "2026-08-10T20:00:00.000Z"
+        });
     });
 
     it("leaves the log's own answer alone where it has one", () => {
         // The server wrote the moment down itself; the record is a sweep that
         // noticed within the minute of it.
-        const events = [{ name: "Alex", kind: "leave" as const, at: "2026-08-13T20:30:00.000Z", address: null }];
+        const events = [
+            { name: "Alex", kind: "leave" as const, at: "2026-08-13T20:30:00.000Z", address: null }
+        ];
         const seen = {
             [seenKey({ name: "Alex", id: null })]: {
                 since: "2026-08-13T19:00:00.000Z",
                 lastSeen: "2026-08-13T20:31:00.000Z"
             }
         };
-        const folded = foldPlayers(status([]), roster({ whitelist: ["Alex"] }), access([]), events, NOW, seen);
-        expect(folded[0]).toMatchObject({ presence: "offline", lastSeen: "2026-08-13T20:30:00.000Z" });
+        const folded = foldPlayers(
+            status([]),
+            roster({ whitelist: ["Alex"] }),
+            access([]),
+            events,
+            NOW,
+            seen
+        );
+        expect(folded[0]).toMatchObject({
+            presence: "offline",
+            lastSeen: "2026-08-13T20:30:00.000Z"
+        });
     });
 });
