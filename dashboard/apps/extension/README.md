@@ -8,9 +8,19 @@ it. Chrome and Firefox from one source, built with [WXT](https://wxt.dev).
 Polaris already answers the Bitwarden client protocol at `https://<your
 polaris>/vault` - that is how the official clients work against it, and it is
 documented in `dashboard/docs/vault.md`. This extension is another client of that
-same surface, so it adds no server code: it signs in at
-`/vault/identity/connect/token`, reads everything from `/vault/api/sync`, and
-polls `/vault/api/accounts/revision-date` to know when to sync again.
+same surface, so it adds no server code: it is let in through
+`/vault/identity/connect/authorize` and its `/claim`, reads everything from
+`/vault/api/sync`, refreshes at `/vault/identity/connect/token`, and polls
+`/vault/api/accounts/revision-date` to know when to sync again.
+
+Signing in is asking Polaris itself, not typing a password into this extension. A
+tab opens on the dashboard, somebody who is already signed in and has their vault
+open approves the request, and the vault key arrives sealed to a pair this
+extension made for the exchange - the same shape as a TV app signing in to a
+streaming service. The master password is not a way in: it only unlocks a vault
+that has already signed in and since locked itself. More than one account can be
+signed in at once; the popup's account line switches between them without
+signing out.
 
 The cryptography is not reimplemented here either. `@polaris/vault-crypto` is the
 module the Polaris web vault uses, pinned against Bitwarden's own test vectors, so
@@ -35,7 +45,8 @@ asking to read every page you open.
 
 ```
 src/lib/server.ts        which Polaris this belongs to, and permission for it
-src/lib/protocol.ts      the Bitwarden protocol client: sign in, be let in, sync, refresh
+src/lib/protocol.ts      the Bitwarden protocol client: be let in, sync, refresh
+src/lib/accounts.ts      more than one signed-in account, and switching between them
 src/lib/matching.ts      whether an item belongs to this page, and which comes first
 src/lib/lock.ts          when an open vault locks itself again
 src/lib/save.ts          what was typed for a new login, before it is encrypted
