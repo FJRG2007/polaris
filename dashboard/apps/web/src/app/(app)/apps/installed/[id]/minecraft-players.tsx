@@ -18,6 +18,7 @@
  */
 
 import * as actions from "./minecraft-actions";
+import { forgetLoginAction } from "./minecraft-login-actions";
 import { relativeTime } from "@/lib/relative-time";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
@@ -74,10 +75,12 @@ import {
     DoorOpen,
     Gamepad2,
     History,
+    KeyRound,
     LocateFixed,
     MapPin,
     MoreHorizontal,
     Pencil,
+    RotateCcw,
     ShieldBan,
     ShieldMinus,
     ShieldPlus,
@@ -109,6 +112,9 @@ export function MinecraftPlayers({
     timeouts,
     levels,
     pending: waiting,
+    passwords,
+    canResetPasswords,
+    onPasswordsChanged,
     onChanged
 }: {
     installedAppId: string;
@@ -139,6 +145,12 @@ export function MinecraftPlayers({
     levels: Readonly<Record<string, number>>;
     /** Decisions the server could not be told yet, oldest first. */
     pending: readonly QueuedAction[];
+    /** Who has a Polaris login password here, or null on a server that does not
+     *  use it - where no row says anything about passwords. */
+    passwords?: readonly { readonly name: string; readonly lastLoginAt: string | null }[] | null;
+    /** Resetting one takes the manage grant; this screen only takes read. */
+    canResetPasswords?: boolean;
+    onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
     const [pending, startTransition] = useTransition();
@@ -167,8 +179,8 @@ export function MinecraftPlayers({
     const bedrock = status?.edition === "bedrock";
     const edition = access?.edition ?? status?.edition ?? "java";
     const known = useMemo(
-        () => foldPlayers(status, roster, access, sessions, now, seen),
-        [status, roster, access, sessions, now, seen]
+        () => foldPlayers(status, roster, access, sessions, now, seen, passwords ?? []),
+        [status, roster, access, sessions, now, seen, passwords]
     );
     const players = useMemo(
         () => known.map((player) => ({ ...player, ...(applied.get(player.name.toLowerCase()) ?? {}) })),
@@ -285,6 +297,23 @@ export function MinecraftPlayers({
     ): Promise<void> {
         if (!(await confirm({ title, description, confirmLabel: "Confirm", danger: true }))) return;
         moderate(input);
+    }
+
+    /** Forget somebody's Polaris login password, so they set a new one on their
+     *  next join. Nothing restarts: the mod asks on every join. */
+    async function resetPassword(player: string): Promise<void> {
+        const agreed = await confirm({
+            title: `Reset ${player}'s password?`,
+            description: `${player} sets a new one the next time they join.`,
+            confirmLabel: "Reset password",
+            danger: true
+        });
+        if (!agreed) return;
+        run(async () => {
+            const result = await forgetLoginAction({ installedAppId, player });
+            if (!result.error) onPasswordsChanged?.();
+            return result;
+        });
     }
 
     async function addPlayer(input: { username: string; address: string }): Promise<boolean> {
@@ -501,6 +530,12 @@ export function MinecraftPlayers({
                                 .length
                         }
                         onOpen={(dialog) => setActing({ player, dialog })}
+                        passwords={passwords != null}
+                        onResetPassword={
+                            canResetPasswords && player.password
+                                ? () => void resetPassword(player.name)
+                                : undefined
+                        }
                         onRevoke={() =>
                             void confirm({
                                 ...playerConfirm.remove(player.name),
@@ -635,6 +670,8 @@ function PlayerRow({
     onModerateWithConfirm,
     onGamemode,
     onOpen,
+    passwords,
+    onResetPassword,
     onRevoke
 }: {
     player: PlayerEntry;
@@ -660,6 +697,10 @@ function PlayerRow({
     ) => Promise<void>;
     onGamemode: (players: readonly string[], mode: string) => Promise<void>;
     onOpen: (dialog: PlayerDialog) => void;
+    /** Whether the server asks for a Polaris login password. */
+    passwords: boolean;
+    /** Forget their password, when they have one and the viewer may. */
+    onResetPassword?: () => void;
     onRevoke: () => void;
 }) {
     const { name } = player;
@@ -712,6 +753,24 @@ function PlayerRow({
                     {player.addresses.length > 0 && <Badge variant="primary">{playerStanding.allowed}</Badge>}
                     {player.operator && <Badge>{playerStanding.operator}</Badge>}
                     {player.whitelisted && <Badge>whitelisted</Badge>}
+                    {/* Whether they can get past Polaris login, on the servers that
+                        ask for it. Somebody without one sets it on their next join. */}
+                    {passwords &&
+                        (player.password ? (
+                            <Badge
+                                variant="success"
+                                title={
+                                    player.password.lastLoginAt
+                                        ? `Last logged in ${new Date(player.password.lastLoginAt).toLocaleString()}`
+                                        : "Has not logged in since registering"
+                                }
+                            >
+                                <KeyRound className="size-3" />
+                                password set
+                            </Badge>
+                        ) : (
+                            <Badge title="Sets one on their next join">no password yet</Badge>
+                        ))}
                     {player.banned &&
                         (timeout ? (
                             <Badge variant="danger" title={`Lifts ${new Date(timeout.until).toLocaleString()}`}>
@@ -841,6 +900,7 @@ function PlayerRow({
                         onOpen={onOpen}
                         onModerateWithConfirm={onModerateWithConfirm}
                         onGamemode={onGamemode}
+                        onResetPassword={onResetPassword}
                     />
                 </div>
             </td>
@@ -896,7 +956,8 @@ function MoreActions({
     live,
     onOpen,
     onModerateWithConfirm,
-    onGamemode
+    onGamemode,
+    onResetPassword
 }: {
     player: PlayerEntry;
     bedrock: boolean;
@@ -908,6 +969,7 @@ function MoreActions({
         description: string
     ) => Promise<void>;
     onGamemode: (players: readonly string[], mode: string) => Promise<void>;
+    onResetPassword?: () => void;
 }) {
     return (
         <DropdownMenu>
@@ -959,6 +1021,13 @@ function MoreActions({
                 <DropdownMenuItem onSelect={() => onOpen("history")}>
                     <History className="size-4" /> {playerMenuItem.history}
                 </DropdownMenuItem>
+                {/* Polaris keeps the password, so this works whether or not the
+                    server is answering. */}
+                {onResetPassword && (
+                    <DropdownMenuItem onSelect={onResetPassword}>
+                        <RotateCcw className="size-4" /> Reset password
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 {/* Flat rather than a submenu. Four items is not enough to be worth
                     a second layer somebody has to hover exactly onto. */}

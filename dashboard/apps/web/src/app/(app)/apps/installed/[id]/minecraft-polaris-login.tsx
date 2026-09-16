@@ -16,20 +16,27 @@
  * has been up a while without checking in is shown as the outage it is.
  */
 
-import { Button, Skeleton } from "@polaris/ui";
-import { useConfirm } from "@/components/confirm-dialog";
+import { Skeleton } from "@polaris/ui";
+import { TriangleAlert } from "lucide-react";
+import { loginStateAction } from "./minecraft-login-actions";
 import { useCallback, useEffect, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
-import { Loader2, RotateCcw, TriangleAlert } from "lucide-react";
 import type { LoginState } from "@/lib/apps/minecraft/polaris-login-service";
-import { forgetLoginAction, loginStateAction } from "./minecraft-login-actions";
 import { readSnapshot, writeSnapshot, dropSnapshots } from "@/lib/snapshot-cache";
 
 const SNAPSHOT_MS = 30_000;
 const snapshotKey = (installedAppId: string) => `minecraft-login:${installedAppId}`;
 
-/** The mod's state on one server, read when `enabled`, from cache first. */
-export function useLoginState(installedAppId: string, enabled: boolean) {
+/** The login state to hand a component that would otherwise read its own. */
+export type LoginStateHandle = ReturnType<typeof useLoginState>;
+
+/**
+ * The mod's state on one server, read when `enabled`, from cache first.
+ *
+ * `refreshMs` reads it again on that interval, for a screen that has to notice
+ * the server checking in after a restart.
+ */
+export function useLoginState(installedAppId: string, enabled: boolean, refreshMs?: number) {
     const [state, setState] = useState<LoginState | null>(() =>
         enabled
             ? (readSnapshot<LoginState>(snapshotKey(installedAppId), SNAPSHOT_MS)?.value ?? null)
@@ -51,8 +58,12 @@ export function useLoginState(installedAppId: string, enabled: boolean) {
     }, [installedAppId]);
 
     useEffect(() => {
-        if (enabled) void reload();
-    }, [enabled, reload]);
+        if (!enabled) return;
+        void reload();
+        if (!refreshMs) return;
+        const timer = setInterval(() => void reload(), refreshMs);
+        return () => clearInterval(timer);
+    }, [enabled, reload, refreshMs]);
 
     const invalidate = useCallback(() => {
         dropSnapshots(snapshotKey(installedAppId));
@@ -64,37 +75,17 @@ export function useLoginState(installedAppId: string, enabled: boolean) {
 
 /** What the card shows while the mod is on. */
 export function LoginDetails({
-    installedAppId,
     state,
-    onChanged
+    onOpenPlayers
 }: {
-    installedAppId: string;
     state: LoginState;
-    onChanged: () => void;
+    /** Where each player's password is shown and reset. */
+    onOpenPlayers?: () => void;
 }) {
-    const [confirm, confirmElement] = useConfirm();
-    const [busy, setBusy] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    async function forget(player: string): Promise<void> {
-        const asked = await confirm({
-            title: `Reset ${player}'s password?`,
-            description: `${player} sets a new one the next time they join.`,
-            confirmLabel: "Reset password",
-            danger: true
-        });
-        if (!asked) return;
-        setBusy(player);
-        setError(null);
-        const result = await forgetLoginAction({ installedAppId, player });
-        setBusy(null);
-        if (result.error) setError(result.error);
-        else onChanged();
-    }
+    const registered = state.players.length;
 
     return (
         <div className="flex flex-col gap-3">
-            {confirmElement}
             {state.health === "silent" ? (
                 <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
@@ -117,8 +108,9 @@ export function LoginDetails({
                 <p className="text-xs text-muted-foreground">
                     {state.health === "ok" && state.seenAt ? (
                         <>
-                            Polaris login {state.modVersion ? `${state.modVersion} ` : ""}checked in{" "}
-                            <RelativeTime iso={state.seenAt} />.
+                            Polaris login checked in <RelativeTime iso={state.seenAt} />.
+                            {state.outdated &&
+                                " The server runs an older build; the new one installs when it restarts."}
                         </>
                     ) : (
                         "Waiting for the server to start and check in."
@@ -134,56 +126,22 @@ export function LoginDetails({
                 password with spaces or symbols goes in double quotes.
             </p>
 
-            <div className="flex flex-col gap-1">
-                <p className="text-xs font-medium">Registered players</p>
-                {state.players.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nobody has registered yet.</p>
+            <p className="text-xs text-muted-foreground">
+                {registered === 0
+                    ? "Nobody has set a password yet."
+                    : `${registered} ${registered === 1 ? "player has" : "players have"} set a password.`}{" "}
+                {onOpenPlayers ? (
+                    <button
+                        type="button"
+                        onClick={onOpenPlayers}
+                        className="text-primary hover:underline"
+                    >
+                        See who, and reset one, in Players
+                    </button>
                 ) : (
-                    <ul className="flex flex-col divide-y divide-border">
-                        {state.players.map((player) => (
-                            <li
-                                key={player.name}
-                                className="flex items-center gap-2 py-1.5 text-sm"
-                            >
-                                <span
-                                    className="min-w-0 flex-1 truncate font-mono"
-                                    title={player.name}
-                                >
-                                    {player.name}
-                                </span>
-                                <span className="shrink-0 text-xs text-muted-foreground">
-                                    {player.lastLoginAt ? (
-                                        <>
-                                            In{" "}
-                                            <RelativeTime
-                                                iso={player.lastLoginAt}
-                                                formatStyle="narrow"
-                                            />
-                                        </>
-                                    ) : (
-                                        "Never logged in"
-                                    )}
-                                </span>
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    aria-label={`Reset ${player.name}'s password`}
-                                    title={`Reset ${player.name}'s password`}
-                                    disabled={busy !== null}
-                                    onClick={() => void forget(player.name)}
-                                >
-                                    {busy === player.name ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <RotateCcw className="size-4" />
-                                    )}
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
+                    "Players shows who, and resets one."
                 )}
-                {error && <p className="text-sm text-danger">{error}</p>}
-            </div>
+            </p>
         </div>
     );
 }

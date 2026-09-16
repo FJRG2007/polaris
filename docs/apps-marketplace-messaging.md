@@ -377,8 +377,9 @@ configured means the machine's own address, as before.
   different places. The mod keeps nothing: every join asks
   `/api/minecraft/login/<server>/<action>` (`hello`, `status`, `register`,
   `login`, `password`), which checks the token and throttles per player and, for
-  failures, per server. Passwords are salted scrypt in `MinecraftLogin`, and the
-  card lists them with a reset per player. Every question about a player also
+  failures, per server. Passwords are salted scrypt in `MinecraftLogin`; the
+  players table marks who has one and resets it from the row's menu, and the
+  card only counts them. Every question about a player also
   carries the address they connect from, and a name the server's player list
   does not allow is answered `refused` - `status` still answers 200, with
   `refused` alongside `registered`, and `register`/`login` answer 403 with
@@ -391,7 +392,14 @@ configured means the machine's own address, as before.
   with a message saying so, and because the
   image downloads `MODS` on every boot, it does not start either. The mod checks
   in every minute (`MinecraftLoginCheckIn`), and the card shows a server that has
-  been up for three minutes without checking in as an outage. `MODS` only prunes
+  been up for three minutes without checking in as an outage. The jar is
+  served with no date, so the image fetches it on every boot: the image keeps a
+  file newer than the date it is given, and its file is dated when it was
+  downloaded, so a dated jar let a server restarted between a build and the
+  Update keep the old one. The version the mod reports carries a fingerprint of
+  its sources (the Dockerfile writes it beside the jar, read by
+  `polaris-mod-files.ts`), and a running server that checked in with another one
+  gets a restart notice at the top of its page (`modOutdated`). `MODS` only prunes
   files it copied itself (one manifest per list), so it never touches what
   `MODRINTH_PROJECTS` installed. `guardForSave` and `minecraftShapeEnv` take the
   mod off a server moved to software or a release it has no build for, and seed

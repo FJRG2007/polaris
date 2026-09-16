@@ -113,6 +113,28 @@ describe("foldPlayers", () => {
         expect(folded[0]?.note).toBe("On the road");
     });
 
+    it("carries who set a Polaris login password, whatever the spelling", () => {
+        const folded = foldPlayers(
+            status([]),
+            roster(),
+            access([rule("Alex", "any")]),
+            [],
+            NOW,
+            {},
+            [
+                { name: "alex", lastLoginAt: "2026-08-13T20:00:00.000Z" },
+                { name: "Newcomer", lastLoginAt: null }
+            ]
+        );
+        expect(folded).toHaveLength(2);
+        expect(folded.find((row) => row.name === "Alex")?.password).toEqual({
+            lastLoginAt: "2026-08-13T20:00:00.000Z"
+        });
+        // Somebody who only set a password is still somebody this server knows.
+        expect(folded.find((row) => row.name === "Newcomer")?.password).toEqual({ lastLoginAt: null });
+        expect(foldPlayers(status(["Steve"]), roster(), access([]))[0]?.password).toBeNull();
+    });
+
     it("lists a registered player who has never connected", () => {
         const folded = foldPlayers(status([]), roster(), access([rule("Alex", "203.0.113.0/24")]));
         expect(folded).toHaveLength(1);

@@ -39,6 +39,9 @@ import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
 import { useGamePresence } from "@/components/use-game-presence";
+import { RestartPlanner } from "./restart-planner";
+import { useLoginState } from "./minecraft-polaris-login";
+import { loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { MinecraftJoinPassword } from "./minecraft-join-password";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
@@ -83,6 +86,8 @@ const SECURITY_GROUP = "Security";
  * inside the container.
  */
 const POLL_MS = 12000;
+/** How often Polaris login's state is read again. The mod checks in every minute. */
+const LOGIN_REFRESH_MS = 60_000;
 
 /** How old a streamed reading may be before the screen stops preferring it to what
  *  the poll last returned. Several times the stream's own cadence, so a frame that
@@ -343,6 +348,20 @@ export function MinecraftPanel({
         onStatus?.(statusLabel(status, isRunning));
     }, [onStatus, status, isRunning]);
 
+    // Polaris login, read once for every screen that shows it: the players table
+    // carries who has a password, and the overview says when the server runs an
+    // older build than this dashboard serves. Read again every minute, because
+    // that notice ends when the restarted server checks in.
+    const software = settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? "";
+    const edition = game?.edition ?? status?.edition ?? "java";
+    const login = useLoginState(
+        installedAppId,
+        edition === "java" && loaderForType(software) === "neoforge",
+        LOGIN_REFRESH_MS
+    );
+    const loginOn = login.state?.on === true;
+    const canManage = held.includes("games.manage");
+
     /** Settings come from the page, so applying them has to re-render it -
      *  otherwise the form keeps showing the old values as the current ones. */
     const reloadSettings = useCallback(() => {
@@ -364,6 +383,20 @@ export function MinecraftPanel({
                 onOpenPlayers={() => openTab("players")}
                 onOpenConsole={() => openTab("console")}
             />
+
+            {/* The jar is fetched when the server boots, so a newer one waits for a
+                restart - and nothing else on the page would say so. */}
+            {canManage && isRunning && login.state?.outdated && (
+                <RestartPlanner
+                    installedAppId={installedAppId}
+                    running={isRunning}
+                    changed
+                    reason="Polaris login update"
+                    title="Polaris login has an update"
+                    detail="This server runs an older build. It installs the new one when it restarts; passwords are kept."
+                    onRestarted={() => void login.reload()}
+                />
+            )}
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -427,6 +460,9 @@ export function MinecraftPanel({
                     timeouts={reading.timeouts}
                     levels={reading.levels}
                     pending={reading.pending}
+                    passwords={loginOn ? (login.state?.players ?? []) : null}
+                    canResetPasswords={canManage}
+                    onPasswordsChanged={() => void login.reload()}
                     onChanged={() => void load()}
                 />
             )}
@@ -496,6 +532,8 @@ export function MinecraftPanel({
                             settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? ""
                         }
                         playersOnline={status?.players.online ?? 0}
+                        login={login}
+                        onOpenPlayers={() => openTab("players")}
                         onSaved={reloadSettings}
                     />
                     {/* The firewall guards HTTP and a game server is not HTTP, so

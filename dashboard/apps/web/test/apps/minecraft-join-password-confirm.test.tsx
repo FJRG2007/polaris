@@ -34,6 +34,8 @@ const OFF = {
     health: "waiting" as const,
     seenAt: null,
     modVersion: null,
+    currentVersion: null,
+    outdated: false,
     players: []
 };
 

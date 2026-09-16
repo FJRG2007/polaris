@@ -121,14 +121,19 @@ RUN mkdir -p /build/apps/web/public
 # Its own stage so the layer is reused until the mod's sources change; the jar is
 # renamed to the file name the dashboard serves (MOD_BUILDS in
 # lib/apps/minecraft/polaris-login.ts, which a test holds to this line).
+# The version it reports carries a fingerprint of its sources, and is written
+# beside the jar too, so the panel can tell a server still running an older build
+# (lib/apps/minecraft/polaris-mod-files.ts).
 # ---------------------------------------------------------------------------
 FROM gradle:9.2.1-jdk21 AS minecraft-mods
 
 WORKDIR /mods/polaris-neoforge
 COPY resources/minecraft/polaris-neoforge/ ./
-RUN gradle --no-daemon -q build \
+RUN version="$(sed -n 's/^mod_version=//p' gradle.properties)+$(find . -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+    && gradle --no-daemon -q build -Pmod_version="$version" \
     && mkdir -p /out \
-    && cp "build/libs/polaris-$(sed -n 's/^mod_version=//p' gradle.properties).jar" /out/polaris-neoforge-1.21.4.jar
+    && cp "build/libs/polaris-$version.jar" /out/polaris-neoforge-1.21.4.jar \
+    && printf '%s\n' "$version" > /out/polaris-neoforge-1.21.4.jar.version
 
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.

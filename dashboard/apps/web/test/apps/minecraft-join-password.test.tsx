@@ -46,6 +46,8 @@ const OFF: LoginState = {
     health: "waiting",
     seenAt: null,
     modVersion: null,
+    currentVersion: null,
+    outdated: false,
     players: []
 };
 
@@ -314,10 +316,37 @@ describe("Polaris login", () => {
         vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: ON });
         neoforge("");
         expect(await screen.findByText(/\/register <password> <password>/)).toBeTruthy();
-        expect(screen.getByText("Steve")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Reset Steve's password" })).toBeTruthy();
         expect(screen.queryByText(/\/trigger/)).toBeNull();
         expect(screen.getByText("On")).toBeTruthy();
+    });
+
+    it("counts who has a password and sends the reader to Players for them", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: ON });
+        const openPlayers = vi.fn();
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects=""
+                software="NEOFORGE"
+                playersOnline={0}
+                onOpenPlayers={openPlayers}
+                onSaved={vi.fn()}
+            />
+        );
+        expect(await screen.findByText(/1 player has set a password/)).toBeTruthy();
+        // The names live in the players table, not in a second list here.
+        expect(screen.queryByText("Steve")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: /in Players/ }));
+        expect(openPlayers).toHaveBeenCalled();
+    });
+
+    it("says an update waits for a restart", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...ON, outdated: true }
+        });
+        neoforge("");
+        expect(await screen.findByText(/installs when it restarts/)).toBeTruthy();
     });
 
     it("says nobody can join when the server has gone quiet", async () => {

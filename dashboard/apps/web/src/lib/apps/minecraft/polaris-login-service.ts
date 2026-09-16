@@ -16,6 +16,7 @@ import { accessRefusal } from "./access";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import * as polarisLogin from "./polaris-login";
 import { publicAppUrl } from "@/lib/domain-service";
+import { bundledModVersion } from "./polaris-mod-files";
 import { readInstallEnvSecret } from "@/lib/apps/install-secret";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
@@ -268,6 +269,10 @@ export interface LoginState {
     readonly health: polarisLogin.LoginHealth;
     readonly seenAt: string | null;
     readonly modVersion: string | null;
+    /** The build this dashboard serves the server, when the image says. */
+    readonly currentVersion: string | null;
+    /** Whether the server runs an older build than that, until it restarts. */
+    readonly outdated: boolean;
     readonly players: readonly RegisteredPlayer[];
 }
 
@@ -298,18 +303,21 @@ export async function loginState(
         onlineSince(install?.config ?? null),
         deployment ? (deployment.finishedAt ?? now) : null
     );
+    const on = polarisLogin.loginOn(env);
+    const build = polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
+    const health = polarisLogin.loginHealth({ seenAt: checkIn?.seenAt ?? null, upSince, now });
+    const modVersion = checkIn?.modVersion ?? null;
+    const currentVersion = build ? await bundledModVersion(build) : null;
     return {
-        on: polarisLogin.loginOn(env),
-        build: polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
+        on,
+        build,
         foreign: foreignLogin(env.get(PROJECTS_KEY) ?? ""),
         reachable: publicUrl !== null,
-        health: polarisLogin.loginHealth({
-            seenAt: checkIn?.seenAt ?? null,
-            upSince,
-            now
-        }),
+        health,
         seenAt: checkIn?.seenAt.toISOString() ?? null,
-        modVersion: checkIn?.modVersion ?? null,
+        modVersion,
+        currentVersion,
+        outdated: polarisLogin.modOutdated({ on, health, running: modVersion, current: currentVersion }),
         players: players.map((row) => ({
             name: row.displayName,
             createdAt: row.createdAt.toISOString(),
