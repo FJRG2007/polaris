@@ -32,6 +32,8 @@ import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
+import { VoiceStateIcons } from "./call-roster";
+import { useChatStream } from "./use-chat-stream";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -186,6 +188,12 @@ export function ChatSidebar() {
             .then((result) => setInRoom(result.inRoom))
             .catch(() => undefined);
     }, [voiceIds]);
+
+    // Somebody walking into a room, leaving it or muting is announced, so the
+    // names under it follow at once rather than at the next poll.
+    useChatStream((frame) => {
+        if (frame.kind === "call" && voiceIds.includes(frame.channelId)) readPresence();
+    });
 
     useEffect(() => {
         readPresence();
@@ -680,6 +688,7 @@ function ChannelRows({
                                         <span className="truncate" title={person.name}>
                                             <PersonName id={person.userId} name={person.name} />
                                         </span>
+                                        <VoiceStateIcons person={person} />
                                     </PersonRow>
                                 ))}
                             </ul>

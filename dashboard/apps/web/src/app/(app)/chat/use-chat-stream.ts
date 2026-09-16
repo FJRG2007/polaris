@@ -49,7 +49,9 @@ const frameSchema = z.discriminatedUnion("kind", [
         name: z.string(),
         // Where the call has gone, when a one-to-one had to become a group to
         // take a third person. The browser in the old room follows it.
-        movedTo: z.object({ meetingId: z.string(), channelId: z.string() }).optional()
+        movedTo: z.object({ meetingId: z.string(), channelId: z.string() }).optional(),
+        // Only somebody's mute or deafen changed; who is in the call did not.
+        voice: z.literal(true).optional()
     })
 ]);
 

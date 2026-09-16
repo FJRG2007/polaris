@@ -39,6 +39,8 @@ import type { PollDraft } from "./poll-dialog";
 import { draftMessage } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
 import { ChannelHeader } from "./channel-header";
+import { CallRoster } from "./call-roster";
+import type { VoicePresence } from "@/lib/chat/meetings";
 import { DirectProfile } from "./direct-profile";
 import { ForwardDialog } from "./forward-dialog";
 import { useChatStream } from "./use-chat-stream";
@@ -182,7 +184,7 @@ export function ChannelView({
     // dragged to it - that is the one thing a chat must not do to somebody
     // mid-sentence - but they are told, and one press takes them there.
     const [unseen, setUnseen] = useState(0);
-    const [live, setLive] = useState<{ meetingId: string; count: number } | null>(null);
+    const [live, setLive] = useState<calls.LiveCall | null>(null);
     // The call this browser is sitting in, held above every screen so that
     // walking out of the conversation shrinks it into a bar rather than hanging
     // up. Being in one is not the same question as one running here: somebody
@@ -814,12 +816,20 @@ export function ChannelView({
                 // frame existed the number was whatever it happened to be when
                 // this screen last had another reason to ask - which is how one
                 // tab said one, another said two, and neither was right.
+                //
+                // The frame carries the count and not the faces, so the faces are
+                // read again: somebody arriving, leaving or muting is what sent
+                // it, and the roster outside the call has to show that.
                 if (frame.kind === "call" && frame.channelId === channelId) {
-                    setLive(
-                        frame.state === "ended" || frame.count === 0
-                            ? null
-                            : { meetingId: frame.meetingId, count: frame.count }
-                    );
+                    if (frame.state === "ended" || frame.count === 0) setLive(null);
+                    else {
+                        setLive((current) => ({
+                            meetingId: frame.meetingId,
+                            count: frame.count,
+                            people: current?.meetingId === frame.meetingId ? current.people : []
+                        }));
+                        checkCall();
+                    }
                 }
                 if (frame.kind === "typing" && frame.channelId === channelId) {
                     setTypists((current) => [
@@ -1796,6 +1806,20 @@ export function ChannelView({
         </>
     );
 
+    /** Start the call here, or walk into the one already running. */
+    async function startCall(withVideo: boolean): Promise<void> {
+        // Through `runAction`, which is the difference between a button that
+        // says what went wrong and one that appears to do nothing: an action
+        // that throws rather than returning an error would otherwise reject into
+        // nowhere, and pressing Join would be silence.
+        const result = await runAction(() => calls.startCallAction(channelId), setError);
+        if (!result || result.error) return;
+        if (result.meetingId) {
+            enter({ meetingId: result.meetingId, channelId, title: callTitle }, withVideo);
+        } else setError("That call could not be joined. Try again.");
+        checkCall();
+    }
+
     return (
         <div
             className={cn(
@@ -1812,25 +1836,7 @@ export function ChannelView({
                     viewerId={viewerId}
                     onChanged={refresh}
                     call={live}
-                    onStartCall={async (withVideo) => {
-                        // Through `runAction`, which is the difference between a
-                        // button that says what went wrong and one that appears
-                        // to do nothing: an action that throws rather than
-                        // returning an error would otherwise reject into
-                        // nowhere, and pressing Join would be silence.
-                        const result = await runAction(
-                            () => calls.startCallAction(channelId),
-                            setError
-                        );
-                        if (!result || result.error) return;
-                        if (result.meetingId) {
-                            enter(
-                                { meetingId: result.meetingId, channelId, title: callTitle },
-                                withVideo
-                            );
-                        } else setError("That call could not be joined. Try again.");
-                        checkCall();
-                    }}
+                    onStartCall={startCall}
                     onSearch={() => setSearching((current) => !current)}
                     // In a conversation with a roster this opens it; in a
                     // one-to-one it opens the other person, which is what the
@@ -1845,10 +1851,34 @@ export function ChannelView({
                     Opening the channel walks in on its own, so this is only
                     what is left when that cannot happen - calls switched off,
                     a room that refused to open, or the moment in between. */}
+                {/* A call running in a conversation somebody is only reading:
+                    who is in it and who is muted, the way a voice room lists
+                    them, with the way in beside it. Nothing of the call itself
+                    reaches this browser until it joins. */}
+                {may.call &&
+                    channel.kind !== "voice" &&
+                    !inCall &&
+                    live &&
+                    live.people.length > 0 && (
+                        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
+                            <span className="text-sm font-medium">Call in progress</span>
+                            <div className="min-w-0 flex-1">
+                                <CallRoster people={live.people} />
+                            </div>
+                            {!callsOff && (
+                                <Button size="xs" onClick={() => void startCall(false)}>
+                                    <Mic className="size-3.5" />
+                                    Join
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
                 {channel.kind === "voice" && !inCall && (
                     <VoiceStrip
                         name={channel.name}
                         count={live?.count ?? 0}
+                        people={live?.people ?? []}
                         off={callsOff}
                         busy={joining}
                         onJoin={async (video) => {
@@ -2080,12 +2110,15 @@ export function ChannelView({
 function VoiceStrip({
     name,
     count,
+    people,
     onJoin,
     off,
     busy = false
 }: {
     name: string;
     count: number;
+    /** Who is in the room, with their microphone and headphones. */
+    people: readonly VoicePresence[];
     onJoin: (withVideo: boolean) => void | Promise<void>;
     /** Why nobody can walk in right now, or null. A voice room whose way in is
      *  a button that fails is a room people press twice and then give up on. */
@@ -2126,6 +2159,11 @@ function VoiceStrip({
                         With video
                     </Button>
                 </>
+            )}
+            {people.length > 0 && (
+                <div className="basis-full">
+                    <CallRoster people={people} />
+                </div>
             )}
         </div>
     );

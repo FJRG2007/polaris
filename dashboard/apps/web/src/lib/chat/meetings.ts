@@ -380,12 +380,46 @@ export async function decideAdmission(
  * somebody *joins* runs that check, or a call the host has been waiting in would
  * end in the instant the other person arrives.
  */
-export async function keepSeat(seat: { meetingId: string; participantId: string }): Promise<void> {
+export async function keepSeat(
+    seat: { meetingId: string; participantId: string },
+    voice?: VoiceState
+): Promise<void> {
     await prisma.meetingParticipant.updateMany({
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
         data: { lastSeenAt: new Date() }
     });
+    if (voice) await setVoiceState(seat, voice);
     await endIfAlone(seat.meetingId);
+}
+
+/** Whether somebody in a call can be heard, and whether they can hear. */
+export interface VoiceState {
+    readonly muted: boolean;
+    readonly deafened: boolean;
+}
+
+/**
+ * Record what somebody's own controls say, and tell the conversation when it
+ * changed.
+ *
+ * The people inside the call learn it from the media server. The people outside
+ * are never connected to it, so this row is the only place they can read it from
+ * - and a heartbeat that repeats the same answer is written but not announced.
+ */
+async function setVoiceState(
+    seat: { meetingId: string; participantId: string },
+    voice: VoiceState
+): Promise<void> {
+    const changed = await prisma.meetingParticipant.updateMany({
+        where: {
+            id: seat.participantId,
+            meetingId: seat.meetingId,
+            leftAt: null,
+            NOT: { muted: voice.muted, deafened: voice.deafened }
+        },
+        data: { muted: voice.muted, deafened: voice.deafened }
+    });
+    if (changed.count > 0) await announceCall(seat.meetingId, "moved", "", undefined, true);
 }
 
 /**
@@ -660,7 +694,9 @@ export async function readMeeting(seat: {
 
 /** The call running in a conversation, if there is one, so the header can say
  *  so without anybody having to join to find out. */
-export async function liveIn(channelId: string): Promise<{ id: string; count: number } | null> {
+export async function liveIn(
+    channelId: string
+): Promise<{ id: string; count: number; people: VoicePresence[] } | null> {
     const meeting = await prisma.meeting.findFirst({
         where: { channelId, endedAt: null },
         select: { id: true }
@@ -668,14 +704,16 @@ export async function liveIn(channelId: string): Promise<{ id: string; count: nu
     if (!meeting) return null;
     await sweep(meeting.id);
 
-    const count = await prisma.meetingParticipant.count({
-        where: { meetingId: meeting.id, leftAt: null, admission: "admitted" }
+    const people = await prisma.meetingParticipant.findMany({
+        where: { meetingId: meeting.id, leftAt: null, admission: "admitted" },
+        orderBy: { joinedAt: "asc" },
+        select: PRESENCE_FIELDS
     });
-    if (count === 0) {
+    if (people.length === 0) {
         await closeMeeting(meeting.id);
         return null;
     }
-    return { id: meeting.id, count };
+    return { id: meeting.id, count: people.length, people };
 }
 
 /** Somebody sitting in a voice room, as the rail draws them. The seat and the
@@ -685,7 +723,17 @@ export interface VoicePresence {
     readonly id: string;
     readonly name: string;
     readonly userId: string | null;
+    readonly muted: boolean;
+    readonly deafened: boolean;
 }
+
+const PRESENCE_FIELDS = {
+    id: true,
+    name: true,
+    userId: true,
+    muted: true,
+    deafened: true
+} as const;
 
 /**
  * Who is sitting in each voice channel of a space.
@@ -716,7 +764,7 @@ export async function voicePresence(
                     lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) }
                 },
                 orderBy: { joinedAt: "asc" },
-                select: { id: true, name: true, userId: true }
+                select: PRESENCE_FIELDS
             }
         }
     });
@@ -850,7 +898,8 @@ async function announceCall(
     meetingId: string,
     state: CallState,
     actorId: string,
-    actorName?: string
+    actorName?: string,
+    voice?: true
 ): Promise<void> {
     const meeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
@@ -862,7 +911,12 @@ async function announceCall(
         kind: "call",
         actorId,
         actorName,
-        call: { meetingId, state, count: state === "ended" ? 0 : await admittedCount(meetingId) }
+        call: {
+            meetingId,
+            state,
+            count: state === "ended" ? 0 : await admittedCount(meetingId),
+            ...(voice ? { voice } : {})
+        }
     });
 }
 
