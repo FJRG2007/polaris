@@ -98,13 +98,9 @@ export async function issueClientKey(
     if (scopes.length === 0) return null;
 
     // Whatever this client held before, so re-connecting replaces rather than
-    // accumulates.
+    // accumulates - read now, cleared further down.
     const held = await listApiKeys(userId).catch(() => []);
-    for (const key of held) {
-        if (isClientKeyFor(key.description, device.identifier)) {
-            await deleteApiKey(userId, key.id).catch(() => undefined);
-        }
-    }
+    const replacing = held.filter((key) => isClientKeyFor(key.description, device.identifier));
 
     const created = await createApiKey(userId, {
         name: clientKeyName(device.name),
@@ -120,6 +116,15 @@ export async function issueClientKey(
         // A client left in a browser nobody opens again should stop answering.
         expiresInDays: 90
     });
+
+    // Only now, because the other order is one failed write away from a browser
+    // that was signed in before it asked and holds nothing after: the approval
+    // it spent getting here is gone, so there is nothing left for it to retry
+    // with. Clearing afterwards costs a moment where the account carries two
+    // credentials for one device, which nothing reads in between.
+    for (const key of replacing) {
+        await deleteApiKey(userId, key.id).catch(() => undefined);
+    }
     return created.secret;
 }
 

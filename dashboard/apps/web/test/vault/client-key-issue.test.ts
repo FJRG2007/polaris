@@ -19,21 +19,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scopesAvailableTo = vi.fn(async () => ["vault.use"]);
 const createApiKey = vi.fn(async () => ({ id: "key-1", prefix: "pol", secret: "pol.secret" }));
+const listApiKeys = vi.fn(async (): Promise<{ id: string; description: string }[]> => []);
+const deleteApiKey = vi.fn(async () => undefined);
 
 vi.mock("@polaris/auth", () => ({
     scopesAvailableTo: (...args: unknown[]) => scopesAvailableTo(...(args as [])),
     createApiKey: (...args: unknown[]) => createApiKey(...(args as [])),
-    listApiKeys: vi.fn(async () => []),
-    deleteApiKey: vi.fn(async () => undefined)
+    listApiKeys: (...args: unknown[]) => listApiKeys(...(args as [])),
+    deleteApiKey: (...args: unknown[]) => deleteApiKey(...(args as []))
 }));
 
-const { issueClientKey } = await import("@/lib/vault/client-key");
+const { clientKeyMark, issueClientKey } = await import("@/lib/vault/client-key");
 
 const DEVICE = { identifier: "device-abc", name: "Brave on Windows" };
+
+/** What this same browser was given the last time it was let in. */
+const HELD = { id: "key-held", description: clientKeyMark(DEVICE.identifier) };
 
 beforeEach(() => {
     scopesAvailableTo.mockClear();
     createApiKey.mockClear();
+    listApiKeys.mockClear();
+    deleteApiKey.mockClear();
+    listApiKeys.mockImplementation(async () => []);
 });
 
 describe("the credential a client is let in with", () => {
@@ -55,5 +63,50 @@ describe("the credential a client is let in with", () => {
         // wrong thing about an account that is perfectly fine.
         createApiKey.mockRejectedValueOnce(new Error("the database was not there"));
         await expect(issueClientKey("user-1", DEVICE)).rejects.toThrow();
+    });
+});
+
+/**
+ * What this browser still holds when the new credential could not be written.
+ *
+ * Re-connecting replaces rather than accumulates, and the obvious way to write
+ * that is to clear what the device had and then write the new one. The obvious
+ * way is wrong: the clearing succeeds, the write fails, and a browser that was
+ * working before it asked is now a browser with nothing - while the approval row
+ * it spent getting here is gone, so it cannot even ask again without the person
+ * going back to Polaris and approving a second time.
+ *
+ * Writing first costs a moment where the account holds two credentials for one
+ * device, which nothing reads in between and the delete below settles. Failing
+ * that way round leaves the device exactly as it was.
+ */
+describe("a credential that could not be written", () => {
+    it("leaves the one this browser already had", async () => {
+        listApiKeys.mockImplementation(async () => [HELD]);
+        createApiKey.mockRejectedValueOnce(new Error("the database was not there"));
+
+        await expect(issueClientKey("user-1", DEVICE)).rejects.toThrow();
+        expect(deleteApiKey).not.toHaveBeenCalled();
+    });
+
+    it("is replaced, not added to, once the write has gone through", async () => {
+        // The other half: the reason the delete is there at all. One per client,
+        // so a second approval from the same browser must not leave the first
+        // credential valid behind it.
+        listApiKeys.mockImplementation(async () => [HELD]);
+
+        await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
+        expect(deleteApiKey).toHaveBeenCalledWith("user-1", HELD.id);
+    });
+
+    it("leaves another browser's credential alone", async () => {
+        // The mark carries the device it was issued to precisely so that
+        // re-connecting one browser does not sign the others out.
+        listApiKeys.mockImplementation(async () => [
+            { id: "key-other", description: clientKeyMark("device-xyz") }
+        ]);
+
+        await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
+        expect(deleteApiKey).not.toHaveBeenCalled();
     });
 });
