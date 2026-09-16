@@ -13,10 +13,11 @@
  * entry somebody made more specific than Polaris knows how to.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { protectionFor } from "@/lib/apps/games-create";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import {
+    guardForSave,
     guardMovedTo,
     joinGuardEntry,
     joinGuardFor,
@@ -230,11 +231,59 @@ describe("moving the guard when the software changes", () => {
         expect(guardsOn(moved!)).toEqual([mod]);
     });
 
-    it("takes the guard off software that can load neither", () => {
-        // Vanilla loads nothing. Leaving the entry would leave the Mods screen
-        // naming a project that will never be installed.
-        const moved = guardMovedTo(`coreprotect?,${plugin}?`, "VANILLA");
-        expect(guardsOn(moved!)).toEqual([]);
-        expect(slugs(moved!)).toContain("coreprotect");
+    it("leaves the guard on software that can load neither", () => {
+        // Vanilla installs nothing from the list, so the entry costs nothing
+        // there, and it is the only record that the server was closed.
+        expect(guardMovedTo(`coreprotect?,${plugin}?`, "VANILLA")).toBeNull();
+    });
+
+    it("puts the guard back on a server moved to Vanilla and off again", () => {
+        const list = `coreprotect?,${plugin}?`;
+        expect(guardMovedTo(list, "VANILLA")).toBeNull();
+        expect(guardMovedTo(list, "PAPER")).toBeNull();
+        expect(guardsOn(guardMovedTo(list, "NEOFORGE")!)).toEqual([mod]);
+    });
+});
+
+/**
+ * Which settings saves move the guard. The card that turns the password off
+ * writes the project list itself, and a save that is not a change of software
+ * has nothing to move - neither may reach for the current list at all.
+ */
+describe("reconciling the guard on a settings save", () => {
+    const plugin = joinGuardFor("PAPER")!.slug;
+    const mod = joinGuardFor("NEOFORGE")!.slug;
+    const listed = `coreprotect?,${plugin}?`;
+
+    const reader = () => vi.fn(async () => listed);
+
+    it("moves the guard when the save changes the software", async () => {
+        const read = reader();
+        const moved = await guardForSave([{ key: "TYPE", value: "NEOFORGE" }], read);
+        expect(guardsOn(moved!)).toEqual([mod]);
+        expect(read).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the card's Turn off alone", async () => {
+        const read = reader();
+        const vars = [
+            { key: "TYPE", value: "NEOFORGE" },
+            { key: "MODRINTH_PROJECTS", value: "coreprotect?" }
+        ];
+        expect(await guardForSave(vars, read)).toBeNull();
+        expect(await guardForSave([{ key: "MODRINTH_PROJECTS", value: "" }], read)).toBeNull();
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it("does not read the list on a save that keeps the software", async () => {
+        const read = reader();
+        expect(await guardForSave([{ key: "DIFFICULTY", value: "hard" }], read)).toBeNull();
+        expect(await guardForSave([{ key: "TYPE", value: "" }], read)).toBeNull();
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing when the guard already suits the new software", async () => {
+        const read = reader();
+        expect(await guardForSave([{ key: "TYPE", value: "PURPUR" }], read)).toBeNull();
     });
 });

@@ -27,7 +27,7 @@ import type { PlayerStats } from "@/lib/apps/games-activity";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { resetMinecraftServer } from "@/lib/apps/games-reset";
-import { guardMovedTo } from "@/lib/apps/minecraft/join-guard";
+import { guardForSave, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { patchInstallConfig } from "@/lib/apps/install-config";
@@ -109,9 +109,6 @@ import {
     setBackupPolicy,
     switchLevel
 } from "@/lib/apps/minecraft/world-service";
-
-/** The setting holding the server's mod list, which the password project sits on. */
-const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -1773,18 +1770,12 @@ export async function updateServerSettingsAction(
         // plugin does not load on a mod loader, so a server moved across would
         // have come up with nobody asked for a password and nothing saying so -
         // the entry is optional, which is exactly what makes it quiet.
-        //
-        // Only when the software is what changed, and only when this save is not
-        // itself writing the project list: that save is the join-password card
-        // turning the guard off, and putting it back here would make that button
-        // do nothing.
-        const software = vars.find((entry) => entry.key === "TYPE")?.value;
-        if (software && !vars.some((entry) => entry.key === PROJECTS_KEY)) {
-            const current = await listEnvVars("application", install.applicationId, access.ownerId);
-            const listed = current.find((entry) => entry.key === PROJECTS_KEY)?.value ?? "";
-            const moved = guardMovedTo(listed, software);
-            if (moved !== null) vars.push({ key: PROJECTS_KEY, value: moved, isSecret: false });
-        }
+        const applicationId = install.applicationId;
+        const moved = await guardForSave(vars, async () => {
+            const current = await listEnvVars("application", applicationId, access.ownerId);
+            return current.find((entry) => entry.key === PROJECTS_KEY)?.value ?? "";
+        });
+        if (moved !== null) vars.push({ key: PROJECTS_KEY, value: moved, isSecret: false });
 
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);

@@ -138,13 +138,19 @@ export const JOIN_GUARD_SLUGS: readonly string[] = [
  * lose it. So the answer is whichever of those two the list already says, kept
  * true across the change.
  *
+ * Software that loads neither leaves the list alone. The entry is optional, so
+ * it installs nothing there, and it is the only record that the server was
+ * closed: taking it off would hand a server moved to Vanilla and back again a
+ * list that says nobody ever asked for a password.
+ *
  * Null rather than the list unchanged, so a caller can tell "nothing to do" from
  * "write this" without comparing strings - and write nothing at all in the
  * ordinary case, which is every save that is not a change of software.
  */
 export function guardMovedTo(projects: string, software: string): string | null {
     const guard = joinGuardFor(software);
-    const own = guard === null ? [] : joinGuardSlugs(guard);
+    if (guard === null) return null;
+    const own = joinGuardSlugs(guard);
     const entries = parseProjectList(projects);
     const slugOf = (entry: string) => projectSlug(entry)?.toLowerCase() ?? "";
 
@@ -159,6 +165,27 @@ export function guardMovedTo(projects: string, software: string): string | null 
     // Already on the right one - including an older slug it answers to, which is
     // left exactly as written for the reason `replaces` gives.
     const settled = kept.some((entry) => own.includes(slugOf(entry)));
-    const next = formatProjectList(settled || guard === null ? kept : [...kept, `${guard.slug}?`]);
+    const next = formatProjectList(settled ? kept : [...kept, `${guard.slug}?`]);
     return next === formatProjectList(entries) ? null : next;
+}
+
+/** The environment key the project list is saved under. */
+export const PROJECTS_KEY = "MODRINTH_PROJECTS";
+
+/**
+ * The project list a settings save has to write alongside itself, or null when
+ * it has to write none.
+ *
+ * Only a save that changes the software moves the guard, and only one that is not
+ * itself writing the list: that save is the join-password card turning the guard
+ * off, and putting it back here would make that button do nothing. The current
+ * list is read only when both hold, so an ordinary save costs no extra lookup.
+ */
+export async function guardForSave(
+    vars: readonly { key: string; value: string }[],
+    readProjects: () => Promise<string>
+): Promise<string | null> {
+    const software = vars.find((entry) => entry.key === "TYPE")?.value;
+    if (!software || vars.some((entry) => entry.key === PROJECTS_KEY)) return null;
+    return guardMovedTo(await readProjects(), software);
 }
