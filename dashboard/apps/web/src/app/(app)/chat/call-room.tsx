@@ -294,7 +294,7 @@ export function CallRoom({
      */
     const [away, setAway] = useState<readonly string[]>([]);
     const sharedKeys = shared.map((stage) => stage.key).join("|");
-    const [knownKeys, setKnownKeys] = useState(sharedKeys);
+    const [knownKeys, setKnownKeys] = useState(place === "direct" ? "" : sharedKeys);
     if (knownKeys !== sharedKeys) {
         const before = knownKeys.length > 0 ? knownKeys.split("|") : [];
         setKnownKeys(sharedKeys);

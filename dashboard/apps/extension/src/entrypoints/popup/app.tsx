@@ -124,7 +124,7 @@ export function App(): React.JSX.Element {
     // back through the approval rather than carrying on, because the extension
     // has no idea whose account it is sitting on until it does.
     !status.connected || !status.polarisSession ? (
-        <SignIn server={status.server} onDone={refresh} />
+        <SignIn server={status.server} connected={status.connected} onDone={refresh} />
     ) : !status.unlocked ? (
         <Unlock onDone={refresh} />
     ) : (
@@ -237,9 +237,11 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
  */
 function SignIn({
     server,
+    connected,
     onDone
 }: {
     server: string;
+    connected: boolean;
     onDone: () => Promise<void>;
 }): React.JSX.Element {
     const [error, setError] = useState<string | null>(null);
@@ -259,6 +261,13 @@ function SignIn({
         if ("waiting" in reply && reply.userCode) {
             setWaiting({ userCode: reply.userCode, pollMs: reply.pollMs });
         }
+    };
+
+    const leave = async (request: { kind: "signOut" } | { kind: "forgetServer" }): Promise<void> => {
+        setError(null);
+        const reply = await askBackground(request);
+        if (!reply.ok) setError(reply.error);
+        await onDone();
     };
 
     /**
@@ -368,12 +377,15 @@ function SignIn({
                 people have one Polaris - but without it, setting an account aside
                 to add another would strand somebody on whichever address they
                 happened to name first. */}
-            <button
-                className="ghost"
-                onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}
-            >
-                Use a different Polaris
-            </button>
+            {connected ? (
+                <button className="ghost" onClick={() => void leave({ kind: "signOut" })}>
+                    Sign out
+                </button>
+            ) : (
+                <button className="ghost" onClick={() => void leave({ kind: "forgetServer" })}>
+                    Use a different Polaris
+                </button>
+            )}
         </main>
     );
 }

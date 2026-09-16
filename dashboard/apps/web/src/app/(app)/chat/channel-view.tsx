@@ -1446,7 +1446,7 @@ export function ChannelView({
         observer.observe(band);
         if (column) observer.observe(column);
         return () => observer.disconnect();
-    }, [inCall, callPlace]);
+    }, [inCall, callPlace, !channel && messages === null]);
 
     const resizeBand = useCallback(
         (size: number) => {
