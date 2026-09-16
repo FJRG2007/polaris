@@ -12,8 +12,8 @@
  * no test noticing.
  */
 
-import { usePaneCeiling } from "@/app/(app)/chat/pane-room";
-import { cleanup, render, screen } from "@testing-library/react";
+import { CONVERSATION_FLOOR, usePaneCeiling } from "@/app/(app)/chat/pane-room";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const BOUNDS = { min: 280, max: 560 };
@@ -152,5 +152,195 @@ describe("a panel whose neighbour holds other panels", () => {
     it("still stops at the floor when the conversation inside is already small", () => {
         render(<NestedRow column={900} conversation={80} />);
         expect(screen.getByText(`ceiling ${BOUNDS.min}`)).toBeTruthy();
+    });
+});
+
+/**
+ * The page under it, replaced.
+ *
+ * What a panel is beside is not a fixture: the conversation list lives in the
+ * layout and outlives every conversation opened beside it, and the element it
+ * measures against belongs to the page - swapped on every navigation, and again
+ * the moment the skeleton gives way to the messages. Resolved once, that element
+ * is detached before the first message lands, and what is left is the stated
+ * ceiling for the rest of the session - which is the squeeze this was written to
+ * stop, back again and harder to see.
+ */
+function SwappingRow({ ready }: { ready: boolean }) {
+    const { ceiling, measure } = usePaneCeiling(BOUNDS);
+    return (
+        <div style={{ display: "flex" }}>
+            <aside ref={measure} data-width={560}>
+                <span>ceiling {ceiling}</span>
+            </aside>
+            <div data-width={900} style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                {ready ? (
+                    <div
+                        key="conversation"
+                        data-width={900}
+                        style={{ flexGrow: 1, display: "flex" }}
+                    >
+                        <div data-width={340} style={{ flexGrow: 1 }}>
+                            conversation
+                        </div>
+                        <aside data-width={240} style={{ flexGrow: 0 }}>
+                            members
+                        </aside>
+                    </div>
+                ) : (
+                    <div key="skeleton" data-width={900} style={{ flexGrow: 1 }}>
+                        skeleton
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+describe("a panel whose neighbour is replaced under it", () => {
+    it("measures what is there now, not what was there at mount", async () => {
+        // The skeleton fills the column, so there is nothing to give back and the
+        // stated ceiling stands.
+        const { rerender } = render(<SwappingRow ready={false} />);
+        expect(screen.getByText(`ceiling ${BOUNDS.max}`)).toBeTruthy();
+
+        // The messages arrive and the column is a row again, with the members
+        // list in it. Nothing changed size: the skeleton was simply taken out and
+        // the conversation put in, so a measurement waiting on a resize waits
+        // forever.
+        await act(async () => rerender(<SwappingRow ready />));
+        expect(screen.getByText("ceiling 540")).toBeTruthy();
+    });
+});
+
+/**
+ * A neighbour that is not a flex row.
+ *
+ * The descent follows `flex-grow` down, and `flex-grow` on the child of anything
+ * else is a declaration nothing acts on. The conversation's scroller is an
+ * ordinary block, and a child of it carrying the class for a reason of its own
+ * would be read as the thing the whole row yields to - pinning every panel near
+ * its minimum, quietly, for a class nobody thought was load-bearing.
+ */
+function BlockInside() {
+    const { ceiling, measure } = usePaneCeiling(BOUNDS);
+    return (
+        <div style={{ display: "flex" }}>
+            <aside ref={measure} data-width={300}>
+                <span>ceiling {ceiling}</span>
+            </aside>
+            <div data-width={400} style={{ flexGrow: 1, display: "block" }}>
+                <div data-width={120} style={{ flexGrow: 1 }}>
+                    a list, not a row
+                </div>
+            </div>
+        </div>
+    );
+}
+
+describe("the descent", () => {
+    it("stops where nothing divides, rather than reading a class off a block", () => {
+        // 300 beside 400 is 340. Walked into the block it would be 300 beside
+        // 120, which is the minimum and a panel held there for no reason.
+        render(<BlockInside />);
+        expect(screen.getByText("ceiling 340")).toBeTruthy();
+    });
+});
+
+/**
+ * The list and the members column, measuring the same conversation.
+ *
+ * Both of them work out what they may grow to from the room that one
+ * conversation has to spare, and neither can see the other. Handed that room
+ * whole, they both take it: each gives back what it is over by, each then reads
+ * the other's pixels as going spare and claims them, and the pair is over again
+ * - a cycle a resize observer runs every frame, with the conversation under its
+ * floor on half of them and nobody having touched a divider.
+ */
+const LIST = { min: 208, max: 480 };
+const MEMBERS = { min: 208, max: 420 };
+/** A 1024 window, less the rail and the dividers. */
+const ROW = 957;
+
+/** One that can be asked to deliver, so a settling pass can be run a frame at a
+ *  time and watched for the two of them taking turns. */
+function observerOnDemand(frames: (() => void)[]): void {
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            constructor(private readonly ran: () => void) {
+                frames.push(ran);
+            }
+            observe(): void {}
+            unobserve(): void {}
+            disconnect(): void {
+                const at = frames.indexOf(this.ran);
+                if (at >= 0) frames.splice(at, 1);
+            }
+        }
+    );
+}
+
+/** The list remembers 480 from a wider monitor; the members column is at the
+ *  width it opens at. Both are drawn at whatever their ceiling allows, which is
+ *  what feeds the next measurement. */
+function TwoPanels() {
+    const list = usePaneCeiling(LIST);
+    const members = usePaneCeiling(MEMBERS);
+    const listWidth = Math.min(480, list.ceiling);
+    const membersWidth = Math.min(240, members.ceiling);
+    const conversation = ROW - listWidth - membersWidth;
+    return (
+        <div style={{ display: "flex" }}>
+            <aside ref={list.measure} data-width={listWidth}>
+                list
+            </aside>
+            <div data-width={ROW - listWidth} style={{ flexGrow: 1, display: "flex" }}>
+                <div data-width={conversation} style={{ flexGrow: 1 }}>
+                    conversation
+                </div>
+                <aside ref={members.measure} data-width={membersWidth}>
+                    members
+                </aside>
+            </div>
+            <p data-testid="widths">{`${listWidth}/${membersWidth}/${conversation}`}</p>
+        </div>
+    );
+}
+
+describe("two panels beside one conversation", () => {
+    const frames: (() => void)[] = [];
+
+    beforeEach(() => {
+        frames.length = 0;
+        observerOnDemand(frames);
+    });
+
+    /** One delivery of every observation, which is what a browser does per
+     *  frame. */
+    async function settle(): Promise<string> {
+        await act(async () => {
+            for (const ran of [...frames]) ran();
+        });
+        return screen.getByTestId("widths").textContent ?? "";
+    }
+
+    it("lands on one arrangement instead of trading the same pixels every frame", async () => {
+        render(<TwoPanels />);
+        const seen: string[] = [];
+        for (let pass = 0; pass < 8; pass += 1) seen.push(await settle());
+
+        // Settled, not alternating: the defect this replaces reads 357/208 and
+        // 389/240 turn and turn about, for as long as the window is that size.
+        expect(new Set(seen.slice(-4)).size).toBe(1);
+        expect(new Set(seen).size).toBeLessThan(seen.length);
+    });
+
+    it("never draws the conversation under its floor on the way there", async () => {
+        render(<TwoPanels />);
+        for (let pass = 0; pass < 8; pass += 1) {
+            const conversation = Number((await settle()).split("/")[2]);
+            expect(conversation).toBeGreaterThanOrEqual(CONVERSATION_FLOOR);
+        }
     });
 });

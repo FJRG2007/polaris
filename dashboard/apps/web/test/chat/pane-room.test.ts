@@ -75,3 +75,66 @@ describe("what a panel may grow to", () => {
         expect(paneCeiling(BOUNDS, 300, 300)).toBe(BOUNDS.min);
     });
 });
+
+/**
+ * Two panels, one conversation.
+ *
+ * The room a conversation has to spare is one pool, and each panel works its own
+ * ceiling out from the same measurement of it. Handed whole to each of them it
+ * is a pool they both take at once, and the pair never lands anywhere: each
+ * gives back what it is over by, each then sees the other's pixels going spare
+ * and takes them, and they are over again. What that costs is not a wasted
+ * frame - it is the conversation under the floor this whole file exists to
+ * defend, on every other one of them.
+ */
+describe("what two panels beside the same conversation may grow to", () => {
+    it("divides what is spare rather than offering it whole to each", () => {
+        // 500 beside them leaves 140 going spare. One panel may have all of it;
+        // two may have half each, because they are going to take it at the same
+        // time.
+        expect(paneCeiling(BOUNDS, 384, 500, CONVERSATION_FLOOR, 1)).toBe(524);
+        expect(paneCeiling(BOUNDS, 384, 500, CONVERSATION_FLOOR, 2)).toBe(454);
+    });
+
+    it("hands out less than there is rather than more, when it will not divide", () => {
+        // 41 spare between two. Twenty each and a pixel left with the
+        // conversation: rounded the other way they would be a pixel over, which
+        // is this mechanism in reverse - given back next frame and taken again
+        // the frame after, for as long as the window is that size.
+        const ceiling = paneCeiling(BOUNDS, 300, CONVERSATION_FLOOR + 41, CONVERSATION_FLOOR, 2);
+        expect(ceiling).toBe(320);
+        expect((ceiling - 300) * 2).toBeLessThanOrEqual(41);
+    });
+
+    it("asks each of them for the whole shortfall, not a share of it", () => {
+        // Over the edge, and every panel has to stand out of the way for the
+        // conversation to be whole again. Sharing a debt leaves it owed.
+        expect(paneCeiling(BOUNDS, 500, 300, CONVERSATION_FLOOR, 2)).toBe(440);
+    });
+
+    it("settles the pair instead of cycling between two sizes", () => {
+        // 957 across a list, a conversation and a members column, with the list
+        // remembering 480 from a wider monitor. Taken whole, the two ceilings
+        // walk 357/208 -> 389/240 -> 357/208 for as long as the window is open.
+        const LIST = { min: 208, max: 480 };
+        const MEMBERS = { min: 208, max: 420 };
+        const total = 957;
+        let list = 480;
+        let members = 240;
+        const seen: string[] = [];
+        for (let pass = 0; pass < 8; pass += 1) {
+            const conversation = total - list - members;
+            // Both are drawn at their ceiling here, so both are still asking.
+            const share = 2;
+            list = Math.min(480, paneCeiling(LIST, list, conversation, CONVERSATION_FLOOR, share));
+            members = Math.min(
+                240,
+                paneCeiling(MEMBERS, members, conversation, CONVERSATION_FLOOR, share)
+            );
+            seen.push(`${list}/${members}`);
+        }
+        // The last four passes are the same arrangement, not two taking turns.
+        expect(new Set(seen.slice(-4)).size).toBe(1);
+        expect(total - list - members).toBeGreaterThanOrEqual(CONVERSATION_FLOOR);
+    });
+});

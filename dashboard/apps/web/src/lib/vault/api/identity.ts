@@ -249,12 +249,13 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
     const token = await issueVaultToken(claim.claimed.userId, claim.claimed.device);
     // And the account credential, so one approval is the whole of it: a client
     // that has just been let in should not then ask for a second sign-in to find
-    // out whose account it is on. Best effort - an approval that could not mint
-    // one is still an approval, and the vault half of it works - so the field is
-    // simply absent, which is what an older client sees anyway.
-    const accountKey = await issueClientKey(claim.claimed.userId, claim.claimed.device).catch(
-        () => null
-    );
+    // out whose account it is on. Absent only when the account holds nothing this
+    // could carry, which is what an older client sees anyway; a failure to write
+    // one is left to fail, like the token above. The row is already spent by
+    // here, so an answer that quietly dropped the field would end a request
+    // nothing can revive, telling a client that requires it the account had lost
+    // vault access - when asking again was all it needed to do.
+    const accountKey = await issueClientKey(claim.claimed.userId, claim.claimed.device);
     return Response.json({
         status: "approved",
         // The account's vault key, sealed to the public half this extension sent.
