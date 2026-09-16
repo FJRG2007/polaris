@@ -184,8 +184,13 @@ export const PROJECTS_KEY = "MODRINTH_PROJECTS";
  * The environment key the server's software is saved under.
  *
  * Beside the one above for the same reason: the reconciliation reads both, and a
- * key spelled out in one subsystem and aliased in another is a rename that
- * typechecks while half the code goes on watching a setting nobody writes.
+ * key spelled out a second time somewhere else is a rename that typechecks while
+ * half the code goes on watching a setting nobody writes.
+ *
+ * A second spelling is the hazard, not a second name. `games-service` binds these
+ * to `SOFTWARE_VAR` and `CROSSPLAY_VAR`, which say what the variable is doing in
+ * a query that reads four of them together; bound to the constant rather than to
+ * the string, those cannot drift from it.
  */
 export const SOFTWARE_KEY = "TYPE";
 
