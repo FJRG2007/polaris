@@ -39,7 +39,7 @@
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { useEffect, useState, useTransition } from "react";
-import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
+import { joinGuardFor, joinGuardSlugs } from "@/lib/apps/minecraft/join-guard";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
@@ -47,12 +47,11 @@ import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actio
 
 const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
-/** Whether the list already carries that project, whatever version or suffix the
- *  entry was written with. */
-function listed(projects: string, slug: string): boolean {
-    return modrinth
-        .parseProjectList(projects)
-        .some((entry) => modrinth.projectSlug(entry)?.toLowerCase() === slug);
+/** Whether an entry names one of those projects, whatever version or suffix it
+ *  was written with. */
+function names(entry: string, slugs: readonly string[]): boolean {
+    const slug = modrinth.projectSlug(entry)?.toLowerCase();
+    return typeof slug === "string" && slugs.includes(slug);
 }
 
 export function MinecraftJoinPassword({
@@ -84,7 +83,12 @@ export function MinecraftJoinPassword({
     // the server again whenever its answer changes underneath - the Mods screen
     // edits the same list.
     useEffect(() => {
-        setOn(guard !== null && listed(projects, guard.slug));
+        setOn(
+            guard !== null &&
+                modrinth
+                    .parseProjectList(projects)
+                    .some((entry) => names(entry, joinGuardSlugs(guard)))
+        );
     }, [projects, guard]);
 
     function apply(wanted: boolean): void {
@@ -122,9 +126,7 @@ export function MinecraftJoinPassword({
             if (!asked) return;
 
             const entries = modrinth.parseProjectList(projects);
-            const without = entries.filter(
-                (entry) => modrinth.projectSlug(entry)?.toLowerCase() !== guard.slug
-            );
+            const without = entries.filter((entry) => !names(entry, joinGuardSlugs(guard)));
             const next = wanted ? [...without, `${guard.slug}?`] : without;
             const result = await updateServerSettingsAction(installedAppId, [
                 { key: PROJECTS_KEY, value: modrinth.formatProjectList(next) }

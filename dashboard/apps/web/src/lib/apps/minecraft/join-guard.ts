@@ -38,6 +38,10 @@ export interface JoinGuard {
     /** The Modrinth slug, as it appears on the mod list. */
     readonly slug: string;
     readonly entry: JoinGuardEntry;
+    /** Slugs this guard took over from, which a server may still carry from
+     *  before the swap. They count as this guard being on, and are taken off the
+     *  list wherever this one is. */
+    readonly replaces: readonly string[];
 }
 
 /**
@@ -51,11 +55,11 @@ export interface JoinGuard {
  * administers the server, while the gap this closes is a stranger who learnt a
  * name. The screen says it rather than leaving somebody to find out.
  */
-const PLUGIN_GUARD: JoinGuard = { slug: "simple-login", entry: "command" };
+const PLUGIN_GUARD: JoinGuard = { slug: "simple-login", entry: "command", replaces: ["mylogin"] };
 
 /** For a server that loads mods. A data pack, so `/trigger <objective> set
  *  <number>` and nothing else - see the note above. */
-const MOD_GUARD: JoinGuard = { slug: "auth", entry: "trigger" };
+const MOD_GUARD: JoinGuard = { slug: "auth", entry: "trigger", replaces: [] };
 
 /**
  * What this server can be asked to install, or null when it can install nothing.
@@ -83,7 +87,15 @@ export function joinGuardEntry(software: string): string | null {
     return guard === null ? null : `${guard.slug}?`;
 }
 
-/** Every slug this may ever seed, for the paths that need to recognise one
- *  without knowing which server it came from - taking it back off a list, or
- *  telling a guard apart from a mod the operator chose themselves. */
-export const JOIN_GUARD_SLUGS: readonly string[] = [PLUGIN_GUARD.slug, MOD_GUARD.slug];
+/** Every slug this guard answers to on a list: its own and the ones it replaced. */
+export function joinGuardSlugs(guard: JoinGuard): readonly string[] {
+    return [guard.slug, ...guard.replaces];
+}
+
+/** Every slug this may ever seed, or has seeded before, for the paths that need
+ *  to recognise one without knowing which server it came from - taking it back
+ *  off a list, or telling a guard apart from a mod the operator chose themselves. */
+export const JOIN_GUARD_SLUGS: readonly string[] = [
+    ...joinGuardSlugs(PLUGIN_GUARD),
+    ...joinGuardSlugs(MOD_GUARD)
+];

@@ -16,7 +16,12 @@
 import { describe, expect, it } from "vitest";
 import { protectionFor } from "@/lib/apps/games-create";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
-import { joinGuardEntry, joinGuardFor, JOIN_GUARD_SLUGS } from "@/lib/apps/minecraft/join-guard";
+import {
+    joinGuardEntry,
+    joinGuardFor,
+    joinGuardSlugs,
+    JOIN_GUARD_SLUGS
+} from "@/lib/apps/minecraft/join-guard";
 
 /** The slugs on a list, lowercased, suffixes and pins dropped. */
 function slugs(list: string): string[] {
@@ -135,5 +140,27 @@ describe("what a new server's project list comes out with", () => {
 
     it("works from an empty list", () => {
         expect(guardsOn(protectionFor("java", "PAPER", ""))).toEqual([joinGuardFor("PAPER")!.slug]);
+    });
+
+    it("replaces the plugin guard it used to seed instead of adding a second", () => {
+        // Servers created before the swap carry the old slug. A reset must not
+        // leave them with two login plugins.
+        const list = protectionFor("java", "PAPER", "coreprotect?,mylogin?");
+        expect(guardsOn(list)).toEqual([joinGuardFor("PAPER")!.slug]);
+        expect(slugs(list)).toContain("coreprotect");
+    });
+
+    it("takes the old plugin guard off a server moved to mods", () => {
+        const list = protectionFor("java", "FABRIC", "mylogin?");
+        expect(slugs(list)).not.toContain("mylogin");
+        expect(guardsOn(list)).toEqual([joinGuardFor("FABRIC")!.slug]);
+    });
+});
+
+describe("which slugs count as the guard being on", () => {
+    it("counts the plugin guard's old slug as the plugin guard", () => {
+        expect(joinGuardSlugs(joinGuardFor("PAPER")!)).toContain("mylogin");
+        expect(joinGuardSlugs(joinGuardFor("NEOFORGE")!)).not.toContain("mylogin");
+        expect(JOIN_GUARD_SLUGS).toContain("mylogin");
     });
 });
