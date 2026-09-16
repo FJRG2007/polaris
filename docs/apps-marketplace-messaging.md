@@ -320,6 +320,20 @@ configured means the machine's own address, as before.
   permission plugin both are administered through (luckperms) installed on the
   first boot. Each carries `?` so a Minecraft release they have no build for yet
   warns instead of stopping the server.
+- **A password on top of the whitelist, by default.** With Mojang authentication
+  off, a name on the whitelist is the only thing standing between a stranger and
+  the account - so every new Java server (and a reset one) is seeded a project
+  that asks a first-time joiner for a password: `simple-login` for a server that
+  loads plugins, the `auth` data pack for one that loads mods, neither for
+  vanilla or Bedrock. `lib/apps/minecraft/join-guard.ts` is the one place that
+  decides which, so the create path, the Mods list and the join-password card on
+  the server's panel never disagree; a server already carrying `mylogin`, the
+  plugin this replaced, is read as already having it rather than being given a
+  second. It is appended to `MODRINTH_PROJECTS` like anything else, so turning it
+  off from the Mods screen or the card keeps it off. The plugin names
+  ProtocolLib as a soft dependency and does not hide the password from the
+  server log without it; Modrinth does not carry ProtocolLib, so the card says so
+  rather than promising a hidden log it cannot deliver.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before
