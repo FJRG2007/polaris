@@ -42,13 +42,13 @@
 
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
-import { joinGuardFor, joinGuardSlugs, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
-import { setLoginAction } from "./minecraft-login-actions";
 import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
+import { joinGuardFor, joinGuardSlugs, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { LoginDetails, LoginOffer, LoginSkeleton, useLoginState } from "./minecraft-polaris-login";
 
 /** Whether an entry names one of those projects, whatever version or suffix it
@@ -88,9 +88,7 @@ export function MinecraftJoinPassword({
     const [pending, startTransition] = useTransition();
     const java = edition === "java";
     const guard = java ? joinGuardFor(software) : null;
-    const [on, setOn] = useState(false);
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
-    const installed = on && listed !== null ? listed : guard?.slug;
     // Only a mod loader can carry Polaris's mod, so only one is asked about it.
     const modCapable = java && modrinth.loaderForType(software) === "neoforge";
     const login = useLoginState(installedAppId, modCapable);
@@ -98,10 +96,16 @@ export function MinecraftJoinPassword({
 
     // Held in state so the switch answers the press immediately, and taken from
     // the server again whenever its answer changes underneath - the Mods screen
-    // edits the same list.
-    useEffect(() => {
+    // edits the same list. Synced during render rather than in an effect, so the
+    // badge never trails the details it sits above by a commit.
+    const serverKey = `${listed ?? ""}|${modOn}`;
+    const [on, setOn] = useState(listed !== null || modOn);
+    const [syncedKey, setSyncedKey] = useState(serverKey);
+    if (syncedKey !== serverKey) {
+        setSyncedKey(serverKey);
         setOn(listed !== null || modOn);
-    }, [listed, modOn]);
+    }
+    const installed = on && listed !== null ? listed : guard?.slug;
 
     const restartNote =
         playersOnline > 0
