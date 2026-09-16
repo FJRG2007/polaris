@@ -130,9 +130,16 @@ export async function issueClientKey(
  * failure here is logged rather than thrown: the approval still succeeds, and
  * the credential left behind can at least be traced by its id.
  */
-async function clearOlderClientKeys(userId: string, deviceIdentifier: string, keepId: string): Promise<void> {
+async function clearOlderClientKeys(
+    userId: string,
+    deviceIdentifier: string,
+    keepId: string
+): Promise<void> {
     const held = await listApiKeys(userId).catch((error: unknown) => {
-        console.error(`[vault-client-key] could not list credentials to replace, kept ${keepId}:`, error);
+        console.error(
+            `[vault-client-key] could not list credentials to replace, kept ${keepId}:`,
+            error
+        );
         return null;
     });
     if (!held) return;
@@ -143,7 +150,10 @@ async function clearOlderClientKeys(userId: string, deviceIdentifier: string, ke
     );
     for (const key of older) {
         await deleteApiKey(userId, key.id).catch((error: unknown) => {
-            console.error(`[vault-client-key] could not delete replaced credential ${key.id}:`, error);
+            console.error(
+                `[vault-client-key] could not delete replaced credential ${key.id}:`,
+                error
+            );
         });
     }
 }
