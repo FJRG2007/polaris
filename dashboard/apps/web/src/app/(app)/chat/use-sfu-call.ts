@@ -751,7 +751,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // browser that has not caught up - an old tab across an update, one
             // that unmuted without undeafening - is exactly the one that would
             // otherwise go on being heard by everybody else.
-            if (microphone && microphone.isSubscribed === state.deafened) {
+            // Against what was asked for, not what has arrived: a subscription
+            // still on its way would otherwise be asked for again on every
+            // change in the room.
+            if (microphone && microphone.isDesired === state.deafened) {
                 microphone.setSubscribed(!state.deafened);
             }
         }
@@ -1910,6 +1913,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             reopen.current?.("audio", track.getSettings().deviceId ?? "default");
             return;
         }
+        // Unmuting while deafened undeafens as well: a deafened person is not
+        // heard, so a microphone that comes on has to bring the room back with
+        // it, or they would be talking to people told they cannot hear them.
+        // First, so it holds on a device that is quiet for a room too - the
+        // effect that gives that one its microphone back waits for this.
+        if (!track.enabled && deafenedRef.current) {
+            deafenedRef.current = false;
+            setDeafened(false);
+            say({ [DEAFENED]: "" });
+        }
         // Pressing unmute while this device is quiet for a room is somebody
         // saying they want to be heard, which is a decision to stop sharing the
         // room's microphone rather than a mute to be argued with. The effect
@@ -1918,14 +1931,6 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             micBeforeGroup.current = true;
             leaveCombine();
             return;
-        }
-        // Unmuting while deafened undeafens as well: a deafened person is not
-        // heard, so a microphone that comes on has to bring the room back with
-        // it, or they would be talking to people told they cannot hear them.
-        if (!track.enabled && deafenedRef.current) {
-            deafenedRef.current = false;
-            setDeafened(false);
-            say({ [DEAFENED]: "" });
         }
         setVoiceEnabled(!track.enabled);
         setMicOn(track.enabled);

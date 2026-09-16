@@ -389,10 +389,8 @@ export function Avatar({
               )
             : null;
 
-    // Nothing until it is known: a grey dot that turns green a moment later
-    // reads as somebody's status changing rather than as an answer arriving.
-    // And nothing on a face too small to carry one - below this the dot is
-    // larger than the initials it covers.
+    // In a call, the mark is whether they can be heard, and only when they
+    // cannot - see `callBadge`.
     if (inRoom && callBadge && size >= PRESENCE_FLOOR) {
         const Icon = callBadge === "deafened" ? HeadphoneOff : MicOff;
         const words = callBadge === "deafened" ? "Not listening" : "Microphone off";
@@ -411,6 +409,10 @@ export function Avatar({
             </span>
         );
     }
+    // Nothing until it is known: a grey dot that turns green a moment later
+    // reads as somebody's status changing rather than as an answer arriving.
+    // And nothing on a face too small to carry one - below this the dot is
+    // larger than the initials it covers.
     if (!where || inRoom || size < PRESENCE_FLOOR) {
         return viewer ? (
             <>

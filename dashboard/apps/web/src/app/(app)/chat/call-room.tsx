@@ -1921,12 +1921,12 @@ function Tile({
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
                 {sharing && <span className="text-primary">sharing</span>}
-                {/* Drawn because this person cannot be heard, yours included.
-                    Deafened wins the space: somebody who is not listening is not
-                    reached by talking louder, and their microphone being off
-                    follows from it anyway. */}
-                {/* Only while the picture is a video: with the camera off the
-                    face carries it instead - see `callBadge`. */}
+                {/* Drawn because this person cannot be heard, yours included -
+                    and only while the picture is a video: with the camera off
+                    the face carries it instead (see `callBadge`). Deafened wins
+                    the space: somebody who is not listening is not reached by
+                    talking louder, and their microphone being off follows from
+                    it anyway. */}
                 {blank ? null : deafened ? (
                     <HeadphoneOff className="size-3 text-danger" aria-label="Not listening" />
                 ) : muted ? (
