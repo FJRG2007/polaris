@@ -17,6 +17,7 @@ import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoginState } from "@/lib/apps/minecraft/polaris-login-service";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import * as actions from "@/app/(app)/apps/installed/[id]/minecraft-actions";
 import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
 import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
 
@@ -41,6 +42,7 @@ const OFF: LoginState = {
     on: false,
     build: null,
     foreign: null,
+    reachable: true,
     health: "waiting",
     seenAt: null,
     modVersion: null,
@@ -244,15 +246,43 @@ describe("Polaris login", () => {
             state: { ...OFF, build: "polaris-neoforge-1.21.4.jar", foreign: "basic-login" }
         });
         neoforge("basic-login?");
-        await screen.findByText(/starts without it/);
+        await screen.findByText(/which Polaris does not manage/);
         expect(screen.queryByText("Use Polaris login")).toBeNull();
         expect(screen.queryByText(/Uses Polaris login/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
+    });
+
+    it("installs the Modrinth project where Polaris has no public address", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar", reachable: false }
+        });
+        neoforge("");
+        await screen.findByText(/starts without it/);
+        expect(screen.queryByText(/Uses Polaris login/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+        await waitFor(() => expect(actions.projectFitsAction).toHaveBeenCalled());
+        expect(loginActions.setLoginAction).not.toHaveBeenCalled();
     });
 
     it("is not offered without a build", async () => {
         neoforge();
         await screen.findByText(/starts without it/);
         expect(screen.queryByText("Use Polaris login")).toBeNull();
+    });
+
+    it("offers no Turn on beside a plugin server's own login", () => {
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects="simple-auth?"
+                software="PAPER"
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+        expect(screen.getByText(/which Polaris does not manage/)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
     });
 
     it("is never asked about on a plugin server", () => {

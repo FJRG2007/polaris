@@ -3,11 +3,12 @@
 /**
  * Polaris's own login mod, inside the join-password card.
  *
- * Offered only where a build exists (NeoForge 1.21.4 today), and never switched on
- * for anybody: the card's own Turn on still installs the Modrinth project. This is
- * the second road, taken on purpose - it gives players real commands and text
- * passwords where the modded project only has `/trigger` and numbers, and it
- * keeps the passwords here, where a forgotten one can be reset.
+ * Offered only where a build exists (NeoForge 1.21.4 today). Where Polaris has a
+ * public address it is what a new server gets and what the card's Turn on
+ * installs; a server already on the Modrinth project is offered the switch. It
+ * gives players real commands and text passwords where the modded project only
+ * has `/trigger` and numbers, and it keeps the passwords here, where a forgotten
+ * one can be reset.
  *
  * What it costs is said before it is turned on: the mod asks Polaris on every
  * join, so a server that cannot reach Polaris lets nobody in, and does not start.

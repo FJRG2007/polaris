@@ -16,7 +16,8 @@ const installApp = vi.fn(async (..._args: unknown[]) => ({
 }));
 
 vi.mock("@/lib/apps/install-service", () => ({ installApp }));
-vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example" }));
+const publicAppUrl = vi.fn(async (): Promise<string | null> => "https://polaris.example");
+vi.mock("@/lib/domain-service", () => ({ publicAppUrl }));
 vi.mock("@/lib/apps/install-config", () => ({ patchInstallConfig: vi.fn(async () => undefined) }));
 vi.mock("@/lib/apps/minecraft/player-access", () => ({
     grantPlayerAccess: vi.fn(async () => undefined)
@@ -60,6 +61,7 @@ function created() {
 
 beforeEach(() => {
     installApp.mockClear();
+    publicAppUrl.mockClear();
 });
 
 describe("a new server's login", () => {
@@ -77,6 +79,15 @@ describe("a new server's login", () => {
         expect(written.get("POLARIS_SERVER_TOKEN")?.isSecret).toBe(true);
         expect(written.get("POLARIS_SERVER_TOKEN")?.value).toMatch(/^[0-9a-f]{64}$/);
         expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(/\bauth\b/);
+    });
+
+    it("is the Modrinth guard where Polaris has no public address", async () => {
+        publicAppUrl.mockResolvedValueOnce(null);
+        await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
+        const { env, seed } = created();
+        expect(seed).toBeUndefined();
+        expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
+        expect(env.has("POLARIS_LOGIN")).toBe(false);
     });
 
     it("is the Modrinth guard where there is none", async () => {

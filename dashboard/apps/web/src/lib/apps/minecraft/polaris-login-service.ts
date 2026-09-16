@@ -12,12 +12,12 @@
 
 import { prisma } from "@polaris/db";
 import * as polarisLogin from "./polaris-login";
-import { appBaseUrl } from "@/lib/domain-service";
+import { appBaseUrl, publicAppUrl } from "@/lib/domain-service";
 import { readInstallEnvSecret } from "@/lib/apps/install-secret";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { foreignLogin, PROJECTS_KEY, SOFTWARE_KEY, withJoinGuard } from "./join-guard";
+import { enableLogin, foreignLogin, PROJECTS_KEY, SOFTWARE_KEY } from "./join-guard";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 
 /** The server a mod request speaks for. */
@@ -225,6 +225,9 @@ export interface LoginState {
     readonly build: string | null;
     /** A login Polaris does not manage that the server already carries. */
     readonly foreign: string | null;
+    /** Whether Polaris has an address a server can reach it on, which the mod
+     *  needs before the server will start. */
+    readonly reachable: boolean;
     readonly health: polarisLogin.LoginHealth;
     readonly seenAt: string | null;
     readonly modVersion: string | null;
@@ -236,7 +239,7 @@ export async function loginState(
     applicationId: string,
     ownerId: string
 ): Promise<LoginState> {
-    const [vars, install, checkIn, players, deployment] = await Promise.all([
+    const [vars, install, checkIn, players, deployment, publicUrl] = await Promise.all([
         listEnvVars("application", applicationId, ownerId),
         prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } }),
         prisma.minecraftLoginCheckIn.findUnique({ where: { installedAppId } }),
@@ -249,7 +252,8 @@ export async function loginState(
             where: { deployableType: "application", deployableId: applicationId },
             orderBy: { createdAt: "desc" },
             select: { finishedAt: true }
-        })
+        }),
+        publicAppUrl().catch(() => null)
     ]);
     const env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
     const now = new Date();
@@ -261,6 +265,7 @@ export async function loginState(
         on: polarisLogin.loginOn(env),
         build: polarisLogin.modFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
         foreign: foreignLogin(env.get(PROJECTS_KEY) ?? ""),
+        reachable: publicUrl !== null,
         health: polarisLogin.loginHealth({
             seenAt: checkIn?.seenAt ?? null,
             upSince,
@@ -328,30 +333,17 @@ export async function setLogin(
         const token =
             (await readInstallEnvSecret(applicationId, ownerId, polarisLogin.TOKEN_KEY)) ??
             randomBytes(32).toString("hex");
-        writes = polarisLogin.enableEnv({
+        writes = enableLogin({
             current,
             baseUrl: await appBaseUrl(),
             installedAppId,
             file: build,
             token
         });
-        writes.set(
-            PROJECTS_KEY,
-            withJoinGuard(current.get(PROJECTS_KEY) ?? "", current.get(SOFTWARE_KEY) ?? "", true)
-        );
     } else {
         writes = polarisLogin.disableEnv(current);
     }
-    await setEnvVars(
-        "application",
-        applicationId,
-        ownerId,
-        [...writes].map(([name, value]) => ({
-            key: name,
-            value,
-            isSecret: name === polarisLogin.TOKEN_KEY
-        }))
-    );
+    await setEnvVars("application", applicationId, ownerId, polarisLogin.envWrites(writes));
 }
 
 /** Forget a player's password, so they register again on their next join. */

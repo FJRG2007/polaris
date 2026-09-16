@@ -243,7 +243,8 @@ export const SOFTWARE_KEY = "TYPE";
  *
  * A server running Polaris's own login mod (`modOn`) gets no project at all, and
  * loses any it has: that mod is its guard, and a project beside it is a second
- * login keeping its passwords somewhere else.
+ * login keeping its passwords somewhere else. So does a server carrying a login
+ * Polaris does not manage (`foreignLogin`), for the same reason.
  *
  * A default, not a policy: this runs where Polaris decides what a server starts
  * life with - a new one, and a reset, which is a server starting again - and where
@@ -253,8 +254,9 @@ export const SOFTWARE_KEY = "TYPE";
  * it back, along with everything else a fresh server is given.
  */
 export function withJoinGuard(current: string, software: string, modOn = false): string {
-    const guard = modOn ? null : joinGuardFor(software);
-    const wanted = modOn ? null : joinGuardEntry(software);
+    const none = modOn || foreignLogin(current) !== null;
+    const guard = none ? null : joinGuardFor(software);
+    const wanted = none ? null : joinGuardEntry(software);
     const own = guard === null ? [] : joinGuardSlugs(guard);
     // A password project for the other loader, whoever put it there: usually left
     // over from the software being changed, and at best a project with almost no
@@ -270,6 +272,27 @@ export function withJoinGuard(current: string, software: string, modOn = false):
     if (wanted === null) return formatProjectList(kept);
     const already = kept.some((entry) => own.includes(projectSlug(entry)?.toLowerCase() ?? ""));
     return formatProjectList(already ? kept : [...kept, wanted]);
+}
+
+/**
+ * Everything turning Polaris login on writes, the project list included.
+ *
+ * One answer for the two places that do it - a new server and the card's switch -
+ * so a server created with the mod and one switched onto it cannot differ.
+ */
+export function enableLogin(
+    input: Parameters<typeof polarisLogin.enableEnv>[0]
+): Map<string, string> {
+    const writes = polarisLogin.enableEnv(input);
+    writes.set(
+        PROJECTS_KEY,
+        withJoinGuard(
+            input.current.get(PROJECTS_KEY) ?? "",
+            input.current.get(SOFTWARE_KEY) ?? "",
+            true
+        )
+    );
+    return writes;
 }
 
 /**

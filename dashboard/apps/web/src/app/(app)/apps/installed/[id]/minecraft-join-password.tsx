@@ -51,7 +51,12 @@ import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
-import { joinGuardFor, joinGuardSlugs, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
+import {
+    foreignLogin,
+    joinGuardFor,
+    joinGuardSlugs,
+    PROJECTS_KEY
+} from "@/lib/apps/minecraft/join-guard";
 import { LoginDetails, LoginOffer, LoginSkeleton, useLoginState } from "./minecraft-polaris-login";
 
 /** Whether an entry names one of those projects, whatever version or suffix it
@@ -96,8 +101,10 @@ export function MinecraftJoinPassword({
     const modCapable = java && modrinth.loaderForType(software) === "neoforge";
     const login = useLoginState(installedAppId, modCapable);
     const modOn = login.state?.on === true;
+    const foreign = java ? foreignLogin(projects) : null;
+    const offerMod = Boolean(login.state?.build) && foreign === null;
     /** Polaris login is what this server should use, when it is not on already. */
-    const preferMod = Boolean(login.state?.build) && !login.state?.foreign;
+    const preferMod = offerMod && login.state?.reachable === true;
 
     // Held in state so the switch answers the press immediately, and taken from
     // the server again whenever its answer changes underneath - the Mods screen
@@ -111,6 +118,7 @@ export function MinecraftJoinPassword({
         setOn(listed !== null || modOn);
     }
     const installed = on && listed !== null ? listed : guard?.slug;
+    const locked = foreign !== null && !on;
 
     const restartNote =
         playersOnline > 0
@@ -162,7 +170,7 @@ export function MinecraftJoinPassword({
     }
 
     function apply(wanted: boolean): void {
-        if (!guard) return;
+        if (!guard || (wanted && foreign !== null)) return;
         setError(null);
         void run(async () => {
             // Asked before the operator is asked anything, because the answer that
@@ -244,6 +252,12 @@ export function MinecraftJoinPassword({
                         state={login.state}
                         onChanged={() => void login.reload()}
                     />
+                ) : locked ? (
+                    <p className="text-xs text-muted-foreground">
+                        Players already log in with <span className="font-mono">{foreign}</span>,
+                        which Polaris does not manage. Remove it from the Mods screen to use a login
+                        from here instead.
+                    </p>
                 ) : preferMod && listed === null ? (
                     <p className="text-xs text-muted-foreground">
                         Uses Polaris login: players get <span className="font-mono">/register</span>{" "}
@@ -295,7 +309,7 @@ export function MinecraftJoinPassword({
                                 )}
                             </p>
                         )}
-                        {preferMod && listed !== null && (
+                        {offerMod && listed !== null && (
                             <LoginOffer
                                 replacing={listed}
                                 disabled={pending}
@@ -312,7 +326,7 @@ export function MinecraftJoinPassword({
                 {/* No button at all on Bedrock rather than one that can never be
                     pressed: there is nothing behind it to install, and a disabled
                     control reads as something the reader is one step away from. */}
-                {java && (
+                {java && !locked && (
                     <div className="flex justify-end">
                         <Button
                             size="sm"

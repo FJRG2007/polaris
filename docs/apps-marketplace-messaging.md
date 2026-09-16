@@ -358,10 +358,13 @@ configured means the machine's own address, as before.
   served at `/api/minecraft/mod/<file>`). A new server whose software and release have a build (`MOD_BUILDS` in
   `lib/apps/minecraft/polaris-login.ts`; NeoForge 1.21.4 today) is created with it
   on and without the Modrinth guard: the install is created with an id chosen up
-  front (`InstallSeed`), because the mod names its server by that id. The
+  front (`InstallSeed`), because the mod names its server by that id. That needs
+  a public address (`publicAppUrl`), since the server fetches the jar from it and
+  does not start without it; a LAN-only install keeps the Modrinth guard and is
+  offered the switch. The
   join-password card's Turn on installs it on such a server too. A server that
   already carries a login Polaris does not manage (`FOREIGN_LOGIN_SLUGS`) gets
-  neither, and an existing server on the Modrinth guard is offered the switch
+  neither (`withJoinGuard` seeds no guard beside it, and the card offers no Turn on), and an existing server on the Modrinth guard is offered the switch
   rather than moved, since switching makes every player register again. Switching it on writes `MODS` (the jar's URL), `POLARIS_LOGIN`,
   `POLARIS_URL`, `POLARIS_SERVER_ID` and a secret `POLARIS_SERVER_TOKEN`, and takes
   the Modrinth guard off the list, since the two keep passwords in different

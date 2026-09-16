@@ -404,6 +404,17 @@ describe("which servers get Polaris login by default", () => {
         }
         expect(foreignLogin("auth?,simple-login?")).toBeNull();
     });
+
+    it("seeds no project guard beside a login Polaris does not manage", () => {
+        for (const software of ["NEOFORGE", "PAPER"]) {
+            const list = protectionFor("java", software, "easyauth?,auth?,simple-login?");
+            expect(slugs(list), software).toContain("easyauth");
+            expect(
+                slugs(list).some((slug) => JOIN_GUARD_SLUGS.includes(slug)),
+                software
+            ).toBe(false);
+        }
+    });
 });
 
 /**

@@ -35,10 +35,11 @@ import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
 import * as polarisLogin from "@/lib/apps/minecraft/polaris-login";
 import { randomBytes, randomUUID } from "node:crypto";
-import { appBaseUrl } from "@/lib/domain-service";
+import { publicAppUrl } from "@/lib/domain-service";
 import { installApp, type InstallSeed } from "@/lib/apps/install-service";
 import {
     defaultModFor,
+    enableLogin,
     PROJECTS_KEY,
     SOFTWARE_KEY,
     withJoinGuard
@@ -439,30 +440,27 @@ async function createMinecraftServer(
  * neither exists until the install does - so the id is chosen here and the
  * install is created with it. The project guard comes off the list in the same
  * step, since two logins would ask a player twice.
+ *
+ * Only where Polaris has a public address: the server fetches the mod from it and
+ * does not start while it cannot reach it, and a LAN name such as
+ * `polaris.local` does not resolve inside a container. Elsewhere the server keeps
+ * the Modrinth guard, and the card offers the switch.
  */
 async function loginSeed(env: Map<string, string>): Promise<InstallSeed | undefined> {
     const file = defaultModFor(env);
     if (file === null) return undefined;
+    const baseUrl = await publicAppUrl().catch(() => null);
+    if (baseUrl === null) return undefined;
     const installedAppId = randomUUID();
-    const written = polarisLogin.enableEnv({
+    const written = enableLogin({
         current: env,
-        baseUrl: await appBaseUrl(),
+        baseUrl,
         installedAppId,
         file,
         token: randomBytes(32).toString("hex")
     });
-    env.set(
-        PROJECTS_KEY,
-        withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? "", true)
-    );
-    return {
-        installedAppId,
-        env: [...written].map(([key, value]) => ({
-            key,
-            value,
-            isSecret: key === polarisLogin.TOKEN_KEY
-        }))
-    };
+    env.set(PROJECTS_KEY, written.get(PROJECTS_KEY) ?? "");
+    return { installedAppId, env: polarisLogin.envWrites(written) };
 }
 
 /**
