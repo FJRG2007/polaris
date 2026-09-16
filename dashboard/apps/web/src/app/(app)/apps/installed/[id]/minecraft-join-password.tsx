@@ -29,6 +29,10 @@
  * being the only way the guard ever got installed, because a switch only protects
  * the servers whose owner went looking for it.
  *
+ * On NeoForge 1.21.4 the card also offers Polaris's own login mod, which is never
+ * the default - see `minecraft-polaris-login`. While it is on, it is the guard
+ * this card describes and the one Turn off takes away.
+ *
  * Java only, and the card says so on Bedrock rather than going quiet. Bedrock
  * loads neither plugins nor mods and has no Modrinth list at all, so there is
  * nothing here to offer it - but its own authentication switch sits on this same
@@ -38,12 +42,14 @@
 
 import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
-import { joinGuardFor, joinGuardSlugs, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
+import { joinGuardFor, joinGuardSlugs, PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
+import { LoginDetails, LoginOffer, LoginSkeleton, useLoginState } from "./minecraft-polaris-login";
 
 /** Whether an entry names one of those projects, whatever version or suffix it
  *  was written with. */
@@ -82,16 +88,52 @@ export function MinecraftJoinPassword({
     const [pending, startTransition] = useTransition();
     const java = edition === "java";
     const guard = java ? joinGuardFor(software) : null;
-    const [on, setOn] = useState(false);
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
-    const installed = on && listed !== null ? listed : guard?.slug;
+    // Only a mod loader can carry Polaris's mod, so only one is asked about it.
+    const modCapable = java && modrinth.loaderForType(software) === "neoforge";
+    const login = useLoginState(installedAppId, modCapable);
+    const modOn = login.state?.on === true;
 
     // Held in state so the switch answers the press immediately, and taken from
     // the server again whenever its answer changes underneath - the Mods screen
-    // edits the same list.
-    useEffect(() => {
-        setOn(listed !== null);
-    }, [listed]);
+    // edits the same list. Synced during render rather than in an effect, so the
+    // badge never trails the details it sits above by a commit.
+    const serverKey = `${listed ?? ""}|${modOn}`;
+    const [on, setOn] = useState(listed !== null || modOn);
+    const [syncedKey, setSyncedKey] = useState(serverKey);
+    if (syncedKey !== serverKey) {
+        setSyncedKey(serverKey);
+        setOn(listed !== null || modOn);
+    }
+    const installed = on && listed !== null ? listed : guard?.slug;
+
+    const restartNote =
+        playersOnline > 0
+            ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
+            : "The server restarts to apply it.";
+
+    function switchMod(wanted: boolean): void {
+        setError(null);
+        startTransition(async () => {
+            const asked = await confirm({
+                title: wanted ? "Restart onto Polaris login?" : "Restart to stop asking?",
+                description: wanted
+                    ? `${restartNote} Everybody registers with /register the next time they join${listed ? `, and the passwords kept by ${listed} stop working` : ""}. While the server cannot reach Polaris, nobody can join and it does not start.`
+                    : `${restartNote} Anybody on the player list gets in on their name alone afterwards. The passwords stay here in case you turn it back on.`,
+                confirmLabel: wanted ? "Use Polaris login" : "Turn off and restart",
+                danger: !wanted
+            });
+            if (!asked) return;
+            const result = await setLoginAction({ installedAppId, on: wanted });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setOn(wanted);
+            await login.reload();
+            onSaved();
+        });
+    }
 
     function apply(wanted: boolean): void {
         if (!guard) return;
@@ -111,10 +153,7 @@ export function MinecraftJoinPassword({
                     return;
                 }
             }
-            const said =
-                playersOnline > 0
-                    ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
-                    : "The server restarts to install it.";
+            const said = restartNote;
             const asked = await confirm({
                 title: wanted
                     ? "Restart to ask players for a password?"
@@ -171,6 +210,14 @@ export function MinecraftJoinPassword({
                         This server runs neither plugins nor mods, so there is nothing to install.
                         Switch it to Paper, or to a mod loader, from Settings first.
                     </p>
+                ) : modCapable && !login.loaded ? (
+                    <LoginSkeleton />
+                ) : modOn && login.state ? (
+                    <LoginDetails
+                        installedAppId={installedAppId}
+                        state={login.state}
+                        onChanged={() => void login.reload()}
+                    />
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
@@ -215,10 +262,19 @@ export function MinecraftJoinPassword({
                                 )}
                             </p>
                         )}
+                        {login.state?.build && (
+                            <LoginOffer
+                                replacing={listed}
+                                disabled={pending}
+                                onUse={() => switchMod(true)}
+                            />
+                        )}
                     </>
                 )}
 
-                {error && <p className="text-sm text-danger">{error}</p>}
+                {(error ?? login.error) && (
+                    <p className="text-sm text-danger">{error ?? login.error}</p>
+                )}
 
                 {/* No button at all on Bedrock rather than one that can never be
                     pressed: there is nothing behind it to install, and a disabled
@@ -228,8 +284,8 @@ export function MinecraftJoinPassword({
                         <Button
                             size="sm"
                             variant={on ? "outline" : "primary"}
-                            disabled={pending || guard === null}
-                            onClick={() => apply(!on)}
+                            disabled={pending || guard === null || !login.loaded}
+                            onClick={() => (modOn ? switchMod(false) : apply(!on))}
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             {on ? "Turn off" : "Turn on"}

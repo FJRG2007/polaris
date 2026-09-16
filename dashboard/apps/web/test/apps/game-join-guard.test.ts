@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { protectionFor } from "@/lib/apps/games-create";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import {
+    guardAsTemplate,
     guardForSave,
     guardMovedTo,
     joinGuardEntry,
@@ -250,20 +251,23 @@ describe("moving the guard when the software changes", () => {
 
 /**
  * Which settings saves move the guard. The card that turns the password off
- * writes the project list itself, and a save that is not a change of software
- * has nothing to move - neither may reach for the current list at all.
+ * writes the project list itself, and a save that is not a change of software or
+ * release has nothing to move - neither may reach for the current environment.
  */
 describe("reconciling the guard on a settings save", () => {
     const plugin = joinGuardFor("PAPER")!.slug;
     const mod = joinGuardFor("NEOFORGE")!.slug;
     const listed = `coreprotect?,${plugin}?`;
 
-    const reader = () => vi.fn(async () => listed);
+    const reader = (env: Record<string, string> = { MODRINTH_PROJECTS: listed, TYPE: "PAPER" }) =>
+        vi.fn(async () => new Map(Object.entries(env)));
+    const written = (writes: { key: string; value: string }[]) =>
+        new Map(writes.map((entry) => [entry.key, entry.value]));
 
     it("moves the guard when the save changes the software", async () => {
         const read = reader();
         const moved = await guardForSave([{ key: "TYPE", value: "NEOFORGE" }], read);
-        expect(guardsOn(moved!)).toEqual([mod]);
+        expect(guardsOn(written(moved).get(PROJECTS_KEY) ?? "")).toEqual([mod]);
         expect(read).toHaveBeenCalledTimes(1);
     });
 
@@ -273,21 +277,98 @@ describe("reconciling the guard on a settings save", () => {
             { key: "TYPE", value: "NEOFORGE" },
             { key: "MODRINTH_PROJECTS", value: "coreprotect?" }
         ];
-        expect(await guardForSave(vars, read)).toBeNull();
-        expect(await guardForSave([{ key: "MODRINTH_PROJECTS", value: "" }], read)).toBeNull();
+        expect(await guardForSave(vars, read)).toEqual([]);
+        expect(await guardForSave([{ key: "MODRINTH_PROJECTS", value: "" }], read)).toEqual([]);
         expect(read).not.toHaveBeenCalled();
     });
 
-    it("does not read the list on a save that keeps the software", async () => {
+    it("does not read the environment on a save that keeps the software", async () => {
         const read = reader();
-        expect(await guardForSave([{ key: "DIFFICULTY", value: "hard" }], read)).toBeNull();
-        expect(await guardForSave([{ key: "TYPE", value: "" }], read)).toBeNull();
+        expect(await guardForSave([{ key: "DIFFICULTY", value: "hard" }], read)).toEqual([]);
+        expect(await guardForSave([{ key: "TYPE", value: "" }], read)).toEqual([]);
         expect(read).not.toHaveBeenCalled();
     });
 
     it("writes nothing when the guard already suits the new software", async () => {
         const read = reader();
-        expect(await guardForSave([{ key: "TYPE", value: "PURPUR" }], read)).toBeNull();
+        expect(await guardForSave([{ key: "TYPE", value: "PURPUR" }], read)).toEqual([]);
+    });
+
+    const modded = {
+        TYPE: "NEOFORGE",
+        VERSION: "1.21.4",
+        MODRINTH_PROJECTS: "open-parties-and-claims?",
+        MODS: "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar",
+        POLARIS_LOGIN: "on"
+    };
+
+    it("keeps Polaris login where it has a build, and seeds nothing beside it", async () => {
+        const vars = [
+            { key: "TYPE", value: "NEOFORGE" },
+            { key: "VERSION", value: "1.21.4" }
+        ];
+        expect(await guardForSave(vars, reader(modded))).toEqual([]);
+    });
+
+    it("takes Polaris login off a release with no build, and closes the server another way", async () => {
+        const writes = written(
+            await guardForSave([{ key: "VERSION", value: "1.21.1" }], reader(modded))
+        );
+        expect(writes.get("POLARIS_LOGIN")).toBe("off");
+        // Emptied rather than dropped, which is what makes the image remove the jar.
+        expect(writes.get("MODS")).toBe("");
+        expect(guardsOn(writes.get(PROJECTS_KEY) ?? "")).toEqual([mod]);
+    });
+
+    it("takes Polaris login off a plugin server, and seeds the plugin guard", async () => {
+        const writes = written(
+            await guardForSave([{ key: "TYPE", value: "PAPER" }], reader(modded))
+        );
+        expect(writes.get("POLARIS_LOGIN")).toBe("off");
+        expect(guardsOn(writes.get(PROJECTS_KEY) ?? "")).toEqual([plugin]);
+    });
+});
+
+/**
+ * A reset rebuilds the list around the new blueprint, and a server running
+ * Polaris's login mod must come out of it with that mod as its only guard.
+ */
+describe("the list of a server running Polaris login", () => {
+    it("gets no project guard, and loses one it had", () => {
+        expect(guardsOn(protectionFor("java", "NEOFORGE", "auth?", true))).toEqual([]);
+        expect(guardsOn(protectionFor("java", "PAPER", "", true))).toEqual([]);
+    });
+
+    it("keeps everything that is not a guard", () => {
+        expect(slugs(protectionFor("java", "NEOFORGE", "create?,auth?", true))).toContain("create");
+    });
+});
+
+/**
+ * A template remembers the kind of server, never this one's login: the mod's id
+ * and token are never copied, so what it keeps instead is a project guard.
+ */
+describe("a template made from a server running Polaris login", () => {
+    const env = new Map([
+        ["TYPE", "NEOFORGE"],
+        ["MODRINTH_PROJECTS", "create?"],
+        [
+            "MODS",
+            "https://example.org/extra.jar,https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar"
+        ],
+        ["POLARIS_LOGIN", "on"]
+    ]);
+
+    it("keeps the other jars and gets the project guard back", () => {
+        const kept = guardAsTemplate(env);
+        expect(kept.get("MODS")).toBe("https://example.org/extra.jar");
+        expect(guardsOn(kept.get(PROJECTS_KEY) ?? "")).toEqual([joinGuardFor("NEOFORGE")!.slug]);
+        expect(slugs(kept.get(PROJECTS_KEY) ?? "")).toContain("create");
+    });
+
+    it("leaves a server without it alone", () => {
+        const plain = new Map([["MODRINTH_PROJECTS", "create?"]]);
+        expect(guardAsTemplate(plain)).toEqual(plain);
     });
 });
 

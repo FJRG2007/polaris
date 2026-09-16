@@ -3650,6 +3650,44 @@ model GameServerPref {
     @@index([installedAppId])
 }
 
+// A password a player set on a Minecraft server that runs Polaris's login mod.
+//
+// The mod keeps nothing: it asks Polaris on every join, so the passwords live
+// where the panel can reset one for a player who forgot it. Salted scrypt, never
+// the password itself.
+model MinecraftLogin {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    // Bare uuid, per the InstalledApp precedent.
+    installedAppId String    @db.Uuid
+    // Lowercased. The game treats two spellings of a name as two players in
+    // offline mode, and a password keyed on the exact spelling would let
+    // "steve" register beside "Steve" and be taken for him by anybody reading.
+    username       String
+    // As the player typed it when registering, for the panel.
+    displayName    String
+    passwordHash   String
+    lastLoginAt    DateTime?
+    createdAt      DateTime  @default(now())
+    updatedAt      DateTime  @updatedAt
+
+    @@unique([installedAppId, username])
+    @@index([installedAppId])
+}
+
+// The last time a server's login mod reached Polaris.
+//
+// A mod that cannot reach Polaris lets nobody in, and it cannot say so from
+// here - so its silence is the signal, and this is what the silence is measured
+// against. A row of its own rather than a key in the install's config: the mod
+// writes it every minute, and the config is merged by read-then-write.
+model MinecraftLoginCheckIn {
+    installedAppId String   @id @db.Uuid
+    seenAt         DateTime
+    // What the mod said it is, and what it runs on.
+    modVersion     String
+    gameVersion    String
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------

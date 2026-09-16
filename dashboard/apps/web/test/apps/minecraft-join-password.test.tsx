@@ -13,9 +13,11 @@
  * is turned on, not discovered afterwards by someone already locked out.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LoginState } from "@/lib/apps/minecraft/polaris-login-service";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
 import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
 
 vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
@@ -23,8 +25,36 @@ vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
     updateServerSettingsAction: vi.fn()
 }));
 
+const { confirm } = vi.hoisted(() => ({
+    confirm: vi.fn(async (_options: { title: string; description?: string }) => true)
+}));
+
+vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => [confirm, null] }));
+
+vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
+    loginStateAction: vi.fn(),
+    setLoginAction: vi.fn(),
+    forgetLoginAction: vi.fn()
+}));
+
+const OFF: LoginState = {
+    on: false,
+    build: null,
+    health: "waiting",
+    seenAt: null,
+    modVersion: null,
+    players: []
+};
+
+beforeEach(() => {
+    sessionStorage.clear();
+    vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: OFF });
+    vi.mocked(loginActions.setLoginAction).mockResolvedValue({});
+});
+
 afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
 });
 
 describe("the modded project's commands", () => {
@@ -113,16 +143,17 @@ describe("what the card says happens when there is no build", () => {
         );
     }
 
-    it("says the server starts without it", () => {
+    it("says the server starts without it", async () => {
         for (const software of ["PAPER", "NEOFORGE"]) {
             cardFor(software);
-            expect(screen.getByText(/starts without it/), software).toBeTruthy();
+            expect(await screen.findByText(/starts without it/), software).toBeTruthy();
         }
     });
 
-    it("never claims the server refuses to start instead", () => {
+    it("never claims the server refuses to start instead", async () => {
         for (const software of ["PAPER", "NEOFORGE"]) {
             cardFor(software);
+            await screen.findByText(/starts without it/);
             expect(screen.queryByText(/rather than starting without it/), software).toBeNull();
         }
     });
@@ -133,5 +164,111 @@ describe("what the card says happens when there is no build", () => {
         // server's own answer is.
         cardFor("PAPER");
         expect(screen.getByText(/check the Mods screen/)).toBeTruthy();
+    });
+});
+
+/**
+ * Polaris's own login mod on the card.
+ *
+ * Offered where there is a build and never the default, and once it is on it is
+ * the guard the card describes: its commands, whether the server can still reach
+ * Polaris, and a Turn off that takes the mod away rather than a Modrinth project
+ * the server does not have.
+ */
+describe("Polaris login", () => {
+    function neoforge(projects = "auth?") {
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects={projects}
+                software="NEOFORGE"
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+    }
+
+    const ON: LoginState = {
+        ...OFF,
+        on: true,
+        build: "polaris-neoforge-1.21.4.jar",
+        health: "ok",
+        seenAt: new Date().toISOString(),
+        modVersion: "0.1.0",
+        players: [{ name: "Steve", createdAt: new Date().toISOString(), lastLoginAt: null }]
+    };
+
+    it("is offered where there is a build, and says who registers again", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar" }
+        });
+        neoforge();
+        expect(await screen.findByText("Use Polaris login")).toBeTruthy();
+        expect(screen.getByText(/every player/)).toBeTruthy();
+        // The default is still the Modrinth project.
+        expect(screen.getByText(/\/trigger register set 1234/)).toBeTruthy();
+    });
+
+    it("says what it costs before it is turned on", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-neoforge-1.21.4.jar" }
+        });
+        neoforge();
+        fireEvent.click(await screen.findByRole("button", { name: "Use Polaris login" }));
+        await waitFor(() => expect(loginActions.setLoginAction).toHaveBeenCalled());
+        const asked = confirm.mock.calls[0]?.[0].description ?? "";
+        expect(asked).toMatch(/nobody can join and it does not start/);
+        expect(asked).toMatch(/passwords kept by auth stop working/);
+    });
+
+    it("is not offered without a build", async () => {
+        neoforge();
+        await screen.findByText(/starts without it/);
+        expect(screen.queryByText("Use Polaris login")).toBeNull();
+    });
+
+    it("is never asked about on a plugin server", () => {
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects=""
+                software="PAPER"
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+        expect(loginActions.loginStateAction).not.toHaveBeenCalled();
+    });
+
+    it("describes the mod, not the project, once it is on", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: ON });
+        neoforge("");
+        expect(await screen.findByText(/\/register <password> <password>/)).toBeTruthy();
+        expect(screen.getByText("Steve")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Reset Steve's password" })).toBeTruthy();
+        expect(screen.queryByText(/\/trigger/)).toBeNull();
+        expect(screen.getByText("On")).toBeTruthy();
+    });
+
+    it("says nobody can join when the server has gone quiet", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...ON, health: "silent" }
+        });
+        neoforge("");
+        expect(await screen.findByText(/nobody can join it/)).toBeTruthy();
+    });
+
+    it("turns the mod off, not a project, from Turn off", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: ON });
+        neoforge("");
+        fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
+        await waitFor(() =>
+            expect(loginActions.setLoginAction).toHaveBeenCalledWith({
+                installedAppId: "server-1",
+                on: false
+            })
+        );
     });
 });

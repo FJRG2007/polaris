@@ -352,6 +352,30 @@ configured means the machine's own address, as before.
   `updateServerSettingsAction` on a Settings save - except the save that is
   itself writing `MODRINTH_PROJECTS`, which is the join-password card's own
   toggle and is left to do that alone.
+- **Polaris login, opt-in.** The Modrinth guards leave NeoForge with `/trigger`
+  and numeric passwords, so Polaris ships its own server-side mod
+  (`resources/minecraft/polaris-neoforge`, built into the dashboard image and
+  served at `/api/minecraft/mod/<file>`). The join-password card offers it on a
+  server whose software and release have a build (`MOD_BUILDS` in
+  `lib/apps/minecraft/polaris-login.ts`; NeoForge 1.21.4 today); nothing turns it
+  on by default. Switching it on writes `MODS` (the jar's URL), `POLARIS_LOGIN`,
+  `POLARIS_URL`, `POLARIS_SERVER_ID` and a secret `POLARIS_SERVER_TOKEN`, and takes
+  the Modrinth guard off the list, since the two keep passwords in different
+  places. The mod keeps nothing: every join asks
+  `/api/minecraft/login/<server>/<action>` (`hello`, `status`, `register`,
+  `login`, `password`), which checks the token and throttles per player and, for
+  failures, per server. Passwords are salted scrypt in `MinecraftLogin`, and the
+  card lists them with a reset per player. It fails closed: a server that cannot
+  reach Polaris refuses every player with a message saying so, and because the
+  image downloads `MODS` on every boot, it does not start either. The mod checks
+  in every minute (`MinecraftLoginCheckIn`), and the card shows a server that has
+  been up for three minutes without checking in as an outage. `MODS` only prunes
+  files it copied itself (one manifest per list), so it never touches what
+  `MODRINTH_PROJECTS` installed. `guardForSave` and `minecraftShapeEnv` take the
+  mod off a server moved to software or a release it has no build for, and seed
+  that software's project guard in its place. `guardAsTemplate` does the same
+  unconditionally when a server carrying it is saved as a template, since the
+  mod's id and token are that server's alone and a template copies neither.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before

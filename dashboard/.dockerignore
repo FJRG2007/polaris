@@ -5,6 +5,9 @@
 **/.next
 **/dist
 **/.turbo
+**/.gradle
+resources/minecraft/*/build
+resources/minecraft/*/run
 **/*.tsbuildinfo
 packages/db/generated
 .dev-data

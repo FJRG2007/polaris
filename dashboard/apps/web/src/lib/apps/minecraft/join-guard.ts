@@ -29,6 +29,7 @@
  * and installed nothing on almost every release anybody runs.
  */
 
+import * as polarisLogin from "./polaris-login";
 import {
     formatProjectList,
     isPluginLoader,
@@ -195,19 +196,106 @@ export const PROJECTS_KEY = "MODRINTH_PROJECTS";
 export const SOFTWARE_KEY = "TYPE";
 
 /**
- * The project list a settings save has to write alongside itself, or null when
- * it has to write none.
+ * The same list with the password-on-join project on it.
  *
- * Only a save that changes the software moves the guard, and only one that is not
- * itself writing the list: that save is the join-password card turning the guard
- * off, and putting it back here would make that button do nothing. The current
- * list is read only when both hold, so an ordinary save costs no extra lookup.
+ * Every server gets this, rather than the operator finding the switch: a server
+ * with Mojang authentication off has only a name to go on, so anybody who learns
+ * a name that is on the player list can wear it. That is worth closing by
+ * default, and a default is the only version of it that protects the servers
+ * whose owner never opened the screen.
+ *
+ * Appended rather than forced. An entry already naming the guard, or the project
+ * it replaced, is left exactly as it was written, because a pinned version, a
+ * dropped `"?"` or an older project players already registered with is somebody
+ * saying something more specific than this function knows.
+ *
+ * A server running Polaris's own login mod (`modOn`) gets no project at all, and
+ * loses any it has: that mod is its guard, and a project beside it is a second
+ * login keeping its passwords somewhere else.
+ *
+ * A default, not a policy: this runs where Polaris decides what a server starts
+ * life with - a new one, and a reset, which is a server starting again - and where
+ * a server loses the mod it was closed with. Turning it off afterwards is the Mods
+ * screen and the join-password card, and both write the list straight out without
+ * coming through here, so an operator who takes it off keeps it off. A reset puts
+ * it back, along with everything else a fresh server is given.
+ */
+export function withJoinGuard(current: string, software: string, modOn = false): string {
+    const guard = modOn ? null : joinGuardFor(software);
+    const wanted = modOn ? null : joinGuardEntry(software);
+    const own = guard === null ? [] : joinGuardSlugs(guard);
+    // A password project for the other loader, whoever put it there: usually left
+    // over from the software being changed, and at best a project with almost no
+    // builds for this loader. Kept, it would sit beside the guard seeded below and
+    // give players two logins, so a reset takes it off like the protection
+    // plugins stripped beside it.
+    const kept = parseProjectList(current).filter((entry) => {
+        const listed = projectSlug(entry)?.toLowerCase();
+        return (
+            typeof listed !== "string" || own.includes(listed) || !JOIN_GUARD_SLUGS.includes(listed)
+        );
+    });
+    if (wanted === null) return formatProjectList(kept);
+    const already = kept.some((entry) => own.includes(projectSlug(entry)?.toLowerCase() ?? ""));
+    return formatProjectList(already ? kept : [...kept, wanted]);
+}
+
+/**
+ * What a settings save has to write alongside itself to keep the server closed,
+ * or nothing.
+ *
+ * Only a save that changes the software or the release moves a guard, and only
+ * one that is not itself writing the project list: that save is the
+ * join-password card turning the guard off, and putting it back here would make
+ * that button do nothing. The current environment is read only when both hold, so
+ * an ordinary save costs no extra lookup.
+ *
+ * Polaris's login mod is looked at first. It has a build per release, so a save
+ * that moves the server to software or a release it has none for takes it off -
+ * and then seeds the project guard of the new software, because the server was
+ * closed and the save did not ask to open it.
  */
 export async function guardForSave(
     vars: readonly { key: string; value: string }[],
-    readProjects: () => Promise<string>
-): Promise<string | null> {
-    const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
-    if (!software || vars.some((entry) => entry.key === PROJECTS_KEY)) return null;
-    return guardMovedTo(await readProjects(), software);
+    readEnv: () => Promise<ReadonlyMap<string, string>>
+): Promise<{ key: string; value: string }[]> {
+    const saved = new Map(vars.map((entry) => [entry.key, entry.value]));
+    const software = saved.get(SOFTWARE_KEY);
+    const version = saved.get("VERSION");
+    if ((!software && !version) || saved.has(PROJECTS_KEY)) return [];
+
+    const current = await readEnv();
+    const nextSoftware = software || (current.get(SOFTWARE_KEY) ?? "");
+    const nextVersion = version ?? current.get("VERSION") ?? "";
+    const mod = polarisLogin.modMovedTo(current, nextSoftware, nextVersion);
+    if (mod !== null) {
+        const after = new Map([...current, ...mod]);
+        const projects = polarisLogin.loginOn(after)
+            ? null
+            : withJoinGuard(current.get(PROJECTS_KEY) ?? "", nextSoftware);
+        const writes = [...mod].map(([key, value]) => ({ key, value }));
+        return projects === null || projects === (current.get(PROJECTS_KEY) ?? "")
+            ? writes
+            : [...writes, { key: PROJECTS_KEY, value: projects }];
+    }
+    if (!software || polarisLogin.loginOn(current)) return [];
+    const moved = guardMovedTo(current.get(PROJECTS_KEY) ?? "", software);
+    return moved === null ? [] : [{ key: PROJECTS_KEY, value: moved }];
+}
+
+/**
+ * A server's environment as a template should remember it.
+ *
+ * Polaris login belongs to the server it was switched on for - its id and token
+ * are that server's, and a template never copies them - so a template made from
+ * such a server would otherwise hand the next one the jar and a project list with
+ * no guard on it. What it remembers instead is the project guard the software
+ * would have been given, so a server built from it starts closed.
+ */
+export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, string> {
+    const copy = new Map(env);
+    if (!polarisLogin.loginOn(env)) return copy;
+    copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(env.get(polarisLogin.MODS_KEY) ?? ""));
+    copy.set(PROJECTS_KEY, withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? ""));
+    return copy;
 }
