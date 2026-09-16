@@ -133,4 +133,10 @@ jobs:
       - run: npm ci --prefer-offline
       - run: npm run db:generate
       - run: npm run build:packages
+      # Node's default heap tops out near 4 GB, and the app build now peaks right
+      # at it: the same commit passed on one run and died with "JavaScript heap
+      # out of memory" on the next. The runner has 16 GB, so the build gets room
+      # instead of a coin toss.
       - run: npm run build -w @polaris/web
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192

@@ -97,15 +97,6 @@ export async function issueClientKey(
     const scopes = CLIENT_SCOPES.filter((scope) => allowed.has(scope));
     if (scopes.length === 0) return null;
 
-    // Whatever this client held before, so re-connecting replaces rather than
-    // accumulates.
-    const held = await listApiKeys(userId).catch(() => []);
-    for (const key of held) {
-        if (isClientKeyFor(key.description, device.identifier)) {
-            await deleteApiKey(userId, key.id).catch(() => undefined);
-        }
-    }
-
     const created = await createApiKey(userId, {
         name: clientKeyName(device.name),
         description: clientKeyMark(device.identifier),
@@ -120,7 +111,51 @@ export async function issueClientKey(
         // A client left in a browser nobody opens again should stop answering.
         expiresInDays: 90
     });
+
+    // Only now, because the other order is one failed write away from a browser
+    // that was signed in before it asked and holds nothing after: the approval
+    // it spent getting here is gone, so there is nothing left for it to retry
+    // with. Read after the write rather than before it, so a credential another
+    // approval for this same device wrote in the meantime is cleared too; only
+    // the ones older than this one go, so two claims racing each other cannot
+    // each take out the other's and leave the device with none.
+    await clearOlderClientKeys(userId, device.identifier, created.id);
     return created.secret;
+}
+
+/**
+ * Remove every credential this device was issued before `keepId`.
+ *
+ * The new credential has already been written by the time this runs, so a
+ * failure here is logged rather than thrown: the approval still succeeds, and
+ * the credential left behind can at least be traced by its id.
+ */
+async function clearOlderClientKeys(
+    userId: string,
+    deviceIdentifier: string,
+    keepId: string
+): Promise<void> {
+    const held = await listApiKeys(userId).catch((error: unknown) => {
+        console.error(
+            `[vault-client-key] could not list credentials to replace, kept ${keepId}:`,
+            error
+        );
+        return null;
+    });
+    if (!held) return;
+    const kept = held.find((key) => key.id === keepId);
+    if (!kept) return;
+    const older = held.filter(
+        (key) => isClientKeyFor(key.description, deviceIdentifier) && key.createdAt < kept.createdAt
+    );
+    for (const key of older) {
+        await deleteApiKey(userId, key.id).catch((error: unknown) => {
+            console.error(
+                `[vault-client-key] could not delete replaced credential ${key.id}:`,
+                error
+            );
+        });
+    }
 }
 
 /** The scope this issues, so a caller can assert it without restating it. */

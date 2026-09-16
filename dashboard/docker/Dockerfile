@@ -91,7 +91,11 @@ COPY . .
 # Generate the Prisma client (output: packages/db/generated/client) and build
 # all packages, then the app. `npm run build` fans out across the workspaces.
 RUN npm run db:generate
-RUN npm run build
+# Extra heap for the Next build, passed by CI where the runner has the memory for
+# it (the default ~4 GB is what the app build now peaks at). Empty on an
+# operator's machine, which keeps Node's own limit for the RAM that box has.
+ARG NODE_BUILD_OPTIONS=""
+RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" npm run build
 
 # Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
 # a separate process alongside the Next server, outside the standalone bundle, so
