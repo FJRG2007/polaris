@@ -21,6 +21,7 @@
  */
 
 import { useConfirm } from "@/components/confirm-dialog";
+import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
@@ -38,7 +39,6 @@ import {
 } from "lucide-react";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
 
-const PROJECTS_KEY = "MODRINTH_PROJECTS";
 const DEPENDENCIES_KEY = "MODRINTH_DOWNLOAD_DEPENDENCIES";
 const VERSION_KEY = "VERSION";
 const SEARCH_DEBOUNCE_MS = 400;

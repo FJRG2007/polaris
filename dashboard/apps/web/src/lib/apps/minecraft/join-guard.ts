@@ -169,7 +169,15 @@ export function guardMovedTo(projects: string, software: string): string | null 
     return next === formatProjectList(entries) ? null : next;
 }
 
-/** The environment key the project list is saved under. */
+/**
+ * The environment key the project list is saved under.
+ *
+ * Named here because the guard is decided here, but the list is not only the
+ * guard's: it is every mod and plugin the image installs, and it is also where
+ * the answer to "do Bedrock clients join this one" is written. Anything writing
+ * it is writing all of that at once, which is why the paths that touch it add
+ * and remove single entries rather than composing a list of their own.
+ */
 export const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /**

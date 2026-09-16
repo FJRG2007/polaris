@@ -35,6 +35,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { PlayerSeen } from "@/lib/apps/games-activity";
 import { MinecraftAppearance } from "./minecraft-appearance";
+import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import type { PlayerTimeout } from "@/lib/apps/player-timeout";
@@ -58,10 +59,6 @@ import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/
 /** Mods are managed on their own screen, so their variables are not repeated as
  *  raw fields on Settings. */
 const MODS_GROUP = "Mods";
-
-/** The setting that lists what the image installs, which is also where the answer
- *  to "do Bedrock clients join this one" is written. */
-const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /** The description has an editor of its own - a preview, a colour toolbar and the
  *  centring - so it is not also offered as a raw text field two cards below, where
