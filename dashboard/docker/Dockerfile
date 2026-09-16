@@ -116,6 +116,19 @@ RUN node_modules/.bin/esbuild apps/web/ws-server.mjs --bundle --platform=node \
 RUN mkdir -p /build/apps/web/public
 
 # ---------------------------------------------------------------------------
+# Minecraft mods - Polaris login, built from resources/minecraft and served by
+# the dashboard to the game servers that switch it on (app/api/minecraft/mod).
+# Its own stage so the layer is reused until the mod's sources change; the jar is
+# renamed to the file name the dashboard serves (MOD_BUILDS in
+# lib/apps/minecraft/polaris-login.ts, which a test holds to this line).
+# ---------------------------------------------------------------------------
+FROM gradle:9.2.1-jdk21 AS minecraft-mods
+
+WORKDIR /mods/polaris-neoforge
+COPY resources/minecraft/polaris-neoforge/ ./
+RUN gradle --no-daemon -q build     && mkdir -p /out     && cp "build/libs/polaris-$(sed -n 's/^mod_version=//p' gradle.properties).jar" /out/polaris-neoforge-1.21.4.jar
+
+# ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
 # ---------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
@@ -157,6 +170,10 @@ COPY --from=builder --chown=node:node /build/apps/web/.next/standalone ./
 # Static assets and public/ are not part of the traced standalone bundle.
 COPY --from=builder --chown=node:node /build/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=node:node /build/apps/web/public ./apps/web/public
+
+# The Minecraft mods the dashboard serves. The build keeps each jar's modification
+# time, which is what a game server's image compares against on every boot.
+COPY --from=minecraft-mods --chown=node:node /out ./minecraft-mods
 
 # The deploy terminal sidecar, bundled into a single self-contained CJS file in
 # the builder stage. server.js does not import it, so Next's output tracing omits
