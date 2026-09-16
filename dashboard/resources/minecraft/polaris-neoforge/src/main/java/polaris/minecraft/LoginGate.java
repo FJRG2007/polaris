@@ -135,6 +135,12 @@ final class LoginGate {
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
+        // Players are saved after this event, and the logout that would have
+        // lifted the darkness finds nothing held by then.
+        for (Map.Entry<UUID, Held> entry : held.entrySet()) {
+            ServerPlayer player = event.getServer().getPlayerList().getPlayer(entry.getKey());
+            if (player != null) lighten(player, entry.getValue());
+        }
         held.clear();
         server = null;
     }
@@ -193,10 +199,15 @@ final class LoginGate {
 
     @SubscribeEvent
     public void onJoin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!guarding || !(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!guarding) {
+            clearOurs(player);
+            return;
+        }
         Held waiting = new Held(player.position(), tick + LOGIN_TICKS);
         held.put(player.getUUID(), waiting);
         if (config.state() != PolarisConfig.State.ON) {
+            clearOurs(player);
             waiting.kick = NOT_SET_UP;
             return;
         }
@@ -279,9 +290,14 @@ final class LoginGate {
     }
 
     private static void lighten(ServerPlayer player, Held waiting) {
-        MobEffectInstance current = player.getEffect(MobEffects.BLINDNESS);
-        if (waiting.darkened && current != null && isOurs(current)) player.removeEffect(MobEffects.BLINDNESS);
+        if (waiting.darkened) clearOurs(player);
         waiting.darkened = false;
+    }
+
+    /** Lifts this gate's darkness, and only this gate's. */
+    private static void clearOurs(ServerPlayer player) {
+        MobEffectInstance current = player.getEffect(MobEffects.BLINDNESS);
+        if (current != null && isOurs(current)) player.removeEffect(MobEffects.BLINDNESS);
     }
 
     private static boolean isOurs(MobEffectInstance effect) {
