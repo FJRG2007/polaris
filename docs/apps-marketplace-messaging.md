@@ -39,10 +39,9 @@ document is the source of truth; keep it current as phases land.
 
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
-(scan a QR); Discord bot token; Slack bot token + MESSAGING_SLACK_SIGNING_SECRET
-
-- Events webhook. All channels also need the bridge running (MESSAGING_BRIDGE_URL/
-  TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
+(scan a QR); Discord bot token; Slack bot token, MESSAGING_SLACK_SIGNING_SECRET
+and Events webhook. All channels also need the bridge running
+(MESSAGING_BRIDGE_URL/TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
 
 ## Known follow-ups (deferred, not silently dropped)
 

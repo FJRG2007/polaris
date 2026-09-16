@@ -54,6 +54,13 @@ function names(entry: string, slugs: readonly string[]): boolean {
     return typeof slug === "string" && slugs.includes(slug);
 }
 
+/** Which of those projects the list carries, so an older server that still runs
+ *  the one this guard replaced is described as that one. */
+function listedSlug(projects: string, slugs: readonly string[]): string | null {
+    const entry = modrinth.parseProjectList(projects).find((item) => names(item, slugs));
+    return entry === undefined ? null : (modrinth.projectSlug(entry)?.toLowerCase() ?? null);
+}
+
 export function MinecraftJoinPassword({
     installedAppId,
     edition,
@@ -78,18 +85,15 @@ export function MinecraftJoinPassword({
     const java = edition === "java";
     const guard = java ? joinGuardFor(software) : null;
     const [on, setOn] = useState(false);
+    const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
+    const installed = on && listed !== null ? listed : guard?.slug;
 
     // Held in state so the switch answers the press immediately, and taken from
     // the server again whenever its answer changes underneath - the Mods screen
     // edits the same list.
     useEffect(() => {
-        setOn(
-            guard !== null &&
-                modrinth
-                    .parseProjectList(projects)
-                    .some((entry) => names(entry, joinGuardSlugs(guard)))
-        );
-    }, [projects, guard]);
+        setOn(listed !== null);
+    }, [listed]);
 
     function apply(wanted: boolean): void {
         if (!guard) return;
@@ -97,9 +101,9 @@ export function MinecraftJoinPassword({
         startTransition(async () => {
             // Asked before the operator is asked anything, because the answer that
             // matters is whether this server can load it at all - and finding that
-            // out after the restart means finding it out from a server that is
-            // down. Only on the way in: taking a project off the list cannot fail
-            // for want of a build.
+            // out after the restart means a server that came up without it while
+            // this card says On. Only on the way in: taking a project off the list
+            // cannot fail for want of a build.
             if (wanted) {
                 const fit = await projectFitsAction({ installedAppId, slug: guard.slug });
                 if (!fit.fits) {
@@ -172,7 +176,7 @@ export function MinecraftJoinPassword({
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
-                            Installs <span className="font-mono">{guard.slug}</span> from Modrinth,
+                            Installs <span className="font-mono">{installed}</span> from Modrinth,
                             which the Mods screen shows afterwards like anything else on the list. A
                             release it has no build for is skipped and the server starts without it
                             rather than failing to start, so check the Mods screen once the server
@@ -199,12 +203,18 @@ export function MinecraftJoinPassword({
                         ) : (
                             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                                 Players register on their first join with the commands{" "}
-                                <span className="font-mono">{guard.slug}</span> documents on its
+                                <span className="font-mono">{installed}</span> documents on its
                                 Modrinth page. Tell them before turning this on: nobody can look
                                 that up from inside the server they have just been locked out of.
-                                Their password can appear in the server log, which the Console
-                                screen shows - it is hidden only by a library Modrinth does not
-                                carry, so treat these as passwords for this server and nothing else.
+                                {installed === guard.slug && (
+                                    <>
+                                        {" "}
+                                        Their password can appear in the server log, which the
+                                        Console screen shows - it is hidden only by a library
+                                        Modrinth does not carry, so treat these as passwords for
+                                        this server and nothing else.
+                                    </>
+                                )}
                             </p>
                         )}
                     </>

@@ -92,9 +92,10 @@ export function joinGuardSlugs(guard: JoinGuard): readonly string[] {
     return [guard.slug, ...guard.replaces];
 }
 
-/** Every slug this may ever seed, or has seeded before, for the paths that need
- *  to recognise one without knowing which server it came from - taking it back
- *  off a list, or telling a guard apart from a mod the operator chose themselves. */
+/** Every slug any guard answers to, for the paths that need to recognise a
+ *  password project without knowing which loader it was meant for. Not "what
+ *  Polaris seeded": an operator may have added any of these themselves, and a
+ *  replaced slug is never seeded at all. */
 export const JOIN_GUARD_SLUGS: readonly string[] = [
     ...joinGuardSlugs(PLUGIN_GUARD),
     ...joinGuardSlugs(MOD_GUARD)

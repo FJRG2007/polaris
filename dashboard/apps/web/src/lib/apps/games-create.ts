@@ -34,7 +34,12 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
-import { joinGuardEntry, JOIN_GUARD_SLUGS } from "@/lib/apps/minecraft/join-guard";
+import {
+    joinGuardEntry,
+    joinGuardFor,
+    joinGuardSlugs,
+    JOIN_GUARD_SLUGS
+} from "@/lib/apps/minecraft/join-guard";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
@@ -685,7 +690,8 @@ function seededPlugins(edition: "java" | "bedrock"): Set<string> {
  * here was handed three Bukkit plugins: two that Modrinth has never heard of for
  * it, and one jar it cannot boot on.
  *
- * Only what Polaris seeded is taken back. Anything else on the list belongs to
+ * Only what Polaris seeded is taken back, plus a password project meant for the
+ * other loader (see `withJoinGuard`). Anything else on the list belongs to
  * whoever put it there, which on a modded server is every mod on it.
  */
 export function protectionFor(
@@ -715,8 +721,9 @@ export function protectionFor(
  * default, and a default is the only version of it that protects the servers
  * whose owner never opened the screen.
  *
- * Appended rather than forced. An entry already naming the guard is left exactly
- * as it was written, because a pinned version or a dropped `"?"` is somebody
+ * Appended rather than forced. An entry already naming the guard, or the project
+ * it replaced, is left exactly as it was written, because a pinned version, a
+ * dropped `"?"` or an older project players already registered with is somebody
  * saying something more specific than this function knows.
  *
  * A default, not a policy: this runs where Polaris decides what a server starts
@@ -727,18 +734,22 @@ export function protectionFor(
  * server is given.
  */
 function withJoinGuard(current: string, software: string): string {
+    const guard = joinGuardFor(software);
     const wanted = joinGuardEntry(software);
-    const slug = wanted === null ? null : projectSlug(wanted)?.toLowerCase();
-    // The guard for a loader this server no longer runs, which is left over from
-    // the software being changed. A plugin on a modded server is not a weaker
-    // guard than the right one - it is a jar the server cannot load, exactly like
-    // the protection plugins stripped above, and the operator never chose it.
+    const own = guard === null ? [] : joinGuardSlugs(guard);
+    // A password project for the other loader, whoever put it there: usually left
+    // over from the software being changed, and at best a project with almost no
+    // builds for this loader. Kept, it would sit beside the guard seeded below and
+    // give players two logins, so a reset takes it off like the protection
+    // plugins stripped above.
     const kept = parseProjectList(current).filter((entry) => {
         const listed = projectSlug(entry)?.toLowerCase();
-        return typeof listed !== "string" || listed === slug || !JOIN_GUARD_SLUGS.includes(listed);
+        return (
+            typeof listed !== "string" || own.includes(listed) || !JOIN_GUARD_SLUGS.includes(listed)
+        );
     });
     if (wanted === null) return formatProjectList(kept);
-    const already = kept.some((entry) => projectSlug(entry)?.toLowerCase() === slug);
+    const already = kept.some((entry) => own.includes(projectSlug(entry)?.toLowerCase() ?? ""));
     return formatProjectList(already ? kept : [...kept, wanted]);
 }
 
