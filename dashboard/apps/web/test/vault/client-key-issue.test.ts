@@ -19,7 +19,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scopesAvailableTo = vi.fn(async () => ["vault.use"]);
 const createApiKey = vi.fn(async () => ({ id: "key-1", prefix: "pol", secret: "pol.secret" }));
-const listApiKeys = vi.fn(async (): Promise<{ id: string; description: string }[]> => []);
+const listApiKeys = vi.fn(
+    async (): Promise<{ id: string; description: string; createdAt: string }[]> => []
+);
 const deleteApiKey = vi.fn(async () => undefined);
 
 vi.mock("@polaris/auth", () => ({
@@ -34,13 +36,25 @@ const { clientKeyMark, issueClientKey } = await import("@/lib/vault/client-key")
 const DEVICE = { identifier: "device-abc", name: "Brave on Windows" };
 
 /** What this same browser was given the last time it was let in. */
-const HELD = { id: "key-held", description: clientKeyMark(DEVICE.identifier) };
+const HELD = {
+    id: "key-held",
+    description: clientKeyMark(DEVICE.identifier),
+    createdAt: "2026-09-01T10:00:00.000Z"
+};
+
+/** The credential this call writes, as the list shows it once it exists. */
+const WRITTEN = {
+    id: "key-1",
+    description: clientKeyMark(DEVICE.identifier),
+    createdAt: "2026-09-16T10:00:00.000Z"
+};
 
 beforeEach(() => {
     scopesAvailableTo.mockClear();
     createApiKey.mockClear();
     listApiKeys.mockClear();
     deleteApiKey.mockClear();
+    listApiKeys.mockReset();
     listApiKeys.mockImplementation(async () => []);
 });
 
@@ -76,9 +90,9 @@ describe("the credential a client is let in with", () => {
  * it spent getting here is gone, so it cannot even ask again without the person
  * going back to Polaris and approving a second time.
  *
- * Writing first costs a moment where the account holds two credentials for one
- * device, which nothing reads in between and the delete below settles. Failing
- * that way round leaves the device exactly as it was.
+ * Writing first, and reading what to clear only after the write, leaves the
+ * device exactly as it was when the write fails and with one credential when it
+ * succeeds - even if another approval for it was being claimed at the same time.
  */
 describe("a credential that could not be written", () => {
     it("leaves the one this browser already had", async () => {
@@ -93,17 +107,64 @@ describe("a credential that could not be written", () => {
         // The other half: the reason the delete is there at all. One per client,
         // so a second approval from the same browser must not leave the first
         // credential valid behind it.
-        listApiKeys.mockImplementation(async () => [HELD]);
+        listApiKeys.mockImplementation(async () => [WRITTEN, HELD]);
 
         await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
         expect(deleteApiKey).toHaveBeenCalledWith("user-1", HELD.id);
+        expect(deleteApiKey).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears one another approval for this browser wrote while this one was writing", async () => {
+        // Read before the write, the list would not have had it, and the device
+        // would come away with two live credentials.
+        const raced = { ...WRITTEN, id: "key-raced", createdAt: "2026-09-16T09:59:59.000Z" };
+        let written = false;
+        createApiKey.mockImplementationOnce(async () => {
+            written = true;
+            return { id: WRITTEN.id, prefix: "pol", secret: "pol.secret" };
+        });
+        listApiKeys.mockImplementation(async () => (written ? [WRITTEN, raced] : []));
+
+        await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
+        expect(deleteApiKey).toHaveBeenCalledWith("user-1", raced.id);
+    });
+
+    it("leaves a newer credential for this browser alone", async () => {
+        // Two claims racing: the older one must not take out the newer one's,
+        // or each would clear the other's and the device would hold none.
+        const newer = { ...WRITTEN, id: "key-newer", createdAt: "2026-09-16T10:00:01.000Z" };
+        listApiKeys.mockImplementation(async () => [newer, WRITTEN]);
+
+        await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
+        expect(deleteApiKey).not.toHaveBeenCalled();
+    });
+
+    it("still hands the new credential over when the old ones could not be cleared", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        listApiKeys.mockImplementation(async () => [WRITTEN, HELD]);
+        deleteApiKey.mockRejectedValueOnce(new Error("the database was not there"));
+
+        await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
+        expect(error).toHaveBeenCalledWith(expect.stringContaining(HELD.id), expect.any(Error));
+        error.mockRestore();
+    });
+
+    it("still hands the new credential over when the list could not be read", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        listApiKeys.mockRejectedValueOnce(new Error("the database was not there"));
+
+        await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
+        expect(deleteApiKey).not.toHaveBeenCalled();
+        expect(error).toHaveBeenCalled();
+        error.mockRestore();
     });
 
     it("leaves another browser's credential alone", async () => {
         // The mark carries the device it was issued to precisely so that
         // re-connecting one browser does not sign the others out.
         listApiKeys.mockImplementation(async () => [
-            { id: "key-other", description: clientKeyMark("device-xyz") }
+            WRITTEN,
+            { id: "key-other", description: clientKeyMark("device-xyz"), createdAt: HELD.createdAt }
         ]);
 
         await expect(issueClientKey("user-1", DEVICE)).resolves.toBe("pol.secret");
