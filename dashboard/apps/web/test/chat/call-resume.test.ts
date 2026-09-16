@@ -12,7 +12,7 @@
  */
 
 import type { CallSession } from "@/app/(app)/chat/call-hold";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rememberCall, takeRememberedCall } from "@/app/(app)/chat/call-resume";
 
 const SESSION: CallSession = {
@@ -45,7 +45,15 @@ beforeEach(() => {
 
 afterEach(() => {
     delete (globalThis as { window?: unknown }).window;
+    vi.restoreAllMocks();
 });
+
+/** What the next page load reports it was. */
+function loadedBy(type: string) {
+    vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+        { type } as unknown as PerformanceEntry
+    ]);
+}
 
 describe("the note a reload carries", () => {
     it("brings back the call, and whether the camera was on", () => {
@@ -94,5 +102,48 @@ describe("the note a reload carries", () => {
             storage.setItem("polaris.call.resume", bad);
             expect(takeRememberedCall(VIEWER)).toBeNull();
         }
+    });
+});
+
+/**
+ * The note the page writes as it is left mid-call. A reload is a refresh, so it
+ * walks back in; anything else is leaving, and a microphone must not open itself.
+ */
+describe("the note a page leaves on its way out", () => {
+    it("brings the call back after a reload", () => {
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        loadedBy("reload");
+        expect(takeRememberedCall(VIEWER)?.session).toEqual(SESSION);
+    });
+
+    it("does not after navigating away and back", () => {
+        for (const type of ["navigate", "back_forward"]) {
+            rememberCall(SESSION, false, VIEWER, "leaving");
+            loadedBy(type);
+            expect(takeRememberedCall(VIEWER), type).toBeNull();
+        }
+    });
+
+    it("leaves the update banner's own note to count however the page loaded", () => {
+        rememberCall(SESSION, false, VIEWER);
+        loadedBy("navigate");
+        expect(takeRememberedCall(VIEWER)?.session).toEqual(SESSION);
+    });
+
+    it("does not overwrite the update banner's note as the page is left", () => {
+        rememberCall(SESSION, true, VIEWER);
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        loadedBy("navigate");
+        expect(takeRememberedCall(VIEWER)).toEqual({ session: SESSION, video: true });
+    });
+
+    it("replaces a banner note that has gone stale", () => {
+        rememberCall(SESSION, true, VIEWER);
+        const raw = JSON.parse(storage.getItem("polaris.call.resume")!) as { at: number };
+        raw.at = Date.now() - 10 * 60 * 1000;
+        storage.setItem("polaris.call.resume", JSON.stringify(raw));
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        loadedBy("navigate");
+        expect(takeRememberedCall(VIEWER)).toBeNull();
     });
 });

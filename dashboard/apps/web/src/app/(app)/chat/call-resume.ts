@@ -14,9 +14,13 @@
  * person it reads as what it is: the page reloaded, and they are still in the
  * call.
  *
- * Deliberately only for that button. A reload somebody typed is a reload they
- * meant, and rejoining a call they had walked away from would be a microphone
- * opening itself.
+ * Written two ways. The update banner writes one just before it reloads. And the
+ * page writes one whenever it is being left while a call is on - but that one
+ * is honoured only if what follows is a reload of this same page. Somebody
+ * pressing F5 mid-call means "refresh", not "hang up", and every other way of
+ * reloading (the automatic one after an update, the settings page after one) is
+ * the same; whereas navigating away and coming back is a decision to leave, and
+ * rejoining then would be a microphone opening itself.
  *
  * Kept in this tab's own storage, which is the exact lifetime wanted: a reload
  * keeps it, closing the tab throws it away, and another tab never sees it. It
@@ -37,8 +41,13 @@ const KEY = "polaris.call.resume";
  */
 const WINDOW_MS = 90_000;
 
+/** Who wrote the note: the update banner, asked to reload, or the page as it was
+ *  being left, which only counts when it was being reloaded. */
+type Reason = "offered" | "leaving";
+
 interface Note {
     readonly session: CallSession;
+    readonly reason?: Reason;
     readonly video: boolean;
     /** Who was on the call. A tab that signed out and back in as somebody else
      *  is not the same person, and their call is not this one's to rejoin. */
@@ -47,14 +56,37 @@ interface Note {
 }
 
 /** Write down the call this tab is on, because it is about to be replaced. */
-export function rememberCall(session: CallSession, video: boolean, viewerId: string): void {
+export function rememberCall(
+    session: CallSession,
+    video: boolean,
+    viewerId: string,
+    reason: Reason = "offered"
+): void {
     if (typeof window === "undefined") return;
     try {
-        const note: Note = { session, video, viewerId, at: Date.now() };
+        if (reason === "leaving" && offeredNote()) return;
+        const note: Note = { session, video, viewerId, reason, at: Date.now() };
         window.sessionStorage.setItem(KEY, JSON.stringify(note));
     } catch {
         // Storage refused - a browser with it off, or a full quota. The reload
         // still happens; it just does not carry the call.
+    }
+}
+
+/** Whether the update banner has already written down a call that still counts. */
+function offeredNote(): boolean {
+    try {
+        const note = JSON.parse(
+            window.sessionStorage.getItem(KEY) ?? "null"
+        ) as Partial<Note> | null;
+        return (
+            !!note &&
+            note.reason !== "leaving" &&
+            typeof note.at === "number" &&
+            Date.now() - note.at <= WINDOW_MS
+        );
+    } catch {
+        return false;
     }
 }
 
@@ -64,7 +96,9 @@ export function rememberCall(session: CallSession, video: boolean, viewerId: str
  * Removed as it is read, whether or not it is used: a note that is left behind
  * is a note that fires on the next reload too.
  */
-export function takeRememberedCall(viewerId: string): { session: CallSession; video: boolean } | null {
+export function takeRememberedCall(
+    viewerId: string
+): { session: CallSession; video: boolean } | null {
     if (typeof window === "undefined") return null;
     let raw: string | null = null;
     try {
@@ -78,11 +112,27 @@ export function takeRememberedCall(viewerId: string): { session: CallSession; vi
     try {
         const note = JSON.parse(raw) as Partial<Note>;
         const session = note.session;
-        if (!session || typeof session.meetingId !== "string" || typeof session.channelId !== "string") return null;
+        if (
+            !session ||
+            typeof session.meetingId !== "string" ||
+            typeof session.channelId !== "string"
+        )
+            return null;
         if (note.viewerId !== viewerId) return null;
         if (typeof note.at !== "number" || Date.now() - note.at > WINDOW_MS) return null;
+        if (note.reason === "leaving" && !reloaded()) return null;
         return { session, video: note.video === true };
     } catch {
         return null;
+    }
+}
+
+/** Whether this page was loaded by reloading itself. */
+function reloaded(): boolean {
+    try {
+        const [entry] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+        return entry?.type === "reload";
+    } catch {
+        return false;
     }
 }

@@ -284,16 +284,9 @@ export async function claimCallAction(meetingId: string, deviceId: string): Prom
     meetings.claimCall(meetingId, seat.participantId, String(deviceId).slice(0, 100));
 }
 
-/** Still here. */
-export async function keepSeatAction(meetingId: string): Promise<void> {
-    const seat = await resolveSeat(meetingId);
-    if (seat) await meetings.keepSeat(seat);
-}
-
-export async function leaveCallAction(meetingId: string): Promise<void> {
-    const seat = await resolveSeat(meetingId);
-    if (seat) await meetings.leave(seat);
-}
+// Keeping and giving back a seat are a route (`api/chat/meetings/[id]/seat`),
+// not actions here: an action's id changes with every build, and a heartbeat
+// that fails after an update ends the call for everybody on it.
 
 export async function admitAction(
     meetingId: string,
@@ -590,7 +583,8 @@ const pollSchema = z.object({
  *  is whoever is asking. */
 export async function pollInMeetingAction(input: unknown): Promise<{ error?: string }> {
     const parsed = pollSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be asked" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be asked" };
 
     const seat = await resolveSeat(parsed.data.meetingId);
     if (!seat) return { error: "You are not in that meeting" };
@@ -637,7 +631,9 @@ export async function mentionsInMeetingAction(
     const seat = await resolveSeat(String(meetingId));
     if (!seat || seat.admission !== "admitted") return { results: [] };
 
-    const wanted = String(query ?? "").trim().toLowerCase();
+    const wanted = String(query ?? "")
+        .trim()
+        .toLowerCase();
     const people = await meetings.readMeeting(seat);
     const results = (people?.participants ?? [])
         .filter((person) => person.admission === "admitted" && person.userId !== null)
@@ -647,5 +643,9 @@ export async function mentionsInMeetingAction(
     // One seat per person in a call, but a rejoin makes a second row, so the
     // same account can appear twice in a roster that has not been swept yet.
     const seen = new Set<string>();
-    return { results: results.filter((entry) => (seen.has(entry.id) ? false : (seen.add(entry.id), true))) };
+    return {
+        results: results.filter((entry) =>
+            seen.has(entry.id) ? false : (seen.add(entry.id), true)
+        )
+    };
 }
