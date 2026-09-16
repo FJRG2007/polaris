@@ -326,7 +326,11 @@ export async function listGameServerFacts(
             // The setting, or what the install recorded when it was created for a
             // game that keeps its slot count in a file rather than in the
             // environment. FiveM is that game.
-            slots: Number.isFinite(slots) ? slots : typeof config.slots === "number" ? config.slots : null,
+            slots: Number.isFinite(slots)
+                ? slots
+                : typeof config.slots === "number"
+                  ? config.slots
+                  : null,
             release: releaseOf(config, env.get(RELEASE_VAR)),
             software: (env.get(SOFTWARE_VAR) ?? "").trim()
                 ? titleCase((env.get(SOFTWARE_VAR) as string).trim())

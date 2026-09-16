@@ -188,7 +188,9 @@ export async function resetMinecraftServer(
     // never on a map that runs on whatever is newest - there the old worlds are
     // merely old, and they stay listed and switchable where their owner left
     // them.
-    const worldsAside = pinnedRelease(mapped) ? await setAsideOtherLevels(ownerId, installedAppId) : null;
+    const worldsAside = pinnedRelease(mapped)
+        ? await setAsideOtherLevels(ownerId, installedAppId)
+        : null;
 
     // The map, and the restart that puts all of this on the server. Generating a
     // new level is the same act as the New world button and it is the same code:

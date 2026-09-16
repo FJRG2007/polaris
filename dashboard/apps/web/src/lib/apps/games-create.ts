@@ -832,5 +832,7 @@ async function attachHostname(
 export function upfrontFields(catalogId: string) {
     const manifest = findApp(catalogId);
     if (!manifest) return [];
-    return promptedEnvVars(manifest).filter((field) => [SOFTWARE_KEY, "VERSION"].includes(field.key));
+    return promptedEnvVars(manifest).filter((field) =>
+        [SOFTWARE_KEY, "VERSION"].includes(field.key)
+    );
 }
