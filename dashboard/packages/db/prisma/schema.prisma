@@ -8794,6 +8794,11 @@ model MeetingParticipant {
     // Refreshed while their browser is on the call, so a participant whose
     // laptop shut is swept rather than left in the room forever.
     lastSeenAt DateTime  @default(now())
+    // What their own controls say, as their browser last reported it, so the
+    // people outside the call can see who is muted or deafened without joining
+    // the media server to find out.
+    muted      Boolean   @default(false)
+    deafened   Boolean   @default(false)
 
     meeting  Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
     messages MeetingMessage[]

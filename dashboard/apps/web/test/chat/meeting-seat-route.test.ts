@@ -21,7 +21,8 @@ vi.mock("@/lib/chat/meetings", () => ({ keepSeat, leave }));
 
 const route = await import("../../src/app/api/chat/meetings/[meetingId]/seat/route");
 const params = (meetingId: string) => ({ params: Promise.resolve({ meetingId }) });
-const request = (method: string) => new Request("https://polaris.example/x", { method });
+const request = (method: string, body?: string) =>
+    new Request("https://polaris.example/x", { method, body });
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -33,7 +34,22 @@ describe("keeping a seat", () => {
         const response = await route.POST(request("POST"), params(MEETING));
         expect(response.status).toBe(204);
         expect(resolveSeat).toHaveBeenCalledWith(MEETING);
-        expect(keepSeat).toHaveBeenCalledWith(SEAT);
+        expect(keepSeat).toHaveBeenCalledWith(SEAT, undefined);
+    });
+
+    it("passes on whether the person is muted or deafened", async () => {
+        const body = JSON.stringify({ muted: true, deafened: false });
+        const response = await route.POST(request("POST", body), params(MEETING));
+        expect(response.status).toBe(204);
+        expect(keepSeat).toHaveBeenCalledWith(SEAT, { muted: true, deafened: false });
+    });
+
+    it("refuses a state that is not the expected shape", async () => {
+        for (const body of ["{", JSON.stringify({ muted: "yes", deafened: false }), JSON.stringify({ muted: true, deafened: false, admin: true })]) {
+            const response = await route.POST(request("POST", body), params(MEETING));
+            expect(response.status).toBe(400);
+        }
+        expect(keepSeat).not.toHaveBeenCalled();
     });
 
     it("tells a request with no seat to stop", async () => {

@@ -122,9 +122,25 @@ function seatUrl(meetingId: string): string {
     return `/api/chat/meetings/${encodeURIComponent(meetingId)}/seat`;
 }
 
-/** Keep the seat, failing on anything but a success so the beat can count it. */
-async function keepSeat(meetingId: string): Promise<void> {
-    const response = await fetch(seatUrl(meetingId), { method: "POST", cache: "no-store" });
+/** Whether this person can be heard and can hear, as the seat reports it. */
+interface VoiceState {
+    readonly muted: boolean;
+    readonly deafened: boolean;
+}
+
+/**
+ * Keep the seat, failing on anything but a success so the beat can count it.
+ *
+ * Carries the controls too: the people outside the call are never connected to
+ * the media server, so the seat is where they read who is muted or deafened.
+ */
+async function keepSeat(meetingId: string, voice: VoiceState): Promise<void> {
+    const response = await fetch(seatUrl(meetingId), {
+        method: "POST",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(voice)
+    });
     if (!response.ok) throw new Error(`seat ${response.status}`);
 }
 
@@ -299,6 +315,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [hasCamera, setHasCamera] = useState(false);
     const [sharing, setSharing] = useState(false);
     const [deafened, setDeafened] = useState(false);
+    /** What the seat is told on every beat. A ref, because the beat is set up
+     *  once per room and would otherwise keep reporting the state it started
+     *  with. */
+    const voiceRef = useRef<VoiceState>({ muted: false, deafened: false });
     const [ended, setEnded] = useState(false);
     /** When the room last said something in its own chat. A moment rather than
      *  the messages themselves: what was said is read from the server by
@@ -1580,7 +1600,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
             let missed = 0;
             beat = setInterval(() => {
-                void keepSeat(inCall)
+                void keepSeat(inCall, voiceRef.current)
                     .then(() => {
                         missed = 0;
                     })
@@ -1918,6 +1938,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  per call: the browser reports the limitation continuously, and a sentence
      *  that reappears every few seconds is one people stop reading. */
     const strained = useRef(false);
+
+    // Said as soon as it changes rather than at the next beat, so somebody
+    // watching the conversation from outside the call sees the mute when it
+    // happens. A browser that was displaced no longer speaks for the seat.
+    useEffect(() => {
+        const voice = { muted: !micOn || deafened, deafened };
+        voiceRef.current = voice;
+        if (!meetingId || !participantId || displaced.current) return;
+        void keepSeat(meetingId, voice).catch(() => undefined);
+    }, [meetingId, participantId, micOn, deafened]);
 
     const toggleMic = useCallback(() => {
         const track = mic.current;

@@ -23,7 +23,7 @@ import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { requirePermission } from "@/lib/session";
 import { mayRing } from "@/lib/privacy-service";
-import type { MeetingView } from "@/lib/chat/meetings";
+import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { createNotification } from "@/lib/notification-service";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
@@ -325,14 +325,22 @@ export async function setGuestLinkAction(
  */
 export async function liveCallAction(
     channelId: string
-): Promise<{ meetingId: string; count: number } | null> {
+): Promise<LiveCall | null> {
     const user = await requirePermission("chat.use");
     const result = await guard(async () => {
         await requireChannel({ id: user.id }, channelId);
         return meetings.liveIn(channelId);
     });
     const live = result.value;
-    return live ? { meetingId: live.id, count: live.count } : null;
+    return live ? { meetingId: live.id, count: live.count, people: live.people } : null;
+}
+
+/** A call running in a conversation, and who is sitting in it - with their
+ *  microphone and headphones as they last reported them. */
+export interface LiveCall {
+    readonly meetingId: string;
+    readonly count: number;
+    readonly people: readonly VoicePresence[];
 }
 
 /**
