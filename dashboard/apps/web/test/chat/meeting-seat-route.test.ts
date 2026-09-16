@@ -45,7 +45,11 @@ describe("keeping a seat", () => {
     });
 
     it("refuses a state that is not the expected shape", async () => {
-        for (const body of ["{", JSON.stringify({ muted: "yes", deafened: false }), JSON.stringify({ muted: true, deafened: false, admin: true })]) {
+        for (const body of [
+            "{",
+            JSON.stringify({ muted: "yes", deafened: false }),
+            JSON.stringify({ muted: true, deafened: false, admin: true })
+        ]) {
             const response = await route.POST(request("POST", body), params(MEETING));
             expect(response.status).toBe(400);
         }

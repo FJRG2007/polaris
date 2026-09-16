@@ -1855,20 +1855,24 @@ export function ChannelView({
                     who is in it and who is muted, the way a voice room lists
                     them, with the way in beside it. Nothing of the call itself
                     reaches this browser until it joins. */}
-                {may.call && channel.kind !== "voice" && !inCall && live && live.people.length > 0 && (
-                    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
-                        <span className="text-sm font-medium">Call in progress</span>
-                        <div className="min-w-0 flex-1">
-                            <CallRoster people={live.people} />
+                {may.call &&
+                    channel.kind !== "voice" &&
+                    !inCall &&
+                    live &&
+                    live.people.length > 0 && (
+                        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
+                            <span className="text-sm font-medium">Call in progress</span>
+                            <div className="min-w-0 flex-1">
+                                <CallRoster people={live.people} />
+                            </div>
+                            {!callsOff && (
+                                <Button size="xs" onClick={() => void startCall(false)}>
+                                    <Mic className="size-3.5" />
+                                    Join
+                                </Button>
+                            )}
                         </div>
-                        {!callsOff && (
-                            <Button size="xs" onClick={() => void startCall(false)}>
-                                <Mic className="size-3.5" />
-                                Join
-                            </Button>
-                        )}
-                    </div>
-                )}
+                    )}
 
                 {channel.kind === "voice" && !inCall && (
                     <VoiceStrip

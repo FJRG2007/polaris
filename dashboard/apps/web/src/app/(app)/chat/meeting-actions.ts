@@ -323,9 +323,7 @@ export async function setGuestLinkAction(
  * channel id somebody guessed would be a way to read a private conversation one
  * bit at a time.
  */
-export async function liveCallAction(
-    channelId: string
-): Promise<LiveCall | null> {
+export async function liveCallAction(channelId: string): Promise<LiveCall | null> {
     const user = await requirePermission("chat.use");
     const result = await guard(async () => {
         await requireChannel({ id: user.id }, channelId);

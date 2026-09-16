@@ -39,7 +39,10 @@ export function VoiceStateIcons({ person }: { person: Seated }) {
 export function CallRoster({ people }: { people: readonly VoicePresence[] }) {
     if (people.length === 0) return null;
     return (
-        <ul aria-label="In the call" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <ul
+            aria-label="In the call"
+            className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+        >
             {people.map((person) => (
                 <PersonRow
                     as="li"

@@ -108,8 +108,7 @@ beforeEach(() => {
     published.length = 0;
 });
 
-const calls = () =>
-    published.filter((change) => (change as { kind: string }).kind === "call");
+const calls = () => published.filter((change) => (change as { kind: string }).kind === "call");
 
 describe("a seat's microphone and headphones", () => {
     it("records a change and tells the conversation", async () => {
