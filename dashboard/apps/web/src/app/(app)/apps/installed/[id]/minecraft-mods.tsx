@@ -21,9 +21,9 @@
  */
 
 import { useConfirm } from "@/components/confirm-dialog";
-import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
 import {
