@@ -26,18 +26,36 @@
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
-import { nameplateCss } from "@/lib/profile-style-css";
-import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
-import { usePresence } from "@/components/presence-store";
-import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
-import { MemberMenu, type MenuPerson } from "./member-menu";
-import { useOpenDirect } from "./use-open-direct";
-import { NicknameDialog } from "./nickname-dialog";
 import { Crown, Users, X } from "lucide-react";
+import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { NicknameDialog } from "./nickname-dialog";
+import { nameplateCss } from "@/lib/profile-style-css";
+import { usePresence } from "@/components/presence-store";
+import { MemberMenu, type MenuPerson } from "./member-menu";
+import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, Skeleton, cn } from "@polaris/ui";
+import { forgetPaneSize, readPaneSize, savePaneSize } from "./pane-preferences";
+import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    ResizeHandle,
+    Skeleton,
+    cn
+} from "@polaris/ui";
+
+/**
+ * What the members list may be narrowed and widened to.
+ *
+ * The fallback is the width it has always been drawn at, and the ceiling is well
+ * short of the conversation's own: this is a column of names, and every pixel it
+ * takes comes off what people are actually reading.
+ */
+const MEMBERS_PANE = { min: 208, max: 420, fallback: 240 };
 
 /** Where the choice to hide it is kept. Per browser and nothing else: it is a
  *  preference about a screen, not a fact about an account. */
@@ -351,6 +369,22 @@ export function ChannelMembers({
     const wide = useWideScreen();
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
     const heading = `Members${loading ? "" : ` - ${members.length}`}`;
+    const [width, setWidth] = useState(MEMBERS_PANE.fallback);
+
+    // Above the two early returns below, and deliberately: a hook that only runs
+    // on some renders is a crash the first time this panel is closed or drawn on
+    // a narrow window.
+    useEffect(() => setWidth(readPaneSize("members", MEMBERS_PANE)), []);
+
+    const resize = useCallback((size: number) => {
+        setWidth(size);
+        savePaneSize("members", size);
+    }, []);
+
+    const reset = useCallback(() => {
+        forgetPaneSize("members");
+        setWidth(MEMBERS_PANE.fallback);
+    }, []);
 
     if (!open) return null;
 
@@ -385,28 +419,43 @@ export function ChannelMembers({
         // fine narrow, where that one carries sentences. Every pixel either
         // takes comes off the conversation, so the wider step waits for a window
         // with room for it - the same breakpoint the profile uses.
-        <aside className="flex w-60 shrink-0 flex-col border-l border-border xl:w-64">
-            <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
-                <span className="text-sm font-semibold">{heading}</span>
-                <button
-                    type="button"
-                    aria-label="Hide the members"
-                    onClick={() => onOpenChange(false)}
-                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <X className="size-4" />
-                </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                <MemberRows
-                    members={members}
-                    loading={loading}
-                    viewerId={viewerId}
-                    channel={channel}
-                    onMention={onMention}
-                    onChanged={refresh}
-                />
-            </div>
-        </aside>
+        <>
+            <ResizeHandle
+                axis="x"
+                side="end"
+                size={width}
+                min={MEMBERS_PANE.min}
+                max={MEMBERS_PANE.max}
+                onChange={resize}
+                onReset={reset}
+                label="Members list width"
+            />
+            <aside
+                style={{ "--members-pane": `${width}px` } as CSSProperties}
+                className="flex shrink-0 flex-col border-l border-border w-[var(--members-pane)]"
+            >
+                <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+                    <span className="text-sm font-semibold">{heading}</span>
+                    <button
+                        type="button"
+                        aria-label="Hide the members"
+                        onClick={() => onOpenChange(false)}
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <X className="size-4" />
+                    </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <MemberRows
+                        members={members}
+                        loading={loading}
+                        viewerId={viewerId}
+                        channel={channel}
+                        onMention={onMention}
+                        onChanged={refresh}
+                    />
+                </div>
+            </aside>
+        </>
     );
 }

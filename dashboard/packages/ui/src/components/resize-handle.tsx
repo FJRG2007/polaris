@@ -39,6 +39,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export function ResizeHandle({
     axis,
+    side = "start",
     size,
     min,
     max,
@@ -49,6 +50,20 @@ export function ResizeHandle({
 }: {
     /** `x` moves a width, `y` moves a height. */
     axis: "x" | "y";
+    /**
+     * Which side of the line the panel being sized is on.
+     *
+     * `start` is a panel before the handle - a list on the left, a call above -
+     * where dragging away from it makes it bigger. `end` is a panel after the
+     * handle, which every panel down the right-hand side is, and there the same
+     * movement means the opposite: dragging left widens it, because the edge
+     * being moved is its own leading edge rather than its trailing one.
+     *
+     * Getting this wrong is not subtle, and it is not a crash either - the panel
+     * simply shrinks when somebody pulls it wider, which reads as the control
+     * being broken rather than as being inverted.
+     */
+    side?: "start" | "end";
     /** What the panel is at now, in pixels. */
     size: number;
     min: number;
@@ -67,14 +82,18 @@ export function ResizeHandle({
     // depends on it, so a render per pixel would be a render for nothing.
     const from = useRef<{ at: number; size: number } | null>(null);
 
+    /** Which way the pointer has to travel to make the panel bigger: away from a
+     *  panel that starts before this line, towards one that starts after it. */
+    const towards = side === "end" ? -1 : 1;
+
     const move = useCallback(
         (event: ReactPointerEvent<HTMLDivElement>) => {
             const start = from.current;
             if (!start) return;
-            const moved = (axis === "x" ? event.clientX : event.clientY) - start.at;
+            const moved = ((axis === "x" ? event.clientX : event.clientY) - start.at) * towards;
             onChange(clamp(start.size + moved, min, max));
         },
-        [axis, max, min, onChange]
+        [axis, max, min, onChange, towards]
     );
 
     const down = useCallback(
@@ -100,8 +119,12 @@ export function ResizeHandle({
         (event: KeyboardEvent<HTMLDivElement>) => {
             const back = axis === "x" ? "ArrowLeft" : "ArrowUp";
             const forward = axis === "x" ? "ArrowRight" : "ArrowDown";
-            if (event.key === back) onChange(clamp(size - STEP, min, max));
-            else if (event.key === forward) onChange(clamp(size + STEP, min, max));
+            // The same inversion the drag makes: on a panel down the right-hand
+            // side, left is wider. The key and the pointer have to agree, or the
+            // divider does one thing to the mouse and the opposite to the arrows.
+            const step = STEP * towards;
+            if (event.key === back) onChange(clamp(size - step, min, max));
+            else if (event.key === forward) onChange(clamp(size + step, min, max));
             else if (event.key === "Home") onChange(min);
             else if (event.key === "End") onChange(max);
             else return;
