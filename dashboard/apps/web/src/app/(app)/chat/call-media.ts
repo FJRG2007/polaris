@@ -228,6 +228,22 @@ export function stillShared(away: readonly string[], stages: readonly CallStage[
     return away.filter((key) => stages.some((stage) => stage.key === key));
 }
 
+/**
+ * The screens that were not there a moment ago.
+ *
+ * What a room does with these is the whole difference between two ways of
+ * treating a share. Somewhere with room to spare can put a new one straight on
+ * the stage, because the cost of being wrong is a picture somebody closes. In a
+ * direct message it is not: the panel is a band a few hundred pixels tall over
+ * the conversation it was started from, and a screen arriving into it takes the
+ * lot without anybody having asked to watch anything. There the arrival is
+ * offered rather than taken - which is what every client with this problem
+ * settled on, and it is the same set of keys either way.
+ */
+export function arrivedKeys(before: readonly string[], now: readonly CallStage[]): string[] {
+    return now.map((stage) => stage.key).filter((key) => !before.includes(key));
+}
+
 /** How the room is laid out around whatever is being watched. */
 export interface CallStaging {
     /** The screens with the big place, in the order they take it. */

@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    arrivedKeys,
     LOCAL_SCREEN_KEY,
     putAwayOf,
     stillShared,
@@ -120,5 +121,49 @@ describe("the shares a reader is told are still going out", () => {
 
         expect([...stage, ...carded]).toHaveLength(room.length);
         expect(carded.some((one) => stage.includes(one))).toBe(false);
+    });
+});
+
+/**
+ * The shares that were not there a moment ago.
+ *
+ * What a direct message does with these is offer them rather than open them, so
+ * getting the set wrong is one of two failures with nothing in between: too
+ * wide, and a screen somebody is already watching is snatched back into a card
+ * mid-sentence; too narrow, and a screen arrives on a band the size of the
+ * conversation without anybody having asked for it.
+ */
+describe("the shares that have just appeared", () => {
+    it("is everything, for the first share of a call", () => {
+        expect(arrivedKeys([], [theirs])).toEqual([theirs.key]);
+    });
+
+    it("is nothing while the room has not changed", () => {
+        expect(arrivedKeys([mine.key, theirs.key], [mine, theirs])).toEqual([]);
+    });
+
+    it("names only the one that is new", () => {
+        expect(arrivedKeys([theirs.key], [theirs, third])).toEqual([third.key]);
+    });
+
+    // A share ending does not make the others arrive again - which is what would
+    // put a screen somebody is watching back behind a card because somebody else
+    // stopped sharing.
+    it("says nothing arrived when one of them left", () => {
+        expect(arrivedKeys([theirs.key, third.key], [theirs])).toEqual([]);
+    });
+
+    // A key outlives the share it names, so the same person sharing a second
+    // time is a new arrival under an old key - and has to be offered again.
+    it("counts the same person sharing again as new", () => {
+        expect(arrivedKeys([], [theirs])).toEqual([theirs.key]);
+        expect(arrivedKeys([third.key], [theirs, third])).toEqual([theirs.key]);
+    });
+
+    // Whose screen it is means nothing here: the room decides that the browser
+    // that pressed Share is not offered its own screen back, and it decides it
+    // where the place is known.
+    it("does not care whose screen it is", () => {
+        expect(arrivedKeys([], [mine, theirs])).toEqual([mine.key, theirs.key]);
     });
 });
