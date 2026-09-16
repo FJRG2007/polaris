@@ -43,7 +43,7 @@ vi.mock("@/app/(app)/chat/call-boost", () => ({
 }));
 
 /** A call with one other person in it, whose sound is what all of this is about. */
-function callWith(deafened: boolean): CallState {
+function callWith(deafened: boolean, graceDeafened = false): CallState {
     const stream = { id: "s1" } as unknown as MediaStream;
     return {
         meeting: {
@@ -68,6 +68,7 @@ function callWith(deafened: boolean): CallState {
         },
         participantId: "p-ada",
         remote: new Map([["p-grace", stream]]),
+        states: new Map([["p-grace", { deafened: graceDeafened }]]),
         deafened
     } as unknown as CallState;
 }
@@ -112,6 +113,17 @@ describe("playing somebody in a call", () => {
         expect(built).toEqual([2]);
 
         view.rerender(<CallAudio call={callWith(true)} />);
+        expect(stopped).toBe(1);
+    });
+
+    it("stops playing somebody who has deafened themselves", () => {
+        // A deafened person is not heard by anybody, whatever their own browser
+        // is still sending.
+        volume = 2;
+        const view = render(<CallAudio call={callWith(false)} />);
+        expect(built).toEqual([2]);
+
+        view.rerender(<CallAudio call={callWith(false, true)} />);
         expect(stopped).toBe(1);
     });
 });

@@ -739,14 +739,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // client's own flag cannot be asked: it answers false both for
             // somebody who muted themselves and for somebody whose media never
             // arrived, and those are different things to say about a person.
-            next.set(
-                participant.identity,
-                peerState({
-                    attributes: participant.attributes,
-                    isMicrophoneEnabled: participant.isMicrophoneEnabled,
-                    hasMicrophone: participant.getTrackPublication(MICROPHONE) !== undefined
-                })
-            );
+            const microphone = participant.getTrackPublication(MICROPHONE);
+            const state = peerState({
+                attributes: participant.attributes,
+                isMicrophoneEnabled: participant.isMicrophoneEnabled,
+                hasMicrophone: microphone !== undefined
+            });
+            next.set(participant.identity, state);
+            // Somebody who is deafened is not heard, whatever their own browser
+            // is doing with its microphone. Their voice is not even fetched: a
+            // browser that has not caught up - an old tab across an update, one
+            // that unmuted without undeafening - is exactly the one that would
+            // otherwise go on being heard by everybody else.
+            if (microphone && microphone.isSubscribed === state.deafened) {
+                microphone.setSubscribed(!state.deafened);
+            }
         }
         setStates(next);
     }, []);
@@ -1912,6 +1919,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             leaveCombine();
             return;
         }
+        // Unmuting while deafened undeafens as well: a deafened person is not
+        // heard, so a microphone that comes on has to bring the room back with
+        // it, or they would be talking to people told they cannot hear them.
+        if (!track.enabled && deafenedRef.current) {
+            deafenedRef.current = false;
+            setDeafened(false);
+            say({ [DEAFENED]: "" });
+        }
         setVoiceEnabled(!track.enabled);
         setMicOn(track.enabled);
         // Kept for the next room. Only a deliberate press is remembered:
@@ -1919,7 +1934,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // muted because you once put your headphones down is not what anybody
         // meant by it.
         setCallMuted(!track.enabled);
-    }, [leaveCombine, setVoiceEnabled]);
+    }, [leaveCombine, say, setVoiceEnabled]);
 
     /**
      * Turn the camera on or off.

@@ -123,7 +123,10 @@ export function CallAudio({ call }: { call: CallState }) {
                     // down holds across calls; their seat where they do not,
                     // which lasts as long as the seat.
                     volumeKey={person.userId ?? person.id}
-                    muted={silent}
+                    // Or they are the one who is deafened: nobody hears somebody
+                    // who has switched the room off, whatever their own browser
+                    // is still sending.
+                    muted={silent || call.states.get(person.id)?.deafened === true}
                     scale={scale}
                     onPlayState={report}
                 />
