@@ -40,7 +40,8 @@ export function measureVoice(track: MediaStreamTrack): VoiceLevel | null {
         typeof window === "undefined"
             ? undefined
             : (window.AudioContext ??
-              (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+              (window as unknown as { webkitAudioContext?: typeof AudioContext })
+                  .webkitAudioContext);
     if (!Context) return null;
 
     let context: AudioContext;
