@@ -615,11 +615,18 @@ export function PlayerAccessDialog({
     onClose,
     onSave,
     onRemoveAddress,
-    onLookUp
+    onLookUp,
+    onLink,
+    onUnlink
 }: {
     edition: MinecraftEdition;
     /** The player being edited, or null to register somebody new. */
-    player: { username: string; addresses: readonly string[]; note: string | null } | null;
+    player: {
+        username: string;
+        addresses: readonly string[];
+        note: string | null;
+        linkedTo?: { userId: string; name: string } | null;
+    } | null;
     pending: boolean;
     error: string | null;
     onClose: () => void;
@@ -628,11 +635,25 @@ export function PlayerAccessDialog({
     /** Find somebody by their Polaris name and hand back the Minecraft username
      *  they linked, plus the addresses their account is signed in from. Absent on
      *  a screen where nobody may look people up. */
-    onLookUp?: (
-        query: string
-    ) => Promise<{ username?: string; name?: string; addresses?: string[]; error?: string }>;
+    onLookUp?: (query: string) => Promise<{
+        userId?: string;
+        username?: string;
+        name?: string;
+        addresses?: string[];
+        error?: string;
+    }>;
+    /** Tie the player to a Polaris account instead of a typed address. */
+    onLink?: (input: { username: string; userId: string }) => void;
+    /** Untie a linked player. */
+    onUnlink?: (username: string) => void;
 }) {
     const editing = player !== null;
+    const linkedTo = player?.linkedTo ?? null;
+    /** The Polaris account a look-up found, which the player can be tied to. */
+    const [account, setAccount] = useState<{ userId: string; name: string } | null>(null);
+    /** Whether a new player follows that account's sign-ins or a typed address. */
+    const [follow, setFollow] = useState(true);
+    const [noMinecraft, setNoMinecraft] = useState(false);
     const [username, setUsername] = useState(player?.username ?? "");
     const [address, setAddress] = useState("");
     const [note, setNote] = useState(player?.note ?? "");
@@ -651,12 +672,15 @@ export function PlayerAccessDialog({
         setLookUpError(null);
         startLooking(async () => {
             const found = await onLookUp(identifier);
-            if (found.error || !found.username) {
+            if (found.error || !found.userId) {
                 setLookUpError(found.error ?? "Could not look that up");
                 setSuggested([]);
+                setAccount(null);
                 return;
             }
-            setUsername(found.username);
+            setAccount({ userId: found.userId, name: found.name ?? identifier });
+            setNoMinecraft(!found.username);
+            if (found.username) setUsername(found.username);
             if (found.name && note.trim().length === 0) setNote(found.name);
             setSuggested(found.addresses ?? []);
             // The common case is one address, and making somebody click it when
@@ -680,9 +704,16 @@ export function PlayerAccessDialog({
     // Editing without touching the address is how a note is changed; the note is
     // stored against a rule, so the one they already have carries it.
     const noteChanged = editing && note.trim() !== (player.note ?? "");
-    const ready = editing
-        ? isAddressRule(rule) || (rule.length === 0 && noteChanged && player.addresses.length > 0)
-        : isPlayerName(edition, name) && isAddressRule(rule);
+    // Tying a new player to an account needs a name and no address: where they
+    // connect from is whatever that account is signed in from.
+    const linking = !editing && account !== null && follow && Boolean(onLink) && edition === "java";
+    const ready = linkedTo
+        ? true
+        : editing
+          ? isAddressRule(rule) || (rule.length === 0 && noteChanged && player.addresses.length > 0)
+          : linking
+            ? isPlayerName(edition, name)
+            : isPlayerName(edition, name) && isAddressRule(rule);
 
     function detect(): void {
         setDetectFailed(false);
@@ -700,22 +731,32 @@ export function PlayerAccessDialog({
         <PlayerFormDialog
             title={editing ? `Edit ${player.username}` : "Add a player"}
             description={
-                editing
-                    ? "Add another address they play from, or change the note. The name itself is what the server checks."
-                    : "A player is let in when the name is on this list and they arrive from an address registered to it."
+                linkedTo
+                    ? `${player?.username} joins from wherever ${linkedTo.name} is signed in to Polaris.`
+                    : editing
+                      ? "Add another address they play from, or change the note. The name itself is what the server checks."
+                      : "A player is let in when the name is on this list and they arrive from an address registered to it."
             }
-            confirmLabel={editing ? "Save" : "Add player"}
+            confirmLabel={linkedTo ? "Done" : editing ? "Save" : "Add player"}
             ready={ready}
             pending={pending}
             error={error}
             onClose={onClose}
-            onConfirm={() =>
+            onConfirm={() => {
+                if (linkedTo) {
+                    onClose();
+                    return;
+                }
+                if (linking && account && onLink) {
+                    onLink({ username: name, userId: account.userId });
+                    return;
+                }
                 onSave({
                     username: editing ? player.username : name,
                     address: rule.length > 0 ? rule : (player?.addresses[0] ?? ""),
                     note: note.trim()
-                })
-            }
+                });
+            }}
         >
             {!editing && onLookUp && (
                 <PlayerFormField
@@ -755,9 +796,54 @@ export function PlayerAccessDialog({
                 </PlayerFormField>
             )}
 
+            {!editing && account && onLink && edition === "java" && (
+                <div className="flex flex-col gap-1.5">
+                    <span className="text-xs text-muted-foreground">
+                        Where {account.name} can join from
+                    </span>
+                    <div
+                        className="flex flex-wrap gap-1"
+                        role="radiogroup"
+                        aria-label="Where they can join from"
+                    >
+                        <Button
+                            type="button"
+                            size="sm"
+                            role="radio"
+                            aria-checked={follow}
+                            variant={follow ? "secondary" : "ghost"}
+                            onClick={() => setFollow(true)}
+                        >
+                            Wherever they are signed in to Polaris
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            role="radio"
+                            aria-checked={!follow}
+                            variant={follow ? "ghost" : "secondary"}
+                            onClick={() => setFollow(false)}
+                        >
+                            A fixed address
+                        </Button>
+                    </div>
+                    {follow && (
+                        <p className="text-xs text-muted-foreground">
+                            They are let in only from an address where {account.name} is signed in
+                            to Polaris, and removed when they sign out.
+                        </p>
+                    )}
+                </div>
+            )}
+
             <PlayerFormField
                 label={edition === "bedrock" ? "Gamertag" : "Username"}
                 error={nameInvalid ? "That is not a username this edition accepts" : null}
+                hint={
+                    !editing && account && noMinecraft
+                        ? `${account.name} has not linked Minecraft, so type their username.`
+                        : undefined
+                }
             >
                 <Input
                     value={username}
@@ -768,9 +854,33 @@ export function PlayerAccessDialog({
                 />
             </PlayerFormField>
 
+            {linkedTo && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                    <span className="text-xs text-muted-foreground">
+                        {player?.addresses.length
+                            ? `Follows ${linkedTo.name}'s Polaris sign-ins.`
+                            : `${linkedTo.name} is not signed in to Polaris anywhere, so ${player?.username} cannot join right now.`}
+                    </span>
+                    {onUnlink && player && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-danger hover:text-danger"
+                            disabled={pending}
+                            onClick={() => onUnlink(player.username)}
+                        >
+                            Unlink
+                        </Button>
+                    )}
+                </div>
+            )}
+
             {editing && player.addresses.length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">Addresses they play from</span>
+                    <span className="text-xs text-muted-foreground">
+                        {linkedTo ? "Signed in from" : "Addresses they play from"}
+                    </span>
                     <div className="flex flex-wrap gap-1">
                         {player.addresses.map((held) => (
                             <span
@@ -778,7 +888,7 @@ export function PlayerAccessDialog({
                                 className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
                             >
                                 {held}
-                                {onRemoveAddress && (
+                                {onRemoveAddress && !linkedTo && (
                                     <button
                                         type="button"
                                         disabled={pending}
@@ -796,73 +906,77 @@ export function PlayerAccessDialog({
                 </div>
             )}
 
-            <PlayerFormField
-                label={editing ? "Another address" : "Address they connect from"}
-                error={addressInvalid ? "That is not an address or a range" : null}
-                hint={
-                    detectFailed
-                        ? "Polaris could not read the address this request came from. Type it in instead."
-                        : editing
-                          ? "Leave it empty to change only the note."
-                          : undefined
-                }
-            >
-                <div className="flex items-center gap-1">
-                    <Input
-                        autoFocus={editing}
-                        value={address}
-                        onChange={(event) => setAddress(event.target.value)}
-                        placeholder="203.0.113.9, 203.0.113.0/24 or any"
-                        aria-label="Address they connect from"
-                    />
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={detect}
-                        disabled={pending || detecting}
-                        aria-label="Use the address you are on now"
-                        title="Use the address you are on now"
-                    >
-                        {detecting ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Locate className="size-4" />
-                        )}
-                    </Button>
-                </div>
-                {/* Where that account signs in to Polaris from. The operator doing
+            {!linkedTo && !linking && (
+                <PlayerFormField
+                    label={editing ? "Another address" : "Address they connect from"}
+                    error={addressInvalid ? "That is not an address or a range" : null}
+                    hint={
+                        detectFailed
+                            ? "Polaris could not read the address this request came from. Type it in instead."
+                            : editing
+                              ? "Leave it empty to change only the note."
+                              : undefined
+                    }
+                >
+                    <div className="flex items-center gap-1">
+                        <Input
+                            autoFocus={editing}
+                            value={address}
+                            onChange={(event) => setAddress(event.target.value)}
+                            placeholder="203.0.113.9, 203.0.113.0/24 or any"
+                            aria-label="Address they connect from"
+                        />
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={detect}
+                            disabled={pending || detecting}
+                            aria-label="Use the address you are on now"
+                            title="Use the address you are on now"
+                        >
+                            {detecting ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Locate className="size-4" />
+                            )}
+                        </Button>
+                    </div>
+                    {/* Where that account signs in to Polaris from. The operator doing
                     this is on their own line, so the detect button beside the
                     field is the wrong address for everybody but themselves. */}
-                {offer.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 pt-1">
-                        <span className="text-xs text-muted-foreground">They sign in from</span>
-                        {offer.map((known) => (
-                            <button
-                                key={known}
-                                type="button"
-                                className="rounded-md border border-border px-2 py-0.5 font-mono text-xs hover:bg-muted"
-                                onClick={() => setAddress(known)}
-                            >
-                                {known}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </PlayerFormField>
+                    {offer.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 pt-1">
+                            <span className="text-xs text-muted-foreground">They sign in from</span>
+                            {offer.map((known) => (
+                                <button
+                                    key={known}
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-0.5 font-mono text-xs hover:bg-muted"
+                                    onClick={() => setAddress(known)}
+                                >
+                                    {known}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </PlayerFormField>
+            )}
 
-            <PlayerFormField
-                label="Note"
-                hint="Who this is, for whoever reads the list next. Only Polaris sees it."
-            >
-                <Input
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                    placeholder="Who this is"
-                    maxLength={120}
-                    aria-label="Note"
-                />
-            </PlayerFormField>
+            {!linkedTo && !linking && (
+                <PlayerFormField
+                    label="Note"
+                    hint="Who this is, for whoever reads the list next. Only Polaris sees it."
+                >
+                    <Input
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        placeholder="Who this is"
+                        maxLength={120}
+                        aria-label="Note"
+                    />
+                </PlayerFormField>
+            )}
         </PlayerFormDialog>
     );
 }

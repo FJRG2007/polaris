@@ -43,11 +43,20 @@ export function GameAccessEditor({
 
     const edition = access?.edition ?? "java";
     const rules = access?.rules ?? [];
+    const links = access?.links ?? [];
     // One row per address in the table, one line per person on the screen. A
     // player who plays from home and from a laptop is one entry with two badges,
     // not two entries that read like two people.
     const people = useMemo(() => {
-        const byName = new Map<string, { username: string; note: string | null; addresses: string[] }>();
+        const byName = new Map<
+            string,
+            {
+                username: string;
+                note: string | null;
+                addresses: string[];
+                linkedTo: string | null;
+            }
+        >();
         for (const rule of rules) {
             const key = rule.username.toLowerCase();
             const held = byName.get(key);
@@ -56,10 +65,29 @@ export function GameAccessEditor({
                 if (!held.note && rule.note) held.note = rule.note;
                 continue;
             }
-            byName.set(key, { username: rule.username, note: rule.note, addresses: [rule.address] });
+            byName.set(key, {
+                username: rule.username,
+                note: rule.note,
+                addresses: [rule.address],
+                linkedTo: null
+            });
+        }
+        // A linked player signed in nowhere has no address and is still listed.
+        for (const link of links) {
+            const key = link.username.toLowerCase();
+            const held = byName.get(key);
+            if (held) held.linkedTo = link.name;
+            else {
+                byName.set(key, {
+                    username: link.username,
+                    note: null,
+                    addresses: [],
+                    linkedTo: link.name
+                });
+            }
         }
         return [...byName.values()];
-    }, [rules]);
+    }, [rules, links]);
 
     /** Report upward when the host screen collects errors, and locally otherwise -
      *  a failure that only one of the two screens can show is a failure the other
@@ -124,7 +152,7 @@ export function GameAccessEditor({
 
                 {access === null ? (
                     <p className="py-3 text-sm text-muted-foreground">Reading the list...</p>
-                ) : rules.length === 0 ? (
+                ) : people.length === 0 ? (
                     <p className="py-3 text-sm text-muted-foreground">
                         Nobody is registered yet, so nobody can join.
                     </p>
@@ -136,6 +164,11 @@ export function GameAccessEditor({
                                     <p className="truncate text-sm" title={person.username}>
                                         {person.username}
                                     </p>
+                                    {person.linkedTo && (
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            Follows {person.linkedTo}&apos;s Polaris sign-ins
+                                        </p>
+                                    )}
                                     {person.note && (
                                         <p className="truncate text-xs text-muted-foreground" title={person.note}>
                                             {person.note}
@@ -143,12 +176,20 @@ export function GameAccessEditor({
                                     )}
                                 </div>
                                 <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
+                                    {person.linkedTo && person.addresses.length === 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                            Not signed in anywhere
+                                        </span>
+                                    )}
                                     {person.addresses.map((address) => (
                                         <span key={address} className="inline-flex items-center gap-0.5">
                                             <Badge>{address}</Badge>
                                             {/* Each address goes on its own. Taking the last
                                                 one takes the player, which the service decides
-                                                so both screens agree about it. */}
+                                                so both screens agree about it. A linked
+                                                player's addresses come from their sign-ins
+                                                and are not removed one by one. */}
+                                            {!person.linkedTo && (
                                             <button
                                                 type="button"
                                                 disabled={pending}
@@ -167,6 +208,7 @@ export function GameAccessEditor({
                                             >
                                                 <X className="size-3" />
                                             </button>
+                                            )}
                                         </span>
                                     ))}
                                 </div>

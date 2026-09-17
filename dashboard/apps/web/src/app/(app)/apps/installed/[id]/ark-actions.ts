@@ -41,7 +41,9 @@ import { readArkMods, setArkMapMod, setArkMods, type ArkModsView } from "@/lib/a
 const playerSchema = z.object({
     installedAppId: z.string().trim().min(1),
     steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
-    label: z.string().trim().max(48).default("")
+    label: z.string().trim().max(48).default(""),
+    /** The Polaris account to follow; null stops following one. */
+    userId: z.string().uuid().nullable().optional()
 });
 
 /** Let somebody onto the server. Recorded whether or not the server was up to be
@@ -49,22 +51,24 @@ const playerSchema = z.object({
 export async function addArkPlayerAction(
     installedAppId: string,
     steamId: string,
-    label: string
+    label: string,
+    userId?: string | null
 ): Promise<{ access?: ark.ArkAccessView; error?: string }> {
-    const parsed = playerSchema.safeParse({ installedAppId, steamId, label });
+    const parsed = playerSchema.safeParse({ installedAppId, steamId, label, userId });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         const view = await ark.addAllowedPlayer(access.ownerId, parsed.data.installedAppId, {
             steamId: parsed.data.steamId,
-            label: parsed.data.label
+            label: parsed.data.label,
+            ...(parsed.data.userId === undefined ? {} : { userId: parsed.data.userId })
         });
         await recordAudit({
             actorId: user.id,
             action: "games.ark.allow",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { steamId: parsed.data.steamId }
+            metadata: { steamId: parsed.data.steamId, userId: parsed.data.userId ?? null }
         });
         return { access: view };
     } catch (caught) {
@@ -873,7 +877,7 @@ export async function broadcastArkAction(installedAppId: string, message: string
 export async function findArkPlayerByUserAction(
     installedAppId: string,
     query: string
-): Promise<{ steamId?: string; name?: string; label?: string; error?: string }> {
+): Promise<{ userId?: string; steamId?: string; name?: string; label?: string; error?: string }> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
     if (!parsed.success) return { error: "Type a Polaris username or email address" };
     try {
@@ -892,7 +896,12 @@ export async function findArkPlayerByUserAction(
             }
             return { error: `${found.name} has not linked a Steam account yet. They can do it under Connected accounts.` };
         }
-        return { steamId: found.identity.accountId, name: found.name, label: found.identity.label };
+        return {
+            userId: found.userId,
+            steamId: found.identity.accountId,
+            name: found.name,
+            label: found.identity.label
+        };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not look that up" };
     }

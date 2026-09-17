@@ -70,7 +70,21 @@ export interface ArkAllowedPlayer {
      *  been told - a server that is still downloading 30 GB cannot be, and the
      *  screen has to be able to say the difference. */
     readonly appliedAt: string | null;
+    /**
+     * The Polaris account this player follows, when they are tied to one.
+     *
+     * ARK does not report where a player connects from, so the address itself
+     * cannot be checked. What can be is the account: a linked player is let in
+     * only while that account is signed in to Polaris somewhere.
+     */
+    readonly userId: string | null;
+    /** True while the server has been told to refuse them because that account
+     *  is signed in nowhere. */
+    readonly held: boolean;
 }
+
+/** A Polaris account id, as far as a stored row can be trusted to hold one. */
+const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Where the list lives on the install's own settings blob. */
 export const ALLOW_LIST_KEY = "arkAllowList";
@@ -94,7 +108,12 @@ export function readAllowList(config: Record<string, unknown>): ArkAllowedPlayer
                 steamId: row.steamId,
                 label: typeof row.label === "string" ? row.label : row.steamId,
                 addedAt: typeof row.addedAt === "string" ? row.addedAt : new Date(0).toISOString(),
-                appliedAt: typeof row.appliedAt === "string" ? row.appliedAt : null
+                appliedAt: typeof row.appliedAt === "string" ? row.appliedAt : null,
+                userId:
+                    typeof row.userId === "string" && ACCOUNT_ID.test(row.userId)
+                        ? row.userId
+                        : null,
+                held: row.held === true
             }
         ];
     });
@@ -104,15 +123,64 @@ export function readAllowList(config: Record<string, unknown>): ArkAllowedPlayer
  *  who is already there must not reset what the server has been told about them. */
 export function withPlayer(
     list: readonly ArkAllowedPlayer[],
-    player: { steamId: string; label: string },
+    player: {
+        steamId: string;
+        label: string;
+        /** The account to follow, null to stop following one, absent to leave it. */
+        userId?: string | null;
+    },
     now: string
 ): ArkAllowedPlayer[] {
     if (list.some((entry) => entry.steamId === player.steamId)) {
-        return list.map((entry) =>
-            entry.steamId === player.steamId ? { ...entry, label: player.label || entry.label } : entry
-        );
+        return list.map((entry) => {
+            if (entry.steamId !== player.steamId) return entry;
+            const next = { ...entry, label: player.label || entry.label };
+            if (player.userId === undefined) return next;
+            // Unlinking somebody the server is refusing has to let them back in,
+            // so they are handed over again as if new.
+            if (player.userId === null && entry.held) {
+                return { ...next, userId: null, held: false, appliedAt: null };
+            }
+            return { ...next, userId: player.userId };
+        });
     }
-    return [...list, { steamId: player.steamId, label: player.label || player.steamId, addedAt: now, appliedAt: null }];
+    return [
+        ...list,
+        {
+            steamId: player.steamId,
+            label: player.label || player.steamId,
+            addedAt: now,
+            appliedAt: null,
+            userId: player.userId ?? null,
+            held: false
+        }
+    ];
+}
+
+/**
+ * What the server has to be told, given who is signed in to Polaris.
+ *
+ * `allow` is everybody it has not been told about yet - except a linked player
+ * whose account is signed in nowhere - plus a linked player it is refusing who
+ * has signed in again. `hold` is a linked player it lets in whose account is no
+ * longer signed in anywhere.
+ */
+export function gateDecisions(
+    list: readonly ArkAllowedPlayer[],
+    signedIn: ReadonlySet<string>
+): { allow: string[]; hold: string[] } {
+    const allow: string[] = [];
+    const hold: string[] = [];
+    for (const entry of list) {
+        if (entry.userId === null) {
+            if (entry.appliedAt === null) allow.push(entry.steamId);
+            continue;
+        }
+        const present = signedIn.has(entry.userId);
+        if (present && (entry.appliedAt === null || entry.held)) allow.push(entry.steamId);
+        else if (!present && entry.appliedAt !== null && !entry.held) hold.push(entry.steamId);
+    }
+    return { allow, hold };
 }
 
 /** The list without one player. */

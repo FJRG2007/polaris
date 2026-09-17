@@ -1160,6 +1160,9 @@ function PlayersTab({
                     <ArkPlayerRow
                         key={entry.steamId}
                         entry={entry}
+                        linkedName={
+                            entry.userId ? (access?.accounts?.[entry.userId] ?? null) : null
+                        }
                         live={status !== null}
                         canModerate={canModerate}
                         canManage={canManage}
@@ -1334,7 +1337,18 @@ function PlayersTab({
 
             {acting?.dialog === "player" && (
                 <ArkPlayerDialog
-                    player={target ? { steamId: target.steamId, label: target.name } : null}
+                    player={
+                        target
+                            ? {
+                                  steamId: target.steamId,
+                                  label: target.name,
+                                  userId: target.userId,
+                                  linkedName: target.userId
+                                      ? (access?.accounts?.[target.userId] ?? null)
+                                      : null
+                              }
+                            : null
+                    }
                     pending={pending}
                     error={dialogError}
                     onClose={() => setActing(null)}
@@ -1345,7 +1359,8 @@ function PlayersTab({
                                 actions.addArkPlayerAction(
                                     installedAppId,
                                     input.steamId,
-                                    input.label
+                                    input.label,
+                                    input.userId
                                 ),
                             target ? undefined : "Added. The server is told as soon as it answers."
                         )
@@ -1528,6 +1543,7 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
  */
 function ArkPlayerRow({
     entry,
+    linkedName,
     live: read,
     canModerate,
     canManage,
@@ -1553,6 +1569,8 @@ function ArkPlayerRow({
     onTimeout
 }: {
     entry: ArkPlayerEntry;
+    /** What Polaris calls the account this player follows, when they follow one. */
+    linkedName: string | null;
     /** Whether the server has been asked yet who is on it. Before that nobody is
      *  offline - they are simply not known about, and a grey "Offline" against a
      *  name that is playing is worse than saying nothing. */
@@ -1688,7 +1706,24 @@ function ArkPlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {entry.standing === "allowed" && <Badge variant="primary">{playerStanding.allowed}</Badge>}
+                    {entry.userId && (
+                        <Badge
+                            title={`Let in only while ${linkedName ?? "their Polaris account"} is signed in to Polaris`}
+                        >
+                            linked
+                        </Badge>
+                    )}
+                    {entry.held && (
+                        <Badge
+                            variant="warning"
+                            title={`${linkedName ?? "Their Polaris account"} is not signed in anywhere, so the server refuses them.`}
+                        >
+                            signed out
+                        </Badge>
+                    )}
+                    {entry.standing === "allowed" && !entry.held && (
+                        <Badge variant="primary">{playerStanding.allowed}</Badge>
+                    )}
                     {entry.standing === "waiting" && (
                         <Badge title="Recorded here. The server is told as soon as it answers.">
                             <Clock className="size-3" /> {playerStanding.waiting}

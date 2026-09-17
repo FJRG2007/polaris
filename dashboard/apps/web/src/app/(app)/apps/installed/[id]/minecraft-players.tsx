@@ -350,6 +350,20 @@ export function MinecraftPlayers({
         return true;
     }
 
+    /** Tie somebody to a Polaris account, so they connect from its sign-ins. */
+    function linkPlayer(input: { username: string; userId: string }): void {
+        setFormError(null);
+        startTransition(async () => {
+            const result = await actions.linkPlayerAccountAction({ installedAppId, ...input });
+            if (result.error) {
+                setFormError(result.error);
+                return;
+            }
+            setActing(null);
+            onChanged();
+        });
+    }
+
     /** Register somebody, or save a change to somebody already registered. Both are
      *  one upsert on the pair the server is closed by, so they are one call. */
     function savePlayer(input: { username: string; address: string; note: string }): void {
@@ -599,10 +613,26 @@ export function MinecraftPlayers({
                             ? {
                                   username: target.name,
                                   addresses: target.addresses,
-                                  note: target.note
+                                  note: target.note,
+                                  linkedTo: target.linkedTo
                               }
                             : null
                     }
+                    onLink={linkPlayer}
+                    onUnlink={(username) => {
+                        void confirm({
+                            title: `Unlink ${username}?`,
+                            description: target?.addresses.length
+                                ? `${username} stops following a Polaris account. The addresses that came from its sign-ins go with it, which takes ${username} off the list.`
+                                : `${username} stops following a Polaris account and comes off the list.`,
+                            confirmLabel: "Unlink",
+                            danger: true
+                        }).then((agreed) => {
+                            if (!agreed) return;
+                            setActing(null);
+                            run(() => actions.unlinkPlayerAccountAction(installedAppId, username));
+                        });
+                    }}
                     pending={pending}
                     error={formError}
                     onClose={() => setActing(null)}
@@ -835,6 +865,13 @@ function PlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
+                    {player.linkedTo && (
+                        <Badge
+                            title={`Joins from wherever ${player.linkedTo.name} is signed in to Polaris`}
+                        >
+                            linked
+                        </Badge>
+                    )}
                     {player.addresses.length > 0 && (
                         <Badge variant="primary">{playerStanding.allowed}</Badge>
                     )}

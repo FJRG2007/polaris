@@ -900,7 +900,13 @@ export async function grantPlayerAccessAction(
 export async function findMinecraftPlayerByUserAction(
     installedAppId: string,
     query: string
-): Promise<{ username?: string; name?: string; addresses?: string[]; error?: string }> {
+): Promise<{
+    userId?: string;
+    username?: string;
+    name?: string;
+    addresses?: string[];
+    error?: string;
+}> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
     if (!parsed.success) return { error: "Type a Polaris username or email address" };
     try {
@@ -908,17 +914,91 @@ export async function findMinecraftPlayerByUserAction(
         const found = await findGameIdentity(parsed.data, "minecraft");
         if (!found)
             return { error: "Nobody here goes by that. Check the username or the email address." };
-        if (!found.identity) {
-            return {
-                error: `${found.name} has not linked a Minecraft account yet. They can do it under Connected accounts.`
-            };
-        }
         // Only the ones a rule can be written against. A session that arrived
         // over something this build cannot parse is not an address to offer.
         const addresses = (await userSessionAddresses(found.userId)).filter(isAddressRule);
-        return { username: found.identity.label, name: found.name, addresses };
+        // Somebody who has not linked Minecraft can still be tied to a name the
+        // operator types, so the account comes back either way.
+        return {
+            userId: found.userId,
+            name: found.name,
+            addresses,
+            ...(found.identity ? { username: found.identity.label } : {})
+        };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not look that up" };
+    }
+}
+
+const linkSchema = z.object({
+    installedAppId: z.string().uuid(),
+    username: z.string().trim().min(1).max(16),
+    userId: z.string().uuid()
+});
+
+/**
+ * Tie a player to a Polaris account, so they may connect only from where that
+ * account is signed in to Polaris.
+ */
+export async function linkPlayerAccountAction(
+    input: z.infer<typeof linkSchema>
+): Promise<{ error?: string }> {
+    const parsed = linkSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        await playerAccess.linkPlayerAccount(access.ownerId, parsed.data.installedAppId, user.id, {
+            username: parsed.data.username,
+            userId: parsed.data.userId
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.player-link",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.username, userId: parsed.data.userId }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not link that player" };
+    }
+}
+
+/** Untie a player from their Polaris account. */
+export async function unlinkPlayerAccountAction(
+    installedAppId: string,
+    username: string
+): Promise<{ error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), username: z.string().trim().min(1).max(16) })
+        .safeParse({ installedAppId, username });
+    if (!parsed.success) return { error: "That player is not on this server" };
+    try {
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        await playerAccess.unlinkPlayerAccount(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.username
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.player-unlink",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.username }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not unlink that player" };
     }
 }
 

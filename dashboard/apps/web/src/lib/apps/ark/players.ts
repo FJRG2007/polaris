@@ -34,6 +34,11 @@ export interface ArkPlayerEntry {
     readonly standing: ArkStanding;
     /** When they were added to the list, for the rows that were. */
     readonly addedAt: string | null;
+    /** The Polaris account they follow, when they are tied to one. */
+    readonly userId: string | null;
+    /** True while the server refuses them because that account is signed in
+     *  nowhere. */
+    readonly held: boolean;
 }
 
 /** Everyone the server knows about, whoever is playing first and then by name -
@@ -49,7 +54,9 @@ export function foldArkPlayers(
             name: player.label || player.steamId,
             online: false,
             standing: player.appliedAt === null ? "waiting" : "allowed",
-            addedAt: player.addedAt
+            addedAt: player.addedAt,
+            userId: player.userId ?? null,
+            held: player.held === true
         });
     }
     for (const player of online) {
@@ -60,7 +67,9 @@ export function foldArkPlayers(
             name: player.name || known?.name || player.steamId,
             online: true,
             standing: known?.standing ?? "not-allowed",
-            addedAt: known?.addedAt ?? null
+            addedAt: known?.addedAt ?? null,
+            userId: known?.userId ?? null,
+            held: known?.held ?? false
         });
     }
     return [...byId.values()].sort((left, right) => {

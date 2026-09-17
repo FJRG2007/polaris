@@ -3455,6 +3455,9 @@ model GamePlayerAccess {
     address        String
     // Why this player is on the list, for whoever reads it in six months.
     note           String?
+    // "manual" for an address somebody typed; "session" for one Polaris keeps in
+    // step with the sign-ins of the Polaris account this player is linked to.
+    source         String   @default("manual")
     createdById    String?  @db.Uuid
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
@@ -3465,6 +3468,25 @@ model GamePlayerAccess {
     @@unique([installedAppId, username, address])
     @@index([installedAppId])
     @@index([installedAppId, username])
+}
+
+// A game server's player tied to a Polaris account.
+//
+// A linked player may only connect from where that account is signed in to
+// Polaris, so their allowed addresses follow its sessions instead of being typed.
+model GamePlayerLink {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // A Minecraft username or gamertag (compared case-insensitively), or an ARK
+    // SteamID64.
+    player         String
+    userId         String   @db.Uuid
+    createdById    String?  @db.Uuid
+    createdAt      DateTime @default(now())
+
+    @@unique([installedAppId, player])
+    @@index([installedAppId])
+    @@index([userId])
 }
 
 // The last inventory Polaris saw a player carrying.

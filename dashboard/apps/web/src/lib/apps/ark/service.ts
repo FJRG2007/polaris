@@ -32,6 +32,7 @@ import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { ARK_ROOT } from "@/lib/apps/ark/files";
 import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { signedIn } from "@/lib/apps/game-sign-in-addresses";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
 import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
@@ -320,6 +321,8 @@ export interface ArkAccessView {
      *  Off, a command it declined leaves no trace to read. */
     readonly logging: boolean;
     readonly players: readonly arkAccess.ArkAllowedPlayer[];
+    /** What Polaris calls each account a player follows, by user id. */
+    readonly accounts: Readonly<Record<string, string>>;
 }
 
 export async function readArkAccess(ownerId: string, installedAppId: string): Promise<ArkAccessView> {
@@ -333,10 +336,24 @@ export async function readArkAccess(ownerId: string, installedAppId: string): Pr
               select: { value: true }
           })
         : null;
+    const players = arkAccess.readAllowList(readInstallConfig(install?.config));
+    const ids = [...new Set(players.flatMap((entry) => (entry.userId ? [entry.userId] : [])))];
+    const people = ids.length
+        ? await prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, name: true, username: true }
+          })
+        : [];
     return {
         closed: arkAccess.isExclusiveJoin(options?.value ?? undefined),
         logging: arkAccess.hasLaunchFlag(options?.value ?? undefined, arkAccess.GAME_LOG),
-        players: arkAccess.readAllowList(readInstallConfig(install?.config))
+        players,
+        accounts: Object.fromEntries(
+            people.map((person) => [
+                person.id,
+                person.name || person.username || "A Polaris account"
+            ])
+        )
     };
 }
 
@@ -360,9 +377,16 @@ async function storedAllowList(installedAppId: string): Promise<arkAccess.ArkAll
 export async function addAllowedPlayer(
     ownerId: string,
     installedAppId: string,
-    player: { steamId: string; label: string }
+    player: { steamId: string; label: string; userId?: string | null }
 ): Promise<ArkAccessView> {
     if (!arkAccess.isSteamId(player.steamId)) throw new Error("That is not a Steam id");
+    if (player.userId) {
+        const person = await prisma.user.findUnique({
+            where: { id: player.userId },
+            select: { id: true }
+        });
+        if (!person) throw new Error("That Polaris account does not exist");
+    }
     const steamId = player.steamId.trim();
     const list = arkAccess.withPlayer(await storedAllowList(installedAppId), { ...player, steamId }, new Date().toISOString());
     await patchInstallConfig(installedAppId, { [arkAccess.ALLOW_LIST_KEY]: list });
@@ -388,7 +412,7 @@ export async function removeAllowedPlayer(
     const known = access.players.find((entry) => entry.steamId === steamId);
     // Only a player the server was actually told about has to be untold. One that
     // never reached it can be dropped from the list whatever the server is doing.
-    if (known?.appliedAt) {
+    if (known?.appliedAt && !known.held) {
         await runArkCommand(ownerId, installedAppId, `DisallowPlayerToJoinNoCheck ${steamId}`);
     }
     await patchInstallConfig(installedAppId, { [arkAccess.ALLOW_LIST_KEY]: arkAccess.withoutPlayer(access.players, steamId) });
@@ -406,23 +430,42 @@ export async function removeAllowedPlayer(
  */
 export async function applyAllowList(ownerId: string, installedAppId: string): Promise<number> {
     const list = await storedAllowList(installedAppId);
-    const pending = arkAccess.pendingPlayers(list);
-    if (pending.length === 0) return 0;
+    // Who each linked player follows is signed in right now, so a player whose
+    // account signed out is refused and one who signed back in is let in again.
+    const linked = list.flatMap((entry) => (entry.userId ? [entry.userId] : []));
+    const present = linked.length ? await signedIn(linked) : new Set<string>();
+    const { allow, hold } = arkAccess.gateDecisions(list, present);
+    if (allow.length === 0 && hold.length === 0) return 0;
     const applied: string[] = [];
-    for (const player of pending) {
-        try {
-            await runArkCommand(ownerId, installedAppId, `AllowPlayerToJoinNoCheck ${player.steamId}`);
-            applied.push(player.steamId);
-        } catch {
-            // Not answering yet. The next sweep tries again; nothing is marked as
-            // told, which is the only state that would be a lie.
-            break;
+    const held: string[] = [];
+    try {
+        for (const steamId of allow) {
+            await runArkCommand(ownerId, installedAppId, `AllowPlayerToJoinNoCheck ${steamId}`);
+            applied.push(steamId);
         }
+        for (const steamId of hold) {
+            await runArkCommand(ownerId, installedAppId, `DisallowPlayerToJoinNoCheck ${steamId}`);
+            held.push(steamId);
+            // Off the server as well, if they are on it. Refused for somebody who
+            // is not connected, which changes nothing.
+            await runArkCommand(ownerId, installedAppId, `KickPlayer ${steamId}`).catch(
+                () => undefined
+            );
+        }
+    } catch {
+        // Not answering yet. The next sweep tries again; nothing is marked as
+        // told, which is the only state that would be a lie.
     }
-    if (applied.length === 0) return 0;
+    if (applied.length === 0 && held.length === 0) return 0;
     const now = new Date().toISOString();
     await patchInstallConfig(installedAppId, {
-        [arkAccess.ALLOW_LIST_KEY]: list.map((entry) => (applied.includes(entry.steamId) ? { ...entry, appliedAt: now } : entry))
+        [arkAccess.ALLOW_LIST_KEY]: list.map((entry) =>
+            applied.includes(entry.steamId)
+                ? { ...entry, appliedAt: now, held: false }
+                : held.includes(entry.steamId)
+                  ? { ...entry, held: true }
+                  : entry
+        )
     });
     return applied.length;
 }
