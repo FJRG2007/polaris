@@ -55,8 +55,13 @@ beforeEach(() => {
 });
 
 describe("the setting", () => {
-    it("is the browser's own handling for somebody who has never touched it", () => {
-        expect(micCleanup()).toBe("standard");
+    it("removes background noise for somebody who has never touched it", () => {
+        expect(micCleanup()).toBe("enhanced");
+    });
+
+    it("keeps a choice saved before the default changed", () => {
+        store.set("polaris.call.mic-cleanup", "off");
+        expect(micCleanup()).toBe("off");
     });
 
     it("remembers each rung", () => {
@@ -66,22 +71,24 @@ describe("the setting", () => {
         }
     });
 
-    it("stores nothing for the default, so it is not a value to migrate later", () => {
+    it("stores an explicit choice even when it matches the default", () => {
         setMicCleanup("enhanced");
+        expect(store.get("polaris.call.mic-cleanup")).toBe("enhanced");
         setMicCleanup("standard");
-        expect(store.size).toBe(0);
+        expect(store.get("polaris.call.mic-cleanup")).toBe("standard");
     });
 
     it("treats anything else as unset", () => {
         // Local storage belongs to whoever owns the browser, and a filter chosen
         // by editing it is a filter nobody wrote.
         store.set("polaris.call.mic-cleanup", "krisp-please");
-        expect(micCleanup()).toBe("standard");
+        expect(micCleanup()).toBe("enhanced");
     });
 });
 
 describe("what is asked of the microphone", () => {
     it("asks for all three at the standard setting", () => {
+        setMicCleanup("standard");
         expect(micConstraints()).toEqual(ALL_ON);
     });
 

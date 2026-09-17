@@ -16,8 +16,10 @@
  *              amount of signal processing will.
  *   licensed - a filter an administrator connected, when there is one.
  *
- * Standard is the default because it costs nothing and suits most rooms;
- * enhanced is one press away and fetches its model then, not before.
+ * Removing background noise is the default, as it is in every voice client:
+ * a keyboard or a fan behind somebody is what everybody else in the call hears
+ * first. The model is fetched when a call first asks for it, and a machine where
+ * it will not start falls back to the browser's own handling.
  *
  * Kept per browser, like the volumes: it is a fact about a room and a
  * microphone, not about an account. The three constraints apply to the live
@@ -32,7 +34,7 @@ import { useCallback, useEffect, useState } from "react";
 const KEY = "polaris.call.mic-cleanup";
 
 /** What somebody who has never touched it gets. */
-export const CLEANUP_DEFAULT: MicFilter = "standard";
+export const CLEANUP_DEFAULT: MicFilter = "enhanced";
 
 /** Same-tab announcement, since the storage event only reaches other tabs. */
 const CHANGED = "polaris:call-mic-cleanup";
@@ -79,8 +81,9 @@ export function micCleanup(): MicFilter {
 export function setMicCleanup(level: MicFilter): void {
     if (typeof window === "undefined") return;
     try {
-        if (level === CLEANUP_DEFAULT) window.localStorage.removeItem(KEY);
-        else window.localStorage.setItem(KEY, level);
+        // Stored even when it matches the default, so an explicit choice
+        // survives the default changing again.
+        window.localStorage.setItem(KEY, level);
     } catch {
         // It still applies to this call; it just will not be remembered.
     }
