@@ -100,6 +100,9 @@ export interface MeetingSummary {
     /** How many people are in the room right now. Zero for one that has not
      *  started, which is most of a list of things happening later. */
     readonly present: number;
+    /** Who those are, with their microphone and headphones, in the order they
+     *  arrived. A guest who came on the link has a name and no account. */
+    readonly people: readonly VoicePresence[];
     /** The link to hand out, and only ever to the host: it is the credential,
      *  and everybody else on this list was invited by name. */
     readonly guestToken: string | null;
@@ -1374,7 +1377,8 @@ export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> 
                     admission: "admitted",
                     lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) }
                 },
-                select: { id: true }
+                orderBy: { joinedAt: "asc" },
+                select: PRESENCE_FIELDS
             }
         }
     });
@@ -1400,6 +1404,7 @@ export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> 
         scheduledAt: row.scheduledAt?.toISOString() ?? null,
         startedAt: row.startedAt.toISOString(),
         present: row.participants.length,
+        people: row.participants,
         // The credential, and it goes to the host alone. Everybody else on this
         // list was asked by name and gets in as themselves.
         guestToken: row.hostId === actor.id ? row.guestToken : null,

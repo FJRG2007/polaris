@@ -678,10 +678,10 @@ function ChannelRows({
                                             size={16}
                                             person={{
                                                 // A guest has no account behind
-                                                // them; their seat is who they
-                                                // are, and the initials of the
-                                                // name they gave is all there is.
-                                                id: person.userId ?? person.id,
+                                                // them, so no picture to ask
+                                                // for: the initials of the name
+                                                // they gave is all there is.
+                                                id: person.userId,
                                                 name: person.name
                                             }}
                                         />
