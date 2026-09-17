@@ -63,8 +63,26 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: (to: string) => pushed.push(to), refresh: () => undefined })
 }));
 
-/** A message quoting one other message, said in `channelId`. */
-function message(quotedIn: string) {
+/** The card a message draws for a quoted message said in `quotedIn`. */
+function card(quotedIn: string) {
+    return {
+        kind: "message" as const,
+        id: "q1",
+        reachable: true,
+        name: "A room",
+        spaceId: "",
+        spaceName: "",
+        channelKind: "group",
+        channelId: quotedIn,
+        authorName: "ada",
+        excerpt: "the thing said earlier",
+        attachments: 0,
+        at: new Date(1_699_000_000_000).toISOString()
+    };
+}
+
+/** A message quoting one other message, or answering one when `answered` is given. */
+function message(quotedIn: string, answered: Record<string, unknown> | null = null) {
     return {
         id: "m1",
         channelId: "c1",
@@ -79,24 +97,9 @@ function message(quotedIn: string) {
         deleted: false,
         reactions: [],
         attachments: [],
-        quote: null,
+        quote: answered,
         starred: false,
-        references: [
-            {
-                kind: "message" as const,
-                id: "q1",
-                reachable: true,
-                name: "A room",
-                spaceId: "",
-                spaceName: "",
-                channelKind: "group",
-                channelId: quotedIn,
-                authorName: "ada",
-                excerpt: "the thing said earlier",
-                attachments: 0,
-                at: new Date(1_699_000_000_000).toISOString()
-            }
-        ],
+        references: answered ? [] : [card(quotedIn)],
         forwardable: true,
         link: null,
         preview: null,
@@ -108,10 +111,14 @@ function message(quotedIn: string) {
 
 const jumped: string[] = [];
 
-function list(quotedIn: string, jump: ((messageId: string) => void) | undefined) {
+function list(
+    quotedIn: string,
+    jump: ((messageId: string) => void) | undefined,
+    answered: Record<string, unknown> | null = null
+) {
     return render(
         <MessageList
-            messages={[message(quotedIn)]}
+            messages={[message(quotedIn, answered)]}
             viewerId="ada"
             canPost
             canModerate={false}
@@ -171,5 +178,44 @@ describe("a list with nowhere to scroll", () => {
         list("c1", undefined);
         await user.click(quote());
         expect(jumped).toEqual([]);
+    });
+});
+
+/** The line over a reply, naming the message it answers. */
+function reply(overrides: Record<string, unknown> = {}) {
+    return {
+        id: "r1",
+        channelId: "c1",
+        authorName: "ada",
+        excerpt: "what was asked",
+        deleted: false,
+        forwarded: false,
+        ...overrides
+    };
+}
+
+const replyLine = () => screen.getByRole("link", { name: /what was asked/ });
+
+describe("the line over a reply", () => {
+    it("scrolls to the message it answers when pressed on the name or the words", async () => {
+        const user = userEvent.setup();
+        list("c1", (id) => jumped.push(id), reply());
+        expect(replyLine().getAttribute("href")).toBe("/chat/c/c1/r1");
+        await user.click(screen.getByText("ada"));
+        await user.click(screen.getByText("what was asked"));
+        expect(jumped).toEqual(["r1", "r1"]);
+    });
+
+    it("travels to a forward's original in another conversation", async () => {
+        const user = userEvent.setup();
+        list("c1", (id) => jumped.push(id), reply({ channelId: "c2", forwarded: true }));
+        expect(replyLine().getAttribute("href")).toBe("/chat/c/c2/r1");
+        await user.click(replyLine());
+        expect(jumped).toEqual([]);
+    });
+
+    it("stays text when the message it answers was deleted", () => {
+        list("c1", (id) => jumped.push(id), reply({ deleted: true, excerpt: "" }));
+        expect(screen.getByText("message deleted").closest("a")).toBeNull();
     });
 });
