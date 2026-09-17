@@ -147,11 +147,18 @@ export function voiceSettings(): VoiceSettings {
                 ? (held.inputMode as InputMode)
                 : VOICE_DEFAULTS.inputMode,
             pttKey:
-                typeof held.pttKey === "string" && held.pttKey.length > 0 && held.pttKey.length <= 32
+                typeof held.pttKey === "string" &&
+                held.pttKey.length > 0 &&
+                held.pttKey.length <= 32
                     ? held.pttKey
                     : VOICE_DEFAULTS.pttKey,
             pttReleaseMs: clamp(held.pttReleaseMs, 0, 2000, VOICE_DEFAULTS.pttReleaseMs),
-            activityThreshold: clamp(held.activityThreshold, 0, 100, VOICE_DEFAULTS.activityThreshold),
+            activityThreshold: clamp(
+                held.activityThreshold,
+                0,
+                100,
+                VOICE_DEFAULTS.activityThreshold
+            ),
             advancedActivity: held.advancedActivity === true,
             // The two that default to on are read as "not false", so a record
             // written before either existed keeps the behaviour it had.
