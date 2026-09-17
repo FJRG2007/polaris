@@ -13,7 +13,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { joinGuardEntry } from "@/lib/apps/minecraft/join-guard";
-import { entryReleaseType, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import {
+    entryReleaseType,
+    forgetModrinthAnswers,
+    projectSlug
+} from "@/lib/apps/minecraft/modrinth";
 import { commonVersions, knownUnsupported } from "@/lib/apps/minecraft/blueprint-version";
 import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@/lib/apps/games-create";
 import {
@@ -42,6 +46,7 @@ let asked: string[] = [];
 beforeEach(() => {
     offline = false;
     asked = [];
+    forgetModrinthAnswers();
     // Each scenario below uses a blueprint of its own, because what a project
     // supports is looked up once and remembered for the rest of the day - which is
     // the behaviour in production and would otherwise make these order-dependent.

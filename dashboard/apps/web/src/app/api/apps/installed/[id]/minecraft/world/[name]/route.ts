@@ -16,15 +16,22 @@ export const dynamic = "force-dynamic";
  * ever hold one in memory.
  */
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ id: string; name: string }> }
 ): Promise<Response> {
+    // A router prefetch, not a download. A tab still running a build that linked
+    // here through the router asks for every archive on screen the moment it is
+    // drawn, and each one is gigabytes read out of the container.
+    if (request.headers.has("rsc") || request.headers.has("next-router-prefetch")) {
+        return new Response(null, { status: 204 });
+    }
     const { id, name } = await params;
     // Resolved once: this both authorizes the caller and reads the install on the
     // owner's behalf, and it has already refused anything that is not a game server.
     const { access } = await requireGameServer("games.manage", id);
     const install = access.install;
-    if (!install.applicationId) return new Response("This server has not been deployed yet", { status: 409 });
+    if (!install.applicationId)
+        return new Response("This server has not been deployed yet", { status: 409 });
 
     let path: string;
     try {

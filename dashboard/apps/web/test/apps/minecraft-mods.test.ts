@@ -20,6 +20,8 @@ let answers: Map<string, unknown>;
 beforeEach(() => {
     asked = [];
     answers = new Map();
+    // Modrinth's answers are kept for a while; each test answers afresh.
+    modrinth.forgetModrinthAnswers();
     vi.stubGlobal("fetch", async (url: string) => {
         asked.push(url);
         // Matched on the path so a test does not have to reproduce the exact query
@@ -67,7 +69,10 @@ describe("what a server is offered", () => {
         // convinced their server is broken.
         answers.set("/search", { hits: [] });
         await modrinth.searchModrinth("sodium", "fabric");
-        expect(facetsOf(asked[0]!)).toContainEqual(["server_side:required", "server_side:optional"]);
+        expect(facetsOf(asked[0]!)).toContainEqual([
+            "server_side:required",
+            "server_side:optional"
+        ]);
     });
 
     it("does not ask a plugin server about server_side", async () => {
@@ -94,7 +99,11 @@ describe("what a server is offered", () => {
     it("drops an icon that is not Modrinth's own", async () => {
         answers.set("/search", {
             hits: [
-                { slug: "good", title: "Good", icon_url: "https://cdn.modrinth.com/data/x/icon.png" },
+                {
+                    slug: "good",
+                    title: "Good",
+                    icon_url: "https://cdn.modrinth.com/data/x/icon.png"
+                },
                 { slug: "bad", title: "Bad", icon_url: "https://someone-else.example/track.png" }
             ]
         });
@@ -127,7 +136,12 @@ describe("what is already on the list", () => {
             }
         ]);
         const [entry] = await modrinth.readInstalledProjects(["coreprotect?"], "paper", "1.21.4");
-        expect(entry).toMatchObject({ title: "CoreProtect", known: true, fitsVersion: true, fitsLoader: true });
+        expect(entry).toMatchObject({
+            title: "CoreProtect",
+            known: true,
+            fitsVersion: true,
+            fitsLoader: true
+        });
         // The entry is kept exactly as the container holds it, so taking it off
         // does not have to guess at the image's own syntax.
         expect(entry!.entry).toBe("coreprotect?");
@@ -143,7 +157,13 @@ describe("what is already on the list", () => {
 
     it("names a project with no build for the release the server is on", async () => {
         answers.set("/projects?ids=", [
-            { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.20.1"], loaders: ["paper"] }
+            {
+                id: "AAAA",
+                slug: "grimac",
+                title: "GrimAC",
+                game_versions: ["1.20.1"],
+                loaders: ["paper"]
+            }
         ]);
         const [entry] = await modrinth.readInstalledProjects(["grimac"], "paper", "1.21.4");
         expect(entry!.fitsVersion).toBe(false);
@@ -152,7 +172,13 @@ describe("what is already on the list", () => {
     it("claims nothing about the version when the server is on LATEST", async () => {
         // "No build for an unknown version" is not a claim anybody can make.
         answers.set("/projects?ids=", [
-            { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.20.1"], loaders: ["paper"] }
+            {
+                id: "AAAA",
+                slug: "grimac",
+                title: "GrimAC",
+                game_versions: ["1.20.1"],
+                loaders: ["paper"]
+            }
         ]);
         const [entry] = await modrinth.readInstalledProjects(["grimac"], "paper", null);
         expect(entry!.fitsVersion).toBeNull();
@@ -174,7 +200,13 @@ describe("conflicts between them", () => {
             [
                 "/projects?ids=",
                 [
-                    { id: "AAAA", slug: "one", title: "One", game_versions: [], loaders: ["paper"] },
+                    {
+                        id: "AAAA",
+                        slug: "one",
+                        title: "One",
+                        game_versions: [],
+                        loaders: ["paper"]
+                    },
                     { id: "BBBB", slug: "two", title: "Two", game_versions: [], loaders: ["paper"] }
                 ]
             ],
@@ -188,7 +220,9 @@ describe("conflicts between them", () => {
 
     it("reports what a publisher says cannot run beside what is here", async () => {
         twoProjects("incompatible", "BBBB");
-        expect(await modrinth.readConflicts(["one", "two"], "paper")).toEqual([{ slug: "one", withSlug: "two" }]);
+        expect(await modrinth.readConflicts(["one", "two"], "paper")).toEqual([
+            { slug: "one", withSlug: "two" }
+        ]);
     });
 
     it("says nothing about a required dependency", async () => {
@@ -211,13 +245,105 @@ describe("conflicts between them", () => {
     });
 });
 
+describe("asking Modrinth", () => {
+    /** A list whose projects clash and depend on each other, so all three walks
+     *  have something to ask about. */
+    function list() {
+        answers = new Map<string, unknown>([
+            [
+                "/projects?ids=",
+                [
+                    {
+                        id: "AAAA",
+                        slug: "one",
+                        title: "One",
+                        game_versions: [],
+                        loaders: ["paper"]
+                    },
+                    { id: "BBBB", slug: "two", title: "Two", game_versions: [], loaders: ["paper"] }
+                ]
+            ],
+            [
+                "/project/one/version",
+                [
+                    {
+                        version_number: "1.0",
+                        dependencies: [{ project_id: "BBBB", dependency_type: "required" }]
+                    }
+                ]
+            ],
+            ["/project/two/version", [{ version_number: "2.0", dependencies: [] }]]
+        ]);
+    }
+
+    it("asks each address once for everything one screen reads", async () => {
+        // What the route does for one look at the list: the three walks at once.
+        list();
+        const entries = ["one", "two:1.0"];
+        await Promise.all([
+            modrinth.readInstalledProjects(entries, "paper", null),
+            modrinth.readConflicts(entries, "paper"),
+            modrinth.newestBuilds(entries, "paper", null),
+            modrinth.readRequirements(entries, "paper", null)
+        ]);
+        expect(asked.length).toBeGreaterThan(0);
+        expect(new Set(asked).size).toBe(asked.length);
+    });
+
+    it("answers the next edit from what it already has", async () => {
+        list();
+        await modrinth.readRequirements(["one", "two"], "paper", null);
+        const first = asked.length;
+        await modrinth.readRequirements(["one", "two"], "paper", null);
+        expect(asked.length).toBe(first);
+    });
+
+    it("asks again after a failure rather than keeping it", async () => {
+        await modrinth.readInstalledProjects(["one"], "paper", null);
+        expect(asked).toHaveLength(1);
+        list();
+        const [entry] = await modrinth.readInstalledProjects(["one"], "paper", null);
+        expect(asked).toHaveLength(2);
+        expect(entry?.known).toBe(true);
+    });
+
+    it("walks a long list a few projects at a time", async () => {
+        const slugs = Array.from({ length: 20 }, (_, index) => `p${index}`);
+        let open = 0;
+        let most = 0;
+        vi.stubGlobal("fetch", async (url: string) => {
+            if (url.includes("/projects?ids=")) {
+                return {
+                    ok: true,
+                    json: async () =>
+                        slugs.map((slug) => ({ id: slug, slug, game_versions: [], loaders: [] }))
+                } as unknown as Response;
+            }
+            open += 1;
+            most = Math.max(most, open);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            open -= 1;
+            return { ok: true, json: async () => [{ dependencies: [] }] } as unknown as Response;
+        });
+        await modrinth.readConflicts(slugs, "paper");
+        expect(most).toBeGreaterThan(1);
+        expect(most).toBeLessThanOrEqual(8);
+    });
+});
+
 describe("the shelves", () => {
     it("differ between a plugin server and a modded one", () => {
         // The same idea is filed under different tags, so one list with holes in
         // it would offer a shelf that is always empty.
-        expect(modrinth.categoriesForLoader("paper").some((entry) => entry.value === "economy")).toBe(true);
-        expect(modrinth.categoriesForLoader("fabric").some((entry) => entry.value === "economy")).toBe(false);
-        expect(modrinth.categoriesForLoader("fabric").some((entry) => entry.value === "technology")).toBe(true);
+        expect(
+            modrinth.categoriesForLoader("paper").some((entry) => entry.value === "economy")
+        ).toBe(true);
+        expect(
+            modrinth.categoriesForLoader("fabric").some((entry) => entry.value === "economy")
+        ).toBe(false);
+        expect(
+            modrinth.categoriesForLoader("fabric").some((entry) => entry.value === "technology")
+        ).toBe(true);
     });
 
     it("are the only ones a query may name", () => {
@@ -287,7 +413,13 @@ describe("an entry that is optional and pinned at once", () => {
 
     it("is resolved to the project it names rather than reported as unknown", async () => {
         answers.set("/projects?ids=", [
-            { id: "AAAA", slug: "grimac", title: "GrimAC", game_versions: ["1.21.4"], loaders: ["paper"] }
+            {
+                id: "AAAA",
+                slug: "grimac",
+                title: "GrimAC",
+                game_versions: ["1.21.4"],
+                loaders: ["paper"]
+            }
         ]);
         const [entry] = await modrinth.readInstalledProjects(["grimac?:alpha"], "paper", "1.21.4");
         expect(entry).toMatchObject({ title: "GrimAC", known: true });
