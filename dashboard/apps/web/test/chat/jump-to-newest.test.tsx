@@ -238,6 +238,11 @@ describe("reading older messages", () => {
         scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
 
         const bar = await screen.findByText("You're viewing older messages");
+        // A pill over the conversation, not a bar across it: full width would
+        // cover the last line somebody is reading.
+        const pill = bar.closest("button");
+        expect(pill?.className).not.toMatch(/(^| )w-full( |$)/);
+        expect(pill?.className).toContain("rounded-full");
         await user.click(bar);
         // Back at the bottom: the list is scrolled to its end and the bar goes.
         expect(scroller.scrollTop).toBe(4000);
