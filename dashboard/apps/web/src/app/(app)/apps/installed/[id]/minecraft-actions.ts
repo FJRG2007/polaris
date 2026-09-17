@@ -85,12 +85,15 @@ import {
     type WorldRules
 } from "@/lib/apps/minecraft/rules-service";
 import {
+    clearInventory,
     clearItem,
     clearSlot,
     giveItem,
     giveToSlot,
     moveStack,
-    recentlyGivenItems
+    recentlyGivenItems,
+    transferInventory,
+    transferStack
 } from "@/lib/apps/minecraft/item-service";
 import {
     applyFirewallBans,
@@ -2158,6 +2161,113 @@ export async function clearPlayerItemAction(
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not take that away" };
+    }
+}
+
+/** Empty everything a player carries. Queued when the player is not on. */
+export async function clearPlayerInventoryAction(input: {
+    installedAppId: string;
+    player: string;
+}): Promise<{ queued?: true; error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        if (!(await isOnline(access.ownerId, installedAppId, player))) {
+            await queueAction({
+                installedAppId,
+                username: player,
+                payload: { kind: "clear-all" },
+                requestedById: user.id
+            });
+            return { queued: true };
+        }
+        await clearInventory(access.ownerId, installedAppId, player);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-empty",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player }
+        });
+        return {};
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "Could not empty the inventory"
+        };
+    }
+}
+
+const transferStackSchema = z.object({
+    installedAppId: z.string().uuid(),
+    from: playerNameSchema,
+    to: playerNameSchema,
+    slot: z.number().int().min(-128).max(127),
+    /** What the screen was showing in that slot. Compared before anything moves. */
+    expected: stackSchema.nullable(),
+    /** Fewer than the stack sends part of it. */
+    count: z.number().int().min(1).max(127).optional()
+});
+
+/** Send one stack from one player's bag to another player. Both must be on. */
+export async function transferStackAction(
+    input: z.infer<typeof transferStackSchema>
+): Promise<{ error?: string }> {
+    const parsed = transferStackSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, from, to, slot, expected, count } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        await transferStack(access.ownerId, installedAppId, from, to, slot, expected, count);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-send",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: {
+                from,
+                to,
+                slot,
+                item: expected?.id ?? null,
+                count: count ?? expected?.count ?? null
+            }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not send that stack" };
+    }
+}
+
+/** Send everything one player carries to another. Both must be on. */
+export async function transferInventoryAction(input: {
+    installedAppId: string;
+    from: string;
+    to: string;
+}): Promise<{ moved?: number; kept?: number; error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), from: playerNameSchema, to: playerNameSchema })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, from, to } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const result = await transferInventory(access.ownerId, installedAppId, from, to);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-send-all",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { from, to, moved: result.moved, kept: result.kept }
+        });
+        return result;
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not send the inventory" };
     }
 }
 

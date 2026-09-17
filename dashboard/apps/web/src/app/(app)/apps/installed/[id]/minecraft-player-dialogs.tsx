@@ -238,6 +238,7 @@ export function InventoryDialog({
     installedAppId,
     player,
     canEdit,
+    others,
     onClose,
     onChanged
 }: {
@@ -246,6 +247,8 @@ export function InventoryDialog({
     /** False for a viewer who may look and not touch, and on Bedrock, whose
      *  commands cannot answer this at all. */
     canEdit: boolean;
+    /** Everybody else who is on right now, for sending stacks to. */
+    others: readonly string[];
     onClose: () => void;
     /** The screen behind lists what is waiting to reach this player too, so a
      *  write that lands in that queue has to ask it to read the list again. */
@@ -266,6 +269,7 @@ export function InventoryDialog({
                     installedAppId={installedAppId}
                     player={player}
                     editable={canEdit}
+                    others={others}
                     onChanged={onChanged}
                 />
                 <DialogFooter>

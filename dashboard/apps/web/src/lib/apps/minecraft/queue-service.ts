@@ -116,6 +116,8 @@ function commandFor(username: string, payload: QueuedPayload): string[] | null {
             return ["give", username, payload.item, String(payload.count)];
         case "clear":
             return ["clear", username, payload.item, String(payload.count)];
+        case "clear-all":
+            return ["clear", username];
         case "ban":
             return ["ban", username, ...(payload.reason ? [payload.reason] : [])];
         case "pardon":

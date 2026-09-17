@@ -687,6 +687,9 @@ export function MinecraftPlayers({
                     // cannot re-read, and still takes an item dropped in from the
                     // palette - which is written down and given when they join.
                     canEdit={!bedrock}
+                    others={onlineNames.filter(
+                        (name) => name.toLowerCase() !== target.name.toLowerCase()
+                    )}
                     onClose={() => setActing(null)}
                     onChanged={onChanged}
                 />

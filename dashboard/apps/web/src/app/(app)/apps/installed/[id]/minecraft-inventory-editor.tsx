@@ -27,13 +27,23 @@ import * as actions from "./minecraft-actions";
 import { ItemPicker } from "./minecraft-item-picker";
 import { bySlot } from "@/lib/apps/minecraft/inventory";
 import { useDisplayFormat } from "@/components/display-format";
-import { Badge, Button, Input, Skeleton, cn } from "@polaris/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { Badge, Button, Input, Select, Skeleton, cn } from "@polaris/ui";
 import { maxStackFor, stacksFor } from "@/lib/apps/minecraft/items";
 import { InventoryGrid, type PendingStack } from "./minecraft-inventory";
 import { isMovable, writableSlots } from "@/lib/apps/minecraft/item-argument";
 import { describeQueued, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, PackageMinus, PackagePlus, RefreshCw, Trash2, X } from "lucide-react";
+import {
+    Eraser,
+    Loader2,
+    PackageMinus,
+    PackagePlus,
+    RefreshCw,
+    Send,
+    Trash2,
+    X
+} from "lucide-react";
 
 /** A bag's worth: 36 slots of 64, which is everything a player can hold. */
 const MOST_THAT_FITS = 2304;
@@ -52,10 +62,13 @@ export function InventoryEditor({
     installedAppId,
     player,
     editable,
+    others = [],
     onChanged
 }: {
     installedAppId: string;
     player: string;
+    /** Everybody else who is on the server right now: who a stack can be sent to. */
+    others?: readonly string[];
     /** False on Bedrock, which answers no `data get`: nothing to read back and no
      *  slot to write, though items can still be given and taken. */
     editable: boolean;
@@ -76,6 +89,9 @@ export function InventoryEditor({
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const [confirm, confirmElement] = useConfirm();
+    /** Who a stack dropped on the send area goes to. */
+    const [recipient, setRecipient] = useState<string | null>(null);
     // Read through a ref so the poll can see it without restarting on every drag.
     const dragging = useRef(false);
     dragging.current = held !== null;
@@ -146,7 +162,7 @@ export function InventoryEditor({
     );
     const queuedElsewhere = waiting.filter((entry) => entry.payload.kind !== "set-slot");
 
-    function run(work: () => Promise<{ error?: string; queued?: true }>): void {
+    function run(work: () => Promise<{ error?: string; queued?: true; note?: string }>): void {
         setError(null);
         setNote(null);
         startTransition(async () => {
@@ -156,6 +172,7 @@ export function InventoryEditor({
                 return;
             }
             if (result.queued) setNote(`Saved. It happens when ${player} next joins.`);
+            else if (result.note) setNote(result.note);
             await Promise.all([reload(), readQueue()]);
             // The screen behind lists what is waiting too, and it only reads that
             // on its own poll.
@@ -231,9 +248,48 @@ export function InventoryEditor({
     }
 
     const stuck = items.filter((item) => !isMovable(item));
+    // Somebody who left since the list was drawn is not somebody to send to.
+    const sendTo = recipient !== null && others.includes(recipient) ? recipient : null;
+
+    async function emptyAll(): Promise<void> {
+        const agreed = await confirm({
+            title: `Empty ${player}'s inventory?`,
+            description: live
+                ? "Everything they carry goes, armour and offhand included. This cannot be undone."
+                : "Everything they carry goes when they next join, armour and offhand included. This cannot be undone.",
+            confirmLabel: "Empty inventory",
+            danger: true
+        });
+        if (agreed) run(() => actions.clearPlayerInventoryAction({ installedAppId, player }));
+    }
+
+    async function sendAll(to: string): Promise<void> {
+        const agreed = await confirm({
+            title: `Send everything to ${to}?`,
+            description: `Every stack ${player} carries moves to ${to}, a stack at a time. What does not fit in ${to}'s bag lands at their feet.`,
+            confirmLabel: "Send everything"
+        });
+        if (!agreed) return;
+        run(async () => {
+            const result = await actions.transferInventoryAction({
+                installedAppId,
+                from: player,
+                to
+            });
+            if (result.error) return { error: result.error };
+            const moved = result.moved ?? 0;
+            const kept = result.kept ?? 0;
+            return {
+                note:
+                    `Sent ${moved} ${moved === 1 ? "stack" : "stacks"} to ${to}.` +
+                    (kept > 0 ? ` ${kept} stayed with ${player}.` : "")
+            };
+        });
+    }
 
     return (
         <div className="flex flex-col gap-4 lg:flex-row">
+            {confirmElement}
             <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={live ? "success" : undefined}>{live ? "Live" : "From a copy"}</Badge>
@@ -455,6 +511,79 @@ export function InventoryEditor({
                         Drop a stack here to take it away
                     </div>
                 )}
+
+                {editable && live && (
+                    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+                        <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                            Send to another player
+                        </span>
+                        {others.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                Nobody else is on the server to send to.
+                            </p>
+                        ) : (
+                            <>
+                                <Select
+                                    aria-label="Player to send to"
+                                    placeholder="Choose a player"
+                                    value={sendTo ?? ""}
+                                    onValueChange={(value) => setRecipient(value || null)}
+                                    options={others.map((name) => ({ value: name, label: name }))}
+                                />
+                                <div
+                                    onDragOver={(event) => event.preventDefault()}
+                                    onDrop={(event) => {
+                                        event.preventDefault();
+                                        const carrying = held;
+                                        setHeld(null);
+                                        if (carrying?.kind !== "slot" || !sendTo) return;
+                                        const source = slots.get(carrying.slot) ?? null;
+                                        run(() =>
+                                            actions.transferStackAction({
+                                                installedAppId,
+                                                from: player,
+                                                to: sendTo,
+                                                slot: carrying.slot,
+                                                expected: source
+                                            })
+                                        );
+                                    }}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-xs transition-colors",
+                                        held?.kind === "slot" && sendTo
+                                            ? "border-primary bg-primary/10 text-foreground"
+                                            : "border-border text-muted-foreground"
+                                    )}
+                                >
+                                    <Send className="size-4" />
+                                    {sendTo
+                                        ? `Drop a stack here to send it to ${sendTo}`
+                                        : "Choose a player, then drop a stack here"}
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={!sendTo || pending || items.length === 0}
+                                    onClick={() => sendTo && void sendAll(sendTo)}
+                                >
+                                    <Send className="size-4" />
+                                    {sendTo ? `Send everything to ${sendTo}` : "Send everything"}
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending || (live && items.length === 0)}
+                    className="text-danger hover:text-danger"
+                    onClick={() => void emptyAll()}
+                >
+                    <Eraser className="size-4" />
+                    {live ? "Empty inventory" : "Empty it when they join"}
+                </Button>
                 {pending && <Skeleton className="h-1 w-full" />}
             </div>
         </div>

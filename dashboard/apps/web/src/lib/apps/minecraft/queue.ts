@@ -17,6 +17,7 @@ import { z } from "zod";
 export const QUEUED_KINDS = [
     "give",
     "clear",
+    "clear-all",
     "set-slot",
     "ban",
     "pardon",
@@ -38,6 +39,7 @@ export type QueuedKind = (typeof QUEUED_KINDS)[number];
 export const NEEDS_PLAYER: Readonly<Record<QueuedKind, boolean>> = {
     give: true,
     clear: true,
+    "clear-all": true,
     "set-slot": true,
     ban: false,
     pardon: false,
@@ -62,6 +64,7 @@ const itemPayload = z.object({
 export const queuePayloadSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("give") }).merge(itemPayload),
     z.object({ kind: z.literal("clear") }).merge(itemPayload),
+    z.object({ kind: z.literal("clear-all") }),
     z.object({ kind: z.literal("set-slot"), slot: z.number().int().min(-128).max(127) }).merge(itemPayload),
     z.object({ kind: z.literal("ban"), reason: z.string().trim().max(200).optional() }),
     z.object({ kind: z.literal("pardon") }),
@@ -105,6 +108,8 @@ export function describeQueued(action: QueuedAction): string {
             return `Give ${payload.count} x ${payload.item}`;
         case "clear":
             return `Take away ${payload.count} x ${payload.item}`;
+        case "clear-all":
+            return "Empty their inventory";
         case "set-slot":
             return `Put ${payload.count} x ${payload.item} in slot ${payload.slot}`;
         case "ban":
