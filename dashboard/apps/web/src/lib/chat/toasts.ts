@@ -22,15 +22,18 @@
  *   stronger one: a mute silences a room, and this silences a person in every
  *   room at once;
  * - the text is the excerpt, not the Markdown, and never the reader's own
- *   message.
+ *   message - and when the body has no words, what was sent instead (a photo,
+ *   a GIF, a voice message), with a preview of the first attachment beside it.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
-import { mentionsReader, notifyLevels, readerTeams } from "./notify";
+import { isVoiceFileName } from "./voice-name";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
+import { isInlineImage, isPlayableMedia } from "./attachments";
+import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 
 /** How much of a message the toast carries. A line, like every other
  *  notification anywhere. */
@@ -56,6 +59,19 @@ const NEWEST = 4;
  *  in a busier room - which is the room somebody sets this on. */
 const SIFTED = 60;
 
+/**
+ * The picture a toast can show for what was sent.
+ *
+ * Only an image, or a video with a still, and never a spoiler: a covered file is
+ * covered so nobody sees it without choosing to, and a toast is not a choice.
+ */
+export interface MessageToastMedia {
+    readonly kind: "image" | "video";
+    /** Where the picture is served from, through the same access check as the
+     *  conversation. */
+    readonly src: string;
+}
+
 /** One arrival, as the toast draws it. */
 export interface MessageToast {
     readonly channelId: string;
@@ -68,8 +84,68 @@ export interface MessageToast {
     readonly inChannel: boolean;
     readonly authorId: string | null;
     readonly authorName: string;
+    /** The words, or what was sent when there are none - never empty. */
     readonly excerpt: string;
+    readonly media: MessageToastMedia | null;
     readonly at: string;
+}
+
+/** The fields of an attachment a toast is described from. */
+interface ToastFile {
+    readonly id: string;
+    readonly name: string;
+    readonly contentType: string;
+    readonly posterPath: string | null;
+    readonly spoiler: boolean;
+}
+
+function isVideo(contentType: string): boolean {
+    return isPlayableMedia(contentType) && contentType.toLowerCase().startsWith("video/");
+}
+
+function isAudio(contentType: string): boolean {
+    return isPlayableMedia(contentType) && contentType.toLowerCase().startsWith("audio/");
+}
+
+/**
+ * What a message with no words in it sent, in words.
+ *
+ * A photo, a GIF or a voice note arrives with an empty body, and a toast that
+ * reads nothing under somebody's name says nothing happened.
+ */
+export function describeFiles(files: readonly ToastFile[]): string {
+    const [first] = files;
+    if (!first) return "Sent a message";
+    if (files.length > 1) {
+        if (files.every((file) => file.spoiler)) return `Sent ${files.length} spoilers`;
+        if (files.some((file) => file.spoiler)) return `Sent ${files.length} files`;
+        if (files.every((file) => isInlineImage(file.contentType)))
+            return `Sent ${files.length} photos`;
+        if (files.every((file) => isVideo(file.contentType))) return `Sent ${files.length} videos`;
+        return `Sent ${files.length} files`;
+    }
+    if (first.spoiler) return "Sent a spoiler";
+    if (isInlineImage(first.contentType)) {
+        return first.contentType.toLowerCase().startsWith("image/gif")
+            ? "Sent a GIF"
+            : "Sent a photo";
+    }
+    if (isVideo(first.contentType)) return "Sent a video";
+    if (isAudio(first.contentType)) {
+        return isVoiceFileName(first.name) ? "Sent a voice message" : `Sent ${first.name}`;
+    }
+    return `Sent ${first.name}`;
+}
+
+/** The picture to show for these files, when the first one has one to show. */
+export function previewOf(files: readonly ToastFile[]): MessageToastMedia | null {
+    const [first] = files;
+    if (!first || first.spoiler) return null;
+    const src = `/api/chat/attachments/${first.id}`;
+    if (isInlineImage(first.contentType)) return { kind: "image", src };
+    if (isVideo(first.contentType) && first.posterPath)
+        return { kind: "video", src: `${src}?poster=1` };
+    return null;
 }
 
 /**
@@ -177,7 +253,8 @@ export async function messageToasts(
             inChannel: row.channel.spaceId !== null,
             authorId: row.authorId,
             authorName: (row.authorId && names.get(row.authorId)) || "Somebody",
-            excerpt: plainExcerpt(row.body, EXCERPT),
+            excerpt: plainExcerpt(row.body, EXCERPT) || describeFiles(row.attachments),
+            media: previewOf(row.attachments),
             at: row.createdAt.toISOString()
         });
     }
@@ -208,6 +285,12 @@ function recentIn(userId: string, channelIds: readonly string[], since: Date, ta
             body: true,
             createdAt: true,
             authorId: true,
+            // In the order they were sent, which is the order the message draws
+            // them - the first is the one a toast shows.
+            attachments: {
+                orderBy: { createdAt: "asc" },
+                select: { id: true, name: true, contentType: true, posterPath: true, spoiler: true }
+            },
             channel: {
                 select: {
                     name: true,

@@ -51,6 +51,9 @@ export interface Toast {
     readonly body?: string;
     /** Drawn to the left of the words. A face, an icon, anything small. */
     readonly icon?: ReactNode;
+    /** Drawn under the words: a picture of what the note is about. Kept to a
+     *  bounded box by the note, so the caller only hands over the element. */
+    readonly media?: ReactNode;
     /** What pressing it does. Without one the note is not pressable, which is
      *  what keeps a note that leads nowhere from looking like it leads
      *  somewhere. */
@@ -87,7 +90,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const show = useCallback((toast: Toast) => {
         next.current += 1;
         const id = toast.key ?? `toast-${next.current}`;
-        setShown((current) => [...current.filter((one) => one.id !== id), { ...toast, id }].slice(-MOST));
+        setShown((current) =>
+            [...current.filter((one) => one.id !== id), { ...toast, id }].slice(-MOST)
+        );
     }, []);
 
     const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
@@ -172,10 +177,17 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         >
             {toast.icon ? <span className="mt-0.5 shrink-0">{toast.icon}</span> : null}
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium" title={toast.title}>{toast.title}</span>
+                <span className="block truncate text-sm font-medium" title={toast.title}>
+                    {toast.title}
+                </span>
                 {toast.body ? (
                     <span className="mt-0.5 block line-clamp-2 text-xs text-muted-foreground">
                         {toast.body}
+                    </span>
+                ) : null}
+                {toast.media ? (
+                    <span className="mt-2 flex max-h-40 overflow-hidden rounded-md empty:hidden">
+                        {toast.media}
                     </span>
                 ) : null}
             </span>

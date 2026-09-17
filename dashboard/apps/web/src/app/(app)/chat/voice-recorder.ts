@@ -18,6 +18,7 @@
  */
 
 import { micGain } from "./mic-gain";
+import { isVoiceFileName, voiceFileName } from "@/lib/chat/voice-name";
 import { filterMic, type FilteredMic } from "./mic-filter";
 import { micCleanup, micConstraints } from "./mic-cleanup";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -48,16 +49,6 @@ export function canRecord(): boolean {
     return recordingType() !== null && typeof navigator?.mediaDevices?.getUserMedia === "function";
 }
 
-/** The name the recording is sent under. Plain and the same every time: the
- *  message says when it was said, and a name with a timestamp in it says it
- *  again, differently. */
-export function voiceFileName(type: string): string {
-    const container = type.split(";")[0]?.trim() ?? "";
-    const extension =
-        container === "audio/mp4" ? "m4a" : container === "audio/ogg" ? "ogg" : "webm";
-    return `voice-message.${extension}`;
-}
-
 /** Whether an attachment is something to play rather than to download. */
 export function isPlayable(contentType: string): boolean {
     return contentType.toLowerCase().startsWith("audio/");
@@ -66,7 +57,7 @@ export function isPlayable(contentType: string): boolean {
 /** Whether an attachment is one of these recordings, as opposed to a music file
  *  somebody uploaded - which gets the same player but keeps its name. */
 export function isVoiceMessage(name: string, contentType: string): boolean {
-    return isPlayable(contentType) && /^voice-message\.[a-z0-9]+$/i.test(name);
+    return isPlayable(contentType) && isVoiceFileName(name);
 }
 
 /** Seconds as a clock reads them. */
