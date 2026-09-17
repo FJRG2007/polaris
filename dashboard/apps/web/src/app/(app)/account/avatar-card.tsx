@@ -525,6 +525,7 @@ export function ProfilePicturesCard({
                             then draws as an ellipse hanging below it. */}
                         <div className="relative -mt-8 flex w-fit">
                             <Avatar
+                                decorated
                                 person={{ id: userId, name }}
                                 size={72}
                                 status={false}

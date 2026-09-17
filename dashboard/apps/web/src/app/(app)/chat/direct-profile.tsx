@@ -126,6 +126,7 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                         second way of being told the same thing about that person. */}
                     <Avatar
                         openable
+                        decorated
                         person={{ id: person.id, name }}
                         size={72}
                         className="ring-[3px] ring-background"

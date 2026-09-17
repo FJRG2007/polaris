@@ -92,6 +92,7 @@ export function UserProfileDialog({
                         <div className="flex items-center gap-3">
                             <Avatar
                                 openable
+                                decorated
                                 person={{ id: userId ?? "", name: profile.name }}
                                 size={44}
                             />

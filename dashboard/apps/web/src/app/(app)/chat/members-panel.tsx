@@ -305,7 +305,7 @@ function MemberRow({
                     // a pill around a name to look like a mistake.
                     style={plate ? nameplateCss(plate) : undefined}
                 >
-                    <Avatar person={{ id: member.userId, name: member.name }} size={28} />
+                    <Avatar decorated person={{ id: member.userId, name: member.name }} size={28} />
                     <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1">
                             <PersonName

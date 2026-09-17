@@ -106,6 +106,7 @@ export function ProfileCard({
                             their photo, and asking through the face would have
                             tied the two together. */}
                         <Avatar
+                            decorated
                             person={profile.showsAvatar ? person : { id: null, name: profile.name }}
                             size={72}
                             presence={where?.status}

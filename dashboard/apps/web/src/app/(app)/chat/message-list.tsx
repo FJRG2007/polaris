@@ -804,6 +804,7 @@ function Message({
                             <span className="inline-flex">
                                 <Avatar
                                     openable
+                                    decorated
                                     person={{ id: message.authorId, name: author }}
                                     size={28}
                                 />
