@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { openDirectAction } from "../../actions";
-import { EmptyState, Skeleton } from "@polaris/ui";
+import { Button, EmptyState, Skeleton } from "@polaris/ui";
 
 export function OpenDirect({ userId }: { userId: string }) {
     const router = useRouter();
@@ -33,6 +34,11 @@ export function OpenDirect({ userId }: { userId: string }) {
                     icon={<MessageCircle />}
                     title="No conversation to open."
                     description={error}
+                    action={
+                        <Button asChild size="sm" variant="secondary">
+                            <Link href="/chat">Back to conversations</Link>
+                        </Button>
+                    }
                 />
             </div>
         );

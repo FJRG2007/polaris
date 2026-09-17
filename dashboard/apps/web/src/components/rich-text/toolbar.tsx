@@ -92,7 +92,9 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                         placeholder="Paste a link"
                         onChange={(event) => setHref(event.target.value)}
                         onKeyDown={(event) => {
-                            if (event.key === "Escape") setLinking(false);
+                            if (event.key !== "Escape") return;
+                            event.preventDefault();
+                            setLinking(false);
                         }}
                         className="h-7 w-56 rounded border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
