@@ -27,9 +27,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.CommandEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -69,6 +73,14 @@ import polaris.minecraft.PolarisClient.Reply;
 final class LoginGate {
     private static final int SECOND = 20;
     private static final int LOGIN_TICKS = 60 * SECOND;
+    /** How long after a release the fall they did not choose is forgiven. Long
+     *  enough to reach the ground from a floor that was blown out from under the
+     *  spot they logged out on, short enough that a real fall later is their own. */
+    private static final int LANDING_TICKS = 10 * SECOND;
+    /** The loan of flight this gate makes while it holds somebody, named so it can
+     *  be taken back without touching what anything else gave them. */
+    private static final ResourceLocation HOLD_FLIGHT =
+            ResourceLocation.fromNamespaceAndPath("polaris", "login_hold");
     private static final int HEARTBEAT_TICKS = 60 * SECOND;
     private static final int REMINDER_TICKS = 3 * SECOND;
     /** How long the title stays up. Longer than the reminder, which puts it back
@@ -92,6 +104,9 @@ final class LoginGate {
     private final PolarisClient client;
     private final String modVersion;
     private final Map<UUID, Held> held = new HashMap<>();
+    /** Players let go over a hole, and the tick their fall stops being this
+     *  gate's fault. Empty on a server where nothing was ever held. */
+    private final Map<UUID, Long> landing = new HashMap<>();
     private MinecraftServer server;
     private boolean guarding;
     private long tick;
@@ -113,6 +128,20 @@ final class LoginGate {
         /** Whether the darkness on their screen is this gate's, and so this gate's
          *  to lift. */
         boolean darkened;
+        /**
+         * Whether this gate allowed them to stay in the air, and what they could
+         * do before it did.
+         *
+         * A held player is pinned to the spot they joined on, and that spot is not
+         * always still above a floor: a block broken, a creeper, or anything else
+         * that happened while they were away leaves them hanging in mid-air, which
+         * the server reads as flying and ends by throwing them out - for a player
+         * who has not moved and cannot move. So they are lent the flight this
+         * game keeps as an attribute for as long as they are held, and it is
+         * taken back - by its own name, leaving anything else alone - the moment
+         * they are let go.
+         */
+        boolean aloft;
         /** The time left, across the top of their screen. Updated in place every
          *  second, so it never has to be said in the chat. */
         final ServerBossEvent countdown = new ServerBossEvent(
@@ -230,6 +259,7 @@ final class LoginGate {
         }
         Held waiting = new Held(player.position(), tick + LOGIN_TICKS);
         held.put(player.getUUID(), waiting);
+        hold(player, waiting);
         if (config.state() != PolarisConfig.State.ON) {
             clearOurs(player);
             waiting.kick = NOT_SET_UP;
@@ -263,8 +293,13 @@ final class LoginGate {
         if (waiting == null) return;
         waiting.countdown.removeAllPlayers();
         // Lifted before the player is saved, or they would wake up in the dark on
-        // their next join with nothing to say it was this gate's.
-        if (event.getEntity() instanceof ServerPlayer player) lighten(player, waiting);
+        // their next join with nothing to say it was this gate's - and the same
+        // for the flight they were lent, which is not theirs to keep.
+        if (event.getEntity() instanceof ServerPlayer player) {
+            lighten(player, waiting);
+            letGo(player, waiting);
+        }
+        landing.remove(event.getEntity().getUUID());
     }
 
     /** The title for what this player has to do next, sent again before it fades. */
@@ -288,6 +323,7 @@ final class LoginGate {
         Held waiting = held.remove(player.getUUID());
         if (waiting != null) {
             lighten(player, waiting);
+            letGo(player, waiting);
             waiting.countdown.removeAllPlayers();
         }
         player.connection.send(new ClientboundClearTitlesPacket(true));
@@ -544,11 +580,59 @@ final class LoginGate {
         if (waiting.registered != null) prompt(player, waiting);
     }
 
+    /**
+     * Let a held player hang where they joined.
+     *
+     * Without this the server's own flight check counts the seconds a player
+     * spends off the ground and disconnects them for flying - and a player held
+     * over a hole that was not there when they logged out is exactly that: off
+     * the ground, not moving, and not able to do anything about it.
+     */
+    private static void hold(ServerPlayer player, Held waiting) {
+        AttributeInstance flight = player.getAttribute(NeoForgeMod.CREATIVE_FLIGHT);
+        if (flight == null) return;
+        waiting.aloft = true;
+        // Transient, so it is never written to the player's file: a server stopped
+        // mid-login cannot bring anybody back able to fly.
+        flight.addOrUpdateTransientModifier(
+                new AttributeModifier(HOLD_FLIGHT, 1.0, AttributeModifier.Operation.ADD_VALUE));
+        player.onUpdateAbilities();
+    }
+
+    /**
+     * Give back what they could do, and forgive the fall they did not choose.
+     *
+     * Restored from what was read at the join rather than set to anything in
+     * particular, so a player in creative keeps their flight and a player in
+     * survival loses it - and, because a logout saves the player after this
+     * event, nobody is ever saved mid-login with flight they were only lent.
+     */
+    private void letGo(ServerPlayer player, Held waiting) {
+        if (!waiting.aloft) return;
+        waiting.aloft = false;
+        AttributeInstance flight = player.getAttribute(NeoForgeMod.CREATIVE_FLIGHT);
+        // Only this gate's own loan is taken back, by its own id: a player in
+        // creative, or one another mod let fly, keeps what that gave them.
+        if (flight != null) flight.removeModifier(HOLD_FLIGHT);
+        player.onUpdateAbilities();
+        player.resetFallDistance();
+        landing.put(player.getUUID(), tick + LANDING_TICKS);
+    }
+
     @SubscribeEvent
     public void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         Held waiting = held.get(player.getUUID());
-        if (waiting == null) return;
+        if (waiting == null) {
+            // Just let go, and on the way down from where they were held: the
+            // drop is this gate's doing, so the damage at the bottom of it is
+            // not theirs to take.
+            Long until = landing.get(player.getUUID());
+            if (until == null) return;
+            if (tick > until || player.onGround()) landing.remove(player.getUUID());
+            else player.resetFallDistance();
+            return;
+        }
         player.resetFallDistance();
         if (player.position().distanceToSqr(waiting.anchor) > 0.01) {
             player.connection.teleport(waiting.anchor.x, waiting.anchor.y, waiting.anchor.z,

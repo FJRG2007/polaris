@@ -73,6 +73,10 @@ final class LoginGate implements Listener, CommandExecutor {
     private static final int TITLE_TICKS = 5 * SECOND;
     /** When the bar turns red. */
     private static final int HURRY_SECONDS = 10;
+    /** How long after a release the fall they did not choose is forgiven. Long
+     *  enough to reach the ground from a floor that was blown out from under the
+     *  spot they logged out on, short enough that a real fall later is their own. */
+    private static final int LANDING_TICKS = 10 * SECOND;
     private static final int MAX_WRONG = 3;
     private static final int MIN_PASSWORD = 6;
     private static final int MAX_PASSWORD = 64;
@@ -90,6 +94,9 @@ final class LoginGate implements Listener, CommandExecutor {
     private final PolarisClient client;
     private final String version;
     private final Map<UUID, Held> held = new ConcurrentHashMap<>();
+    /** Players let go over a hole, and the tick their fall stops being this
+     *  gate's fault. Empty on a server where nothing was ever held. */
+    private final Map<UUID, Long> landing = new ConcurrentHashMap<>();
     private BukkitTask ticker;
     private boolean guarding;
     private long tick;
@@ -110,6 +117,21 @@ final class LoginGate implements Listener, CommandExecutor {
         /** Whether the darkness on their screen is this gate's, and so this gate's
          *  to lift. */
         boolean darkened;
+        /**
+         * Whether this gate allowed them to stay in the air, and what they could
+         * do before it did.
+         *
+         * A held player stands on the spot they joined on, and that spot is not
+         * always still above a floor: a block broken, a creeper, or anything else
+         * that happened while they were away leaves them hanging in mid-air, which
+         * the server reads as flying and ends by throwing them out - for a player
+         * who has not moved and cannot move. So they are allowed to fly for as
+         * long as they are held, and given back exactly what they had the moment
+         * they are let go.
+         */
+        boolean aloft;
+        boolean couldFly;
+        boolean wasFlying;
 
         Held(Location anchor, long deadline, BossBar bar) {
             this.anchor = anchor;
@@ -153,6 +175,7 @@ final class LoginGate implements Listener, CommandExecutor {
             if (player != null) lighten(player, entry.getValue());
         }
         held.clear();
+        landing.clear();
     }
 
     private void onTick() {
@@ -170,6 +193,16 @@ final class LoginGate implements Listener, CommandExecutor {
             } else {
                 if (tick % SECOND == 0) countdown(waiting);
                 if (tick % (TITLE_TICKS - SECOND) == 0) titleFor(player, waiting);
+            }
+        }
+        // The players on their way down from where this gate held them: the drop
+        // is its doing, so the damage at the bottom of it is not theirs to take.
+        for (Map.Entry<UUID, Long> entry : new ArrayList<>(landing.entrySet())) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || tick > entry.getValue()) {
+                landing.remove(entry.getKey());
+            } else {
+                player.setFallDistance(0f);
             }
         }
     }
@@ -225,6 +258,7 @@ final class LoginGate implements Listener, CommandExecutor {
         BossBar bar = Bukkit.createBossBar(secondsLeft(LOGIN_TICKS / SECOND), BarColor.YELLOW, BarStyle.SOLID);
         Held waiting = new Held(player.getLocation(), tick + LOGIN_TICKS, bar);
         held.put(player.getUniqueId(), waiting);
+        lift(player, waiting);
         if (config.state() != PolarisConfig.State.ON) {
             clearOurs(player);
             waiting.kick = NOT_SET_UP;
@@ -256,13 +290,51 @@ final class LoginGate implements Listener, CommandExecutor {
         Held waiting = held.get(event.getPlayer().getUniqueId());
         forget(event.getPlayer().getUniqueId());
         // Lifted before the player is saved, or they would wake up in the dark on
-        // their next join with nothing to say it was this gate's.
-        if (waiting != null) lighten(event.getPlayer(), waiting);
+        // their next join with nothing to say it was this gate's - and the same
+        // for the flight they were lent, which is not theirs to keep.
+        if (waiting != null) {
+            lighten(event.getPlayer(), waiting);
+            drop(event.getPlayer(), waiting);
+        }
+        landing.remove(event.getPlayer().getUniqueId());
     }
 
     private void forget(UUID id) {
         Held waiting = held.remove(id);
         if (waiting != null) waiting.bar.removeAll();
+    }
+
+    /**
+     * Let a held player hang where they joined.
+     *
+     * Without this the server's own flight check counts the ticks a player spends
+     * off the ground and disconnects them for flying - and a player held over a
+     * hole that was not there when they logged out is exactly that: off the
+     * ground, not moving, and unable to do anything about it.
+     */
+    private static void lift(Player player, Held waiting) {
+        waiting.couldFly = player.getAllowFlight();
+        waiting.wasFlying = player.isFlying();
+        waiting.aloft = true;
+        player.setAllowFlight(true);
+        player.setFlying(true);
+    }
+
+    /**
+     * Give back what they could do, and forgive the fall they did not choose.
+     *
+     * Restored from what was read at the join rather than set to anything in
+     * particular, so a player in creative keeps their flight and a player in
+     * survival loses it - and, because a quit is handled before the player is
+     * saved, nobody is ever saved mid-login with flight they were only lent.
+     */
+    private void drop(Player player, Held waiting) {
+        if (!waiting.aloft) return;
+        waiting.aloft = false;
+        player.setFlying(waiting.couldFly && waiting.wasFlying);
+        player.setAllowFlight(waiting.couldFly);
+        player.setFallDistance(0f);
+        landing.put(player.getUniqueId(), tick + LANDING_TICKS);
     }
 
     /** The bar across the top: how long is left, draining, red at the end. */
@@ -298,7 +370,10 @@ final class LoginGate implements Listener, CommandExecutor {
     private void release(Player player, String message) {
         Held waiting = held.get(player.getUniqueId());
         forget(player.getUniqueId());
-        if (waiting != null) lighten(player, waiting);
+        if (waiting != null) {
+            lighten(player, waiting);
+            drop(player, waiting);
+        }
         player.resetTitle();
         player.sendMessage(ChatColor.GREEN + message);
     }
