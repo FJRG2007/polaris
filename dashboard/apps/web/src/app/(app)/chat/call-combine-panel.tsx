@@ -76,6 +76,9 @@ export function CombineStrip({ call }: { call: CallState }) {
         );
     }
 
+    // Two people cannot combine: they are the whole call.
+    if (!call.combineOpen) return null;
+
     const admitted = new Set(
         (call.meeting?.participants ?? [])
             .filter((person) => person.admission === "admitted")
@@ -149,7 +152,7 @@ function Strip({
  */
 export function CombineRequestDialog({ call }: { call: CallState }) {
     const asking = call.combineRequest;
-    if (!asking) return null;
+    if (!asking || !call.combineOpen) return null;
     const name = nameOf(call, asking.from);
 
     return (

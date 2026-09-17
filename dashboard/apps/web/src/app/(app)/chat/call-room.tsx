@@ -232,7 +232,10 @@ export function CallRoom({
             sameRoom: quiet,
             onCombine: () => call.combineWith(personId),
             onAskCombine: () => call.askToCombine(personId),
-            combineAsked: call.combineAsked === personId
+            combineAsked: call.combineAsked === personId,
+            // Offered but greyed out with two people: the two devices would be
+            // the whole call. Follows the roster live - see `combineOffered`.
+            combineLocked: !call.combineOpen
         };
     };
     /** What this person has reacted with in the last few seconds. Grouped here
@@ -1375,6 +1378,7 @@ function PersonMenu({
     onCombine,
     onAskCombine,
     combineAsked = false,
+    combineLocked = false,
     children
 }: {
     name: string;
@@ -1386,6 +1390,8 @@ function PersonMenu({
     onCombine?: () => void;
     onAskCombine?: () => void;
     combineAsked?: boolean;
+    /** Whether the call is too small to combine in, which disables both. */
+    combineLocked?: boolean;
     children: React.ReactNode;
 }) {
     const [volume, setVolume] = useCallVolume(volumeKey);
@@ -1456,16 +1462,24 @@ function PersonMenu({
                     machine where listening for the room is switched off. */}
                 {(onCombine || onAskCombine) && <ContextMenuSeparator />}
                 {onCombine && (
-                    <ContextMenuItem onSelect={onCombine}>
+                    <ContextMenuItem onSelect={onCombine} disabled={combineLocked}>
                         <Headphones className="size-3.5" />
                         Use their audio
                     </ContextMenuItem>
                 )}
                 {onAskCombine && (
-                    <ContextMenuItem onSelect={onAskCombine} disabled={combineAsked}>
+                    <ContextMenuItem
+                        onSelect={onAskCombine}
+                        disabled={combineAsked || combineLocked}
+                    >
                         <Users className="size-3.5" />
                         {combineAsked ? "Asked to combine" : "Ask them to combine audio"}
                     </ContextMenuItem>
+                )}
+                {(onCombine || onAskCombine) && combineLocked && (
+                    <p className="px-2 pb-1 text-xs text-muted-foreground">
+                        Needs at least three people in the call.
+                    </p>
                 )}
             </ContextMenuContent>
         </ContextMenu>
@@ -1500,6 +1514,7 @@ function Face({
     onCombine,
     onAskCombine,
     combineAsked = false,
+    combineLocked = false,
     volumeKey
 }: {
     name: string;
@@ -1519,6 +1534,7 @@ function Face({
     onCombine?: () => void;
     onAskCombine?: () => void;
     combineAsked?: boolean;
+    combineLocked?: boolean;
     /** Who this face's volume is remembered against. Absent on your own, which
      *  has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -1593,6 +1609,7 @@ function Face({
             onCombine={onCombine}
             onAskCombine={onAskCombine}
             combineAsked={combineAsked}
+            combineLocked={combineLocked}
         >
             {face}
         </PersonMenu>
@@ -1622,6 +1639,7 @@ function Tile({
     onCombine,
     onAskCombine,
     combineAsked = false,
+    combineLocked = false,
     volumeKey
 }: {
     stream: MediaStream | null;
@@ -1677,6 +1695,7 @@ function Tile({
     onCombine?: () => void;
     onAskCombine?: () => void;
     combineAsked?: boolean;
+    combineLocked?: boolean;
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -2016,6 +2035,7 @@ function Tile({
             onCombine={onCombine}
             onAskCombine={onAskCombine}
             combineAsked={combineAsked}
+            combineLocked={combineLocked}
         >
             {tile}
         </PersonMenu>

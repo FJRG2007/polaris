@@ -74,6 +74,7 @@ import {
     AUDIO_GROUP,
     audioPlan,
     combineMessageSchema,
+    combineOffered,
     type AudioRole,
     type CombineMessage,
     type CombineRequest
@@ -378,6 +379,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [combineAsked, setCombineAsked] = useState<string | null>(null);
     const [combineRequest, setCombineRequest] = useState<CombineRequest | null>(null);
     const [nearby, setNearby] = useState<ReadonlySet<string>>(new Set());
+    /** How many other people are on the media connection, for `combineOpen`. */
+    const [connected, setConnected] = useState(0);
     /** Whether this browser is telling the room it is recording. What is being
      *  written lives in `call-recorder`; this is the half everybody can see. */
     const [recording, setRecordingSaid] = useState(false);
@@ -773,6 +776,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
         setRemote((held) => settle(held, faces));
         setScreens((held) => settle(held, shared));
+        setConnected(current.remoteParticipants.size);
     }, []);
 
     /** What everybody's controls are set to: what they say about themselves,
@@ -1072,6 +1076,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setError("");
         setRemote(new Map());
         setScreens(new Map());
+        setConnected(0);
         setStates(new Map());
         setSpeaking(new Set());
         // The screen is reset, unlike the microphone and camera, because
@@ -1742,13 +1747,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * their microphone and their speakers, and a call where anybody can silence
      * anybody from a menu is not a call.
      */
+    const seated =
+        meeting?.participants.filter((person) => person.admission === "admitted").length ?? 0;
+    const combineOpen = combineOffered(seated, connected);
+
     const askToCombine = useCallback(
         (participantId: string) => {
+            if (!combineOpen) return;
             setCombineAsked(participantId);
             tell(participantId, { kind: "combine-ask" });
         },
-        [tell]
+        [combineOpen, tell]
     );
+
+    // Down to two people, whatever was pending is moot: a question on screen
+    // about combining with the only other person in the call has one answer.
+    useEffect(() => {
+        if (combineOpen) return;
+        setCombineAsked(null);
+        setCombineRequest(null);
+    }, [combineOpen]);
 
     /** Answer whoever asked. Yes is this browser pointing at them, which they
      *  see for themselves; no is the one message that has to be sent, or their
@@ -2931,6 +2949,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         audioRole,
         audioHost,
         audioMembers,
+        combineOpen,
         combineAsked,
         combineRequest,
         combineWith,

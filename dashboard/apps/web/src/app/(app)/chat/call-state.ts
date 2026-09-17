@@ -150,6 +150,9 @@ export interface CallState {
     readonly audioHost: string | null;
     /** The other seats in the group. */
     readonly audioMembers: readonly string[];
+    /** Whether combining is offered right now: only with three or more people
+     *  in the call - see `combineOffered`. */
+    readonly combineOpen: boolean;
     /** Somebody this browser has asked to go quiet, until they answer. */
     readonly combineAsked: string | null;
     /** Somebody asking this browser to go quiet, until it answers. */
