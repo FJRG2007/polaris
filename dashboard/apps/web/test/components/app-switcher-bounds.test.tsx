@@ -16,9 +16,27 @@ import { cleanup, render, screen } from "@testing-library/react";
 afterEach(cleanup);
 
 const APPS = [
-    { id: "drive", label: "Drive", description: "Files across every NAS", icon: Files, href: "/drive" },
-    { id: "mail", label: "Mail", description: "Your mailboxes, read and answered here", icon: Mail, href: "/mail" },
-    { id: "watch", label: "Watch", description: "Alarms on app health, spikes and outages", icon: Bell, href: "/watch" }
+    {
+        id: "drive",
+        label: "Drive",
+        description: "Files across every NAS",
+        icon: Files,
+        href: "/drive"
+    },
+    {
+        id: "mail",
+        label: "Mail",
+        description: "Your mailboxes, read and answered here",
+        icon: Mail,
+        href: "/mail"
+    },
+    {
+        id: "watch",
+        label: "Watch",
+        description: "Alarms on app health, spikes and outages",
+        icon: Bell,
+        href: "/watch"
+    }
 ];
 
 describe("the app switcher's surface", () => {

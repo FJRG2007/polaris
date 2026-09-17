@@ -43,9 +43,7 @@ describe("AvatarStack", () => {
     });
 
     it("counts a face and the rest as overlapping", () => {
-        const markup = renderToStaticMarkup(
-            <AvatarStack people={[ADA, ALAN]} max={1} size={20} />
-        );
+        const markup = renderToStaticMarkup(<AvatarStack people={[ADA, ALAN]} max={1} size={20} />);
         expect(wrappers(markup)[0]).toContain("ring-2");
         expect(markup).toContain("+1");
     });
