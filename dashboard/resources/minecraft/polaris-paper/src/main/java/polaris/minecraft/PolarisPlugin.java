@@ -35,5 +35,6 @@ public final class PolarisPlugin extends JavaPlugin {
     public void onDisable() {
         if (gate != null) gate.stop();
         gate = null;
+        CommandLogFilter.uninstall();
     }
 }

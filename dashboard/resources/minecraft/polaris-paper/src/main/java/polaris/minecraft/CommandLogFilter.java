@@ -20,19 +20,27 @@ final class CommandLogFilter extends AbstractFilter {
             "issued server command: /(?:polaris:)?(?:login|register|changepassword)(?:\\s|$)",
             Pattern.CASE_INSENSITIVE);
 
-    private static boolean installed;
+    private static CommandLogFilter active;
 
     private CommandLogFilter() {
         super(Filter.Result.NEUTRAL, Filter.Result.NEUTRAL);
     }
 
-    /** Once per server run; a plugin reload must not stack a second one. */
+    /** One at a time; {@link #uninstall()} takes it off again before a reload loads a new copy. */
     static synchronized void install() {
-        if (installed) return;
+        if (active != null) return;
         if (LogManager.getRootLogger() instanceof Logger root) {
-            root.addFilter(new CommandLogFilter());
-            installed = true;
+            active = new CommandLogFilter();
+            root.addFilter(active);
         }
+    }
+
+    static synchronized void uninstall() {
+        if (active == null) return;
+        if (LogManager.getRootLogger() instanceof Logger root) {
+            root.getContext().getConfiguration().getRootLogger().removeFilter(active);
+        }
+        active = null;
     }
 
     @Override

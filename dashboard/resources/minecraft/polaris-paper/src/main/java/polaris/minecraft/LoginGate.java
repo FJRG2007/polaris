@@ -140,7 +140,7 @@ final class LoginGate implements Listener, CommandExecutor {
         Bukkit.getPluginManager().registerEvents(this, plugin);
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::onTick, 1, 1);
         // A reload leaves players online who never passed through this gate.
-        for (Player player : Bukkit.getOnlinePlayers()) hold(player);
+        if (guarding) for (Player player : Bukkit.getOnlinePlayers()) hold(player);
         heartbeat();
     }
 
