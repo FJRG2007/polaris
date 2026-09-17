@@ -3492,6 +3492,25 @@ model PlayerInventorySnapshot {
     @@index([installedAppId])
 }
 
+// The last experience level Polaris saw a player on.
+//
+// A level can only be asked of somebody standing on the server, so the column
+// was a dash for everyone offline - which is nearly everyone, most of the time.
+// Kept from the last time they were on, with when that was, so the table says
+// what it knew rather than nothing.
+model GamePlayerStat {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // As the server reported it; looked up case-insensitively.
+    username       String
+    level          Int
+    // When the server was last asked, not when the row was written.
+    levelAt        DateTime
+
+    @@unique([installedAppId, username])
+    @@index([installedAppId])
+}
+
 // Something an operator decided that the server could not be told yet.
 //
 // Giving an item needs the player standing there; banning only needs the server

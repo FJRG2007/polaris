@@ -52,6 +52,8 @@ function table(props: {
     passwords: { name: string; lastLoginAt: string | null }[] | null;
     canResetPasswords?: boolean;
     onPasswordsChanged?: () => void;
+    levels?: Record<string, number>;
+    lastLevels?: Record<string, { level: number; at: string }>;
 }) {
     render(
         <MinecraftPlayers
@@ -65,6 +67,7 @@ function table(props: {
             now={Date.now()}
             timeouts={[]}
             levels={{}}
+            lastLevels={{}}
             pending={[]}
             onChanged={vi.fn()}
             {...props}
@@ -125,5 +128,21 @@ describe("passwords in the players table", () => {
         await user.click(within(rowOf("Steve")).getByRole("button", { name: "More for Steve" }));
         await screen.findByRole("menu");
         expect(screen.queryByRole("menuitem", { name: /Reset password/ })).toBeNull();
+    });
+});
+
+describe("levels in the players table", () => {
+    it("shows the live level of somebody on, and the last one of somebody away", () => {
+        table({
+            passwords: null,
+            levels: { Steve: 30 },
+            lastLevels: {
+                steve: { level: 12, at: "2026-09-16T10:00:00.000Z" },
+                alex: { level: 7, at: "2026-09-15T10:00:00.000Z" }
+            }
+        });
+        expect(within(rowOf("Steve")).getByText("30")).toBeTruthy();
+        const away = within(rowOf("Alex")).getByText("7");
+        expect(away.getAttribute("title")).toContain("Level 7 when last seen");
     });
 });

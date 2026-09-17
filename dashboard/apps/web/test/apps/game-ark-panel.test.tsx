@@ -50,6 +50,9 @@ function context(overrides: Partial<GameContext> = {}): GameContext {
         schedule: { enabled: false, timezone: "UTC", otherwise: "on", idleMinutes: 30, windows: [] },
         scheduleState: { checkedAt: null, emptySince: null },
         playerAccess: null,
+        rosterMemory: null,
+        lastLevels: {},
+        login: null,
         gamePort: 19133,
         queryPort: 19135,
         arkAccess: {

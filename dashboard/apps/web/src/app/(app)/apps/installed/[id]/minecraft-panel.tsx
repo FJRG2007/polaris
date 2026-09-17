@@ -50,6 +50,7 @@ import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import type { RememberedLevel } from "@/lib/apps/minecraft/level-memory";
 import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { findBlueprint, hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
@@ -126,6 +127,9 @@ interface ServerReading {
     /** What experience level each player who is on right now has reached. Only the
      *  moderation screen asks for it, and only Java can answer. */
     levels: Readonly<Record<string, number>>;
+    /** The level each player was last seen on, for the rows of players who are
+     *  not on right now. */
+    lastLevels: Readonly<Record<string, RememberedLevel>>;
     /** Decisions the server could not be told yet. */
     pending: readonly QueuedAction[];
 }
@@ -183,11 +187,15 @@ export function MinecraftPanel({
     // Seeded with what the page already knew, so the list of who may join is on
     // screen before a request goes out. Only what the server itself has to answer -
     // who is playing, the roster, the log - waits on the poll.
+    //
+    // The roster is Polaris's own note of what the server last said, dated, so
+    // the crown and every row's standing paint with the page; the poll replaces
+    // it with the server's answer as soon as there is one.
     const [reading, setReading] = useState<ServerReading>({
         status: null,
         reach: null,
-        roster: null,
-        rosterAsOf: null,
+        roster: game?.rosterMemory?.roster ?? null,
+        rosterAsOf: game?.rosterMemory?.at ?? null,
         rosterSeenAt: null,
         firewall: null,
         access: game?.playerAccess ?? null,
@@ -196,6 +204,7 @@ export function MinecraftPanel({
         now: Date.now(),
         timeouts: [],
         levels: {},
+        lastLevels: game?.lastLevels ?? {},
         pending: []
     });
     const [error, setError] = useState<string | null>(null);
@@ -224,6 +233,7 @@ export function MinecraftPanel({
                 seen?: Record<string, PlayerSeen>;
                 timeouts?: PlayerTimeout[];
                 levels?: Record<string, number>;
+                lastLevels?: Record<string, RememberedLevel>;
                 pending?: QueuedAction[];
                 now?: string;
                 error?: string;
@@ -238,7 +248,9 @@ export function MinecraftPanel({
                 // Kept when a poll could not work it out, rather than dropped back
                 // to the page's: the warning would flicker on every failed read.
                 reach: data.reach ?? current.reach,
-                roster: data.roster ?? (wantsRoster ? current.roster : null),
+                // Kept rather than dropped on a screen that did not ask: it is
+                // what the next visit to the players tab paints with.
+                roster: data.roster ?? current.roster,
                 // Taken as it was sent rather than defaulted against what is
                 // held: null is a real answer here - it means the roster above
                 // came from the server just now - and `??` would read it as
@@ -252,13 +264,15 @@ export function MinecraftPanel({
                 // a failed write is silent - this falls back to when this screen
                 // last saw a live one. A stale roster with no date under it is
                 // the whole failure this set out to remove.
+                // A screen that did not ask keeps the roster it holds, dated, so
+                // the players tab paints with it when it is opened.
                 rosterAsOf: !wantsRoster
-                    ? null
+                    ? (current.rosterAsOf ?? current.rosterSeenAt)
                     : data.roster
                       ? (data.rosterAsOf ?? null)
                       : (data.rosterAsOf ?? current.rosterAsOf ?? current.rosterSeenAt),
                 rosterSeenAt: !wantsRoster
-                    ? null
+                    ? current.rosterSeenAt
                     : data.roster && !data.rosterAsOf
                       ? (data.now ?? new Date().toISOString())
                       : current.rosterSeenAt,
@@ -291,6 +305,7 @@ export function MinecraftPanel({
                 // Kept between polls of the same screen so the column does not
                 // blink empty on a read the server was too busy to answer.
                 levels: data.levels ?? (wantsRoster ? current.levels : {}),
+                lastLevels: data.lastLevels ?? current.lastLevels,
                 now: data.now ? Date.parse(data.now) : current.now
             }));
             // The header's Start and Stop, and everything else the page rendered on
@@ -356,6 +371,7 @@ export function MinecraftPanel({
     const edition = game?.edition ?? status?.edition ?? "java";
     const login = useLoginState(
         installedAppId,
+        game?.login ?? null,
         edition === "java" && hasBuildFor(software),
         LOGIN_REFRESH_MS
     );
@@ -373,6 +389,7 @@ export function MinecraftPanel({
         <div className="flex flex-col gap-4">
             <ConnectCard
                 status={status}
+                address={status?.address ?? game?.address ?? null}
                 running={isRunning}
                 settings={settings}
                 installedAppId={installedAppId}
@@ -459,6 +476,7 @@ export function MinecraftPanel({
                     now={reading.now}
                     timeouts={reading.timeouts}
                     levels={reading.levels}
+                    lastLevels={reading.lastLevels}
                     pending={reading.pending}
                     passwords={loginOn ? (login.state?.players ?? []) : null}
                     canResetPasswords={canManage}
@@ -569,7 +587,7 @@ export function MinecraftPanel({
                         installedAppId={installedAppId}
                         hostname={game?.hostname ?? null}
                         suffix={game?.suffix ?? null}
-                        address={status?.address ?? null}
+                        address={status?.address ?? game?.address ?? null}
                         routed={game?.routed ?? false}
                         canRoute={game?.canRoute ?? false}
                     />
@@ -606,6 +624,7 @@ export function MinecraftPanel({
  *  this page came for - plus what the server is doing right now. */
 function ConnectCard({
     status,
+    address,
     running,
     settings,
     installedAppId,
@@ -617,6 +636,9 @@ function ConnectCard({
     onOpenConsole
 }: {
     status: MinecraftStatus | null;
+    /** What players type. Known from Polaris's own records before the server is
+     *  asked anything, so it paints with the page. */
+    address: string | null;
     running: boolean;
     settings: InstalledAppSetting[];
     installedAppId: string;
@@ -672,15 +694,15 @@ function ConnectCard({
             <CardBody className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex min-w-0 flex-col gap-1">
                     <span className="text-xs text-muted-foreground">Server address</span>
-                    {status === null ? (
-                        <Skeleton className="h-7 w-48" />
-                    ) : status.address ? (
+                    {address ? (
                         <div className="flex items-center gap-2">
-                            <code className="truncate font-mono text-lg" title={status.address}>
-                                {status.address}
+                            <code className="truncate font-mono text-lg" title={address}>
+                                {address}
                             </code>
-                            <CopyButton value={status.address} label="Copy the server address" />
+                            <CopyButton value={address} label="Copy the server address" />
                         </div>
+                    ) : status === null ? (
+                        <Skeleton className="h-7 w-48" />
                     ) : (
                         <span className="text-sm text-muted-foreground">
                             Not published yet - the address appears once the server has deployed.

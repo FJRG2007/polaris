@@ -30,6 +30,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import type { RememberedLevel } from "@/lib/apps/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
@@ -115,6 +116,7 @@ export function MinecraftPlayers({
     now,
     timeouts,
     levels,
+    lastLevels,
     pending: waiting,
     passwords,
     canResetPasswords,
@@ -147,6 +149,9 @@ export function MinecraftPlayers({
     /** What experience level each player who is on has reached, by name. Only
      *  players standing on the server have one, and only Java can be asked. */
     levels: Readonly<Record<string, number>>;
+    /** The level each player was last seen on, for the rows of players who are
+     *  not on right now. */
+    lastLevels: Readonly<Record<string, RememberedLevel>>;
     /** Decisions the server could not be told yet, oldest first. */
     pending: readonly QueuedAction[];
     /** Who has a Polaris login password here, or null on a server that does not
@@ -198,6 +203,13 @@ export function MinecraftPlayers({
         [known, applied]
     );
     const registered = access?.rules.length ?? 0;
+    // Folded to lower case, because the server reports a name the way it stored
+    // it and the table may be drawing it the way the operator typed it.
+    const remembered = useMemo(
+        () =>
+            new Map(Object.entries(lastLevels).map(([name, value]) => [name.toLowerCase(), value])),
+        [lastLevels]
+    );
     const onlineNames = useMemo(
         () => players.filter((player) => player.online).map((player) => player.name),
         [players]
@@ -545,6 +557,7 @@ export function MinecraftPlayers({
                         onModerateWithConfirm={moderateWithConfirm}
                         onGamemode={setGamemode}
                         level={levels[player.name] ?? null}
+                        lastLevel={remembered.get(player.name.toLowerCase()) ?? null}
                         timeout={timeoutFor(timeouts, player.name)}
                         waiting={
                             waiting.filter(
@@ -712,6 +725,7 @@ function PlayerRow({
     pending,
     timeout,
     level,
+    lastLevel,
     waiting,
     onModerate,
     onModerateWithConfirm,
@@ -734,6 +748,9 @@ function PlayerRow({
     /** The experience level they are on, or null for somebody who is not standing
      *  on the server - nobody who is away has one to report. */
     level: number | null;
+    /** The level they were on the last time they were, for somebody who is not
+     *  on now. */
+    lastLevel: RememberedLevel | null;
     /** How many decisions are still waiting to reach this player. */
     waiting: number;
     onModerate: (input: Omit<MinecraftModeration, "installedAppId">) => void;
@@ -754,6 +771,7 @@ function PlayerRow({
     // Every verb below is an RCON command, so none of them exist while the server
     // is not answering. Registering and unregistering are Polaris' own and do.
     const live = answering && !pending;
+    const format = useDisplayFormat();
 
     return (
         <tr
@@ -777,11 +795,19 @@ function PlayerRow({
                 )}
             </td>
             {/* Only the players who are standing on the server have a level to
-                report: it is read out of the running world, not out of a file. A
-                dash against somebody who is away is the truth rather than a gap. */}
+                report: it is read out of the running world, not out of a file. For
+                somebody who is away it is the one they were last seen on, muted and
+                dated, and a dash only when Polaris has never seen one. */}
             {!bedrock && (
                 <td className="px-3 py-2 tabular-nums">
-                    {level === null ? (
+                    {level === null && lastLevel !== null ? (
+                        <span
+                            className="text-muted-foreground"
+                            title={`Level ${lastLevel.level} when last seen, ${format.dateTime(lastLevel.at)}`}
+                        >
+                            {lastLevel.level}
+                        </span>
+                    ) : level === null ? (
                         <span
                             className="text-muted-foreground"
                             title={

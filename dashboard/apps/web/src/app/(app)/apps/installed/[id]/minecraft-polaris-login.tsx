@@ -31,19 +31,31 @@ const snapshotKey = (installedAppId: string) => `minecraft-login:${installedAppI
 export type LoginStateHandle = ReturnType<typeof useLoginState>;
 
 /**
- * The mod's state on one server, read when `enabled`, from cache first.
+ * The mod's state on one server, read when `enabled`.
  *
- * `refreshMs` reads it again on that interval, for a screen that has to notice
- * the server checking in after a restart.
+ * `initial` is what the page was rendered with, so the first paint already has
+ * it; without one, the last answer this tab kept is used, read after hydration
+ * so the server's markup and the browser's first render agree. `refreshMs` reads
+ * it again on that interval, for a screen that has to notice the server checking
+ * in after a restart.
  */
-export function useLoginState(installedAppId: string, enabled: boolean, refreshMs?: number) {
-    const [state, setState] = useState<LoginState | null>(() =>
-        enabled
-            ? (readSnapshot<LoginState>(snapshotKey(installedAppId), SNAPSHOT_MS)?.value ?? null)
-            : null
-    );
+export function useLoginState(
+    installedAppId: string,
+    initial: LoginState | null,
+    enabled: boolean,
+    refreshMs?: number
+) {
+    const [state, setState] = useState<LoginState | null>(enabled ? initial : null);
     const [loaded, setLoaded] = useState(state !== null);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!enabled || initial) return;
+        const kept = readSnapshot<LoginState>(snapshotKey(installedAppId), SNAPSHOT_MS)?.value;
+        if (!kept) return;
+        setState((current) => current ?? kept);
+        setLoaded(true);
+    }, [enabled, initial, installedAppId]);
 
     const reload = useCallback(async () => {
         const result = await loginStateAction(installedAppId);
