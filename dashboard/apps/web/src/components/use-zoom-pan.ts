@@ -8,7 +8,7 @@
  * call - which is the one where reading a line of code in it is the whole point
  * - and a video opened out of Drive. Three copies of a wheel handler and a drag
  * would have been three sets of the clamping bugs this exists to avoid, so it is
- * one hook and the arithmetic stays in `lib/home/zoom`, pure and tested.
+ * one hook and the arithmetic stays in `lib/zoom`, pure and tested.
  *
  * It hands back the props for the frame. The caller draws whatever it likes
  * inside and applies `transform` to it; nothing here knows or cares whether that
@@ -26,7 +26,7 @@ import {
     NO_ZOOM,
     ZOOM_STEP,
     type Zoom
-} from "@/lib/home/zoom";
+} from "@/lib/zoom";
 
 export interface ZoomPan {
     /** Put on the element the gestures happen over. A callback ref, because an
@@ -129,7 +129,9 @@ export function useZoomPan(): ZoomPan {
                 if (!from) return;
                 const to = pointAt(event);
                 dragging.current = to;
-                setZoom((current) => panBy(current, to.x - from.x, to.y - from.y, covering.current));
+                setZoom((current) =>
+                    panBy(current, to.x - from.x, to.y - from.y, covering.current)
+                );
             },
             onPointerUp: () => (dragging.current = null),
             onPointerCancel: () => (dragging.current = null)

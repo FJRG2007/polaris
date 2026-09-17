@@ -13,7 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { isGameServerApp } from "@/lib/apps/games-service";
+import { isGameServerApp } from "@/lib/apps/catalog";
 import type { OverviewFeatures } from "@/lib/overview/catalog";
 
 /**

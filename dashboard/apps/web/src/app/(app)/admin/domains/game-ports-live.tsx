@@ -23,8 +23,8 @@ import { Badge, Button } from "@polaris/ui";
 import { RouterSteps } from "./router-steps";
 import { inBlock } from "@/lib/apps/port-block";
 import { gameForwardRules } from "@/lib/router-guide";
-import type { GamePortsReading } from "@/lib/apps/games-service";
-import { describePorts } from "@/lib/apps/minecraft/reach-advice";
+import type { GamePortsReading } from "@/lib/apps/port-advice";
+import { describePorts } from "@/lib/apps/port-advice";
 
 export function GamePortsLive({
     reading,
@@ -47,7 +47,9 @@ export function GamePortsLive({
     // A server whose port predates the block is one the range rule does not cover,
     // and it is worth saying which: the operator would otherwise forward the range,
     // see this server still unreachable, and have nothing to go on.
-    const outside = servers.filter((server) => server.ports.some((port) => !inBlock(port.port, blocks[port.protocol])));
+    const outside = servers.filter((server) =>
+        server.ports.some((port) => !inBlock(port.port, blocks[port.protocol]))
+    );
 
     return (
         <div className="flex flex-col gap-3">
@@ -75,7 +77,9 @@ export function GamePortsLive({
                             <p className="truncate text-sm" title={server.name}>
                                 {server.name}
                             </p>
-                            <p className="font-mono text-xs text-muted-foreground">{describePorts(server.ports)}</p>
+                            <p className="font-mono text-xs text-muted-foreground">
+                                {describePorts(server.ports)}
+                            </p>
                         </div>
                         {server.confirmed ? (
                             <Badge
@@ -89,7 +93,9 @@ export function GamePortsLive({
                                 Reached from outside
                             </Badge>
                         ) : server.running ? (
-                            <Badge className="border-warning-edge text-warning">Not confirmed</Badge>
+                            <Badge className="border-warning-edge text-warning">
+                                Not confirmed
+                            </Badge>
                         ) : (
                             // Neither reached nor unreachable: nothing was measured, because
                             // there was nothing behind the port to measure. Saying "not
@@ -121,7 +127,11 @@ export function GamePortsLive({
                     )}
                     {advice.forward && (
                         <div className="text-muted-foreground">
-                            <RouterSteps server={null} lanIp={lanIp} rules={gameForwardRules(pending, policy, blocks)} />
+                            <RouterSteps
+                                server={null}
+                                lanIp={lanIp}
+                                rules={gameForwardRules(pending, policy, blocks)}
+                            />
                         </div>
                     )}
                 </div>
@@ -129,10 +139,13 @@ export function GamePortsLive({
 
             {policy === "range" && outside.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                    {outside.length === 1 ? "One server answers" : `${outside.length} servers answer`} outside those
-                    ranges - {outside.map((server) => server.name).join(", ")} - so{" "}
-                    {outside.length === 1 ? "it" : "they"} {outside.length === 1 ? "keeps" : "keep"} a rule of their own
-                    above. Widening a range does not move a server that is already running; recreating it does.
+                    {outside.length === 1
+                        ? "One server answers"
+                        : `${outside.length} servers answer`}{" "}
+                    outside those ranges - {outside.map((server) => server.name).join(", ")} - so{" "}
+                    {outside.length === 1 ? "it" : "they"} {outside.length === 1 ? "keeps" : "keep"}{" "}
+                    a rule of their own above. Widening a range does not move a server that is
+                    already running; recreating it does.
                 </p>
             )}
         </div>

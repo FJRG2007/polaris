@@ -22,7 +22,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { installedGames } from "@/lib/apps/game-zones";
 import { serverEnvironmentSchema } from "@polaris/core";
-import { listGamePorts } from "@/lib/apps/games-service";
+import { forwardedPorts } from "@/lib/app-extensions/registry";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
@@ -30,8 +30,18 @@ import { detectDnsProvider, type DnsProviderInfo } from "@/lib/dns-provider";
 import { isBaseDomain, isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
-import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
-import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
+import {
+    getDomainConfig,
+    setDomainConfig,
+    syncDuckDns,
+    type DomainConfig
+} from "@/lib/domain-service";
+import {
+    checkZoneDns,
+    provisionZoneDns,
+    type ZoneDnsProvisionResult,
+    type ZoneDnsReport
+} from "@/lib/domain-dns";
 import {
     getLocalEnvironment,
     getNetworkStatus,
@@ -90,7 +100,11 @@ export interface DomainSetupState {
      * website and no game client, so a deployment running game servers needs rules
      * nothing else here would ever mention.
      */
-    gameServers: Array<{ name: string; ports: Array<{ port: number; protocol: "tcp" | "udp" }>; confirmed: boolean }>;
+    gameServers: Array<{
+        name: string;
+        ports: Array<{ port: number; protocol: "tcp" | "udp" }>;
+        confirmed: boolean;
+    }>;
     /** How those ports are opened - a rule each, or one range per transport - and
      *  the ranges themselves, which is what the rules are written from. */
     portPolicy: PortPolicy;
@@ -111,22 +125,33 @@ async function domainSetupState(): Promise<DomainSetupState> {
     // operator to guess that a button on the last step is what unblocks their domain.
     const saved = await getDomainZones();
     if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
-    const [environment, network, zones, domains, cloudflare, strategy, lanIp, gameServers, portPolicy, portBlocks, games] =
-        await Promise.all([
-            getLocalEnvironment(),
-            getNetworkStatus(),
-            getDomainZones(),
-            getDomainConfig(),
-            getCloudflareAccountStatus(),
-            getSetting(STRATEGY_KEY),
-            getHostLanIp(),
-            // Best effort: the domain setup must open with or without the game servers,
-            // and a deployment that has none is the common case.
-            listGamePorts().catch(() => []),
-            getPortPolicy(),
-            getPortBlocks(),
-            installedGames().catch(() => [])
-        ]);
+    const [
+        environment,
+        network,
+        zones,
+        domains,
+        cloudflare,
+        strategy,
+        lanIp,
+        gameServers,
+        portPolicy,
+        portBlocks,
+        games
+    ] = await Promise.all([
+        getLocalEnvironment(),
+        getNetworkStatus(),
+        getDomainZones(),
+        getDomainConfig(),
+        getCloudflareAccountStatus(),
+        getSetting(STRATEGY_KEY),
+        getHostLanIp(),
+        // Best effort: the domain setup must open with or without the game servers,
+        // and a deployment that has none is the common case.
+        forwardedPorts().catch(() => []),
+        getPortPolicy(),
+        getPortBlocks(),
+        installedGames().catch(() => [])
+    ]);
     return {
         environment,
         network,
@@ -135,7 +160,9 @@ async function domainSetupState(): Promise<DomainSetupState> {
         // Validated like any other stored value: a key written by a version that knew
         // a strategy this one does not would otherwise preselect an option that no
         // longer exists, leaving step 2 with nothing highlighted.
-        strategy: EXPOSURE_STRATEGIES.includes(strategy as ExposureStrategy) ? (strategy as ExposureStrategy) : null,
+        strategy: EXPOSURE_STRATEGIES.includes(strategy as ExposureStrategy)
+            ? (strategy as ExposureStrategy)
+            : null,
         // The records need the token and nothing else, so a zone-scoped token counts
         // as connected here even though it reaches no account.
         cloudflareConnected: cloudflare.dnsReady,
@@ -165,7 +192,13 @@ const setupSchema = z.object({
     strategy: z.enum(EXPOSURE_STRATEGIES as [ExposureStrategy, ...ExposureStrategy[]]),
     baseDomain: z.string().default(""),
     zones: z
-        .array(z.object({ label: z.string(), scope: z.enum(["polaris", "deploy"]), primary: z.boolean() }))
+        .array(
+            z.object({
+                label: z.string(),
+                scope: z.enum(["polaris", "deploy"]),
+                primary: z.boolean()
+            })
+        )
         .default([]),
     duckdnsSubdomain: z.string().default(""),
     duckdnsToken: z.string().default(""),
@@ -231,14 +264,19 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
         if (!duckSubdomain || !isZoneLabel(duckSubdomain)) {
             return {
                 state: current,
-                error: duckSubdomain ? "Enter just the subdomain, e.g. mypolaris" : "Enter your DuckDNS subdomain"
+                error: duckSubdomain
+                    ? "Enter just the subdomain, e.g. mypolaris"
+                    : "Enter your DuckDNS subdomain"
             };
         }
         // Without a token nothing can update the record, so the setup would report
         // success while the name points wherever DuckDNS last had it - and the DNS
         // step would promise Polaris keeps it up to date.
         if (!current.domains.hasDuckdnsToken && !parsed.data.duckdnsToken.trim()) {
-            return { state: current, error: "Enter your DuckDNS token so Polaris can keep the record updated" };
+            return {
+                state: current,
+                error: "Enter your DuckDNS token so Polaris can keep the record updated"
+            };
         }
     }
     if (meta.needsDomain && meta.wildcard && !baseDomain) {
@@ -255,7 +293,9 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
         if (strategy === "duckdns") {
             await setDomainConfig({
                 duckdnsSubdomain: duckSubdomain,
-                ...(parsed.data.duckdnsToken.trim() ? { duckdnsToken: parsed.data.duckdnsToken.trim() } : {})
+                ...(parsed.data.duckdnsToken.trim()
+                    ? { duckdnsToken: parsed.data.duckdnsToken.trim() }
+                    : {})
             });
         }
 
@@ -336,7 +376,9 @@ const provisionSchema = z.object({ overwrite: z.boolean().default(false) });
  * that already point elsewhere come back as conflicts and are only repointed on a
  * second call with `overwrite`, once the operator has seen what would be replaced.
  */
-export async function provisionZoneDnsAction(input?: unknown): Promise<ZoneDnsProvisionResult & { error?: string }> {
+export async function provisionZoneDnsAction(
+    input?: unknown
+): Promise<ZoneDnsProvisionResult & { error?: string }> {
     const user = await requireAdmin();
     const overwrite = provisionSchema.safeParse(input ?? {}).data?.overwrite ?? false;
     try {

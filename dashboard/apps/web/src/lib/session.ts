@@ -173,13 +173,13 @@ export function accessFor(user: SessionUser): AppAccessInput {
         isAdmin: user.isAdmin,
         can: (permission) => sessionCanAny(user, permission),
         isInstalled: isAppInstalled,
-        // Places is the one app a single item of can be lent to somebody who
-        // holds none of its permissions - one door, one camera - and somebody
-        // holding a key to a door has an app to open. Asked only after the
-        // permission has said no, and imported here rather than in the registry
-        // because the registry is read in the browser.
+        // An app a single item of can be lent to somebody who holds none of
+        // its permissions - Places: one door, one camera - is an app they can
+        // open. Asked only after the permission has said no, and imported here
+        // rather than in the app registry because that one is read in the
+        // browser.
         alsoReaches: async (appId) =>
-            appId === "home" ? (await import("@/lib/home/sharing")).reachesPlaces(user.id) : false
+            (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id)
     };
 }
 

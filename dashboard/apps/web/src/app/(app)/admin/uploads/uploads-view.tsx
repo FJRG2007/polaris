@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import type { FootageSettings } from "@/lib/home/stills";
+import type { FootageSettings } from "@/lib/footage-storage";
 import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";

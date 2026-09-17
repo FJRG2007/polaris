@@ -15,7 +15,7 @@
  */
 
 import { withLease } from "./lease";
-import { prisma } from "@polaris/db";
+import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepTrash } from "@/lib/mailbox/trash";
 import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepExpiredSends } from "@/lib/vault/sends";
@@ -24,7 +24,6 @@ import { pruneTelemetry } from "@/lib/telemetry/store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
-import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { probeAllDomains } from "@/lib/watch/health-probe";
@@ -32,34 +31,24 @@ import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
-import { drainQueue } from "@/lib/apps/minecraft/queue-service";
-import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { runMailServerPass } from "@/lib/mail-server/scheduled";
 import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
-import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
-import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
-import { sweepWorldBackups } from "@/lib/apps/minecraft/world-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
 import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
 import { ensureManagedCertificates } from "@/lib/tls/managed-certificates";
 import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
 import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
-import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
-import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
-import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
-import { isGameServerApp, sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
-import { isAppInstalled } from "@/lib/apps/install-presence";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -106,19 +95,6 @@ async function sweepEveryDisk(): Promise<{ local: number; servers: number }> {
     return { local: local.freed, servers: servers.reduce((total, one) => total + one.freed, 0) };
 }
 
-/**
- * A job that only runs while its app is installed.
- *
- * Without the app there is nothing it should be doing, and an uninstalled app
- * must not keep reaching into containers or cameras on its own.
- */
-function whileInstalled(catalogId: string, run: () => Promise<unknown>): () => Promise<unknown> {
-    return async () => {
-        if (!(await isAppInstalled(catalogId))) return { skipped: `${catalogId} is not installed` };
-        return run();
-    };
-}
-
 export interface ScheduledJob {
     /** Names the job everywhere: the route that triggers it, the lease it takes,
      *  and the line it logs. */
@@ -128,196 +104,6 @@ export interface ScheduledJob {
      *  through. Null for the jobs where two runners are harmless. */
     readonly leaseMs: number | null;
     readonly run: () => Promise<unknown>;
-}
-
-/** Every owner with an installed app. A blocklist and a schedule are instance-wide
- *  and run on nobody's behalf in particular, so the walk starts from the owners
- *  rather than from a session. */
-async function ownersWithApps(): Promise<string[]> {
-    const rows = await prisma.installedApp.findMany({
-        where: { status: { not: "removed" } },
-        select: { ownerId: true },
-        distinct: ["ownerId"]
-    });
-    return rows.map((row) => row.ownerId);
-}
-
-/** How long one activity pass may spend starting owners. Half the lease, so the
- *  owner still being walked when it runs out has as long again to finish inside
- *  it. */
-const GAME_ACTIVITY_BUDGET_MS = 10 * MINUTE;
-
-async function runFirewall(): Promise<{
-    servers: number;
-    banned: number;
-    kicked: number;
-    allowed: number;
-}> {
-    let servers = 0;
-    let banned = 0;
-    let kicked = 0;
-    let allowed = 0;
-    for (const ownerId of await ownersWithApps()) {
-        const result = await syncFirewallBans(ownerId).catch(() => null);
-        if (!result) continue;
-        servers += result.servers;
-        banned += result.banned;
-        kicked += result.kicked;
-        allowed += result.allowed;
-    }
-    return { servers, banned, kicked, allowed };
-}
-
-/**
- * Ask every game server who is on it, write that down, and then apply the schedules
- * with the answer already in hand.
- *
- * One pass rather than two, because asking is the expensive half - a command inside
- * a container, per server - and the schedule sweep already takes a map of counts
- * somebody else has paid for. Two jobs on the same minute would ask every server
- * twice for the same number.
- */
-async function runGameActivity(): Promise<{
-    started: number;
-    stopped: number;
-    arrived: number;
-    left: number;
-    skipped: number;
-}> {
-    const owners = await ownersWithApps();
-    // Bounded like the backup sweep, and now for the same reason: a scheduled
-    // stop writes the world out and takes a copy of it first, which is `tar` over
-    // a whole world inside the container and is allowed ninety seconds per server
-    // before it gives up. Four servers going quiet on the same night is six
-    // minutes in one pass, and a pass that outlives its lease releases it - which
-    // starts a second runner that re-reads who is playing and opens a second visit
-    // for everybody already on, the exact duplicate this job's lease exists to
-    // prevent. An owner this pass did not reach is reached on the next tick, a
-    // minute later, from the same state on disk.
-    const until = Date.now() + GAME_ACTIVITY_BUDGET_MS;
-    let started = 0;
-    let stopped = 0;
-    let arrived = 0;
-    let left = 0;
-    let skipped = 0;
-    for (const [index, ownerId] of owners.entries()) {
-        // Before the owner rather than during them: a budget may decide what not
-        // to begin, and must never leave a server stopped without the copy that
-        // was the reason for stopping it slowly.
-        if (Date.now() >= until) {
-            skipped = owners.length - index;
-            break;
-        }
-        const now = new Date();
-        const activity = await sweepGameActivity(ownerId, now).catch(() => null);
-        const swept = await sweepGameSchedules(ownerId, now, {
-            ...(activity ? { known: activity.known } : {})
-        }).catch(() => null);
-        // After the windows, not before: a routine that restarts a server should
-        // not race the sweep that was about to stop it for being empty.
-        for (const installedAppId of activity?.known.keys() ?? []) {
-            await runGameRoutines(ownerId, installedAppId, now).catch(() => 0);
-        }
-        if (activity) {
-            arrived += activity.arrived;
-            left += activity.left;
-        }
-        if (swept) {
-            started += swept.started;
-            stopped += swept.stopped;
-        }
-    }
-    return { started, stopped, arrived, left, skipped };
-}
-
-/**
- * Take the world copies that are due, across every owner.
- *
- * Its own job rather than a line in `backups`: that one is driven by
- * `nextDueAt` on a protected resource, and a game world is not one - the
- * schedule lives in the install's own config and the only thing that says when
- * the last copy was taken is the archive sitting next to the world. Without
- * this the schedule on the Backups card is a date nothing ever acts on, which is
- * worse than no schedule at all.
- */
-/** How long one pass may spend starting copies. Half the lease, so the copy that
- *  was in flight when the budget ran out still has room to finish inside it. */
-const WORLD_BACKUP_BUDGET_MS = 10 * MINUTE;
-
-async function runWorldBackups(): Promise<{
-    taken: number;
-    pruned: number;
-    failed: number;
-    left: number;
-}> {
-    const owners = await ownersWithApps();
-    // Bounded like the sibling sweep, and for the reason its lease exists: `tar`
-    // over a world takes as long as the world is big, a pass walks every owner,
-    // and a pass that outlives the scheduler's own stuck-after mark releases the
-    // lease and the guard together - which starts a second runner archiving the
-    // same world the first one is still archiving. The budget is what keeps the
-    // pass inside its lease; an owner it did not reach is reached ten minutes
-    // later, because the schedule is re-read from what is on disk every time.
-    const until = Date.now() + WORLD_BACKUP_BUDGET_MS;
-    let taken = 0;
-    let pruned = 0;
-    let failed = 0;
-    let left = 0;
-    for (const [index, ownerId] of owners.entries()) {
-        // Before the work rather than after it: a budget can decide what not to
-        // start, and must never cut a copy already being written in half.
-        if (Date.now() >= until) {
-            left = owners.length - index;
-            break;
-        }
-        const swept = await sweepWorldBackups(ownerId).catch(() => []);
-        for (const server of swept) {
-            if (server.name) taken += 1;
-            if (server.error) failed += 1;
-            pruned += server.pruned.length;
-        }
-    }
-    return { taken, pruned, failed, left };
-}
-
-async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
-    let checked = 0;
-    let stopped = 0;
-    for (const ownerId of await ownersWithApps()) {
-        const swept = await sweepCrashLoops(ownerId).catch(() => null);
-        if (!swept) continue;
-        checked += swept.checked;
-        stopped += swept.stopped;
-    }
-    return { checked, stopped };
-}
-
-async function runInventories(): Promise<{ servers: number; snapshots: number; applied: number }> {
-    const installs = await prisma.installedApp.findMany({
-        where: { status: { not: "removed" } },
-        select: { id: true, ownerId: true, catalogId: true }
-    });
-
-    let servers = 0;
-    let snapshots = 0;
-    let applied = 0;
-    for (const install of installs) {
-        if (!isGameServerApp(install.catalogId)) continue;
-        // Who is on, asked once and used twice. A server that is not answering has
-        // nobody on it as far as this is concerned, and neither pass has anything
-        // to do - which is the common case and costs one refused connection.
-        const online = await getServerPlayers(install.ownerId, install.id)
-            .then((status) => (status.answering ? status.players.players : []))
-            .catch(() => [] as string[]);
-        if (online.length === 0) continue;
-        servers += 1;
-        const report = await drainQueue(install.ownerId, install.id, online).catch(() => null);
-        applied += report?.applied ?? 0;
-        snapshots += await sweepInventorySnapshots(install.ownerId, install.id, online).catch(
-            () => 0
-        );
-    }
-    return { servers, snapshots, applied };
 }
 
 /**
@@ -609,76 +395,6 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: dispatchDueReminders
     },
     {
-        key: "game-firewall",
-        everyMs: Number(process.env.POLARIS_GAME_FIREWALL_MS) || 2 * MINUTE,
-        leaseMs: null,
-        run: whileInstalled("game-servers", runFirewall)
-    },
-    {
-        key: "game-schedules",
-        everyMs: Number(process.env.POLARIS_GAME_SCHEDULE_MS) || MINUTE,
-        // Leased now that the same pass records who was playing. A duplicate
-        // schedule decision was harmless and a duplicate history is not: two
-        // runners write two readings a millisecond apart and open a second visit
-        // for everybody already on.
-        //
-        // Longer than the cadence by a wide margin, because a stop on this path
-        // writes the world out and copies it before the container goes down, and
-        // that is minutes rather than seconds on a world people have been playing.
-        // The lease is only held while a pass is actually in flight, so a normal
-        // one - which is over in seconds - still runs every minute; what this
-        // buys is that a slow one is not overtaken by the next. Twice the pass's
-        // own budget, and under the scheduler's stuck-after mark.
-        leaseMs: 20 * MINUTE,
-        run: whileInstalled("game-servers", runGameActivity)
-    },
-    {
-        key: "game-inventories",
-        everyMs: Number(process.env.POLARIS_GAME_INVENTORY_MS) || 5 * MINUTE,
-        leaseMs: null,
-        run: whileInstalled("game-servers", runInventories)
-    },
-    {
-        key: "game-health",
-        // Every minute, because what it catches costs a core and a disk for as
-        // long as nobody catches it, and because the person waiting on that server
-        // is watching it say "starting" the whole time.
-        everyMs: Number(process.env.POLARIS_GAME_HEALTH_MS) || MINUTE,
-        // Leased, unlike the other game sweeps: this one stops a container and
-        // writes a notification about it, and two runners doing that is a server
-        // stopped twice and somebody told twice.
-        leaseMs: 5 * MINUTE,
-        run: whileInstalled("game-servers", runGameHealth)
-    },
-    {
-        key: "game-world-backups",
-        // Every ten minutes, and the schedule itself decides whether anything is
-        // due - the shortest one on offer is hourly, so this is only ever asking a
-        // question it usually answers no to, and it makes a daily copy land within
-        // ten minutes of when the card said it would.
-        everyMs: Number(process.env.POLARIS_GAME_BACKUP_SWEEP_MS) || 10 * MINUTE,
-        // Leased, and for longer than the gap: this archives a world with `tar`
-        // inside the container, and two runners doing that at once is two copies
-        // of the same world competing for the same disk. Twice the pass's own
-        // budget, and under the scheduler's stuck-after mark - a lease as long as
-        // that mark expires both guards at once, which is the second runner this
-        // is here to prevent.
-        leaseMs: 20 * MINUTE,
-        run: whileInstalled("game-servers", runWorldBackups)
-    },
-    {
-        key: "game-reach",
-        // Two minutes, because it is only ever answering a question the operator
-        // has already been told the answer arrives on its own: a port opened while
-        // the server was still starting, or a forward made after the tab was
-        // closed. Nothing is knocked on once it is proven.
-        everyMs: Number(process.env.POLARIS_GAME_REACH_MS) || 2 * MINUTE,
-        // Unleased like the other read-only sweeps: two runners knock on the same
-        // port and write the same timestamp, which is the same outcome.
-        leaseMs: null,
-        run: whileInstalled("game-servers", sweepGameReach)
-    },
-    {
         key: "scheduled-deletions",
         everyMs: Number(process.env.POLARIS_DELETION_SWEEP_MS) || 10 * MINUTE,
         leaseMs: null,
@@ -697,40 +413,6 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // only when somebody opens the link would mean a Send nobody opened
         // sitting there forever, which is the case it was set for.
         run: () => sweepExpiredSends()
-    },
-    {
-        key: "home-recording",
-        // A minute, and each pass only tops up: a camera already writing a
-        // segment is left alone, and one that has just finished starts the next.
-        everyMs: Number(process.env.POLARIS_HOME_RECORDING_MS) || MINUTE,
-        // Leased, because two runners would each start a segment on the same
-        // camera and write the same footage to the disk twice.
-        leaseMs: 20 * MINUTE,
-        run: whileInstalled("home", sweepContinuousRecording)
-    },
-    {
-        key: "home-availability",
-        // A minute. A camera that has gone quiet is only useful to know about
-        // quickly, and the pass is one cached frame per camera - which is what
-        // the wall already asks for whenever somebody has it open.
-        everyMs: Number(process.env.POLARIS_HOME_AVAILABILITY_MS) || MINUTE,
-        // Leased: two runners asking the same camera at the same moment would
-        // each decide it was the one to write the outage down, and the house
-        // would be told twice.
-        leaseMs: 5 * MINUTE,
-        run: whileInstalled("home", sweepCameraReachability)
-    },
-    {
-        key: "home-retention",
-        // Footage is the only part of the house that grows whether or not anybody
-        // uses it, so this is the job that decides whether a disk fills.
-        everyMs: Number(process.env.POLARIS_HOME_RETENTION_MS) || 15 * MINUTE,
-        // Leased: it removes files, and two runners racing on the same clip means
-        // one of them fails on a file the other already dropped. Longer than the
-        // cadence, so a pass that runs over does not have the next one start
-        // beside it.
-        leaseMs: 30 * MINUTE,
-        run: whileInstalled("home", sweepHomeRetention)
     },
     {
         key: "host-space",
@@ -853,7 +535,10 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // it stopped and start two.
         leaseMs: 10 * MINUTE,
         run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
-    }
+    },
+
+    // What the installed apps run, each only while its app is installed.
+    ...appJobs()
 ];
 
 /** Run one job's body, taking its lease first when it has one. Null means another

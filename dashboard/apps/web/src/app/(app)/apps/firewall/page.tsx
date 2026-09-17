@@ -13,21 +13,19 @@
  * further and never loosen.
  */
 
-import Link from "next/link";
 import { WafEditor } from "./waf-editor";
 import { notFound } from "next/navigation";
 import { ScopePicker } from "./scope-picker";
 import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
-import { GameFirewallPanel } from "./game-panel";
 import { listProjectScopes } from "@/lib/deploy-service";
 import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
-import { gameServerForApplication } from "@/lib/apps/games-service";
+import { firewallSlot } from "@/lib/app-extensions/registry";
 import { listInstalledAppScopes } from "@/lib/apps/install-service";
-import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
     ruleScopeFor,
     scopeNeedsTarget,
@@ -81,9 +79,15 @@ export default async function FirewallPage({
     const services: ScopeOption[] = [];
     for (const project of projects) {
         for (const environment of project.environments) {
-            environments.push({ id: environment.id, label: `${project.name} / ${environment.name}` });
+            environments.push({
+                id: environment.id,
+                label: `${project.name} / ${environment.name}`
+            });
             for (const application of environment.applications) {
-                services.push({ id: application.id, label: `${project.name} / ${environment.name} / ${application.name}` });
+                services.push({
+                    id: application.id,
+                    label: `${project.name} / ${environment.name} / ${application.name}`
+                });
             }
         }
     }
@@ -118,7 +122,9 @@ export default async function FirewallPage({
     const ruleScope = ruleScopeFor(kind);
 
     const options = scopeOptions(kind, catalog);
-    const scopeId = scopeNeedsTarget(kind) ? (options.find((option) => option.id === id)?.id ?? options[0]?.id ?? "") : "";
+    const scopeId = scopeNeedsTarget(kind)
+        ? (options.find((option) => option.id === id)?.id ?? options[0]?.id ?? "")
+        : "";
     if (scopeNeedsTarget(kind) && id && !options.some((option) => option.id === id)) {
         // An id that is not the caller's must not silently resolve to their first
         // project - that would be a link to someone else's rules quietly rewritten
@@ -126,15 +132,13 @@ export default async function FirewallPage({
         notFound();
     }
     const label = options.find((option) => option.id === scopeId)?.label ?? "";
-    // A service that is a game server is guarded by something else entirely: its
-    // player list, not the HTTP rules below. Looked up only when one service is in
-    // scope, which is the only case where it can be one.
-    const game = ruleScope === "application" && scopeId ? await gameServerForApplication(user.id, scopeId) : null;
-    // Only Minecraft keeps a player list of names and addresses. An ARK server is
-    // guarded by its own allow list of Steam ids, which lives on its own page - and
-    // offering this editor for it would be a screen full of rules that do nothing.
-    const playerList = game?.game === "minecraft" ? game : null;
-    const gameAccess = playerList ? await listPlayerAccess(user.id, playerList.installedAppId).catch(() => null) : null;
+    // A service an installed app runs may be guarded by something else entirely -
+    // a game server by its player list, not the HTTP rules below. Asked only when
+    // one service is in scope, which is the only case where it can be one.
+    const appSection =
+        ruleScope === "application" && scopeId
+            ? await firewallSlot(user.id, scopeId).catch(() => null)
+            : null;
     // Read once: the editor offers it for the allowlist, and the anomaly panel marks
     // the reader's own address so a finding about themselves reads as one.
     const callerIp = (await clientIp()) ?? null;
@@ -148,7 +152,10 @@ export default async function FirewallPage({
                         chosen scope is no longer next to the title - so the title
                         carries it. */}
                     {label ? (
-                        <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline" title={label}>
+                        <span
+                            className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline"
+                            title={label}
+                        >
                             {label}
                         </span>
                     ) : null}
@@ -158,38 +165,12 @@ export default async function FirewallPage({
 
             {scopeNeedsTarget(kind) && !scopeId ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    Nothing of that kind exists yet, so there is nothing to protect. Create one and its rules appear
-                    here.
+                    Nothing of that kind exists yet, so there is nothing to protect. Create one and
+                    its rules appear here.
                 </p>
             ) : (
                 <>
-                    {playerList && <GameFirewallPanel installedAppId={playerList.installedAppId} initial={gameAccess} />}
-                    {game?.game === "fivem" && (
-                        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                            A FiveM server is guarded by its own list of players rather than by the rules below - a
-                            game port does not go through the web firewall.{" "}
-                            <Link
-                                href={`/apps/installed/${game.installedAppId}/security`}
-                                className="text-primary hover:underline"
-                            >
-                                Open who may join
-                            </Link>
-                            . Addresses blocked here are carried onto that list as well.
-                        </p>
-                    )}
-                    {game?.game === "ark" && (
-                        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                            An ARK server is guarded by its join password and its own allow list of Steam ids, not by
-                            the rules below.{" "}
-                            <Link
-                                href={`/apps/installed/${game.installedAppId}/security`}
-                                className="text-primary hover:underline"
-                            >
-                                Open who may join
-                            </Link>
-                            .
-                        </p>
-                    )}
+                    {appSection && <AppSlotView slot={appSection} />}
                     <WafEditor
                         key={`${ruleScope}:${scopeId}`}
                         scopeType={ruleScope}
@@ -205,7 +186,9 @@ export default async function FirewallPage({
                         // the instance rather than to a project's members. Handed to the
                         // editor rather than rendered beside it: they belong under the
                         // rule LIST, and a rule opened from it is a page of its own.
-                        instancePanels={canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null}
+                        instancePanels={
+                            canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null
+                        }
                     />
                 </>
             )}

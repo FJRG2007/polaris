@@ -14,8 +14,7 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { installRef } from "@/lib/apps/install-access";
-import { flushGameWorld } from "@/lib/apps/games-flush";
-import { clearCrashLoop } from "@/lib/apps/games-health";
+import { afterInstallStarts, beforeInstallStops } from "@/lib/app-extensions/registry";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { requirePermissionOn, type ResourceAccess } from "@/lib/resource-access";
@@ -32,10 +31,9 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
     try {
         const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
-        // A game server's world lives in memory between autosaves, and a redeploy
-        // destroys the container. Anything that is not a game server has nothing to
-        // flush and this costs it one query.
-        await flushGameWorld(access.ownerId, id);
+        // What only lives in memory - a game server's world - is written out
+        // first, because a redeploy destroys the container.
+        await beforeInstallStops(access.ownerId, id);
         await deployApplication(applicationId, access.ownerId, user.id);
         revalidatePath(`/apps/installed/${id}`);
         return {};
@@ -44,14 +42,15 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
     }
 }
 
-export async function setInstalledAppRunningAction(id: string, running: boolean): Promise<{ error?: string }> {
+export async function setInstalledAppRunningAction(
+    id: string,
+    running: boolean
+): Promise<{ error?: string }> {
     try {
         const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
-        if (!running) await flushGameWorld(access.ownerId, id);
-        // Starting it again is somebody saying the crash it was stopped for has
-        // been dealt with. If it has not, the health sweep says so within a minute.
-        if (running) await clearCrashLoop(id);
+        if (!running) await beforeInstallStops(access.ownerId, id);
+        if (running) await afterInstallStarts(id);
         await setApplicationRunning(applicationId, access.ownerId, running, user.id);
         revalidatePath(`/apps/installed/${id}`);
         return {};
@@ -69,7 +68,12 @@ export async function uninstallInstalledAppAction(id: string): Promise<{ error?:
         await uninstallApp(access.ownerId, id);
         // The app is gone, so the access people were given to it is too.
         await clearResourceGrants(installRef(id));
-        await recordAudit({ actorId: user.id, action: "apps.uninstall", targetType: "installedApp", targetId: id });
+        await recordAudit({
+            actorId: user.id,
+            action: "apps.uninstall",
+            targetType: "installedApp",
+            targetId: id
+        });
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {

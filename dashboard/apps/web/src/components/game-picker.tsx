@@ -21,6 +21,7 @@
 import { Input, cn } from "@polaris/ui";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GameLogo } from "@/components/game-logo";
 import type { GameDefinition, GameId } from "@/lib/apps/games-catalog";
 
 /** Past this many, scanning the list stops being instant and the search box is
@@ -38,18 +39,7 @@ function matches(game: GameDefinition, query: string): boolean {
     );
 }
 
-/** A game's own mark, from its publisher. Decoration beside a name that is already
- *  written out, so it is hidden from a screen reader rather than described twice. */
-export function GameLogo({ game, className }: { game: GameDefinition; className?: string }) {
-    return (
-        <img
-            src={game.logo}
-            alt=""
-            aria-hidden
-            className={cn("shrink-0 object-contain", className)}
-        />
-    );
-}
+export { GameLogo };
 
 export function GamePicker({
     games,
