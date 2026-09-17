@@ -1,0 +1,49 @@
+// Polaris login for Paper, Purpur and Spigot. Built inside the dashboard image
+// (see docker/Dockerfile), which serves the jar to the servers that switch it on.
+//
+// Compiled against the Spigot API, which all three load, and nothing else at
+// runtime: it talks to Polaris with the JDK's own HTTP client and the Gson the
+// server already ships, so the jar carries no dependency a server would have to
+// resolve. Log4j is only compiled against, to keep passwords out of the console.
+plugins {
+    id 'java'
+}
+
+version = mod_version
+group = 'polaris.minecraft'
+
+base {
+    archivesName = 'polaris'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// The HTTP client and the environment reader, shared with the NeoForge mod.
+sourceSets.main.java.srcDir '../polaris-common/src/main/java'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+dependencies {
+    compileOnly "org.spigotmc:spigot-api:${spigot_api_version}"
+    compileOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
+    // The API's own annotations, which it does not ship; without them the
+    // compiler warns on every class it reads.
+    compileOnly "org.jetbrains:annotations:${annotations_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+    options.compilerArgs << '-Xlint:all' << '-Werror'
+}
+
+processResources {
+    var replaceProperties = [version: mod_version, api_version: api_version]
+    inputs.properties replaceProperties
+    from('src/main/templates') {
+        expand replaceProperties
+    }
+}

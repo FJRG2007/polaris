@@ -22,11 +22,30 @@ describe("which servers have a build", () => {
         expect(login.modFileFor("neoforge", " 1.21.4 ")).toBe(JAR);
     });
 
+    it("is the plugin on Paper, Purpur and Spigot from its floor on, LATEST included", () => {
+        for (const software of ["PAPER", "PURPUR", "SPIGOT"]) {
+            for (const version of ["1.20.6", "1.21.4", "1.21.11", "26.2", "LATEST", "latest"]) {
+                expect(login.modFileFor(software, version), `${software} ${version}`).toBe(
+                    "polaris-paper.jar"
+                );
+            }
+            for (const version of ["1.20.4", "1.20.5", "1.8.8", "26.3-rc-3", "SNAPSHOT", ""]) {
+                expect(login.modFileFor(software, version), `${software} ${version}`).toBeNull();
+            }
+        }
+    });
+
+    it("is asked about on any software with a build, whatever the release", () => {
+        expect(login.hasBuildFor("NEOFORGE")).toBe(true);
+        expect(login.hasBuildFor("purpur")).toBe(true);
+        expect(login.hasBuildFor("FABRIC")).toBe(false);
+        expect(login.hasBuildFor("VANILLA")).toBe(false);
+    });
+
     it("is nothing else", () => {
         expect(login.modFileFor("NEOFORGE", "1.21.1")).toBeNull();
         expect(login.modFileFor("NEOFORGE", "LATEST")).toBeNull();
         expect(login.modFileFor("FABRIC", "1.21.4")).toBeNull();
-        expect(login.modFileFor("PAPER", "1.21.4")).toBeNull();
         expect(login.modFileFor("VANILLA", "1.21.4")).toBeNull();
     });
 
@@ -80,7 +99,9 @@ describe("the MODS list", () => {
         expect(
             login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/polaris-neoforge-1.21.4.jar")
         ).toBe(true);
+        expect(login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/polaris-paper.jar")).toBe(true);
         expect(login.hasMod("https://example.org/polaris-helper.jar")).toBe(false);
+        expect(login.hasMod("https://example.org/polaris-paperweight.jar")).toBe(false);
         expect(login.hasMod("")).toBe(false);
     });
 
@@ -146,12 +167,20 @@ describe("moving a server that runs it", () => {
         for (const [software, version] of [
             ["NEOFORGE", "1.21.1"],
             ["NEOFORGE", "LATEST"],
-            ["PAPER", "1.21.4"]
+            ["PAPER", "1.20.4"],
+            ["FABRIC", "1.21.4"]
         ] as const) {
             const env = login.modMovedTo(on, software, version);
             expect(env?.get("POLARIS_LOGIN"), `${software} ${version}`).toBe("off");
             expect(env?.get("MODS")).toBe("");
         }
+    });
+
+    it("moves it to the plugin when the server moves to Paper", () => {
+        const env = login.modMovedTo(on, "PAPER", "1.21.4");
+        expect(env?.get("MODS")).toBe(`${BASE}/api/minecraft/mod/polaris-paper.jar`);
+        expect(env?.has("POLARIS_LOGIN")).toBe(false);
+        expect(login.modMovedTo(on, "NEOFORGE", "1.21.4")).toBeNull();
     });
 
     it("points it at the right build when it names another one", () => {

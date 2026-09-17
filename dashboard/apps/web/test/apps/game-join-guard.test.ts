@@ -322,12 +322,37 @@ describe("reconciling the guard on a settings save", () => {
         expect(guardsOn(writes.get(PROJECTS_KEY) ?? "")).toEqual([mod]);
     });
 
-    it("takes Polaris login off a plugin server, and seeds the plugin guard", async () => {
+    it("moves Polaris login to the plugin on a plugin server, and seeds nothing beside it", async () => {
         const writes = written(
             await guardForSave([{ key: "TYPE", value: "PAPER" }], reader(modded))
         );
+        expect(writes.get("MODS")).toBe(
+            "https://polaris.example/api/minecraft/mod/polaris-paper.jar"
+        );
+        expect(writes.has("POLARIS_LOGIN")).toBe(false);
+        expect(writes.has(PROJECTS_KEY)).toBe(false);
+    });
+
+    it("takes Polaris login off a plugin server on an older release, and seeds the plugin guard", async () => {
+        const writes = written(
+            await guardForSave(
+                [
+                    { key: "TYPE", value: "PAPER" },
+                    { key: "VERSION", value: "1.20.4" }
+                ],
+                reader(modded)
+            )
+        );
         expect(writes.get("POLARIS_LOGIN")).toBe("off");
         expect(guardsOn(writes.get(PROJECTS_KEY) ?? "")).toEqual([plugin]);
+    });
+
+    it("takes Polaris login off software with no build, and seeds its guard", async () => {
+        const writes = written(
+            await guardForSave([{ key: "TYPE", value: "FABRIC" }], reader(modded))
+        );
+        expect(writes.get("POLARIS_LOGIN")).toBe("off");
+        expect(guardsOn(writes.get(PROJECTS_KEY) ?? "")).toEqual([mod]);
     });
 });
 
@@ -392,9 +417,15 @@ describe("which servers get Polaris login by default", () => {
         );
     });
 
+    it("is a plugin server too", () => {
+        expect(defaultModFor(env("simple-login?", "PAPER"))).toBe("polaris-paper.jar");
+        expect(defaultModFor(env("", "PURPUR", "LATEST"))).toBe("polaris-paper.jar");
+    });
+
     it("is not one without a build", () => {
         expect(defaultModFor(env("", "NEOFORGE", "LATEST"))).toBeNull();
-        expect(defaultModFor(env("", "PAPER"))).toBeNull();
+        expect(defaultModFor(env("", "PAPER", "1.20.4"))).toBeNull();
+        expect(defaultModFor(env("", "FABRIC"))).toBeNull();
     });
 
     it("is not one that logs players in some other way", () => {

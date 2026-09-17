@@ -40,3 +40,5 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
     into 'build/generated/sources/modMetadata'
 }
 sourceSets.main.resources.srcDir generateModMetadata
+// The HTTP client and the environment reader, shared with the Paper plugin.
+sourceSets.main.java.srcDir '../polaris-common/src/main/java'

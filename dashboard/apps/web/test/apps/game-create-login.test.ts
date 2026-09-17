@@ -97,8 +97,20 @@ describe("a new server's login", () => {
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
     });
 
-    it("is the plugin on a plugin server", async () => {
+    it("is Polaris login's plugin on a plugin server", async () => {
         await createGameServer("owner", "actor", server("PAPER", "1.21.4"));
+        const { env, seed } = created();
+        expect(seed).toBeDefined();
+        const written = new Map(seed!.env.map((entry) => [entry.key, entry.value]));
+        expect(written.get("MODS")).toBe(
+            "https://polaris.example/api/minecraft/mod/polaris-paper.jar"
+        );
+        expect(written.get("POLARIS_LOGIN")).toBe("on");
+        expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(/simple-login/);
+    });
+
+    it("is the Modrinth plugin on a release before Polaris login's", async () => {
+        await createGameServer("owner", "actor", server("PAPER", "1.20.4"));
         const { env, seed } = created();
         expect(seed).toBeUndefined();
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/simple-login\?/);

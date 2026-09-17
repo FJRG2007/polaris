@@ -80,6 +80,10 @@ describe("asking before a restart", () => {
     });
 
     it("shows the dialog for Turn off", async () => {
+        // A plugin server with no build for Polaris login keeps the Modrinth switch.
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: null }
+        });
         card("PAPER", "simple-login?");
         fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
         fireEvent.click(await screen.findByRole("button", { name: "Turn off and restart" }));

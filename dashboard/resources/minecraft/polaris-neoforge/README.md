@@ -45,7 +45,9 @@ Gradle wrapper; with Gradle 9 and JDK 21 installed:
 gradle build
 ```
 
-The jar lands in `build/libs/`. The image builds it with
+The HTTP client and the environment reader live in `../polaris-common`, shared
+with the Paper plugin (`../polaris-paper`). The jar lands in `build/libs/`. The
+image builds it with
 `-Pmod_version=<version>+<source fingerprint>`, so a server that checked in with
 another version is shown as needing a restart. It is built for Minecraft 1.21.4 only, and the
 dashboard offers it only there (`MOD_BUILDS` in

@@ -101,7 +101,7 @@ describe("the modded project's commands", () => {
 });
 
 describe("the plugin project", () => {
-    it("names the plugin rather than inventing its commands", () => {
+    it("names the plugin rather than inventing its commands", async () => {
         render(
             <MinecraftJoinPassword
                 installedAppId="server-1"
@@ -113,7 +113,7 @@ describe("the plugin project", () => {
             />
         );
 
-        expect(screen.getByText(/documents on its Modrinth page/)).toBeTruthy();
+        expect(await screen.findByText(/documents on its Modrinth page/)).toBeTruthy();
         // Read from the module rather than written out, because the point of the
         // assertion is that the card names whatever is actually seeded - a slug
         // repeated here would keep passing after the two had drifted apart.
@@ -163,12 +163,12 @@ describe("what the card says happens when there is no build", () => {
         }
     });
 
-    it("tells the reader where to confirm it actually installed", () => {
+    it("tells the reader where to confirm it actually installed", async () => {
         // The cost of seeding it optional is a screen that can say On while
         // nothing was installed. The only honest answer is to say where the
         // server's own answer is.
         cardFor("PAPER");
-        expect(screen.getByText(/check the Mods screen/)).toBeTruthy();
+        expect(await screen.findByText(/check the Mods screen/)).toBeTruthy();
     });
 });
 
@@ -283,7 +283,7 @@ describe("Polaris login", () => {
         expect(screen.queryByText("Use Polaris login")).toBeNull();
     });
 
-    it("offers no Turn on beside a plugin server's own login", () => {
+    it("offers no Turn on beside a plugin server's own login", async () => {
         render(
             <MinecraftJoinPassword
                 installedAppId="server-1"
@@ -294,22 +294,50 @@ describe("Polaris login", () => {
                 onSaved={vi.fn()}
             />
         );
-        expect(screen.getByText(/which Polaris does not manage/)).toBeTruthy();
+        expect(await screen.findByText(/which Polaris does not manage/)).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
     });
 
-    it("is never asked about on a plugin server", () => {
+    it("is never asked about on software it has no build for", () => {
         render(
             <MinecraftJoinPassword
                 installedAppId="server-1"
                 edition="java"
                 projects=""
-                software="PAPER"
+                software="FABRIC"
                 playersOnline={0}
                 onSaved={vi.fn()}
             />
         );
         expect(loginActions.loginStateAction).not.toHaveBeenCalled();
+    });
+
+    it("is what Turn on installs on a plugin server, replacing its Modrinth login", async () => {
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({
+            state: { ...OFF, build: "polaris-paper.jar" }
+        });
+        render(
+            <MinecraftJoinPassword
+                installedAppId="server-1"
+                edition="java"
+                projects="simple-login?"
+                software="PAPER"
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+        expect(await screen.findByText(/Uses Polaris login/)).toBeTruthy();
+        // simple-login takes text passwords; only the modded project is numeric.
+        expect(screen.getByText(/every player registers again/)).toBeTruthy();
+        expect(screen.queryByText(/numeric passwords/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+        await waitFor(() =>
+            expect(loginActions.setLoginAction).toHaveBeenCalledWith({
+                installedAppId: "server-1",
+                on: true
+            })
+        );
+        expect(actions.updateServerSettingsAction).not.toHaveBeenCalled();
     });
 
     it("describes the mod, not the project, once it is on", async () => {
