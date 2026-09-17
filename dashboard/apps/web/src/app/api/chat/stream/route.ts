@@ -172,7 +172,11 @@ export async function GET(request: Request): Promise<Response> {
                     send({
                         kind: "read",
                         channelId: change.channelId,
-                        userId: change.actorId
+                        userId: change.actorId,
+                        // Absent unless the mark went backwards, so a tab from
+                        // the build before this reads it as the catch-up it
+                        // always was.
+                        ...(change.unread ? { unread: true } : {})
                     });
                     return;
                 }

@@ -125,6 +125,26 @@ describe("the volume", () => {
         expect(peaks).toEqual([]);
     });
 
+    it("is kept under the account it belongs to", () => {
+        // Two accounts signed in side by side share one browser store, and a
+        // volume written under one key would be adopted by the other.
+        adoptSoundVolume(45, "ada");
+        expect(store.get("polaris.notifications.volume.ada")).toBe("45");
+
+        const heard = vi.fn();
+        const stop = onSoundVolumeChange(heard);
+        window.dispatchEvent(
+            new StorageEvent("storage", {
+                key: "polaris.notifications.volume.grace",
+                newValue: "10"
+            })
+        );
+        expect(soundVolume()).toBe(45);
+        expect(heard).not.toHaveBeenCalled();
+        stop();
+        adoptSoundVolume(DEFAULT_SOUND_VOLUME, "");
+    });
+
     it("is shared with the other tabs, and follows theirs", () => {
         adoptSoundVolume(30);
         expect(store.get("polaris.notifications.volume")).toBe("30");

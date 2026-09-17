@@ -88,13 +88,20 @@ export function markSeenOnDevice(
 /** Whether another tab of this browser was showing `channelId` when the arrival
  *  this tab heard about at `arrivedAt` reached it. */
 export function seenOnDevice(channelId: string, arrivedAt: number, tab: string = TAB): boolean {
+    const key = `${SEEN_PREFIX}${channelId}`;
     try {
-        const raw = window.localStorage.getItem(`${SEEN_PREFIX}${channelId}`);
+        const raw = window.localStorage.getItem(key);
         if (!raw) return false;
         const mark = JSON.parse(raw) as { tab?: unknown; at?: unknown };
-        if (typeof mark.at !== "number" || typeof mark.tab !== "string" || mark.tab === tab)
+        if (typeof mark.at !== "number" || typeof mark.tab !== "string") {
+            window.localStorage.removeItem(key);
             return false;
-        return Math.abs(mark.at - arrivedAt) < SEEN_WINDOW_MS;
+        }
+        const within = Math.abs(mark.at - arrivedAt) < SEEN_WINDOW_MS;
+        // A mark means nothing outside its window, and one per conversation ever
+        // opened would sit in this browser for good. Dropped as it is read.
+        if (!within) window.localStorage.removeItem(key);
+        return within && mark.tab !== tab;
     } catch {
         return false;
     }

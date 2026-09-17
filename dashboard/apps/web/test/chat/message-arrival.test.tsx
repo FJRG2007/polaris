@@ -278,6 +278,21 @@ describe("catching up in another window", () => {
         expect(notices).toEqual([]);
     });
 
+    it("leaves them alone when the reader put the conversation back to unread", async () => {
+        // The same frame carries both, because it is the same mark moving. A
+        // conversation deliberately left unread must keep what announced it.
+        watched = false;
+        await arrive();
+        act(() =>
+            onFrame?.(
+                { kind: "read", channelId: CHANNEL, userId: "scope", unread: true },
+                { owner: true }
+            )
+        );
+        expect(closed).toEqual([]);
+        expect(dismissed).toEqual([]);
+    });
+
     it("leaves them alone when it is the other side of the conversation catching up", async () => {
         watched = false;
         await arrive();

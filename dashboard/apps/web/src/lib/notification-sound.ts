@@ -23,8 +23,10 @@ import {
 const STORAGE_KEY = "polaris.notifications.sound";
 
 /** The account's volume, mirrored so another tab of this browser follows a
- *  change made here without waiting for its next page load. */
-const VOLUME_KEY = "polaris.notifications.volume";
+ *  change made here without waiting for its next page load. Keyed by the
+ *  account: two of them signed in side by side would otherwise hand each other
+ *  their volume, since a browser's storage is one store per origin. */
+const VOLUME_PREFIX = "polaris.notifications.volume";
 
 /** Raised at the window when the volume changes in this tab. */
 const VOLUME_CHANGED = "polaris:notification-volume";
@@ -76,6 +78,15 @@ export function setNotificationSoundEnabled(next: boolean): void {
 
 let volume = DEFAULT_SOUND_VOLUME;
 
+/** Whose volume this is. Empty until the page says, which is the one moment the
+ *  account is known here. */
+let account = "";
+
+/** Where this account's volume is mirrored. */
+function volumeKey(): string {
+    return account ? `${VOLUME_PREFIX}.${account}` : VOLUME_PREFIX;
+}
+
 /** The account's volume, 0 to 100. */
 export function soundVolume(): number {
     return volume;
@@ -90,11 +101,12 @@ export function soundGain(): number {
  * Take a volume as the one in force - the account's, handed down by the page, or
  * one just chosen in Settings - and tell this tab and the others.
  */
-export function adoptSoundVolume(next: number): void {
+export function adoptSoundVolume(next: number, forAccount: string = account): void {
+    account = forAccount;
     const value = asSoundVolume(next);
     try {
-        if (window.localStorage.getItem(VOLUME_KEY) !== String(value)) {
-            window.localStorage.setItem(VOLUME_KEY, String(value));
+        if (window.localStorage.getItem(volumeKey()) !== String(value)) {
+            window.localStorage.setItem(volumeKey(), String(value));
         }
     } catch {
         // Refused storage only means other tabs follow on their next load.
@@ -112,7 +124,7 @@ export function adoptSoundVolume(next: number): void {
  *  unsubscribe. */
 export function onSoundVolumeChange(listener: () => void): () => void {
     const stored = (event: StorageEvent) => {
-        if (event.key !== VOLUME_KEY || event.newValue === null) return;
+        if (event.key !== volumeKey() || event.newValue === null) return;
         // Something another build or a person wrote there is not a volume.
         const parsed = soundVolumeSchema.safeParse(Number(event.newValue));
         if (!parsed.success || parsed.data === volume) return;

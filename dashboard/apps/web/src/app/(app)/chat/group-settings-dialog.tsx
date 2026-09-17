@@ -76,6 +76,9 @@ export function GroupSettingsDialog({
         const result = await runAction(() => setGroupOptionsAction(channel.id, change), setError);
         setBusy(false);
         if (!result || result.error) {
+            // Said, not only undone: `runAction` reports what throws, and this
+            // action answers with its refusal instead of throwing it.
+            if (result?.error) setError(result.error);
             setPending({});
             return;
         }

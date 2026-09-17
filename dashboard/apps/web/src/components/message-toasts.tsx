@@ -190,6 +190,9 @@ export function MessageToasts() {
                 // this account, which is what makes this work across windows.
                 if (frame.kind === "read") {
                     if (frame.userId !== device.current) return;
+                    // Put back to unread on purpose. Withdrawing the notice for
+                    // it would undo exactly what they asked for.
+                    if (frame.unread) return;
                     pending.current.delete(frame.channelId);
                     announced.current.delete(frame.channelId);
                     caughtUp.current.add(frame.channelId);

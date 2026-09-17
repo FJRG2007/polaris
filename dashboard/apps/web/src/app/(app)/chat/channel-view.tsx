@@ -2050,9 +2050,11 @@ export function ChannelView({
                             call={call}
                             meetingId={inCall}
                             viewerId={viewerId}
-                            // Bringing somebody into the call adds them to the
-                            // conversation, so it answers to the same rule.
-                            mayInvite={channel.mayInvite}
+                            // Bringing somebody into the call adds them to
+                            // the conversation, so it answers to the same rule -
+                            // except in a one-to-one, which nobody is added to:
+                            // the call moves into a new group instead.
+                            mayInvite={channel.kind === "dm" || channel.mayInvite}
                             onStage={setStaged}
                             onLeave={() => {
                                 leaveCall();

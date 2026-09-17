@@ -8,10 +8,14 @@
  */
 
 import { useEffect } from "react";
+import { useSessionScope } from "@/components/session-scope";
 import { adoptSoundVolume, onSoundVolumeChange } from "@/lib/notification-sound";
 
 export function SoundVolumeSeed({ volume }: { volume: number }) {
-    useEffect(() => adoptSoundVolume(volume), [volume]);
+    // Whose volume it is, so a second account signed in beside this one in
+    // another tab does not hand this one its level.
+    const account = useSessionScope();
+    useEffect(() => adoptSoundVolume(volume, account), [volume, account]);
     useEffect(() => onSoundVolumeChange(() => undefined), []);
     return null;
 }
