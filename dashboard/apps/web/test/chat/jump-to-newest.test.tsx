@@ -225,3 +225,22 @@ describe("the way back to the newest message", () => {
         await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m3" }]));
     });
 });
+
+describe("reading older messages", () => {
+    it("offers the way back to the present once the reader is well up the history", async () => {
+        const user = userEvent.setup();
+        const { container } = render(<ChannelView channelId="c1" />);
+        await screen.findByText("m2");
+        expect(screen.queryByText("You're viewing older messages")).toBeNull();
+
+        const scroller = readingUpwards(container);
+        vi.setSystemTime(Date.now() + 5000);
+        scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
+
+        const bar = await screen.findByText("You're viewing older messages");
+        await user.click(bar);
+        // Back at the bottom: the list is scrolled to its end and the bar goes.
+        expect(scroller.scrollTop).toBe(4000);
+        await waitFor(() => expect(screen.queryByText("You're viewing older messages")).toBeNull());
+    });
+});
