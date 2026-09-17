@@ -118,22 +118,37 @@ RUN mkdir -p /build/apps/web/public
 # ---------------------------------------------------------------------------
 # Minecraft mods - Polaris login, built from resources/minecraft and served by
 # the dashboard to the game servers that switch it on (app/api/minecraft/mod).
-# Its own stage so the layer is reused until the mod's sources change; the jar is
-# renamed to the file name the dashboard serves (MOD_BUILDS in
-# lib/apps/minecraft/polaris-login.ts, which a test holds to this line).
-# The version it reports carries a fingerprint of its sources, and is written
-# beside the jar too, so the panel can tell a server still running an older build
-# (lib/apps/minecraft/polaris-mod-files.ts).
+# One stage per jar so each layer is reused until its own sources, or the ones
+# both share (polaris-common), change. Each jar is renamed to the file name the
+# dashboard serves (MOD_BUILDS in lib/apps/minecraft/polaris-login.ts, which a
+# test holds to these lines). The version it reports carries a fingerprint of
+# its sources, and is written beside the jar too, so the panel can tell a server
+# still running an older build (lib/apps/minecraft/polaris-mod-files.ts).
 # ---------------------------------------------------------------------------
 FROM gradle:9.2.1-jdk21 AS minecraft-mods
 
-WORKDIR /mods/polaris-neoforge
-COPY resources/minecraft/polaris-neoforge/ ./
-RUN version="$(sed -n 's/^mod_version=//p' gradle.properties)+$(find . -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+WORKDIR /mods
+COPY resources/minecraft/polaris-common/ ./polaris-common/
+COPY resources/minecraft/polaris-neoforge/ ./polaris-neoforge/
+RUN cd /mods/polaris-neoforge \
+    && version="$(sed -n 's/^mod_version=//p' gradle.properties)+$(cd /mods && find polaris-neoforge polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
     && gradle --no-daemon -q build -Pmod_version="$version" \
     && mkdir -p /out \
     && cp "build/libs/polaris-$version.jar" /out/polaris-neoforge-1.21.4.jar \
     && printf '%s\n' "$version" > /out/polaris-neoforge-1.21.4.jar.version
+
+# The same login as a plugin, for Paper, Purpur and Spigot.
+FROM gradle:9.2.1-jdk21 AS minecraft-plugins
+
+WORKDIR /mods
+COPY resources/minecraft/polaris-common/ ./polaris-common/
+COPY resources/minecraft/polaris-paper/ ./polaris-paper/
+RUN cd /mods/polaris-paper \
+    && version="$(sed -n 's/^mod_version=//p' gradle.properties)+$(cd /mods && find polaris-paper polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+    && gradle --no-daemon -q build -Pmod_version="$version" \
+    && mkdir -p /out \
+    && cp "build/libs/polaris-$version.jar" /out/polaris-paper.jar \
+    && printf '%s\n' "$version" > /out/polaris-paper.jar.version
 
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
@@ -186,6 +201,7 @@ COPY --from=builder --chown=node:node /build/apps/web/public ./apps/web/public
 # The Minecraft mods the dashboard serves. The build keeps each jar's modification
 # time, which is what a game server's image compares against on every boot.
 COPY --from=minecraft-mods --chown=node:node /out ./minecraft-mods
+COPY --from=minecraft-plugins --chown=node:node /out ./minecraft-mods
 
 # The deploy terminal sidecar, bundled into a single self-contained CJS file in
 # the builder stage. server.js does not import it, so Next's output tracing omits

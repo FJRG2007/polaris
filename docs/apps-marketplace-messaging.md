@@ -354,10 +354,14 @@ configured means the machine's own address, as before.
   toggle and is left to do that alone.
 - **Polaris login, the default where it has a build.** The Modrinth guards
   leave NeoForge with `/trigger` and numeric passwords, so Polaris ships its
-  own server-side mod (`resources/minecraft/polaris-neoforge`, built into the
-  dashboard image and served at `/api/minecraft/mod/<file>`). A new server
+  own server-side mod (`resources/minecraft/polaris-neoforge`) and, for
+  Paper, Purpur and Spigot, the same login as a plugin
+  (`resources/minecraft/polaris-paper`; both share
+  `resources/minecraft/polaris-common`), both built into the
+  dashboard image and served at `/api/minecraft/mod/<file>`. A new server
   whose software and release have a build (`MOD_BUILDS` in
-  `lib/apps/minecraft/polaris-login.ts`; NeoForge 1.21.4 today) is created
+  `lib/apps/minecraft/polaris-login.ts`; NeoForge 1.21.4, and the plugin
+  from 1.20.6 on, LATEST included) is created
   with it on and without the Modrinth guard: the install is created with an
   id chosen up front (`InstallSeed`), because the mod names its server by
   that id. That needs a public address (`publicAppUrl`), since the server
@@ -399,7 +403,10 @@ configured means the machine's own address, as before.
   Update keep the old one. The version the mod reports carries a fingerprint of
   its sources (the Dockerfile writes it beside the jar, read by
   `polaris-mod-files.ts`), and a running server that checked in with another one
-  gets a restart notice at the top of its page (`modOutdated`). `MODS` only prunes
+  gets a restart notice at the top of its page (`modOutdated`). The plugin
+  rides `MODS` too: on a plugin-only server the image copies `MODS` and
+  `PLUGINS` together into the plugins folder, with the same per-list manifest.
+  `MODS` only prunes
   files it copied itself (one manifest per list), so it never touches what
   `MODRINTH_PROJECTS` installed. `guardForSave` and `minecraftShapeEnv` take the
   mod off a server moved to software or a release it has no build for, and seed

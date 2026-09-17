@@ -41,7 +41,7 @@ import type { PlayerTimeout } from "@/lib/apps/player-timeout";
 import { useGamePresence } from "@/components/use-game-presence";
 import { RestartPlanner } from "./restart-planner";
 import { useLoginState } from "./minecraft-polaris-login";
-import { loaderForType } from "@/lib/apps/minecraft/modrinth";
+import { hasBuildFor } from "@/lib/apps/minecraft/polaris-login";
 import { MinecraftJoinPassword } from "./minecraft-join-password";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
@@ -356,7 +356,7 @@ export function MinecraftPanel({
     const edition = game?.edition ?? status?.edition ?? "java";
     const login = useLoginState(
         installedAppId,
-        edition === "java" && loaderForType(software) === "neoforge",
+        edition === "java" && hasBuildFor(software),
         LOGIN_REFRESH_MS
     );
     const loginOn = login.state?.on === true;

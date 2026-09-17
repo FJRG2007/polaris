@@ -3,12 +3,12 @@
 /**
  * Polaris's own login mod, inside the join-password card.
  *
- * Where a build exists (NeoForge 1.21.4 today) and Polaris has a public address,
- * it is the only login the card manages: what a new server gets, and what Turn
- * on installs - replacing a Modrinth guard the server still carries. It gives
- * players real commands and text passwords where the modded project only has
- * `/trigger` and numbers, and it keeps the passwords here, where a forgotten one
- * can be reset.
+ * Where a build exists (a plugin for Paper, Purpur and Spigot, a mod for
+ * NeoForge 1.21.4) and Polaris has a public address, it is the only login the
+ * card manages: what a new server gets, and what Turn on installs - replacing a
+ * Modrinth guard the server still carries. It gives players real commands and
+ * text passwords where the modded project only has `/trigger` and numbers, and
+ * it keeps the passwords here, where a forgotten one can be reset.
  *
  * What it costs is said before it is turned on: the mod asks Polaris on every
  * join, so a server that cannot reach Polaris lets nobody in, and does not start.

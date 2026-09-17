@@ -377,7 +377,7 @@ export async function setLogin(
         }
         if (build === null) {
             throw new Error(
-                "Polaris login has no build for this server's software and release. It needs NeoForge on Minecraft 1.21.4."
+                `Polaris login has no build for this server's software and release. It runs on Paper, Purpur and Spigot from Minecraft ${polarisLogin.PLUGIN_SINCE}, and on NeoForge 1.21.4.`
             );
         }
         // The server downloads the mod from this address and asks it on every

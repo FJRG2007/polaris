@@ -29,9 +29,10 @@
  * being the only way the guard ever got installed, because a switch only protects
  * the servers whose owner went looking for it.
  *
- * Where Polaris's own login mod has a build (NeoForge 1.21.4 today) and Polaris
- * has a public address, it is the only login this card manages, unless the
- * server already has a login Polaris does not manage - see
+ * Where Polaris's own login has a build (Paper, Purpur and Spigot from 1.20.6,
+ * and NeoForge 1.21.4) and Polaris has a public address, it is the only login
+ * this card manages, unless the server already has a login Polaris does not
+ * manage - see
  * `minecraft-polaris-login`. A server still on the Modrinth project is not
  * offered a second choice: Turn on replaces it directly, and says so, because
  * replacing it makes every player register again. Without a public address the
@@ -50,6 +51,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
 import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
+import * as polarisLogin from "@/lib/apps/minecraft/polaris-login";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { projectFitsAction, updateServerSettingsAction } from "./minecraft-actions";
@@ -110,8 +112,8 @@ export function MinecraftJoinPassword({
     const java = edition === "java";
     const guard = java ? joinGuardFor(software) : null;
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
-    // Only a mod loader can carry Polaris's mod, so only one is asked about it.
-    const modCapable = java && modrinth.loaderForType(software) === "neoforge";
+    // Only software Polaris login has a build for is asked about it.
+    const modCapable = java && polarisLogin.hasBuildFor(software);
     const own = useLoginState(installedAppId, modCapable && !shared);
     const login = shared ?? own;
     const modOn = login.state?.on === true;
@@ -288,9 +290,9 @@ export function MinecraftJoinPassword({
                                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                 <span>
                                     Players still log in with{" "}
-                                    <span className="font-mono">{listed}</span> and numeric
-                                    passwords. Turning this on replaces it, and every player
-                                    registers again.
+                                    <span className="font-mono">{listed}</span>
+                                    {guard.entry === "trigger" ? " and numeric passwords" : ""}.
+                                    Turning this on replaces it, and every player registers again.
                                 </span>
                             </p>
                         )}

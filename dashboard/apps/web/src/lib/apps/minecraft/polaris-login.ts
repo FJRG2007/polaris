@@ -1,9 +1,13 @@
 /**
  * Polaris's own login mod: what a server has to carry for it, and when it can.
  *
- * The other join guards are Modrinth projects and live on the project list. This
- * one is not on Modrinth: the jar is built into the dashboard image and the
- * server's image downloads it from here, through `MODS`. So whether it is on is
+ * It comes as a mod for NeoForge and as a plugin for Paper, Purpur and Spigot;
+ * "the mod" below means either. The other join guards are Modrinth projects and
+ * live on the project list. This one is not on Modrinth: the jar is built into
+ * the dashboard image and the server's image downloads it from here, through
+ * `MODS` - on a plugin server too, where the image copies `MODS` into the
+ * plugins folder (its `start-setupModpack` hands `MODS` and `PLUGINS` to the
+ * same copy there), so the one list carries both. So whether it is on is
  * read from two places - the jar on `MODS` and the switch the mod itself reads -
  * and everything that decides a server's guard has to look at both, or it seeds a
  * second login beside this one.
@@ -42,29 +46,81 @@ export const TOKEN_KEY = "POLARIS_SERVER_TOKEN";
 /** The path the dashboard serves the jars under. */
 export const MOD_PATH = "/api/minecraft/mod";
 
+/** One jar the dashboard image carries, and the servers it loads on. */
+export interface ModBuild {
+    readonly file: string;
+    /** Modrinth's loader names, as `loaderForType` gives them. */
+    readonly loaders: readonly string[];
+    /** Whether it loads on this release, as the server's `VERSION` spells it. */
+    readonly runsOn: (version: string) => boolean;
+}
+
 /**
- * The builds the dashboard image carries, per loader, per release.
+ * The oldest release the plugin is offered on: where Minecraft moved to Java 21,
+ * which it is built for. It is compiled against this release's API and declares
+ * it (`resources/minecraft/polaris-paper/gradle.properties`).
+ */
+export const PLUGIN_SINCE = "1.20.6";
+
+/** A release as numbers, or null for anything that is not a plain release. */
+function releaseParts(version: string): number[] | null {
+    return /^\d+(\.\d+)*$/.test(version) ? version.split(".").map(Number) : null;
+}
+
+function atLeast(version: string, floor: string): boolean {
+    const parts = releaseParts(version);
+    const min = releaseParts(floor) ?? [];
+    if (parts === null) return false;
+    for (let at = 0; at < Math.max(parts.length, min.length); at++) {
+        const left = parts[at] ?? 0;
+        const right = min[at] ?? 0;
+        if (left !== right) return left > right;
+    }
+    return true;
+}
+
+/**
+ * The builds the dashboard image carries.
  *
  * A mod declares the one release it was built for and the loader refuses to start
- * on any other, so a release missing here is a server this is not offered to -
- * not one that gets the nearest build. `test/apps/polaris-login.test.ts` checks
- * that the image builds every file named here.
+ * on any other, so a release missing here is a server the mod is not offered to -
+ * not one that gets the nearest build. A plugin is different: Paper, Purpur and
+ * Spigot load one built against an older API on every release after it, so the
+ * plugin is offered from its floor on, LATEST included. `test/apps/polaris-login.test.ts`
+ * checks that the image builds every file named here.
  */
-export const MOD_BUILDS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-    neoforge: { "1.21.4": "polaris-neoforge-1.21.4.jar" }
-};
+export const MOD_BUILDS: readonly ModBuild[] = [
+    {
+        file: "polaris-neoforge-1.21.4.jar",
+        loaders: ["neoforge"],
+        runsOn: (version) => version === "1.21.4"
+    },
+    {
+        file: "polaris-paper.jar",
+        loaders: ["paper", "spigot"],
+        runsOn: (version) => version.toUpperCase() === "LATEST" || atLeast(version, PLUGIN_SINCE)
+    }
+];
 
 /** Every file the dashboard serves, for the route that serves them. */
-export const MOD_FILES: readonly string[] = Object.values(MOD_BUILDS).flatMap((builds) =>
-    Object.values(builds)
-);
+export const MOD_FILES: readonly string[] = MOD_BUILDS.map((build) => build.file);
 
-/** The build for this software and release, or null when there is none. A server
- *  left on LATEST has no release to match, so it gets none either. */
+/** The build for this software and release, or null when there is none. */
 export function modFileFor(software: string, version: string): string | null {
     const loader = loaderForType(software);
     if (!loader) return null;
-    return MOD_BUILDS[loader]?.[version.trim()] ?? null;
+    const release = version.trim();
+    return (
+        MOD_BUILDS.find((build) => build.loaders.includes(loader) && build.runsOn(release))?.file ??
+        null
+    );
+}
+
+/** Whether any build loads on this software, whatever the release - the question
+ *  of whether a screen should ask about Polaris login at all. */
+export function hasBuildFor(software: string): boolean {
+    const loader = loaderForType(software);
+    return loader !== null && MOD_BUILDS.some((build) => build.loaders.includes(loader));
 }
 
 /** Where a server downloads the build from. */
@@ -80,12 +136,19 @@ function modEntries(mods: string): string[] {
         .filter((entry) => entry.length > 0);
 }
 
-/** Whether an entry is one of these builds, whichever address it was written
- *  with - the dashboard's address can change after it was. */
+/** Each build's name without its release: `polaris-neoforge`, `polaris-paper`. */
+const BUILD_FAMILIES: readonly string[] = MOD_FILES.map((file) =>
+    file.replace(/(-[0-9][0-9.]*)?\.jar$/, "")
+);
+
+/** Whether an entry is one of these builds - for any release, and whichever
+ *  address it was written with, since the dashboard's address can change after
+ *  it was. */
 function isModEntry(entry: string): boolean {
     const path = entry.split(/[?#]/)[0] ?? "";
     const file = path.slice(path.lastIndexOf("/") + 1);
-    return /^polaris-[a-z]+-[0-9][0-9.]*\.jar$/.test(file);
+    const release = /(-[0-9][0-9.]*)?\.jar$/.exec(file);
+    return release !== null && BUILD_FAMILIES.includes(file.slice(0, release.index));
 }
 
 export function hasMod(mods: string): boolean {

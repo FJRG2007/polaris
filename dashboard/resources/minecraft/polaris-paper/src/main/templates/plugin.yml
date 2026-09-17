@@ -1,0 +1,15 @@
+name: Polaris
+version: "${version}"
+main: polaris.minecraft.PolarisPlugin
+api-version: "${api_version}"
+description: Asks every player for a password kept by Polaris before they can play.
+commands:
+  register:
+    description: Choose a password for this server.
+    usage: /register <password> <password>
+  login:
+    description: Log in with your password.
+    usage: /login <password>
+  changepassword:
+    description: Change your password.
+    usage: /changepassword <current> <new>

@@ -12,7 +12,8 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The mod's only way to Polaris: one POST per question, answered asynchronously.
+ * Polaris login's only way to Polaris, in the mod and the plugin alike: one POST
+ * per question, answered asynchronously.
  *
  * Every failure to get an answer - a refused connection, a timeout, a certificate
  * the JVM does not trust, a proxy's HTML error page - comes back as an unreachable

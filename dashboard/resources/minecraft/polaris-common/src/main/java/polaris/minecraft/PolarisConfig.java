@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /**
  * What the server's environment says about Polaris login.
  *
- * Polaris writes all four variables together when it switches the mod on, so one
+ * Polaris writes all four variables together when it switches the login on, so one
  * of them missing while the switch is on is not a setting somebody chose - it is a
  * server that cannot check anybody, and it is reported as that (BROKEN) rather than
  * quietly treated as off.
