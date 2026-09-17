@@ -16,6 +16,11 @@ import { SEARCH_SCOPES, type SearchScope } from "@polaris/core";
 import {
     AtSign,
     Boxes,
+    Hash,
+    MessageCircle,
+    MessagesSquare,
+    TextQuote,
+    UserRound,
     CheckSquare,
     Database,
     FileText,
@@ -120,8 +125,51 @@ export const SEARCH_SCOPE_LIST: readonly SearchScopeDefinition[] = [
         icon: AtSign,
         placeholder: "Search people",
         sigil: "@"
+    },
+    {
+        id: "chat",
+        label: "Chat",
+        keywords: ["chat"],
+        icon: MessagesSquare,
+        placeholder: "Find people, conversations, channels and messages"
+    },
+    {
+        id: "contacts",
+        label: "People",
+        keywords: ["contacts", "contact", "dm"],
+        icon: UserRound,
+        placeholder: "Find somebody to message"
+    },
+    {
+        id: "chats",
+        label: "Conversations",
+        keywords: ["chats", "conversations", "conversation"],
+        icon: MessageCircle,
+        placeholder: "Find a direct message or a group"
+    },
+    {
+        id: "channels",
+        label: "Channels",
+        keywords: ["channels", "channel"],
+        icon: Hash,
+        placeholder: "Find a channel in your spaces"
+    },
+    {
+        id: "messages",
+        label: "Messages",
+        keywords: ["messages", "message", "msg"],
+        icon: TextQuote,
+        placeholder: "Find something that was said"
     }
 ];
+
+/**
+ * The Chat quick switcher's filters, in the order its chips are drawn: all of it
+ * first, then one kind at a time.
+ */
+export const CHAT_SCOPE_FILTERS: readonly SearchScopeDefinition[] = (
+    ["chat", "contacts", "chats", "channels", "messages"] as const
+).map((id) => SEARCH_SCOPE_LIST.find((scope) => scope.id === id)!);
 
 const BY_ID = new Map(SEARCH_SCOPE_LIST.map((scope) => [scope.id, scope]));
 

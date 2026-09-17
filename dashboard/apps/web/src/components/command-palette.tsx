@@ -20,14 +20,15 @@
 
 import Fuse from "fuse.js";
 import * as core from "@polaris/core";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import * as recentStore from "@/lib/search/recent";
 import { PlainNames } from "@/components/person-name";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
-import { Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
-import { searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
+import { Dialog, DialogContent, DialogTitle, Input, SegmentedControl, cn } from "@polaris/ui";
+import { CHAT_SCOPE_FILTERS, searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
 import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
 import {
     navigationEntries,
@@ -132,7 +133,10 @@ export function CommandPalette({
     installed?: string[];
 }) {
     const router = useRouter();
+    const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    /** The scope the panel is to open on, when whatever opened it asked for one. */
+    const presetRef = useRef<core.SearchScope | null>(null);
     const [query, setQuery] = useState("");
     const [scope, setScope] = useState<SearchScopeDefinition | null>(null);
     const [active, setActive] = useState(0);
@@ -161,10 +165,31 @@ export function CommandPalette({
             if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
             // Browsers put Ctrl+K on the address bar; the dashboard claims it here.
             event.preventDefault();
-            setOpen((value) => !value);
+            // Inside Chat it is Chat's quick switcher, as it is in every chat app;
+            // Backspace on the empty field widens it to everything again.
+            presetRef.current = pathname.startsWith("/chat") ? "chat" : null;
+            setOpen((value) => {
+                // Closing uses no preset, and must not leave one for the next open.
+                if (value) presetRef.current = null;
+                return !value;
+            });
         }
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
+    }, [pathname]);
+
+    // Opened from a field somewhere else on the page, already narrowed.
+    useEffect(() => {
+        function onOpenRequest(event: Event) {
+            const wanted = requestedScope(event);
+            presetRef.current = wanted;
+            // Already open: the reset below does not run again, so narrow here.
+            setScope(wanted ? searchScope(wanted) : null);
+            setActive(0);
+            setOpen(true);
+        }
+        window.addEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
+        return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
     }, []);
 
     const loadResources = useCallback(() => {
@@ -187,7 +212,8 @@ export function CommandPalette({
     useEffect(() => {
         if (!open) return;
         setQuery("");
-        setScope(null);
+        setScope(presetRef.current ? searchScope(presetRef.current) : null);
+        presetRef.current = null;
         setActive(0);
         setHits([]);
         setFailure(null);
@@ -379,8 +405,16 @@ export function CommandPalette({
         const found: Row[] = [];
         if (!writingCommand) {
             if (scope && !scope.resourceKind) {
+                // All of Chat at once is four kinds of answer, each under its own
+                // heading; one scope is one heading.
+                const mixed = scope.id === "chat";
                 for (const hit of hits) {
-                    found.push({ kind: "hit", id: `hit:${hit.scope}:${hit.id}`, group: scope.label, hit });
+                    found.push({
+                        kind: "hit",
+                        id: `hit:${hit.scope}:${hit.id}`,
+                        group: mixed ? searchScope(hit.scope).label : scope.label,
+                        hit
+                    });
                 }
             } else {
                 // With nothing typed and no command, the panel is a map of the
@@ -495,7 +529,10 @@ export function CommandPalette({
         <>
             <button
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={() => {
+                    presetRef.current = null;
+                    setOpen(true);
+                }}
                 title={`Search (${hint})`}
                 aria-label="Search Polaris"
                 aria-keyshortcuts="Control+K Meta+K"
@@ -560,6 +597,27 @@ export function CommandPalette({
                             <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />
                         ) : null}
                     </div>
+
+                    {/* Chat's filters, one kind or all of them, keeping what was
+                        typed - the way a chat app's quick switcher narrows. */}
+                    {scope && core.isChatSearchScope(scope.id) ? (
+                        <div className="border-b border-border px-3 py-2">
+                            <SegmentedControl
+                                size="sm"
+                                aria-label="What to find"
+                                value={scope.id}
+                                onValueChange={(id) => {
+                                    setScope(searchScope(id));
+                                    setActive(0);
+                                    fieldRef.current?.focus();
+                                }}
+                                options={CHAT_SCOPE_FILTERS.map((filter) => ({
+                                    value: filter.id,
+                                    label: filter.id === "chat" ? "All" : filter.label
+                                }))}
+                            />
+                        </div>
+                    ) : null}
 
                     <div
                         ref={listRef}

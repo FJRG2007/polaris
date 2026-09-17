@@ -26,7 +26,6 @@
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
-import { usePaneCeiling } from "./pane-room";
 import { Crown, Users, X } from "lucide-react";
 import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
@@ -36,7 +35,8 @@ import { usePresence } from "@/components/presence-store";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
-import { forgetPaneSize, readPaneSize, savePaneSize } from "./pane-preferences";
+import { useChatPane } from "./use-chat-pane";
+import { resetPaneLayout } from "./pane-preferences";
 import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
@@ -370,30 +370,10 @@ export function ChannelMembers({
     const wide = useWideScreen();
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
     const heading = `Members${loading ? "" : ` - ${members.length}`}`;
-    const [width, setWidth] = useState(MEMBERS_PANE.fallback);
-    // What the row can actually spare, which is not the same as what this list
-    // may be: a remembered width from a wider window would otherwise arrive here
-    // and take it out of the conversation.
-    const { ceiling, measure } = usePaneCeiling(MEMBERS_PANE);
-
     // Above the two early returns below, and deliberately: a hook that only runs
     // on some renders is a crash the first time this panel is closed or drawn on
     // a narrow window.
-    useEffect(() => setWidth(readPaneSize("members", MEMBERS_PANE)), []);
-
-    const resize = useCallback((size: number) => {
-        setWidth(size);
-        savePaneSize("members", size);
-    }, []);
-
-    const reset = useCallback(() => {
-        forgetPaneSize("members");
-        setWidth(MEMBERS_PANE.fallback);
-    }, []);
-
-    /** What is on screen: what somebody chose, held to what there is room for.
-     *  The choice itself is left alone, so it comes back with the room. */
-    const drawn = Math.min(width, ceiling);
+    const { drawn, ceiling, measure, resize, reset } = useChatPane("members", MEMBERS_PANE);
 
     if (!open) return null;
 
@@ -437,6 +417,7 @@ export function ChannelMembers({
                 max={ceiling}
                 onChange={resize}
                 onReset={reset}
+                onResetAll={resetPaneLayout}
                 label="Members list width"
             />
             <aside

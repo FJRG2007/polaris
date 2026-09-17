@@ -20,7 +20,14 @@
  * arrow keys move it a step at a time, and Home and End go straight to the
  * limits - so the person who cannot drag can still decide, and the person who
  * dragged it somewhere silly can put it back with a double press.
+ *
+ * A right-click on the line itself says the same in words: put this panel back,
+ * or put every panel on the screen back. Only on the line - anywhere else the
+ * right-click belongs to whatever is under the pointer.
  */
+
+import { RotateCcw, LayoutPanelLeft } from "lucide-react";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./context-menu";
 
 import {
     useCallback,
@@ -45,6 +52,7 @@ export function ResizeHandle({
     max,
     onChange,
     onReset,
+    onResetAll,
     label,
     className
 }: {
@@ -72,6 +80,9 @@ export function ResizeHandle({
     /** What a double press goes back to. Without one the control is still
      *  useful, so this is optional rather than a required default nobody chose. */
     onReset?: () => void;
+    /** Puts every panel on the screen back, offered beside `onReset` on a
+     *  right-click. The screen decides what "every panel" covers. */
+    onResetAll?: () => void;
     /** Said to a screen reader, because a line between two panels has no text of
      *  its own: "Conversation list width" rather than "separator". */
     label: string;
@@ -135,7 +146,7 @@ export function ResizeHandle({
         [axis, max, min, onChange, size, towards]
     );
 
-    return (
+    const line = (
         <div
             role="separator"
             tabIndex={0}
@@ -162,5 +173,26 @@ export function ResizeHandle({
                 .filter(Boolean)
                 .join(" ")}
         />
+    );
+
+    if (!onReset && !onResetAll) return line;
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{line}</ContextMenuTrigger>
+            <ContextMenuContent className="w-48">
+                {onReset && (
+                    <ContextMenuItem onSelect={onReset}>
+                        <RotateCcw className="size-3.5" />
+                        Reset to default
+                    </ContextMenuItem>
+                )}
+                {onResetAll && (
+                    <ContextMenuItem onSelect={onResetAll}>
+                        <LayoutPanelLeft className="size-3.5" />
+                        Reset layout
+                    </ContextMenuItem>
+                )}
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }

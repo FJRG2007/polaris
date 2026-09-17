@@ -18,7 +18,6 @@ import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
-import { usePaneCeiling } from "./pane-room";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import type { PollDraft } from "./poll-dialog";
@@ -26,7 +25,8 @@ import { useChatStream } from "./use-chat-stream";
 import { ResizeHandle, Skeleton } from "@polaris/ui";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { forgetPaneSize, readPaneSize, savePaneSize } from "./pane-preferences";
+import { useChatPane } from "./use-chat-pane";
+import { resetPaneLayout } from "./pane-preferences";
 
 /**
  * What the thread may be narrowed and widened to.
@@ -63,35 +63,16 @@ export function ThreadPanel({
     onChanged: () => void;
 }) {
     const { may } = useChat();
-    const [width, setWidth] = useState(THREAD_PANE.fallback);
-    // What the row can actually spare, which is not the same as what a thread may
-    // be: a remembered width from a wider window, or a second panel opened beside
-    // this one, is how the conversation gets squeezed to nothing.
-    const { ceiling, measure } = usePaneCeiling(THREAD_PANE);
+    // Held to what the row can spare: a remembered width from a wider window, or
+    // a second panel opened beside this one, is how the conversation gets
+    // squeezed to nothing.
+    const { drawn, ceiling, measure, resize, reset } = useChatPane("thread", THREAD_PANE);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [error, setError] = useState("");
     /** Somebody to drop into the reply being written. The thread has its own box,
      *  so a name mentioned in here belongs in this one rather than in the
      *  channel's - see the composer's `insert`. */
     const [inserting, setInserting] = useState<{ token: number; text: string } | null>(null);
-
-    // After the first paint: there is no localStorage on the server, and a width
-    // read during render would not match what was sent.
-    useEffect(() => setWidth(readPaneSize("thread", THREAD_PANE)), []);
-
-    const resize = useCallback((size: number) => {
-        setWidth(size);
-        savePaneSize("thread", size);
-    }, []);
-
-    const reset = useCallback(() => {
-        forgetPaneSize("thread");
-        setWidth(THREAD_PANE.fallback);
-    }, []);
-
-    /** What is on screen: what somebody chose, held to what there is room for.
-     *  The choice itself is left alone, so it comes back with the room. */
-    const drawn = Math.min(width, ceiling);
 
     const load = useCallback(async () => {
         const result = await actions.readThreadAction(root.id);
@@ -138,6 +119,7 @@ export function ThreadPanel({
                 max={ceiling}
                 onChange={resize}
                 onReset={reset}
+                onResetAll={resetPaneLayout}
                 label="Thread width"
                 className="hidden md:block"
             />

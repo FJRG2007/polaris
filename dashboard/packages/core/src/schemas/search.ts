@@ -18,13 +18,25 @@ import { z } from "zod";
 
 export const LOCAL_SEARCH_SCOPES = ["projects", "services", "databases", "servers", "runners", "apps"] as const;
 
-export const REMOTE_SEARCH_SCOPES = ["tasks", "docs", "notes", "users"] as const;
+/**
+ * The Chat quick switcher's scopes: `chat` is all four at once, the others one
+ * kind each. People here are the ones a conversation can be started with, which
+ * is a different set from `users` - the people somebody shares work with.
+ */
+export const CHAT_SEARCH_SCOPES = ["chat", "contacts", "chats", "channels", "messages"] as const;
+
+export const REMOTE_SEARCH_SCOPES = ["tasks", "docs", "notes", "users", ...CHAT_SEARCH_SCOPES] as const;
 
 export const SEARCH_SCOPES = [...LOCAL_SEARCH_SCOPES, ...REMOTE_SEARCH_SCOPES] as const;
 
 export type LocalSearchScope = (typeof LOCAL_SEARCH_SCOPES)[number];
 export type RemoteSearchScope = (typeof REMOTE_SEARCH_SCOPES)[number];
+export type ChatSearchScope = (typeof CHAT_SEARCH_SCOPES)[number];
 export type SearchScope = (typeof SEARCH_SCOPES)[number];
+
+export function isChatSearchScope(scope: SearchScope): scope is ChatSearchScope {
+    return (CHAT_SEARCH_SCOPES as readonly string[]).includes(scope);
+}
 
 export function isRemoteSearchScope(scope: SearchScope): scope is RemoteSearchScope {
     return (REMOTE_SEARCH_SCOPES as readonly string[]).includes(scope);

@@ -29,6 +29,7 @@ import { usePresence } from "@/components/presence-store";
 import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
 import { channelLink, copyText } from "./links";
+import { openSearch } from "@/lib/search/open-search";
 import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
@@ -63,12 +64,14 @@ import {
     Pin,
     PinOff,
     Plus,
+    Search,
     Settings2,
     ShieldOff,
     Star,
     Trash2,
     Video,
-    Volume2
+    Volume2,
+    X
 } from "lucide-react";
 import {
     Button,
@@ -308,6 +311,22 @@ export function ChatSidebar() {
                         )
                     )}
                 </div>
+            </div>
+
+            {/* The quick switcher, where a chat app keeps it: above the list,
+                opening the same panel as Ctrl+K already narrowed to Chat -
+                people, conversations, channels and messages. */}
+            <div className="shrink-0 px-2 pt-2">
+                <button
+                    type="button"
+                    onClick={() => openSearch("chat")}
+                    aria-label="Find or start a conversation"
+                    aria-keyshortcuts="Control+K Meta+K"
+                    className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-field px-2 text-left text-sm text-foreground-subtle transition-colors hover:border-border-strong hover:text-muted-foreground"
+                >
+                    <Search className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">Find or start a conversation</span>
+                </button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
@@ -924,12 +943,26 @@ function RowMenu({
     // Only a group can be left. A direct message is between two people and has
     // no door; a channel in a space is left by leaving the space.
     const group = channel.kind === "group";
+    // Only the conversation on screen can be closed; any other row is already
+    // closed.
+    const showing = here === `/chat/c/${channel.id}` || here.startsWith(`/chat/c/${channel.id}/`);
 
     return (
         <>
             <ContextMenu>
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent className="w-48">
+                    {/* Back to the empty screen, as Escape does. Nothing is left
+                        or deleted: the conversation is only no longer open. */}
+                    {showing && (
+                        <>
+                            <ContextMenuItem onSelect={() => router.push("/chat")}>
+                                <X className="size-3.5" />
+                                Close chat
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                        </>
+                    )}
                     {/* Kept for this reader and nobody else, which is why it sits
                     beside muting rather than in the channel's settings. */}
                     <ContextMenuItem

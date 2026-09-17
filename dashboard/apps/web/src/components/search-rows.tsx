@@ -20,7 +20,7 @@ import { Clock, CornerDownLeft, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
-import type { SearchScopeDefinition } from "@/lib/search/scopes";
+import { searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
 
 /** What every row is given, whatever it draws inside. */
 export interface RowProps {
@@ -107,11 +107,20 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
  * live data with a state of their own, not entries in a list of screens.
  */
 export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
-    const personId = hit.scope === "users" ? hit.id : null;
+    const person = hit.scope === "users" || hit.scope === "contacts";
+    const personId = person ? hit.id : null;
+    // A conversation, a channel or a message wears its kind, since it has no
+    // face or state of its own to wear.
+    const KindIcon =
+        hit.scope === "chats" || hit.scope === "channels" || hit.scope === "messages"
+            ? searchScope(hit.scope).icon
+            : null;
     return (
         <Row {...row} label={hit.label} personId={personId}>
-            {hit.scope === "users" ? (
+            {person ? (
                 <Avatar person={{ id: hit.id, name: hit.label, image: hit.image ?? null }} size={22} />
+            ) : KindIcon ? (
+                <KindIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             ) : hit.status ? (
                 <span
                     aria-hidden="true"
