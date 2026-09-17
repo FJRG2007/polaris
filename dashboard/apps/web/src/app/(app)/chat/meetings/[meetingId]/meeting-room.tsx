@@ -25,8 +25,8 @@ import { copyText } from "@/app/(app)/chat/links";
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { useCallHold } from "@/app/(app)/chat/call-hold";
 import type { MeetingSummary } from "@/lib/chat/meetings";
-import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { CallRoster } from "@/app/(app)/chat/call-roster";
+import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { useRouter, useSearchParams } from "next/navigation";
 import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -97,10 +97,13 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     // A meeting belongs to no conversation, so nothing is announced to this
     // screen when somebody walks in or mutes; it asks instead.
     useEffect(() => {
-        if (inCall) return;
-        const timer = setInterval(() => void load(), OUTSIDE_POLL_MS);
+        if (inCall || gone || waiting) return;
+        const timer = setInterval(() => {
+            if (document.hidden) return;
+            load().catch(() => undefined);
+        }, OUTSIDE_POLL_MS);
         return () => clearInterval(timer);
-    }, [inCall, load]);
+    }, [gone, inCall, load, waiting]);
 
     const join = useCallback(async () => {
         setJoining(true);
