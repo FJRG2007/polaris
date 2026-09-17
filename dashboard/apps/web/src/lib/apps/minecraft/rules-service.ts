@@ -23,7 +23,7 @@
 
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
-import { withServerContainer, type ServerContainer } from "./service";
+import { editionOf, withServerContainer, type ServerContainer } from "./service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import {
     GAME_RULES,
@@ -63,6 +63,19 @@ export interface WorldRules {
      * to change a rule in either case would be offering something that fails.
      */
     readonly answering: boolean;
+    /**
+     * Whether a change can be made at all, answering or not.
+     *
+     * A Java server takes a change while it is off: it is kept as the value the
+     * world should be played under and handed to the server when it answers.
+     * Bedrock cannot be asked from here, so nothing on it can be changed.
+     */
+    readonly changeable: boolean;
+    /** The rules (and `difficulty`) set from Polaris that the server has not
+     *  confirmed yet. */
+    readonly pending: readonly string[];
+    /** Why the server refused one that was set from Polaris, by rule. */
+    readonly failures: Readonly<Record<string, string>>;
 }
 
 /** A rule name is only ever one of ours, and this is what says so out loud before
@@ -87,7 +100,10 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
             difficulty: null,
             reason: "Bedrock keeps its rules inside the world rather than answering for them.",
             asOf: null,
-            answering: false
+            answering: false,
+            changeable: false,
+            pending: [],
+            failures: {}
         };
     }
     assertKnownRuleNames();
@@ -108,7 +124,10 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
                 difficulty: null,
                 reason: "Start the server to read what these are set to.",
                 asOf: null,
-                answering: false
+                answering: false,
+                changeable: true,
+                pending: [],
+                failures: {}
             };
         }
         // It answered, and refused every one of them. Seen on Minecraft 26.2, which
@@ -127,7 +146,10 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
                 difficulty: parseDifficulty(output),
                 reason: "This server's version will not say what a rule is set to. Setting one still works.",
                 asOf: null,
-                answering: true
+                answering: true,
+                changeable: true,
+                pending: [],
+                failures: {}
             };
         }
         // Whatever this is, it is not the game talking. The container being down is
@@ -139,7 +161,10 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
             difficulty: parseDifficulty(output),
             reason: "The server is not answering, so what these are set to cannot be read right now.",
             asOf: null,
-            answering: false
+            answering: false,
+            changeable: true,
+            pending: [],
+            failures: {}
         };
     }
     return {
@@ -147,7 +172,10 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
         difficulty: parseDifficulty(output),
         reason: null,
         asOf: null,
-        answering: true
+        answering: true,
+        changeable: true,
+        pending: [],
+        failures: {}
     };
 }
 
@@ -312,6 +340,170 @@ export async function rememberDifficulty(installedAppId: string, difficulty: Dif
     await rememberQuietly(installedAppId, { difficulty });
 }
 
+/** The difficulty's row among the settings, beside the rule ids. */
+const DIFFICULTY_RULE = "difficulty";
+
+/** One value set from Polaris. */
+interface DesiredRule {
+    readonly rule: string;
+    readonly value: string;
+    readonly appliedAt: Date | null;
+    readonly failure: string | null;
+}
+
+/** Everything set from Polaris on this server, checked against the catalogue as
+ *  it is now - a row for a rule this Polaris no longer has is left alone. */
+async function desiredRules(installedAppId: string): Promise<DesiredRule[]> {
+    const rows = await prisma.gameRuleSetting.findMany({
+        where: { installedAppId },
+        select: { rule: true, value: true, appliedAt: true, failure: true }
+    });
+    return rows.filter((row) =>
+        row.rule === DIFFICULTY_RULE ? isDifficulty(row.value) : findRule(row.rule) !== undefined
+    );
+}
+
+/** Whether this install is a Java server, which is the edition a change can wait
+ *  for. Read from the install rather than from a container that may be off. */
+async function isJavaServer(installedAppId: string): Promise<boolean> {
+    const row = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { catalogId: true }
+    });
+    return row?.catalogId ? editionOf(row.catalogId) === "java" : false;
+}
+
+/** A reading with what Polaris was asked to set laid over it: the value the
+ *  world is meant to have, and which of them the server has not taken yet. */
+function withDesired(rules: WorldRules, desired: readonly DesiredRule[]): WorldRules {
+    const values = { ...rules.values };
+    let difficulty = rules.difficulty;
+    const pending: string[] = [];
+    const failures: Record<string, string> = {};
+    for (const row of desired) {
+        if (row.failure) {
+            failures[row.rule] = row.failure;
+            continue;
+        }
+        if (row.appliedAt === null) pending.push(row.rule);
+        if (row.rule === DIFFICULTY_RULE) difficulty = row.value as Difficulty;
+        else values[row.rule] = row.value;
+    }
+    return { ...rules, values, difficulty, pending, failures };
+}
+
+/** Record that the server confirmed one, or refused it. */
+async function settle(
+    installedAppId: string,
+    rule: string,
+    outcome: { value: string } | { failure: string }
+): Promise<void> {
+    await prisma.gameRuleSetting.updateMany({
+        where: { installedAppId, rule },
+        data:
+            "failure" in outcome
+                ? { failure: outcome.failure, appliedAt: null }
+                : { value: outcome.value, appliedAt: new Date(), failure: null }
+    });
+}
+
+/** Tell the server one value and read back what it took, or why it refused. A
+ *  server that is not answering throws. */
+async function tellServer(
+    server: ServerContainer,
+    rule: string,
+    value: string
+): Promise<{ value: string } | { refused: string }> {
+    if (rule === DIFFICULTY_RULE) {
+        await server.say(["difficulty", value]);
+        return { value };
+    }
+    const reply = stripFormatting(await server.say(["gamerule", rule, value]));
+    const said = parseGameRules(reply).get(rule);
+    if (said !== undefined) return { value: said };
+    const trimmed = reply.trim().replace(/\s+/g, " ").slice(0, 160);
+    return {
+        refused: trimmed ? `The server refused it: ${trimmed}` : "The server did not accept that"
+    };
+}
+
+/**
+ * Put the world back in line with what was set from Polaris.
+ *
+ * Runs against a server that has just answered. A value still waiting is sent;
+ * a value the game has drifted from - somebody typed `/gamerule` in the console -
+ * is sent again, because the stored one is what the operator chose here. A
+ * server that will not read rules back cannot show drift, so only what is
+ * waiting is sent to it.
+ */
+async function reconcile(
+    server: ServerContainer,
+    installedAppId: string,
+    live: WorldRules,
+    desired: readonly DesiredRule[]
+): Promise<WorldRules> {
+    let values = live.values;
+    let difficulty = live.difficulty;
+    const readable = Object.keys(live.values).length > 0;
+    for (const row of desired) {
+        if (row.failure) continue;
+        const isDifficultyRow = row.rule === DIFFICULTY_RULE;
+        const current = isDifficultyRow ? difficulty : values[row.rule];
+        const drifted =
+            (readable || isDifficultyRow) &&
+            current !== undefined &&
+            current !== null &&
+            current !== row.value;
+        if (row.appliedAt !== null && !drifted) continue;
+        // A rule this version does not have is one the server would refuse every
+        // time, so it says so instead of being retried forever.
+        if (readable && !isDifficultyRow && current === undefined) {
+            await settle(installedAppId, row.rule, {
+                failure: "This server's version does not have this rule."
+            });
+            continue;
+        }
+        const told = await tellServer(server, row.rule, row.value).catch(() => null);
+        // Not answering after all: it stays waiting for the next time.
+        if (told === null) continue;
+        if ("refused" in told) {
+            await settle(installedAppId, row.rule, { failure: told.refused });
+            continue;
+        }
+        await settle(installedAppId, row.rule, { value: told.value });
+        if (isDifficultyRow) difficulty = told.value as Difficulty;
+        else values = { ...values, [row.rule]: told.value };
+    }
+    return { ...live, values, difficulty };
+}
+
+/**
+ * The rules as Polaris has them, without asking the server anything.
+ *
+ * What the screen paints with: the last reading, with what was set from here
+ * laid over it. The live read that follows replaces it.
+ */
+export async function storedRulesFor(installedAppId: string): Promise<WorldRules> {
+    const [kept, desired, java] = await Promise.all([
+        remembered(installedAppId).catch(() => null),
+        desiredRules(installedAppId),
+        isJavaServer(installedAppId)
+    ]);
+    return withDesired(
+        {
+            values: kept?.values ?? {},
+            difficulty: kept?.difficulty ?? null,
+            reason: null,
+            asOf: kept?.at ?? null,
+            answering: false,
+            changeable: java,
+            pending: [],
+            failures: {}
+        },
+        desired
+    );
+}
+
 /**
  * The same, opening the machine for it.
  *
@@ -319,14 +511,26 @@ export async function rememberDifficulty(installedAppId: string, difficulty: Dif
  * container id nobody has ever seen. That is not an answer to put on a screen, and
  * it is not a reason to withhold the rules either: they are the game's, they are in
  * Polaris, and the only thing a stopped server changes is that none of them can be
- * read or set right now - so what it last said is what the screen shows, locked and
- * dated.
+ * read right now - so what it last said is what the screen shows, dated, with
+ * anything set from here waiting for it to start.
+ *
+ * A server that does answer is brought into line with what was set from Polaris
+ * in the same visit.
  */
 export async function readRulesFor(ownerId: string, installedAppId: string): Promise<WorldRules> {
-    const live = await withServerContainer(ownerId, installedAppId, readWorldRules).catch(() => null);
+    const desired = await desiredRules(installedAppId);
+    const live = await withServerContainer(ownerId, installedAppId, async (server) => {
+        const read = await readWorldRules(server);
+        return read.answering ? reconcile(server, installedAppId, read, desired) : read;
+    }).catch(() => null);
+    // Reconciling settles rows, so the overlay reads them again.
+    const settled = live?.answering ? await desiredRules(installedAppId) : desired;
     if (live && Object.keys(live.values).length > 0) {
-        await rememberQuietly(installedAppId, { values: live.values, difficulty: live.difficulty ?? undefined });
-        return live;
+        await rememberQuietly(installedAppId, {
+            values: live.values,
+            difficulty: live.difficulty ?? undefined
+        });
+        return withDesired(live, settled);
     }
     // It read no rules back, which does not mean it said nothing: a server that
     // will not answer for a rule still answers for the difficulty. That is worth
@@ -334,29 +538,113 @@ export async function readRulesFor(ownerId: string, installedAppId: string): Pro
     // when the server was more forthcoming.
     if (live?.difficulty) await rememberQuietly(installedAppId, { difficulty: live.difficulty });
     const kept = await remembered(installedAppId).catch(() => null);
+    const java = live ? live.changeable : await isJavaServer(installedAppId);
     if (kept) {
-        return {
-            values: kept.values,
-            difficulty: live?.difficulty ?? kept.difficulty,
-            // A server that is up but will not read a rule back keeps its own
-            // explanation: those values are old, and setting one still works.
-            reason:
-                live?.answering === true
-                    ? live.reason
-                    : "The server is not running. These are the values Polaris last read from it, and nothing here can be changed until it starts.",
-            asOf: kept.at,
-            answering: live?.answering === true
-        };
+        return withDesired(
+            {
+                values: kept.values,
+                difficulty: live?.difficulty ?? kept.difficulty,
+                // A server that is up but will not read a rule back keeps its own
+                // explanation: those values are old, and setting one still works.
+                reason:
+                    live?.answering === true
+                        ? live.reason
+                        : "The server is not running. These are the values Polaris last read from it, and a change made now is applied when it starts.",
+                asOf: kept.at,
+                answering: live?.answering === true,
+                changeable: java,
+                pending: [],
+                failures: {}
+            },
+            settled
+        );
     }
-    return (
+    return withDesired(
         live ?? {
             values: {},
             difficulty: null,
-            reason: "The server is stopped, so its rules cannot be read or changed yet.",
+            reason: "The server is stopped, so its rules cannot be read yet. A change made now is applied when it starts.",
             asOf: null,
-            answering: false
-        }
+            answering: false,
+            changeable: java,
+            pending: [],
+            failures: {}
+        },
+        settled
     );
+}
+
+/** What a change came to: in force now, or kept until the server answers. */
+export interface RuleChange {
+    readonly value: string;
+    readonly queued: boolean;
+}
+
+/**
+ * Set one value, stored first and then handed to the server.
+ *
+ * The stored row is the truth about what the world should be played under, so it
+ * is written before the server is asked. A server that answers and takes it marks
+ * it applied; one that is not answering leaves it waiting, and the next time
+ * Polaris reaches it the value is sent. A server that answers and refuses it puts
+ * the row back the way it was and says why - a value the game will not take is
+ * not a setting to keep.
+ */
+async function changeRule(
+    ownerId: string,
+    installedAppId: string,
+    actorId: string | null,
+    rule: string,
+    value: string
+): Promise<RuleChange> {
+    if (!(await isJavaServer(installedAppId))) {
+        throw new Error("Bedrock servers cannot be asked this from here");
+    }
+    const before = await prisma.gameRuleSetting.findUnique({
+        where: { installedAppId_rule: { installedAppId, rule } }
+    });
+    const now = new Date();
+    await prisma.gameRuleSetting.upsert({
+        where: { installedAppId_rule: { installedAppId, rule } },
+        create: {
+            installedAppId,
+            rule,
+            value,
+            setAt: now,
+            setById: actorId,
+            appliedAt: null,
+            failure: null
+        },
+        update: { value, setAt: now, setById: actorId, appliedAt: null, failure: null }
+    });
+    const told = await withServerContainer(ownerId, installedAppId, (server) =>
+        tellServer(server, rule, value)
+    ).catch(() => null);
+    if (told === null) return { value, queued: true };
+    if ("refused" in told) {
+        if (before) {
+            await prisma.gameRuleSetting.update({
+                where: { id: before.id },
+                data: {
+                    value: before.value,
+                    setAt: before.setAt,
+                    setById: before.setById,
+                    appliedAt: before.appliedAt,
+                    failure: before.failure
+                }
+            });
+        } else {
+            await prisma.gameRuleSetting.deleteMany({ where: { installedAppId, rule } });
+        }
+        throw new Error(told.refused);
+    }
+    await settle(installedAppId, rule, { value: told.value });
+    if (rule === DIFFICULTY_RULE) {
+        await rememberQuietly(installedAppId, { difficulty: told.value as Difficulty });
+    } else {
+        await rememberQuietly(installedAppId, { values: { [rule]: told.value } });
+    }
+    return { value: told.value, queued: false };
 }
 
 /**
@@ -370,34 +658,70 @@ export async function setWorldRule(
     ownerId: string,
     installedAppId: string,
     id: string,
-    value: string
-): Promise<string> {
+    value: string,
+    actorId: string | null = null
+): Promise<RuleChange> {
     const rule = findRule(id);
     if (!rule) throw new Error("That is not a rule Polaris can set");
     const normalized = normalizeRuleValue(rule, value);
     if (normalized === null) throw new Error(`${rule.label} does not take that value`);
-    const reply = await withServerContainer(ownerId, installedAppId, (server) => {
-        if (server.edition !== "java") throw new Error("Bedrock servers cannot be asked this from here");
-        return server.say(["gamerule", rule.id, normalized]);
-    });
-    const said = parseGameRules(stripFormatting(reply)).get(rule.id);
-    if (said === undefined) {
-        const trimmed = stripFormatting(reply).trim().replace(/\s+/g, " ").slice(0, 160);
-        throw new Error(trimmed ? `The server refused it: ${trimmed}` : "The server did not accept that");
-    }
-    await rememberQuietly(installedAppId, { values: { [rule.id]: said } });
-    return said;
+    return changeRule(ownerId, installedAppId, actorId, rule.id, normalized);
 }
 
-/** Change the difficulty, live. */
+/** Change the difficulty, live when the server answers. */
 export async function setWorldDifficulty(
     ownerId: string,
     installedAppId: string,
-    difficulty: Difficulty
+    difficulty: Difficulty,
+    actorId: string | null = null
+): Promise<RuleChange> {
+    return changeRule(ownerId, installedAppId, actorId, DIFFICULTY_RULE, difficulty);
+}
+
+/**
+ * The difficulty chosen on the Settings form, kept as the one the world should
+ * be played under.
+ *
+ * Settings and Rules both set it, and the stored value is what the rules pass
+ * puts back - so a choice made on Settings has to land here too, or the next
+ * read would undo it. Nothing is written when it already says this.
+ */
+export async function recordDifficulty(
+    installedAppId: string,
+    difficulty: Difficulty,
+    actorId: string | null
 ): Promise<void> {
-    await withServerContainer(ownerId, installedAppId, (server) => {
-        if (server.edition !== "java") throw new Error("Bedrock servers cannot be asked this from here");
-        return server.say(["difficulty", difficulty]);
+    const current = await prisma.gameRuleSetting.findUnique({
+        where: { installedAppId_rule: { installedAppId, rule: DIFFICULTY_RULE } }
     });
-    await rememberQuietly(installedAppId, { difficulty });
+    if (current?.value === difficulty) return;
+    const now = new Date();
+    await prisma.gameRuleSetting.upsert({
+        where: { installedAppId_rule: { installedAppId, rule: DIFFICULTY_RULE } },
+        create: {
+            installedAppId,
+            rule: DIFFICULTY_RULE,
+            value: difficulty,
+            setAt: now,
+            setById: actorId,
+            appliedAt: null,
+            failure: null
+        },
+        update: { value: difficulty, setAt: now, setById: actorId, appliedAt: null, failure: null }
+    });
+}
+
+/**
+ * Hand a server everything set from Polaris that it has not taken yet.
+ *
+ * For the cron, which reaches every server whether or not anybody has the rules
+ * screen open. One indexed query says there is nothing to do, which is almost
+ * every time.
+ */
+export async function applyPendingRules(ownerId: string, installedAppId: string): Promise<void> {
+    const waiting = await prisma.gameRuleSetting.count({
+        where: { installedAppId, appliedAt: null, failure: null }
+    });
+    if (waiting === 0) return;
+    await readRulesFor(ownerId, installedAppId);
 }

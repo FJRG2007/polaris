@@ -3492,6 +3492,28 @@ model PlayerInventorySnapshot {
     @@index([installedAppId])
 }
 
+// A world rule (or the difficulty) as the operator set it from Polaris.
+//
+// This is what the world is meant to be played under, and it wins: a change made
+// while the server is off waits here until the server answers, and a value the
+// game drifted away from is put back the next time Polaris reads it.
+model GameRuleSetting {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    installedAppId String    @db.Uuid
+    // A game rule id from the catalogue, or "difficulty".
+    rule           String
+    value          String
+    setAt          DateTime
+    setById        String?   @db.Uuid
+    // When the server last confirmed it. Null while it is waiting to be applied.
+    appliedAt      DateTime?
+    // Why the server would not take it, when it refused.
+    failure        String?
+
+    @@unique([installedAppId, rule])
+    @@index([installedAppId])
+}
+
 // The last experience level Polaris saw a player on.
 //
 // A level can only be asked of somebody standing on the server, so the column

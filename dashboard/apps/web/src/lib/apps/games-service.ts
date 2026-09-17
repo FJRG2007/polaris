@@ -35,6 +35,7 @@ import {
     sweepFivemBans
 } from "@/lib/apps/fivem/service";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
+import { applyPendingRules } from "@/lib/apps/minecraft/rules-service";
 import { applyAllowList, getArkPlayers } from "@/lib/apps/ark/service";
 import { applyPendingArkRules } from "@/lib/apps/ark/settings-service";
 import { syncMinecraftRoutes } from "@/lib/apps/minecraft/router-service";
@@ -701,6 +702,10 @@ export async function syncFirewallBans(
         }
         // Bedrock has no ban command at all, so there is nothing to hand it.
         if (editionOf(install.catalogId) === "bedrock") continue;
+        // The world rules set from Polaris while the server was off, handed over
+        // whether or not anybody has the rules screen open. One indexed query
+        // when there is nothing waiting.
+        await applyPendingRules(ownerId, install.id).catch(() => undefined);
         const applied = await applyFirewallBans(ownerId, install.id).catch(() => null);
         if (applied === null) continue;
         servers += 1;

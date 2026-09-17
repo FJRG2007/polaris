@@ -26,10 +26,62 @@ let stored: string | null = null;
  *  about the install, so writing to it is a thing worth counting. */
 let writes = 0;
 
+/** The values set from Polaris, keyed by rule. */
+type Setting = {
+    id: string;
+    installedAppId: string;
+    rule: string;
+    value: string;
+    setAt: Date;
+    setById: string | null;
+    appliedAt: Date | null;
+    failure: string | null;
+};
+const settings = new Map<string, Setting>();
+
+type Where = { installedAppId?: string; rule?: string; appliedAt?: null; failure?: null };
+const matching = (where: Where) =>
+    [...settings.values()].filter(
+        (row) =>
+            (where.rule === undefined || row.rule === where.rule) &&
+            (where.appliedAt === undefined || row.appliedAt === null) &&
+            (where.failure === undefined || row.failure === null)
+    );
+
 vi.mock("@polaris/db", () => ({
     prisma: {
+        gameRuleSetting: {
+            findMany: async ({ where }: { where: Where }) => matching(where),
+            count: async ({ where }: { where: Where }) => matching(where).length,
+            findUnique: async ({ where }: { where: { installedAppId_rule: { rule: string } } }) =>
+                settings.get(where.installedAppId_rule.rule) ?? null,
+            upsert: async (args: {
+                where: { installedAppId_rule: { rule: string } };
+                create: Omit<Setting, "id">;
+                update: Partial<Setting>;
+            }) => {
+                const rule = args.where.installedAppId_rule.rule;
+                const current = settings.get(rule);
+                settings.set(
+                    rule,
+                    current ? { ...current, ...args.update } : { id: rule, ...args.create }
+                );
+            },
+            update: async (args: { where: { id: string }; data: Partial<Setting> }) => {
+                const current = settings.get(args.where.id);
+                if (current) settings.set(current.rule, { ...current, ...args.data });
+            },
+            updateMany: async (args: { where: Where; data: Partial<Setting> }) => {
+                for (const row of matching(args.where)) {
+                    settings.set(row.rule, { ...row, ...args.data });
+                }
+            },
+            deleteMany: async (args: { where: Where }) => {
+                for (const row of matching(args.where)) settings.delete(row.rule);
+            }
+        },
         installedApp: {
-            findUnique: async () => ({ config: stored }),
+            findUnique: async () => ({ config: stored, catalogId: "minecraft" }),
             update: async (args: { data: { config: string } }) => {
                 stored = args.data.config;
                 writes += 1;
@@ -42,7 +94,14 @@ vi.mock("@polaris/db", () => ({
 /** What the container would say, or null for a server that cannot be opened. */
 let talking: string | null = null;
 
+/** Every command the server was handed, in order. */
+const told: string[][] = [];
+
+/** What the server answers to a `gamerule` set, when that differs from `talking`. */
+let setReply: string | null = null;
+
 vi.mock("@/lib/apps/minecraft/service", () => ({
+    editionOf: () => "java",
     withServerContainer: async (
         _ownerId: string,
         _installedAppId: string,
@@ -53,7 +112,14 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
         if (talking === null) {
             throw new Error("Error response from daemon: container 0000000000 is not running");
         }
-        return run({ edition: "java", run: async () => ({ output: talking }), say: async () => talking });
+        return run({
+            edition: "java",
+            run: async () => ({ output: talking }),
+            say: async (argv: string[]) => {
+                told.push(argv);
+                return argv[0] === "gamerule" && setReply !== null ? setReply : talking;
+            }
+        });
     }
 }));
 
@@ -75,6 +141,9 @@ beforeEach(() => {
     stored = null;
     writes = 0;
     talking = ANSWERED;
+    setReply = null;
+    settings.clear();
+    told.length = 0;
 });
 
 describe("what a server that will not answer is allowed to say", () => {
@@ -152,7 +221,10 @@ describe("a change made while the server is up", () => {
     it("is what the screen shows after it goes down", async () => {
         await readRulesFor(OWNER, SERVER);
         talking = "Gamerule keepInventory is now set to: false";
-        expect(await setWorldRule(OWNER, SERVER, "keepInventory", "false")).toBe("false");
+        expect(await setWorldRule(OWNER, SERVER, "keepInventory", "false")).toEqual({
+            value: "false",
+            queued: false
+        });
 
         talking = null;
         const kept = await readRulesFor(OWNER, SERVER);
@@ -267,5 +339,60 @@ describe("a server that answers but will not read a rule back", () => {
         // rather than letting them pass for a reading.
         expect(rules.answering).toBe(true);
         expect(rules.asOf).toBeTruthy();
+    });
+});
+
+describe("what is set from Polaris", () => {
+    it("is kept while the server is off and handed over when it answers", async () => {
+        talking = null;
+        const change = await setWorldRule(OWNER, SERVER, "keepInventory", "false");
+        expect(change).toEqual({ value: "false", queued: true });
+
+        const waiting = await readRulesFor(OWNER, SERVER);
+        expect(waiting.values.keepInventory).toBe("false");
+        expect(waiting.pending).toContain("keepInventory");
+        expect(waiting.changeable).toBe(true);
+
+        // The server starts, still on its old value.
+        talking = ANSWERED;
+        setReply = "Gamerule keepInventory is now set to: false";
+        const applied = await readRulesFor(OWNER, SERVER);
+        expect(told).toContainEqual(["gamerule", "keepInventory", "false"]);
+        expect(applied.values.keepInventory).toBe("false");
+        expect(applied.pending).toEqual([]);
+    });
+
+    it("puts back a value the game drifted from", async () => {
+        setReply = "Gamerule keepInventory is now set to: false";
+        await setWorldRule(OWNER, SERVER, "keepInventory", "false");
+        told.length = 0;
+
+        // Somebody typed /gamerule keepInventory true in the console.
+        const read = await readRulesFor(OWNER, SERVER);
+        expect(told).toContainEqual(["gamerule", "keepInventory", "false"]);
+        expect(read.values.keepInventory).toBe("false");
+    });
+
+    it("leaves a value the server refused out, and says why", async () => {
+        setReply = "Incorrect argument for command";
+        await expect(setWorldRule(OWNER, SERVER, "keepInventory", "false")).rejects.toThrow(
+            /refused/
+        );
+        const read = await readRulesFor(OWNER, SERVER);
+        expect(read.values.keepInventory).toBe("true");
+        expect(read.pending).toEqual([]);
+    });
+
+    it("waits for a difficulty set while the server is off", async () => {
+        talking = null;
+        expect(await setWorldDifficulty(OWNER, SERVER, "hard")).toEqual({
+            value: "hard",
+            queued: true
+        });
+        talking = ANSWERED;
+        const applied = await readRulesFor(OWNER, SERVER);
+        expect(told).toContainEqual(["difficulty", "hard"]);
+        expect(applied.difficulty).toBe("hard");
+        expect(applied.pending).toEqual([]);
     });
 });

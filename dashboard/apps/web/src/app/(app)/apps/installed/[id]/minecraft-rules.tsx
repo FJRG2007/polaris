@@ -7,9 +7,14 @@
  * Every control here takes effect the moment it is switched. That is not a
  * detail - the same settings exist in `server.properties`, where changing one
  * rebuilds the container and disconnects everybody playing, and this screen is
- * the version of them that does not. So there is no Save button and no pending
- * state: a switch is the change, and what comes back is the server's own answer
- * about what it now is.
+ * the version of them that does not. So there is no Save button: a switch is
+ * the change, and what comes back is the server's own answer about what it now
+ * is.
+ *
+ * What is set here is kept by Polaris and wins. The screen paints from that
+ * first, then from the server's answer; a change made while the server is off
+ * waits and is applied when it starts, and a value the game drifted from is put
+ * back.
  *
  * What is drawn is what this server has. The rules are read from it rather than
  * listed from a version Polaris assumes, so a 1.16 server is not shown three
@@ -22,12 +27,20 @@ import type { WorldRules } from "@/lib/apps/minecraft/rules-service";
 import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import { DIFFICULTIES, ruleGroups, normalizeRuleValue, type GameRule } from "@/lib/apps/minecraft/rules";
-import { readWorldRulesAction, setWorldDifficultyAction, setWorldRuleAction } from "./minecraft-actions";
+import {
+    readWorldRulesAction,
+    setWorldDifficultyAction,
+    setWorldRuleAction,
+    storedWorldRulesAction
+} from "./minecraft-actions";
 
 /** What a control says when its position is Polaris's note of an earlier reading
  *  and the control still works, which is the one case where it would otherwise
  *  read as what the world is being played under right now. */
 const REMEMBERED_NOTE = "This is the value Polaris last read, not one the server confirmed just now.";
+
+/** What a row says when its value was set here and the server has not taken it. */
+const PENDING_NOTE = "Saved. Applied when the server is running.";
 
 export function MinecraftRules({
     installedAppId,
@@ -39,12 +52,17 @@ export function MinecraftRules({
 }) {
     const [rules, setRules] = useState<WorldRules | null>(null);
     const [loading, setLoading] = useState(true);
+    /** Whether the server is being asked right now, with Polaris's own values
+     *  already on screen. */
+    const [checking, setChecking] = useState(true);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
+        setChecking(true);
         const result = await readWorldRulesAction(installedAppId);
         setLoading(false);
+        setChecking(false);
         if (result.rules) {
             setRules(result.rules);
             setError(null);
@@ -54,8 +72,31 @@ export function MinecraftRules({
     }, [installedAppId]);
 
     useEffect(() => {
+        let live = true;
+        // What Polaris has, first: a database read, on screen while the server -
+        // two dozen commands in a container - is still being asked.
+        void storedWorldRulesAction(installedAppId).then((result) => {
+            if (!live || !result.rules) return;
+            const stored = result.rules;
+            setRules((current) => current ?? stored);
+            setLoading(false);
+        });
         void load();
-    }, [load]);
+        return () => {
+            live = false;
+        };
+    }, [installedAppId, load]);
+
+    /** Mark one value as waiting for the server, or as taken. */
+    function markPending(id: string, waiting: boolean): void {
+        setRules((current) => {
+            if (!current) return current;
+            const others = current.pending.filter((entry) => entry !== id);
+            const failures = { ...current.failures };
+            delete failures[id];
+            return { ...current, pending: waiting ? [...others, id] : others, failures };
+        });
+    }
 
     /** Set one rule and take the server's answer as the truth about it. */
     async function apply(rule: GameRule, value: string): Promise<void> {
@@ -82,6 +123,7 @@ export function MinecraftRules({
             );
             return;
         }
+        markPending(rule.id, result.queued === true);
         if (result.value !== undefined && result.value !== normalized) {
             setRules((current) =>
                 current ? { ...current, values: { ...current.values, [rule.id]: result.value as string } } : current
@@ -101,7 +143,9 @@ export function MinecraftRules({
         if (result.error) {
             setError(result.error);
             setRules((current) => (current ? { ...current, difficulty: before } : current));
+            return;
         }
+        markPending("difficulty", result.queued === true);
     }
 
     // Whether this server told us anything at all. Some releases - 26.2 among them
@@ -143,13 +187,10 @@ export function MinecraftRules({
                     className="ml-auto"
                     aria-label="Read the rules again"
                     title="Read the rules again"
-                    disabled={loading}
-                    onClick={() => {
-                        setLoading(true);
-                        void load();
-                    }}
+                    disabled={checking}
+                    onClick={() => void load()}
                 >
-                    <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
+                    <RefreshCw className={checking ? "size-4 animate-spin" : "size-4"} />
                 </Button>
             </div>
 
@@ -177,14 +218,21 @@ export function MinecraftRules({
                                 <p className="text-xs text-muted-foreground">
                                     Peaceful removes hostile mobs and stops hunger draining.
                                 </p>
-                                {remembered && rules.difficulty ? (
+                                {rules.pending.includes("difficulty") ? (
+                                    <p className="text-xs text-warning">{PENDING_NOTE}</p>
+                                ) : remembered && rules.difficulty ? (
                                     <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
+                                ) : null}
+                                {rules.failures.difficulty ? (
+                                    <p className="text-xs text-danger">
+                                        {rules.failures.difficulty}
+                                    </p>
                                 ) : null}
                             </div>
                             <Select
                                 className="w-40"
                                 aria-label="Difficulty"
-                                disabled={!canManage || busy === "difficulty" || !rules.answering}
+                                disabled={!canManage || busy === "difficulty" || !rules.changeable}
                                 value={rules.difficulty ?? ""}
                                 onValueChange={(value) => void applyDifficulty(value)}
                                 options={[
@@ -237,13 +285,11 @@ export function MinecraftRules({
                                                 value={rules.values[rule.id] ?? ""}
                                                 unknown={rules.values[rule.id] === undefined}
                                                 remembered={remembered}
+                                                pending={rules.pending.includes(rule.id)}
+                                                failure={rules.failures[rule.id] ?? null}
                                                 first={index === 0}
                                                 busy={busy === rule.id}
-                                                disabled={
-                                                    !canManage ||
-                                                    !rules.answering ||
-                                                    rules.values[rule.id] === undefined
-                                                }
+                                                disabled={!canManage || !rules.changeable}
                                                 onChange={(value) => void apply(rule, value)}
                                             />
                                         ))}
@@ -263,6 +309,8 @@ function RuleRow({
     value,
     unknown = false,
     remembered = false,
+    pending = false,
+    failure = null,
     first,
     busy,
     disabled,
@@ -276,6 +324,10 @@ function RuleRow({
     /** The position is the last one Polaris read rather than one the server just
      *  gave, and the control beside it still works. */
     remembered?: boolean;
+    /** Set from Polaris and waiting for the server to take it. */
+    pending?: boolean;
+    /** Why the server refused the value set from Polaris. */
+    failure?: string | null;
     /** The first row carries no divider above it. */
     first: boolean;
     busy: boolean;
@@ -300,7 +352,10 @@ function RuleRow({
                     {busy ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" /> : null}
                 </p>
                 {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
-                {unknown ? (
+                {failure ? <p className="text-xs text-danger">{failure}</p> : null}
+                {pending ? (
+                    <p className="text-xs text-warning">{PENDING_NOTE}</p>
+                ) : unknown ? (
                     <p className="text-xs text-warning">
                         This server will not say what it is set to, so this is not its current value.
                     </p>

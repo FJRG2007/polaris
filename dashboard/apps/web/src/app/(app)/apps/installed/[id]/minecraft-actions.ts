@@ -77,6 +77,8 @@ import {
 } from "@/lib/apps/catalog";
 import {
     readRulesFor,
+    recordDifficulty,
+    storedRulesFor,
     rememberDifficulty,
     setWorldDifficulty,
     setWorldRule,
@@ -1789,6 +1791,11 @@ export async function updateServerSettingsAction(
         if (restart && difficulty && isDifficulty(difficulty)) {
             await rememberDifficulty(parsed.data.installedAppId, difficulty);
         }
+        // Either way it is now the difficulty the world should be played under,
+        // and the rules pass would otherwise put back the one set before it.
+        if (difficulty && isDifficulty(difficulty)) {
+            await recordDifficulty(parsed.data.installedAppId, difficulty, user.id);
+        }
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
@@ -1816,6 +1823,23 @@ export async function readWorldRulesAction(
 }
 
 /**
+ * The rules as Polaris has them, without asking the server - what the screen
+ * paints with before the live read answers.
+ */
+export async function storedWorldRulesAction(
+    installedAppId: string
+): Promise<{ rules?: WorldRules; error?: string }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: "That server does not exist" };
+    try {
+        await requireGameServer("games.read", parsed.data);
+        return { rules: await storedRulesFor(parsed.data) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the rules" };
+    }
+}
+
+/**
  * Change one rule while the server keeps running.
  *
  * Deliberately not a form with a Save button: every rule here takes effect the
@@ -1827,7 +1851,7 @@ export async function setWorldRuleAction(
     installedAppId: string,
     rule: string,
     value: string
-): Promise<{ value?: string; error?: string }> {
+): Promise<{ value?: string; queued?: boolean; error?: string }> {
     const parsed = z
         .object({
             installedAppId: z.string().uuid(),
@@ -1845,16 +1869,17 @@ export async function setWorldRuleAction(
             access.ownerId,
             parsed.data.installedAppId,
             parsed.data.rule,
-            parsed.data.value
+            parsed.data.value,
+            user.id
         );
         await recordAudit({
             actorId: user.id,
             action: "minecraft.gamerule",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { rule: parsed.data.rule, value: applied }
+            metadata: { rule: parsed.data.rule, value: applied.value, queued: applied.queued }
         });
-        return { value: applied };
+        return { value: applied.value, queued: applied.queued };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change that rule" };
     }
@@ -1893,7 +1918,7 @@ async function writeDifficultyEnv(
 export async function setWorldDifficultyAction(
     installedAppId: string,
     difficulty: string
-): Promise<{ error?: string }> {
+): Promise<{ queued?: boolean; error?: string }> {
     const parsed = z
         .object({ installedAppId: z.string().uuid(), difficulty: z.enum(DIFFICULTIES) })
         .safeParse({ installedAppId, difficulty });
@@ -1903,10 +1928,11 @@ export async function setWorldDifficultyAction(
             "games.manage",
             parsed.data.installedAppId
         );
-        await setWorldDifficulty(
+        const changed = await setWorldDifficulty(
             access.ownerId,
             parsed.data.installedAppId,
-            parsed.data.difficulty
+            parsed.data.difficulty,
+            user.id
         );
         // Recorded the moment it is in force, and before anything that can fail
         // afterwards. The world is being played under it from here on, so whether
@@ -1916,7 +1942,7 @@ export async function setWorldDifficultyAction(
             action: "minecraft.difficulty",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { difficulty: parsed.data.difficulty }
+            metadata: { difficulty: parsed.data.difficulty, queued: changed.queued }
         });
         // After the live change, and reported separately: the difficulty they
         // asked for is in force either way, and what a failure here costs is the
@@ -1928,7 +1954,7 @@ export async function setWorldDifficultyAction(
                 error: "The difficulty changed, but Polaris could not store it - a restart will put it back."
             };
         }
-        return {};
+        return { queued: changed.queued };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not change the difficulty"
