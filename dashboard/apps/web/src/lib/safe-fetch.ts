@@ -41,8 +41,8 @@
 
 import * as core from "@polaris/core";
 import { lookup } from "node:dns/promises";
-import { lookup as resolveHost } from "node:dns";
 import { Agent, fetch as guardedFetch } from "undici";
+import { createGate, createSharedFlight, deadline } from "@/lib/concurrency-gate";
 
 /** What undici's fetch answers with. Named off the function so this cannot drift
  *  from the version installed. */
@@ -54,6 +54,53 @@ export const FETCH_TIMEOUT_MS = 5000;
 /** How many redirects are followed. Enough for the ordinary http-to-https and a
  *  canonical host, and not enough to be walked around a network. */
 const MAX_HOPS = 3;
+
+/**
+ * How many name lookups for outside addresses may run at once.
+ *
+ * `dns.lookup` is `getaddrinfo`, and Node runs it on libuv's thread pool - four
+ * threads by default, shared with everything else in the process that is not
+ * plain network I/O: signing and checking the session cookie, compressing a
+ * response, reading a file. A name that does not answer holds its thread for the
+ * resolver's whole timeout. The Mail list asks for a sender's mark per row, each
+ * of those tries up to three hosts, and a screenful of senders was enough to put
+ * every thread in the pool on a slow lookup at once - after which every page in
+ * Polaris, for every user, waited behind them. From the browser that is a click
+ * on another app that does nothing until the page is reloaded.
+ *
+ * Two, so at least two threads are always left for serving pages.
+ */
+const LOOKUP_SLOTS = 2;
+
+const lookups = createGate(LOOKUP_SLOTS);
+const sameName = createSharedFlight<VettedAddress[]>();
+
+/**
+ * Every address a name answers with, through the gate above.
+ *
+ * The same name asked twice while the first lookup is out is one lookup - which
+ * is also what the check and the connect below are for a single fetch. Gives up
+ * waiting after `FETCH_TIMEOUT_MS`; a lookup already running keeps its slot until
+ * it finishes, which is exactly the bound the gate exists to keep, and one still
+ * in line when its last caller gives up leaves the line instead of running for
+ * nobody.
+ */
+export async function resolveName(hostname: string): Promise<VettedAddress[]> {
+    const wait = deadline(FETCH_TIMEOUT_MS, `${hostname} took too long to resolve`);
+    try {
+        return await sameName(
+            hostname.toLowerCase(),
+            (abandoned) =>
+                lookups.run(async () => {
+                    const found = await lookup(hostname, { all: true });
+                    return found.map((entry) => ({ address: entry.address, family: entry.family }));
+                }, abandoned),
+            wait.signal
+        );
+    } finally {
+        wait.clear();
+    }
+}
 
 /** An address Polaris is willing to consider at all. */
 export function safeUrl(address: string): URL | null {
@@ -83,7 +130,7 @@ export async function reachable(hostname: string): Promise<boolean> {
     if (core.isIpAddress(bare)) return !core.isPrivateIp(bare);
 
     try {
-        const addresses = await lookup(bare, { all: true });
+        const addresses = await resolveName(bare);
         if (addresses.length === 0) return false;
         return addresses.every((entry) => !core.isPrivateIp(entry.address));
     } catch {
@@ -143,16 +190,18 @@ export function vettedAddresses(
 const dispatcher = new Agent({
     connect: {
         lookup(hostname, options, callback) {
-            resolveHost(hostname, { all: true }, (error, addresses) => {
-                if (error) return callback(error, "", 0);
-                const vetted = vettedAddresses(hostname, addresses);
-                if (vetted instanceof Error) return callback(vetted, "", 0);
-                // Answered in the shape it was asked in. `all` is what a socket
-                // opening with happy eyeballs wants, and the single address is
-                // what everything else does.
-                if (options.all) return callback(null, vetted);
-                callback(null, vetted[0]!.address, vetted[0]!.family);
-            });
+            resolveName(hostname).then(
+                (addresses) => {
+                    const vetted = vettedAddresses(hostname, addresses);
+                    if (vetted instanceof Error) return callback(vetted, "", 0);
+                    // Answered in the shape it was asked in. `all` is what a
+                    // socket opening with happy eyeballs wants, and the single
+                    // address is what everything else does.
+                    if (options.all) return callback(null, vetted);
+                    callback(null, vetted[0]!.address, vetted[0]!.family);
+                },
+                (error: Error) => callback(error as NodeJS.ErrnoException, "", 0)
+            );
         }
     }
 });

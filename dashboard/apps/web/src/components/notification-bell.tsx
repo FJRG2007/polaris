@@ -70,7 +70,9 @@ export function NotificationBell() {
                     </span>
                 ) : null}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            {/* A column, so on a short screen it is the list that gives up height
+                and scrolls, while the heading and "View all" stay on screen. */}
+            <DropdownMenuContent align="end" className="flex w-80 flex-col">
                 <div className="flex items-center justify-between px-2 py-1.5">
                     <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
                     {unread > 0 ? (
@@ -92,7 +94,7 @@ export function NotificationBell() {
                         You&apos;re all caught up.
                     </p>
                 ) : (
-                    <div className="max-h-80 overflow-auto overscroll-contain">
+                    <div className="max-h-80 min-h-0 overflow-auto overscroll-contain">
                         {items.slice(0, PREVIEW_COUNT).map((item) => {
                             const audience = describeAudience(item.audience, item.audienceLabel);
                             return (

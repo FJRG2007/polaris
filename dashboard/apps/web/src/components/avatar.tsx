@@ -16,17 +16,17 @@
  */
 
 import { cn } from "@polaris/ui";
-import { useState, type CSSProperties } from "react";
-import { HeadphoneOff, MicOff, Volume2 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useState, type CSSProperties } from "react";
 import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
+import { useNamesArePlain } from "@/components/person-name";
+import { HeadphoneOff, MicOff, Volume2 } from "lucide-react";
 import { usePhotoOpenable } from "@/components/photo-access";
 import { ringGlow, ringWidth } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
-import { useNamesArePlain } from "@/components/person-name";
 import { decorationOf, PRESENCE_WORDS, type Presence } from "@polaris/core";
 
 /**
@@ -536,6 +536,11 @@ export function AvatarStack({
     if (people.length === 0) return null;
     const shown = people.slice(0, Math.max(1, max));
     const rest = Math.max(0, (total ?? people.length) - shown.length);
+    // The cutout only exists to part faces that overlap. On a lone face there is
+    // nothing to part, and a stroke in the page's colour drawn on a card or a
+    // row reads as a dark border - and, with the wrapper below taller than the
+    // face, as a second person half hidden behind the first.
+    const overlapping = shown.length + (rest > 0 ? 1 : 0) > 1;
     return (
         // The overlap is the point: a row of faces that touch reads as a group,
         // and a row of faces that do not reads as a list. The ring is what keeps
@@ -545,7 +550,14 @@ export function AvatarStack({
             {shown.map((person) => (
                 <span
                     key={person.id}
-                    className="rounded-full ring-2 ring-background"
+                    // `inline-flex`, and it is load-bearing: a block wrapper
+                    // around an inline face is as tall as the line of text it
+                    // sits in, not as the face, so the round ring came out an
+                    // oval hanging below the picture.
+                    className={cn(
+                        "inline-flex shrink-0 rounded-full",
+                        overlapping && "ring-2 ring-background"
+                    )}
                     title={person.name}
                 >
                     <Avatar person={person} size={size} status={false} />
@@ -553,7 +565,7 @@ export function AvatarStack({
             ))}
             {rest > 0 && (
                 <span
-                    className="inline-flex items-center justify-center rounded-full bg-muted text-[0.625rem] font-medium text-muted-foreground ring-2 ring-background"
+                    className="inline-flex shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] font-medium text-muted-foreground ring-2 ring-background"
                     style={{ width: size, height: size }}
                 >
                     +{rest}

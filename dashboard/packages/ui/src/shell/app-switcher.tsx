@@ -115,7 +115,7 @@ export function AppSwitcher({
                                 aria-current={active ? "page" : undefined}
                             >
                                 <Icon className="size-4 text-muted-foreground" />
-                                <span className="flex-1">
+                                <span className="min-w-0 flex-1">
                                     <span className="block">{app.label}</span>
                                     {app.description ? (
                                         <span className="block text-xs text-muted-foreground">

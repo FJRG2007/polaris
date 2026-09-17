@@ -26,6 +26,7 @@ import { apiPermission } from "@/lib/api-session";
 import { markDomains } from "@/lib/mailbox/sender-domain";
 import { iconLinks, MAX_HTML_BYTES } from "@/lib/mailbox/site-icon";
 import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
+import { createGate, createSharedFlight, deadline } from "@/lib/concurrency-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +69,21 @@ const BUDGET_MS = 12_000;
  */
 const PER_HOST_MS = 4_000;
 
+/**
+ * How many domains are hunted at once, across every reader.
+ *
+ * A mailbox opened cold asks for a mark per row, all at the same moment, and a
+ * hunt is several outside requests that can each take seconds. Unbounded, one
+ * screenful of senders was dozens of those running together - see
+ * `LOOKUP_SLOTS` in `safe-fetch.ts` for what that did to every other page. The
+ * rest wait here and are answered in turn; the list draws initials meanwhile.
+ */
+const hunts = createGate(4);
+
+/** A hundred messages from one shop arriving together are one hunt, not a
+ *  hundred: the cache below only helps once the first has finished. */
+const sameDomain = createSharedFlight<Found | null>();
+
 /** A mark, as it will be handed to the browser. */
 interface Found {
     readonly bytes: Uint8Array;
@@ -91,7 +107,7 @@ function remembered(): Map<string, Remembered> {
 }
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ address: string }> }
 ): Promise<Response> {
     const user = await apiPermission("mail.use");
@@ -122,13 +138,28 @@ export async function GET(
         return held.bytes ? picture(held.bytes, held.type) : gone();
     }
 
-    const found = await fetchMark(domain);
-    remembered().set(domain, {
-        at: Date.now(),
-        bytes: found?.bytes ?? null,
-        type: found?.type ?? ""
-    });
-    return found ? picture(found.bytes, found.type) : gone();
+    const wait = deadline(BUDGET_MS, `${domain} waited too long for a hunt`, request.signal);
+    try {
+        const found = await sameDomain(
+            domain,
+            (abandoned) =>
+                hunts.run(async () => {
+                    const mark = await fetchMark(domain);
+                    remembered().set(domain, {
+                        at: Date.now(),
+                        bytes: mark?.bytes ?? null,
+                        type: mark?.type ?? ""
+                    });
+                    return mark;
+                }, abandoned),
+            wait.signal
+        );
+        return found ? picture(found.bytes, found.type) : gone();
+    } catch {
+        return busy();
+    } finally {
+        wait.clear();
+    }
 }
 
 /**
@@ -248,5 +279,14 @@ function gone(): Response {
     return new Response(null, {
         status: 404,
         headers: { "cache-control": "private, max-age=3600" }
+    });
+}
+
+/** No picture yet. Initials as well, but not remembered by the browser: the
+ *  mark may well be found on the next visit. */
+function busy(): Response {
+    return new Response(null, {
+        status: 503,
+        headers: { "cache-control": "no-store" }
     });
 }

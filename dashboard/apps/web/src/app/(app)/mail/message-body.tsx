@@ -47,7 +47,6 @@ export function MessageBody({
     remoteAllowed: boolean;
     trackerVendors: readonly string[];
 }) {
-
     /**
      * What is actually drawn.
      *
@@ -93,7 +92,9 @@ export function MessageBody({
                     </button>
                 </>
             ) : (
-                <p className="text-[13px] text-foreground-subtle">This message has nothing in it.</p>
+                <p className="text-[13px] text-foreground-subtle">
+                    This message has nothing in it.
+                </p>
             )}
         </div>
     );
@@ -161,7 +162,10 @@ export function linkifyBareAddresses(html: string): string {
  * newsletter into a chore.
  */
 function trackerSentence(vendors: readonly string[]): string {
-    const named = vendors.length === 1 ? vendors[0] : `${vendors.slice(0, -1).join(", ")} and ${vendors.at(-1)}`;
+    const named =
+        vendors.length === 1
+            ? vendors[0]
+            : `${vendors.slice(0, -1).join(", ")} and ${vendors.at(-1)}`;
     return `Trackers from ${named} were served through Polaris, so they learned nothing about you.`;
 }
 
@@ -211,7 +215,8 @@ export function dressesItself(html: string): boolean {
  * page this is actually sitting on, not what the device prefers.
  */
 function readerColors(): { foreground: string; link: string; dark: boolean } {
-    if (typeof window === "undefined") return { foreground: "inherit", link: "#4f7cff", dark: false };
+    if (typeof window === "undefined")
+        return { foreground: "inherit", link: "#4f7cff", dark: false };
     const style = getComputedStyle(document.documentElement);
     const raw = (name: string) => style.getPropertyValue(name).trim();
     const token = (name: string, fallback: string) => {
@@ -229,7 +234,12 @@ function readerColors(): { foreground: string; link: string; dark: boolean } {
 
 /** The wrapper the message is drawn inside. Nothing here is the message's: the
  *  policy, the base target, the colours and the height reporter are all ours. */
-function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, origin: string): string {
+function frameDocument(
+    body: string,
+    showRemote: boolean,
+    paper: MessagePaper,
+    origin: string
+): string {
     // Only this origin, and only when the mailbox draws pictures at all. Not
     // `https:` - that would let a message fetch straight from its sender and
     // undo the whole point of serving them through here.
@@ -321,6 +331,22 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
  *  screen away; past this it scrolls inside its own frame. */
 const MAX_FRAME_HEIGHT = 20000;
 
+/**
+ * The frame's next height, given what the message says it measures.
+ *
+ * A message sized in viewport units (`min-height: 100vh` is common in
+ * newsletters) measures exactly as tall as the frame it is in. Answering that
+ * with the height plus the margin grew the frame, which grew the message, which
+ * reported again: eight pixels a frame until the ceiling, a few thousand renders
+ * of the page while somebody was trying to use it. A message as tall as its
+ * frame is one that fills it, not one asking for more.
+ */
+export function nextFrameHeight(current: number, claimed: number): number {
+    const measured = Math.ceil(claimed);
+    if (measured <= current && measured >= current - 1) return current;
+    return Math.min(Math.max(120, measured + 8), MAX_FRAME_HEIGHT);
+}
+
 /** The frame itself, exported for the print page - which must draw a message
  *  through exactly these three layers and nothing less. */
 export function SandboxedHtml({
@@ -359,7 +385,17 @@ export function SandboxedHtml({
                     "data-remote-background",
                     "data-remote-poster"
                 ],
-                FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button", "meta", "base"],
+                FORBID_TAGS: [
+                    "script",
+                    "iframe",
+                    "object",
+                    "embed",
+                    "form",
+                    "input",
+                    "button",
+                    "meta",
+                    "base"
+                ],
                 FORBID_ATTR: ["srcdoc", "formaction", "ping"],
                 // Mail is full of tables and inline styles and always will be.
                 // They are safe inside a frame with no same-origin and a policy
@@ -394,16 +430,22 @@ export function SandboxedHtml({
             // Only the frame this component owns, and only a number. Anything
             // else on the wire is somebody else's message.
             if (event.source !== frame.current?.contentWindow) return;
-            const claimed = (event.data as { polarisMailHeight?: unknown } | null)?.polarisMailHeight;
+            const claimed = (event.data as { polarisMailHeight?: unknown } | null)
+                ?.polarisMailHeight;
             if (typeof claimed !== "number" || !Number.isFinite(claimed)) return;
-            setHeight(Math.min(Math.max(120, Math.ceil(claimed) + 8), MAX_FRAME_HEIGHT));
+            setHeight((current) => nextFrameHeight(current, claimed));
         }
         window.addEventListener("message", onMessage);
         return () => window.removeEventListener("message", onMessage);
     }, []);
 
     if (clean === null || !origin) {
-        return <div className="h-24 animate-pulse rounded-md bg-card" aria-label="Opening the message" />;
+        return (
+            <div
+                className="h-24 animate-pulse rounded-md bg-card"
+                aria-label="Opening the message"
+            />
+        );
     }
 
     return (
