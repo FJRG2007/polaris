@@ -27,6 +27,7 @@
  */
 
 import { desktopBridge } from "@/lib/desktop-bridge";
+import { attending } from "@/components/use-attention";
 
 /**
  * The notices this device has drawn and not yet withdrawn, by tag.
@@ -47,9 +48,15 @@ export function canNotify(): boolean {
     return desktopBridge() !== null || (typeof window !== "undefined" && "Notification" in window);
 }
 
-/** Whether the person is looking at this tab right now. */
+/**
+ * Whether the person is looking at this tab right now: visible AND focused. A
+ * window with another program on top of it is still `visible`, and a card drawn
+ * there is a card nobody sees - see `components/use-attention`.
+ */
 export function tabIsWatched(): boolean {
-    return typeof document !== "undefined" && document.visibilityState === "visible";
+    return (
+        typeof document !== "undefined" && attending(document.visibilityState, document.hasFocus())
+    );
 }
 
 /**

@@ -20,6 +20,10 @@
  * One note per conversation, replaced rather than stacked: ten messages in one
  * room is one note that keeps changing, which is what every messenger does and
  * what stops a busy channel from filling the screen.
+ *
+ * The conversation open in this tab is only exempt while somebody is attending to
+ * the tab. Left open behind another window, it is announced like any other - see
+ * `lib/chat/message-alert` for the whole decision.
  */
 
 import { useRouter } from "next/navigation";
@@ -34,6 +38,13 @@ import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { notificationSoundEnabled } from "@/lib/notification-sound";
+import {
+    arrivalAlert,
+    markSeenOnDevice,
+    seenOnDevice,
+    showsConversation
+} from "@/lib/chat/message-alert";
 
 /** How long the words wait for more of them before being fetched. A burst of
  *  five messages is one request, not five. */
@@ -54,7 +65,8 @@ export function MessageToasts() {
     const go = useRef(router.push);
     go.current = router.push;
 
-    const pending = useRef(new Set<string>());
+    /** Conversations waiting to be announced, and when this tab heard of each. */
+    const pending = useRef(new Map<string, number>());
     /**
      * The last message announced in each conversation.
      *
@@ -71,16 +83,24 @@ export function MessageToasts() {
     device.current = scope;
 
     const flush = useCallback(async () => {
-        const asked = [...pending.current];
+        const heard = new Map(pending.current);
+        const asked = [...heard.keys()];
         pending.current.clear();
         if (asked.length === 0) return;
 
         const { toasts } = await messageToastsAction(asked).catch(() => ({ toasts: [] }));
         let sounded = false;
         for (const message of toasts) {
-            // The conversation somebody is standing in needs no announcement:
-            // the message is already on their screen.
-            if (here.current.startsWith(`/chat/c/${message.channelId}`)) continue;
+            const inThatChat = showsConversation(here.current, message.channelId);
+            const alert = arrivalAlert({
+                inThatChat,
+                attended: tabIsWatched(),
+                soundOn: notificationSoundEnabled()
+            });
+            // Somebody is reading it, here or in another tab of this browser.
+            if (!alert.toast && !alert.sound && !alert.desktop) continue;
+            const arrivedAt = heard.get(message.channelId) ?? Date.now();
+            if (seenOnDevice(message.channelId, arrivedAt)) continue;
             // Already said, and saying it twice is not a second message.
             if (announced.current.get(message.channelId) === message.messageId) continue;
             announced.current.set(message.channelId, message.messageId);
@@ -88,27 +108,29 @@ export function MessageToasts() {
             const who = message.inChannel
                 ? `${message.authorName} in ${message.conversation}`
                 : message.authorName;
-            const note: Toast = {
-                key: `message:${message.channelId}`,
-                title: who,
-                body: message.excerpt,
-                // Bounded both ways and never stretched: a tall photo is shown
-                // whole at a smaller size rather than cropped or squashed.
-                media: message.media ? (
-                    <ToastPicture src={message.media.src} alt={message.excerpt} />
-                ) : undefined,
-                icon: (
-                    <Avatar
-                        size={28}
-                        person={{
-                            id: message.authorId ?? message.channelId,
-                            name: message.authorName
-                        }}
-                    />
-                ),
-                onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`)
-            };
-            raise.current(note);
+            if (alert.toast) {
+                const note: Toast = {
+                    key: `message:${message.channelId}`,
+                    title: who,
+                    body: message.excerpt,
+                    // Bounded both ways and never stretched: a tall photo is shown
+                    // whole at a smaller size rather than cropped or squashed.
+                    media: message.media ? (
+                        <ToastPicture src={message.media.src} alt={message.excerpt} />
+                    ) : undefined,
+                    icon: (
+                        <Avatar
+                            size={28}
+                            person={{
+                                id: message.authorId ?? message.channelId,
+                                name: message.authorName
+                            }}
+                        />
+                    ),
+                    onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`)
+                };
+                raise.current(note);
+            }
 
             // Heard, not only seen. A silent card in the corner of a screen
             // somebody is typing on is a message they find later; every
@@ -117,7 +139,7 @@ export function MessageToasts() {
             // settle between themselves which of them makes it, because on an
             // install served over plain http they all believe they hold the
             // connection; see `device-once`.
-            if (!sounded) {
+            if (alert.sound && !sounded) {
                 sounded = true;
                 void claimForDevice(`${device.current}:message-chime`).then((mine) => {
                     if (mine) playCallSound("message");
@@ -126,7 +148,7 @@ export function MessageToasts() {
 
             // Past the window as well, when nobody is looking at it, and drawn
             // once however many tabs this browser has open on it.
-            if (!tabIsWatched()) {
+            if (alert.desktop) {
                 void claimForDevice(`${device.current}:message-notice:${message.channelId}`).then(
                     (mine) => {
                         if (!mine) return;
@@ -150,9 +172,15 @@ export function MessageToasts() {
                 // connection has nobody to tell and nothing to draw.
                 if (!context.owner && !tabIsWatched()) return;
 
+                const attended = tabIsWatched();
                 for (const channelId of frame.channels) {
-                    if (here.current.startsWith(`/chat/c/${channelId}`)) continue;
-                    pending.current.add(channelId);
+                    // Being read right here: the line is on screen, and the
+                    // other tabs are told so they stay quiet about it too.
+                    if (attended && showsConversation(here.current, channelId)) {
+                        markSeenOnDevice(channelId);
+                        continue;
+                    }
+                    pending.current.set(channelId, Date.now());
                 }
                 if (pending.current.size === 0) return;
 
