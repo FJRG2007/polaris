@@ -46,6 +46,11 @@ describe("what a toast says for a message with no words", () => {
 
     it("does not name what is behind a spoiler", () => {
         expect(describeFiles([file("image/png", { spoiler: true })])).toBe("Sent a spoiler");
+        const hidden = { spoiler: true };
+        expect(describeFiles([file("image/png", hidden), file("image/jpeg", hidden)])).toBe(
+            "Sent 2 spoilers"
+        );
+        expect(describeFiles([file("video/mp4", hidden), file("video/mp4")])).toBe("Sent 2 files");
     });
 });
 

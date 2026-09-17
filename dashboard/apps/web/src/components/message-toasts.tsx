@@ -23,6 +23,7 @@
 
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
+import { ToastPicture } from "@/components/toast-picture";
 import { usePathname } from "next/navigation";
 import { useToast, type Toast } from "@polaris/ui";
 import { useCallback, useEffect, useRef } from "react";
@@ -93,12 +94,7 @@ export function MessageToasts() {
                 // Bounded both ways and never stretched: a tall photo is shown
                 // whole at a smaller size rather than cropped or squashed.
                 media: message.media ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- an authenticated attachment route, not an optimisable asset
-                    <img
-                        src={message.media.src}
-                        alt={message.excerpt}
-                        className="max-h-40 w-auto max-w-full rounded-md object-contain"
-                    />
+                    <ToastPicture src={message.media.src} alt={message.excerpt} />
                 ) : undefined,
                 icon: (
                     <Avatar

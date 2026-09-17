@@ -30,6 +30,7 @@ import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { isVoiceFileName } from "./voice-name";
 import { reachableChannelIds, type ChatActor } from "./access";
 import { isInlineImage, isPlayableMedia } from "./attachments";
 
@@ -115,6 +116,8 @@ export function describeFiles(files: readonly ToastFile[]): string {
     const [first] = files;
     if (!first) return "Sent a message";
     if (files.length > 1) {
+        if (files.every((file) => file.spoiler)) return `Sent ${files.length} spoilers`;
+        if (files.some((file) => file.spoiler)) return `Sent ${files.length} files`;
         if (files.every((file) => isInlineImage(file.contentType)))
             return `Sent ${files.length} photos`;
         if (files.every((file) => isVideo(file.contentType))) return `Sent ${files.length} videos`;
@@ -128,9 +131,7 @@ export function describeFiles(files: readonly ToastFile[]): string {
     }
     if (isVideo(first.contentType)) return "Sent a video";
     if (isAudio(first.contentType)) {
-        return /^voice-message\.[a-z0-9]+$/i.test(first.name)
-            ? "Sent a voice message"
-            : `Sent ${first.name}`;
+        return isVoiceFileName(first.name) ? "Sent a voice message" : `Sent ${first.name}`;
     }
     return `Sent ${first.name}`;
 }

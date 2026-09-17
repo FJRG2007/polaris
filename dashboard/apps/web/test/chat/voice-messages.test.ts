@@ -9,14 +9,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { voiceFileName } from "@/lib/chat/voice-name";
 import { isInlineImage, isPlayableMedia } from "@/lib/chat/attachments";
 import {
     barsFrom,
     barsOf,
     isPlayable,
     isVoiceMessage,
-    spokenLength,
-    voiceFileName
+    spokenLength
 } from "@/app/(app)/chat/voice-recorder";
 
 describe("what gets a player", () => {
@@ -77,7 +77,10 @@ describe("the shape of it", () => {
     });
 
     it("stays inside what the server will store", () => {
-        const shape = barsFrom(Array.from({ length: 4000 }, () => 0.5), 500);
+        const shape = barsFrom(
+            Array.from({ length: 4000 }, () => 0.5),
+            500
+        );
         expect(shape.length).toBeLessThanOrEqual(64);
         expect(shape).toMatch(/^[0-9]+$/);
     });

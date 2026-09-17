@@ -182,7 +182,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                     </span>
                 ) : null}
                 {toast.media ? (
-                    <span className="mt-2 flex max-h-40 overflow-hidden rounded-md">
+                    <span className="mt-2 flex max-h-40 overflow-hidden rounded-md empty:hidden">
                         {toast.media}
                     </span>
                 ) : null}

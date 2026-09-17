@@ -6,9 +6,10 @@
  */
 
 import { useEffect } from "react";
+import { ToastPicture } from "@/components/toast-picture";
 import { ToastProvider, useToast } from "@polaris/ui";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 function Raise() {
     const toast = useToast();
@@ -35,5 +36,11 @@ describe("a toast with media", () => {
         expect(picture.getAttribute("src")).toBe("/api/chat/attachments/f1");
         expect(picture.parentElement?.className).toContain("max-h-40");
         expect(screen.getByText("Sent a photo", { selector: "span" })).toBeTruthy();
+    });
+
+    it("drops a picture that cannot be loaded and keeps the words", () => {
+        render(<ToastPicture src="/api/chat/attachments/gone" alt="Sent a photo" />);
+        fireEvent.error(screen.getByRole("img", { name: "Sent a photo" }));
+        expect(screen.queryByRole("img")).toBeNull();
     });
 });
