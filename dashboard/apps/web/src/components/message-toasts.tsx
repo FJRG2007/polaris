@@ -13,8 +13,9 @@
  * exactly what people mean when they turn notifications off.
  *
  * What arrives on the wire is a channel id and nothing else, by design, so the
- * words are fetched afterwards through the same access check that draws the
- * conversation. Muted conversations never come back from it.
+ * words - and the picture of what was sent, when there is one - are fetched
+ * afterwards through the same access check that draws the conversation. Muted
+ * conversations never come back from it.
  *
  * One note per conversation, replaced rather than stacked: ten messages in one
  * room is one note that keeps changing, which is what every messenger does and
@@ -23,15 +24,15 @@
 
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
-import { ToastPicture } from "@/components/toast-picture";
 import { usePathname } from "next/navigation";
+import { playCallSound } from "@/lib/call-sounds";
 import { useToast, type Toast } from "@polaris/ui";
+import { claimForDevice } from "@/lib/device-once";
 import { useCallback, useEffect, useRef } from "react";
+import { ToastPicture } from "@/components/toast-picture";
+import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
-import { playCallSound } from "@/lib/call-sounds";
-import { claimForDevice } from "@/lib/device-once";
-import { useSessionScope } from "@/components/session-scope";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 
 /** How long the words wait for more of them before being fetched. A burst of

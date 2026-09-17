@@ -22,17 +22,18 @@
  *   stronger one: a mute silences a room, and this silences a person in every
  *   room at once;
  * - the text is the excerpt, not the Markdown, and never the reader's own
- *   message.
+ *   message - and when the body has no words, what was sent instead (a photo,
+ *   a GIF, a voice message), with a preview of the first attachment beside it.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
-import { mentionsReader, notifyLevels, readerTeams } from "./notify";
-import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isVoiceFileName } from "./voice-name";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
 import { isInlineImage, isPlayableMedia } from "./attachments";
+import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 
 /** How much of a message the toast carries. A line, like every other
  *  notification anywhere. */
