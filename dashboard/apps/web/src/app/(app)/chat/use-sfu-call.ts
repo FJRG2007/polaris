@@ -381,6 +381,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [nearby, setNearby] = useState<ReadonlySet<string>>(new Set());
     /** How many other people are on the media connection, for `combineOpen`. */
     const [connected, setConnected] = useState(0);
+    /** Whether combining is open, for the paths that decide it outside a render:
+     *  a menu is a screen, and the rule belongs to the call rather than to
+     *  whatever happens to be drawn. */
+    const combineOpenRef = useRef(false);
     /** Whether this browser is telling the room it is recording. What is being
      *  written lives in `call-recorder`; this is the half everybody can see. */
     const [recording, setRecordingSaid] = useState(false);
@@ -1489,7 +1493,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const message = combineMessageSchema.safeParse(raw);
             if (!message.success) return;
             if (message.data.kind === "combine-ask") {
-                setCombineRequest({ from: participant.identity });
+                // A call of two has nothing to combine, whoever asked and
+                // whatever their screen believes.
+                if (combineOpenRef.current) setCombineRequest({ from: participant.identity });
                 return;
             }
             // Turned down. Only ever about the person this browser asked, so a
@@ -1717,6 +1723,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const combineWith = useCallback(
         (participantId: string) => {
+            if (!combineOpenRef.current) return;
             groupRef.current = participantId;
             setAudioGroup(participantId);
             setCombineAsked(null);
@@ -1750,6 +1757,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const seated =
         meeting?.participants.filter((person) => person.admission === "admitted").length ?? 0;
     const combineOpen = combineOffered(seated, connected);
+    useEffect(() => {
+        combineOpenRef.current = combineOpen;
+    }, [combineOpen]);
 
     const askToCombine = useCallback(
         (participantId: string) => {

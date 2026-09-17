@@ -59,24 +59,39 @@ export function NoAudioNotice({
             swallowedSince: null,
             swallowedHits: 0
         }));
-        const heard = measureVoice(source);
-        if (!heard) return;
-        const sent = source === track ? heard : measureVoice(track);
+        // The device is read from a clone of it, which the gate does not touch.
+        // Push to talk and voice activity close the microphone's own track
+        // between sentences, and a gate never opens for a device that is picking
+        // nothing up - so reading that track would have held the warning back
+        // from exactly the people it exists for. A clone carries what the
+        // hardware is delivering whatever the call is doing with it.
+        const probe = source.clone();
+        probe.enabled = true;
+        const heard = measureVoice(probe);
+        if (!heard) {
+            probe.stop();
+            return;
+        }
+        // What is sent is the track itself, and only while it is open: with no
+        // filter between them the clone is already reading the same audio.
+        const sent = source === track ? null : measureVoice(track);
         const timer = setInterval(() => {
             const devicePeak = heard.peak();
             setWatch((current) =>
                 watchNoAudio(current, {
                     now: Date.now(),
+                    micOn,
                     sending: source.enabled && track.enabled,
                     device: devicePeak,
-                    outgoing: sent ? (sent === heard ? devicePeak : sent.peak()) : devicePeak
+                    outgoing: sent ? sent.peak() : devicePeak
                 })
             );
         }, SAMPLE_MS);
         return () => {
             clearInterval(timer);
             heard.stop();
-            if (sent !== heard) sent?.stop();
+            sent?.stop();
+            probe.stop();
         };
     }, [voice.noAudioWarning, micOn, track, source]);
 

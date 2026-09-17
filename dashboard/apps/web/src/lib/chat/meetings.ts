@@ -164,7 +164,7 @@ export async function startOrJoin(
     channelId: string
 ): Promise<MeetingSeat> {
     const access = await requireChannel(actor, channelId);
-    const { meetingId, created } = await liveMeetingId(actor, channelId);
+    let { meetingId, created } = await liveMeetingId(actor, channelId);
     // Swept first, and this is the line the whole thing turned on: a browser
     // that was closed mid-call leaves its seat behind, and a room with a seat
     // in it is not empty. So the next call into that conversation announced
@@ -175,7 +175,15 @@ export async function startOrJoin(
     // question about the room rather than about the room plus the person now
     // walking into it. An empty room is a call starting, which is what makes
     // everybody else's browser ring; an occupied one is somebody joining.
-    const wasEmpty = (await admittedCount(meetingId)) === 0;
+    let wasEmpty = (await admittedCount(meetingId)) === 0;
+    // A call nobody is really in any more is over, not one to walk back into:
+    // reused, it would ring with no start line, and its ending would be timed
+    // from, and credited to, whoever rang the abandoned one.
+    if (wasEmpty && !created) {
+        await closeMeeting(meetingId);
+        ({ meetingId, created } = await liveMeetingId(actor, channelId));
+        wasEmpty = (await admittedCount(meetingId)) === 0;
+    }
     const seat = await seatFor(meetingId, actor.id, actor.name);
     await announceCall(meetingId, wasEmpty ? "ringing" : "moved", actor.id, actor.name);
     // Written by whoever created the call and nobody else: two people pressing

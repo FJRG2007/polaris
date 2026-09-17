@@ -64,6 +64,8 @@ vi.mock("@polaris/db", () => ({
                 where.id ? (state.endedAt === null ? { id: "m1" } : null) : state.running,
             create: async () => {
                 state.running = { id: "m1" };
+                state.endedAt = null;
+                state.startedAt = new Date();
                 return { id: "m1" };
             },
             findUnique: async () => ({
@@ -79,7 +81,10 @@ vi.mock("@polaris/db", () => ({
                 }
             }),
             updateMany: async ({ data }: { data: { endedAt?: Date } }) => {
-                if (data.endedAt) state.endedAt = data.endedAt;
+                if (data.endedAt) {
+                    state.endedAt = data.endedAt;
+                    state.running = null;
+                }
                 return { count: 1 };
             }
         },
@@ -173,9 +178,18 @@ describe("a call in a direct message", () => {
 
     it("keeps the old missed-call line for a call with no start line", async () => {
         state.running = { id: "m1" };
-        await meetings.startOrJoin(ana, "c1");
         await meetings.end(ana, "m1");
         expect(state.notices.map((notice) => notice.kind)).toEqual(["missedCall"]);
+    });
+
+    it("starts a fresh call, with its own start line, over one nobody is in", async () => {
+        state.running = { id: "m1" };
+        state.startedAt = new Date(Date.now() - 90 * MINUTE);
+        state.seats = [{ id: "p-ana", userId: "ana", leftAt: new Date() }];
+        await meetings.startOrJoin(ana, "c1");
+        expect(state.running).toEqual({ id: "m1" });
+        expect(state.endedAt).toBeNull();
+        expect(state.notices.map((notice) => notice.kind)).toEqual(["missedCall", "callStarted"]);
     });
 });
 

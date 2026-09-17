@@ -27,12 +27,13 @@ function run(
     state: NoAudioWatch,
     from: number,
     ms: number,
-    reading: { device: number; outgoing?: number; sending?: boolean }
+    reading: { device: number; outgoing?: number; sending?: boolean; micOn?: boolean }
 ): NoAudioWatch {
     let current = state;
     for (let now = from; now <= from + ms; now += 1000) {
         current = watchNoAudio(current, {
             now,
+            micOn: reading.micOn ?? true,
             sending: reading.sending ?? true,
             device: reading.device,
             outgoing: reading.outgoing ?? reading.device
@@ -56,16 +57,47 @@ describe("the dead microphone warning", () => {
         expect(run(dead, DEAD_MS + 1000, 0, { device: QUIET }).warning).toBe(false);
     });
 
-    it("does not count time the track is held closed by a gate", () => {
+    it("does not count time the microphone is off", () => {
         let state = run(NO_AUDIO_START, 0, DEAD_MS / 2, { device: 0 });
-        state = run(state, DEAD_MS / 2 + 1000, 5000, { device: 0, sending: false });
+        state = run(state, DEAD_MS / 2 + 1000, 5000, { device: 0, micOn: false });
         state = run(state, DEAD_MS / 2 + 7000, DEAD_MS / 2, { device: 0 });
+        expect(state.warning).toBe(false);
+    });
+
+    it("still fires while a gate holds the track closed", () => {
+        // Voice activity never opens for a device picking nothing up, so the
+        // reader it is happening to would otherwise never be told.
+        const state = run(NO_AUDIO_START, 0, DEAD_MS, { device: 0, sending: false });
+        expect(state.warning).toBe(true);
+    });
+
+    it("does not blame the filter for a track a gate is holding shut", () => {
+        const state = run(NO_AUDIO_START, 0, 4 * SWALLOWED_MS, {
+            device: VOICE,
+            outgoing: 0,
+            sending: false
+        });
         expect(state.warning).toBe(false);
     });
 
     it("fires when a voice goes in and nothing comes out", () => {
         const state = run(NO_AUDIO_START, 0, SWALLOWED_MS, { device: VOICE, outgoing: 0 });
         expect(state.warning).toBe(true);
+    });
+
+    it("does not blame a filter for taking out keystrokes between the quiet", () => {
+        // A thump above the old bar every other reading, which is what typing
+        // next to a laptop microphone looks like, and what the filter removes.
+        let state = NO_AUDIO_START;
+        for (let now = 0; now <= 4 * SWALLOWED_MS; now += 1000) {
+            state = watchNoAudio(state, {
+                now,
+                sending: true,
+                device: now % 2000 === 0 ? 0.02 : QUIET,
+                outgoing: 0
+            });
+        }
+        expect(state.warning).toBe(false);
     });
 
     it("does not blame a filter that removes silence", () => {

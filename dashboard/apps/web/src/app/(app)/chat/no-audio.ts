@@ -12,9 +12,13 @@
  *   off at the cable or taken by another application delivers zeros.
  * - **A voice going in and nothing coming out.** The device hears somebody and
  *   the track being sent stays flat - the noise filter has stopped producing.
+ *   Only while the track is open: push to talk and voice activity close it
+ *   between sentences, and a closed track carries zeros of its own.
  *
- * Only while the microphone is actually sending: push to talk and voice
- * activity close the track between sentences, and a closed track is zeros too.
+ * Only while the microphone is on. The device itself is watched whatever a gate
+ * is doing to the track, because a gate never opens for a microphone that is
+ * picking nothing up - so watching the track would have kept the warning from
+ * the voice-activity readers it exists for.
  *
  * Once shown, the next warning needs twice as long, and closing it keeps it
  * away for the rest of that microphone.
@@ -22,14 +26,22 @@
 
 /** Below one step of a 16-bit sample: the device is producing nothing. */
 export const FLAT_PEAK = 1 / 32768;
-/** Loud enough to be somebody talking into the device (about -40 dBFS). */
-export const VOICE_PEAK = 0.01;
+/**
+ * Loud enough to be somebody talking into the device (about -26 dBFS).
+ *
+ * Well above the level a keystroke or a fan burst reaches on a laptop
+ * microphone, because those are exactly what the noise filter is there to take
+ * out: read as a voice, they would have the filter working correctly reported
+ * as a filter that had stopped.
+ */
+export const VOICE_PEAK = 0.05;
 /** How long the device has to be flat before it is worth saying. */
 export const DEAD_MS = 60_000;
 /** How long a voice has to go in with nothing coming out. */
 export const SWALLOWED_MS = 15_000;
-/** Loud samples with flat output needed before the filter is blamed. */
-const SWALLOWED_HITS = 3;
+/** Readings of voice, net of the quiet ones between them, before the filter is
+ *  blamed. */
+const SWALLOWED_HITS = 8;
 
 export interface NoAudioWatch {
     /** Since when the device has read flat, or null. */
@@ -54,10 +66,13 @@ export const NO_AUDIO_START: NoAudioWatch = {
 
 export interface NoAudioSample {
     readonly now: number;
-    /** Whether the microphone is open right now - on, and not held closed by a
-     *  gate. */
+    /** Whether the reader wants to be heard. Muted is not a fault, and a gate
+     *  holding the track closed between sentences is not this. */
+    readonly micOn: boolean;
+    /** Whether the track being sent is open right now, rather than held closed
+     *  by push to talk or voice activity. */
     readonly sending: boolean;
-    /** The device's loudest sample, 0 to 1. */
+    /** The device's loudest sample, 0 to 1, read past any gate. */
     readonly device: number;
     /** The loudest sample of what is being sent, 0 to 1. */
     readonly outgoing: number;
@@ -65,7 +80,7 @@ export interface NoAudioSample {
 
 /** One reading, folded into what is known. */
 export function watchNoAudio(state: NoAudioWatch, sample: NoAudioSample): NoAudioWatch {
-    if (!sample.sending) {
+    if (!sample.micOn) {
         return {
             ...state,
             flatSince: null,
@@ -80,12 +95,27 @@ export function watchNoAudio(state: NoAudioWatch, sample: NoAudioSample): NoAudi
 
     let swallowedSince = state.swallowedSince;
     let swallowedHits = state.swallowedHits;
-    if (sample.outgoing >= FLAT_PEAK) {
+    if (!sample.sending) {
+        // A track a gate is holding shut carries zeros because it was closed,
+        // not because anything swallowed a voice.
+        swallowedSince = null;
+        swallowedHits = 0;
+    } else if (sample.outgoing >= FLAT_PEAK) {
         swallowedSince = null;
         swallowedHits = 0;
     } else if (sample.device >= VOICE_PEAK) {
         swallowedSince = swallowedSince ?? now;
         swallowedHits += 1;
+    } else {
+        // A quiet reading takes back a loud one, so what is counted is a voice
+        // that keeps reading as one rather than a handful of thumps spread over
+        // the window. Somebody typing next to a microphone produces the second
+        // and would otherwise be told their microphone is dead.
+        swallowedHits -= 1;
+        if (swallowedHits <= 0) {
+            swallowedHits = 0;
+            swallowedSince = null;
+        }
     }
 
     // The window a warning already on screen appeared with, so it does not
