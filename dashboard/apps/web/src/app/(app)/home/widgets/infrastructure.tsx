@@ -13,7 +13,7 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
-import { GameLogo } from "@/components/game-picker";
+import { GameLogo } from "@/components/game-logo";
 import { findGame } from "@/lib/apps/games-catalog";
 import { PriorityMark } from "@/components/priority-mark";
 import { RelativeTime } from "@/components/relative-time";

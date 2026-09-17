@@ -5,9 +5,9 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { UploadsView } from "./uploads-view";
-import { homeInstall } from "@/lib/home/access";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 import { avatarSettings } from "@/lib/avatar-service";
-import { footageSettings } from "@/lib/home/stills";
+import { footageSettings } from "@/lib/footage-storage";
 import { chatStorageSettings } from "@/lib/chat/attachments";
 import { personalDriveSettings } from "@/lib/personal-drive";
 import { organizationDriveSettings } from "@/lib/organization-drive";
@@ -23,7 +23,7 @@ export default async function UploadsPage() {
         chatStorageSettings(),
         personalDriveSettings(),
         organizationDriveSettings(),
-        homeInstall()
+        isAppInstalled("home")
     ]);
     // Only asked for when there is a house: on an instance with no cameras it is
     // a setting for something that does not exist.

@@ -11,7 +11,7 @@
  * runtime.
  */
 
-import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
+import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark-maps";
 import {
     Bot,
     Gamepad2,
@@ -1166,6 +1166,14 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
 ];
 
 /** Look up an app manifest by id. */
+/** Whether an install of this catalog app is a game server. A catalog
+ *  question, so the marketplace and the access checks can ask it whether or not
+ *  Game servers is installed. */
+export function isGameServerApp(catalogId: string): boolean {
+    const manifest = findApp(catalogId);
+    return manifest ? appHasCapability(manifest, "game-server") : false;
+}
+
 export function findApp(id: string): AppManifest | undefined {
     return POLARIS_APP_CATALOG.find((app) => app.id === id);
 }

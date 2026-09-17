@@ -19,7 +19,7 @@ import { findApp } from "@/lib/apps/catalog";
 import { requirePermission } from "@/lib/session";
 import { MarketplaceView } from "./marketplace-view";
 import { gameForCatalogId } from "@/lib/apps/games-catalog";
-import { adoptGameServersApp } from "@/lib/apps/game-install";
+import { adoptAppInstalls } from "@/lib/app-extensions/registry";
 import { adoptMailServerApp } from "@/lib/mail-server/app-install";
 import { instanceWideInstallIds, listInstalledApps } from "@/lib/apps/install-service";
 
@@ -31,7 +31,7 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
     // replaced them, here as well as on the Game servers page - this is the other
     // screen where the old rows would still be visible. The same for a mail server
     // that was running before it was an app.
-    await Promise.all([adoptGameServersApp(user.id), adoptMailServerApp()]);
+    await Promise.all([adoptAppInstalls(user.id), adoptMailServerApp()]);
     const installed = await listInstalledApps(user.id, await instanceWideInstallIds());
     const { app } = await searchParams;
     const focus = typeof app === "string" ? findApp(app) : undefined;

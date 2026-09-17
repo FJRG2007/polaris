@@ -26,7 +26,7 @@ import { listUserSessions } from "@/lib/session-directory";
 import { listRecentAlarmEvents } from "@/lib/watch-service";
 import type { MyWorkTask } from "@/lib/tasks/report-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
-import { listGameServerFacts } from "@/lib/apps/games-service";
+import { gameServerSummaries } from "@/lib/app-extensions/registry";
 import { getWatchOverview } from "@/lib/watch-overview-service";
 import { inFlightDeployments, listProjects } from "@/lib/deploy-service";
 import { myUrgentTasks, myWorkCounts } from "@/lib/tasks/report-service";
@@ -264,7 +264,7 @@ export async function getOverviewData(user: SessionUser, wanted: readonly Overvi
  * knows whether anybody is actually playing.
  */
 async function gameServers(userId: string): Promise<OverviewGames> {
-    const servers = await listGameServerFacts(userId);
+    const servers = await gameServerSummaries(userId);
     const rows = servers.map((server) => ({
         id: server.id,
         name: server.name,

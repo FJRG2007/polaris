@@ -22,7 +22,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { installedGames } from "@/lib/apps/game-zones";
 import { serverEnvironmentSchema } from "@polaris/core";
-import { listGamePorts } from "@/lib/apps/games-service";
+import { forwardedPorts } from "@/lib/app-extensions/registry";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
@@ -122,7 +122,7 @@ async function domainSetupState(): Promise<DomainSetupState> {
             getHostLanIp(),
             // Best effort: the domain setup must open with or without the game servers,
             // and a deployment that has none is the common case.
-            listGamePorts().catch(() => []),
+            forwardedPorts().catch(() => []),
             getPortPolicy(),
             getPortBlocks(),
             installedGames().catch(() => [])

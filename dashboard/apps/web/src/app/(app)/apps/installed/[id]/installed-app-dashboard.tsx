@@ -9,14 +9,12 @@
  */
 
 import Link from "next/link";
-import { ArkPanel } from "./ark-panel";
-import { FivemPanel } from "./fivem-panel";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { Permission } from "@polaris/core";
-import type { GameContext } from "./game-context";
+import type { AppSlot } from "@/lib/app-extensions/types";
 import { useRuntimeLog } from "./use-runtime-log";
-import { MinecraftPanel } from "./minecraft-panel";
+import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { LogViewer } from "@/components/log-viewer";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
 import { gameForCatalogId, isGameServersApp } from "@/lib/apps/games-catalog";
@@ -37,16 +35,17 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * The adapted dashboard an app brings with it, by catalog id. An app without one
- * falls back to the shell's own lifecycle controls and runtime log, which is what
- * the shell renders around this either way. New apps are added here and nowhere
- * else in the shell.
+ * The adapted dashboard an app brings with it. Core's own apps are named here by
+ * catalog id; an installable app's panel arrives as a slot it built on the
+ * server and is drawn by its own component. An app without either falls back to
+ * the shell's own lifecycle controls and runtime log, which is what the shell
+ * renders around this either way.
  */
 function adaptedPanelFor(
     app: InstalledAppDetail,
     settings: InstalledAppSetting[],
     running: boolean,
-    game: GameContext | null,
+    slot: AppSlot | null,
     /** What the viewer holds on THIS app, so a panel offers only what its actions
      *  would accept. */
     held: readonly Permission[],
@@ -56,75 +55,17 @@ function adaptedPanelFor(
     switch (app.catalogId) {
         case "messaging-bridge":
             return <MessagingBridgePanel />;
-        // The app runs nothing itself - its dashboard is the Game servers page, and
-        // this is the door to it rather than a second copy of the list. The two
-        // per-game ids are the apps it replaced, kept until their owner opens
-        // either page and they are adopted.
-        case "game-servers":
-        case "minecraft-manager":
-        case "ark-manager":
-            return (
-                <Card>
-                    <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
-                        <p className="text-sm font-medium">Your servers live on the Game servers page</p>
-                        <p className="max-w-md text-sm text-muted-foreground">
-                            Create as many as you want, of any game Polaris knows, each with its own address, console,
-                            players and settings. The app itself runs nothing.
-                        </p>
-                        <Link href="/apps/games">
-                            <Button size="sm">Open Game servers</Button>
-                        </Link>
-                    </CardBody>
-                </Card>
-            );
-        case "fivem":
-            return (
-                <FivemPanel
-                    installedAppId={app.id}
-                    applicationId={app.applicationId}
-                    running={running}
-                    game={game}
-                    held={held}
-                    onStatus={onStatus}
-                />
-            );
-        case "ark":
-            return (
-                <ArkPanel
-                    installedAppId={app.id}
-                    applicationId={app.applicationId}
-                    settings={settings}
-                    running={running}
-                    game={game}
-                    held={held}
-                    onStatus={onStatus}
-                />
-            );
-        // Both editions are driven by the same panel; what differs is underneath,
-        // and the panel offers what the edition it is looking at actually has.
-        case "minecraft":
-        case "minecraft-bedrock":
-            return (
-                <MinecraftPanel
-                    installedAppId={app.id}
-                    applicationId={app.applicationId}
-                    name={app.name}
-                    settings={settings}
-                    running={running}
-                    game={game}
-                    held={held}
-                    onStatus={onStatus}
-                />
-            );
         default:
-            return null;
+            return slot ? (
+                <AppSlotView slot={slot} host={{ app, settings, running, held, onStatus }} />
+            ) : null;
     }
 }
 
 export function InstalledAppDashboard({
     app,
     settings,
-    game = null,
+    slot = null,
     held = [],
     canManage = true,
     canRemove = true
@@ -132,9 +73,9 @@ export function InstalledAppDashboard({
     app: InstalledAppDetail;
     /** What the app was deployed with, for a panel that edits its settings. */
     settings: InstalledAppSetting[];
-    /** For a game server: its address, and what still has to be opened for
-     *  players outside this network. Null for anything that is not one. */
-    game?: GameContext | null;
+    /** What an installable app draws for this install, built on the server.
+     *  Null for anything no app draws a panel for. */
+    slot?: AppSlot | null;
     /** What the viewer holds on this app, resolved on the server. Cosmetic here -
      *  every action behind these controls asks again. */
     held?: readonly Permission[];
@@ -158,7 +99,7 @@ export function InstalledAppDashboard({
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
     // Apps with an adapted panel lead with it and fold the raw log away by default.
-    const adaptedPanel = adaptedPanelFor(app, settings, running, game, held, setLiveStatus);
+    const adaptedPanel = adaptedPanelFor(app, settings, running, slot, held, setLiveStatus);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
     // Back goes where this app is listed, which for anything belonging to a game -

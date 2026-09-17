@@ -13,21 +13,19 @@
  * further and never loosen.
  */
 
-import Link from "next/link";
 import { WafEditor } from "./waf-editor";
 import { notFound } from "next/navigation";
 import { ScopePicker } from "./scope-picker";
 import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
-import { GameFirewallPanel } from "./game-panel";
 import { listProjectScopes } from "@/lib/deploy-service";
 import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
-import { gameServerForApplication } from "@/lib/apps/games-service";
+import { firewallSlot } from "@/lib/app-extensions/registry";
 import { listInstalledAppScopes } from "@/lib/apps/install-service";
-import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
     ruleScopeFor,
     scopeNeedsTarget,
@@ -126,15 +124,11 @@ export default async function FirewallPage({
         notFound();
     }
     const label = options.find((option) => option.id === scopeId)?.label ?? "";
-    // A service that is a game server is guarded by something else entirely: its
-    // player list, not the HTTP rules below. Looked up only when one service is in
-    // scope, which is the only case where it can be one.
-    const game = ruleScope === "application" && scopeId ? await gameServerForApplication(user.id, scopeId) : null;
-    // Only Minecraft keeps a player list of names and addresses. An ARK server is
-    // guarded by its own allow list of Steam ids, which lives on its own page - and
-    // offering this editor for it would be a screen full of rules that do nothing.
-    const playerList = game?.game === "minecraft" ? game : null;
-    const gameAccess = playerList ? await listPlayerAccess(user.id, playerList.installedAppId).catch(() => null) : null;
+    // A service an installed app runs may be guarded by something else entirely -
+    // a game server by its player list, not the HTTP rules below. Asked only when
+    // one service is in scope, which is the only case where it can be one.
+    const appSection =
+        ruleScope === "application" && scopeId ? await firewallSlot(user.id, scopeId).catch(() => null) : null;
     // Read once: the editor offers it for the allowlist, and the anomaly panel marks
     // the reader's own address so a finding about themselves reads as one.
     const callerIp = (await clientIp()) ?? null;
@@ -163,33 +157,7 @@ export default async function FirewallPage({
                 </p>
             ) : (
                 <>
-                    {playerList && <GameFirewallPanel installedAppId={playerList.installedAppId} initial={gameAccess} />}
-                    {game?.game === "fivem" && (
-                        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                            A FiveM server is guarded by its own list of players rather than by the rules below - a
-                            game port does not go through the web firewall.{" "}
-                            <Link
-                                href={`/apps/installed/${game.installedAppId}/security`}
-                                className="text-primary hover:underline"
-                            >
-                                Open who may join
-                            </Link>
-                            . Addresses blocked here are carried onto that list as well.
-                        </p>
-                    )}
-                    {game?.game === "ark" && (
-                        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                            An ARK server is guarded by its join password and its own allow list of Steam ids, not by
-                            the rules below.{" "}
-                            <Link
-                                href={`/apps/installed/${game.installedAppId}/security`}
-                                className="text-primary hover:underline"
-                            >
-                                Open who may join
-                            </Link>
-                            .
-                        </p>
-                    )}
+                    {appSection && <AppSlotView slot={appSection} />}
                     <WafEditor
                         key={`${ruleScope}:${scopeId}`}
                         scopeType={ruleScope}

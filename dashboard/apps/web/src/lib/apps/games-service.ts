@@ -19,11 +19,10 @@ import type { CrashLoop } from "@/lib/apps/crash-loop";
 import { readServerUptime } from "@/lib/apps/games-uptime";
 import { getLocalEnvironment } from "@/lib/network-service";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
-import { appHasCapability, findApp } from "@/lib/apps/catalog";
+import { findApp, isGameServerApp } from "@/lib/apps/catalog";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
-import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { primaryIdentifier } from "@/lib/apps/fivem/players";
@@ -55,9 +54,9 @@ import {
 import {
     gameReachAdvice,
     gameStoppedAdvice,
-    type GamePort,
-    type GameReachAdvice
-} from "@/lib/apps/minecraft/reach-advice";
+    type GamePortRow,
+    type GamePortsReading
+} from "@/lib/apps/port-advice";
 
 /** How many players the server was built for. */
 const SLOTS_VAR = "MAX_PLAYERS";
@@ -82,10 +81,7 @@ function titleCase(value: string): string {
 /** Whether a catalog id names a game server rather than any other installed app.
  *  The manifest's capability is the authority - a game server is not a list of
  *  known ids, it is anything that declares itself one. */
-export function isGameServerApp(catalogId: string): boolean {
-    const manifest = findApp(catalogId);
-    return manifest ? appHasCapability(manifest, "game-server") : false;
-}
+export { isGameServerApp };
 
 /** A machine a server can be created on, with what it has left to give. */
 export interface GameMachine {
@@ -735,23 +731,6 @@ export async function syncFirewallBans(
     return { servers, banned, kicked, allowed };
 }
 
-/** One game server's published ports, named so a forwarding rule can be written
- *  for it. Instance-wide: what has to be open is the operator's problem, not one
- *  owner's, and the domain setup that asks for it is an admin screen. */
-export interface GamePortRow {
-    readonly installedAppId: string;
-    readonly name: string;
-    readonly ports: readonly GamePort[];
-    /** Whether a player has already arrived on it from outside the network. */
-    readonly confirmed: boolean;
-    /** When that last happened, so a row can date what it is remembering rather
-     *  than assert it. Null for a port nothing has ever arrived on. */
-    readonly confirmedAt: string | null;
-    /** Whether it is meant to be up. A stopped server answers nothing, so it is
-     *  neither knocked on nor reported as unreachable - the port it published is
-     *  not what is silent. */
-    readonly running: boolean;
-}
 
 /**
  * The game server backing a deployed application, when it is one.
@@ -834,16 +813,7 @@ export async function sweepGameReach(): Promise<{ pending: number; proven: numbe
     return { pending: pending.length, proven: proven.length };
 }
 
-/** Every game server's ports, what is still in the way of the ones not proven,
- *  and the settings the router instructions are written from. */
-export interface GamePortsReading {
-    readonly servers: readonly GamePortRow[];
-    readonly advice: GameReachAdvice;
-    /** This server's address on the network, for the rules to point at. */
-    readonly lanIp: string | null;
-    readonly policy: PortPolicy;
-    readonly blocks: PortBlocks;
-}
+export type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 
 /**
  * The whole of what the Domains card shows, in one read.

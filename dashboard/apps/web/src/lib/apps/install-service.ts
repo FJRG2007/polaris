@@ -25,8 +25,7 @@ import {
     resumeOwnedServices
 } from "@/lib/apps/app-lifecycle";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
-import { isPluginLoader, loaderForType } from "@/lib/apps/minecraft/modrinth";
-import { SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
+import { isPluginServer } from "@/lib/app-extensions/registry";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import {
     createApplication,
@@ -261,9 +260,8 @@ export async function installApp(
     // two reported on screen as projects Modrinth had never heard of, and one jar
     // the server could not boot on. Anything the operator typed is theirs and stays.
     const typedKeys = new Set(input.env.map((entry) => entry.key));
-    const software = envByKey.get(SOFTWARE_KEY)?.value ?? "";
-    const loader = loaderForType(software);
-    if (!loader || !isPluginLoader(loader)) {
+    const values = new Map([...envByKey].map(([key, entry]) => [key, entry.value]));
+    if (isPluginServer(app.id, values) !== true) {
         for (const declared of template.env ?? []) {
             if (declared.pluginServersOnly && !typedKeys.has(declared.key))
                 envByKey.delete(declared.key);

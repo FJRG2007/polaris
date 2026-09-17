@@ -21,16 +21,22 @@ const SRC = resolve(__dirname, "../../src");
 const APPS: Readonly<Record<string, readonly RegExp[]>> = {
     "game-servers": [
         /^lib\/apps\/(minecraft|ark|fivem)\//,
-        /^lib\/apps\/(console-[\w-]+|crash-loop|game-identity|game-install|game-templates(-service)?|mod-image-cache|recent-items|game-sign-in-addresses)\.ts$/,
+        /^lib\/apps\/(console-[\w-]+|crash-loop|game-identity|game-install|game-templates(-service)?|mod-image-cache|recent-items|game-sign-in-addresses|container-files)\.ts$/,
         /^lib\/apps\/games-(?!catalog\.ts$)[\w-]+\.ts$/,
         /^lib\/apps\/player-[\w-]+\.ts$/,
         /^lib\/backups\/sources\/minecraft\.ts$/,
         /^components\/(game-(access-editor|access-form|blueprint-fields|picker|players-table)|player-(form-dialog|history|timeout-dialog)|use-game-presence)\.tsx?$/,
         /^app\/\(app\)\/apps\/games\//,
         /^app\/\(app\)\/apps\/installed\/\[id\]\/(minecraft|ark|fivem|game)-[\w-]+\.tsx?$/,
+        /^app\/\(app\)\/apps\/installed\/\[id\]\/(console-actions|restart-actions|restart-planner)\.tsx?$/,
         /^app\/api\/apps\/games\//,
         /^app\/api\/minecraft\//,
         /^app\/api\/apps\/installed\/\[id\]\/(minecraft|ark|fivem|game)\//
+    ],
+    places: [
+        /^lib\/home\//,
+        /^app\/\(app\)\/places\//,
+        /^app\/api\/home\//
     ]
 };
 

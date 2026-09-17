@@ -16,7 +16,7 @@ import { personalDriveSettings, setPersonalDriveTarget } from "@/lib/personal-dr
 import { organizationDriveSettings, setOrganizationDriveTarget } from "@/lib/organization-drive";
 import { uploadSettings } from "@/lib/tasks/attachment-service";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
-import { footageSettings, setFootageTarget } from "@/lib/home/stills";
+import { footageSettings, setFootageTarget } from "@/lib/footage-storage";
 import { setChatStorageTarget, tidyChatStorage } from "@/lib/chat/attachments";
 
 /** A storage connection id, `local`, or `auto`. */

@@ -31,7 +31,7 @@ import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
 import { describeBlock } from "@/lib/apps/port-block";
 import { useLiveResource } from "@/components/use-live-resource";
-import type { GamePortsReading } from "@/lib/apps/games-service";
+import type { GamePortsReading } from "@/lib/apps/port-advice";
 
 /** How often the card re-reads. The knock behind it is rate limited to one every
  *  thirty seconds per server, so this is about how soon the answer shows. */

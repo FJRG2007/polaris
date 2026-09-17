@@ -17,7 +17,7 @@
 import { findApp } from "@/lib/apps/catalog";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
-import { gameContextFor } from "../game-context";
+import { installedPanelSlot } from "@/lib/app-extensions/registry";
 import { canOpenGameTab, isGameTab } from "../tabs";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { heldOn, resourceAccess } from "@/lib/resource-access";
@@ -74,15 +74,20 @@ export default async function InstalledAppPage({
     // waiting on a request of its own. Both are detail on a page whose job is to
     // manage the install, so neither may take it down: an app that cannot be
     // described is precisely the one somebody came here to stop or remove.
-    const [settings, game] = await Promise.all([
+    const [settings, slot] = await Promise.all([
         getInstalledAppSettings(access.ownerId, id),
-        gameContextFor(app).catch(() => null)
+        installedPanelSlot({
+            id: app.id,
+            catalogId: app.catalogId,
+            applicationId: app.applicationId,
+            ownerId: access.ownerId
+        }).catch(() => null)
     ]);
     return (
         <InstalledAppDashboard
             app={app}
             settings={settings}
-            game={game}
+            slot={slot}
             held={held}
             canManage={canManage}
             canRemove={canRemove}

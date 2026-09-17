@@ -11,7 +11,7 @@
 
 import * as core from "@polaris/core";
 import { grantsForUser } from "@polaris/auth";
-import { isGameServerApp } from "@/lib/apps/games-service";
+import { isGameServerApp } from "@/lib/apps/catalog";
 import { requireUser, type SessionUser } from "@/lib/session";
 import { getInstalledApp, type InstalledAppDetail } from "@/lib/apps/install-service";
 import { heldOn, reachableResources, resourceAccess, type ResourceAccess } from "@/lib/resource-access";

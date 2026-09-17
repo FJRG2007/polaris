@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiAdmin } from "@/lib/api-session";
 
-import { readGamePorts } from "@/lib/apps/games-service";
+import { readForwardedPorts } from "@/lib/app-extensions/registry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,10 @@ export async function GET(request: Request): Promise<Response> {
     if (refused instanceof Response) return refused;
     const probe = new URL(request.url).searchParams.get("probe") === "1";
     try {
-        return NextResponse.json(await readGamePorts(probe));
+        const reading = await readForwardedPorts(probe);
+        // No app forwards ports here: the card reads an empty list and draws nothing.
+        if (!reading) return NextResponse.json({ servers: [] });
+        return NextResponse.json(reading);
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read the game ports" },

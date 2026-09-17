@@ -31,7 +31,7 @@ import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
-import { minecraftImageFor } from "./apps/minecraft/runtime";
+import { releaseImageFor } from "./app-extensions/registry";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
@@ -2348,10 +2348,10 @@ async function buildAppPlan(
         ownerId
     });
     const env = references.env;
-    // A Minecraft server runs the Java its release needs, which changes with the
-    // release it is set to.
+    // An app may decide the image a release runs - a Minecraft server runs the
+    // Java its release needs, which changes with the release it is set to.
     const storedImage = typeof source.imageRef === "string" ? source.imageRef : undefined;
-    const imageRef = minecraftImageFor(storedImage, env);
+    const imageRef = releaseImageFor(storedImage, env);
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
     // persisted), so a remote hub keeps the public URL from its stored env.

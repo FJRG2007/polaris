@@ -28,6 +28,11 @@ Done (2026-09-17):
 - Existing instances keep their screens: a game server or an old per-game
   manager counts as Game servers being installed.
 
+Phase 1 is done too (below): core no longer imports any Game servers or Places
+module.
+`test/build/app-boundaries.test.ts` fails the build if that changes, and
+`test/build/app-extensions-empty.test.ts` runs core with no app registered.
+
 What that does not do is take the code away. That is the rest of this plan.
 
 ## The model
@@ -87,13 +92,23 @@ app registers its implementation when its bundle loads.
 
 ## Phases
 
-1. **Core stops importing app code.** Introduce the registry, move every core
-   call site listed above to it, and register the in-tree Game servers and Places
-   implementations from one list. Verifiable here: the dashboard builds and every
-   test passes with that list empty. No behaviour changes.
+1. **Core stops importing app code.** Done for Game servers. The registry is
+   `lib/app-extensions/` (types, registry, and `installed.ts`, the one list);
+   the client half is `components/app-extensions/installed-client.tsx`. Game
+   servers registers `lib/apps/games-extension.ts`, its jobs moved to
+   `lib/apps/games-jobs.ts`, its firewall section and install panels are drawn
+   by `app/(app)/apps/games/extension-slot.tsx`. Catalog data and port policy
+   (`games-catalog`, `ark-maps`, `port-advice`, `port-block*`, `game-logo`) are
+   core. Places registers `lib/home/places-extension.ts`: its jobs, what it
+   starts at boot (its container upgrade and the camera watcher) and who it
+   reaches through a lent camera or door. Its footage storage setting
+   (`lib/footage-storage.ts`) and the zoom arithmetic (`lib/zoom.ts`) are core.
 2. **Move the app's code under its own workspace** (`apps/game-servers`,
-   `apps/places`): services, routes, screens, jobs, tests. Still compiled into
-   the image, loaded through the registry. Verifiable here.
+   `apps/places`): services, routes, screens, jobs, tests - including the
+   routes that still sit in the dashboard's tree (`app/(app)/apps/games`, the
+   game tabs under `app/(app)/apps/installed/[id]`, `app/api/apps/games`,
+   `app/api/minecraft`, and the `app/api/cron/game-*` triggers). Still compiled
+   into the image, loaded through the registry. Verifiable here.
 3. **Bundles.** Build each app workspace into a bundle in CI; add the loader,
    the resolution hook, the catch-all routes and the import map; stop compiling
    the app workspaces into the dashboard image. Needs a container to verify.

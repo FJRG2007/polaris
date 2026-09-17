@@ -23,8 +23,8 @@ import { Badge, Button } from "@polaris/ui";
 import { RouterSteps } from "./router-steps";
 import { inBlock } from "@/lib/apps/port-block";
 import { gameForwardRules } from "@/lib/router-guide";
-import type { GamePortsReading } from "@/lib/apps/games-service";
-import { describePorts } from "@/lib/apps/minecraft/reach-advice";
+import type { GamePortsReading } from "@/lib/apps/port-advice";
+import { describePorts } from "@/lib/apps/port-advice";
 
 export function GamePortsLive({
     reading,
