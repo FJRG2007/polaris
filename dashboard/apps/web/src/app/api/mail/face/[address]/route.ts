@@ -26,6 +26,7 @@ import { apiPermission } from "@/lib/api-session";
 import { markDomains } from "@/lib/mailbox/sender-domain";
 import { iconLinks, MAX_HTML_BYTES } from "@/lib/mailbox/site-icon";
 import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
+import { createGate, createSharedFlight } from "@/lib/concurrency-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +68,21 @@ const BUDGET_MS = 12_000;
  * logo and showing two letters.
  */
 const PER_HOST_MS = 4_000;
+
+/**
+ * How many domains are hunted at once, across every reader.
+ *
+ * A mailbox opened cold asks for a mark per row, all at the same moment, and a
+ * hunt is several outside requests that can each take seconds. Unbounded, one
+ * screenful of senders was dozens of those running together - see
+ * `LOOKUP_SLOTS` in `safe-fetch.ts` for what that did to every other page. The
+ * rest wait here and are answered in turn; the list draws initials meanwhile.
+ */
+const hunts = createGate(4);
+
+/** A hundred messages from one shop arriving together are one hunt, not a
+ *  hundred: the cache below only helps once the first has finished. */
+const sameDomain = createSharedFlight<Found | null>();
 
 /** A mark, as it will be handed to the browser. */
 interface Found {
@@ -122,12 +138,17 @@ export async function GET(
         return held.bytes ? picture(held.bytes, held.type) : gone();
     }
 
-    const found = await fetchMark(domain);
-    remembered().set(domain, {
-        at: Date.now(),
-        bytes: found?.bytes ?? null,
-        type: found?.type ?? ""
-    });
+    const found = await sameDomain(domain, () =>
+        hunts.run(async () => {
+            const mark = await fetchMark(domain);
+            remembered().set(domain, {
+                at: Date.now(),
+                bytes: mark?.bytes ?? null,
+                type: mark?.type ?? ""
+            });
+            return mark;
+        })
+    );
     return found ? picture(found.bytes, found.type) : gone();
 }
 
