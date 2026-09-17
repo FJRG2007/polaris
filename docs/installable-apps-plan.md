@@ -1,0 +1,110 @@
+# Installable apps: an app's code only on a server that installed it
+
+Game servers and Places ship inside the one dashboard image today. Installing
+either only writes a row, and every Polaris carries every line of both whether
+anybody uses them or not. The goal:
+
+- an app that is not installed has no code on the server;
+- installing it from the marketplace brings its code, uninstalling it removes it,
+  at any time, from the interface;
+- nothing an existing install already has is lost or broken by getting there;
+- Polaris and its apps use as little memory and disk as possible.
+
+The last point decides the shape. A container per app costs a Node process per
+app - a few hundred megabytes each for a Next.js server - on a machine that is
+often a home server. So an app is a **bundle loaded into the dashboard's own
+process**, not a service of its own: one container, one runtime, and the app's
+code present only while it is installed.
+
+## Where things stand
+
+Done (2026-09-17):
+
+- Installing and uninstalling Game servers and Places is real at runtime. The
+  rail entry, the scheduled jobs, the camera watcher and Places' container
+  upgrade all do nothing while the app is not installed. Uninstalling Game
+  servers is refused while servers exist. Uninstalling Places brings its helper
+  containers down and keeps their data; reinstalling brings them back.
+- Existing instances keep their screens: a game server or an old per-game
+  manager counts as Game servers being installed.
+
+What that does not do is take the code away. That is the rest of this plan.
+
+## The model
+
+An **app bundle** is a versioned archive published by CI next to the dashboard
+image, one per app and per Polaris build:
+
+```
+game-servers-<build>.tgz
+  manifest.json      id, version, the dashboard build it was compiled against,
+                     permissions, scheduled jobs, routes, rail sections
+  server/index.mjs   the server half: services, route handlers, job bodies
+  client/index.mjs   the screens, as React components
+  assets/            what the screens load
+```
+
+- **Installing** downloads the bundle for the running build into the
+  `polaris-apps` volume, checks its signature and build, and registers it.
+  **Uninstalling** unregisters it and deletes the folder. Updating Polaris
+  replaces each installed bundle with the one for the new build, in the same
+  updater run - never a dashboard on one build with an app from another.
+- **One process.** The dashboard loads `server/index.mjs` with a dynamic
+  `import()` of the file on the volume. Shared libraries (`react`, `@polaris/*`,
+  `zod`, `@polaris/db`) are never inside a bundle: they are resolved to the
+  dashboard's own copies through a Node module resolution hook, so an app adds
+  its own code and nothing else to memory.
+- **Screens** are served by one catch-all route per app surface
+  (`/apps/games/[...path]`, `/places/[...path]`). It asks the loaded bundle which
+  component renders that path and hands it the data its server half returned.
+  The client half is an ES module loaded by the browser with an import map that
+  points shared libraries at the chunks the dashboard already serves.
+- **Everything core needs from an app goes through one contract**, the app
+  extension registry (below). Core never imports an app's module by path.
+- **Data** stays in the one Postgres schema. The tables are additive and
+  untouched by uninstalling, so reinstalling finds everything where it was. An
+  explicit "delete this app's data" is a separate, confirmed action.
+
+## The extension contract
+
+What core asks an app today, grouped by the core screen that asks:
+
+| Core area | What it needs from Game servers |
+| --- | --- |
+| Deploy (`deploy-service`) | which image a Minecraft server's release runs |
+| Marketplace / install (`install-service`, `catalog`) | port allocation for game ports, loader and software defaults, ARK map list |
+| Access (`install-access`, `container-files`) | per-server permissions, container file access |
+| Admin > Domains | game ports to forward, their live reachability, the port policy |
+| Firewall | the per-server player access panel |
+| Backups | the Minecraft world backup source |
+| Overview and home widgets | counts and state of game servers |
+| Router guide | which ports the router has to forward |
+| Cron | the game-* jobs |
+
+The registry is a typed interface in core with one implementation per installed
+app. Core asks the registry and treats a missing app as "nothing to show". The
+app registers its implementation when its bundle loads.
+
+## Phases
+
+1. **Core stops importing app code.** Introduce the registry, move every core
+   call site listed above to it, and register the in-tree Game servers and Places
+   implementations from one list. Verifiable here: the dashboard builds and every
+   test passes with that list empty. No behaviour changes.
+2. **Move the app's code under its own workspace** (`apps/game-servers`,
+   `apps/places`): services, routes, screens, jobs, tests. Still compiled into
+   the image, loaded through the registry. Verifiable here.
+3. **Bundles.** Build each app workspace into a bundle in CI; add the loader,
+   the resolution hook, the catch-all routes and the import map; stop compiling
+   the app workspaces into the dashboard image. Needs a container to verify.
+4. **Install, uninstall and update deliver bundles**, including the updater
+   replacing installed bundles on update, and the migration for existing
+   instances: an instance that has the app installed gets its bundle on the
+   update that ships phase 3, before the old code is gone from the image.
+   Needs a container to verify.
+5. **Places** through the same phases.
+
+Phases 3 and 4 change how every deployment is updated and cannot be exercised
+on the development machine, which has no Docker. They are verified on a staging
+host before release, and phase 3 ships with the in-image copy still present so a
+bundle that fails to load falls back to it for one release.
