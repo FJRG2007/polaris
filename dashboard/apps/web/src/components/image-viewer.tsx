@@ -95,7 +95,10 @@ export function ImageViewer({
     useEffect(() => {
         if (!image) return;
         const onKey = (event: KeyboardEvent) => {
-            if (event.key === "Escape") onClose();
+            if (event.key === "Escape") {
+                event.preventDefault();
+                onClose();
+            }
             if (event.key === "+" || event.key === "=") setZoom((current) => step(current, 1));
             if (event.key === "-") setZoom((current) => step(current, -1));
         };
@@ -116,6 +119,7 @@ export function ImageViewer({
     return (
         <div
             role="dialog"
+            data-state="open"
             aria-modal="true"
             aria-label={image.name}
             className="fixed inset-0 z-50 flex flex-col bg-background/95"

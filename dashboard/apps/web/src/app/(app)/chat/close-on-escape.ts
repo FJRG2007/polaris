@@ -15,8 +15,10 @@
 import { useEffect, useRef } from "react";
 
 /** What still owns the key while it is on screen. `data-state` rather than the
- *  role alone, because a menu's submenus stay mounted and hidden once opened. */
+ *  role alone, because a menu's submenus stay mounted and hidden once opened.
+ *  A modal is only mounted while it is open, so one without a state counts. */
 const OVERLAY = [
+    "[aria-modal='true']:not([data-state='closed'])",
     "[role='dialog'][data-state='open']",
     "[role='alertdialog'][data-state='open']",
     "[role='menu'][data-state='open']",

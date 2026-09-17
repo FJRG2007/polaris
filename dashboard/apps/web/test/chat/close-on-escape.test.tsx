@@ -11,6 +11,8 @@
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { VideoViewer } from "@/components/video-viewer";
+import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
 import { closesConversation, useCloseOnEscape } from "@/app/(app)/chat/close-on-escape";
 
 afterEach(cleanup);
@@ -43,6 +45,12 @@ describe("which presses close the conversation", () => {
         expect(closesConversation(escape())).toBe(false);
     });
 
+    it("not while a hand-built viewer is open", () => {
+        document.body.innerHTML = `<div role="dialog" aria-modal="true"></div>`;
+        expect(closesConversation(escape())).toBe(false);
+        document.body.innerHTML = "";
+    });
+
     it("despite a submenu kept mounted after it closed", () => {
         document.body.innerHTML = `<div role="menu" data-state="closed" hidden></div>`;
         expect(closesConversation(escape())).toBe(true);
@@ -68,6 +76,32 @@ function Conversation({ onClose }: { onClose: () => void }) {
 }
 
 describe("the conversation screen", () => {
+    it("leaves a picture or a video open over it to close first", () => {
+        const onClose = vi.fn();
+        const onViewerClose = vi.fn();
+        render(
+            <>
+                <Conversation onClose={onClose} />
+                <ImageViewer image={{ url: "/a.png", name: "a.png" } as ViewedImage} onClose={onViewerClose} />
+            </>
+        );
+        window.dispatchEvent(escape());
+        expect(onViewerClose).toHaveBeenCalledTimes(1);
+        expect(onClose).not.toHaveBeenCalled();
+        cleanup();
+
+        render(
+            <>
+                <Conversation onClose={onClose} />
+                <VideoViewer src="/a.mp4" onClose={onViewerClose} />
+            </>
+        );
+        window.dispatchEvent(escape());
+        expect(onViewerClose).toHaveBeenCalledTimes(2);
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
+
     it("backs out of an edit first, then closes", () => {
         const onClose = vi.fn();
         render(<Conversation onClose={onClose} />);
