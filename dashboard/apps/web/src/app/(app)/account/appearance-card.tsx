@@ -28,23 +28,15 @@ import { useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { saveProfileStyleAction } from "./actions";
-import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
-import { ProfileBanner } from "@/components/profile-banner";
-import { PictureEditor, usePicture } from "./avatar-card";
 import { Choice, Tile } from "./appearance-choice";
-import { NameEffectPicker, NameFontPicker } from "./name-style-picker";
+import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
+import { PictureEditor, usePicture } from "./avatar-card";
+import { ProfileBanner } from "@/components/profile-banner";
 import { BAND_CROP, FACE_CROP } from "@/components/image-cropper";
-import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
+import { NameEffectPicker, NameFontPicker } from "./name-style-picker";
 import { useProfileStyleRefresh } from "@/components/profile-style-store";
-import {
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    ColorPicker,
-    cn
-} from "@polaris/ui";
+import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
+import { Button, Card, CardBody, CardHeader, CardTitle, ColorPicker, cn } from "@polaris/ui";
 import {
     frameCss,
     nameLookCss,
@@ -86,10 +78,7 @@ export function AppearanceCard({
     const banner = usePicture("/api/banner", bannerUrl(userId), BAND_CROP);
     const pictureError = photo.error || banner.error;
 
-    const changed = useMemo(
-        () => JSON.stringify(style) !== JSON.stringify(saved),
-        [style, saved]
-    );
+    const changed = useMemo(() => JSON.stringify(style) !== JSON.stringify(saved), [style, saved]);
     const background: Background = style.banner?.kind ?? "photo";
     const effect = core.effectOf(style.effect);
     const plate = core.nameplateOf(style.nameplate);
@@ -106,10 +95,20 @@ export function AppearanceCard({
      *  without losing the colour already picked. */
     const setBackground = (kind: Background) => {
         if (kind === "photo") return set({ banner: null });
-        const first = style.banner?.kind === "solid" ? style.banner.color : style.banner?.from ?? FIRST_COLOR;
+        const first =
+            style.banner?.kind === "solid"
+                ? style.banner.color
+                : (style.banner?.from ?? FIRST_COLOR);
         if (kind === "solid") return set({ banner: { kind: "solid", color: first } });
         const second = style.banner?.kind === "gradient" ? style.banner.to : SECOND_COLOR;
-        set({ banner: { kind: "gradient", angle: style.banner?.kind === "gradient" ? style.banner.angle : 135, from: first, to: second } });
+        set({
+            banner: {
+                kind: "gradient",
+                angle: style.banner?.kind === "gradient" ? style.banner.angle : 135,
+                from: first,
+                to: second
+            }
+        });
     };
 
     return (
@@ -260,14 +259,28 @@ export function AppearanceCard({
                                     label="From"
                                     value={style.banner.from}
                                     onChange={(from) =>
-                                        set({ banner: { ...(style.banner as core.BannerFill & { kind: "gradient" }), from } })
+                                        set({
+                                            banner: {
+                                                ...(style.banner as core.BannerFill & {
+                                                    kind: "gradient";
+                                                }),
+                                                from
+                                            }
+                                        })
                                     }
                                 />
                                 <ColorPicker
                                     label="To"
                                     value={style.banner.to}
                                     onChange={(to) =>
-                                        set({ banner: { ...(style.banner as core.BannerFill & { kind: "gradient" }), to } })
+                                        set({
+                                            banner: {
+                                                ...(style.banner as core.BannerFill & {
+                                                    kind: "gradient";
+                                                }),
+                                                to
+                                            }
+                                        })
                                     }
                                 />
                             </div>
@@ -282,14 +295,18 @@ export function AppearanceCard({
                                     onChange={(event) =>
                                         set({
                                             banner: {
-                                                ...(style.banner as core.BannerFill & { kind: "gradient" }),
+                                                ...(style.banner as core.BannerFill & {
+                                                    kind: "gradient";
+                                                }),
                                                 angle: Number(event.target.value)
                                             }
                                         })
                                     }
                                     className="h-1.5 max-w-xs flex-1 cursor-pointer appearance-none rounded-full bg-muted"
                                 />
-                                <span className="w-10 font-mono tabular-nums">{style.banner.angle}&deg;</span>
+                                <span className="w-10 font-mono tabular-nums">
+                                    {style.banner.angle}&deg;
+                                </span>
                             </label>
                         </div>
                     ) : null}
@@ -298,7 +315,7 @@ export function AppearanceCard({
                 <section className="flex flex-col gap-2">
                     <Field
                         label="Avatar decoration"
-                        hint="Drawn on your picture everywhere it appears, at whatever size it is drawn. Every one of them is free."
+                        hint="Drawn on your picture wherever you're introduced - your profile, messages, member lists - not in pickers or tables. Every one of them is free."
                     />
                     {/* A gallery rather than a row of chips, because a decoration
                         is a drawing and the only useful way to choose between
@@ -347,7 +364,11 @@ export function AppearanceCard({
                         hint="Where your name appears in a list of people, like the members of a conversation."
                     />
                     <div className="flex flex-wrap gap-1.5">
-                        <Choice chosen={!style.nameplate} onClick={() => set({ nameplate: null })} label="None" />
+                        <Choice
+                            chosen={!style.nameplate}
+                            onClick={() => set({ nameplate: null })}
+                            label="None"
+                        />
                         {core.NAMEPLATES.map((entry) => (
                             <Choice
                                 key={entry.id}
@@ -395,9 +416,16 @@ export function AppearanceCard({
                 </section>
 
                 <section className="flex flex-col gap-2">
-                    <Field label="Profile effect" hint="An edge, a slow band of light, or both. It stops for anybody who has asked their machine for less motion." />
+                    <Field
+                        label="Profile effect"
+                        hint="An edge, a slow band of light, or both. It stops for anybody who has asked their machine for less motion."
+                    />
                     <div className="flex flex-wrap gap-1.5">
-                        <Choice chosen={!style.effect} onClick={() => set({ effect: null })} label="None" />
+                        <Choice
+                            chosen={!style.effect}
+                            onClick={() => set({ effect: null })}
+                            label="None"
+                        />
                         {core.PROFILE_EFFECTS.map((entry) => (
                             <Choice
                                 key={entry.id}
@@ -431,7 +459,15 @@ export function AppearanceCard({
                             variant="ghost"
                             size="sm"
                             disabled={busy || core.styleIsPlain(style)}
-                            onClick={() => set({ banner: null, decoration: null, nameplate: null, effect: null, nameStyle: null })}
+                            onClick={() =>
+                                set({
+                                    banner: null,
+                                    decoration: null,
+                                    nameplate: null,
+                                    effect: null,
+                                    nameStyle: null
+                                })
+                            }
                         >
                             <RotateCcw className="size-4 shrink-0" />
                             Clear it all

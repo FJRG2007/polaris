@@ -10,7 +10,15 @@ import { useEffect, useState } from "react";
 import { Ban, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { PersonName } from "@/components/person-name";
-import { Badge, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 import {
     banUserAction,
     getUserProfileAction,
@@ -92,6 +100,7 @@ export function UserProfileDialog({
                         <div className="flex items-center gap-3">
                             <Avatar
                                 openable
+                                decorated
                                 person={{ id: userId ?? "", name: profile.name }}
                                 size={44}
                             />
@@ -100,16 +109,22 @@ export function UserProfileDialog({
                                     <span className="truncate">
                                         <PersonName id={userId} name={profile.name} />
                                     </span>
-                                    {profile.isAdmin ? <Badge variant="neutral">Admin</Badge> : null}
+                                    {profile.isAdmin ? (
+                                        <Badge variant="neutral">Admin</Badge>
+                                    ) : null}
                                     {profile.banned ? <Badge variant="danger">Banned</Badge> : null}
                                 </p>
                                 {profile.email ? (
-                                    <p className="truncate text-sm text-muted-foreground">{profile.email}</p>
+                                    <p className="truncate text-sm text-muted-foreground">
+                                        {profile.email}
+                                    </p>
                                 ) : null}
                             </div>
                         </div>
                         {profile.banned && profile.banReason ? (
-                            <p className="text-sm text-muted-foreground">Reason: {profile.banReason}</p>
+                            <p className="text-sm text-muted-foreground">
+                                Reason: {profile.banReason}
+                            </p>
                         ) : null}
                         {profile.viewerIsAdmin && !profile.self ? (
                             profile.banned ? (

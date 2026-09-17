@@ -399,7 +399,11 @@ export function ChatSidebar() {
                                             // list was the one place in Polaris
                                             // where somebody's face did not say
                                             // whether they were there.
-                                            <Avatar person={channel.others[0]} size={24} />
+                                            <Avatar
+                                                decorated
+                                                person={channel.others[0]}
+                                                size={24}
+                                            />
                                         ) : (
                                             // A group is its picture, or the
                                             // faces of the people in it. An

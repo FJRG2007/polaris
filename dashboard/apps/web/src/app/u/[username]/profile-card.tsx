@@ -40,7 +40,13 @@ import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { effectOf, linkLabel, nameLookOf } from "@polaris/core";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
-import { frameCss, nameStyleClass, nameLookCss, sheenCss, SHEEN_LAYER } from "@/lib/profile-style-css";
+import {
+    frameCss,
+    nameStyleClass,
+    nameLookCss,
+    sheenCss,
+    SHEEN_LAYER
+} from "@/lib/profile-style-css";
 
 export function ProfileCard({
     profile,
@@ -106,6 +112,7 @@ export function ProfileCard({
                             their photo, and asking through the face would have
                             tied the two together. */}
                         <Avatar
+                            decorated
                             person={profile.showsAvatar ? person : { id: null, name: profile.name }}
                             size={72}
                             presence={where?.status}
@@ -173,7 +180,11 @@ export function ProfileCard({
                 ) : null}
 
                 {!own && signedIn ? (
-                    <ProfileActions personId={profile.id} name={profile.name} standing={profile.standing} />
+                    <ProfileActions
+                        personId={profile.id}
+                        name={profile.name}
+                        standing={profile.standing}
+                    />
                 ) : null}
 
                 {profile.mutual ? (
@@ -189,7 +200,9 @@ export function ProfileCard({
                 />
 
                 {profile.description ? (
-                    <p className="text-sm leading-relaxed text-foreground/90">{profile.description}</p>
+                    <p className="text-sm leading-relaxed text-foreground/90">
+                        {profile.description}
+                    </p>
                 ) : null}
 
                 {profile.organizations.length > 0 || profile.companies.length > 0 ? (

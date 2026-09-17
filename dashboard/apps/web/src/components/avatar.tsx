@@ -154,6 +154,7 @@ export function Avatar({
     status = true,
     presence,
     decoration: chosen,
+    decorated = false,
     openable = false,
     callBadge
 }: {
@@ -179,6 +180,15 @@ export function Avatar({
      * time. Everywhere else this is left alone and the store answers.
      */
     decoration?: string | null;
+    /**
+     * Whether this face wears the ring its owner chose.
+     *
+     * Off by default, and on only where somebody is being introduced: their
+     * profile, a message they wrote, the member list of a room, the list of
+     * direct messages. A picker, a settings list or a table of accounts is a
+     * column being scanned for one name, and a ring there is noise.
+     */
+    decorated?: boolean;
     /**
      * Whether pressing the face opens the photo full size.
      *
@@ -224,6 +234,11 @@ export function Avatar({
     // id to ask about in the first place.
     const inRoom = callBadge !== undefined;
     const known = usePresence(presence || !status || square || inRoom ? null : person.id);
+    const plain = useNamesArePlain();
+    // Only where the caller asked for it, and never on a surface that draws
+    // people plainly - see `PlainNames`. An explicitly passed decoration is a
+    // preview of a choice being made, so it is drawn whatever the surface says.
+    const wears = chosen === undefined && decorated && !plain;
     /**
      * The ring somebody chose, if they chose one.
      *
@@ -232,15 +247,9 @@ export function Avatar({
      * of them have nothing but a name and an id to hand. An organization is not
      * a person and has no appearance to wear, so it is not asked about.
      */
-    const stored = useProfileStyle(square || chosen !== undefined ? null : person.id);
-    // Not on a surface that draws people plainly. A ring around a face is the
-    // same kind of thing as a colour across a name: it belongs where somebody is
-    // being introduced, and not in a column of two hundred accounts being
-    // scanned for one - see `PlainNames`. An explicitly passed decoration is a
-    // preview of a choice being made, so it is drawn whatever the surface says.
-    const plain = useNamesArePlain();
+    const stored = useProfileStyle(square || !wears ? null : person.id);
     const decoration = decorationOf(
-        chosen === undefined ? (plain ? null : (stored?.decoration ?? null)) : chosen
+        chosen === undefined ? (wears ? (stored?.decoration ?? null) : null) : chosen
     );
     /**
      * The decoration is drawn around the picture, and the picture stays the size

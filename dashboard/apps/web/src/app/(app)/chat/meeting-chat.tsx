@@ -219,6 +219,7 @@ export function MeetingChat({
                         {lines.map((line) => (
                             <li key={line.id} className="flex gap-2">
                                 <Avatar
+                                    decorated
                                     size={22}
                                     // Here or gone from this room, never the
                                     // presence store's answer: inside a call its
