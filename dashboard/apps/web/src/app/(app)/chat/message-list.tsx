@@ -44,7 +44,7 @@ import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { MessageInfoDialog } from "./message-info-dialog";
 import type { VoicePresence } from "@/lib/chat/meetings";
-import type { ChatMessageView } from "@/lib/chat/messages";
+import type { ChatMessageView, ChatQuoteView } from "@/lib/chat/messages";
 import type { ChatReferenceView } from "@/lib/chat/references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { VideoPreview } from "@/components/video-preview";
@@ -81,7 +81,11 @@ function SentFile({
 
     if (!readable) {
         return (
-            <a href={`/api/chat/attachments/${file.id}?download=1`} download={file.name} className={chip}>
+            <a
+                href={`/api/chat/attachments/${file.id}?download=1`}
+                download={file.name}
+                className={chip}
+            >
                 <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-[16rem] truncate" title={file.name}>
                     {file.name}
@@ -97,7 +101,9 @@ function SentFile({
                 type="button"
                 className={chip}
                 title={`Open ${file.name}`}
-                onClick={() => onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })}
+                onClick={() =>
+                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
+                }
             >
                 <FileText className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-[16rem] truncate">{file.name}</span>
@@ -852,20 +858,11 @@ function Message({
                     )}
 
                     {message.quote && (
-                        <p className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <CornerUpLeft className="size-3 shrink-0" />
-                            {message.quote.forwarded && (
-                                <span className="shrink-0 font-medium">Forwarded from</span>
-                            )}
-                            <span className="shrink-0 font-medium text-foreground">
-                                {message.quote.authorName ?? "somebody who has left"}
-                            </span>
-                            <span className="min-w-0 truncate" title={message.quote.excerpt}>
-                                {message.quote.deleted
-                                    ? "message deleted"
-                                    : message.quote.excerpt || "attachment"}
-                            </span>
-                        </p>
+                        <QuoteLine
+                            quote={message.quote}
+                            here={message.channelId}
+                            onJumpTo={onJumpTo}
+                        />
                     )}
 
                     {message.deleted ? (
@@ -942,59 +939,62 @@ function Message({
                                         className={file.spoiler ? undefined : "contents"}
                                         covered={file.spoiler}
                                     >
-                                    {file.inline ? (
-                                        <KeepableImage
-                                            href={`/api/chat/attachments/${file.id}`}
-                                            alt={file.name}
-                                            source={`attachment:${file.id}`}
-                                            name={file.name}
-                                            onOpen={() =>
-                                                onOpenImage({
-                                                    url: `/api/chat/attachments/${file.id}`,
-                                                    name: file.name,
-                                                    messageId: message.id,
-                                                    forwardable: message.forwardable
-                                                })
-                                            }
-                                        />
-                                    ) : isPlayable(file.contentType) ? (
-                                        <VoiceNote
-                                            href={`/api/chat/attachments/${file.id}`}
-                                            name={file.name}
-                                            recorded={isVoiceMessage(file.name, file.contentType)}
-                                            waveform={file.waveform}
-                                            durationMs={file.durationMs}
-                                        />
-                                    ) : isWatchable(file.contentType) ? (
-                                        // Watched where it was sent, and not a
-                                        // byte of it fetched until somebody
-                                        // presses play: a room with four clips
-                                        // in it would otherwise pull four files
-                                        // off the disk to draw the text above
-                                        // them. See `VideoPreview`.
-                                        <VideoPreview
-                                            name={file.name}
-                                            size={file.size}
-                                            src={`/api/chat/attachments/${file.id}`}
-                                            // A frame of the video itself, taken
-                                            // by the browser that sent it. A few
-                                            // kilobytes, and the difference
-                                            // between a list of black rectangles
-                                            // and a list somebody can read.
-                                            poster={
-                                                file.hasPoster
-                                                    ? `/api/chat/attachments/${file.id}?poster=1`
-                                                    : undefined
-                                            }
-                                            download={`/api/chat/attachments/${file.id}?download=1`}
-                                        />
-                                    ) : (
-                                        <SentFile
-                                            file={file}
-                                            at={message.createdAt}
-                                            onOpen={onOpenFile}
-                                        />
-                                    )}
+                                        {file.inline ? (
+                                            <KeepableImage
+                                                href={`/api/chat/attachments/${file.id}`}
+                                                alt={file.name}
+                                                source={`attachment:${file.id}`}
+                                                name={file.name}
+                                                onOpen={() =>
+                                                    onOpenImage({
+                                                        url: `/api/chat/attachments/${file.id}`,
+                                                        name: file.name,
+                                                        messageId: message.id,
+                                                        forwardable: message.forwardable
+                                                    })
+                                                }
+                                            />
+                                        ) : isPlayable(file.contentType) ? (
+                                            <VoiceNote
+                                                href={`/api/chat/attachments/${file.id}`}
+                                                name={file.name}
+                                                recorded={isVoiceMessage(
+                                                    file.name,
+                                                    file.contentType
+                                                )}
+                                                waveform={file.waveform}
+                                                durationMs={file.durationMs}
+                                            />
+                                        ) : isWatchable(file.contentType) ? (
+                                            // Watched where it was sent, and not a
+                                            // byte of it fetched until somebody
+                                            // presses play: a room with four clips
+                                            // in it would otherwise pull four files
+                                            // off the disk to draw the text above
+                                            // them. See `VideoPreview`.
+                                            <VideoPreview
+                                                name={file.name}
+                                                size={file.size}
+                                                src={`/api/chat/attachments/${file.id}`}
+                                                // A frame of the video itself, taken
+                                                // by the browser that sent it. A few
+                                                // kilobytes, and the difference
+                                                // between a list of black rectangles
+                                                // and a list somebody can read.
+                                                poster={
+                                                    file.hasPoster
+                                                        ? `/api/chat/attachments/${file.id}?poster=1`
+                                                        : undefined
+                                                }
+                                                download={`/api/chat/attachments/${file.id}?download=1`}
+                                            />
+                                        ) : (
+                                            <SentFile
+                                                file={file}
+                                                at={message.createdAt}
+                                                onOpen={onOpenFile}
+                                            />
+                                        )}
                                     </Spoiler>
                                 </li>
                             ))}
@@ -1416,6 +1416,106 @@ function VoiceCard({
 }
 
 /**
+ * A link to one message that scrolls when the message is in the conversation
+ * on screen, and travels when it is not.
+ *
+ * Scrolling only for this conversation: one somewhere else is a real journey,
+ * which is also what keeps this from rewriting the address to a room the reader
+ * is not in. A list with nowhere to scroll - the thread panel - keeps the plain
+ * link, whose page opens the message wherever it is.
+ */
+function MessageLink({
+    messageId,
+    channelId,
+    here,
+    onJumpTo,
+    className,
+    title,
+    children
+}: {
+    messageId: string;
+    channelId: string;
+    /** The conversation this link is drawn in. */
+    here: string | null;
+    onJumpTo?: (messageId: string) => void;
+    className: string;
+    title?: string;
+    children: React.ReactNode;
+}) {
+    const jump = onJumpTo && here === channelId ? onJumpTo : null;
+
+    return (
+        <Link
+            href={`/chat/c/${channelId}/${messageId}`}
+            title={title}
+            onClick={
+                jump
+                    ? (event) => {
+                          // A click held with a modifier is somebody asking for
+                          // a tab or a window. That is the browser's to answer,
+                          // and it needs the address left alone.
+                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+                              return;
+                          event.preventDefault();
+                          jump(messageId);
+                      }
+                    : undefined
+            }
+            className={className}
+        >
+            {children}
+        </Link>
+    );
+}
+
+/**
+ * The line over a reply or a forward naming what it answers.
+ *
+ * Pressing it lands on the original, the way a quoted message card does. A
+ * deleted original has nowhere to land, so its line stays text.
+ */
+function QuoteLine({
+    quote,
+    here,
+    onJumpTo
+}: {
+    quote: ChatQuoteView;
+    here: string;
+    onJumpTo?: (messageId: string) => void;
+}) {
+    const body = (
+        <>
+            <CornerUpLeft className="size-3 shrink-0" />
+            {quote.forwarded && <span className="shrink-0 font-medium">Forwarded from</span>}
+            <span className="shrink-0 font-medium text-foreground">
+                {quote.authorName ?? "somebody who has left"}
+            </span>
+            <span className="min-w-0 truncate" title={quote.excerpt}>
+                {quote.deleted ? "message deleted" : quote.excerpt || "attachment"}
+            </span>
+        </>
+    );
+    const shape = "mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground";
+    if (quote.deleted || !quote.channelId) return <p className={shape}>{body}</p>;
+
+    return (
+        <MessageLink
+            messageId={quote.id}
+            channelId={quote.channelId}
+            here={here}
+            onJumpTo={onJumpTo}
+            title="Go to the original message"
+            className={cn(
+                shape,
+                "w-fit max-w-full rounded no-underline transition-colors hover:text-foreground focus-visible:text-foreground"
+            )}
+        >
+            {body}
+        </MessageLink>
+    );
+}
+
+/**
  * Where a quoted message is, said only where it is not obvious.
  *
  * Every part that matches where the reader already is comes out. Somebody
@@ -1474,26 +1574,13 @@ function QuotedMessageCard({
     onJumpTo?: (messageId: string) => void;
 }) {
     const from = whereFrom(reference, here);
-    // Only for a message in the conversation on screen. One somewhere else is a
-    // real journey and stays a link, which is also what keeps this from
-    // rewriting the address to a room the reader is not in.
-    const jump = onJumpTo && here?.channelId === reference.channelId ? onJumpTo : null;
 
     return (
-        <Link
-            href={`/chat/c/${reference.channelId}/${reference.id}`}
-            onClick={
-                jump
-                    ? (event) => {
-                          // A click held with a modifier is somebody asking for
-                          // a tab or a window. That is the browser's to answer,
-                          // and it needs the address left alone.
-                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                          event.preventDefault();
-                          jump(reference.id);
-                      }
-                    : undefined
-            }
+        <MessageLink
+            messageId={reference.id}
+            channelId={reference.channelId}
+            here={here?.channelId ?? null}
+            onJumpTo={onJumpTo}
             className="block max-w-md rounded-md border-l-2 border-primary bg-primary/5 px-3 py-2 no-underline transition-colors hover:bg-primary/10"
         >
             {from && (
@@ -1514,7 +1601,7 @@ function QuotedMessageCard({
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                 {saidWhat(reference)}
             </span>
-        </Link>
+        </MessageLink>
     );
 }
 
