@@ -93,13 +93,19 @@ type Rail = () => Promise<ChatChannelView[]>;
 async function conversations(rail: Rail, term: string, limit: number): Promise<ChatHit[]> {
     const needle = term.toLowerCase();
     return (await rail())
-        .filter((channel) => (channel.kind === "dm" || channel.kind === "group") && matches(channel, needle))
+        .filter(
+            (channel) =>
+                (channel.kind === "dm" || channel.kind === "group") && matches(channel, needle)
+        )
         .sort(byRecent)
         .slice(0, limit)
         .map((channel) => ({
             id: channel.id,
             scope: "chats",
-            label: channel.name || channel.others.map((other) => other.name).join(", ") || "Direct message",
+            label:
+                channel.name ||
+                channel.others.map((other) => other.name).join(", ") ||
+                "Direct message",
             detail: channel.kind === "group" ? "Group" : "Direct message",
             href: `/chat/c/${channel.id}`
         }));
@@ -117,13 +123,18 @@ async function channels(
     const [listed, spaces] = await Promise.all([rail(), listSpaces(actor)]);
     const spaceNames = new Map(spaces.map((space) => [space.id, space.name]));
     return listed
-        .filter((channel) => channel.spaceId !== null && channel.name.toLowerCase().includes(needle))
+        .filter(
+            (channel) => channel.spaceId !== null && channel.name.toLowerCase().includes(needle)
+        )
         .slice(0, limit)
         .map((channel) => ({
             id: channel.id,
             scope: "channels",
             label: channel.name,
-            detail: [channel.kind === "voice" ? "Voice" : null, spaceNames.get(channel.spaceId!) ?? null]
+            detail: [
+                channel.kind === "voice" ? "Voice" : null,
+                spaceNames.get(channel.spaceId!) ?? null
+            ]
                 .filter(Boolean)
                 .join(" - "),
             href: `/chat/c/${channel.id}`

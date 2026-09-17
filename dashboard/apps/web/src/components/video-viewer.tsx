@@ -78,10 +78,7 @@ export function VideoViewer({
                 </p>
             )}
 
-            <div
-                className="w-full max-w-5xl"
-                onClick={(event) => event.stopPropagation()}
-            >
+            <div className="w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
                 <MediaPlayer
                     autoPlay
                     kind="video"

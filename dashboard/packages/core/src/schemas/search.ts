@@ -16,7 +16,14 @@
 
 import { z } from "zod";
 
-export const LOCAL_SEARCH_SCOPES = ["projects", "services", "databases", "servers", "runners", "apps"] as const;
+export const LOCAL_SEARCH_SCOPES = [
+    "projects",
+    "services",
+    "databases",
+    "servers",
+    "runners",
+    "apps"
+] as const;
 
 /**
  * The Chat quick switcher's scopes: `chat` is all four at once, the others one
@@ -25,7 +32,13 @@ export const LOCAL_SEARCH_SCOPES = ["projects", "services", "databases", "server
  */
 export const CHAT_SEARCH_SCOPES = ["chat", "contacts", "chats", "channels", "messages"] as const;
 
-export const REMOTE_SEARCH_SCOPES = ["tasks", "docs", "notes", "users", ...CHAT_SEARCH_SCOPES] as const;
+export const REMOTE_SEARCH_SCOPES = [
+    "tasks",
+    "docs",
+    "notes",
+    "users",
+    ...CHAT_SEARCH_SCOPES
+] as const;
 
 export const SEARCH_SCOPES = [...LOCAL_SEARCH_SCOPES, ...REMOTE_SEARCH_SCOPES] as const;
 
@@ -108,13 +121,17 @@ export interface RecentSearch extends RecentSearchInput {
  * rows; and a query is remembered by the words rather than the casing, so
  * "Orphion" does not sit under "orphion" in the same list.
  */
-export function recentSearchKey(entry: Pick<RecentSearch, "kind" | "scope" | "term" | "href">): string {
+export function recentSearchKey(
+    entry: Pick<RecentSearch, "kind" | "scope" | "term" | "href">
+): string {
     const target = entry.kind === "result" ? (entry.href ?? "") : entry.term.toLowerCase();
     return `${entry.kind}:${entry.scope ?? ""}:${target}`;
 }
 
 /** Newest first, capped, one entry per key. */
-export function mergeRecentSearches(...lists: readonly (readonly RecentSearch[])[]): RecentSearch[] {
+export function mergeRecentSearches(
+    ...lists: readonly (readonly RecentSearch[])[]
+): RecentSearch[] {
     const byKey = new Map<string, RecentSearch>();
     for (const entry of lists.flat()) {
         const key = recentSearchKey(entry);

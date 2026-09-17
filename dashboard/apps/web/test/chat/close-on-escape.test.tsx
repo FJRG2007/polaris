@@ -82,7 +82,10 @@ describe("the conversation screen", () => {
         render(
             <>
                 <Conversation onClose={onClose} />
-                <ImageViewer image={{ url: "/a.png", name: "a.png" } as ViewedImage} onClose={onViewerClose} />
+                <ImageViewer
+                    image={{ url: "/a.png", name: "a.png" } as ViewedImage}
+                    onClose={onViewerClose}
+                />
             </>
         );
         window.dispatchEvent(escape());
@@ -100,7 +103,6 @@ describe("the conversation screen", () => {
         expect(onViewerClose).toHaveBeenCalledTimes(2);
         expect(onClose).not.toHaveBeenCalled();
     });
-
 
     it("backs out of an edit first, then closes", () => {
         const onClose = vi.fn();

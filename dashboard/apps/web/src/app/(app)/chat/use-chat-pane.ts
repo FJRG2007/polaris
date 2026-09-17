@@ -36,7 +36,10 @@ export function useChatPane(pane: string, bounds: PaneBounds) {
 
     // After the first paint: there is no localStorage on the server, and a width
     // read during render would not match what was sent.
-    useEffect(() => setWidth(readPaneSize(pane, { min, max, fallback })), [pane, min, max, fallback]);
+    useEffect(
+        () => setWidth(readPaneSize(pane, { min, max, fallback })),
+        [pane, min, max, fallback]
+    );
 
     useEffect(() => onLayoutReset(() => setWidth(fallback)), [fallback]);
 

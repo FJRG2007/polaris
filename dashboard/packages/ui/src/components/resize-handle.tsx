@@ -27,7 +27,12 @@
  */
 
 import { RotateCcw, LayoutPanelLeft } from "lucide-react";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./context-menu";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger
+} from "./context-menu";
 
 import {
     useCallback,

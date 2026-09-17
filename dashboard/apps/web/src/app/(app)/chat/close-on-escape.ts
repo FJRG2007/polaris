@@ -26,7 +26,8 @@ const OVERLAY = [
 ].join(", ");
 
 export function closesConversation(event: KeyboardEvent, root: ParentNode = document): boolean {
-    if (event.key !== "Escape" || event.defaultPrevented || event.repeat || event.isComposing) return false;
+    if (event.key !== "Escape" || event.defaultPrevented || event.repeat || event.isComposing)
+        return false;
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
     return root.querySelector(OVERLAY) === null;
 }

@@ -75,9 +75,16 @@ export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) 
         <Row {...row} label={entry.label}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={entry.label}>{entry.label}</span>
+                <span className="block truncate text-sm" title={entry.label}>
+                    {entry.label}
+                </span>
                 {entry.context ? (
-                    <span className="block truncate text-xs text-muted-foreground" title={entry.context}>{entry.context}</span>
+                    <span
+                        className="block truncate text-xs text-muted-foreground"
+                        title={entry.context}
+                    >
+                        {entry.context}
+                    </span>
                 ) : null}
             </span>
         </Row>
@@ -91,7 +98,9 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
         <Row {...row} label={`Search ${scope.label}`}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={scope.placeholder}>{scope.placeholder}</span>
+                <span className="block truncate text-sm" title={scope.placeholder}>
+                    {scope.placeholder}
+                </span>
             </span>
             <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none text-muted-foreground">
                 {scope.sigil ?? `/${scope.keywords[0]}`}
@@ -118,7 +127,10 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
     return (
         <Row {...row} label={hit.label} personId={personId}>
             {person ? (
-                <Avatar person={{ id: hit.id, name: hit.label, image: hit.image ?? null }} size={22} />
+                <Avatar
+                    person={{ id: hit.id, name: hit.label, image: hit.image ?? null }}
+                    size={22}
+                />
             ) : KindIcon ? (
                 <KindIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             ) : hit.status ? (
@@ -129,7 +141,10 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
                     style={{ backgroundColor: hit.status.color }}
                 />
             ) : (
-                <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                <span
+                    aria-hidden="true"
+                    className="size-2.5 shrink-0 rounded-full bg-muted-foreground/40"
+                />
             )}
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
@@ -143,11 +158,18 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
                     </span>
                 </span>
                 {hit.detail ? (
-                    <span className="block truncate text-xs text-muted-foreground" title={hit.detail}>{hit.detail}</span>
+                    <span
+                        className="block truncate text-xs text-muted-foreground"
+                        title={hit.detail}
+                    >
+                        {hit.detail}
+                    </span>
                 ) : null}
             </span>
             {hit.status ? (
-                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{hit.status.name}</span>
+                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                    {hit.status.name}
+                </span>
             ) : null}
         </Row>
     );
@@ -168,13 +190,20 @@ export function RecentRow({
     return (
         <Row {...row} label={entry.label}>
             {entry.kind === "result" ? (
-                <CornerDownLeft className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <CornerDownLeft
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                />
             ) : (
                 <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
-            <span className="min-w-0 flex-1 truncate text-sm" title={entry.label}>{entry.label}</span>
+            <span className="min-w-0 flex-1 truncate text-sm" title={entry.label}>
+                {entry.label}
+            </span>
             {scopeLabel ? (
-                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{scopeLabel}</span>
+                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                    {scopeLabel}
+                </span>
             ) : null}
             <button
                 type="button"
@@ -200,7 +229,10 @@ export function HitSkeleton() {
             {[0, 1, 2].map((row) => (
                 <div key={row} className="flex items-center gap-3 rounded-md px-2 py-2">
                     <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-muted" />
-                    <span className="h-3 flex-1 animate-pulse rounded bg-muted" style={{ maxWidth: `${70 - row * 12}%` }} />
+                    <span
+                        className="h-3 flex-1 animate-pulse rounded bg-muted"
+                        style={{ maxWidth: `${70 - row * 12}%` }}
+                    />
                 </div>
             ))}
         </div>

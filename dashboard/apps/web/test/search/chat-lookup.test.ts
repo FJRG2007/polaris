@@ -48,12 +48,27 @@ beforeEach(() => {
     userHasManage.mockResolvedValue(true);
     listSpaces.mockResolvedValue([{ id: "s1", name: "Studio" }]);
     listChannels.mockResolvedValue([
-        channel({ id: "dm-ana", kind: "dm", name: "Ana Ruiz", others: [{ id: "u-ana", name: "Ana Ruiz" }], lastMessageAt: "2026-09-01T10:00:00Z" }),
-        channel({ id: "grp", kind: "group", name: "Release crew", others: [{ id: "u-bo", name: "Bo" }], lastMessageAt: "2026-09-02T10:00:00Z" }),
+        channel({
+            id: "dm-ana",
+            kind: "dm",
+            name: "Ana Ruiz",
+            others: [{ id: "u-ana", name: "Ana Ruiz" }],
+            lastMessageAt: "2026-09-01T10:00:00Z"
+        }),
+        channel({
+            id: "grp",
+            kind: "group",
+            name: "Release crew",
+            others: [{ id: "u-bo", name: "Bo" }],
+            lastMessageAt: "2026-09-02T10:00:00Z"
+        }),
         channel({ id: "general", kind: "text", name: "release-notes", spaceId: "s1" }),
         channel({ id: "lounge", kind: "voice", name: "Lounge", spaceId: "s1" })
     ]);
-    searchForConversation.mockResolvedValue({ people: [{ id: "u-ana", name: "Ana Ruiz" }], withheld: 0 });
+    searchForConversation.mockResolvedValue({
+        people: [{ id: "u-ana", name: "Ana Ruiz" }],
+        withheld: 0
+    });
     searchMessages.mockResolvedValue([
         {
             channelId: "grp",
@@ -82,7 +97,11 @@ describe("one kind at a time", () => {
     it("finds people to message, and opens the conversation with them", async () => {
         const [hit] = await lookup(user, { scope: "contacts", query: "ana" });
         expect(searchForConversation).toHaveBeenCalledWith(user, "ana", expect.any(Number));
-        expect(hit).toMatchObject({ scope: "contacts", label: "Ana Ruiz", href: "/chat/with/u-ana" });
+        expect(hit).toMatchObject({
+            scope: "contacts",
+            label: "Ana Ruiz",
+            href: "/chat/with/u-ana"
+        });
     });
 
     it("finds direct messages and groups by who is in them, newest first", async () => {
@@ -95,7 +114,11 @@ describe("one kind at a time", () => {
     it("finds channels in the reader's spaces, named with the space", async () => {
         const hits = await lookup(user, { scope: "channels", query: "lou" });
         expect(hits).toEqual([
-            expect.objectContaining({ id: "lounge", detail: "Voice - Studio", href: "/chat/c/lounge" })
+            expect.objectContaining({
+                id: "lounge",
+                detail: "Voice - Studio",
+                href: "/chat/c/lounge"
+            })
         ]);
         // Every channel is not an answer to an empty box.
         expect(await lookup(user, { scope: "channels", query: "" })).toEqual([]);
@@ -103,7 +126,10 @@ describe("one kind at a time", () => {
 
     it("finds messages and opens each at the line", async () => {
         const [hit] = await lookup(user, { scope: "messages", query: "release" });
-        expect(searchMessages).toHaveBeenCalledWith(user, expect.objectContaining({ term: "release", channelId: null }));
+        expect(searchMessages).toHaveBeenCalledWith(
+            user,
+            expect.objectContaining({ term: "release", channelId: null })
+        );
         expect(hit).toMatchObject({
             label: "the release is out",
             detail: "Bo in Release crew",

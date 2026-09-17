@@ -29,7 +29,11 @@ export function OpenDirect({ userId }: { userId: string }) {
     if (error) {
         return (
             <div className="flex flex-1 items-center justify-center p-6">
-                <EmptyState icon={<MessageCircle />} title="No conversation to open." description={error} />
+                <EmptyState
+                    icon={<MessageCircle />}
+                    title="No conversation to open."
+                    description={error}
+                />
             </div>
         );
     }

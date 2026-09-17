@@ -57,7 +57,10 @@ const SCOPE_KINDS: Record<MentionScope, ReferenceKind> = {
  * same permission their screens are: search must not become the way to read the
  * name of something the app itself would refuse to open.
  */
-export async function canSearchScope(user: SessionUser, scope: core.RemoteSearchScope): Promise<boolean> {
+export async function canSearchScope(
+    user: SessionUser,
+    scope: core.RemoteSearchScope
+): Promise<boolean> {
     if (scope === "tasks" || scope === "docs") return userHasManage(user, "tasks.read");
     // The same grant the Chat screens are behind.
     if (core.isChatSearchScope(scope)) return userHasManage(user, "chat.use");
@@ -71,7 +74,10 @@ export async function canSearchScope(user: SessionUser, scope: core.RemoteSearch
  * @param input - The scope and what was typed after the command; an empty query
  *                answers with what was touched most recently.
  */
-export async function lookup(user: SessionUser, input: core.SearchLookupInput): Promise<SearchHit[]> {
+export async function lookup(
+    user: SessionUser,
+    input: core.SearchLookupInput
+): Promise<SearchHit[]> {
     if (!(await canSearchScope(user, input.scope))) return [];
     if (core.isChatSearchScope(input.scope)) return chatLookup(user, input.scope, input.query);
     const scope = input.scope;
@@ -107,6 +113,7 @@ function toHit(scope: MentionScope, candidate: mentions.MentionCandidate): Searc
  * the address its chips already link to.
  */
 function hitHref(candidate: mentions.MentionCandidate): string {
-    if (candidate.kind === "user") return `/tasks/everything?assignee=${encodeURIComponent(candidate.id)}`;
+    if (candidate.kind === "user")
+        return `/tasks/everything?assignee=${encodeURIComponent(candidate.id)}`;
     return referenceHref(candidate.kind, candidate.id) ?? "/";
 }

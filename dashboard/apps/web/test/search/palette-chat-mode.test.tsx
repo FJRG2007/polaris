@@ -47,10 +47,30 @@ beforeEach(() => {
                 return Response.json({
                     hits:
                         scope === "messages"
-                            ? [{ id: "m1", scope: "messages", label: "the release is out", detail: "Bo in Crew", href: "/chat/c/grp/m1" }]
+                            ? [
+                                  {
+                                      id: "m1",
+                                      scope: "messages",
+                                      label: "the release is out",
+                                      detail: "Bo in Crew",
+                                      href: "/chat/c/grp/m1"
+                                  }
+                              ]
                             : [
-                                  { id: "u1", scope: "contacts", label: "Ana Ruiz", detail: "Message", href: "/chat/with/u1" },
-                                  { id: "grp", scope: "chats", label: "Release crew", detail: "Group", href: "/chat/c/grp" }
+                                  {
+                                      id: "u1",
+                                      scope: "contacts",
+                                      label: "Ana Ruiz",
+                                      detail: "Message",
+                                      href: "/chat/with/u1"
+                                  },
+                                  {
+                                      id: "grp",
+                                      scope: "chats",
+                                      label: "Release crew",
+                                      detail: "Group",
+                                      href: "/chat/c/grp"
+                                  }
                               ]
                 });
             }
@@ -78,12 +98,16 @@ describe("opened from Chat", () => {
         expect(screen.getByRole("radiogroup", { name: "What to find" })).toBeTruthy();
         fireEvent.change(field, { target: { value: "release" } });
 
-        await waitFor(() => expect(lookups().some((url) => url.includes("scope=chat&q=release"))).toBe(true));
+        await waitFor(() =>
+            expect(lookups().some((url) => url.includes("scope=chat&q=release"))).toBe(true)
+        );
         expect(await screen.findByRole("group", { name: "People" })).toBeTruthy();
         expect(screen.getByRole("group", { name: "Conversations" })).toBeTruthy();
 
         fireEvent.click(screen.getByRole("radio", { name: "Messages" }));
-        await waitFor(() => expect(lookups().some((url) => url.includes("scope=messages&q=release"))).toBe(true));
+        await waitFor(() =>
+            expect(lookups().some((url) => url.includes("scope=messages&q=release"))).toBe(true)
+        );
         const hit = await screen.findByRole("option", { name: "the release is out" });
         fireEvent.click(hit);
         expect(push).toHaveBeenCalledWith("/chat/c/grp/m1");
@@ -108,7 +132,9 @@ describe("opened from Chat", () => {
     it("ignores a request for a scope that does not exist", async () => {
         render(<CommandPalette appIds={[]} />);
         act(() => {
-            window.dispatchEvent(new CustomEvent("polaris:open-search", { detail: { scope: "everything" } }));
+            window.dispatchEvent(
+                new CustomEvent("polaris:open-search", { detail: { scope: "everything" } })
+            );
         });
         await screen.findByRole("combobox");
         expect(screen.queryByRole("radiogroup", { name: "What to find" })).toBeNull();
