@@ -25,9 +25,15 @@ import {
     type StrayContainer
 } from "@/lib/deploy/host-containers";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
-import { createHost, listHosts, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import {
+    createHost,
+    listHosts,
+    renameHost,
+    setHostEnvironment,
+    setHostWildcardDomain
+} from "@/lib/host-service";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
-import { prepareServerEdge, readServerEdge, type ServerEdgeState } from "@/lib/deploy/server-edge";
+import * as serverEdge from "@/lib/deploy/server-edge";
 import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
     createEnrollmentSchema,
@@ -82,10 +88,14 @@ export async function serverNotesAction(hostId: string): Promise<CommentView[]> 
     }
 }
 
-export async function postServerNoteAction(input: { hostId: string; body: string }): Promise<{ error?: string }> {
+export async function postServerNoteAction(input: {
+    hostId: string;
+    body: string;
+}): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = subjectCommentSchema.safeParse({ subjectId: input.hostId, body: input.body });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
     try {
         await notes.postServerNote(parsed.data.subjectId, user.id, parsed.data.body);
         return {};
@@ -144,7 +154,9 @@ export async function createHostAction(input: unknown): Promise<{ error?: string
             metadata: { name: parsed.data.name, address: parsed.data.config.address }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not connect to the host" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not connect to the host"
+        };
     }
     revalidatePath(SERVERS_PATH);
     return {};
@@ -161,7 +173,8 @@ export async function setServerEnvironmentAction(input: unknown): Promise<{ erro
     if (!parsed.success) return { error: "Invalid server environment" };
     const { hostId, environment } = parsed.data;
     if (hostId) {
-        if (!(await setHostEnvironment(user.id, hostId, environment))) return { error: "Server not found" };
+        if (!(await setHostEnvironment(user.id, hostId, environment)))
+            return { error: "Server not found" };
     } else {
         await setLocalEnvironment(environment);
     }
@@ -259,7 +272,9 @@ export async function useLocalPathAction(input: unknown): Promise<{ error?: stri
         targetId: parsed.data.hostId,
         metadata: { address: parsed.data.address }
     });
-    await notes.recordServerEvent(parsed.data.hostId, user.id, "address", { to: parsed.data.address });
+    await notes.recordServerEvent(parsed.data.hostId, user.id, "address", {
+        to: parsed.data.address
+    });
     revalidatePath(SERVERS_PATH);
     return {};
 }
@@ -309,7 +324,9 @@ export async function setServerWildcardAction(input: unknown): Promise<{ error?:
     const parsed = serverWildcardSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid domain" };
     try {
-        if (!(await setHostWildcardDomain(user.id, parsed.data.hostId, parsed.data.wildcardDomain))) {
+        if (
+            !(await setHostWildcardDomain(user.id, parsed.data.hostId, parsed.data.wildcardDomain))
+        ) {
             return { error: "Server not found" };
         }
     } catch (caught) {
@@ -339,7 +356,9 @@ export async function openEnrollmentAction(
     try {
         return { enrollment: await openEnrollment(user.id, parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the enrollment" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not start the enrollment"
+        };
     }
 }
 
@@ -417,11 +436,18 @@ export async function listHostGroupsAction(): Promise<HostGroupView[]> {
     return listHostGroups(user.id);
 }
 
-export async function createHostGroupAction(name: string): Promise<{ id?: string; error?: string }> {
+export async function createHostGroupAction(
+    name: string
+): Promise<{ id?: string; error?: string }> {
     const user = await requirePermission("system.manage");
     try {
         const group = await createHostGroup(user.id, name);
-        await recordAudit({ actorId: user.id, action: "host.group.create", targetType: "hostGroup", targetId: group.id });
+        await recordAudit({
+            actorId: user.id,
+            action: "host.group.create",
+            targetType: "hostGroup",
+            targetId: group.id
+        });
         revalidatePath(SERVERS_PATH);
         return { id: group.id };
     } catch (caught) {
@@ -429,7 +455,10 @@ export async function createHostGroupAction(name: string): Promise<{ id?: string
     }
 }
 
-export async function renameHostGroupAction(groupId: string, name: string): Promise<{ error?: string }> {
+export async function renameHostGroupAction(
+    groupId: string,
+    name: string
+): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     try {
         await renameHostGroup(user.id, groupId, name);
@@ -445,7 +474,12 @@ export async function deleteHostGroupAction(groupId: string): Promise<{ error?: 
     const user = await requirePermission("system.manage");
     try {
         await deleteHostGroup(user.id, groupId);
-        await recordAudit({ actorId: user.id, action: "host.group.delete", targetType: "hostGroup", targetId: groupId });
+        await recordAudit({
+            actorId: user.id,
+            action: "host.group.delete",
+            targetType: "hostGroup",
+            targetId: groupId
+        });
         revalidatePath(SERVERS_PATH);
         return {};
     } catch (caught) {
@@ -453,7 +487,10 @@ export async function deleteHostGroupAction(groupId: string): Promise<{ error?: 
     }
 }
 
-export async function setHostGroupMembersAction(groupId: string, hostIds: string[]): Promise<{ error?: string }> {
+export async function setHostGroupMembersAction(
+    groupId: string,
+    hostIds: string[]
+): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     try {
         await setHostGroupMembers(user.id, groupId, hostIds);
@@ -572,7 +609,11 @@ export async function removeStrayContainerAction(id: string): Promise<{ error?: 
         action: "server.container.removed",
         targetType: "container",
         targetId: id,
-        metadata: { name: before?.name ?? null, project: before?.project ?? null, image: before?.image ?? null }
+        metadata: {
+            name: before?.name ?? null,
+            project: before?.project ?? null,
+            image: before?.image ?? null
+        }
     });
     revalidatePath(SERVERS_PATH);
     return {};
@@ -589,9 +630,9 @@ export async function removeStrayContainerAction(id: string): Promise<{ error?: 
  * by the panel that draws the answer rather than by the page, and the screen is
  * complete before it comes back.
  */
-export async function serverEdgeAction(hostId: string): Promise<ServerEdgeState> {
+export async function serverEdgeAction(hostId: string): Promise<serverEdge.ServerEdgeState> {
     const user = await requirePermission("system.manage");
-    return readServerEdge(hostId, user.id);
+    return serverEdge.readServerEdge(hostId, user.id);
 }
 
 /**
@@ -601,7 +642,9 @@ export async function serverEdgeAction(hostId: string): Promise<ServerEdgeState>
  * server that already is - so it is a deliberate press with that said next to it,
  * never something a page does on its own.
  */
-export async function prepareServerEdgeAction(hostId: string): Promise<{ error?: string; log?: string }> {
+export async function prepareServerEdgeAction(
+    hostId: string
+): Promise<{ error?: string; log?: string }> {
     const user = await requirePermission("system.manage");
     const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
     if (!host) return { error: "That server is not one of yours" };
@@ -609,10 +652,12 @@ export async function prepareServerEdgeAction(hostId: string): Promise<{ error?:
         // The same target the deploy pipeline uses, so the proxy network the edge
         // joins is the one deployed containers are already on. Two networks is an
         // edge that cannot reach a single thing it is meant to be routing.
-        const target = await getOrCreateHostTarget(host.id, user.id, host.name);
         let log = "";
-        await prepareServerEdge(host.id, user.id, target.proxyNetwork, (chunk) => {
-            log += chunk;
+        await serverEdge.withSetupLock(host.id, async () => {
+            const target = await getOrCreateHostTarget(host.id, user.id, host.name);
+            await serverEdge.prepareServerEdge(host.id, user.id, target.proxyNetwork, (chunk) => {
+                log += chunk;
+            });
         });
         await recordAudit({
             actorId: user.id,
@@ -623,6 +668,8 @@ export async function prepareServerEdgeAction(hostId: string): Promise<{ error?:
         revalidatePath(`/apps/servers/${host.id}`);
         return { log: log.slice(-4000) };
     } catch (error) {
-        return { error: error instanceof Error ? error.message : "That server refused to set itself up" };
+        return {
+            error: error instanceof Error ? error.message : "That server refused to set itself up"
+        };
     }
 }

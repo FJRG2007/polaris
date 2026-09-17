@@ -149,7 +149,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Deploy to a remote server | done | P0 | |
 | Remote terminal / files / metrics | done | P1 | |
 | Server resource dashboard | done | P2 | |
-| Auto-install Docker on a fresh server | todo | P2 | enrollment only warns when Docker is missing |
+| Auto-install Docker on a fresh server | done | P2 | a Linux server enrolled with root sets itself up right after enrollment - Docker, the builder and its own edge - unless it already runs one; other servers still need Set this server up |
 | Move a whole instance to another machine | done | P2 | sealed export and import |
 
 ## 10. Extras

@@ -27,6 +27,13 @@
  * without redeploying it. Running it again is how that is fixed, and the only way
  * to tell is to ask - so `readServerEdge` asks.
  *
+ * **It needs root, and Polaris does not sign in as root.** It installs Docker
+ * and the builder, and writes under `/var/lib/polaris`. The login Polaris holds
+ * is an ordinary account; a server enrolled with root access lets it act as root
+ * through password-less sudo, and that is what the script runs under. It then
+ * hands the directories the login writes into back to that login, because every
+ * deploy after this one runs as it.
+ *
  * Server-only.
  */
 
@@ -34,7 +41,96 @@ import { loadEnv } from "@polaris/config";
 import { onboardingScript } from "@polaris/deploy";
 import { publicAppUrl } from "@/lib/domain-service";
 import { getHostConnection } from "@/lib/host-service";
+import { recordServerEvent } from "@/lib/server-notes-service";
+import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { execCommand, openSshClient } from "@polaris/ssh";
+
+/**
+ * How the script is started on the server.
+ *
+ * The script arrives on stdin and is written to a private temporary file first,
+ * rather than being the command line: a command line is readable by every user
+ * on the machine, and this one carries the secret the guard verifies with. It is
+ * not fed to the shell on stdin either, because the installers it runs read stdin
+ * and would swallow the rest of the script.
+ */
+export function edgeLauncher(elevate: boolean): string {
+    return [
+        "f=$(mktemp) || exit 1",
+        "trap 'rm -f \"$f\"' EXIT",
+        'cat > "$f"',
+        "shell=$(command -v bash || command -v sh)",
+        `${elevate ? "sudo -n " : ""}"$shell" "$f"`
+    ].join("\n");
+}
+
+/** Why setting a server up cannot work with the access Polaris was given. */
+export const NEEDS_ROOT =
+    "Setting this server up needs root, and Polaris was not given it here: it installs Docker and writes under /var/lib/polaris. Remove the server and add it again with the command from Add server, which grants it.";
+
+/** Why a setup was refused: one is already running on that server. */
+export const SETUP_RUNNING = "This server is already being set up. Wait for that to finish.";
+
+/** Hosts being set up right now. On `globalThis` so the enrollment route and the
+ *  server action share one set, and a dev reload does not drop it. */
+const SETTING_UP = Symbol.for("polaris.servers.setting-up");
+
+function settingUp(): Set<string> {
+    const held = globalThis as { [SETTING_UP]?: Set<string> };
+    held[SETTING_UP] ??= new Set();
+    return held[SETTING_UP];
+}
+
+export function isSettingUp(hostId: string): boolean {
+    return settingUp().has(hostId);
+}
+
+/**
+ * Run `task` as the only setup of this server. Two at once fight over the package
+ * manager's lock and both replace the same Traefik, so a second is refused.
+ */
+export async function withSetupLock<T>(hostId: string, task: () => Promise<T>): Promise<T> {
+    if (isSettingUp(hostId)) throw new Error(SETUP_RUNNING);
+    settingUp().add(hostId);
+    try {
+        return await task();
+    } finally {
+        settingUp().delete(hostId);
+    }
+}
+
+/**
+ * The sentence for a failed setup, out of what the server printed.
+ *
+ * A refused sudo, and a refusal to write by a login that never had root, are the
+ * failures with a known cause, so they are said as that cause - the raw
+ * `mkdir: ... Permission denied` names a path and nothing to do. With root in
+ * hand a refusal to write means something else, and is passed through.
+ */
+export function setupFailure(
+    complaint: string,
+    access: { readonly elevated: boolean; readonly asRoot: boolean }
+): string {
+    if (
+        !access.asRoot &&
+        /sudo: a password is required|sudo: .*not allowed|may not run sudo/i.test(complaint)
+    ) {
+        return access.elevated
+            ? "The server no longer lets Polaris act as root without a password. Add the server again with the command from Add server, which puts that back."
+            : NEEDS_ROOT;
+    }
+    if (
+        !access.elevated &&
+        !access.asRoot &&
+        /permission denied|operation not permitted/i.test(complaint)
+    ) {
+        return NEEDS_ROOT;
+    }
+    return (
+        complaint.trim().split(/\r?\n/).at(-1)?.slice(0, 200) ||
+        "That server refused to set itself up"
+    );
+}
 
 /** What a server's edge looks like right now. */
 export interface ServerEdgeState {
@@ -48,6 +144,8 @@ export interface ServerEdgeState {
      *  edge without it still serves everything deployed to it; what it cannot do
      *  is take a domain or a firewall change without the service being rebuilt. */
     readonly pushable: boolean;
+    /** Whether Polaris is setting this server up right now. */
+    readonly settingUp: boolean;
     /** Why the server could not be asked, where it could not. Its own words. */
     readonly error: string | null;
 }
@@ -56,6 +154,7 @@ const UNREACHABLE: ServerEdgeState = {
     traefik: false,
     guard: false,
     pushable: false,
+    settingUp: false,
     error: null
 };
 
@@ -75,7 +174,7 @@ const PROBE = [
 
 /** What the probe said, out of its own output. Anything unrecognised is false,
  *  which is the answer that offers to fix it rather than the one that hides it. */
-export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error"> {
+export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error" | "settingUp"> {
     const said = (key: string): string => {
         const found = output.split(/\r?\n/).find((line) => line.trim().startsWith(`${key}=`));
         return found ? found.trim().slice(key.length + 1) : "";
@@ -104,14 +203,18 @@ export async function readServerEdge(hostId: string, ownerId: string): Promise<S
                     said += chunk.toString("utf8");
                 }
             });
-            return { ...readEdgeProbe(said), error: null };
+            return { ...readEdgeProbe(said), settingUp: isSettingUp(hostId), error: null };
         } finally {
             client.end();
         }
     } catch (error) {
         // A server that is asleep or has moved is not a server with a broken edge,
         // and the screen has to be able to say which of the two it is looking at.
-        return { ...UNREACHABLE, error: error instanceof Error ? error.message : "It could not be reached" };
+        return {
+            ...UNREACHABLE,
+            settingUp: isSettingUp(hostId),
+            error: error instanceof Error ? error.message : "It could not be reached"
+        };
     }
 }
 
@@ -131,7 +234,12 @@ export async function prepareServerEdge(
 ): Promise<void> {
     const env = loadEnv();
     const connection = await getHostConnection(hostId, ownerId);
+    const asRoot = connection.username === "root";
+    const elevate = !asRoot && connection.sudo;
     const script = onboardingScript({
+        // What the login writes into after this, handed to it - only when the
+        // script runs as root on its behalf.
+        owner: elevate ? connection.username : undefined,
         proxyNetwork,
         // Where Let's Encrypt writes about an expiring certificate. Their own
         // registration requires one; an empty string is refused by the API, so the
@@ -155,7 +263,8 @@ export async function prepareServerEdge(
     });
     try {
         let complaint = "";
-        const result = await execCommand(client, script, {
+        const result = await execCommand(client, edgeLauncher(elevate), {
+            input: script,
             onStdout: (chunk) => onOutput?.(chunk.toString("utf8")),
             onStderr: (chunk) => {
                 const text = chunk.toString("utf8");
@@ -163,13 +272,36 @@ export async function prepareServerEdge(
                 onOutput?.(text);
             }
         });
-        if (result.code !== 0) {
-            throw new Error(
-                complaint.trim().split(/\r?\n/).at(-1)?.slice(0, 200) ||
-                    "That server refused to set itself up"
-            );
-        }
+        if (result.code !== 0)
+            throw new Error(setupFailure(complaint, { elevated: elevate, asRoot }));
     } finally {
         client.end();
+    }
+}
+
+/**
+ * Set up a server that has just been enrolled, without waiting for the button.
+ *
+ * Nothing is replaced: a server whose own edge is already running is left as it
+ * is, because setting up again stops what it serves for a moment and that is the
+ * operator's call, and so is a setup somebody already started. What happened is
+ * written into the server's history, since nobody is watching when this runs.
+ */
+export async function setUpNewServer(hostId: string, ownerId: string, name: string): Promise<void> {
+    if (isSettingUp(hostId)) return;
+    try {
+        const ready = await withSetupLock(hostId, async () => {
+            const state = await readServerEdge(hostId, ownerId);
+            if (state.error) throw new Error(state.error);
+            if (state.traefik) return false;
+            const target = await getOrCreateHostTarget(hostId, ownerId, name);
+            await prepareServerEdge(hostId, ownerId, target.proxyNetwork);
+            return true;
+        });
+        if (ready) await recordServerEvent(hostId, null, "edge-ready");
+    } catch (error) {
+        await recordServerEvent(hostId, null, "edge-failed", {
+            to: error instanceof Error ? error.message : "It could not be set up"
+        }).catch(() => undefined);
     }
 }

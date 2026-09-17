@@ -44,3 +44,25 @@ describe("describing what happened to a server", () => {
         expect(describeServerEvent(line({ action: "rebooted" }))).toBe("Ana changed it");
     });
 });
+
+describe("setting a server up on its own", () => {
+    it("says it was done, by Polaris when nobody pressed anything", () => {
+        expect(describeServerEvent(line({ action: "edge-ready", authorName: null }))).toBe(
+            "Polaris set it up to serve its own domains"
+        );
+    });
+
+    it("says why it could not be", () => {
+        expect(
+            describeServerEvent(
+                line({
+                    action: "edge-failed",
+                    authorName: null,
+                    toValue: "Error: port 80 is already allocated"
+                })
+            )
+        ).toBe(
+            "Polaris could not set it up to serve its own domains: Error: port 80 is already allocated"
+        );
+    });
+});

@@ -13,7 +13,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ServerRow, ServerStatus, ServerStatusPayload } from "../../src/app/(app)/apps/servers/types";
+import type {
+    ServerRow,
+    ServerStatus,
+    ServerStatusPayload
+} from "../../src/app/(app)/apps/servers/types";
 
 let statuses: ServerStatus[] = [];
 
@@ -29,12 +33,19 @@ vi.mock("@/components/use-live-resource", () => ({
         refresh: () => {}
     })
 }));
+vi.mock("../../src/app/(app)/apps/servers/actions", () => ({
+    renameServerAction: async () => ({})
+}));
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/host-dialog", () => ({ HostDialog: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/quick-enroll", () => ({ QuickEnroll: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/server-groups", () => ({ ServerGroups: () => null }));
-vi.mock("../../src/app/(app)/apps/servers/remove-server-dialog", () => ({ RemoveServerDialog: () => null }));
-vi.mock("../../src/app/(app)/apps/servers/environment-dialog", () => ({ EnvironmentDialog: () => null }));
+vi.mock("../../src/app/(app)/apps/servers/remove-server-dialog", () => ({
+    RemoveServerDialog: () => null
+}));
+vi.mock("../../src/app/(app)/apps/servers/environment-dialog", () => ({
+    EnvironmentDialog: () => null
+}));
 
 const { ServersView } = await import("../../src/app/(app)/apps/servers/servers-view");
 
@@ -85,7 +96,7 @@ describe("the Servers table on an unreachable machine", () => {
         const markup = render(row, { id: row.id, state: "up", latencyMs: 12, detail: null });
 
         expect(markup).toContain(`/drive?c=host:${row.hostId}`);
-        expect(markup).not.toContain("disabled=\"\"");
+        expect(markup).not.toContain('disabled=""');
     });
 
     it("keeps both while the probe has not answered yet", () => {
@@ -95,6 +106,6 @@ describe("the Servers table on an unreachable machine", () => {
 
         expect(markup).toContain("Checking...");
         expect(markup).toContain(`/drive?c=host:${row.hostId}`);
-        expect(markup).not.toContain("disabled=\"\"");
+        expect(markup).not.toContain('disabled=""');
     });
 });

@@ -32,6 +32,7 @@
  * really do hold the machine.
  */
 
+import { setsUpOnEnrollment } from "@/lib/enrollment-setup";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
@@ -196,11 +197,22 @@ interface LiveEnrollment {
  * "never existed", "already used" and "expired": a stranger holding a token
  * should not learn which of the three it is.
  */
-export async function resolveEnrollment(token: string, ip: string | undefined): Promise<LiveEnrollment | null> {
-    if (!(await rateLimit(`enroll:fetch:${ip ?? "unknown"}`, FETCH_LIMIT, FETCH_WINDOW_MS)).ok) return null;
+export async function resolveEnrollment(
+    token: string,
+    ip: string | undefined
+): Promise<LiveEnrollment | null> {
+    if (!(await rateLimit(`enroll:fetch:${ip ?? "unknown"}`, FETCH_LIMIT, FETCH_WINDOW_MS)).ok)
+        return null;
     const row = await prisma.enrollment.findUnique({
         where: { tokenHash: hashToken(token) },
-        select: { id: true, kind: true, username: true, publicKey: true, claimedAt: true, expiresAt: true }
+        select: {
+            id: true,
+            kind: true,
+            username: true,
+            publicKey: true,
+            claimedAt: true,
+            expiresAt: true
+        }
     });
     if (!row || row.claimedAt || row.expiresAt < new Date()) return null;
     return { id: row.id, kind: row.kind, username: row.username, publicKey: row.publicKey };
@@ -231,9 +243,18 @@ export async function refuseEnrollment(
     reason: EnrollmentRefusalReason,
     sourceIp: string | undefined
 ): Promise<void> {
-    if (!(await rateLimit(`enroll:refuse:${sourceIp ?? "unknown"}`, REFUSE_LIMIT, REFUSE_WINDOW_MS)).ok) return;
+    if (
+        !(await rateLimit(`enroll:refuse:${sourceIp ?? "unknown"}`, REFUSE_LIMIT, REFUSE_WINDOW_MS))
+            .ok
+    )
+        return;
     await prisma.enrollment.updateMany({
-        where: { tokenHash: hashToken(token), claimedAt: null, hostId: null, expiresAt: { gt: new Date() } },
+        where: {
+            tokenHash: hashToken(token),
+            claimedAt: null,
+            hostId: null,
+            expiresAt: { gt: new Date() }
+        },
         data: { error: ENROLLMENT_REFUSAL_MESSAGES[reason] }
     });
 }
@@ -252,7 +273,10 @@ export interface EnrollmentStatus {
     retryable: boolean;
 }
 
-export async function getEnrollmentStatus(id: string, userId: string): Promise<EnrollmentStatus | null> {
+export async function getEnrollmentStatus(
+    id: string,
+    userId: string
+): Promise<EnrollmentStatus | null> {
     const row = await prisma.enrollment.findFirst({
         where: { id, createdById: userId },
         select: { name: true, claimedAt: true, expiresAt: true, hostId: true, error: true }
@@ -277,7 +301,12 @@ export async function getEnrollmentStatus(id: string, userId: string): Promise<E
  * A claim is the exception, because a claim spends the token: what happened to it
  * stays the answer regardless of what the clock did afterwards.
  */
-function resolveState(row: { claimedAt: Date | null; expiresAt: Date; hostId: string | null; error: string | null }): EnrollmentState {
+function resolveState(row: {
+    claimedAt: Date | null;
+    expiresAt: Date;
+    hostId: string | null;
+    error: string | null;
+}): EnrollmentState {
     if (row.hostId) return "claimed";
     if (row.claimedAt) return row.error ? "failed" : "pending";
     if (row.expiresAt < new Date()) return "expired";
@@ -288,12 +317,23 @@ function resolveState(row: { claimedAt: Date | null; expiresAt: Date; hostId: st
  *  been can be killed without waiting out its lifetime. */
 export async function cancelEnrollment(id: string, userId: string): Promise<void> {
     await prisma.enrollment.deleteMany({ where: { id, createdById: userId, hostId: null } });
-    await recordAudit({ actorId: userId, action: "enrollment.cancel", targetType: "enrollment", targetId: id });
+    await recordAudit({
+        actorId: userId,
+        action: "enrollment.cancel",
+        targetType: "enrollment",
+        targetId: id
+    });
 }
 
 export interface ClaimResult {
     ok: boolean;
     error?: string;
+    /**
+     * A server that can be set up to serve its own domains now, without anybody
+     * pressing the button: a Linux server enrolled with root. For the caller to
+     * start once the machine has had its answer - never sent back to it.
+     */
+    setup?: { hostId: string; ownerId: string; name: string };
 }
 
 /**
@@ -311,12 +351,15 @@ export async function claimEnrollment(
     payload: ClaimEnrollmentInput,
     sourceIp: string | undefined
 ): Promise<ClaimResult> {
-    if (!(await rateLimit(`enroll:claim:${sourceIp ?? "unknown"}`, CLAIM_LIMIT, CLAIM_WINDOW_MS)).ok) {
+    if (
+        !(await rateLimit(`enroll:claim:${sourceIp ?? "unknown"}`, CLAIM_LIMIT, CLAIM_WINDOW_MS)).ok
+    ) {
         return { ok: false, error: "Too many attempts" };
     }
 
     const row = await prisma.enrollment.findUnique({ where: { tokenHash: hashToken(token) } });
-    if (!row || row.claimedAt || row.expiresAt < new Date()) return { ok: false, error: "Enrollment unavailable" };
+    if (!row || row.claimedAt || row.expiresAt < new Date())
+        return { ok: false, error: "Enrollment unavailable" };
 
     // Burn first. Everything below can fail, and none of it should be retryable
     // by whoever holds the token.
@@ -340,11 +383,19 @@ export async function claimEnrollment(
     // reached across the room rather than out through the router and back. Null
     // on an install with no responder, and then this is the ordering it always
     // had.
-    const candidates = enrollmentAddressCandidates(sourceIp, payload.addresses, await getHostLanIp().catch(() => null));
-    if (candidates.length === 0) return await failClaim(row.id, "Could not work out an address to reach this machine at");
+    const candidates = enrollmentAddressCandidates(
+        sourceIp,
+        payload.addresses,
+        await getHostLanIp().catch(() => null)
+    );
+    if (candidates.length === 0)
+        return await failClaim(row.id, "Could not work out an address to reach this machine at");
 
-    const pins = payload.hostKeys.map(publicKeyBlob).filter((blob): blob is string => blob !== null);
-    if (pins.length === 0) return await failClaim(row.id, "The machine reported no usable SSH host key");
+    const pins = payload.hostKeys
+        .map(publicKeyBlob)
+        .filter((blob): blob is string => blob !== null);
+    if (pins.length === 0)
+        return await failClaim(row.id, "The machine reported no usable SSH host key");
 
     const privateKey = decryptSecret(
         {
@@ -417,7 +468,12 @@ export async function claimEnrollment(
         }
     });
 
-    return { ok: true };
+    return {
+        ok: true,
+        setup: setsUpOnEnrollment(row.kind, payload)
+            ? { hostId: host.id, ownerId: row.createdById, name: payload.hostname }
+            : undefined
+    };
 }
 
 /**
@@ -517,7 +573,15 @@ export async function purgeExpiredEnrollments(): Promise<number> {
 export async function listOpenEnrollments(userId: string, kind: EnrollmentKind = "server") {
     const rows = await prisma.enrollment.findMany({
         where: { createdById: userId, kind, hostId: null, expiresAt: { gt: new Date() } },
-        select: { id: true, name: true, createdAt: true, expiresAt: true, error: true, claimedAt: true, hostId: true },
+        select: {
+            id: true,
+            name: true,
+            createdAt: true,
+            expiresAt: true,
+            error: true,
+            claimedAt: true,
+            hostId: true
+        },
         orderBy: { createdAt: "desc" }
     });
     return rows.map((row) => ({
