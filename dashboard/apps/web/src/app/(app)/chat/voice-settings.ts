@@ -100,6 +100,12 @@ export interface VoiceSettings {
     readonly attenuate: boolean;
     /** How far it quietens, 0 to 100, where 100 is silent. */
     readonly attenuation: number;
+    /**
+     * How far everybody's voices are lowered while a stream with sound is
+     * playing here, 0 to 100 - "stream attenuation". Low by default: enough for
+     * a film to be followed, not so much that a friend talking over it is lost.
+     */
+    readonly streamAttenuation: number;
 }
 
 export const VOICE_DEFAULTS: VoiceSettings = {
@@ -113,7 +119,8 @@ export const VOICE_DEFAULTS: VoiceSettings = {
     noAudioWarning: true,
     switchWarning: false,
     attenuate: false,
-    attenuation: 50
+    attenuation: 50,
+    streamAttenuation: 30
 };
 
 function clamp(value: unknown, low: number, high: number, fallback: number): number {
@@ -153,7 +160,13 @@ export function voiceSettings(): VoiceSettings {
             noAudioWarning: held.noAudioWarning !== false,
             switchWarning: held.switchWarning === true,
             attenuate: held.attenuate === true,
-            attenuation: clamp(held.attenuation, 0, 100, VOICE_DEFAULTS.attenuation)
+            attenuation: clamp(held.attenuation, 0, 100, VOICE_DEFAULTS.attenuation),
+            streamAttenuation: clamp(
+                held.streamAttenuation,
+                0,
+                100,
+                VOICE_DEFAULTS.streamAttenuation
+            )
         };
     } catch {
         return VOICE_DEFAULTS;

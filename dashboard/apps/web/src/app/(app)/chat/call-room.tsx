@@ -59,13 +59,16 @@ import { useZoomPan } from "@/components/use-zoom-pan";
 import { callBareFaces, type CallPlace } from "./call-band";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
-import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
+import { useCallVolume } from "./call-volumes";
+import { setWatchedStreams } from "./call-stream-audio";
+import { PersonMenu, StreamMenu } from "./call-menus";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     arrivedKeys,
     LOCAL_SCREEN_KEY,
     putAwayOf,
     stagesOf,
+    type CallStage,
     stagingOf,
     stillShared,
     watched
@@ -104,18 +107,11 @@ import {
     Users,
     Video,
     VideoOff,
-    Volume2,
     VolumeX,
     X
 } from "lucide-react";
 import {
     Button,
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuLabel,
-    ContextMenuSeparator,
-    ContextMenuTrigger,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -332,6 +328,44 @@ export function CallRoom({
      * a card instead of disappearing.
      */
     const putAway = putAwayOf(shared, away);
+
+    /** Tell the call's audio which streams are being watched, so their sound
+     *  plays - see `call-stream-audio`. */
+    const stageKeys = stages.map((stage) => stage.key).join("|");
+    useEffect(() => {
+        setWatchedStreams(stageKeys ? stageKeys.split("|") : []);
+    }, [stageKeys]);
+
+    /** What right-clicking a stream offers. Nothing on this browser's own
+     *  screen, which is never played back here. */
+    const streamMenu = (stage: CallStage): StreamMenuFor | undefined => {
+        if (stage.key === LOCAL_SCREEN_KEY) return undefined;
+        const seat = stage.key.slice("screen:".length);
+        const person = admitted?.find((entry) => entry.id === seat);
+        const watching = !away.includes(stage.key);
+        return {
+            name: stage.name,
+            person: person?.userId ?? seat,
+            streamKey: stage.key,
+            stream: stage.stream,
+            hasSound: stage.stream.getAudioTracks().length > 0,
+            watching,
+            onWatch: () =>
+                setAway((was) =>
+                    watching ? [...was, stage.key] : was.filter((key) => key !== stage.key)
+                )
+        };
+    };
+    /** A share offered rather than shown, as a card the size of a face. */
+    const offer = (stage: CallStage, className: string) => (
+        <StreamCard
+            key={stage.key}
+            name={stage.name}
+            className={className}
+            onWatch={() => setAway((was) => was.filter((key) => key !== stage.key))}
+            menu={streamMenu(stage)}
+        />
+    );
     const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
     const live =
         focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
@@ -372,6 +406,16 @@ export function CallRoom({
      * back the moment it is closed.
      */
     const peopleShown = !enlarged && !(place === "direct" && staged);
+    /**
+     * In a direct message a watched stream sits to the left of the people, the
+     * way every voice client draws a call of a few: the stream gets the room,
+     * and the faces stay in sight in a narrow column beside it - a row under it
+     * on a phone, where there is no width to spare.
+     */
+    const sideBySide = place === "direct" && showing.length > 0 && !enlarged;
+    /** Offered shares sit among the people, first, rather than in a row above
+     *  them. Only where the people are drawn in the main area. */
+    const offersInline = place === "direct" && peopleShown;
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
@@ -608,7 +652,7 @@ export function CallRoom({
                 an offer nobody has answered yet - and an offer reads as a card
                 beside the people, the way every client draws one, rather than as
                 a row of small print above them. */}
-            {putAway.length > 0 && (
+            {putAway.length > 0 && !offersInline && (
                 <ul
                     className={cn(
                         "shrink-0",
@@ -619,58 +663,38 @@ export function CallRoom({
                 >
                     {putAway.map((stage) =>
                         place === "direct" ? (
-                            <li key={stage.key}>
-                                {/* The whole card, not a button inside it: what
-                                    somebody is reaching for is the screen, and a
-                                    target the size of a word inside a target the
-                                    size of a card is the smaller of the two. */}
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setAway((was) => was.filter((key) => key !== stage.key))
-                                    }
-                                    title={`Watch ${stage.name}`}
-                                    className="flex h-24 w-40 flex-col items-center justify-center gap-1.5 rounded-md border border-border bg-muted/40 px-3 text-center transition-colors hover:border-border-strong hover:bg-card-hover"
-                                >
-                                    <MonitorUp
-                                        className="size-5 shrink-0 text-muted-foreground"
-                                        aria-hidden
-                                    />
-                                    <span className="w-full truncate text-xs font-medium">
-                                        {stage.name}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">Watch</span>
-                                </button>
-                            </li>
+                            <li key={stage.key}>{offer(stage, "h-24 w-40")}</li>
                         ) : (
-                            <li
-                                key={stage.key}
-                                className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
-                            >
-                                <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
-                                    <EyeOff className="size-4 text-muted-foreground" aria-hidden />
-                                </span>
-                                <span className="flex min-w-0 flex-col">
-                                    <span
-                                        className="truncate text-sm font-medium"
-                                        title={stage.name}
+                            <MaybeStreamMenu key={stage.key} menu={streamMenu(stage)}>
+                                <li className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
+                                    <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
+                                        <EyeOff
+                                            className="size-4 text-muted-foreground"
+                                            aria-hidden
+                                        />
+                                    </span>
+                                    <span className="flex min-w-0 flex-col">
+                                        <span
+                                            className="truncate text-sm font-medium"
+                                            title={stage.name}
+                                        >
+                                            {stage.name}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Still sharing. You are not watching.
+                                        </span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setAway((was) => was.filter((key) => key !== stage.key))
+                                        }
+                                        className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
                                     >
-                                        {stage.name}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        Still sharing. You are not watching.
-                                    </span>
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setAway((was) => was.filter((key) => key !== stage.key))
-                                    }
-                                    className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
-                                >
-                                    Watch
-                                </button>
-                            </li>
+                                        Watch
+                                    </button>
+                                </li>
+                            </MaybeStreamMenu>
                         )
                     )}
                 </ul>
@@ -683,21 +707,73 @@ export function CallRoom({
                 side when there are several, rather than stacked - two shares
                 stacked in a panel this tall leave each of them a strip. */}
             {showing.length > 0 && (
-                <div className={cn("grid min-h-0 flex-[3] gap-2", gridColumns(showing.length))}>
-                    {showing.map((stage) => (
-                        <Tile
-                            key={stage.key}
-                            stream={stage.stream}
-                            name={stage.name}
-                            personId={null}
-                            focused={live === stage.key}
-                            onFocus={() => focus(stage.key)}
-                            // A shared screen is usually text, and the reason
-                            // anybody stares at one is to read a line of it.
-                            zoomable
-                            volumeKey={undefined}
-                        />
-                    ))}
+                <div
+                    className={cn(
+                        "flex min-h-0 flex-[3] gap-2",
+                        sideBySide ? "flex-col sm:flex-row" : "flex-col"
+                    )}
+                >
+                    <div
+                        className={cn(
+                            "grid min-h-0 min-w-0 flex-1 gap-2",
+                            gridColumns(showing.length)
+                        )}
+                    >
+                        {showing.map((stage) => (
+                            <Tile
+                                key={stage.key}
+                                stream={stage.stream}
+                                name={stage.name}
+                                personId={null}
+                                focused={live === stage.key}
+                                onFocus={() => focus(stage.key)}
+                                // A shared screen is usually text, and the reason
+                                // anybody stares at one is to read a line of it.
+                                zoomable
+                                volumeKey={undefined}
+                                streamMenu={streamMenu(stage)}
+                            />
+                        ))}
+                    </div>
+                    {sideBySide && (
+                        <ul
+                            aria-label="People in the call"
+                            className="flex shrink-0 items-start gap-3 overflow-x-auto overscroll-contain sm:w-20 sm:flex-col sm:items-center sm:overflow-y-auto sm:overflow-x-hidden"
+                        >
+                            <Face
+                                compact
+                                name="You"
+                                personId={mine?.userId ?? viewerId ?? null}
+                                speaking={
+                                    call.participantId !== null &&
+                                    call.speaking.has(call.participantId) &&
+                                    call.micOn
+                                }
+                                muted={!call.micOn}
+                                deafened={call.deafened}
+                                hand={call.handRaised}
+                                sameRoom={call.audioRole !== null}
+                            />
+                            {(admitted ?? [])
+                                .filter((person) => person.id !== call.participantId)
+                                .map((person) => (
+                                    <Face
+                                        compact
+                                        key={person.id}
+                                        name={person.name}
+                                        personId={person.userId ?? null}
+                                        guest={person.guest}
+                                        speaking={call.speaking.has(person.id)}
+                                        muted={call.states.get(person.id)?.muted}
+                                        deafened={call.states.get(person.id)?.deafened}
+                                        hand={call.states.get(person.id)?.hand}
+                                        reactions={reactionsFor(person.id)}
+                                        {...combining(person.id)}
+                                        volumeKey={person.userId ?? person.id}
+                                    />
+                                ))}
+                        </ul>
+                    )}
                 </div>
             )}
 
@@ -765,6 +841,12 @@ export function CallRoom({
                 the bar already records. */}
             {peopleShown && bareFaces && (
                 <ul className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-3 overflow-y-auto overscroll-contain py-1">
+                    {offersInline &&
+                        putAway.map((stage) => (
+                            <li key={stage.key} className="shrink-0">
+                                {offer(stage, "h-24 w-40")}
+                            </li>
+                        ))}
                     <Face
                         name="You"
                         personId={mine?.userId ?? viewerId ?? null}
@@ -824,6 +906,7 @@ export function CallRoom({
                             : cn("flex-1", columns)
                     )}
                 >
+                    {offersInline && putAway.map((stage) => offer(stage, "size-full min-h-24"))}
                     <Tile
                         stream={call.localStream}
                         name="You"
@@ -1358,132 +1441,58 @@ function clock(seconds: number): string {
 /** How big the face in an empty tile is. One size for every tile: a grid where
  *  the faces are different sizes reads as a mistake. */
 const AVATAR_SIZE = 72;
+/** The same, beside a stream, where the faces are a column rather than the room. */
+const COMPACT_AVATAR_SIZE = 44;
 
-/**
- * What right-clicking somebody offers, wherever they are drawn.
- *
- * Its own component because the two ways a person is drawn are not two kinds of
- * person: turning somebody down, silencing them, and combining audio with them
- * are decisions about the person rather than about the rectangle they happen to
- * be in. Held on the tile alone, they were quietly gone from every call drawn as
- * faces - a stored volume still applied on playback, so the controls vanished
- * while their effects stayed, which is the way for this to go wrong silently.
- *
- * Absent only where there is no volume to set, which is your own picture: it is
- * never played back here.
- */
-function PersonMenu({
-    name,
-    volumeKey,
-    onCombine,
-    onAskCombine,
-    combineAsked = false,
-    combineLocked = false,
+/** What a stream's menu needs, less the thing it wraps. */
+type StreamMenuFor = Omit<React.ComponentProps<typeof StreamMenu>, "children">;
+
+/** A stream's menu around something, when it has one. */
+function MaybeStreamMenu({
+    menu,
     children
 }: {
-    name: string;
-    /** Who this volume is remembered against: their account where they have one,
-     *  their seat where they do not. */
-    volumeKey: string;
-    /** Go quiet and listen through this person's device, and ask them to go
-     *  quiet and listen through this one - see `call-combine`. */
-    onCombine?: () => void;
-    onAskCombine?: () => void;
-    combineAsked?: boolean;
-    /** Whether the call is too small to combine in, which disables both. */
-    combineLocked?: boolean;
-    children: React.ReactNode;
+    menu: StreamMenuFor | undefined;
+    children: React.ReactElement;
 }) {
-    const [volume, setVolume] = useCallVolume(volumeKey);
+    return menu ? <StreamMenu {...menu}>{children}</StreamMenu> : children;
+}
 
-    return (
-        <ContextMenu>
-            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-56">
-                <ContextMenuLabel>{name}</ContextMenuLabel>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                    onSelect={(event) => {
-                        // The menu would otherwise close on the press that moved
-                        // the slider, which is the one control here that is used
-                        // by dragging rather than by choosing.
-                        event.preventDefault();
-                    }}
-                    className="flex-col items-stretch gap-1.5"
-                >
-                    <span className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Volume</span>
-                        <span
-                            className={cn(
-                                "tabular-nums",
-                                volume > DEFAULT_VOLUME && "font-medium text-warning"
-                            )}
-                        >
-                            {Math.round(volume * 100)}%
-                        </span>
-                    </span>
-                    <input
-                        type="range"
-                        min={0}
-                        max={MAX_VOLUME}
-                        step={0.05}
-                        value={volume}
-                        aria-label={`How loud ${name} is`}
-                        onChange={(event) => setVolume(Number(event.target.value))}
-                        className="w-full accent-primary"
-                    />
-                    {/* Where they were sent, marked on a track that runs past
-                        it. Without it there is nothing on screen to find your
-                        way back to, and "as loud as they actually are" is the
-                        one position on this slider anybody looks for. Pressing
-                        it is how you get there. */}
-                    <button
-                        type="button"
-                        onClick={() => setVolume(DEFAULT_VOLUME)}
-                        disabled={volume === DEFAULT_VOLUME}
-                        className="self-start text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
-                    >
-                        {volume === DEFAULT_VOLUME
-                            ? "As they were sent"
-                            : "Back to how they were sent"}
-                    </button>
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
-                    {volume === 0 ? (
-                        <Volume2 className="size-3.5" />
-                    ) : (
-                        <VolumeX className="size-3.5" />
-                    )}
-                    {volume === 0 ? "Let them through" : "Silence them for you"}
-                </ContextMenuItem>
-
-                {/* The way to combine with somebody this browser did not hear -
-                    across a big room, on a laptop with the volume down, or on a
-                    machine where listening for the room is switched off. */}
-                {(onCombine || onAskCombine) && <ContextMenuSeparator />}
-                {onCombine && (
-                    <ContextMenuItem onSelect={onCombine} disabled={combineLocked}>
-                        <Headphones className="size-3.5" />
-                        Use their audio
-                    </ContextMenuItem>
-                )}
-                {onAskCombine && (
-                    <ContextMenuItem
-                        onSelect={onAskCombine}
-                        disabled={combineAsked || combineLocked}
-                    >
-                        <Users className="size-3.5" />
-                        {combineAsked ? "Asked to combine" : "Ask them to combine audio"}
-                    </ContextMenuItem>
-                )}
-                {(onCombine || onAskCombine) && combineLocked && (
-                    <p className="px-2 pb-1 text-xs text-muted-foreground">
-                        Needs at least three people in the call.
-                    </p>
-                )}
-            </ContextMenuContent>
-        </ContextMenu>
+/**
+ * A stream somebody is sharing that this reader is not watching yet.
+ *
+ * The whole card is the button: what somebody is reaching for is the screen,
+ * and a target the size of a word inside a target the size of a card is the
+ * smaller of the two. Right-clicking it offers the stream's own menu, so its
+ * sound can be settled before it is opened.
+ */
+function StreamCard({
+    name,
+    className,
+    onWatch,
+    menu
+}: {
+    name: string;
+    className: string;
+    onWatch: () => void;
+    menu?: StreamMenuFor;
+}) {
+    const card = (
+        <button
+            type="button"
+            onClick={onWatch}
+            title={`Watch ${name}`}
+            className={cn(
+                "flex flex-col items-center justify-center gap-1.5 rounded-md border border-border bg-muted/40 px-3 text-center transition-colors hover:border-border-strong hover:bg-card-hover",
+                className
+            )}
+        >
+            <MonitorUp className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="w-full truncate text-xs font-medium">{name}</span>
+            <span className="text-xs text-muted-foreground">Watch</span>
+        </button>
     );
+    return <MaybeStreamMenu menu={menu}>{card}</MaybeStreamMenu>;
 }
 
 /**
@@ -1515,6 +1524,7 @@ function Face({
     onAskCombine,
     combineAsked = false,
     combineLocked = false,
+    compact = false,
     volumeKey
 }: {
     name: string;
@@ -1535,6 +1545,8 @@ function Face({
     onAskCombine?: () => void;
     combineAsked?: boolean;
     combineLocked?: boolean;
+    /** Smaller, for the column beside a watched stream. */
+    compact?: boolean;
     /** Who this face's volume is remembered against. Absent on your own, which
      *  has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -1542,10 +1554,10 @@ function Face({
     const [volume] = useCallVolume(volumeKey ?? "");
 
     const face = (
-        <li className="flex w-20 shrink-0 flex-col items-center gap-1">
+        <li className={cn("flex shrink-0 flex-col items-center gap-1", compact ? "w-16" : "w-20")}>
             <span className="relative">
                 <Avatar
-                    size={AVATAR_SIZE}
+                    size={compact ? COMPACT_AVATAR_SIZE : AVATAR_SIZE}
                     person={{ id: personId, name }}
                     callBadge={deafened ? "deafened" : muted ? "muted" : null}
                     className={cn(
@@ -1640,6 +1652,7 @@ function Tile({
     onAskCombine,
     combineAsked = false,
     combineLocked = false,
+    streamMenu,
     volumeKey
 }: {
     stream: MediaStream | null;
@@ -1696,6 +1709,8 @@ function Tile({
     onAskCombine?: () => void;
     combineAsked?: boolean;
     combineLocked?: boolean;
+    /** Set on a stream somebody else is sharing: its right-click menu. */
+    streamMenu?: StreamMenuFor;
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -2026,6 +2041,7 @@ function Tile({
         </div>
     );
 
+    if (streamMenu) return <MaybeStreamMenu menu={streamMenu}>{tile}</MaybeStreamMenu>;
     if (!volumeKey) return tile;
 
     return (

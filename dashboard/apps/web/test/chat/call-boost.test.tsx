@@ -68,6 +68,7 @@ function callWith(deafened: boolean, graceDeafened = false): CallState {
         },
         participantId: "p-ada",
         remote: new Map([["p-grace", stream]]),
+        screens: new Map(),
         states: new Map([["p-grace", { deafened: graceDeafened }]]),
         deafened
     } as unknown as CallState;

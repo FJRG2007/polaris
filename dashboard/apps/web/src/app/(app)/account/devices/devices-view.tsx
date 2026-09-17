@@ -545,6 +545,29 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                         </span>
                     </div>
                 ) : null}
+                <div className="flex flex-col gap-1">
+                    <span className="flex items-center justify-between gap-2 text-sm">
+                        Lower voices while a stream plays
+                        <span className="tabular-nums text-muted-foreground">
+                            {voice.streamAttenuation}%
+                        </span>
+                    </span>
+                    <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={voice.streamAttenuation}
+                        aria-label="How far voices are lowered while a stream plays"
+                        onChange={(event) =>
+                            setVoice({ streamAttenuation: Number(event.target.value) })
+                        }
+                        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        While you watch a stream that has sound. Zero leaves voices alone.
+                    </span>
+                </div>
             </CardBody>
         </Card>
     );

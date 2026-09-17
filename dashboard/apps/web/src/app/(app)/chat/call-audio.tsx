@@ -37,6 +37,15 @@ import { useVoiceSettings } from "./voice-settings";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
 import { playThroughChosenSpeaker, SPEAKER_CHANGED } from "./speaker-device";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    closePopOut,
+    poppedStream,
+    setWatchedStreams,
+    streamVolumeKey,
+    useStreamMuted,
+    useWatchedStreams,
+    voiceScale
+} from "./call-stream-audio";
 
 export function CallAudio({ call }: { call: CallState }) {
     /**
@@ -83,7 +92,53 @@ export function CallAudio({ call }: { call: CallState }) {
     const [voice] = useVoiceSettings();
     const ducking =
         voice.attenuate && call.participantId !== null && call.speaking.has(call.participantId);
-    const scale = ducking ? Math.max(0, 1 - voice.attenuation / 100) : 1;
+
+    /**
+     * The screens whose sound plays here: the ones being watched, on the stage
+     * or popped out, that carry any. A share nobody opened stays silent.
+     */
+    const watching = useWatchedStreams();
+    const streams = others.filter((person) => {
+        const stream = call.screens.get(person.id);
+        return (
+            stream !== undefined &&
+            stream.getAudioTracks().length > 0 &&
+            watching.includes(`screen:${person.id}`)
+        );
+    });
+    /** Which of those can actually be heard, so voices are lowered only while
+     *  a stream really plays - see `voiceScale`. */
+    const [audible, setAudible] = useState<ReadonlySet<string>>(new Set());
+    const hear = useCallback((id: string, on: boolean) => {
+        setAudible((current) => {
+            if (current.has(id) === on) return current;
+            const next = new Set(current);
+            if (on) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    }, []);
+    const streamPlaying = !silent && streams.some((person) => audible.has(person.id));
+    const scale = voiceScale({
+        ducking: ducking ? voice.attenuation : 0,
+        streamPlaying,
+        streamAttenuation: voice.streamAttenuation
+    });
+
+    // A floating window for a share that has ended would be a black rectangle
+    // on top of everything, and one outliving the call is worse.
+    const sharedKeys = [...call.screens.keys()].map((id) => `screen:${id}`).join(" ");
+    useEffect(() => {
+        const key = poppedStream();
+        if (key && !sharedKeys.split(" ").includes(key)) closePopOut();
+    }, [sharedKeys]);
+    useEffect(
+        () => () => {
+            closePopOut();
+            setWatchedStreams([]);
+        },
+        []
+    );
 
     /**
      * Forget whoever is no longer here.
@@ -99,7 +154,10 @@ export function CallAudio({ call }: { call: CallState }) {
      * Keyed by the ids rather than the array: the roster is rebuilt on every
      * refresh, and depending on the array itself would run this on each one.
      */
-    const present = others.map((person) => person.id).join(" ");
+    const present = [
+        ...others.map((person) => person.id),
+        ...streams.map((person) => `stream:${person.id}`)
+    ].join(" ");
     useEffect(() => {
         const here = new Set(present ? present.split(" ") : []);
         for (const id of unblock.current.keys()) {
@@ -132,6 +190,18 @@ export function CallAudio({ call }: { call: CallState }) {
                 />
             ))}
 
+            {streams.map((person) => (
+                <StreamAudio
+                    key={`stream:${person.id}`}
+                    id={person.id}
+                    stream={call.screens.get(person.id) ?? null}
+                    person={person.userId ?? person.id}
+                    silent={silent}
+                    onAudible={hear}
+                    onPlayState={report}
+                />
+            ))}
+
             {/* A browser is entitled to refuse to start audio, and it refuses
                 silently. A press is all it wants, so this asks for one - once
                 for the room, wherever in Polaris the reader happens to be. */}
@@ -154,6 +224,47 @@ export function CallAudio({ call }: { call: CallState }) {
                 </div>
             )}
         </>
+    );
+}
+
+/**
+ * One watched stream's sound, at the volume and mute this reader chose for that
+ * sharer's streams.
+ */
+function StreamAudio({
+    id,
+    stream,
+    person,
+    silent,
+    onAudible,
+    onPlayState
+}: {
+    id: string;
+    stream: MediaStream | null;
+    /** Their account where they have one, their seat where they do not. */
+    person: string;
+    silent: boolean;
+    onAudible: (id: string, audible: boolean) => void;
+    onPlayState: (id: string, blocked: boolean, press: () => void) => void;
+}) {
+    const volumeKey = streamVolumeKey(person);
+    const [muted] = useStreamMuted(person);
+    const [volume] = useCallVolume(volumeKey);
+    const audible = !muted && volume > 0;
+    useEffect(() => {
+        onAudible(id, audible);
+        return () => onAudible(id, false);
+    }, [audible, id, onAudible]);
+
+    return (
+        <RemoteAudio
+            id={`stream:${id}`}
+            stream={stream}
+            volumeKey={volumeKey}
+            muted={silent || muted}
+            scale={1}
+            onPlayState={onPlayState}
+        />
     );
 }
 
