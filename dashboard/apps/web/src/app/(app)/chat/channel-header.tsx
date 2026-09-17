@@ -121,8 +121,9 @@ export function ChannelHeader({
     const [error, setError] = useState("");
 
     const named = channel.spaceId !== null;
-    // A group belongs to everybody in it: any of them can name it, add somebody
-    // and walk out. What none of them can do is turn anybody else out.
+    // A group belongs to everybody in it: any of them can walk out, and add
+    // somebody unless its owner closed that. What none of them can do is turn
+    // anybody else out.
     const group = channel.kind === "group";
 
     useEffect(() => {
@@ -308,7 +309,7 @@ export function ChannelHeader({
                             </button>
                         </>
                     )}
-                    {(named || group) && (
+                    {channel.mayInvite && (
                         <button
                             type="button"
                             aria-label="Add people"

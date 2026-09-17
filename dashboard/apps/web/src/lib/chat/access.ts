@@ -468,6 +468,33 @@ export function picturesAllowed(
     return groupOwnerId(channel) === actorId || channel.membersMayEdit;
 }
 
+/**
+ * Whether this reader may add people to a conversation.
+ *
+ * A channel is run by whoever administers its space. A group by its owner, and by
+ * everybody else in it unless the owner has closed that - which is the one way
+ * to keep a group to the people who started it. A direct message takes nobody:
+ * a third person makes it a group, which is its own action.
+ *
+ * Same shape as `picturesAllowed`, for the same reason: the list that decides
+ * whether to offer the button and the service that adds must not disagree.
+ */
+export function invitesAllowed(
+    channel: {
+        readonly kind: string;
+        readonly spaceId: string | null;
+        readonly ownerId: string | null;
+        readonly createdById?: string | null;
+        readonly membersMayInvite: boolean;
+        readonly mayAdminister: boolean;
+    },
+    actorId: string
+): boolean {
+    if (channel.spaceId) return channel.mayAdminister;
+    if (channel.kind !== "group") return false;
+    return groupOwnerId(channel) === actorId || channel.membersMayInvite;
+}
+
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {
     const unique = [...new Set(userIds)];
     if (unique.length === 0) return new Set();

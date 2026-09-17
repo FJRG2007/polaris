@@ -22,8 +22,16 @@ let ownerId: string | null = "ada";
  *  this, and it is the same person. */
 let createdById: string | null = "ada";
 let membersMayEdit = false;
+/** Whether the rest of the group may add people. On unless the owner closed it,
+ *  which is how every group behaved before there was a switch. */
+let membersMayInvite = true;
 let members = ["ada", "grace", "alan"];
-let written: { name?: string; removed?: string[]; added?: string[] } = {};
+let written: {
+    name?: string;
+    removed?: string[];
+    added?: string[];
+    options?: Record<string, unknown>;
+} = {};
 
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
@@ -45,10 +53,12 @@ vi.mock("@polaris/db", () => ({
                 space: null,
                 ownerId,
                 createdById,
-                membersMayEdit
+                membersMayEdit,
+                membersMayInvite
             }),
-            update: async ({ data }: { data: { name?: string } }) => {
+            update: async ({ data }: { data: { name?: string; membersMayInvite?: boolean } }) => {
                 written.name = data.name;
+                written.options = data;
                 return {};
             }
         },
@@ -83,7 +93,7 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const chat = await import("@/lib/chat/chat-service");
-const { ChatAccessError } = await import("@/lib/chat/access");
+const { ChatAccessError, invitesAllowed } = await import("@/lib/chat/access");
 
 const ada = { id: "ada" };
 
@@ -91,6 +101,7 @@ beforeEach(() => {
     ownerId = "ada";
     createdById = "ada";
     membersMayEdit = false;
+    membersMayInvite = true;
     kind = "group";
     members = ["ada", "grace", "alan"];
     written = {};
@@ -164,6 +175,61 @@ describe("adding people", () => {
         await expect(
             chat.addChannelMembers(ada, "channel-1", ["one-too-many"])
         ).rejects.toThrow(/Make a channel/);
+    });
+});
+
+describe("who may add people to a group", () => {
+    const grace = { id: "grace" };
+
+    it("is everybody in it until the owner closes it", async () => {
+        await chat.addChannelMembers(grace, "channel-1", ["turing"]);
+        expect(written.added).toEqual(["turing"]);
+    });
+
+    it("is refused on the server to a member once the owner has closed it", async () => {
+        membersMayInvite = false;
+        await expect(chat.addChannelMembers(grace, "channel-1", ["turing"])).rejects.toThrow(
+            /Only the owner of this group can add people/
+        );
+        expect(written.added).toBeUndefined();
+    });
+
+    it("stays open to the owner when it is closed", async () => {
+        membersMayInvite = false;
+        await chat.addChannelMembers(ada, "channel-1", ["turing"]);
+        expect(written.added).toEqual(["turing"]);
+    });
+
+    it("is closed and opened by the owner alone, one switch at a time", async () => {
+        await chat.setGroupOptions(ada, "channel-1", { membersMayInvite: false });
+        // The other switch is left as it was rather than written back.
+        expect(written.options).toEqual({ membersMayInvite: false });
+
+        await expect(
+            chat.setGroupOptions(grace, "channel-1", { membersMayInvite: true })
+        ).rejects.toThrow(/Only the owner/);
+    });
+
+    it("is decided the same way for the button as for the service", () => {
+        const group = {
+            kind: "group",
+            spaceId: null,
+            ownerId: "ada",
+            membersMayInvite: false,
+            mayAdminister: false
+        };
+        expect(invitesAllowed(group, "ada")).toBe(true);
+        expect(invitesAllowed(group, "grace")).toBe(false);
+        expect(invitesAllowed({ ...group, membersMayInvite: true }, "grace")).toBe(true);
+        // A one-to-one conversation takes nobody, and a channel is its admins'.
+        expect(invitesAllowed({ ...group, kind: "dm", membersMayInvite: true }, "ada")).toBe(false);
+        expect(invitesAllowed({ ...group, kind: "text", spaceId: "space-1" }, "ada")).toBe(false);
+        expect(
+            invitesAllowed(
+                { ...group, kind: "text", spaceId: "space-1", mayAdminister: true },
+                "grace"
+            )
+        ).toBe(true);
     });
 });
 

@@ -557,14 +557,18 @@ export async function reportMessageAction(
  * The service refuses anybody else; this only shapes the input. A boolean from a
  * browser is still a value from outside.
  */
+const groupOptionsSchema = z
+    .object({ membersMayEdit: z.boolean().optional(), membersMayInvite: z.boolean().optional() })
+    .strict();
+
 export async function setGroupOptionsAction(
     channelId: string,
-    membersMayEdit: unknown
+    options: unknown
 ): Promise<{ error?: string }> {
     const me = await actor();
-    const result = await guard(() =>
-        chat.setGroupOptions(me, channelId, { membersMayEdit: membersMayEdit === true })
-    );
+    const parsed = groupOptionsSchema.safeParse(options);
+    if (!parsed.success) return { error: "That is not a setting this group has" };
+    const result = await guard(() => chat.setGroupOptions(me, channelId, parsed.data));
     return result.error ? { error: result.error } : {};
 }
 
