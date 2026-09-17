@@ -10,6 +10,10 @@ import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 
+/** How far a menu keeps from the edge of the screen, in px - the page's own
+ *  gutter on a phone. */
+export const MENU_GUTTER = 16;
+
 export const DropdownMenu = RadixMenu.Root;
 export const DropdownMenuTrigger = RadixMenu.Trigger;
 export const DropdownMenuGroup = RadixMenu.Group;
@@ -19,13 +23,18 @@ export const DropdownMenuSeparatorRoot = RadixMenu.Separator;
 export const DropdownMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, sideOffset = 6, onFocus, ...props }, ref) => (
+>(({ className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, ...props }, ref) => (
     <RadixMenu.Portal>
         <RadixMenu.Content
             ref={ref}
             sideOffset={sideOffset}
+            // Kept off the screen's edge, and never taller or wider than what is
+            // left of it: the app switcher lists every app with a line of
+            // description under each, which is taller than a phone, and a surface
+            // that clipped its overflow left the bottom half of it unreachable.
+            collisionPadding={collisionPadding}
             className={cn(
-                "z-50 min-w-[12rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                 className
             )}
             {...props}
@@ -117,12 +126,13 @@ DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
 export const DropdownMenuSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
->(({ className, ...props }, ref) => (
+>(({ className, collisionPadding = MENU_GUTTER, ...props }, ref) => (
     <RadixMenu.Portal>
         <RadixMenu.SubContent
             ref={ref}
+            collisionPadding={collisionPadding}
             className={cn(
-                "z-50 min-w-[12rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                 className
             )}
             {...props}

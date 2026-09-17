@@ -13,6 +13,7 @@ import { applePlatform, formatShortcut } from "../lib/shortcut";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-context-menu";
+import { MENU_GUTTER } from "./dropdown-menu";
 import { useReopenElsewhere } from "../lib/menu-reopen";
 import {
     forwardRef,
@@ -68,7 +69,7 @@ export function ContextMenuSub({ onOpenChange, ...props }: ComponentPropsWithout
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, onFocus, ...props }, ref) => {
+>(({ className, onFocus, collisionPadding = MENU_GUTTER, ...props }, ref) => {
     // The surface itself, in state rather than in a ref, and that is
     // load-bearing: this component sits in the tree whether or not its menu is
     // open - Radix gates on the open state inside the portal below - so a ref
@@ -85,8 +86,10 @@ export const ContextMenuContent = forwardRef<
         <RadixMenu.Portal>
             <RadixMenu.Content
                 ref={mergeRefs(ref, setSurface)}
+                // Same bounds as the dropdown's - see `DropdownMenuContent`.
+                collisionPadding={collisionPadding}
                 className={cn(
-                    "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    "z-50 max-h-[--radix-context-menu-content-available-height] min-w-[min(11rem,calc(100vw-2rem))] max-w-[--radix-context-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                     className
                 )}
                 {...props}
@@ -227,7 +230,7 @@ ContextMenuSubTrigger.displayName = "ContextMenuSubTrigger";
 export const ContextMenuSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
->(({ className, ...props }, ref) => {
+>(({ className, collisionPadding = MENU_GUTTER, ...props }, ref) => {
     // Kept mounted once it has been opened - see ContextMenuSub. Hidden rather
     // than faded while closed, since there is nothing to animate out of a
     // submenu that is only being stepped past.
@@ -237,8 +240,9 @@ export const ContextMenuSubContent = forwardRef<
             <RadixMenu.SubContent
                 ref={ref}
                 forceMount={kept || undefined}
+                collisionPadding={collisionPadding}
                 className={cn(
-                    "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    "z-50 max-h-[--radix-context-menu-content-available-height] min-w-[min(11rem,calc(100vw-2rem))] max-w-[--radix-context-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                     className,
                     kept && "data-[state=closed]:hidden"
                 )}
