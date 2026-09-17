@@ -32,6 +32,9 @@ dependencies {
     // The API's own annotations, which it does not ship; without them the
     // compiler warns on every class it reads.
     compileOnly "org.jetbrains:annotations:${annotations_version}"
+    // Named by an annotation on Log4j's own classes, which it does not ship
+    // either; without it the compiler warns reading them, and -Werror fails.
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugs_annotations_version}"
 }
 
 tasks.withType(JavaCompile).configureEach {
