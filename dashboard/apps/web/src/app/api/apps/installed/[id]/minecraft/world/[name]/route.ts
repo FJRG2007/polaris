@@ -30,7 +30,8 @@ export async function GET(
     // owner's behalf, and it has already refused anything that is not a game server.
     const { access } = await requireGameServer("games.manage", id);
     const install = access.install;
-    if (!install.applicationId) return new Response("This server has not been deployed yet", { status: 409 });
+    if (!install.applicationId)
+        return new Response("This server has not been deployed yet", { status: 409 });
 
     let path: string;
     try {
