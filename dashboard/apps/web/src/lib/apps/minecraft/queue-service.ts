@@ -86,7 +86,10 @@ export async function queueAction(input: {
 }
 
 /** What is still waiting on this server, oldest first. */
-export async function pendingFor(installedAppId: string, username?: string): Promise<QueuedAction[]> {
+export async function pendingFor(
+    installedAppId: string,
+    username?: string
+): Promise<QueuedAction[]> {
     const rows = await prisma.playerActionQueue.findMany({
         where: {
             installedAppId,
@@ -116,6 +119,8 @@ function commandFor(username: string, payload: QueuedPayload): string[] | null {
             return ["give", username, payload.item, String(payload.count)];
         case "clear":
             return ["clear", username, payload.item, String(payload.count)];
+        case "clear-all":
+            return ["clear", username];
         case "ban":
             return ["ban", username, ...(payload.reason ? [payload.reason] : [])];
         case "pardon":
@@ -213,7 +218,10 @@ export async function drainQueue(
                 await prisma.playerActionQueue
                     .update({
                         where: { id: row.id },
-                        data: { lastError: caught instanceof Error ? caught.message.slice(0, 200) : "Refused" }
+                        data: {
+                            lastError:
+                                caught instanceof Error ? caught.message.slice(0, 200) : "Refused"
+                        }
                     })
                     .catch(() => null);
             }
@@ -243,7 +251,13 @@ async function apply(
     // give itself does, rather than one command with a number the server may
     // refuse once nobody is watching.
     if (action.payload.kind === "give") {
-        await giveItem(ownerId, installedAppId, action.username, action.payload.item, action.payload.count);
+        await giveItem(
+            ownerId,
+            installedAppId,
+            action.username,
+            action.payload.item,
+            action.payload.count
+        );
         return;
     }
     const argv = commandFor(action.username, action.payload);

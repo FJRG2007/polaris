@@ -15,6 +15,7 @@
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { normalizeItemId, stacksFor } from "./items";
+import { readLiveInventory } from "./inventory-service";
 import { parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
 import { recentlyGivenItems as recentlyGiven } from "@/lib/apps/recent-items";
@@ -31,7 +32,15 @@ const COMMAND_KEY = "itemCommand";
 const UNKNOWN_COMMAND = /unknown or incomplete command/i;
 
 /** Why a write did not happen, in the words the screen uses. */
-export type WriteRefusal = ItemArgumentRefusal | "moved" | "gone" | "unsupported" | "occupied" | "indivisible";
+export type WriteRefusal =
+    | ItemArgumentRefusal
+    | "moved"
+    | "gone"
+    | "unsupported"
+    | "occupied"
+    | "indivisible"
+    | "recipient"
+    | "same";
 
 export class ItemWriteError extends Error {
     constructor(
@@ -45,12 +54,18 @@ export class ItemWriteError extends Error {
 const REFUSALS: Record<WriteRefusal, string> = {
     unreadable:
         "That stack carries data Polaris cannot write back exactly, so moving it would strip it. Give the item again instead.",
-    "too-long": "That stack carries more data than one command can hold, so it cannot be moved without losing some.",
+    "too-long":
+        "That stack carries more data than one command can hold, so it cannot be moved without losing some.",
     moved: "They moved that stack while you were dragging it. The slot was left alone.",
     gone: "That slot is empty now. The slot was left alone.",
-    unsupported: "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
-    occupied: "Drop part of a stack on an empty slot. Splitting onto an occupied one is not something the game does.",
-    indivisible: "That stack carries its own data, so the items in it are not interchangeable and cannot be split."
+    unsupported:
+        "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
+    occupied:
+        "Drop part of a stack on an empty slot. Splitting onto an occupied one is not something the game does.",
+    indivisible:
+        "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
+    recipient: "The other player has to be on the server to receive it. Nothing was moved.",
+    same: "Pick a different player to send it to."
 };
 
 function refuse(why: WriteRefusal): never {
@@ -133,7 +148,12 @@ async function storedCommand(installedAppId: string): Promise<ItemCommand | null
 }
 
 /** Empty one slot. */
-export async function clearSlot(ownerId: string, installedAppId: string, player: string, slot: number): Promise<void> {
+export async function clearSlot(
+    ownerId: string,
+    installedAppId: string,
+    player: string,
+    slot: number
+): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (server) => {
         await writeSlot(server, installedAppId, player, slot, AIR, 1);
     });
@@ -175,7 +195,10 @@ export async function moveStack(
 ): Promise<void> {
     if (from === to) return;
     await withServerContainer(ownerId, installedAppId, async (server) => {
-        const [source, target] = await Promise.all([readSlot(server, player, from), readSlot(server, player, to)]);
+        const [source, target] = await Promise.all([
+            readSlot(server, player, from),
+            readSlot(server, player, to)
+        ]);
         if (source === null) refuse("gone");
         if (!sameStack(source, expected.from) || !sameStack(target, expected.to)) refuse("moved");
 
@@ -185,7 +208,8 @@ export async function moveStack(
         const moving = itemArgument(source);
         if (!moving.ok) refuse(moving.why);
 
-        const part = count === undefined ? source.count : Math.max(1, Math.min(count, source.count));
+        const part =
+            count === undefined ? source.count : Math.max(1, Math.min(count, source.count));
         if (part < source.count) {
             // A split is two writes of the same item, so nothing has to be
             // reconstructed and nothing can be lost - but only for a stack whose
@@ -194,7 +218,14 @@ export async function moveStack(
             if (source.data !== null) refuse("indivisible");
             if (target !== null) refuse("occupied");
             await writeSlot(server, installedAppId, player, to, moving.value, part);
-            await writeSlot(server, installedAppId, player, from, moving.value, source.count - part);
+            await writeSlot(
+                server,
+                installedAppId,
+                player,
+                from,
+                moving.value,
+                source.count - part
+            );
             return;
         }
 
@@ -246,10 +277,130 @@ export async function giveItem(
         const said: string[] = [];
         let given = 0;
         for (const stack of stacks) {
-            said.push(stripFormatting(await server.say(["give", player, itemId, String(stack)])).trim());
+            said.push(
+                stripFormatting(await server.say(["give", player, itemId, String(stack)])).trim()
+            );
             given += stack;
         }
         return { given, output: said.filter(Boolean).join("\n") };
+    });
+}
+
+/** Empty everything a player carries, armour and offhand included. */
+export async function clearInventory(
+    ownerId: string,
+    installedAppId: string,
+    player: string
+): Promise<string> {
+    return withServerContainer(ownerId, installedAppId, (server) => server.say(["clear", player]));
+}
+
+/** What `/give` answers when the item arrived: "Gave 3 [Stone] to Steve", or
+ *  "Given [Stone] * 3 to Steve" before 1.13. Anything else - "No player was
+ *  found" - means nothing was handed over. */
+const GAVE = /^(gave|given)\b/i;
+
+/** Hand one stack, data and all, to a player. True when the server says it did. */
+async function handOver(
+    server: ServerContainer,
+    player: string,
+    argument: string,
+    count: number
+): Promise<boolean> {
+    const reply = stripFormatting(
+        await server.say(["give", player, argument, String(count)])
+    ).trim();
+    return GAVE.test(reply);
+}
+
+/**
+ * Send one stack from one player to another.
+ *
+ * Given to the recipient first and taken from the sender only once the server
+ * says it arrived, so a failure in between leaves a copy rather than nothing.
+ * The stack is re-read and compared with what the screen showed, the same as a
+ * move inside one bag, and re-emitted with its data so a sword keeps its
+ * enchantments.
+ */
+export async function transferStack(
+    ownerId: string,
+    installedAppId: string,
+    from: string,
+    to: string,
+    slot: number,
+    expected: InventoryItem | null,
+    count?: number
+): Promise<void> {
+    if (from.toLowerCase() === to.toLowerCase()) refuse("same");
+    await withServerContainer(ownerId, installedAppId, async (server) => {
+        const source = await readSlot(server, from, slot);
+        if (source === null) refuse("gone");
+        if (!sameStack(source, expected)) refuse("moved");
+        const moving = itemArgument(source);
+        if (!moving.ok) refuse(moving.why);
+        const part =
+            count === undefined ? source.count : Math.max(1, Math.min(count, source.count));
+        if (part < source.count && source.data !== null) refuse("indivisible");
+        if (!(await handOver(server, to, moving.value, part))) refuse("recipient");
+        if (part < source.count) {
+            await writeSlot(server, installedAppId, from, slot, moving.value, source.count - part);
+        } else {
+            await writeSlot(server, installedAppId, from, slot, AIR, 1);
+        }
+    });
+}
+
+/** What sending a whole bag came to. */
+export interface BagTransfer {
+    /** Stacks that arrived and were taken from the sender. */
+    readonly moved: number;
+    /** Stacks left with the sender because their data cannot be written back
+     *  exactly, or the server would not hand them over in one reply. */
+    readonly kept: number;
+}
+
+/**
+ * Send everything one player carries to another, a stack at a time.
+ *
+ * Each stack is given, then taken, before the next one is touched, so stopping
+ * part of the way - the recipient logged off - leaves both bags consistent. Each
+ * stack is read again just before it is given, and one that changed since the
+ * bag was read stays where it is, as does one whose data cannot be written back.
+ * Both are counted as kept.
+ */
+export async function transferInventory(
+    ownerId: string,
+    installedAppId: string,
+    from: string,
+    to: string
+): Promise<BagTransfer> {
+    if (from.toLowerCase() === to.toLowerCase()) refuse("same");
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        const reading = await readLiveInventory((argv) => server.say(argv), from);
+        if (!reading.answered)
+            throw new Error(`${from} has to be on the server to send their inventory.`);
+        let moved = 0;
+        let kept = reading.unreadable;
+        for (const [index, item] of reading.items.entries()) {
+            const argument = itemArgument(item);
+            if (!argument.ok) {
+                kept += 1;
+                continue;
+            }
+            if (!sameStack(await readSlot(server, from, item.slot), item)) {
+                kept += 1;
+                continue;
+            }
+            if (!(await handOver(server, to, argument.value, item.count))) {
+                if (moved === 0) refuse("recipient");
+                // Everything from here on stays where it is.
+                kept += reading.items.length - index;
+                break;
+            }
+            await writeSlot(server, installedAppId, from, item.slot, AIR, 1);
+            moved += 1;
+        }
+        return { moved, kept };
     });
 }
 

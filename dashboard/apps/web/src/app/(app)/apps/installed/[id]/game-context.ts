@@ -21,6 +21,9 @@ import { BLUEPRINT_KEY, MAP_KEY } from "@/lib/apps/games-create";
 import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
 import { readFivemAccess, readFivemPort, type FivemAccessView } from "@/lib/apps/fivem/service";
 import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { rememberedRoster, type RememberedRoster } from "@/lib/apps/minecraft/roster-memory";
+import { rememberedLevels, type RememberedLevel } from "@/lib/apps/minecraft/level-memory";
+import { loginState, type LoginState } from "@/lib/apps/minecraft/polaris-login-service";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { editionOf, type MinecraftEdition } from "@/lib/apps/minecraft/service";
@@ -90,6 +93,20 @@ export interface GameContext {
      */
     readonly gamePort: number | null;
     readonly queryPort: number | null;
+    /**
+     * What the Minecraft server last said about its operators, whitelist and
+     * bans, and when.
+     *
+     * Written down each time the server answers, so the crown and the standing
+     * of every row paint with the page instead of after the container has been
+     * asked - which is the slowest read the panel makes.
+     */
+    readonly rosterMemory: RememberedRoster | null;
+    /** The level each Minecraft player was last seen on. */
+    readonly lastLevels: Readonly<Record<string, RememberedLevel>>;
+    /** Polaris login's state on a Minecraft server, so who has a password is
+     *  on the first paint rather than a request later. */
+    readonly login: LoginState | null;
 }
 
 /**
@@ -109,16 +126,35 @@ export async function gameContextFor(app: {
         select: { config: true, ownerId: true }
     });
     const ownerId = app.ownerId ?? install?.ownerId ?? null;
-    const [suffix, facts, arkAccess, playerAccess, fivemAccess, ports, fivemPort] = await Promise.all([
+    const minecraft = game.id === "minecraft";
+    const [
+        suffix,
+        facts,
+        arkAccess,
+        playerAccess,
+        fivemAccess,
+        ports,
+        fivemPort,
+        rosterMemory,
+        lastLevels,
+        login
+    ] = await Promise.all([
         // Each game's servers live under a label of their own, so the address
         // picker has to be told which one it is naming a server in.
         gameDomainSuffix(game.domainLabel).catch(() => null),
         ownerId ? gameServerFacts(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" && ownerId ? readArkAccess(ownerId, app.id).catch(() => null) : null,
-        game.id === "minecraft" && ownerId ? listPlayerAccess(ownerId, app.id).catch(() => null) : null,
+        game.id === "minecraft" && ownerId
+            ? listPlayerAccess(ownerId, app.id).catch(() => null)
+            : null,
         game.id === "fivem" && ownerId ? readFivemAccess(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" ? readArkPorts(app.applicationId).catch(() => null) : null,
-        game.id === "fivem" ? readFivemPort(app.applicationId).catch(() => null) : null
+        game.id === "fivem" ? readFivemPort(app.applicationId).catch(() => null) : null,
+        minecraft ? rememberedRoster(app.id).catch(() => null) : null,
+        minecraft ? rememberedLevels(app.id).catch(() => ({})) : {},
+        minecraft && ownerId && editionOf(app.catalogId) === "java"
+            ? loginState(app.id, app.applicationId, ownerId).catch(() => null)
+            : null
     ]);
     const config = readInstallConfig(install?.config);
     return {
@@ -129,8 +165,12 @@ export async function gameContextFor(app: {
         canRoute: routesByHostname(app.catalogId),
         iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null,
         edition: game.id === "minecraft" ? editionOf(app.catalogId) : null,
-        blueprintId: typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : null,
-        mapId: typeof config[MAP_KEY] === "string" && config[MAP_KEY] ? (config[MAP_KEY] as string) : null,
+        blueprintId:
+            typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : null,
+        mapId:
+            typeof config[MAP_KEY] === "string" && config[MAP_KEY]
+                ? (config[MAP_KEY] as string)
+                : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),
         routineRuns: readRoutineRuns(config),
@@ -138,6 +178,9 @@ export async function gameContextFor(app: {
         playerAccess,
         fivemAccess,
         gamePort: ports?.gamePort ?? fivemPort ?? null,
-        queryPort: ports?.queryPort ?? null
+        queryPort: ports?.queryPort ?? null,
+        rosterMemory,
+        lastLevels,
+        login
     };
 }

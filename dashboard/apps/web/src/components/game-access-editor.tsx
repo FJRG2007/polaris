@@ -43,11 +43,20 @@ export function GameAccessEditor({
 
     const edition = access?.edition ?? "java";
     const rules = access?.rules ?? [];
+    const links = access?.links ?? [];
     // One row per address in the table, one line per person on the screen. A
     // player who plays from home and from a laptop is one entry with two badges,
     // not two entries that read like two people.
     const people = useMemo(() => {
-        const byName = new Map<string, { username: string; note: string | null; addresses: string[] }>();
+        const byName = new Map<
+            string,
+            {
+                username: string;
+                note: string | null;
+                addresses: string[];
+                linkedTo: string | null;
+            }
+        >();
         for (const rule of rules) {
             const key = rule.username.toLowerCase();
             const held = byName.get(key);
@@ -56,10 +65,29 @@ export function GameAccessEditor({
                 if (!held.note && rule.note) held.note = rule.note;
                 continue;
             }
-            byName.set(key, { username: rule.username, note: rule.note, addresses: [rule.address] });
+            byName.set(key, {
+                username: rule.username,
+                note: rule.note,
+                addresses: [rule.address],
+                linkedTo: null
+            });
+        }
+        // A linked player signed in nowhere has no address and is still listed.
+        for (const link of links) {
+            const key = link.username.toLowerCase();
+            const held = byName.get(key);
+            if (held) held.linkedTo = link.name;
+            else {
+                byName.set(key, {
+                    username: link.username,
+                    note: null,
+                    addresses: [],
+                    linkedTo: link.name
+                });
+            }
         }
         return [...byName.values()];
-    }, [rules]);
+    }, [rules, links]);
 
     /** Report upward when the host screen collects errors, and locally otherwise -
      *  a failure that only one of the two screens can show is a failure the other
@@ -86,7 +114,8 @@ export function GameAccessEditor({
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">
-                        Who can connect <span className="text-muted-foreground">{rules.length || ""}</span>
+                        Who can connect{" "}
+                        <span className="text-muted-foreground">{rules.length || ""}</span>
                     </p>
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
@@ -94,7 +123,9 @@ export function GameAccessEditor({
                         </span>
                         <Switch
                             checked={access?.bindAddresses ?? true}
-                            onChange={(enabled) => run(() => setAddressBindingAction(installedAppId, enabled))}
+                            onChange={(enabled) =>
+                                run(() => setAddressBindingAction(installedAppId, enabled))
+                            }
                             disabled={pending || access === null || !access.addressesAvailable}
                             aria-label="Check each player's address when they join"
                         />
@@ -102,8 +133,9 @@ export function GameAccessEditor({
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                    A player is let in when the username is on this list and they arrive from the address registered to
-                    it. The rest of the firewall guards HTTP, which a game port is not.
+                    A player is let in when the username is on this list and they arrive from the
+                    address registered to it. The rest of the firewall guards HTTP, which a game
+                    port is not.
                 </p>
                 <p className="text-xs text-muted-foreground">{ACCESS_REACH_NOTE}</p>
 
@@ -124,7 +156,7 @@ export function GameAccessEditor({
 
                 {access === null ? (
                     <p className="py-3 text-sm text-muted-foreground">Reading the list...</p>
-                ) : rules.length === 0 ? (
+                ) : people.length === 0 ? (
                     <p className="py-3 text-sm text-muted-foreground">
                         Nobody is registered yet, so nobody can join.
                     </p>
@@ -136,37 +168,57 @@ export function GameAccessEditor({
                                     <p className="truncate text-sm" title={person.username}>
                                         {person.username}
                                     </p>
+                                    {person.linkedTo && (
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            Follows {person.linkedTo}&apos;s Polaris sign-ins
+                                        </p>
+                                    )}
                                     {person.note && (
-                                        <p className="truncate text-xs text-muted-foreground" title={person.note}>
+                                        <p
+                                            className="truncate text-xs text-muted-foreground"
+                                            title={person.note}
+                                        >
                                             {person.note}
                                         </p>
                                     )}
                                 </div>
                                 <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
+                                    {person.linkedTo && person.addresses.length === 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                            Not signed in anywhere
+                                        </span>
+                                    )}
                                     {person.addresses.map((address) => (
-                                        <span key={address} className="inline-flex items-center gap-0.5">
+                                        <span
+                                            key={address}
+                                            className="inline-flex items-center gap-0.5"
+                                        >
                                             <Badge>{address}</Badge>
                                             {/* Each address goes on its own. Taking the last
                                                 one takes the player, which the service decides
-                                                so both screens agree about it. */}
-                                            <button
-                                                type="button"
-                                                disabled={pending}
-                                                aria-label={`Remove ${address} from ${person.username}`}
-                                                title={`Remove ${address} from ${person.username}`}
-                                                className="text-muted-foreground hover:text-danger disabled:opacity-50"
-                                                onClick={() =>
-                                                    run(() =>
-                                                        revokePlayerAddressAction(
-                                                            installedAppId,
-                                                            person.username,
-                                                            address
+                                                so both screens agree about it. A linked
+                                                player's addresses come from their sign-ins
+                                                and are not removed one by one. */}
+                                            {!person.linkedTo && (
+                                                <button
+                                                    type="button"
+                                                    disabled={pending}
+                                                    aria-label={`Remove ${address} from ${person.username}`}
+                                                    title={`Remove ${address} from ${person.username}`}
+                                                    className="text-muted-foreground hover:text-danger disabled:opacity-50"
+                                                    onClick={() =>
+                                                        run(() =>
+                                                            revokePlayerAddressAction(
+                                                                installedAppId,
+                                                                person.username,
+                                                                address
+                                                            )
                                                         )
-                                                    )
-                                                }
-                                            >
-                                                <X className="size-3" />
-                                            </button>
+                                                    }
+                                                >
+                                                    <X className="size-3" />
+                                                </button>
+                                            )}
                                         </span>
                                     ))}
                                 </div>
@@ -177,7 +229,12 @@ export function GameAccessEditor({
                                     aria-label={`Remove ${person.username}`}
                                     title={`Remove ${person.username} and every address they have`}
                                     onClick={() =>
-                                        run(() => revokePlayerAccessAction(installedAppId, person.username))
+                                        run(() =>
+                                            revokePlayerAccessAction(
+                                                installedAppId,
+                                                person.username
+                                            )
+                                        )
                                     }
                                 >
                                     <UserMinus className="size-4" />
@@ -189,7 +246,8 @@ export function GameAccessEditor({
 
                 {access && !access.addressesAvailable && (
                     <p className="text-xs text-muted-foreground">
-                        Bedrock does not record where a player connected from, so only the names here are enforced.
+                        Bedrock does not record where a player connected from, so only the names
+                        here are enforced.
                     </p>
                 )}
                 {failure && !onError && <p className="text-xs text-danger">{failure}</p>}

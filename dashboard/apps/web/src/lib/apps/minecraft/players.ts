@@ -34,6 +34,8 @@ export interface PlayerEntry {
      *  are not registered at all - a name the game knows and Polaris does not. A
      *  person plays from more than one place, so this is a list. */
     readonly addresses: readonly string[];
+    /** The Polaris account their addresses follow, when they are tied to one. */
+    readonly linkedTo: { readonly userId: string; readonly name: string } | null;
     readonly note: string | null;
     readonly banReason: string | null;
     readonly banned: boolean;
@@ -92,6 +94,7 @@ export function foldPlayers(
             operator: false,
             whitelisted: false,
             addresses: [],
+            linkedTo: null,
             note: null,
             banReason: null,
             banned: false,
@@ -112,6 +115,9 @@ export function foldPlayers(
             addresses: held.includes(rule.address) ? held : [...held, rule.address],
             ...(rule.note ? { note: rule.note } : {})
         });
+    }
+    for (const link of access?.links ?? []) {
+        upsert(link.username, { linkedTo: { userId: link.userId, name: link.name } });
     }
     for (const player of roster?.ops ?? []) upsert(player, { operator: true });
     for (const player of roster?.whitelist ?? []) upsert(player, { whitelisted: true });

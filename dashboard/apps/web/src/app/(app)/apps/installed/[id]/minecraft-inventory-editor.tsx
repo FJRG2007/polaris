@@ -27,13 +27,23 @@ import * as actions from "./minecraft-actions";
 import { ItemPicker } from "./minecraft-item-picker";
 import { bySlot } from "@/lib/apps/minecraft/inventory";
 import { useDisplayFormat } from "@/components/display-format";
-import { Badge, Button, Input, Skeleton, cn } from "@polaris/ui";
+import { useConfirm } from "@/components/confirm-dialog";
+import { Badge, Button, Input, Select, Skeleton, cn } from "@polaris/ui";
 import { maxStackFor, stacksFor } from "@/lib/apps/minecraft/items";
 import { InventoryGrid, type PendingStack } from "./minecraft-inventory";
 import { isMovable, writableSlots } from "@/lib/apps/minecraft/item-argument";
 import { describeQueued, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, PackageMinus, PackagePlus, RefreshCw, Trash2, X } from "lucide-react";
+import {
+    Eraser,
+    Loader2,
+    PackageMinus,
+    PackagePlus,
+    RefreshCw,
+    Send,
+    Trash2,
+    X
+} from "lucide-react";
 
 /** A bag's worth: 36 slots of 64, which is everything a player can hold. */
 const MOST_THAT_FITS = 2304;
@@ -46,16 +56,21 @@ const POLL_MS = 2000;
 const SLOW_POLL_MS = 8000;
 
 /** What is being dragged: a slot already in the bag, or an item from the palette. */
-type Held = { readonly kind: "slot"; readonly slot: number } | { readonly kind: "palette"; readonly id: string };
+type Held =
+    | { readonly kind: "slot"; readonly slot: number }
+    | { readonly kind: "palette"; readonly id: string };
 
 export function InventoryEditor({
     installedAppId,
     player,
     editable,
+    others = [],
     onChanged
 }: {
     installedAppId: string;
     player: string;
+    /** Everybody else who is on the server right now: who a stack can be sent to. */
+    others?: readonly string[];
     /** False on Bedrock, which answers no `data get`: nothing to read back and no
      *  slot to write, though items can still be given and taken. */
     editable: boolean;
@@ -76,6 +91,9 @@ export function InventoryEditor({
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const [confirm, confirmElement] = useConfirm();
+    /** Who a stack dropped on the send area goes to. */
+    const [recipient, setRecipient] = useState<string | null>(null);
     // Read through a ref so the poll can see it without restarting on every drag.
     const dragging = useRef(false);
     dragging.current = held !== null;
@@ -105,7 +123,9 @@ export function InventoryEditor({
      */
     const readQueue = useCallback(async () => {
         const result = await actions.pendingActionsAction(installedAppId);
-        setWaiting(result.pending.filter((entry) => entry.username.toLowerCase() === player.toLowerCase()));
+        setWaiting(
+            result.pending.filter((entry) => entry.username.toLowerCase() === player.toLowerCase())
+        );
     }, [installedAppId, player]);
 
     useEffect(() => {
@@ -117,7 +137,9 @@ export function InventoryEditor({
     // it is a hint about where to start, not a live figure.
     useEffect(() => {
         let alive = true;
-        void actions.recentItemsAction(installedAppId).then((result) => alive && setRecent(result.items));
+        void actions
+            .recentItemsAction(installedAppId)
+            .then((result) => alive && setRecent(result.items));
         return () => {
             alive = false;
         };
@@ -141,12 +163,19 @@ export function InventoryEditor({
      *  else that is waiting, which is a line under it. */
     const queuedSlots: PendingStack[] = waiting.flatMap((entry) =>
         entry.payload.kind === "set-slot"
-            ? [{ id: entry.id, slot: entry.payload.slot, item: entry.payload.item, count: entry.payload.count }]
+            ? [
+                  {
+                      id: entry.id,
+                      slot: entry.payload.slot,
+                      item: entry.payload.item,
+                      count: entry.payload.count
+                  }
+              ]
             : []
     );
     const queuedElsewhere = waiting.filter((entry) => entry.payload.kind !== "set-slot");
 
-    function run(work: () => Promise<{ error?: string; queued?: true }>): void {
+    function run(work: () => Promise<{ error?: string; queued?: true; note?: string }>): void {
         setError(null);
         setNote(null);
         startTransition(async () => {
@@ -156,6 +185,7 @@ export function InventoryEditor({
                 return;
             }
             if (result.queued) setNote(`Saved. It happens when ${player} next joins.`);
+            else if (result.note) setNote(result.note);
             await Promise.all([reload(), readQueue()]);
             // The screen behind lists what is waiting too, and it only reads that
             // on its own poll.
@@ -173,10 +203,21 @@ export function InventoryEditor({
     async function putInSlot(id: string, slot: number): Promise<{ error?: string; queued?: true }> {
         const [first, ...rest] = stacksFor(id, amount);
         if (first === undefined) return {};
-        const placed = await actions.setInventorySlotAction({ installedAppId, player, slot, item: id, count: first });
+        const placed = await actions.setInventorySlotAction({
+            installedAppId,
+            player,
+            slot,
+            item: id,
+            count: first
+        });
         if (placed.error || rest.length === 0) return placed;
         const spare = rest.reduce((sum, stack) => sum + stack, 0);
-        const given = await actions.givePlayerItemAction({ installedAppId, player, item: id, count: spare });
+        const given = await actions.givePlayerItemAction({
+            installedAppId,
+            player,
+            item: id,
+            count: spare
+        });
         if (given.error) return given;
         return placed;
     }
@@ -231,14 +272,58 @@ export function InventoryEditor({
     }
 
     const stuck = items.filter((item) => !isMovable(item));
+    // Somebody who left since the list was drawn is not somebody to send to.
+    const sendTo = recipient !== null && others.includes(recipient) ? recipient : null;
+
+    async function emptyAll(): Promise<void> {
+        const agreed = await confirm({
+            title: `Empty ${player}'s inventory?`,
+            description: live
+                ? "Everything they carry goes, armour and offhand included. This cannot be undone."
+                : "Everything they carry goes when they next join, armour and offhand included. This cannot be undone.",
+            confirmLabel: "Empty inventory",
+            danger: true
+        });
+        if (agreed) run(() => actions.clearPlayerInventoryAction({ installedAppId, player }));
+    }
+
+    async function sendAll(to: string): Promise<void> {
+        const agreed = await confirm({
+            title: `Send everything to ${to}?`,
+            description: `Every stack ${player} carries moves to ${to}, a stack at a time. What does not fit in ${to}'s bag lands at their feet.`,
+            confirmLabel: "Send everything"
+        });
+        if (!agreed) return;
+        run(async () => {
+            const result = await actions.transferInventoryAction({
+                installedAppId,
+                from: player,
+                to
+            });
+            if (result.error) return { error: result.error };
+            const moved = result.moved ?? 0;
+            const kept = result.kept ?? 0;
+            return {
+                note:
+                    `Sent ${moved} ${moved === 1 ? "stack" : "stacks"} to ${to}.` +
+                    (kept > 0 ? ` ${kept} stayed with ${player}.` : "")
+            };
+        });
+    }
 
     return (
         <div className="flex flex-col gap-4 lg:flex-row">
+            {confirmElement}
             <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={live ? "success" : undefined}>{live ? "Live" : "From a copy"}</Badge>
+                    <Badge variant={live ? "success" : undefined}>
+                        {live ? "Live" : "From a copy"}
+                    </Badge>
                     {!live && reading?.takenAt && (
-                        <span className="text-xs text-muted-foreground" title={display.dateTime(reading.takenAt)}>
+                        <span
+                            className="text-xs text-muted-foreground"
+                            title={display.dateTime(reading.takenAt)}
+                        >
                             kept {ago(reading.takenAt)}
                         </span>
                     )}
@@ -271,8 +356,9 @@ export function InventoryEditor({
                             <>This is the last copy Polaris kept. Nothing in it can be moved,</>
                         ) : (
                             <>
-                                Polaris has no copy of their bag yet - one is kept every ten minutes while they play -
-                                so it is drawn empty. Nothing can be moved out of it,
+                                Polaris has no copy of their bag yet - one is kept every ten minutes
+                                while they play - so it is drawn empty. Nothing can be moved out of
+                                it,
                             </>
                         )}{" "}
                         but an item dropped onto a slot is saved and given to them when they join.
@@ -287,11 +373,14 @@ export function InventoryEditor({
                     <InventoryGrid
                         items={items}
                         pending={queuedSlots}
-                        onCancelPending={(id) => run(() => actions.cancelQueuedActionAction(installedAppId, id))}
+                        onCancelPending={(id) =>
+                            run(() => actions.cancelQueuedActionAction(installedAppId, id))
+                        }
                         {...(editable
                             ? {
                                   handlers: {
-                                      onPick: (slot) => setHeld(slot === null ? null : { kind: "slot", slot }),
+                                      onPick: (slot) =>
+                                          setHeld(slot === null ? null : { kind: "slot", slot }),
                                       onDropAt: dropOn,
                                       ...(live ? { onSplit: split } : {}),
                                       dragging: held?.kind === "slot" ? held.slot : null
@@ -313,18 +402,20 @@ export function InventoryEditor({
                     // looks exactly like a complete one, and somebody checking what
                     // a player is carrying would believe it.
                     <p className="text-xs text-warning">
-                        {reading?.unreadable} {reading?.unreadable === 1 ? "stack was" : "stacks were"} too large for
-                        the server to hand over in one reply, so {reading?.unreadable === 1 ? "it is" : "they are"}{" "}
-                        not drawn here.
+                        {reading?.unreadable}{" "}
+                        {reading?.unreadable === 1 ? "stack was" : "stacks were"} too large for the
+                        server to hand over in one reply, so{" "}
+                        {reading?.unreadable === 1 ? "it is" : "they are"} not drawn here.
                     </p>
                 )}
                 {stuck.length > 0 && (
                     // Named rather than left as slots that silently refuse to be
                     // picked up, which reads as the page being broken.
                     <p className="text-xs text-muted-foreground">
-                        {stuck.length} {stuck.length === 1 ? "stack carries" : "stacks carry"} data Polaris cannot
-                        write back exactly, so {stuck.length === 1 ? "it cannot" : "they cannot"} be moved without
-                        losing it.
+                        {stuck.length} {stuck.length === 1 ? "stack carries" : "stacks carry"} data
+                        Polaris cannot write back exactly, so{" "}
+                        {stuck.length === 1 ? "it cannot" : "they cannot"} be moved without losing
+                        it.
                     </p>
                 )}
 
@@ -333,8 +424,13 @@ export function InventoryEditor({
                         <p className="text-xs font-medium">Also waiting for {player}</p>
                         <ul className="flex flex-col gap-0.5">
                             {queuedElsewhere.map((entry) => (
-                                <li key={entry.id} className="flex items-center justify-between gap-2 text-xs">
-                                    <span className="truncate text-muted-foreground">{describeQueued(entry)}</span>
+                                <li
+                                    key={entry.id}
+                                    className="flex items-center justify-between gap-2 text-xs"
+                                >
+                                    <span className="truncate text-muted-foreground">
+                                        {describeQueued(entry)}
+                                    </span>
                                     <button
                                         type="button"
                                         disabled={pending}
@@ -342,7 +438,12 @@ export function InventoryEditor({
                                         aria-label={`Cancel ${describeQueued(entry)} for ${player}`}
                                         className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
                                         onClick={() =>
-                                            run(() => actions.cancelQueuedActionAction(installedAppId, entry.id))
+                                            run(() =>
+                                                actions.cancelQueuedActionAction(
+                                                    installedAppId,
+                                                    entry.id
+                                                )
+                                            )
                                         }
                                     >
                                         <X className="size-3.5" />
@@ -359,7 +460,9 @@ export function InventoryEditor({
             </div>
 
             <div className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
-                <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Items</span>
+                <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                    Items
+                </span>
                 {/* Dragged onto a slot rather than clicked into one: the whole
                     point of the grid is that the operator picks where it lands.
                     The two buttons under it are for when they do not care. */}
@@ -371,7 +474,10 @@ export function InventoryEditor({
                         onQueryChange={setQuery}
                         onSelect={setPicked}
                         {...(editable
-                            ? { onDragItem: (id) => setHeld(id === null ? null : { kind: "palette", id }) }
+                            ? {
+                                  onDragItem: (id) =>
+                                      setHeld(id === null ? null : { kind: "palette", id })
+                              }
                             : {})}
                     />
                 </div>
@@ -385,15 +491,20 @@ export function InventoryEditor({
                         aria-label="How many"
                         className="w-20"
                         onChange={(event) =>
-                            setAmount(Math.max(1, Math.min(MOST_THAT_FITS, Number(event.target.value) || 1)))
+                            setAmount(
+                                Math.max(
+                                    1,
+                                    Math.min(MOST_THAT_FITS, Number(event.target.value) || 1)
+                                )
+                            )
                         }
                     />
                     <span className="text-xs text-muted-foreground">at a time</span>
                 </div>
                 {picked && amount > maxStackFor(picked) && (
                     <p className="text-xs text-muted-foreground">
-                        {stacksFor(picked, amount).length} stacks. One lands where you drop it and the rest go into the
-                        bag.
+                        {stacksFor(picked, amount).length} stacks. One lands where you drop it and
+                        the rest go into the bag.
                     </p>
                 )}
 
@@ -405,7 +516,12 @@ export function InventoryEditor({
                         onClick={() =>
                             picked &&
                             run(() =>
-                                actions.givePlayerItemAction({ installedAppId, player, item: picked, count: amount })
+                                actions.givePlayerItemAction({
+                                    installedAppId,
+                                    player,
+                                    item: picked,
+                                    count: amount
+                                })
                             )
                         }
                     >
@@ -420,7 +536,12 @@ export function InventoryEditor({
                         onClick={() =>
                             picked &&
                             run(() =>
-                                actions.clearPlayerItemAction({ installedAppId, player, item: picked, count: amount })
+                                actions.clearPlayerItemAction({
+                                    installedAppId,
+                                    player,
+                                    item: picked,
+                                    count: amount
+                                })
                             )
                         }
                     >
@@ -442,7 +563,13 @@ export function InventoryEditor({
                             const carrying = held;
                             setHeld(null);
                             if (carrying?.kind !== "slot") return;
-                            run(() => actions.clearInventorySlotAction(installedAppId, player, carrying.slot));
+                            run(() =>
+                                actions.clearInventorySlotAction(
+                                    installedAppId,
+                                    player,
+                                    carrying.slot
+                                )
+                            );
                         }}
                         className={cn(
                             "flex items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-xs transition-colors",
@@ -455,6 +582,79 @@ export function InventoryEditor({
                         Drop a stack here to take it away
                     </div>
                 )}
+
+                {editable && live && (
+                    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+                        <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                            Send to another player
+                        </span>
+                        {others.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                Nobody else is on the server to send to.
+                            </p>
+                        ) : (
+                            <>
+                                <Select
+                                    aria-label="Player to send to"
+                                    placeholder="Choose a player"
+                                    value={sendTo ?? ""}
+                                    onValueChange={(value) => setRecipient(value || null)}
+                                    options={others.map((name) => ({ value: name, label: name }))}
+                                />
+                                <div
+                                    onDragOver={(event) => event.preventDefault()}
+                                    onDrop={(event) => {
+                                        event.preventDefault();
+                                        const carrying = held;
+                                        setHeld(null);
+                                        if (carrying?.kind !== "slot" || !sendTo) return;
+                                        const source = slots.get(carrying.slot) ?? null;
+                                        run(() =>
+                                            actions.transferStackAction({
+                                                installedAppId,
+                                                from: player,
+                                                to: sendTo,
+                                                slot: carrying.slot,
+                                                expected: source
+                                            })
+                                        );
+                                    }}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-xs transition-colors",
+                                        held?.kind === "slot" && sendTo
+                                            ? "border-primary bg-primary/10 text-foreground"
+                                            : "border-border text-muted-foreground"
+                                    )}
+                                >
+                                    <Send className="size-4" />
+                                    {sendTo
+                                        ? `Drop a stack here to send it to ${sendTo}`
+                                        : "Choose a player, then drop a stack here"}
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={!sendTo || pending || items.length === 0}
+                                    onClick={() => sendTo && void sendAll(sendTo)}
+                                >
+                                    <Send className="size-4" />
+                                    {sendTo ? `Send everything to ${sendTo}` : "Send everything"}
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending || (live && items.length === 0)}
+                    className="text-danger hover:text-danger"
+                    onClick={() => void emptyAll()}
+                >
+                    <Eraser className="size-4" />
+                    {live ? "Empty inventory" : "Empty it when they join"}
+                </Button>
                 {pending && <Skeleton className="h-1 w-full" />}
             </div>
         </div>

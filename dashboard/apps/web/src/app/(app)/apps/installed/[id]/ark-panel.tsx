@@ -336,7 +336,10 @@ export function ArkPanel({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <ScrollRow as="nav" className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm">
+            <ScrollRow
+                as="nav"
+                className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm"
+            >
                 {tabs.map((entry) => (
                     <a
                         key={entry.slug}
@@ -463,7 +466,8 @@ export function ArkPanel({
                     <MinecraftSettings
                         installedAppId={installedAppId}
                         settings={settings.filter(
-                            (setting) => setting.group !== SECURITY_GROUP && setting.group !== MODS_GROUP
+                            (setting) =>
+                                setting.group !== SECURITY_GROUP && setting.group !== MODS_GROUP
                         )}
                         playersOnline={status?.players.length ?? 0}
                         running={isRunning}
@@ -1069,7 +1073,9 @@ function PlayersTab({
         // Normally already in hand - see the warm-up above. This is the second
         // chance for a tab where that failed, and it costs nothing when it did not.
         if (dialog === "give" && recentItems.length === 0) {
-            void actions.recentArkItemsAction(installedAppId).then((answer) => setRecentItems(answer.items));
+            void actions
+                .recentArkItemsAction(installedAppId)
+                .then((answer) => setRecentItems(answer.items));
         }
     }
 
@@ -1160,6 +1166,9 @@ function PlayersTab({
                     <ArkPlayerRow
                         key={entry.steamId}
                         entry={entry}
+                        linkedName={
+                            entry.userId ? (access?.accounts?.[entry.userId] ?? null) : null
+                        }
                         live={status !== null}
                         canModerate={canModerate}
                         canManage={canManage}
@@ -1173,7 +1182,8 @@ function PlayersTab({
                         admin={admins.includes(entry.steamId)}
                         onAdmin={(next) =>
                             run(
-                                () => actions.setArkAdminAction(installedAppId, entry.steamId, next),
+                                () =>
+                                    actions.setArkAdminAction(installedAppId, entry.steamId, next),
                                 next
                                     ? `${entry.name} administers this server from its next start.`
                                     : `${entry.name} stops administering it at its next start.`
@@ -1210,7 +1220,8 @@ function PlayersTab({
                         onKill={() =>
                             void confirm({
                                 title: `Kill ${entry.name}?`,
-                                description: "Their survivor dies where they are standing and drops everything they were carrying. The body can be looted by anybody who reaches it first.",
+                                description:
+                                    "Their survivor dies where they are standing and drops everything they were carrying. The body can be looted by anybody who reaches it first.",
                                 confirmLabel: "Kill them",
                                 danger: true
                             }).then((agreed) => {
@@ -1231,7 +1242,8 @@ function PlayersTab({
                         onStrip={() =>
                             void confirm({
                                 title: `Empty ${entry.name}'s inventory?`,
-                                description: "Everything they are carrying, wearing and holding in a slot is destroyed rather than dropped. There is no undo.",
+                                description:
+                                    "Everything they are carrying, wearing and holding in a slot is destroyed rather than dropped. There is no undo.",
                                 confirmLabel: "Empty it",
                                 danger: true
                             }).then((agreed) => {
@@ -1244,7 +1256,8 @@ function PlayersTab({
                                                 "strip"
                                             ),
                                         "Sent to the server.",
-                                        (reason) => `${entry.name}'s inventory was left alone: ${reason}`
+                                        (reason) =>
+                                            `${entry.name}'s inventory was left alone: ${reason}`
                                     );
                                 }
                             })
@@ -1302,8 +1315,8 @@ function PlayersTab({
             />
 
             <p className="text-xs text-muted-foreground">
-                Enforcing the list takes effect the next time the server starts, and is on top of the
-                join password. Adding and removing somebody reaches a running server at once.
+                Enforcing the list takes effect the next time the server starts, and is on top of
+                the join password. Adding and removing somebody reaches a running server at once.
             </p>
 
             <p className="text-xs text-muted-foreground">
@@ -1312,8 +1325,8 @@ function PlayersTab({
                 next restart. Levels come from each survivor&apos;s own file, so somebody who has
                 never played here has none - and neither has anybody the server has no file for,
                 which is what a dash in that column means. When they were last on is Polaris&apos;
-                own record: ARK can say who is connected this second and nothing about a minute
-                ago, so it starts from the day Polaris first watched this server.
+                own record: ARK can say who is connected this second and nothing about a minute ago,
+                so it starts from the day Polaris first watched this server.
             </p>
 
             <p className="text-xs text-muted-foreground">
@@ -1334,7 +1347,18 @@ function PlayersTab({
 
             {acting?.dialog === "player" && (
                 <ArkPlayerDialog
-                    player={target ? { steamId: target.steamId, label: target.name } : null}
+                    player={
+                        target
+                            ? {
+                                  steamId: target.steamId,
+                                  label: target.name,
+                                  userId: target.userId,
+                                  linkedName: target.userId
+                                      ? (access?.accounts?.[target.userId] ?? null)
+                                      : null
+                              }
+                            : null
+                    }
                     pending={pending}
                     error={dialogError}
                     onClose={() => setActing(null)}
@@ -1345,7 +1369,8 @@ function PlayersTab({
                                 actions.addArkPlayerAction(
                                     installedAppId,
                                     input.steamId,
-                                    input.label
+                                    input.label,
+                                    input.userId
                                 ),
                             target ? undefined : "Added. The server is told as soon as it answers."
                         )
@@ -1382,9 +1407,7 @@ function PlayersTab({
                         // In front of the list before the server has been asked,
                         // so the next give opens on what was just handed out.
                         const keys = lines.map((line) => line.key);
-                        setRecentItems((was) =>
-                            [...new Set([...keys, ...was])].slice(0, 12)
-                        );
+                        setRecentItems((was) => [...new Set([...keys, ...was])].slice(0, 12));
                         runOptimistic(
                             () =>
                                 actions.giveArkItemsAction({
@@ -1528,6 +1551,7 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
  */
 function ArkPlayerRow({
     entry,
+    linkedName,
     live: read,
     canModerate,
     canManage,
@@ -1553,6 +1577,8 @@ function ArkPlayerRow({
     onTimeout
 }: {
     entry: ArkPlayerEntry;
+    /** What Polaris calls the account this player follows, when they follow one. */
+    linkedName: string | null;
     /** Whether the server has been asked yet who is on it. Before that nobody is
      *  offline - they are simply not known about, and a grey "Offline" against a
      *  name that is playing is worse than saying nothing. */
@@ -1609,7 +1635,9 @@ function ArkPlayerRow({
                     {/* The same mark the Minecraft table puts against an operator,
                         because it is the same thing: somebody who may do anything
                         on this server. */}
-                    {admin && <Crown className="size-3.5 text-warning" role="img" aria-label="Admin" />}
+                    {admin && (
+                        <Crown className="size-3.5 text-warning" role="img" aria-label="Admin" />
+                    )}
                     {entry.name}
                 </p>
                 {/* The name they gave their survivor, when it is not the Steam name
@@ -1688,7 +1716,24 @@ function ArkPlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {entry.standing === "allowed" && <Badge variant="primary">{playerStanding.allowed}</Badge>}
+                    {entry.userId && (
+                        <Badge
+                            title={`Let in only while ${linkedName ?? "their Polaris account"} is signed in to Polaris`}
+                        >
+                            linked
+                        </Badge>
+                    )}
+                    {entry.held && (
+                        <Badge
+                            variant="warning"
+                            title={`${linkedName ?? "Their Polaris account"} is not signed in anywhere, so the server refuses them.`}
+                        >
+                            signed out
+                        </Badge>
+                    )}
+                    {entry.standing === "allowed" && !entry.held && (
+                        <Badge variant="primary">{playerStanding.allowed}</Badge>
+                    )}
                     {entry.standing === "waiting" && (
                         <Badge title="Recorded here. The server is told as soon as it answers.">
                             <Clock className="size-3" /> {playerStanding.waiting}
@@ -1706,7 +1751,10 @@ function ArkPlayerRow({
                         list to itself, so a permanent one leaves nothing to show;
                         a timeout is Polaris' own note and says when it lifts. */}
                     {timeout && (
-                        <Badge variant="danger" title={`Lifts ${new Date(timeout.until).toLocaleString()}`}>
+                        <Badge
+                            variant="danger"
+                            title={`Lifts ${new Date(timeout.until).toLocaleString()}`}
+                        >
                             <Timer className="size-3" />
                             timed out, {timeoutRemaining(timeout.until)}
                         </Badge>
@@ -1795,7 +1843,9 @@ function ArkPlayerRow({
                                         ) : (
                                             <ShieldPlus className="size-4" />
                                         )}
-                                        {admin ? "Stop them administering it" : "Let them administer it"}
+                                        {admin
+                                            ? "Stop them administering it"
+                                            : "Let them administer it"}
                                     </DropdownMenuItem>
                                 )}
                                 {/* The id is a number, and the question behind it

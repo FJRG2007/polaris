@@ -3455,6 +3455,9 @@ model GamePlayerAccess {
     address        String
     // Why this player is on the list, for whoever reads it in six months.
     note           String?
+    // "manual" for an address somebody typed; "session" for one Polaris keeps in
+    // step with the sign-ins of the Polaris account this player is linked to.
+    source         String   @default("manual")
     createdById    String?  @db.Uuid
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
@@ -3465,6 +3468,25 @@ model GamePlayerAccess {
     @@unique([installedAppId, username, address])
     @@index([installedAppId])
     @@index([installedAppId, username])
+}
+
+// A game server's player tied to a Polaris account.
+//
+// A linked player may only connect from where that account is signed in to
+// Polaris, so their allowed addresses follow its sessions instead of being typed.
+model GamePlayerLink {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // A Minecraft username or gamertag (compared case-insensitively), or an ARK
+    // SteamID64.
+    player         String
+    userId         String   @db.Uuid
+    createdById    String?  @db.Uuid
+    createdAt      DateTime @default(now())
+
+    @@unique([installedAppId, player])
+    @@index([installedAppId])
+    @@index([userId])
 }
 
 // The last inventory Polaris saw a player carrying.
@@ -3487,6 +3509,47 @@ model PlayerInventorySnapshot {
     // When the server was actually asked. Not when the row was written: a sweep
     // that found nothing to do must not make a stale snapshot look fresh.
     takenAt        DateTime
+
+    @@unique([installedAppId, username])
+    @@index([installedAppId])
+}
+
+// A world rule (or the difficulty) as the operator set it from Polaris.
+//
+// This is what the world is meant to be played under, and it wins: a change made
+// while the server is off waits here until the server answers, and a value the
+// game drifted away from is put back the next time Polaris reads it.
+model GameRuleSetting {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    installedAppId String    @db.Uuid
+    // A game rule id from the catalogue, or "difficulty".
+    rule           String
+    value          String
+    setAt          DateTime
+    setById        String?   @db.Uuid
+    // When the server last confirmed it. Null while it is waiting to be applied.
+    appliedAt      DateTime?
+    // Why the server would not take it, when it refused.
+    failure        String?
+
+    @@unique([installedAppId, rule])
+    @@index([installedAppId])
+}
+
+// The last experience level Polaris saw a player on.
+//
+// A level can only be asked of somebody standing on the server, so the column
+// was a dash for everyone offline - which is nearly everyone, most of the time.
+// Kept from the last time they were on, with when that was, so the table says
+// what it knew rather than nothing.
+model GamePlayerStat {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // As the server reported it; looked up case-insensitively.
+    username       String
+    level          Int
+    // When the server was last asked, not when the row was written.
+    levelAt        DateTime
 
     @@unique([installedAppId, username])
     @@index([installedAppId])

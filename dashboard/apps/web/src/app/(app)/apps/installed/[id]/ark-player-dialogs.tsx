@@ -59,18 +59,37 @@ export function ArkPlayerDialog({
     onLookUp
 }: {
     /** The row being edited, or null to add somebody. */
-    player: Pick<ArkAllowedPlayer, "steamId" | "label"> | null;
+    player:
+        | (Pick<ArkAllowedPlayer, "steamId" | "label"> & {
+              userId?: string | null;
+              linkedName?: string | null;
+          })
+        | null;
     pending: boolean;
     error: string | null;
     onClose: () => void;
-    onSave: (input: { steamId: string; label: string }) => void;
+    /** `userId` is the account to follow, null to stop following one, and absent
+     *  to leave it as it is. */
+    onSave: (input: { steamId: string; label: string; userId?: string | null }) => void;
     /** Find somebody by their Polaris name and hand back the Steam account they
      *  linked - its id, and the name they play under on it. Absent on a screen
      *  where nobody may look people up. */
-    onLookUp?: (
-        query: string
-    ) => Promise<{ steamId?: string; name?: string; label?: string; error?: string }>;
+    onLookUp?: (query: string) => Promise<{
+        userId?: string;
+        steamId?: string;
+        name?: string;
+        label?: string;
+        error?: string;
+    }>;
 }) {
+    /** The Polaris account the player follows, or would. */
+    const [account, setAccount] = useState<{ userId: string; name: string } | null>(
+        player?.userId
+            ? { userId: player.userId, name: player.linkedName ?? "their account" }
+            : null
+    );
+    /** Whether they are let in only while that account is signed in. */
+    const [follow, setFollow] = useState(Boolean(player?.userId) || player === null);
     const editing = player !== null;
     const [steamId, setSteamId] = useState(player?.steamId ?? "");
     // The label falls back to the id itself when nobody gave one, and showing that
@@ -100,6 +119,7 @@ export function ArkPlayerDialog({
                 return;
             }
             setSteamId(found.steamId);
+            if (found.userId) setAccount({ userId: found.userId, name: found.name ?? identifier });
             // The name on their Steam account, which is what ARK knows them as.
             // Their Polaris name is somebody else's word for the same person and
             // would leave the list disagreeing with the server.
@@ -120,7 +140,19 @@ export function ArkPlayerDialog({
             pending={pending}
             error={error}
             onClose={onClose}
-            onConfirm={() => onSave({ steamId: trimmed, label: label.trim() })}
+            onConfirm={() =>
+                onSave({
+                    steamId: trimmed,
+                    label: label.trim(),
+                    // Only said when something was decided: following the account
+                    // found, or no longer following the one they had.
+                    ...(account && follow
+                        ? { userId: account.userId }
+                        : player?.userId
+                          ? { userId: null }
+                          : {})
+                })
+            }
         >
             {!editing && onLookUp && (
                 <PlayerFormField
@@ -176,6 +208,23 @@ export function ArkPlayerDialog({
                     aria-label="Steam id"
                 />
             </PlayerFormField>
+            {account && (
+                <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+                    <div className="min-w-0">
+                        <p className="text-sm">Only while {account.name} is signed in to Polaris</p>
+                        <p className="text-xs text-muted-foreground">
+                            ARK does not say where a player connects from, so this checks the
+                            account instead: when it is signed in nowhere, the server refuses them.
+                        </p>
+                    </div>
+                    <Switch
+                        aria-label={`Only while ${account.name} is signed in to Polaris`}
+                        checked={follow}
+                        onChange={setFollow}
+                    />
+                </div>
+            )}
+
             <PlayerFormField
                 label="Name"
                 hint="The name they play under on Steam. Only Polaris sees it - the server shows whoever is on."

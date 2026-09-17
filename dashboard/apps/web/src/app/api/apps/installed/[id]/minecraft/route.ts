@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { readLastSeen } from "@/lib/apps/games-activity-service";
@@ -6,6 +6,7 @@ import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "@/lib/apps/minecraft/queue-service";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { rememberRoster, rememberedRoster } from "@/lib/apps/minecraft/roster-memory";
+import { rememberLevels, rememberedLevels } from "@/lib/apps/minecraft/level-memory";
 import { readPlayerTimeouts, sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { enforcePlayerAddresses, listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import {
@@ -28,7 +29,10 @@ export const dynamic = "force-dynamic";
  *  the operator makes the forward with this page open, and the answer has to reach
  *  them without a reload. The knock behind it is rate limited in `probeReach`, so
  *  the five-second poll costs one attempt every thirty seconds. */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     // Resolved once, here: the reads below all run on the owner's shelf, and this
     // is what decides whether the caller may see any of it. Named `server` because
@@ -56,14 +60,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // Named rather than destructured by position: this list has grown twice,
         // and a name that silently slid onto its neighbour's result is what shipped
         // the enforcement report to the screen as if it were the session history.
+        const online = status.answering ? status.players.players : [];
         const gathered = await Promise.all([
             wantsRoster && status.answering ? getServerRoster(server.ownerId, id) : null,
             wantsRoster ? getServerFirewall(server.ownerId, id).catch(() => null) : null,
-            // Opening the moderation screen is also when the list gets applied to
-            // whoever is already on. The cron does this on its own schedule; a
-            // deployment without cron configured would otherwise have rules that
-            // only ever took effect on the next join. Nothing reads the report.
-            wantsRoster ? enforcePlayerAddresses(server.ownerId, id).catch(() => null) : null,
+            // What level each of them is on. Only for the screen that has a
+            // column for it, and only for players who are actually standing on
+            // the server - it is one command each, and nobody who is offline has
+            // an answer. Beside the roster rather than after it, so the table is
+            // not held for one read behind the other.
+            wantsRoster && online.length > 0
+                ? getPlayerLevels(server.ownerId, id, online).catch(() => ({}))
+                : ({} as Record<string, number>),
             // Who arrived and who left, which only the log records. Gathered for
             // the screen that shows it, like the roster - and unlike the roster it
             // survives a server that has stopped answering, because a history is
@@ -75,7 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // that grants them is also when the due ones are lifted.
             wantsRoster && status.answering ? sweepTimeouts(server.ownerId, id).catch(() => 0) : 0
         ] as const);
-        const [live, firewall] = gathered;
+        const [live, firewall, levels] = gathered;
         const sessions = gathered[3];
         /*
          * What the server last said about who may play on it.
@@ -90,10 +98,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
          * are gated on whether the server is answering, not on whether a roster
          * arrived.
          */
-        if (live) await rememberRoster(id, live).catch(() => undefined);
-        const kept = wantsRoster && !live ? await rememberedRoster(id).catch(() => null) : null;
+        const [kept, timeouts, lastLevels, pending] = await Promise.all([
+            wantsRoster && !live ? rememberedRoster(id).catch(() => null) : null,
+            wantsRoster ? readPlayerTimeouts(id).catch(() => []) : [],
+            // The level each of them was last seen on, for the rows of players
+            // who are not on right now.
+            wantsRoster ? rememberedLevels(id).catch(() => ({})) : {},
+            wantsRoster ? pendingFor(id).catch(() => []) : []
+        ]);
         const roster = live ?? kept?.roster ?? null;
-        const timeouts = wantsRoster ? await readPlayerTimeouts(id).catch(() => []) : [];
         // When Polaris last watched each of them, for the rows the log no longer
         // reaches back to: it holds only the tail that was asked for and starts
         // again empty every time the container is replaced, so a regular who has
@@ -115,40 +128,44 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
               ).catch(() => ({}))
             : {};
 
-        // Two passes that only cost anything when there is something to do, so
-        // they can ride on a five-second poll: one indexed query each says no.
-        //
-        // The queue is drained here as well as from the cron because a decision
-        // waiting for somebody to join should land while an operator is watching
-        // the screen that told them to wait - and on an instance with no cron
-        // configured, this is the only place it ever would.
-        //
-        // The snapshot is guarded by each row's own age, so it reads a bag every
-        // ten minutes rather than every poll.
-        const online = status.answering ? status.players.players : [];
-        if (online.length > 0) {
-            await drainQueue(server.ownerId, id, online).catch(() => null);
-            await sweepInventorySnapshots(server.ownerId, id, online).catch(() => 0);
-        }
-        // What level each of them is on. Only for the screen that has a column for
-        // it, and only for players who are actually standing on the server - it is
-        // one command each, and nobody who is offline has an answer.
-        const levels =
-            wantsRoster && online.length > 0
-                ? await getPlayerLevels(server.ownerId, id, online).catch(() => ({}))
-                : {};
-        const pending = wantsRoster ? await pendingFor(id).catch(() => []) : [];
-        // The schedule, on the server it belongs to and with the player count this
-        // poll has already paid for. The cron sweeps every server on its own
-        // schedule and the Game servers page sweeps the ones it lists; neither
-        // covers somebody sitting on this page with no cron configured, which is
-        // exactly where "I set a schedule and nothing happened" comes from.
-        await sweepGameSchedules(server.ownerId, new Date(), {
-            only: id,
-            // What this poll already found out, silence included, so the sweep
-            // never asks the same container the same question twice.
-            known: new Map([[id, status.answering ? status.players.online : null]])
-        }).catch(() => undefined);
+        /*
+         * The work this poll triggers but the screen does not wait for.
+         *
+         * Each of these reaches into the container or walks a table, and none of
+         * their results is in the answer - so they run once the answer has been
+         * sent rather than holding it open.
+         *
+         * - The roster and the levels are written down, so the next first paint
+         *   has them before any container is asked.
+         * - Opening the moderation screen is also when the player list gets
+         *   applied to whoever is already on. The cron does this on its own
+         *   schedule; a deployment without cron configured would otherwise have
+         *   rules that only ever took effect on the next join.
+         * - The queue is drained here as well as from the cron because a decision
+         *   waiting for somebody to join should land while an operator is
+         *   watching the screen that told them to wait.
+         * - The inventory snapshot is guarded by each row's own age, so it reads a
+         *   bag every ten minutes rather than every poll.
+         * - The schedule, with the player count this poll has already paid for:
+         *   neither the cron nor the Game servers page covers somebody sitting on
+         *   this page with no cron configured.
+         */
+        after(async () => {
+            if (live) await rememberRoster(id, live).catch(() => undefined);
+            if (Object.keys(levels).length > 0)
+                await rememberLevels(id, levels).catch(() => undefined);
+            if (wantsRoster) await enforcePlayerAddresses(server.ownerId, id).catch(() => null);
+            if (online.length > 0) {
+                await drainQueue(server.ownerId, id, online).catch(() => null);
+                await sweepInventorySnapshots(server.ownerId, id, online).catch(() => 0);
+            }
+            await sweepGameSchedules(server.ownerId, new Date(), {
+                only: id,
+                // What this poll already found out, silence included, so the
+                // sweep never asks the same container the same question twice.
+                known: new Map([[id, status.answering ? status.players.online : null]])
+            }).catch(() => undefined);
+        });
         // The log's timestamps are the server's, so the clock they are read
         // against has to be too - a browser minutes out would otherwise report
         // somebody as still arriving long after they left.
@@ -165,6 +182,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             seen,
             timeouts,
             levels,
+            lastLevels,
             pending,
             now: new Date().toISOString()
         });

@@ -52,20 +52,24 @@ describe("a join password", () => {
     it("mints one that its own check accepts", () => {
         // The same source of randomness on both sides, so this is the generator
         // and the validator agreeing rather than a fixed string.
-        const password = access.generateJoinPassword((size) => new Uint8Array(Array.from({ length: size }, (_, i) => i * 7)));
+        const password = access.generateJoinPassword(
+            (size) => new Uint8Array(Array.from({ length: size }, (_, i) => i * 7))
+        );
         expect(access.isJoinPassword(password)).toBe(true);
     });
 });
 
 describe("the closed-server flag", () => {
     it("is added without disturbing the options somebody else set", () => {
-        expect(access.withExclusiveJoin("-PreventHibernation", true)).toBe("-PreventHibernation -exclusivejoin");
+        expect(access.withExclusiveJoin("-PreventHibernation", true)).toBe(
+            "-PreventHibernation -exclusivejoin"
+        );
     });
 
     it("is taken out without taking the rest with it", () => {
-        expect(access.withExclusiveJoin("-PreventHibernation -exclusivejoin -NoBattlEye", false)).toBe(
-            "-PreventHibernation -NoBattlEye"
-        );
+        expect(
+            access.withExclusiveJoin("-PreventHibernation -exclusivejoin -NoBattlEye", false)
+        ).toBe("-PreventHibernation -NoBattlEye");
     });
 
     it("is never added twice", () => {
@@ -81,7 +85,11 @@ describe("the closed-server flag", () => {
 
 describe("the allow list", () => {
     it("reads back what was written to the install", () => {
-        const list = access.withPlayer([], { steamId: ALICE, label: "Alice" }, "2026-01-01T00:00:00.000Z");
+        const list = access.withPlayer(
+            [],
+            { steamId: ALICE, label: "Alice" },
+            "2026-01-01T00:00:00.000Z"
+        );
         expect(access.readAllowList({ [access.ALLOW_LIST_KEY]: list })).toEqual(list);
     });
 
@@ -113,7 +121,71 @@ describe("the allow list", () => {
     });
 
     it("takes somebody off without touching anybody else", () => {
-        const list = access.withPlayer(access.withPlayer([], { steamId: ALICE, label: "Alice" }, "t"), { steamId: BOB, label: "Bob" }, "t");
+        const list = access.withPlayer(
+            access.withPlayer([], { steamId: ALICE, label: "Alice" }, "t"),
+            { steamId: BOB, label: "Bob" },
+            "t"
+        );
         expect(access.withoutPlayer(list, ALICE).map((entry) => entry.steamId)).toEqual([BOB]);
+    });
+});
+
+describe("a player tied to a Polaris account", () => {
+    const ACCOUNT = "0190c1d2-0000-7000-8000-00000000000a";
+    const now = "2026-09-17T10:00:00.000Z";
+    const told = (steamId: string, extra: Partial<access.ArkAllowedPlayer> = {}) => ({
+        steamId,
+        label: steamId,
+        addedAt: now,
+        appliedAt: now,
+        userId: null,
+        held: false,
+        ...extra
+    });
+
+    it("is kept through a read of the stored list", () => {
+        const list = access.readAllowList({
+            [access.ALLOW_LIST_KEY]: [
+                { steamId: ALICE, label: "Alice", userId: ACCOUNT, held: true },
+                { steamId: BOB, label: "Bob", userId: "not-an-id" }
+            ]
+        });
+        expect(list[0]).toMatchObject({ userId: ACCOUNT, held: true });
+        expect(list[1]).toMatchObject({ userId: null, held: false });
+    });
+
+    it("is let in only while the account is signed in", () => {
+        const list = [
+            told(ALICE, { userId: ACCOUNT, appliedAt: null }),
+            told(BOB, { appliedAt: null })
+        ];
+        expect(access.gateDecisions(list, new Set())).toEqual({ allow: [BOB], hold: [] });
+        expect(access.gateDecisions(list, new Set([ACCOUNT]))).toEqual({
+            allow: [ALICE, BOB],
+            hold: []
+        });
+    });
+
+    it("is refused once the account signs out, and let back in when it returns", () => {
+        const allowed = [told(ALICE, { userId: ACCOUNT })];
+        expect(access.gateDecisions(allowed, new Set())).toEqual({ allow: [], hold: [ALICE] });
+
+        const refused = [told(ALICE, { userId: ACCOUNT, held: true })];
+        expect(access.gateDecisions(refused, new Set())).toEqual({ allow: [], hold: [] });
+        expect(access.gateDecisions(refused, new Set([ACCOUNT]))).toEqual({
+            allow: [ALICE],
+            hold: []
+        });
+    });
+
+    it("is handed over again when unlinked while refused", () => {
+        const refused = [told(ALICE, { userId: ACCOUNT, held: true })];
+        const unlinked = access.withPlayer(
+            refused,
+            { steamId: ALICE, label: "", userId: null },
+            now
+        );
+        expect(unlinked[0]).toMatchObject({ userId: null, held: false, appliedAt: null });
+        expect(access.gateDecisions(unlinked, new Set())).toEqual({ allow: [ALICE], hold: [] });
     });
 });

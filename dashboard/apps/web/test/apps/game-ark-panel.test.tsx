@@ -47,17 +47,36 @@ function context(overrides: Partial<GameContext> = {}): GameContext {
         suffix: "ark.example.com",
         address: "los-payasos-gaming.ark.example.com:19133",
         iconSetAt: null,
-        schedule: { enabled: false, timezone: "UTC", otherwise: "on", idleMinutes: 30, windows: [] },
+        schedule: {
+            enabled: false,
+            timezone: "UTC",
+            otherwise: "on",
+            idleMinutes: 30,
+            windows: []
+        },
         scheduleState: { checkedAt: null, emptySince: null },
         playerAccess: null,
+        rosterMemory: null,
+        lastLevels: {},
+        login: null,
         gamePort: 19133,
         queryPort: 19135,
         arkAccess: {
             closed: true,
             logging: true,
             players: [
-                { steamId: "76561198000000001", label: "Pau", addedAt: "2026-08-10T10:00:00.000Z", appliedAt: "2026-08-10T10:01:00.000Z" },
-                { steamId: "76561198000000002", label: "Ana", addedAt: "2026-08-10T10:00:00.000Z", appliedAt: null }
+                {
+                    steamId: "76561198000000001",
+                    label: "Pau",
+                    addedAt: "2026-08-10T10:00:00.000Z",
+                    appliedAt: "2026-08-10T10:01:00.000Z"
+                },
+                {
+                    steamId: "76561198000000002",
+                    label: "Ana",
+                    addedAt: "2026-08-10T10:00:00.000Z",
+                    appliedAt: null
+                }
             ]
         },
         ...overrides

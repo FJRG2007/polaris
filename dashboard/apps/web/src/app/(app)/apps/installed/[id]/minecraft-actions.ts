@@ -77,18 +77,23 @@ import {
 } from "@/lib/apps/catalog";
 import {
     readRulesFor,
+    recordDifficulty,
+    storedRulesFor,
     rememberDifficulty,
     setWorldDifficulty,
     setWorldRule,
     type WorldRules
 } from "@/lib/apps/minecraft/rules-service";
 import {
+    clearInventory,
     clearItem,
     clearSlot,
     giveItem,
     giveToSlot,
     moveStack,
-    recentlyGivenItems
+    recentlyGivenItems,
+    transferInventory,
+    transferStack
 } from "@/lib/apps/minecraft/item-service";
 import {
     applyFirewallBans,
@@ -895,7 +900,13 @@ export async function grantPlayerAccessAction(
 export async function findMinecraftPlayerByUserAction(
     installedAppId: string,
     query: string
-): Promise<{ username?: string; name?: string; addresses?: string[]; error?: string }> {
+): Promise<{
+    userId?: string;
+    username?: string;
+    name?: string;
+    addresses?: string[];
+    error?: string;
+}> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
     if (!parsed.success) return { error: "Type a Polaris username or email address" };
     try {
@@ -903,17 +914,91 @@ export async function findMinecraftPlayerByUserAction(
         const found = await findGameIdentity(parsed.data, "minecraft");
         if (!found)
             return { error: "Nobody here goes by that. Check the username or the email address." };
-        if (!found.identity) {
-            return {
-                error: `${found.name} has not linked a Minecraft account yet. They can do it under Connected accounts.`
-            };
-        }
         // Only the ones a rule can be written against. A session that arrived
         // over something this build cannot parse is not an address to offer.
         const addresses = (await userSessionAddresses(found.userId)).filter(isAddressRule);
-        return { username: found.identity.label, name: found.name, addresses };
+        // Somebody who has not linked Minecraft can still be tied to a name the
+        // operator types, so the account comes back either way.
+        return {
+            userId: found.userId,
+            name: found.name,
+            addresses,
+            ...(found.identity ? { username: found.identity.label } : {})
+        };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not look that up" };
+    }
+}
+
+const linkSchema = z.object({
+    installedAppId: z.string().uuid(),
+    username: z.string().trim().min(1).max(16),
+    userId: z.string().uuid()
+});
+
+/**
+ * Tie a player to a Polaris account, so they may connect only from where that
+ * account is signed in to Polaris.
+ */
+export async function linkPlayerAccountAction(
+    input: z.infer<typeof linkSchema>
+): Promise<{ error?: string }> {
+    const parsed = linkSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        await playerAccess.linkPlayerAccount(access.ownerId, parsed.data.installedAppId, user.id, {
+            username: parsed.data.username,
+            userId: parsed.data.userId
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.player-link",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.username, userId: parsed.data.userId }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not link that player" };
+    }
+}
+
+/** Untie a player from their Polaris account. */
+export async function unlinkPlayerAccountAction(
+    installedAppId: string,
+    username: string
+): Promise<{ error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), username: z.string().trim().min(1).max(16) })
+        .safeParse({ installedAppId, username });
+    if (!parsed.success) return { error: "That player is not on this server" };
+    try {
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        await playerAccess.unlinkPlayerAccount(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.username
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.player-unlink",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.username }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not unlink that player" };
     }
 }
 
@@ -1789,6 +1874,11 @@ export async function updateServerSettingsAction(
         if (restart && difficulty && isDifficulty(difficulty)) {
             await rememberDifficulty(parsed.data.installedAppId, difficulty);
         }
+        // Either way it is now the difficulty the world should be played under,
+        // and the rules pass would otherwise put back the one set before it.
+        if (difficulty && isDifficulty(difficulty)) {
+            await recordDifficulty(parsed.data.installedAppId, difficulty, user.id);
+        }
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
@@ -1816,6 +1906,23 @@ export async function readWorldRulesAction(
 }
 
 /**
+ * The rules as Polaris has them, without asking the server - what the screen
+ * paints with before the live read answers.
+ */
+export async function storedWorldRulesAction(
+    installedAppId: string
+): Promise<{ rules?: WorldRules; error?: string }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: "That server does not exist" };
+    try {
+        await requireGameServer("games.read", parsed.data);
+        return { rules: await storedRulesFor(parsed.data) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the rules" };
+    }
+}
+
+/**
  * Change one rule while the server keeps running.
  *
  * Deliberately not a form with a Save button: every rule here takes effect the
@@ -1827,7 +1934,7 @@ export async function setWorldRuleAction(
     installedAppId: string,
     rule: string,
     value: string
-): Promise<{ value?: string; error?: string }> {
+): Promise<{ value?: string; queued?: boolean; error?: string }> {
     const parsed = z
         .object({
             installedAppId: z.string().uuid(),
@@ -1845,16 +1952,17 @@ export async function setWorldRuleAction(
             access.ownerId,
             parsed.data.installedAppId,
             parsed.data.rule,
-            parsed.data.value
+            parsed.data.value,
+            user.id
         );
         await recordAudit({
             actorId: user.id,
             action: "minecraft.gamerule",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { rule: parsed.data.rule, value: applied }
+            metadata: { rule: parsed.data.rule, value: applied.value, queued: applied.queued }
         });
-        return { value: applied };
+        return { value: applied.value, queued: applied.queued };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change that rule" };
     }
@@ -1893,7 +2001,7 @@ async function writeDifficultyEnv(
 export async function setWorldDifficultyAction(
     installedAppId: string,
     difficulty: string
-): Promise<{ error?: string }> {
+): Promise<{ queued?: boolean; error?: string }> {
     const parsed = z
         .object({ installedAppId: z.string().uuid(), difficulty: z.enum(DIFFICULTIES) })
         .safeParse({ installedAppId, difficulty });
@@ -1903,10 +2011,11 @@ export async function setWorldDifficultyAction(
             "games.manage",
             parsed.data.installedAppId
         );
-        await setWorldDifficulty(
+        const changed = await setWorldDifficulty(
             access.ownerId,
             parsed.data.installedAppId,
-            parsed.data.difficulty
+            parsed.data.difficulty,
+            user.id
         );
         // Recorded the moment it is in force, and before anything that can fail
         // afterwards. The world is being played under it from here on, so whether
@@ -1916,7 +2025,7 @@ export async function setWorldDifficultyAction(
             action: "minecraft.difficulty",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { difficulty: parsed.data.difficulty }
+            metadata: { difficulty: parsed.data.difficulty, queued: changed.queued }
         });
         // After the live change, and reported separately: the difficulty they
         // asked for is in force either way, and what a failure here costs is the
@@ -1928,7 +2037,7 @@ export async function setWorldDifficultyAction(
                 error: "The difficulty changed, but Polaris could not store it - a restart will put it back."
             };
         }
-        return {};
+        return { queued: changed.queued };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : "Could not change the difficulty"
@@ -2132,6 +2241,113 @@ export async function clearPlayerItemAction(
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not take that away" };
+    }
+}
+
+/** Empty everything a player carries. Queued when the player is not on. */
+export async function clearPlayerInventoryAction(input: {
+    installedAppId: string;
+    player: string;
+}): Promise<{ queued?: true; error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        if (!(await isOnline(access.ownerId, installedAppId, player))) {
+            await queueAction({
+                installedAppId,
+                username: player,
+                payload: { kind: "clear-all" },
+                requestedById: user.id
+            });
+            return { queued: true };
+        }
+        await clearInventory(access.ownerId, installedAppId, player);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-empty",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player }
+        });
+        return {};
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "Could not empty the inventory"
+        };
+    }
+}
+
+const transferStackSchema = z.object({
+    installedAppId: z.string().uuid(),
+    from: playerNameSchema,
+    to: playerNameSchema,
+    slot: z.number().int().min(-128).max(127),
+    /** What the screen was showing in that slot. Compared before anything moves. */
+    expected: stackSchema.nullable(),
+    /** Fewer than the stack sends part of it. */
+    count: z.number().int().min(1).max(127).optional()
+});
+
+/** Send one stack from one player's bag to another player. Both must be on. */
+export async function transferStackAction(
+    input: z.infer<typeof transferStackSchema>
+): Promise<{ error?: string }> {
+    const parsed = transferStackSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, from, to, slot, expected, count } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        await transferStack(access.ownerId, installedAppId, from, to, slot, expected, count);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-send",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: {
+                from,
+                to,
+                slot,
+                item: expected?.id ?? null,
+                count: count ?? expected?.count ?? null
+            }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not send that stack" };
+    }
+}
+
+/** Send everything one player carries to another. Both must be on. */
+export async function transferInventoryAction(input: {
+    installedAppId: string;
+    from: string;
+    to: string;
+}): Promise<{ moved?: number; kept?: number; error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), from: playerNameSchema, to: playerNameSchema })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, from, to } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const result = await transferInventory(access.ownerId, installedAppId, from, to);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-send-all",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { from, to, moved: result.moved, kept: result.kept }
+        });
+        return result;
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not send the inventory" };
     }
 }
 
