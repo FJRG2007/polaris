@@ -125,6 +125,20 @@ vi.mock("@/app/(app)/chat/members-panel", () => ({
 beforeEach(() => {
     state.kind = "group";
     state.started = [];
+    state.live!.meetingId = "m1";
+    // This runtime's jsdom has no local storage of its own, and what a call put
+    // away is remembered in one. Written out rather than mocked away: surviving
+    // the screen being built again is the whole point of it.
+    const kept = new Map<string, string>();
+    Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: {
+            getItem: (key: string) => kept.get(key) ?? null,
+            setItem: (key: string, value: string) => void kept.set(key, value),
+            removeItem: (key: string) => void kept.delete(key),
+            clear: () => kept.clear()
+        }
+    });
     Element.prototype.scrollIntoView = () => undefined;
 });
 afterEach(cleanup);
@@ -156,6 +170,33 @@ describe("a call running in a group somebody is only reading", () => {
         expect(screen.getByText("2 people in the call")).toBeTruthy();
 
         fireEvent.click(screen.getByRole("button", { name: "Show" }));
+        expect(await screen.findByRole("region", { name: "Call in progress" })).toBeTruthy();
+    });
+
+    it("stays put away when the conversation is opened again", async () => {
+        render(<ChannelView channelId="c1" />);
+        const panel = await screen.findByRole("region", { name: "Call in progress" });
+        fireEvent.click(within(panel).getByRole("button", { name: "Hide the call" }));
+
+        // Opening another conversation and coming back - or reloading - builds
+        // this screen from nothing, which is where a decision held in component
+        // state was lost.
+        cleanup();
+        render(<ChannelView channelId="c1" />);
+
+        expect(await screen.findByText("2 people in the call")).toBeTruthy();
+        expect(screen.queryByRole("region", { name: "Call in progress" })).toBeNull();
+    });
+
+    it("shows the next call, which nobody put away", async () => {
+        render(<ChannelView channelId="c1" />);
+        const panel = await screen.findByRole("region", { name: "Call in progress" });
+        fireEvent.click(within(panel).getByRole("button", { name: "Hide the call" }));
+
+        cleanup();
+        state.live!.meetingId = "m2";
+        render(<ChannelView channelId="c1" />);
+
         expect(await screen.findByRole("region", { name: "Call in progress" })).toBeTruthy();
     });
 });

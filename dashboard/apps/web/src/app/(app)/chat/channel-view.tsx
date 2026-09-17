@@ -25,26 +25,29 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
+import { SidePane } from "./side-pane";
 import { threadRootFor } from "./links";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { channelDraftKey } from "./drafts";
 import { posterFor } from "./video-poster";
-import { CallRosterList } from "./call-roster";
-import { CallPreview, CallPreviewLine } from "./call-preview";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { useCallHold } from "./call-session";
+import { useCallHidden } from "./call-hidden";
+import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
 import { draftMessage } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
 import { ChannelHeader } from "./channel-header";
 import { DirectProfile } from "./direct-profile";
 import { ForwardDialog } from "./forward-dialog";
+import { CALL_CHAT_PANE } from "./use-chat-pane";
 import { useChatStream } from "./use-chat-stream";
 import { useVoiceSettings } from "./voice-settings";
+import { useCloseOnEscape } from "./close-on-escape";
 import type { RecordedSound } from "./voice-recorder";
 import type * as messagesLib from "@/lib/chat/messages";
 import type { VoicePresence } from "@/lib/chat/meetings";
@@ -52,14 +55,12 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CallPreview, CallPreviewLine } from "./call-preview";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { callBandHeight, callBandLimit, type CallPlace } from "./call-band";
-import { SidePane } from "./side-pane";
-import { useCloseOnEscape } from "./close-on-escape";
-import { CALL_CHAT_PANE } from "./use-chat-pane";
 import {
     forgetPaneSize,
     onLayoutReset,
@@ -218,13 +219,13 @@ export function ChannelView({
     const measuring = useRef(false);
     const [live, setLive] = useState<calls.LiveCall | null>(null);
     /**
-     * A call this reader has put away, by the call it was.
+     * Whether this reader has put the running call away.
      *
-     * Kept per call rather than per conversation: deciding not to watch the one
-     * happening now says nothing about the next one, and a room that stayed
-     * folded away for good is a room where the next call is invisible again.
+     * Kept per call rather than per conversation, and remembered by the browser
+     * rather than by this screen: opening another conversation unmounts all of
+     * this, so held here it lasted until the next click - see `call-hidden`.
      */
-    const [hidden, setHidden] = useState<string | null>(null);
+    const [hidden, setHidden] = useCallHidden(live?.meetingId ?? null);
     // The call this browser is sitting in, held above every screen so that
     // walking out of the conversation shrinks it into a bar rather than hanging
     // up. Being in one is not the same question as one running here: somebody
@@ -1950,13 +1951,13 @@ export function ChannelView({
                     !inCall &&
                     live &&
                     live.people.length > 0 &&
-                    (hidden === live.meetingId ? (
+                    (hidden ? (
                         <CallPreviewLine
                             count={live.count}
                             canJoin={!callsOff}
                             busy={joining}
                             onJoin={(video) => void startCall(video)}
-                            onShow={() => setHidden(null)}
+                            onShow={() => setHidden(false)}
                         />
                     ) : (
                         <CallPreview
@@ -1965,7 +1966,7 @@ export function ChannelView({
                             canJoin={!callsOff}
                             busy={joining}
                             onJoin={(video) => void startCall(video)}
-                            onHide={() => setHidden(live.meetingId)}
+                            onHide={() => setHidden(true)}
                         />
                     ))}
 
