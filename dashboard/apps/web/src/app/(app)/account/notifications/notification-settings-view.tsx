@@ -252,7 +252,10 @@ function SoundCard() {
                         />
                     </div>
                 </div>
-                <VolumeSlider disabled={!enabled} />
+                {/* Not disabled with the switch: the switch governs the chimes
+                    on this device, and the volume governs how loud everything
+                    is - a call rings whatever the switch says. */}
+                <VolumeSlider />
             </CardBody>
         </Card>
     );
@@ -272,7 +275,7 @@ const VOLUME_SAVE_MS = 400;
  * the new one. The pending save also survives leaving the page - a volume
  * chosen and then navigated away from within the wait was simply lost.
  */
-function VolumeSlider({ disabled }: { disabled: boolean }) {
+function VolumeSlider() {
     const volume = useSyncExternalStore(
         onSoundVolumeChange,
         soundVolume,
@@ -335,10 +338,9 @@ function VolumeSlider({ disabled }: { disabled: boolean }) {
                 max={100}
                 step={5}
                 value={volume}
-                disabled={disabled}
                 aria-label="Sound volume"
                 onChange={(event) => change(Number(event.target.value))}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
             />
             <span className="text-xs text-muted-foreground">
                 For every Polaris sound: alerts, messages and calls. Saved to your account.

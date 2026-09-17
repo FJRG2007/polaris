@@ -43,4 +43,14 @@ describe("the sound setting", () => {
         expect(slider).toContain('value="100"');
         expect(markup).toContain("100%");
     });
+
+    it("leaves the volume usable with the chime switched off", () => {
+        // The switch silences the chimes on this device; it does not silence a
+        // call, so the only control over how loud that rings must stay usable.
+        const markup = renderToStaticMarkup(
+            <NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />
+        );
+        const slider = markup.slice(markup.indexOf('aria-label="Sound volume"') - 300);
+        expect(slider.slice(0, slider.indexOf(">"))).not.toContain("disabled");
+    });
 });

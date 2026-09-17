@@ -70,6 +70,15 @@ export function MessageToasts() {
     /** Conversations waiting to be announced, and when this tab heard of each. */
     const pending = useRef(new Map<string, number>());
     /**
+     * Conversations caught up while this tab was asking for the words.
+     *
+     * The queue is copied and cleared before that round trip, so a read landing
+     * during it has nothing left to take out - and the announcement would arrive
+     * for a conversation the reader is looking straight at. An entry is dropped
+     * again when the next message lands in that conversation.
+     */
+    const caughtUp = useRef(new Set<string>());
+    /**
      * The last message announced in each conversation.
      *
      * A conversation followed for mentions answers with the newest message that
@@ -104,6 +113,8 @@ export function MessageToasts() {
             });
             // Somebody is reading it, here or in another tab of this browser.
             if (!alert.toast && !alert.sound && !alert.desktop) continue;
+            // Read while this was being asked for, here or in another tab.
+            if (caughtUp.current.has(message.channelId)) continue;
             const arrivedAt = heard.get(message.channelId) ?? Date.now();
             if (seenOnDevice(message.channelId, arrivedAt)) continue;
             // Already said, and saying it twice is not a second message.
@@ -181,6 +192,7 @@ export function MessageToasts() {
                     if (frame.userId !== device.current) return;
                     pending.current.delete(frame.channelId);
                     announced.current.delete(frame.channelId);
+                    caughtUp.current.add(frame.channelId);
                     closeDesktopNotice(`message:${frame.channelId}`);
                     drop.current(`message:${frame.channelId}`);
                     return;
@@ -198,6 +210,7 @@ export function MessageToasts() {
                         markSeenOnDevice(channelId);
                         continue;
                     }
+                    caughtUp.current.delete(channelId);
                     pending.current.set(channelId, Date.now());
                 }
                 if (pending.current.size === 0) return;

@@ -39,6 +39,13 @@ let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = nu
 let pathname = "/deploy";
 let watched = true;
 let soundOn = true;
+/** Held open by a test that needs the round trip to still be in flight; it
+ *  always answers false, so the words come back either way. */
+let inFlight: Promise<void> | null = null;
+async function hold(): Promise<boolean> {
+    if (inFlight) await inFlight;
+    return false;
+}
 const shown: Array<{ key?: string }> = [];
 const dismissed: string[] = [];
 const closed: string[] = [];
@@ -65,16 +72,18 @@ vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({
     messageToastsAction: async (ids: string[]) => ({
-        toasts: ids.map((channelId) => ({
-            channelId,
-            messageId: "m-1",
-            conversation: "general",
-            inChannel: false,
-            authorId: "ada",
-            authorName: "Ada",
-            excerpt: "Hello",
-            media: null
-        }))
+        toasts: (await hold())
+            ? []
+            : ids.map((channelId) => ({
+                  channelId,
+                  messageId: "m-1",
+                  conversation: "general",
+                  inChannel: false,
+                  authorId: "ada",
+                  authorName: "Ada",
+                  excerpt: "Hello",
+                  media: null
+              }))
     })
 }));
 vi.mock("@/lib/device-once", () => ({ claimForDevice: async () => true }));
@@ -114,6 +123,7 @@ beforeEach(() => {
     notices.length = 0;
     dismissed.length = 0;
     closed.length = 0;
+    inFlight = null;
     window.localStorage.clear();
 });
 
@@ -238,6 +248,34 @@ describe("catching up in another window", () => {
         );
         expect(closed).toEqual([`message:${CHANNEL}`]);
         expect(dismissed).toEqual([`message:${CHANNEL}`]);
+    });
+
+    it("says nothing about a conversation read while the words were being fetched", async () => {
+        // The queue is emptied before the round trip, so the read frame has
+        // nothing left to take out of it - and what comes back would be
+        // announced for a conversation the reader has just opened elsewhere.
+        let release: (() => void) | null = null;
+        inFlight = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        watched = false;
+        render(<MessageToasts />);
+        act(() => onFrame?.({ kind: "posted", seq: 1, channels: [CHANNEL] }, { owner: true }));
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        });
+        act(() =>
+            onFrame?.({ kind: "read", channelId: CHANNEL, userId: "scope" }, { owner: true })
+        );
+        release?.();
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+        inFlight = null;
+
+        expect(shown).toEqual([]);
+        expect(played).toEqual([]);
+        expect(notices).toEqual([]);
     });
 
     it("leaves them alone when it is the other side of the conversation catching up", async () => {
