@@ -90,6 +90,16 @@ export function MessageToasts() {
                 key: `message:${message.channelId}`,
                 title: who,
                 body: message.excerpt,
+                // Bounded both ways and never stretched: a tall photo is shown
+                // whole at a smaller size rather than cropped or squashed.
+                media: message.media ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- an authenticated attachment route, not an optimisable asset
+                    <img
+                        src={message.media.src}
+                        alt={message.excerpt}
+                        className="max-h-40 w-auto max-w-full rounded-md object-contain"
+                    />
+                ) : undefined,
                 icon: (
                     <Avatar
                         size={28}
