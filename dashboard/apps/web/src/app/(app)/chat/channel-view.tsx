@@ -1694,7 +1694,7 @@ export function ChannelView({
                             either, so a message that had arrived was a message they
                             found later by accident. */}
                 {(newerThan || unseen > 0 || away) && (
-                    <div className="sticky bottom-0 z-10 px-3 pb-2">
+                    <div className="pointer-events-none sticky bottom-0 z-10 flex justify-center px-3 pb-2">
                         <button
                             type="button"
                             onClick={() => {
@@ -1716,7 +1716,10 @@ export function ChannelView({
                                     catchUpMark(true);
                                 }
                             }}
-                            className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-elevated px-3 py-1.5 text-xs shadow-md transition-colors hover:bg-card-hover"
+                            // A pill in the middle rather than a bar across the
+                            // room: it sits over the last line of the conversation,
+                            // and the wider it is the more of that line it hides.
+                            className="pointer-events-auto flex max-w-full items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
                         >
                             <span className="truncate text-muted-foreground">
                                 {unseen === 0
