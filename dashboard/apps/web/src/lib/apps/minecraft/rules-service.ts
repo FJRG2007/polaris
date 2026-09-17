@@ -19,6 +19,17 @@
  * config blob and handed back when the server cannot be reached, marked with when
  * it was read and with everything on the screen locked - a remembered value is
  * something to look at, never something to appear to change.
+ *
+ * **What was set from here is the source of truth**, kept apart from that cache in
+ * `GameRuleSetting`. A change (`setWorldRule`, `setWorldDifficulty`) is stored
+ * before the server is asked, so an operator's choice survives a server that is
+ * off or drops the connection mid-request; a server that is off leaves it waiting
+ * rather than failing the request, and the cron pass or the next read
+ * (`applyPendingRules`, `reconcile`) hands it over and settles the row. A value the
+ * game has since drifted from - somebody typed `/gamerule` in the console - is put
+ * back rather than left to win, because the stored row is what the world is meant
+ * to be played under. A refusal rolls the row back to what it was and is surfaced
+ * per rule (`failures`) instead of silently keeping the old value.
  */
 
 import { prisma } from "@polaris/db";

@@ -15,24 +15,29 @@
  * soon as it answers. Until then the panel says the difference out loud, because
  * "added" and "the server knows" are not the same state and a moderator has to be
  * able to see which one they are in.
+ *
+ * A player tied to a Polaris account is the exception: ARK reports no connecting
+ * address to check, so `applyAllowList` follows the account's sign-ins instead
+ * (`signedIn`), disallowing and kicking the moment it has none and allowing again
+ * the moment it has one - see `gateDecisions` in `ark/access` for the rule.
  */
 
 import { prisma } from "@polaris/db";
 import { randomBytes } from "node:crypto";
 import { withTimeout } from "@polaris/core";
 import { findApp } from "@/lib/apps/catalog";
+import { ARK_ROOT } from "@/lib/apps/ark/files";
 import { setEnvVars } from "@/lib/env-var-service";
 import * as arkAccess from "@/lib/apps/ark/access";
 import * as arkAdmins from "@/lib/apps/ark/admins";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
+import { signedIn } from "@/lib/apps/game-sign-in-addresses";
 import { arkExperienceCommand } from "@/lib/apps/ark/experience";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
-import { parseProfileDump, type ArkProfile } from "@/lib/apps/ark/profile";
 import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
-import { ARK_ROOT } from "@/lib/apps/ark/files";
-import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
+import { parseProfileDump, type ArkProfile } from "@/lib/apps/ark/profile";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { signedIn } from "@/lib/apps/game-sign-in-addresses";
+import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
 import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";

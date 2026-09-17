@@ -20,6 +20,13 @@
  *
  * Bedrock prints no address in its log, so there the username half is enforced and
  * the address half is reported as unavailable rather than silently ignored.
+ *
+ * A player can also be tied to a Polaris account (`GamePlayerLink`) instead of a
+ * typed address: their allowed addresses are kept in step with that account's
+ * sign-ins (`signInAddresses`) rather than written down once, and they are kicked
+ * with `LINKED_REFUSAL` when the account is signed in nowhere they are connecting
+ * from - even with the address half switched off for this server, since a linked
+ * name is a promise about who is playing, not only where from.
  */
 
 import { prisma } from "@polaris/db";
