@@ -22,7 +22,9 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.BossEvent;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -49,7 +51,7 @@ import polaris.minecraft.PolarisClient.Reply;
  * Holds every player who joins until they have given their password.
  *
  * A held player stands where they joined, in the dark, with what to type in the
- * middle of the screen. They cannot be hurt, and can do nothing but
+ * middle of the screen and the time they have left in a bar across the top. They cannot be hurt, and can do nothing but
  * {@code /login} and {@code /register}: no chat, no other command, no blocks, no
  * items, no attacks. Before any of that, Polaris is asked whether the name is on
  * the server's player list at all, and from that network - a name that is not is
@@ -72,6 +74,8 @@ final class LoginGate {
     /** How long the title stays up. Longer than the reminder, which puts it back
      *  before it fades. */
     private static final int TITLE_TICKS = 5 * SECOND;
+    /** Below this many seconds left, the countdown turns red. */
+    private static final int HURRY_SECONDS = 10;
     private static final int MAX_WRONG = 3;
     private static final int MIN_PASSWORD = 6;
     private static final int MAX_PASSWORD = 64;
@@ -109,6 +113,10 @@ final class LoginGate {
         /** Whether the darkness on their screen is this gate's, and so this gate's
          *  to lift. */
         boolean darkened;
+        /** The time left, across the top of their screen. Updated in place every
+         *  second, so it never has to be said in the chat. */
+        final ServerBossEvent countdown = new ServerBossEvent(
+                Component.empty(), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
 
         Held(Vec3 anchor, long deadline) {
             this.anchor = anchor;
@@ -141,6 +149,7 @@ final class LoginGate {
         for (Map.Entry<UUID, Held> entry : held.entrySet()) {
             ServerPlayer player = event.getServer().getPlayerList().getPlayer(entry.getKey());
             if (player != null) lighten(player, entry.getValue());
+            entry.getValue().countdown.removeAllPlayers();
         }
         held.clear();
         server = null;
@@ -155,15 +164,29 @@ final class LoginGate {
             ServerPlayer player = event.getServer().getPlayerList().getPlayer(entry.getKey());
             Held waiting = entry.getValue();
             if (player == null) {
-                held.remove(entry.getKey());
+                held.remove(entry.getKey()).countdown.removeAllPlayers();
             } else if (waiting.kick != null) {
                 player.connection.disconnect(Component.literal(waiting.kick));
             } else if (tick > waiting.deadline && !waiting.busy) {
                 player.connection.disconnect(Component.literal("You took too long to log in."));
-            } else if (tick % (TITLE_TICKS - SECOND) == 0) {
-                titleFor(player, waiting);
+            } else {
+                if (tick % SECOND == 0) count(waiting);
+                if (tick % (TITLE_TICKS - SECOND) == 0) titleFor(player, waiting);
             }
         }
+    }
+
+    /** Put the time left on the bar: whole seconds, and how much of the window is
+     *  still to go. */
+    private void count(Held waiting) {
+        long left = Math.max(0, waiting.deadline - tick);
+        long seconds = (left + SECOND - 1) / SECOND;
+        waiting.countdown.setName(Component.literal(
+                seconds + (seconds == 1 ? " second" : " seconds") + " to log in"));
+        waiting.countdown.setProgress(Math.min(1f, (float) left / LOGIN_TICKS));
+        waiting.countdown.setColor(seconds <= HURRY_SECONDS
+                ? BossEvent.BossBarColor.RED
+                : BossEvent.BossBarColor.YELLOW);
     }
 
     private void heartbeat() {
@@ -213,6 +236,8 @@ final class LoginGate {
             return;
         }
         darken(player, waiting);
+        count(waiting);
+        waiting.countdown.addPlayer(player);
         title(player, "Checking your account", "One moment");
         waiting.busy = true;
         ask(player, waiting, "status", identity(player), (current, reply) -> {
@@ -235,9 +260,11 @@ final class LoginGate {
     @SubscribeEvent
     public void onLeave(PlayerEvent.PlayerLoggedOutEvent event) {
         Held waiting = held.remove(event.getEntity().getUUID());
+        if (waiting == null) return;
+        waiting.countdown.removeAllPlayers();
         // Lifted before the player is saved, or they would wake up in the dark on
         // their next join with nothing to say it was this gate's.
-        if (waiting != null && event.getEntity() instanceof ServerPlayer player) lighten(player, waiting);
+        if (event.getEntity() instanceof ServerPlayer player) lighten(player, waiting);
     }
 
     /** The title for what this player has to do next, sent again before it fades. */
@@ -248,19 +275,21 @@ final class LoginGate {
     }
 
     private void prompt(ServerPlayer player, Held waiting) {
-        long seconds = Math.max(0, (waiting.deadline - tick) / SECOND);
         titleFor(player, waiting);
         if (Boolean.TRUE.equals(waiting.registered)) {
-            tell(player, "Log in with /login <password>. You have " + seconds + " seconds.");
+            tell(player, "Log in with /login <password>.");
         } else {
-            tell(player, "Choose a password for this server with /register <password> <password>. You have "
-                    + seconds + " seconds. Put it in double quotes if it has spaces or symbols.");
+            tell(player, "Choose a password for this server with /register <password> <password>."
+                    + " Put it in double quotes if it has spaces or symbols.");
         }
     }
 
     private void release(ServerPlayer player, String message) {
         Held waiting = held.remove(player.getUUID());
-        if (waiting != null) lighten(player, waiting);
+        if (waiting != null) {
+            lighten(player, waiting);
+            waiting.countdown.removeAllPlayers();
+        }
         player.connection.send(new ClientboundClearTitlesPacket(true));
         player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.GREEN));
     }
