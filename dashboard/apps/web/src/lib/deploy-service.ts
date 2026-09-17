@@ -31,6 +31,7 @@ import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
+import { minecraftImageFor } from "./apps/minecraft/runtime";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
@@ -2320,6 +2321,18 @@ async function buildAppPlan(
         ownerId
     });
     const env = references.env;
+    // A Minecraft server runs the Java its release needs, which changes with the
+    // release it is set to. Kept on the service as well, so what Polaris shows and
+    // checks for updates is the image it actually runs.
+    const storedImage = typeof source.imageRef === "string" ? source.imageRef : undefined;
+    const imageRef = minecraftImageFor(storedImage, env);
+    if (imageRef !== storedImage) {
+        source.imageRef = imageRef;
+        await prisma.application.update({
+            where: { id: app.id },
+            data: { sourceConfig: JSON.stringify(source) }
+        });
+    }
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
     // persisted), so a remote hub keeps the public URL from its stored env.
@@ -2473,7 +2486,7 @@ async function buildAppPlan(
         build: {
             method: (app.sourceType as AppDeployPlan["build"]["method"]) ?? "image",
             name: app.slug,
-            imageRef: typeof source.imageRef === "string" ? source.imageRef : undefined,
+            imageRef,
             // Both derived from the root directory: a monorepo's one app is built from a
             // context that stays the whole repository (the lockfile and the shared
             // packages it needs are above it), with the builder pointed at its own

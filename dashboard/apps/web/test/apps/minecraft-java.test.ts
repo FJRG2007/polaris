@@ -21,6 +21,7 @@
  */
 
 import { findApp } from "@/lib/apps/catalog";
+import { minecraftImageFor } from "@/lib/apps/minecraft/runtime";
 import { describe, expect, it } from "vitest";
 
 describe("the Minecraft server's image", () => {
@@ -30,8 +31,16 @@ describe("the Minecraft server's image", () => {
         expect(minecraft?.template?.image).toBeTruthy();
     });
 
-    it("names a Java the game can actually start on", () => {
-        expect(minecraft?.template?.image).toBe("itzg/minecraft-server:java21");
+    it("names a Java tag the deploy knows how to swap", () => {
+        // Minecraft 26.x needs Java 25 and the 1.21 line's mod loaders cannot run
+        // on it, so every deploy picks the tag from VERSION - but only when the
+        // stored image is one of the tags it manages (`minecraft-runtime.test.ts`).
+        expect(minecraftImageFor(minecraft?.template?.image, { VERSION: "LATEST" })).toBe(
+            "itzg/minecraft-server:java25"
+        );
+        expect(minecraftImageFor(minecraft?.template?.image, { VERSION: "1.21.4" })).toBe(
+            "itzg/minecraft-server:java21"
+        );
     });
 
     it("never floats on latest", () => {
