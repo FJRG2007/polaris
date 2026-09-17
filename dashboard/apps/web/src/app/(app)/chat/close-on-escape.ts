@@ -9,7 +9,8 @@
  * them says so by taking the key (`preventDefault`) - so a key somebody else
  * already handled is not this one's. An open dialog or menu that did not take it
  * is also left alone: closing the conversation behind it is never what the press
- * was for.
+ * was for. A popup that is neither must take the key itself when it closes on
+ * Escape, or this closes the conversation on the same press.
  */
 
 import { useEffect, useRef } from "react";
