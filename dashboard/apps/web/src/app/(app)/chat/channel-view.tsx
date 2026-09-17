@@ -30,7 +30,8 @@ import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { channelDraftKey } from "./drafts";
 import { posterFor } from "./video-poster";
-import { CallRoster } from "./call-roster";
+import { CallRosterList } from "./call-roster";
+import { CallPreview, CallPreviewLine } from "./call-preview";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
@@ -216,6 +217,14 @@ export function ChannelView({
     const readingAt = useRef<ReadingPosition | null>(null);
     const measuring = useRef(false);
     const [live, setLive] = useState<calls.LiveCall | null>(null);
+    /**
+     * A call this reader has put away, by the call it was.
+     *
+     * Kept per call rather than per conversation: deciding not to watch the one
+     * happening now says nothing about the next one, and a room that stayed
+     * folded away for good is a room where the next call is invisible again.
+     */
+    const [hidden, setHidden] = useState<string | null>(null);
     // The call this browser is sitting in, held above every screen so that
     // walking out of the conversation shrinks it into a bar rather than hanging
     // up. Being in one is not the same question as one running here: somebody
@@ -1940,20 +1949,25 @@ export function ChannelView({
                     channel.kind !== "voice" &&
                     !inCall &&
                     live &&
-                    live.people.length > 0 && (
-                        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2">
-                            <span className="text-sm font-medium">Call in progress</span>
-                            <div className="min-w-0 flex-1">
-                                <CallRoster people={live.people} />
-                            </div>
-                            {!callsOff && (
-                                <Button size="xs" onClick={() => void startCall(false)}>
-                                    <Mic className="size-3.5" />
-                                    Join
-                                </Button>
-                            )}
-                        </div>
-                    )}
+                    live.people.length > 0 &&
+                    (hidden === live.meetingId ? (
+                        <CallPreviewLine
+                            count={live.count}
+                            canJoin={!callsOff}
+                            busy={joining}
+                            onJoin={(video) => void startCall(video)}
+                            onShow={() => setHidden(null)}
+                        />
+                    ) : (
+                        <CallPreview
+                            people={live.people}
+                            count={live.count}
+                            canJoin={!callsOff}
+                            busy={joining}
+                            onJoin={(video) => void startCall(video)}
+                            onHide={() => setHidden(live.meetingId)}
+                        />
+                    ))}
 
                 {channel.kind === "voice" && !inCall && (
                     <VoiceStrip
@@ -2249,8 +2263,11 @@ function VoiceStrip({
                 </>
             )}
             {people.length > 0 && (
-                <div className="basis-full">
-                    <CallRoster people={people} />
+                // Listed rather than lined up: this is the room's own roster,
+                // so it is the row the rest of Polaris uses - see
+                // `CallRosterList`.
+                <div className="basis-full max-h-40 overflow-y-auto overscroll-contain">
+                    <CallRosterList people={people} label={`In ${name}`} />
                 </div>
             )}
         </div>

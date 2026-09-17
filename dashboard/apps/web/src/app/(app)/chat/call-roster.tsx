@@ -66,3 +66,48 @@ export function CallRoster({ people }: { people: readonly VoicePresence[] }) {
         </ul>
     );
 }
+
+/**
+ * The same people, listed rather than lined up.
+ *
+ * A voice room is somewhere people are, so who is in it is a roster - and a
+ * roster in Polaris is a column of rows: a face, a name, and whatever else is
+ * true of that person. The chips above are for the places where the call is an
+ * aside to something else being read; this is for the room itself, and it is
+ * the row the rest of Polaris uses (the members column next door, the assignee
+ * picker in Tasks) rather than a third shape.
+ */
+export function CallRosterList({
+    people,
+    label = "In this room"
+}: {
+    people: readonly VoicePresence[];
+    /** What the list is called, for anybody who cannot see it. */
+    label?: string;
+}) {
+    if (people.length === 0) return null;
+    return (
+        <ul aria-label={label} className="flex min-w-0 flex-col gap-0.5">
+            {people.map((person) => (
+                <PersonRow
+                    as="li"
+                    key={person.id}
+                    personId={person.userId}
+                    className="flex min-w-0 items-center gap-2 rounded px-1 py-0.5 text-sm"
+                    title={person.name}
+                >
+                    <Avatar
+                        size={24}
+                        // A guest has no account, so no picture to ask for: the
+                        // initials of the name they gave.
+                        person={{ id: person.userId, name: person.name }}
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                        <PersonName id={person.userId} name={person.name} />
+                    </span>
+                    <VoiceStateIcons person={person} />
+                </PersonRow>
+            ))}
+        </ul>
+    );
+}
