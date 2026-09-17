@@ -2285,6 +2285,8 @@ async function buildAppPlan(
     cutover: boolean;
     /** Variable references nothing in the environment answers, as written. */
     unresolved: string[];
+    /** The image the service now needs in place of the stored one, when they differ. */
+    imageRefChange?: string;
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -2322,17 +2324,9 @@ async function buildAppPlan(
     });
     const env = references.env;
     // A Minecraft server runs the Java its release needs, which changes with the
-    // release it is set to. Kept on the service as well, so what Polaris shows and
-    // checks for updates is the image it actually runs.
+    // release it is set to.
     const storedImage = typeof source.imageRef === "string" ? source.imageRef : undefined;
     const imageRef = minecraftImageFor(storedImage, env);
-    if (imageRef !== storedImage) {
-        source.imageRef = imageRef;
-        await prisma.application.update({
-            where: { id: app.id },
-            data: { sourceConfig: JSON.stringify(source) }
-        });
-    }
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
     // persisted), so a remote hub keeps the public URL from its stored env.
@@ -2619,8 +2613,25 @@ async function buildAppPlan(
         buildCommands,
         keepsHistory: keepsReleases(app),
         cutover: release ? cutover : await changesOver(app, ownerId),
-        unresolved: references.unresolved
+        unresolved: references.unresolved,
+        imageRefChange: imageRef !== storedImage ? imageRef : undefined
     };
+}
+
+/** Keep a changed image on the service, so what Polaris shows and checks for
+ *  updates is the image it runs. */
+async function saveImageRef(applicationId: string, imageRef: string): Promise<void> {
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { sourceConfig: true }
+    });
+    if (!app) return;
+    const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    if (source.imageRef === imageRef) return;
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { sourceConfig: JSON.stringify({ ...source, imageRef }) }
+    });
 }
 
 /**
@@ -2855,8 +2866,11 @@ export async function deployApplication(
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
     const { plan, target, buildCommands, keepsHistory } = built;
+    // A kept image was made from the image the service ran before, so a service
+    // that now needs another one pulls it instead of running the kept one.
+    const keptImage = built.imageRefChange ? undefined : rollback?.imageTag;
     const scaled =
-        rollback?.kind === "scale"
+        rollback?.kind === "scale" && keptImage
             ? await prisma.deployment.findUnique({
                   where: { id: rollback.deploymentId },
                   select: { id: true, commitSha: true, cutover: true }
@@ -2955,6 +2969,7 @@ export async function deployApplication(
     // id it records is what the states after it are posted against, and a build
     // that started first would find nothing to post against.
     await announceDeployQueued(deployment.id);
+    if (built.imageRefChange) await saveImageRef(applicationId, built.imageRefChange);
     // Every deploy is on the audit trail, whatever started it - a screen, the API,
     // a push, a rollback, a one-press fix, an installed app's redeploy. There are
     // more than twenty ways in and this is the one way through, so it is said
@@ -2992,8 +3007,8 @@ export async function deployApplication(
         ...planned,
         build: {
             ...planned.build,
-            ...(rollback
-                ? { rollbackImage: rollback.imageTag }
+            ...(keptImage
+                ? { rollbackImage: keptImage }
                 : prebuilt
                   ? { prebuilt }
                   : {
