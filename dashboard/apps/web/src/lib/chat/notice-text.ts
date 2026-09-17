@@ -31,7 +31,9 @@ export type ChatNoticeKind =
     | "removed"
     | "banned"
     | "timedOut"
-    | "missedCall";
+    | "missedCall"
+    | "callStarted"
+    | "callUnanswered";
 
 /** Somebody a notice names. */
 export interface NoticePerson {
@@ -104,7 +106,36 @@ export function noticeBody(
             // and an unanswered one look the same from the other end, and that
             // is deliberate - it is the same silence the card that rang keeps.
             return `${who} called - no answer`;
+        case "callStarted":
+            return `${who} started a call`;
+        case "callUnanswered":
+            // Follows the line that said the call started, which already names
+            // who rang.
+            return "Nobody answered the call";
     }
+}
+
+/** The kinds of conversation a call is announced in, the way a messenger
+ *  does. A channel's call is a room people drop in and out of, and a line for
+ *  every one would bury the conversation. */
+export function announcesCalls(channelKind: string): boolean {
+    return channelKind === "dm" || channelKind === "group";
+}
+
+/** How long a call lasted, as a sentence says it. */
+export function callLength(ms: number): string {
+    const minutes = Math.floor(Math.max(0, ms) / 60_000);
+    if (minutes < 1) return "a few seconds";
+    const count = (value: number, unit: string) => `${value} ${unit}${value === 1 ? "" : "s"}`;
+    if (minutes < 60) return count(minutes, "minute");
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0 ? count(hours, "hour") : `${count(hours, "hour")} ${count(rest, "minute")}`;
+}
+
+/** The stored body of the line written when a call that was answered ends. */
+export function callEndedBody(ms: number): string {
+    return `The call ended after ${callLength(ms)}`;
 }
 
 /** The accounts a notice names, so their current names can be looked up in one
