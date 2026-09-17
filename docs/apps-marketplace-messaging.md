@@ -352,6 +352,13 @@ configured means the machine's own address, as before.
   `updateServerSettingsAction` on a Settings save - except the save that is
   itself writing `MODRINTH_PROJECTS`, which is the join-password card's own
   toggle and is left to do that alone.
+- **The Java a server runs follows its release.** The image's Java version
+  is its tag, and no tag runs everything: Minecraft 26.x (what `LATEST`
+  resolves to on every software) exits on Java 21, and NeoForge 1.21.x dies on
+  Java 25 (`jdk.crypto.ec`). Every deploy - create, settings save, reset,
+  restart - swaps a managed tag (`java21`/`java25`) for the one `VERSION` needs
+  (`lib/apps/minecraft/runtime.ts`) and stores it on the service; an image
+  pinned by hand is left alone.
 - **Polaris login, the default where it has a build.** The Modrinth guards
   leave NeoForge with `/trigger` and numeric passwords, so Polaris ships its
   own server-side mod (`resources/minecraft/polaris-neoforge`) and, for

@@ -31,6 +31,7 @@ import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
+import { minecraftImageFor } from "./apps/minecraft/runtime";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
@@ -596,7 +597,9 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             deployBranch: input.deployBranch ?? null,
             keepReleases: input.keepReleases ?? false,
             publishPort: input.publishPort,
-            ...(input.safeHeaders ? { edgeConfig: JSON.stringify({ headers: { preset: "recommended" } }) } : {}),
+            ...(input.safeHeaders
+                ? { edgeConfig: JSON.stringify({ headers: { preset: "recommended" } }) }
+                : {}),
             ...(input.buildConfig ? { buildConfig: JSON.stringify(input.buildConfig) } : {}),
             ...(input.replicas ? { replicas: input.replicas } : {})
         }
@@ -1104,7 +1107,11 @@ export async function setApplicationEdgeConfig(
     // How traffic is spread over copies and releases is set from Scaling and from
     // the deployments, not from this screen, so what those saved is kept.
     const stored = parseAppEdgeConfig(app.edgeConfig);
-    const next = { ...appEdgeConfigSchema.parse(config), balancing: stored.balancing, canary: stored.canary };
+    const next = {
+        ...appEdgeConfigSchema.parse(config),
+        balancing: stored.balancing,
+        canary: stored.canary
+    };
     await prisma.application.update({
         where: { id: app.id },
         data: { edgeConfig: JSON.stringify(next) }
@@ -1256,13 +1263,20 @@ export async function syncAppRoutes(): Promise<void> {
     // The kept releases a share of traffic is sent to, and only while each is a
     // kept release still running: a canary that was retired, promoted or taken down
     // routes nothing, whatever the setting still says.
-    const canaryIds = [...edgeOf.values()].flatMap((fields) => (fields.edge?.canary ? [fields.edge.canary.deploymentId] : []));
+    const canaryIds = [...edgeOf.values()].flatMap((fields) =>
+        fields.edge?.canary ? [fields.edge.canary.deploymentId] : []
+    );
     const liveCanaries = new Set(
         canaryIds.length === 0
             ? []
             : (
                   await prisma.deployment.findMany({
-                      where: { id: { in: canaryIds }, status: "running", isolated: true, cutover: false },
+                      where: {
+                          id: { in: canaryIds },
+                          status: "running",
+                          isolated: true,
+                          cutover: false
+                      },
                       select: { id: true }
                   })
               ).map((row) => row.id)
@@ -1395,7 +1409,11 @@ export async function syncAppRoutes(): Promise<void> {
             // Several copies are each reached by name, published or not: only the
             // first holds the host port.
             const copies = own
-                ? copiesOf(domain.application, ownName, serving.get(domain.application.currentDeploymentId ?? ""))
+                ? copiesOf(
+                      domain.application,
+                      ownName,
+                      serving.get(domain.application.currentDeploymentId ?? "")
+                  )
                 : undefined;
             const privately = own && (!domain.application.publishPort || copies !== undefined);
             const dialHost = privately
@@ -1490,9 +1508,13 @@ function canaryRoute(
     current: string | null,
     localIp: string
 ): Pick<AppRoute, "canary"> {
-    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId)) return {};
+    if (!canary || !current || canary.deploymentId === current || !live.has(canary.deploymentId))
+        return {};
     return {
-        canary: { upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`, percent: canary.percent }
+        canary: {
+            upstream: `http://${localIp}:${hostPortForApp(canary.deploymentId)}`,
+            percent: canary.percent
+        }
     };
 }
 
@@ -2039,7 +2061,11 @@ export async function setApplicationRunning(
  * `asleepSince` is what says why it is not. The container is stopped and started
  * as it is, so it wakes in seconds with the same release and variables.
  */
-export async function setApplicationAsleep(applicationId: string, ownerId: string, asleep: boolean): Promise<void> {
+export async function setApplicationAsleep(
+    applicationId: string,
+    ownerId: string,
+    asleep: boolean
+): Promise<void> {
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
@@ -2284,6 +2310,8 @@ async function buildAppPlan(
     cutover: boolean;
     /** Variable references nothing in the environment answers, as written. */
     unresolved: string[];
+    /** The image the service now needs in place of the stored one, when they differ. */
+    imageRefChange?: string;
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -2320,6 +2348,10 @@ async function buildAppPlan(
         ownerId
     });
     const env = references.env;
+    // A Minecraft server runs the Java its release needs, which changes with the
+    // release it is set to.
+    const storedImage = typeof source.imageRef === "string" ? source.imageRef : undefined;
+    const imageRef = minecraftImageFor(storedImage, env);
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
     // persisted), so a remote hub keeps the public URL from its stored env.
@@ -2473,7 +2505,7 @@ async function buildAppPlan(
         build: {
             method: (app.sourceType as AppDeployPlan["build"]["method"]) ?? "image",
             name: app.slug,
-            imageRef: typeof source.imageRef === "string" ? source.imageRef : undefined,
+            imageRef,
             // Both derived from the root directory: a monorepo's one app is built from a
             // context that stays the whole repository (the lockfile and the shared
             // packages it needs are above it), with the builder pointed at its own
@@ -2594,7 +2626,8 @@ async function buildAppPlan(
                   // Set on every service created since the other languages were
                   // detected, and on one that names its own runtime version. A
                   // service the builder already deploys stays on the builder.
-                  languages: build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
+                  languages:
+                      build.languageImages === true || stringOrNull(build.runtimeVersion) !== null
               }
             : undefined;
     return {
@@ -2606,8 +2639,25 @@ async function buildAppPlan(
         buildCommands,
         keepsHistory: keepsReleases(app),
         cutover: release ? cutover : await changesOver(app, ownerId),
-        unresolved: references.unresolved
+        unresolved: references.unresolved,
+        imageRefChange: imageRef !== storedImage ? imageRef : undefined
     };
+}
+
+/** Keep a changed image on the service, so what Polaris shows and checks for
+ *  updates is the image it runs. */
+async function saveImageRef(applicationId: string, imageRef: string): Promise<void> {
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { sourceConfig: true }
+    });
+    if (!app) return;
+    const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    if (source.imageRef === imageRef) return;
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { sourceConfig: JSON.stringify({ ...source, imageRef }) }
+    });
 }
 
 /**
@@ -2624,11 +2674,16 @@ async function changesOver(
     if (!runsCutover(app, { followsPushedRoutes: true })) return false;
     if (!hostId) return true;
     const { readServerEdge } = await import("./deploy/server-edge");
-    return runsCutover(app, { followsPushedRoutes: (await readServerEdge(hostId, ownerId)).pushable });
+    return runsCutover(app, {
+        followsPushedRoutes: (await readServerEdge(hostId, ownerId)).pushable
+    });
 }
 
 /** A service's or database's stored ceilings as a plan carries them. */
-export function limitsOf(row: { cpuLimit: number | null; memoryLimitMb: number | null }): AppDeployPlan["limits"] {
+export function limitsOf(row: {
+    cpuLimit: number | null;
+    memoryLimitMb: number | null;
+}): AppDeployPlan["limits"] {
     if (row.cpuLimit === null && row.memoryLimitMb === null) return undefined;
     return {
         ...(row.cpuLimit !== null ? { cpus: row.cpuLimit } : {}),
@@ -2673,7 +2728,9 @@ export async function redeployForEnvScope(
               };
     const apps = await prisma.application.findMany({ where, select: { id: true } });
     for (const app of apps) {
-        await restartFromKeptImage(app.id, ownerId, actorId, "variables", audit).catch(() => undefined);
+        await restartFromKeptImage(app.id, ownerId, actorId, "variables", audit).catch(
+            () => undefined
+        );
     }
 }
 
@@ -2842,8 +2899,11 @@ export async function deployApplication(
 ): Promise<string> {
     const built = await buildAppPlan(applicationId, ownerId);
     const { plan, target, buildCommands, keepsHistory } = built;
+    // A kept image was made from the image the service ran before, so a service
+    // that now needs another one pulls it instead of running the kept one.
+    const keptImage = built.imageRefChange ? undefined : rollback?.imageTag;
     const scaled =
-        rollback?.kind === "scale"
+        rollback?.kind === "scale" && keptImage
             ? await prisma.deployment.findUnique({
                   where: { id: rollback.deploymentId },
                   select: { id: true, commitSha: true, cutover: true }
@@ -2865,7 +2925,9 @@ export async function deployApplication(
     const uploadArchive = rollback || prebuilt ? undefined : built.uploadArchive;
     const fromSource = plan.build.method === "dockerfile" || plan.build.method === "nixpacks";
     if (fromSource && !rollback && !prebuilt && !gitSource && !uploadArchive) {
-        throw new Error("This service has no source yet. Upload a folder or connect a repository first.");
+        throw new Error(
+            "This service has no source yet. Upload a folder or connect a repository first."
+        );
     }
     // Where a build from source runs, when that is not where the service does.
     const builder =
@@ -2932,7 +2994,9 @@ export async function deployApplication(
             // Only a rollback points back at the release it restored; a variable
             // change re-runs the live one and is not a step back.
             rollbackOfId:
-                rollback && (rollback.kind ?? "rollback") === "rollback" ? rollback.deploymentId : null,
+                rollback && (rollback.kind ?? "rollback") === "rollback"
+                    ? rollback.deploymentId
+                    : null,
             trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
         }
     });
@@ -2942,6 +3006,7 @@ export async function deployApplication(
     // id it records is what the states after it are posted against, and a build
     // that started first would find nothing to post against.
     await announceDeployQueued(deployment.id);
+    if (built.imageRefChange) await saveImageRef(applicationId, built.imageRefChange);
     // Every deploy is on the audit trail, whatever started it - a screen, the API,
     // a push, a rollback, a one-press fix, an installed app's redeploy. There are
     // more than twenty ways in and this is the one way through, so it is said
@@ -2979,8 +3044,8 @@ export async function deployApplication(
         ...planned,
         build: {
             ...planned.build,
-            ...(rollback
-                ? { rollbackImage: rollback.imageTag }
+            ...(keptImage
+                ? { rollbackImage: keptImage }
                 : prebuilt
                   ? { prebuilt }
                   : {
@@ -3083,15 +3148,21 @@ export async function restartFromKeptImage(
     if (!live?.imageKept || !isReleaseImage(live.imageTag)) {
         return deployApplication(applicationId, ownerId, userId, { trigger: reason, audit });
     }
-    return deployApplication(applicationId, ownerId, userId, { audit }, {
-        deploymentId: live.id,
-        imageTag: live.imageTag,
-        commitSha: live.commitSha,
-        commitMessage: live.commitMessage,
-        authorName: live.authorName,
-        authorAvatarUrl: live.authorAvatarUrl,
-        kind: reason
-    });
+    return deployApplication(
+        applicationId,
+        ownerId,
+        userId,
+        { audit },
+        {
+            deploymentId: live.id,
+            imageTag: live.imageTag,
+            commitSha: live.commitSha,
+            commitMessage: live.commitMessage,
+            authorName: live.authorName,
+            authorAvatarUrl: live.authorAvatarUrl,
+            kind: reason
+        }
+    );
 }
 
 /**
@@ -3141,15 +3212,25 @@ export async function rollbackToDeployment(
         select: { currentDeploymentId: true }
     });
     if (app?.currentDeploymentId === source.id) throw new Error("That release is already live.");
-    const started = await deployApplication(source.deployableId, ownerId, userId, { audit }, {
-        deploymentId: source.id,
-        imageTag: source.imageTag,
-        commitSha: source.commitSha,
-        commitMessage: source.commitMessage,
-        authorName: source.authorName,
-        authorAvatarUrl: source.authorAvatarUrl
-    });
-    return { deploymentId: started, applicationId: source.deployableId, commitSha: source.commitSha };
+    const started = await deployApplication(
+        source.deployableId,
+        ownerId,
+        userId,
+        { audit },
+        {
+            deploymentId: source.id,
+            imageTag: source.imageTag,
+            commitSha: source.commitSha,
+            commitMessage: source.commitMessage,
+            authorName: source.authorName,
+            authorAvatarUrl: source.authorAvatarUrl
+        }
+    );
+    return {
+        deploymentId: started,
+        applicationId: source.deployableId,
+        commitSha: source.commitSha
+    };
 }
 
 /** Keep a release's image past the window, or let the window have it again. */
@@ -3197,16 +3278,22 @@ export async function setDeploymentCanary(
         if (edge.canary?.deploymentId !== deploymentId) return;
         edge.canary = null;
     } else {
-        if (deploymentId === app.currentDeploymentId) throw new Error("That is the release already serving everybody.");
+        if (deploymentId === app.currentDeploymentId)
+            throw new Error("That is the release already serving everybody.");
         if (deployment.status !== "running" || !deployment.isolated || deployment.cutover) {
-            throw new Error("Only a previous deployment that is kept running can take a share of the traffic.");
+            throw new Error(
+                "Only a previous deployment that is kept running can take a share of the traffic."
+            );
         }
         if (!Number.isInteger(percent) || percent < 1 || percent > 50) {
             throw new Error("A share of the traffic is between 1 and 50 percent.");
         }
         edge.canary = { deploymentId, percent };
     }
-    await prisma.application.update({ where: { id: app.id }, data: { edgeConfig: JSON.stringify(edge) } });
+    await prisma.application.update({
+        where: { id: app.id },
+        data: { edgeConfig: JSON.stringify(edge) }
+    });
     await syncAppRoutes();
 }
 
@@ -3239,7 +3326,11 @@ export const ROLLBACK_WINDOW = 0;
 async function pruneReleaseImages(applicationId: string): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
-        select: { currentDeploymentId: true, target: true, environment: { select: { project: { select: { ownerId: true } } } } }
+        select: {
+            currentDeploymentId: true,
+            target: true,
+            environment: { select: { project: { select: { ownerId: true } } } }
+        }
     });
     if (!app) return;
     const rows = await prisma.deployment.findMany({
@@ -3260,7 +3351,11 @@ async function pruneReleaseImages(applicationId: string): Promise<void> {
                 continue;
             }
             await prisma.deployment.updateMany({
-                where: { deployableType: "application", deployableId: applicationId, imageTag: image },
+                where: {
+                    deployableType: "application",
+                    deployableId: applicationId,
+                    imageTag: image
+                },
                 data: { imageKept: false, pinned: false }
             });
         }
@@ -3519,7 +3614,10 @@ export async function listDeployments(
                 ? row.finishedAt.getTime() - row.startedAt.getTime()
                 : null,
         canTakeTraffic:
-            row.status === "running" && row.isolated && !row.cutover && row.id !== app.currentDeploymentId,
+            row.status === "running" &&
+            row.isolated &&
+            !row.cutover &&
+            row.id !== app.currentDeploymentId,
         trafficPercent: canary?.deploymentId === row.id ? canary.percent : null
     }));
 }
@@ -3651,13 +3749,19 @@ export async function setApplicationSourcePaths(
     // this service is built, not where it is. Cleared back to undefined when blank,
     // which is what hands the phase back to detection.
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
-    for (const key of ["installCommand", "buildCommand", "startCommand", "runtimeVersion"] as const) {
+    for (const key of [
+        "installCommand",
+        "buildCommand",
+        "startCommand",
+        "runtimeVersion"
+    ] as const) {
         const value = paths[key];
         if (value !== undefined) build[key] = value?.trim() || undefined;
     }
     // Relative to the service's directory, like the root directory is to the
     // repository's, so it goes through the same normalizer.
-    if (paths.outputDirectory !== undefined) build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
+    if (paths.outputDirectory !== undefined)
+        build.outputDirectory = normalizeRoot(paths.outputDirectory ?? undefined);
 
     await prisma.application.update({
         where: { id: app.id },
@@ -3844,7 +3948,8 @@ function runDeployment(
         scaling?.inPlace ? scaling.releaseId : undefined
     ).finally(async () => {
         // An uploaded release is loaded onto its machine by now, or never will be.
-        if (plan.build.prebuilt) await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
+        if (plan.build.prebuilt)
+            await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
     });
 }
 
@@ -3862,7 +3967,10 @@ async function prepareScale(releaseId: string, replicas: number): Promise<string
     if (serving === 0) {
         return "The release this was to scale was replaced by a deploy that ran first. Scaling again applies the count to the one serving now.";
     }
-    const release = await prisma.deployment.findUnique({ where: { id: releaseId }, select: { replicas: true } });
+    const release = await prisma.deployment.findUnique({
+        where: { id: releaseId },
+        select: { replicas: true }
+    });
     if (release?.replicas && replicas < release.replicas) {
         await prisma.deployment.update({ where: { id: releaseId }, data: { replicas } });
         await syncAppRoutes().catch(() => undefined);
@@ -3877,9 +3985,18 @@ async function prepareScale(releaseId: string, replicas: number): Promise<string
  * is the record of it and never serves anything itself.
  */
 async function settleScaleInPlace(deploymentId: string, releaseId: string): Promise<void> {
-    const step = await prisma.deployment.findUnique({ where: { id: deploymentId }, select: { replicas: true } });
-    await prisma.deployment.update({ where: { id: releaseId }, data: { replicas: step?.replicas ?? null } });
-    await prisma.deployment.update({ where: { id: deploymentId }, data: { status: "removed", imageKept: false } });
+    const step = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { replicas: true }
+    });
+    await prisma.deployment.update({
+        where: { id: releaseId },
+        data: { replicas: step?.replicas ?? null }
+    });
+    await prisma.deployment.update({
+        where: { id: deploymentId },
+        data: { status: "removed", imageKept: false }
+    });
     await syncAppRoutes().catch(() => undefined);
 }
 
@@ -4362,7 +4479,12 @@ const CUTOVER_DRAIN_MS = 5_000;
  */
 async function retireReplaced(
     applicationId: string,
-    replaced: readonly { id: string; commitSha: string | null; isolated: boolean; cutover: boolean }[]
+    replaced: readonly {
+        id: string;
+        commitSha: string | null;
+        isolated: boolean;
+        cutover: boolean;
+    }[]
 ): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
@@ -4392,7 +4514,10 @@ async function retireReplaced(
         await ports.dispose().catch(() => undefined);
     }
     await prisma.deployment.updateMany({
-        where: { id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) }, status: "running" },
+        where: {
+            id: { in: replaced.filter((row) => row.cutover).map((row) => row.id) },
+            status: "running"
+        },
         data: { status: "removed", finishedAt: new Date() }
     });
 }
@@ -4415,9 +4540,13 @@ async function abandonRelease(deploymentId: string, open?: RuntimePorts): Promis
         include: { environment: { include: { project: true } }, target: true }
     });
     if (!app) return;
-    const project = releaseRef(serviceRef(app.environment.project.slug, app.slug, app.id), markerOf(row)).project;
+    const project = releaseRef(
+        serviceRef(app.environment.project.slug, app.slug, app.id),
+        markerOf(row)
+    ).project;
     if (project === (await currentReleaseRef(app)).project) return;
-    const ports = open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
+    const ports =
+        open ?? (await getPorts(app.target as TargetRow, app.environment.project.ownerId));
     try {
         await ports.composeDown(project).catch(() => undefined);
     } finally {
