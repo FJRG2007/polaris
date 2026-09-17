@@ -27,7 +27,7 @@ import {
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, listHosts, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
-import { prepareServerEdge, readServerEdge, type ServerEdgeState } from "@/lib/deploy/server-edge";
+import * as serverEdge from "@/lib/deploy/server-edge";
 import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
     createEnrollmentSchema,
@@ -589,9 +589,9 @@ export async function removeStrayContainerAction(id: string): Promise<{ error?: 
  * by the panel that draws the answer rather than by the page, and the screen is
  * complete before it comes back.
  */
-export async function serverEdgeAction(hostId: string): Promise<ServerEdgeState> {
+export async function serverEdgeAction(hostId: string): Promise<serverEdge.ServerEdgeState> {
     const user = await requirePermission("system.manage");
-    return readServerEdge(hostId, user.id);
+    return serverEdge.readServerEdge(hostId, user.id);
 }
 
 /**
@@ -609,10 +609,12 @@ export async function prepareServerEdgeAction(hostId: string): Promise<{ error?:
         // The same target the deploy pipeline uses, so the proxy network the edge
         // joins is the one deployed containers are already on. Two networks is an
         // edge that cannot reach a single thing it is meant to be routing.
-        const target = await getOrCreateHostTarget(host.id, user.id, host.name);
         let log = "";
-        await prepareServerEdge(host.id, user.id, target.proxyNetwork, (chunk) => {
-            log += chunk;
+        await serverEdge.withSetupLock(host.id, async () => {
+            const target = await getOrCreateHostTarget(host.id, user.id, host.name);
+            await serverEdge.prepareServerEdge(host.id, user.id, target.proxyNetwork, (chunk) => {
+                log += chunk;
+            });
         });
         await recordAudit({
             actorId: user.id,

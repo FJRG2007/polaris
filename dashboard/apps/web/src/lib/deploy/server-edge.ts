@@ -59,7 +59,7 @@ export function edgeLauncher(elevate: boolean): string {
         "f=$(mktemp) || exit 1",
         "trap 'rm -f \"$f\"' EXIT",
         'cat > "$f"',
-        'shell=$(command -v bash || command -v sh)',
+        "shell=$(command -v bash || command -v sh)",
         `${elevate ? "sudo -n " : ""}"$shell" "$f"`
     ].join("\n");
 }
@@ -68,22 +68,63 @@ export function edgeLauncher(elevate: boolean): string {
 export const NEEDS_ROOT =
     "Setting this server up needs root, and Polaris was not given it here: it installs Docker and writes under /var/lib/polaris. Remove the server and add it again with the command from Add server, which grants it.";
 
+/** Why a setup was refused: one is already running on that server. */
+export const SETUP_RUNNING = "This server is already being set up. Wait for that to finish.";
+
+/** Hosts being set up right now. On `globalThis` so the enrollment route and the
+ *  server action share one set, and a dev reload does not drop it. */
+const SETTING_UP = Symbol.for("polaris.servers.setting-up");
+
+function settingUp(): Set<string> {
+    const held = globalThis as { [SETTING_UP]?: Set<string> };
+    held[SETTING_UP] ??= new Set();
+    return held[SETTING_UP];
+}
+
+export function isSettingUp(hostId: string): boolean {
+    return settingUp().has(hostId);
+}
+
+/**
+ * Run `task` as the only setup of this server. Two at once fight over the package
+ * manager's lock and both replace the same Traefik, so a second is refused.
+ */
+export async function withSetupLock<T>(hostId: string, task: () => Promise<T>): Promise<T> {
+    if (isSettingUp(hostId)) throw new Error(SETUP_RUNNING);
+    settingUp().add(hostId);
+    try {
+        return await task();
+    } finally {
+        settingUp().delete(hostId);
+    }
+}
+
 /**
  * The sentence for a failed setup, out of what the server printed.
  *
- * A refusal to write is the one failure with a known cause, so it is said as that
- * cause - the raw `mkdir: ... Permission denied` names a path and nothing to do.
+ * A refused sudo, and a refusal to write by a login that never had root, are the
+ * failures with a known cause, so they are said as that cause - the raw
+ * `mkdir: ... Permission denied` names a path and nothing to do. With root in
+ * hand a refusal to write means something else, and is passed through.
  */
-export function setupFailure(complaint: string, elevated: boolean): string {
-    if (/permission denied|operation not permitted/i.test(complaint)) {
-        return elevated
-            ? "The server refused to let Polaris act as root, although it was enrolled with root access. Its sudo rule may have been removed: add the server again with the command from Add server."
-            : NEEDS_ROOT;
-    }
-    if (/sudo: a password is required|sudo: .*not allowed|may not run sudo/i.test(complaint)) {
-        return elevated
+export function setupFailure(
+    complaint: string,
+    access: { readonly elevated: boolean; readonly asRoot: boolean }
+): string {
+    if (
+        !access.asRoot &&
+        /sudo: a password is required|sudo: .*not allowed|may not run sudo/i.test(complaint)
+    ) {
+        return access.elevated
             ? "The server no longer lets Polaris act as root without a password. Add the server again with the command from Add server, which puts that back."
             : NEEDS_ROOT;
+    }
+    if (
+        !access.elevated &&
+        !access.asRoot &&
+        /permission denied|operation not permitted/i.test(complaint)
+    ) {
+        return NEEDS_ROOT;
     }
     return (
         complaint.trim().split(/\r?\n/).at(-1)?.slice(0, 200) ||
@@ -103,6 +144,8 @@ export interface ServerEdgeState {
      *  edge without it still serves everything deployed to it; what it cannot do
      *  is take a domain or a firewall change without the service being rebuilt. */
     readonly pushable: boolean;
+    /** Whether Polaris is setting this server up right now. */
+    readonly settingUp: boolean;
     /** Why the server could not be asked, where it could not. Its own words. */
     readonly error: string | null;
 }
@@ -111,6 +154,7 @@ const UNREACHABLE: ServerEdgeState = {
     traefik: false,
     guard: false,
     pushable: false,
+    settingUp: false,
     error: null
 };
 
@@ -130,7 +174,7 @@ const PROBE = [
 
 /** What the probe said, out of its own output. Anything unrecognised is false,
  *  which is the answer that offers to fix it rather than the one that hides it. */
-export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error"> {
+export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error" | "settingUp"> {
     const said = (key: string): string => {
         const found = output.split(/\r?\n/).find((line) => line.trim().startsWith(`${key}=`));
         return found ? found.trim().slice(key.length + 1) : "";
@@ -159,14 +203,18 @@ export async function readServerEdge(hostId: string, ownerId: string): Promise<S
                     said += chunk.toString("utf8");
                 }
             });
-            return { ...readEdgeProbe(said), error: null };
+            return { ...readEdgeProbe(said), settingUp: isSettingUp(hostId), error: null };
         } finally {
             client.end();
         }
     } catch (error) {
         // A server that is asleep or has moved is not a server with a broken edge,
         // and the screen has to be able to say which of the two it is looking at.
-        return { ...UNREACHABLE, error: error instanceof Error ? error.message : "It could not be reached" };
+        return {
+            ...UNREACHABLE,
+            settingUp: isSettingUp(hostId),
+            error: error instanceof Error ? error.message : "It could not be reached"
+        };
     }
 }
 
@@ -224,7 +272,8 @@ export async function prepareServerEdge(
                 onOutput?.(text);
             }
         });
-        if (result.code !== 0) throw new Error(setupFailure(complaint, elevate));
+        if (result.code !== 0)
+            throw new Error(setupFailure(complaint, { elevated: elevate, asRoot }));
     } finally {
         client.end();
     }
@@ -235,16 +284,21 @@ export async function prepareServerEdge(
  *
  * Nothing is replaced: a server whose own edge is already running is left as it
  * is, because setting up again stops what it serves for a moment and that is the
- * operator's call. What happened is written into the server's history, since
- * nobody is watching when this runs.
+ * operator's call, and so is a setup somebody already started. What happened is
+ * written into the server's history, since nobody is watching when this runs.
  */
 export async function setUpNewServer(hostId: string, ownerId: string, name: string): Promise<void> {
+    if (isSettingUp(hostId)) return;
     try {
-        const state = await readServerEdge(hostId, ownerId);
-        if (state.error || state.traefik) return;
-        const target = await getOrCreateHostTarget(hostId, ownerId, name);
-        await prepareServerEdge(hostId, ownerId, target.proxyNetwork);
-        await recordServerEvent(hostId, null, "edge-ready");
+        const ready = await withSetupLock(hostId, async () => {
+            const state = await readServerEdge(hostId, ownerId);
+            if (state.error) throw new Error(state.error);
+            if (state.traefik) return false;
+            const target = await getOrCreateHostTarget(hostId, ownerId, name);
+            await prepareServerEdge(hostId, ownerId, target.proxyNetwork);
+            return true;
+        });
+        if (ready) await recordServerEvent(hostId, null, "edge-ready");
     } catch (error) {
         await recordServerEvent(hostId, null, "edge-failed", {
             to: error instanceof Error ? error.message : "It could not be set up"

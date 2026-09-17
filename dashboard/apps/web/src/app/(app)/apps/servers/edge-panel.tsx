@@ -42,6 +42,15 @@ export function EdgePanel({ hostId }: { hostId: string }) {
         void ask();
     }, [ask]);
 
+    // A setup started elsewhere, such as the one that follows enrollment, is
+    // watched until it ends so the panel says what it left behind.
+    const elsewhere = state?.settingUp === true && !busy;
+    useEffect(() => {
+        if (!elsewhere) return;
+        const timer = setInterval(() => void ask(), 10_000);
+        return () => clearInterval(timer);
+    }, [elsewhere, ask]);
+
     const prepare = async () => {
         setBusy(true);
         setError("");
@@ -62,6 +71,13 @@ export function EdgePanel({ hostId }: { hostId: string }) {
     return (
         <section className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">Serving its own domains</h2>
+
+            {elsewhere && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                    Polaris is setting this server up now. This can take a few minutes.
+                </p>
+            )}
 
             {state === null ? (
                 <p className="text-sm text-muted-foreground">
@@ -92,7 +108,10 @@ export function EdgePanel({ hostId }: { hostId: string }) {
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -107,15 +126,19 @@ export function EdgePanel({ hostId }: { hostId: string }) {
                 <Button
                     size="sm"
                     variant={ready ? "outline" : "primary"}
-                    disabled={busy}
+                    disabled={busy || elsewhere}
                     onClick={() => void prepare()}
                 >
-                    {busy ? (
+                    {busy || elsewhere ? (
                         <Loader2 className="size-4 shrink-0 animate-spin" />
                     ) : (
                         <RefreshCw className="size-4 shrink-0" />
                     )}
-                    {busy ? "Setting it up" : ready ? "Set it up again" : "Set this server up"}
+                    {busy || elsewhere
+                        ? "Setting it up"
+                        : ready
+                          ? "Set it up again"
+                          : "Set this server up"}
                 </Button>
                 <span className="text-xs text-muted-foreground">
                     Installs Docker if it is missing, and starts this server&apos;s own edge. It

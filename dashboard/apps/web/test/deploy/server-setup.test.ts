@@ -69,9 +69,17 @@ vi.mock("@polaris/ssh", () => ({
     }
 }));
 
-const { edgeLauncher, NEEDS_ROOT, prepareServerEdge, setUpNewServer, setupFailure } = await import(
-    "@/lib/deploy/server-edge"
-);
+const {
+    edgeLauncher,
+    isSettingUp,
+    NEEDS_ROOT,
+    prepareServerEdge,
+    readServerEdge,
+    SETUP_RUNNING,
+    setUpNewServer,
+    setupFailure,
+    withSetupLock
+} = await import("@/lib/deploy/server-edge");
 const { setsUpOnEnrollment } = await import("@/lib/enrollment-setup");
 
 beforeEach(() => {
@@ -131,29 +139,69 @@ describe("the launcher", () => {
 });
 
 describe("what a failed setup says", () => {
+    const elevated = { elevated: true, asRoot: false };
+    const unprivileged = { elevated: false, asRoot: false };
+    const root = { elevated: false, asRoot: true };
+
     it("names missing root rather than a path", () => {
         const said = setupFailure(
             "mkdir: cannot create directory '/var/lib/polaris': Permission denied",
-            false
+            unprivileged
         );
         expect(said).toBe(NEEDS_ROOT);
         expect(said).toMatch(/Add server/);
     });
 
     it("says the sudo rule is gone when root was granted and refused", () => {
-        expect(setupFailure("sudo: a password is required", true)).toMatch(
+        expect(setupFailure("sudo: a password is required", elevated)).toMatch(
             /no longer lets Polaris act as root/
-        );
-        expect(setupFailure("chown: changing ownership: Operation not permitted", true)).toMatch(
-            /refused to let Polaris act as root/
         );
     });
 
+    it("does not blame root for a refusal it had root for", () => {
+        const complaint = "warning: Permission denied\nchown: /mnt/ro: Read-only file system\n";
+        expect(setupFailure(complaint, elevated)).toBe("chown: /mnt/ro: Read-only file system");
+        expect(setupFailure(complaint, root)).toBe("chown: /mnt/ro: Read-only file system");
+    });
+
     it("passes anything else through as its last line", () => {
-        expect(setupFailure("pulling\nError: port 80 is already allocated\n", true)).toBe(
+        expect(setupFailure("pulling\nError: port 80 is already allocated\n", elevated)).toBe(
             "Error: port 80 is already allocated"
         );
-        expect(setupFailure("", true)).toBe("That server refused to set itself up");
+        expect(setupFailure("", elevated)).toBe("That server refused to set itself up");
+    });
+});
+
+describe("one setup at a time", () => {
+    it("refuses a second setup of the same server while the first runs", async () => {
+        let finish = () => {};
+        const first = withSetupLock("h1", () => new Promise<void>((done) => (finish = done)));
+        expect(isSettingUp("h1")).toBe(true);
+        expect((await readServerEdge("h1", "o1")).settingUp).toBe(true);
+        await expect(withSetupLock("h1", async () => {})).rejects.toThrow(SETUP_RUNNING);
+        await expect(withSetupLock("h2", async () => "other")).resolves.toBe("other");
+        finish();
+        await first;
+        expect(isSettingUp("h1")).toBe(false);
+    });
+
+    it("releases the server when a setup fails", async () => {
+        await expect(
+            withSetupLock("h1", async () => {
+                throw new Error("boom");
+            })
+        ).rejects.toThrow("boom");
+        expect(isSettingUp("h1")).toBe(false);
+    });
+
+    it("leaves a new server alone while somebody is already setting it up", async () => {
+        let finish = () => {};
+        const manual = withSetupLock("h1", () => new Promise<void>((done) => (finish = done)));
+        await setUpNewServer("h1", "o1", "ubuntu");
+        expect(commands).toEqual([]);
+        expect(events).toEqual([]);
+        finish();
+        await manual;
     });
 });
 
@@ -171,6 +219,14 @@ describe("a server that has just been enrolled", () => {
         await setUpNewServer("h1", "o1", "ubuntu");
         expect(commands.some((run) => run.command.includes("mktemp"))).toBe(false);
         expect(events).toEqual([]);
+    });
+
+    it("writes down that it could not reach the server", async () => {
+        const ssh = await import("@polaris/ssh");
+        vi.spyOn(ssh, "openSshClient").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+        await setUpNewServer("h1", "o1", "ubuntu");
+        expect(commands).toEqual([]);
+        expect(events).toEqual([{ action: "edge-failed", values: { to: "connect ECONNREFUSED" } }]);
     });
 
     it("writes down why it could not be set up", async () => {
