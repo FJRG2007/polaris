@@ -106,6 +106,11 @@ model User {
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.
     notifyPrefs   String?
+    // How loud Polaris' own sounds are for this account - the chime for an
+    // alert, a message, a ring - as a percentage. Null follows the default in
+    // code, which is full volume, so an account that never chose keeps what it
+    // always heard.
+    soundVolume   Int?
     // How this account reads mail - the order lists come in, when an opened
     // message stops being unread, where the screen goes after one is filed, and
     // how long a sent message can be caught back - as stringified JSON. A
