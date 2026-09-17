@@ -174,7 +174,8 @@ export interface ChatQuoteView {
     readonly id: string;
     /** Where the quoted message lives. A reply's is always this conversation; a
      *  forward's is usually another, which is what pressing the quote travels to.
-     *  Null when the message is gone and nothing is known about it. */
+     *  Null when the message is gone and nothing is known about it, or when it
+     *  lives in a conversation the reader cannot open. */
     readonly channelId: string | null;
     readonly authorName: string | null;
     /** Trimmed to a line: a quote that repeats a paragraph is the paragraph
@@ -1574,6 +1575,11 @@ export async function decorateMessages(
         ])
     );
     const quotes = new Map(quoted.map((row) => [row.id, row]));
+    const quotedElsewhere = rows.some((row) => {
+        const original = row.replyToId ? quotes.get(row.replyToId) : undefined;
+        return original !== undefined && original.channelId !== row.channelId;
+    });
+    const quoteReachable = quotedElsewhere ? await reachableChannelIds(actor) : new Set<string>();
     const kept = new Set(stars.map((row) => row.messageId));
     /**
      * The messages on this page that name the reader.
@@ -1661,7 +1667,7 @@ export async function decorateMessages(
             ),
         attachments: onMessageFiles.get(row.id) ?? [],
         poll: polls.get(row.id) ?? null,
-        quote: quoteViewOf(row, quotes, names),
+        quote: quoteViewOf(row, quotes, names, quoteReachable),
         starred: kept.has(row.id),
         blocked: row.authorId !== null && shut.has(row.authorId),
         mentionsYou: mentioned.has(row.id),
@@ -1792,7 +1798,8 @@ function quoteViewOf(
             deletedAt: Date | null;
         }
     >,
-    names: ReadonlyMap<string, string>
+    names: ReadonlyMap<string, string>,
+    reachable: ReadonlySet<string>
 ): ChatQuoteView | null {
     if (!row.replyToId) return null;
     const original = quotes.get(row.replyToId);
@@ -1811,7 +1818,10 @@ function quoteViewOf(
     }
     return {
         id: original.id,
-        channelId: original.channelId,
+        channelId:
+            original.channelId === row.channelId || reachable.has(original.channelId)
+                ? original.channelId
+                : null,
         authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,
         // The words, not the Markdown they were written in. A quote that read
         // "```py print(1) ```" showed the reader the fence rather than the code.

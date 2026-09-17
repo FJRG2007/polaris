@@ -33,6 +33,14 @@ vi.mock("@/lib/privacy-service", () => ({
         new Set(ids.filter((id) => !refusing.includes(id)))
 }));
 
+/** The conversations the reader can open, for a forward's quote. */
+let reachable: string[] = [];
+
+vi.mock("@/lib/chat/access", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/chat/access")>("@/lib/chat/access");
+    return { ...actual, reachableChannelIds: async () => new Set(reachable) };
+});
+
 vi.mock("@/lib/chat/rules", () => ({
     rulesForChannel: async () => ({
         keepEditHistory: false,
@@ -70,6 +78,17 @@ const original = {
     createdAt: SENT
 };
 
+/** Ada's forward of it into a conversation of her own. */
+const forwarded = {
+    ...original,
+    id: "forwarded-1",
+    channelId: "channel-2",
+    authorId: "ada" as string | null,
+    body: "",
+    replyToId: "message-1",
+    forwarded: true
+};
+
 let created: number;
 
 vi.mock("@polaris/db", () => {
@@ -90,6 +109,7 @@ vi.mock("@polaris/db", () => {
         },
         chatChannelMember: {
             findUnique: async () => ({ role: "member" }),
+            findFirst: async () => null,
             findMany: async () => [],
             updateMany: async () => undefined,
             upsert: async () => undefined
@@ -97,7 +117,8 @@ vi.mock("@polaris/db", () => {
         chatMessage: {
             findUnique: async () => original,
             findFirst: async () => null,
-            findMany: async () => [],
+            findMany: async ({ where }: { where?: { id?: { in?: string[] } } }) =>
+                where?.id?.in?.includes(original.id) ? [original] : [],
             count: async () => 0,
             create: async () => {
                 created += 1;
@@ -125,6 +146,7 @@ const ada = { id: "ada" };
 
 beforeEach(() => {
     refusing = [];
+    reachable = ["channel-2"];
     created = 0;
     original.deletedAt = null;
     original.authorId = "grace";
@@ -173,5 +195,23 @@ describe("a message nobody is left to ask", () => {
         original.deletedAt = SENT;
         const [view] = await decorateMessages(ada, [original]);
         expect(view?.forwardable).toBe(false);
+    });
+});
+
+describe("the quote on a forward", () => {
+    it("points at the room it came from when the reader can open it", async () => {
+        reachable = ["channel-1", "channel-2"];
+        const [view] = await decorateMessages(ada, [forwarded]);
+        expect(view?.quote).toMatchObject({ id: "message-1", channelId: "channel-1" });
+    });
+
+    it("does not name a room the reader cannot open", async () => {
+        const [view] = await decorateMessages(ada, [forwarded]);
+        expect(view?.quote).toMatchObject({
+            id: "message-1",
+            channelId: null,
+            excerpt: "the thing she said",
+            deleted: false
+        });
     });
 });
