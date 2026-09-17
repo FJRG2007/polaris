@@ -22,6 +22,8 @@ type Install = {
 let installs: Install[] = [];
 const removed: string[] = [];
 const deployed: string[] = [];
+const stopped = new Set<string>();
+const failing = new Set<string>();
 
 function matches(row: Install, where: Record<string, unknown>): boolean {
     return Object.entries(where).every(([key, value]) => {
@@ -43,15 +45,22 @@ vi.mock("@polaris/db", () => ({
             findFirst: async ({ where }: { where: Record<string, unknown> }) =>
                 installs.find((row) => matches(row, where)) ?? null
         },
+        application: {
+            findFirst: async ({ where }: { where: { id: string } }) => ({
+                desiredState: stopped.has(where.id) ? "stopped" : "running"
+            })
+        },
         mailServer: { findFirst: async () => null }
     }
 }));
 
 vi.mock("@/lib/deploy-service", () => ({
     removeApplicationDeployment: async (applicationId: string) => {
+        if (failing.has(applicationId)) throw new Error("daemon unavailable");
         removed.push(applicationId);
     },
     deployApplication: async (applicationId: string) => {
+        if (failing.has(applicationId)) throw new Error("daemon unavailable");
         deployed.push(applicationId);
     }
 }));
@@ -92,6 +101,8 @@ beforeEach(() => {
     installs = [];
     removed.length = 0;
     deployed.length = 0;
+    stopped.clear();
+    failing.clear();
     invalidateInstallPresence();
 });
 
@@ -131,6 +142,46 @@ describe("Places' helper containers", () => {
         deployed.length = 0;
         await resumeOwnedServices("home", OWNER);
         expect(deployed).toEqual([]);
+    });
+
+    it("leave a helper the operator had switched off switched off", async () => {
+        installs.push(install({ catalogId: "camera-hub", applicationId: "app-relay" }));
+        installs.push(install({ catalogId: "face-recognizer", applicationId: "app-face" }));
+        stopped.add("app-face");
+        await pauseOwnedServices("home");
+        expect(removed.sort()).toEqual(["app-face", "app-relay"]);
+
+        await resumeOwnedServices("home", OWNER);
+        expect(deployed).toEqual(["app-relay"]);
+    });
+
+    it("keep a helper that failed to come back marked for the next try", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        installs.push(install({ catalogId: "camera-hub", applicationId: "app-relay" }));
+        await pauseOwnedServices("home");
+
+        failing.add("app-relay");
+        await resumeOwnedServices("home", OWNER);
+        expect(deployed).toEqual([]);
+        expect(error).toHaveBeenCalled();
+
+        failing.clear();
+        await resumeOwnedServices("home", OWNER);
+        expect(deployed).toEqual(["app-relay"]);
+        error.mockRestore();
+    });
+
+    it("are not marked paused when they could not be brought down", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        installs.push(install({ catalogId: "camera-hub", applicationId: "app-relay" }));
+        failing.add("app-relay");
+        await pauseOwnedServices("home");
+        expect(error).toHaveBeenCalled();
+
+        failing.clear();
+        await resumeOwnedServices("home", OWNER);
+        expect(deployed).toEqual([]);
+        error.mockRestore();
     });
 });
 

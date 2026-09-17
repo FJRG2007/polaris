@@ -74,14 +74,22 @@ export async function pauseOwnedServices(catalogId: string): Promise<void> {
             status: { not: "removed" },
             applicationId: { not: null }
         },
-        select: { id: true, ownerId: true, applicationId: true }
+        select: { id: true, ownerId: true, catalogId: true, applicationId: true }
     });
     for (const install of installs) {
-        if (!install.applicationId) continue;
-        await removeApplicationDeployment(install.applicationId, install.ownerId).catch(
-            () => undefined
-        );
-        await patchInstallConfig(install.id, { [PAUSED_KEY]: true }).catch(() => undefined);
+        const applicationId = install.applicationId as string;
+        const application = await prisma.application.findFirst({
+            where: { id: applicationId },
+            select: { desiredState: true }
+        });
+        try {
+            await removeApplicationDeployment(applicationId, install.ownerId);
+            if (application?.desiredState === "running") {
+                await patchInstallConfig(install.id, { [PAUSED_KEY]: true });
+            }
+        } catch (error) {
+            console.error(`polaris: could not bring down ${install.catalogId}:`, error);
+        }
     }
 }
 
@@ -98,14 +106,22 @@ export async function resumeOwnedServices(
             status: { not: "removed" },
             applicationId: { not: null }
         },
-        select: { id: true, ownerId: true, applicationId: true, config: true }
+        select: { id: true, ownerId: true, catalogId: true, applicationId: true, config: true }
     });
     for (const install of installs) {
         if (!install.applicationId || readInstallConfig(install.config)[PAUSED_KEY] !== true)
             continue;
-        await deployApplication(install.applicationId, install.ownerId, actorId).catch(
-            () => undefined
-        );
-        await patchInstallConfig(install.id, { [PAUSED_KEY]: false }).catch(() => undefined);
+        const application = await prisma.application.findFirst({
+            where: { id: install.applicationId },
+            select: { desiredState: true }
+        });
+        try {
+            if (application?.desiredState === "running") {
+                await deployApplication(install.applicationId, install.ownerId, actorId);
+            }
+            await patchInstallConfig(install.id, { [PAUSED_KEY]: false });
+        } catch (error) {
+            console.error(`polaris: could not bring back ${install.catalogId}:`, error);
+        }
     }
 }
