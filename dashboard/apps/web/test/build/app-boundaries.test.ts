@@ -33,11 +33,9 @@ const APPS: Readonly<Record<string, readonly RegExp[]>> = {
         /^app\/api\/minecraft\//,
         /^app\/api\/apps\/installed\/\[id\]\/(minecraft|ark|fivem|game)\//
     ],
-    places: [
-        /^lib\/home\//,
-        /^app\/\(app\)\/places\//,
-        /^app\/api\/home\//
-    ]
+    // Places lives in its own package now (`apps/places`); what is left here
+    // are its route bridges, which `app-packages.test.ts` holds to that.
+    places: []
 };
 
 /** The files allowed to name an app's code: the lists of installed extensions. */

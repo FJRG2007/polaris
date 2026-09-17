@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { filterCameras, zonesOf } from "@/lib/home/camera-filter";
+import { filterCameras, zonesOf } from "@polaris-app/places/src/lib/camera-filter";
 
 const CAMERAS = [
     { name: "Front door", zone: "Outside", address: "192.168.1.10" },

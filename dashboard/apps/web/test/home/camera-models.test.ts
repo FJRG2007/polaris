@@ -17,8 +17,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseCameraInput } from "@/lib/home/schemas";
-import { DEFAULT_DETECTION } from "@/lib/home/detection";
+import { parseCameraInput } from "@polaris-app/places/src/lib/schemas";
+import { DEFAULT_DETECTION } from "@polaris-app/places/src/lib/detection";
 import {
     CAMERA_MODELS,
     askPowerFor,
@@ -31,7 +31,7 @@ import {
     modelCanPan,
     searchModels,
     vendorForModel
-} from "@/lib/home/camera-models";
+} from "@polaris-app/places/src/lib/camera-models";
 
 describe("finding a camera by what is written on it", () => {
     it("finds the model by its own name", () => {

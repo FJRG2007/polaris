@@ -12,11 +12,13 @@
  * window reads as before, and a switched-off camera never claims to be quiet.
  */
 
-import type { CameraView } from "@/lib/home/cameras";
-import { OFFLINE_GRACE_MS } from "@/lib/home/availability";
+import type { CameraView } from "@polaris-app/places/src/lib/cameras";
+import { OFFLINE_GRACE_MS } from "@polaris-app/places/src/lib/availability";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { CamerasView } from "@/app/(app)/places/cameras/cameras-view";
+import { CamerasView } from "@polaris-app/places/src/screens/cameras/cameras-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
 let cameras: CameraView[] = [];
 
@@ -30,7 +32,7 @@ vi.mock("@/app/(app)/access-actions", () => ({
     findSharePeopleAction: async () => ({ people: [] })
 }));
 
-vi.mock("@/app/(app)/places/actions", () => ({
+vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listCamerasAction: async () => ({ cameras }),
     listServersAction: async () => ({ servers: [] }),
     listStorageOptionsAction: async () => ({ options: [] }),

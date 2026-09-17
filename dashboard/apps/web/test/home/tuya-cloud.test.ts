@@ -17,7 +17,7 @@
  */
 
 import { createHash, createHmac } from "node:crypto";
-import { tuyaCloudDriver } from "@/lib/home/drivers/tuya-cloud";
+import { tuyaCloudDriver } from "@polaris-app/places/src/lib/drivers/tuya-cloud";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ACCESS_SECRET = "secret-secret-secret";

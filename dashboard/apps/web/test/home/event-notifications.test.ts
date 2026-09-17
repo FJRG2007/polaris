@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { alertRuleInputSchema } from "@/lib/home/schemas";
+import { alertRuleInputSchema } from "@polaris-app/places/src/lib/schemas";
 import { NOTIFICATION_EVENTS, notificationEvent, resolveRule } from "@polaris/core";
 
 /** Every event id Places hands the dispatcher. An id nothing declares is

@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const SOURCE = readFileSync(
-    resolve(import.meta.dirname, "../../src/app/(app)/places/actions.ts"),
+    resolve(import.meta.dirname, "../../../places/src/screens/actions.ts"),
     "utf8"
 );
 

@@ -6,8 +6,10 @@
  * app ships as a bundle instead, its line here is replaced by the bundle loader.
  */
 
+// First: the apps below take the dashboard's services from it as they load.
+import "@/lib/app-host/server";
 import type { AppExtension } from "./types";
-import { placesExtension } from "@/lib/home/places-extension";
+import { placesExtension } from "@polaris-app/places/src/lib/places-extension";
 import { gameServersExtension } from "@/lib/apps/games-extension";
 
 export function installedExtensions(): readonly AppExtension[] {

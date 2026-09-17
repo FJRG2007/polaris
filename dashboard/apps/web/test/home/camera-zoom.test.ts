@@ -21,7 +21,7 @@ import {
     panBy,
     zoomBy,
     zoomTransform
-} from "@/lib/home/zoom";
+} from "@polaris/ui/zoom";
 
 describe("how far in it goes", () => {
     it("starts all the way out", () => {

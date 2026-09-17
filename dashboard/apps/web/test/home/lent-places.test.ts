@@ -12,7 +12,7 @@
  * a place that is not theirs.
  */
 
-import type { PlaceView } from "@/lib/home/place-kinds";
+import type { PlaceView } from "@polaris-app/places/src/lib/place-kinds";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Row {
@@ -41,7 +41,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { placesHolding } = await import("@/lib/home/places");
+const { placesHolding } = await import("@polaris-app/places/src/lib/places");
 
 /** Three properties, of which one is the visitor's business. */
 const ALL: PlaceView[] = [

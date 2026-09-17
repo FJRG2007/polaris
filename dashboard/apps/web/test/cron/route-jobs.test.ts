@@ -17,7 +17,7 @@ const CRON_DIR = join(process.cwd(), "src/app/api/cron");
 const JOBS = [
     "src/lib/cron/jobs.ts",
     "src/lib/apps/games-jobs.ts",
-    "src/lib/home/places-extension.ts"
+    "../places/src/lib/places-extension.ts"
 ]
     .map((path) => readFileSync(join(process.cwd(), path), "utf8"))
     .join("\n");

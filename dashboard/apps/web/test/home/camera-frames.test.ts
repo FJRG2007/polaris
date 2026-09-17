@@ -17,11 +17,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** What `snapshot` was asked for, in order. */
 const asked: { quality: string; options: { width?: number; cacheMs?: number } }[] = [];
 
-vi.mock("@/lib/home/cameras", () => ({
+vi.mock("@polaris-app/places/src/lib/cameras", () => ({
     getCamera: async (_install: string, id: string) => ({ id, enabled: true, reachVia: null })
 }));
 
-vi.mock("@/lib/home/relay", () => ({
+vi.mock("@polaris-app/places/src/lib/relay", () => ({
     relayEndpoint: async () => ({ baseUrl: "http://relay:1984", key: "k" }),
     relayServerFor: () => null,
     snapshot: async (
@@ -39,7 +39,7 @@ vi.mock("@/lib/home/relay", () => ({
     hlsAssetPath: () => "/api/hls/playlist.m3u8"
 }));
 
-const live = await import("../../src/lib/home/live");
+const live = await import("@polaris-app/places/src/lib/live");
 
 beforeEach(() => {
     asked.length = 0;

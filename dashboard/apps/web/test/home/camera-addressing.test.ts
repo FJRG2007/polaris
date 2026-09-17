@@ -8,11 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { attrValues, tagValue, tagValues } from "@/lib/home/onvif";
-import { hostsInCidr, vendorFromScopes } from "@/lib/home/discovery";
-import { cameraVendor, redactRtspUrl, rtspUrl } from "@/lib/home/vendors";
-import { normalizeAddress, normalizeCameraInput, normalizeStreamPath } from "@/lib/home/schemas";
-import { DEFAULT_DETECTION, detectorReaches, needsSomewhereToRun, withinHours } from "@/lib/home/detection";
+import { attrValues, tagValue, tagValues } from "@polaris-app/places/src/lib/onvif";
+import { hostsInCidr, vendorFromScopes } from "@polaris-app/places/src/lib/discovery";
+import { cameraVendor, redactRtspUrl, rtspUrl } from "@polaris-app/places/src/lib/vendors";
+import { normalizeAddress, normalizeCameraInput, normalizeStreamPath } from "@polaris-app/places/src/lib/schemas";
+import { DEFAULT_DETECTION, detectorReaches, needsSomewhereToRun, withinHours } from "@polaris-app/places/src/lib/detection";
 
 describe("addresses", () => {
     it("keeps just the host, however it was pasted", () => {

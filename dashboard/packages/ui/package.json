@@ -10,7 +10,11 @@
             "import": "./src/index.ts"
         },
         "./styles.css": "./src/styles/tokens.css",
-        "./preset": "./src/tailwind-preset.ts"
+        "./preset": "./src/tailwind-preset.ts",
+        "./zoom": {
+            "types": "./src/lib/zoom.ts",
+            "import": "./src/lib/zoom.ts"
+        }
     },
     "scripts": {
         "typecheck": "tsc --noEmit",

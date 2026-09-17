@@ -90,7 +90,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/home/relay", () => ({
+vi.mock("@polaris-app/places/src/lib/relay", () => ({
     relayServerFor: (reachVia: string) =>
         reachVia.startsWith("server:") ? reachVia.slice("server:".length) : "local",
     streamName: (cameraId: string, quality: string) => `${cameraId}-${quality}`,
@@ -106,8 +106,8 @@ vi.mock("@/lib/notifications/preferences", () => ({
 }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 
-const { sweepCameraReachability } = await import("@/lib/home/reachability");
-const { OFFLINE_GRACE_MS } = await import("@/lib/home/availability");
+const { sweepCameraReachability } = await import("@polaris-app/places/src/lib/reachability");
+const { OFFLINE_GRACE_MS } = await import("@polaris-app/places/src/lib/availability");
 
 /** A camera that has already been quiet for longer than the grace window, so
  *  this pass is the one that would report it. */

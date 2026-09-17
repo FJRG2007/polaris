@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as registry from "@/lib/home/device-connections";
+import * as registry from "@polaris-app/places/src/lib/device-connections";
 
 const NUKI_WEB = "nuki-web";
 

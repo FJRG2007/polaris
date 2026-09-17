@@ -26,7 +26,7 @@ import {
     NO_ZOOM,
     ZOOM_STEP,
     type Zoom
-} from "@/lib/zoom";
+} from "@polaris/ui/zoom";
 
 export interface ZoomPan {
     /** Put on the element the gestures happen over. A callback ref, because an

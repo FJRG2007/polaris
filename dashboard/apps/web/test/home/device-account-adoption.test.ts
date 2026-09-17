@@ -72,7 +72,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { listAccounts } = await import("@/lib/home/device-accounts");
+const { listAccounts } = await import("@polaris-app/places/src/lib/device-accounts");
 
 /** The old setting as it was actually stored: the encrypted envelope, base64, as
  *  one JSON string. */

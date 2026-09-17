@@ -1,0 +1,28 @@
+{
+    "name": "@polaris/app-host",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "The dashboard as an installable app sees it: the services an app may call, provided at runtime.",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./src/index.ts"
+        },
+        "./client": {
+            "types": "./src/client.ts",
+            "import": "./src/client.ts"
+        }
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "peerDependencies": {
+        "react": "^19"
+    },
+    "devDependencies": {
+        "@types/react": "19.0.7",
+        "react": "19.0.0"
+    }
+}

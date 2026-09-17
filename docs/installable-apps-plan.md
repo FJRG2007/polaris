@@ -108,7 +108,7 @@ load those into a core path that never uses them.
    core. Places registers `lib/home/places-extension.ts`: its jobs, what it
    starts at boot (its container upgrade and the camera watcher) and who it
    reaches through a lent camera or door. Its footage storage setting
-   (`lib/footage-storage.ts`) and the zoom arithmetic (`lib/zoom.ts`) are core.
+   (`lib/footage-storage.ts`) is core; the zoom arithmetic moved on to `@polaris/ui/zoom`.
 2. **Move the app's code under its own workspace** (`apps/game-servers`,
    `apps/places`): services, routes, screens, jobs, tests - including the
    routes that still sit in the dashboard's tree (`app/(app)/apps/games`, the
@@ -116,15 +116,31 @@ load those into a core path that never uses them.
    `app/api/minecraft`, and the `app/api/cron/game-*` triggers). Still compiled
    into the image, loaded through the registry. Verifiable here.
 
-    Needs a design first: the host API. The registry only covers core calling
-    the app. The other direction is still direct. Game servers' services import
-    about 40 core modules by path (`install-config`, `deploy-service`,
-    `env-var-service`, `session`, `domain-service`, `crash-loop` and others). A
-    workspace that imports the dashboard's `@/lib` depends on the dashboard, and
-    a bundle built from it cannot load without the dashboard's module graph. So
-    phase 2 starts by defining the host API: the core services an app may call,
-    exported from one package with a versioned contract. The app's imports then
-    move onto that package before its files move.
+   Places has moved (`apps/places`, `@polaris-app/places`): its services,
+   screens and route bodies live there, its Next routes are one-line bridges in
+   the dashboard, and `test/build/app-packages.test.ts` fails if either side
+   reaches past that. Game servers is next.
+
+   The host API is `@polaris/app-host`. An app takes the dashboard's services
+   from `host.<area>.<name>` and its client pieces from `hostUi.<area>.<name>`;
+   the dashboard fills both in - `lib/app-host/server.ts` and
+   `components/app-host/client.tsx` - and those two files are the whole of what
+   an app may reach. `AppHost` and `AppHostTypes` are augmented there, so an app
+   is type-checked against the running dashboard and a service taken away breaks
+   the app at compile time rather than at runtime.
+
+   Three rules the implementation is held to:
+
+   - Every server service is loaded when it is first called, so importing the
+     host costs nothing and a test that replaces a dashboard module replaces it
+     for the apps too.
+   - That turns a synchronous service into a promise, which nothing in the types
+     objects to inside a template string, so
+     `test/build/app-host-contract.test.ts` refuses one whose module is not
+     already asynchronous unless every call in every app awaits it.
+   - What is pure and shared moves to a package instead of the host: the zoom
+     arithmetic went to `@polaris/ui/zoom`, `LOCAL_TARGET` was already in
+     `@polaris/core`.
 
 3. **Bundles.** Build each app workspace into a bundle in CI; add the loader,
    the resolution hook, the catch-all routes and the import map; stop compiling

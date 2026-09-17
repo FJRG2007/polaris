@@ -7,15 +7,15 @@
  * the difference somebody chose the expensive setting for.
  */
 
-import { parseServices } from "@/lib/home/onvif";
-import { relaySource } from "@/lib/home/vendors";
+import { parseServices } from "@polaris-app/places/src/lib/onvif";
+import { relaySource } from "@polaris-app/places/src/lib/vendors";
 import { describe, expect, it, vi } from "vitest";
 
 // The watcher reaches the database to read a camera's quiet window; nothing in
 // this file gets that far, but importing it does.
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
-const { kindForTopic } = await import("@/lib/home/watcher");
+const { kindForTopic } = await import("@polaris-app/places/src/lib/watcher");
 
 describe("what the relay is told to open", () => {
     const camera = { address: "192.168.1.50", rtspPort: 554, mainPath: "/stream1", subPath: "/stream2" };

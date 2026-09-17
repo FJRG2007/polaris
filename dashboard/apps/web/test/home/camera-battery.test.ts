@@ -15,8 +15,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DETECTION } from "@/lib/home/detection";
-import { normalizeCameraInput, parseCameraInput } from "@/lib/home/schemas";
+import { DEFAULT_DETECTION } from "@polaris-app/places/src/lib/detection";
+import { normalizeCameraInput, parseCameraInput } from "@polaris-app/places/src/lib/schemas";
 import {
     CAMERA_VENDORS,
     TAPO_CONTROL_PORT,
@@ -25,7 +25,7 @@ import {
     redactSource,
     relaySource,
     reportsOwnAlerts
-} from "@/lib/home/vendors";
+} from "@polaris-app/places/src/lib/vendors";
 
 const c410 = { vendor: "tapo-battery", address: "192.168.1.64", rtspPort: 554 };
 

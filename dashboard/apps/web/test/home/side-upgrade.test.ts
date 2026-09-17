@@ -49,7 +49,7 @@ vi.mock("@/lib/setting-store", () => ({
     })
 }));
 
-const { upgradeHomeServices } = await import("@/lib/home/side-upgrade");
+const { upgradeHomeServices } = await import("@polaris-app/places/src/lib/side-upgrade");
 
 beforeEach(() => {
     build = "abc123";

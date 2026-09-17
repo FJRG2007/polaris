@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { afterClick, afterMove, focusAfterMove, rangeBetween, toggled } from "@/lib/list-selection";
+import { afterClick, afterMove, focusAfterMove, rangeBetween, toggled } from "@polaris-app/places/src/lib/list-selection";
 
 const KEYS = ["a", "b", "c", "d", "e"];
 

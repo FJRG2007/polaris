@@ -16,13 +16,13 @@
 
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HomeSettingsView } from "@/app/(app)/places/settings/settings-view";
+import { HomeSettingsView } from "@polaris-app/places/src/screens/settings/settings-view";
 
 let answering = false;
 let enabled = true;
 let asked = 0;
 
-vi.mock("@/app/(app)/places/actions", () => ({
+vi.mock("@polaris-app/places/src/screens/actions", () => ({
     homeSettingsAction: async () => {
         asked += 1;
         return {

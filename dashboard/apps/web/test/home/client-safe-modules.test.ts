@@ -19,20 +19,20 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-const SOURCE = resolve(import.meta.dirname, "../../src");
+const SOURCE = resolve(import.meta.dirname, "../../../places/src");
 
 /** The modules that promise a browser may load them. */
 const CLIENT_SAFE = [
-    "lib/home/device-kinds.ts",
-    "lib/home/device-connections.ts",
-    "lib/home/place-kinds.ts",
+    "lib/device-kinds.ts",
+    "lib/device-connections.ts",
+    "lib/place-kinds.ts",
     "lib/integrations/tuya-regions.ts",
-    "lib/home/drivers/contract.ts"
+    "lib/drivers/contract.ts"
 ];
 
 /** What a browser has none of. `node:` is the one that actually failed a build;
  *  the rest are the doors into this app's own server half. */
-const FORBIDDEN = [/^node:/, /^@polaris\/db$/, /^@polaris\/storage$/, /^@polaris\/config$/, /^mqtt$/, /^fs$/, /^net$/];
+const FORBIDDEN = [/^node:/, /^@polaris\/app-host$/, /^@polaris\/db$/, /^@polaris\/storage$/, /^@polaris\/config$/, /^mqtt$/, /^fs$/, /^net$/];
 
 /** Every module specifier a file imports, type-only ones excluded: `import type`
  *  is erased before anything is bundled, which is what makes it the right way for

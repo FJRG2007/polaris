@@ -17,9 +17,9 @@
 
 import { describe, expect, it } from "vitest";
 import { notificationEvent, resolveRule } from "@polaris/core";
-import { ALERT_KINDS, alertRuleInputSchema } from "@/lib/home/schemas";
-import { OFFLINE_GRACE_MS, quietSince } from "@/lib/home/availability";
-import { outageHeadline, outageLength } from "@/lib/home/reachability";
+import { ALERT_KINDS, alertRuleInputSchema } from "@polaris-app/places/src/lib/schemas";
+import { OFFLINE_GRACE_MS, quietSince } from "@polaris-app/places/src/lib/availability";
+import { outageHeadline, outageLength } from "@polaris-app/places/src/lib/reachability";
 
 describe("how an outage is worded", () => {
     it("names the building when everything there went at once", () => {

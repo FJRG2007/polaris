@@ -1,0 +1,371 @@
+/**
+ * Keeping footage, and getting rid of it again.
+ *
+ * A clip is a segment of the good stream, copied straight from the relay to
+ * whichever storage the house writes to. Copied, not re-encoded: the bytes that
+ * arrive are the bytes that are written, so recording four cameras costs disk
+ * and almost no processor. It is also why this can live in the dashboard process
+ * at all, where decoding never could.
+ *
+ * Two ways a clip comes to exist, and they are different promises:
+ *
+ * - **On movement.** Something happened, and the next stretch of video is worth
+ *   keeping. Deliberately from the moment it fired rather than from a moment
+ *   before it: keeping the seconds before would mean holding every camera's
+ *   stream in memory all day, which is the exact cost this app exists to avoid.
+ * - **Always.** A segment at a time, back to back, on a schedule. Segments
+ *   rather than one endless file, so retention can drop an afternoon without
+ *   rewriting anything and a clip somebody wants is a clip they can download.
+ *
+ * Server-only.
+ */
+
+import { prisma } from "@polaris/db";
+import { HomeError } from "./home-error";
+import { randomUUID } from "node:crypto";
+import { getCamera } from "./cameras";
+import { footageTarget } from "./stills";
+import { relayEndpoint, relayServerFor, relayStream, streamPath } from "./relay";
+import { LOCAL_TARGET } from "@polaris/core";
+import { host } from "@polaris/app-host";
+
+const { driverForTarget, safeName } = host.storageTarget;
+
+/** Where clips sit on whichever storage they land on. */
+const CLIP_ROOT = "polaris/home/clips";
+
+/** The folder under Polaris's own data directory, for the local fallback. */
+const LOCAL_FOLDER = "home";
+
+/** How long one segment is. Five minutes is the compromise every recorder makes:
+ *  short enough that retention is granular and a download is reasonable, long
+ *  enough that a day is not thousands of files. */
+export const SEGMENT_SECONDS = 300;
+
+/** How much is kept after something happened. */
+export const MOTION_SECONDS = 30;
+
+/** A ceiling on any single clip, whatever asked for it. A stream that never ends
+ *  and a bug that never stops it are the same thing to a disk. */
+const MAX_SECONDS = 900;
+
+export interface ClipView {
+    readonly id: string;
+    readonly cameraId: string;
+    readonly cameraName: string;
+    readonly startedAt: string;
+    readonly endedAt: string | null;
+    readonly reason: string;
+    readonly bytes: number;
+    readonly durationMs: number;
+    readonly pinned: boolean;
+}
+
+/**
+ * Record one segment of a camera and write it where the house keeps footage.
+ *
+ * Returns the clip, or null when there was nothing to record - the relay is not
+ * up, the camera is not answering, or it sent nothing at all. A camera that is
+ * down must never leave a zero-byte clip behind claiming otherwise.
+ */
+export async function recordClip(
+    installedAppId: string,
+    cameraId: string,
+    reason: "motion" | "continuous" | "manual",
+    seconds: number
+): Promise<ClipView | null> {
+    const camera = await getCamera(installedAppId, cameraId);
+    if (!camera || !camera.enabled) return null;
+    const endpoint = await relayEndpoint(relayServerFor(camera.reachVia));
+    if (!endpoint) return null;
+
+    const duration = Math.min(Math.max(seconds, 5), MAX_SECONDS);
+    const startedAt = new Date();
+    const folder = `${CLIP_ROOT}/${await safeName(cameraId)}`;
+    const path = `${folder}/${startedAt.toISOString().slice(0, 10)}-${randomUUID()}.mp4`;
+
+    // The camera's own disk when it names one, the instance's otherwise.
+    const target = await footageTarget(camera.storageTarget || null);
+    const driver = await driverForTarget(target.id, LOCAL_FOLDER);
+    try {
+        const upstream = await relayStream(endpoint, streamPath(cameraId, "mp4", "main"));
+        if (!upstream.ok || !upstream.body) return null;
+
+        // The stream never ends on its own - it is live - so the clip's length is
+        // decided here, by stopping reading. Anything already written stays: half
+        // a clip of something happening is worth keeping.
+        const reader = upstream.body.getReader();
+        let written = 0;
+        const stopAt = Date.now() + duration * 1000;
+        const body = new ReadableStream<Uint8Array>({
+            async pull(controller) {
+                if (Date.now() >= stopAt) {
+                    await reader.cancel().catch(() => undefined);
+                    controller.close();
+                    return;
+                }
+                const { done, value } = await reader.read();
+                if (done || !value) {
+                    controller.close();
+                    return;
+                }
+                written += value.byteLength;
+                controller.enqueue(value);
+            },
+            async cancel() {
+                await reader.cancel().catch(() => undefined);
+            }
+        });
+
+        await driver.mkdir(folder).catch(() => undefined);
+        // No size given: a live stream has no length, and the drivers take that.
+        await driver.writeStream(path, body, { mime: "video/mp4" });
+        if (written === 0) {
+            await driver.delete(path).catch(() => undefined);
+            return null;
+        }
+
+        const row = await prisma.cameraClip.create({
+            data: {
+                cameraId,
+                startedAt,
+                endedAt: new Date(),
+                reason,
+                connectionId: target.id === LOCAL_TARGET ? null : target.id,
+                path: `${target.id}:${path}`,
+                bytes: BigInt(written),
+                durationMs: Date.now() - startedAt.getTime()
+            }
+        });
+        return toView(row, camera.name);
+    } finally {
+        await driver.dispose?.();
+    }
+}
+
+type ClipRow = Awaited<ReturnType<typeof prisma.cameraClip.create>>;
+
+function toView(row: ClipRow, cameraName: string): ClipView {
+    return {
+        id: row.id,
+        cameraId: row.cameraId,
+        cameraName,
+        startedAt: row.startedAt.toISOString(),
+        endedAt: row.endedAt?.toISOString() ?? null,
+        reason: row.reason,
+        bytes: Number(row.bytes),
+        durationMs: row.durationMs,
+        pinned: row.pinned
+    };
+}
+
+/** One clip of this house, or null. Scoped through its camera rather than
+ *  trusting the id: a clip id from anywhere else must not resolve. */
+export async function getClip(installedAppId: string, id: string): Promise<ClipView | null> {
+    const row = await prisma.cameraClip.findFirst({
+        where: { id, camera: { installedAppId } },
+        include: { camera: { select: { name: true } } }
+    });
+    return row ? toView(row, row.camera.name) : null;
+}
+
+/** The house's footage, newest first, bounded and keyset-paged like the events. */
+export async function listClips(
+    installedAppId: string,
+    query: { placeId?: string | null; cameraId?: string | null; before?: Date | null; limit?: number } = {}
+): Promise<ClipView[]> {
+    const limit = Math.min(Math.max(query.limit ?? 40, 1), 200);
+    const cameras = await prisma.camera.findMany({
+        where: {
+            installedAppId,
+            ...(query.placeId ? { placeId: query.placeId } : {}),
+            ...(query.cameraId ? { id: query.cameraId } : {})
+        },
+        select: { id: true, name: true }
+    });
+    if (cameras.length === 0) return [];
+    const names = new Map(cameras.map((camera) => [camera.id, camera.name]));
+    const rows = await prisma.cameraClip.findMany({
+        where: {
+            cameraId: { in: [...names.keys()] },
+            ...(query.before ? { startedAt: { lt: query.before } } : {})
+        },
+        orderBy: { startedAt: "desc" },
+        take: limit
+    });
+    return rows.map((row) => toView(row, names.get(row.cameraId) ?? ""));
+}
+
+/**
+ * The footage of one moment, and how far into it that moment is.
+ *
+ * What a log entry is for: "somebody was at the door at 03:12" is worth reading
+ * and worth nothing without the ten seconds either side of it. The clip an event
+ * points at when one was kept for it, else whichever segment covers that instant
+ * - a camera recording all day has no event-shaped clips, and the answer is
+ * still there, three minutes into a segment.
+ *
+ * Null when nothing covers it, which is the ordinary case for a camera that
+ * keeps nothing.
+ */
+export async function momentOf(
+    installedAppId: string,
+    eventId: string
+): Promise<{ clipId: string; offsetSeconds: number } | null> {
+    const event = await prisma.cameraEvent.findFirst({
+        where: { id: eventId, camera: { installedAppId } },
+        select: { at: true, cameraId: true, clipId: true }
+    });
+    if (!event) return null;
+
+    const clip = event.clipId
+        ? await prisma.cameraClip.findFirst({
+              where: { id: event.clipId },
+              select: { id: true, startedAt: true }
+          })
+        : await prisma.cameraClip.findFirst({
+              where: {
+                  cameraId: event.cameraId,
+                  startedAt: { lte: event.at },
+                  // A segment still being written has no end yet, and is exactly
+                  // the one covering anything that just happened.
+                  OR: [{ endedAt: null }, { endedAt: { gte: event.at } }]
+              },
+              orderBy: { startedAt: "desc" },
+              select: { id: true, startedAt: true }
+          });
+    if (!clip) return null;
+
+    // A second or two before it, because the useful part of "somebody appeared"
+    // is the moment before they were there.
+    const offset = Math.max(0, Math.floor((event.at.getTime() - clip.startedAt.getTime()) / 1000) - 2);
+    return { clipId: clip.id, offsetSeconds: offset };
+}
+
+/** Keep this one whatever the retention says, or stop keeping it. */
+export async function pinClip(installedAppId: string, id: string, pinned: boolean): Promise<void> {
+    const clip = await prisma.cameraClip.findFirst({
+        where: { id, camera: { installedAppId } },
+        select: { id: true }
+    });
+    if (!clip) throw new HomeError("Clip not found");
+    await prisma.cameraClip.update({ where: { id }, data: { pinned } });
+}
+
+/**
+ * Read a clip back for a viewer.
+ *
+ * A stream rather than a link into the storage: the file may be on a NAS nobody
+ * outside the house can reach, and it is footage of somebody's home either way.
+ * The range is honored, because without it a browser cannot scrub - it can only
+ * play the whole thing from the start.
+ */
+export async function openClip(
+    installedAppId: string,
+    id: string,
+    range?: { start: number; end?: number }
+): Promise<{ stream: ReadableStream<Uint8Array>; bytes: number; dispose: () => Promise<void> } | null> {
+    const clip = await prisma.cameraClip.findFirst({
+        where: { id, camera: { installedAppId } },
+        select: { path: true, bytes: true }
+    });
+    if (!clip) return null;
+    const split = clip.path.indexOf(":");
+    if (split <= 0) return null;
+    const driver = await driverForTarget(clip.path.slice(0, split), LOCAL_FOLDER);
+    try {
+        const stream = await driver.readStream(clip.path.slice(split + 1), range);
+        return { stream, bytes: Number(clip.bytes), dispose: async () => void (await driver.dispose?.()) };
+    } catch {
+        await driver.dispose?.();
+        return null;
+    }
+}
+
+/** How many clips one pass of a bulk delete takes. */
+const CLIP_DELETE_BATCH = 200;
+
+/** A ceiling on one call, so clearing a month of footage cannot hold a request
+ *  open indefinitely. What is left goes on the next press, and the nightly sweep
+ *  takes it either way. */
+const CLIP_DELETE_CEILING = 5_000;
+
+/**
+ * Remove everything a filter matched.
+ *
+ * The screen used to do this by calling the single delete once per clip, which
+ * on a list of a few hundred is a few hundred round trips and a request that
+ * gives up before it finishes - so "delete them all" looked like it did nothing.
+ * This works through the whole match instead, a batch at a time, with one
+ * statement per batch.
+ *
+ * A kept clip is never taken. That is what keeping one is for, and a bulk action
+ * that ignored it would be the one gesture here with no undo.
+ */
+export async function deleteClips(
+    installedAppId: string,
+    query: { placeId?: string | null; cameraId?: string | null; ids?: readonly string[] }
+): Promise<number> {
+    const cameras = await prisma.camera.findMany({
+        where: {
+            installedAppId,
+            ...(query.placeId ? { placeId: query.placeId } : {}),
+            ...(query.cameraId ? { id: query.cameraId } : {})
+        },
+        select: { id: true }
+    });
+    if (cameras.length === 0) return 0;
+
+    const where = {
+        cameraId: { in: cameras.map((camera) => camera.id) },
+        pinned: false,
+        ...(query.ids ? { id: { in: [...query.ids] } } : {})
+    };
+
+    let removed = 0;
+    while (removed < CLIP_DELETE_CEILING) {
+        const batch = await prisma.cameraClip.findMany({
+            where,
+            orderBy: { startedAt: "asc" },
+            take: CLIP_DELETE_BATCH,
+            select: { id: true, path: true }
+        });
+        if (batch.length === 0) break;
+
+        // The file before the row, so a failure leaves a row pointing at a file
+        // rather than a file nothing points at.
+        for (const clip of batch) await deleteClipFile(clip.path);
+        const { count } = await prisma.cameraClip.deleteMany({
+            where: { id: { in: batch.map((clip) => clip.id) } }
+        });
+        removed += count;
+        if (batch.length < CLIP_DELETE_BATCH) break;
+    }
+    return removed;
+}
+
+/** Remove a clip and its file. */
+export async function deleteClip(installedAppId: string, id: string): Promise<void> {
+    const clip = await prisma.cameraClip.findFirst({
+        where: { id, camera: { installedAppId } },
+        select: { id: true, path: true }
+    });
+    if (!clip) throw new HomeError("Clip not found");
+    await deleteClipFile(clip.path);
+    await prisma.cameraClip.delete({ where: { id } });
+}
+
+/** Drop a stored file, wherever it went. Best effort: a NAS that is unplugged
+ *  this morning must not stop the row being removed, or retention would stall
+ *  forever on one unreachable disk. */
+export async function deleteClipFile(key: string): Promise<void> {
+    const split = key.indexOf(":");
+    if (split <= 0) return;
+    try {
+        const driver = await driverForTarget(key.slice(0, split), LOCAL_FOLDER);
+        await driver.delete(key.slice(split + 1)).catch(() => undefined);
+        await driver.dispose?.();
+    } catch {
+        // Unreachable storage; the row goes either way.
+    }
+}

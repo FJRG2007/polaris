@@ -8,9 +8,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { rewriteMasterPlaylist } from "@/lib/home/live";
-import { hlsAssetPath, hlsMasterPath, isHlsFile, streamName } from "@/lib/home/relay";
-import { otherTransport, preferredTransport, stillSrc, streamSrc } from "@/lib/home/player";
+import { rewriteMasterPlaylist } from "@polaris-app/places/src/lib/live";
+import { hlsAssetPath, hlsMasterPath, isHlsFile, streamName } from "@polaris-app/places/src/lib/relay";
+import { otherTransport, preferredTransport, stillSrc, streamSrc } from "@polaris-app/places/src/lib/player";
 
 describe("the master playlist", () => {
     it("points at a sibling of itself rather than one directory deeper", () => {

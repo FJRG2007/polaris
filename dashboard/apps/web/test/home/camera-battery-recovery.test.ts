@@ -19,8 +19,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_DETECTION } from "@/lib/home/detection";
-import { parseCameraInput } from "@/lib/home/schemas";
+import { DEFAULT_DETECTION } from "@polaris-app/places/src/lib/detection";
+import { parseCameraInput } from "@polaris-app/places/src/lib/schemas";
 
 /** The row as the update leaves it, so the test can read what was written. */
 let stored: Record<string, unknown> = {};
@@ -68,7 +68,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const cameras = await import("../../src/lib/home/cameras");
+const cameras = await import("@polaris-app/places/src/lib/cameras");
 
 const input = (power: string, modelId = "tapo-c410") =>
     parseCameraInput({
