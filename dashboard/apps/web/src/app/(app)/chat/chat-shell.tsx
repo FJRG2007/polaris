@@ -36,6 +36,15 @@ import { useCallback, type CSSProperties, type ReactNode } from "react";
  */
 const LIST_PANE = { min: 208, max: 480, fallback: 256 };
 
+/**
+ * Whether this address is a conversation, which on a phone takes the whole
+ * screen. Opening one with somebody counts: that page either becomes the
+ * conversation or says why it cannot, and a hidden column says nothing.
+ */
+export function conversationOnScreen(pathname: string): boolean {
+    return pathname.startsWith("/chat/c/") || pathname.startsWith("/chat/with/");
+}
+
 export function ChatShell({
     viewerId,
     viewerName,
@@ -77,7 +86,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
     const { drawn, ceiling, measure, resize, reset } = useChatPane("list", LIST_PANE);
     // Inside a conversation on a phone the list steps aside; on anything wider
     // both are shown, which is why this decides a class rather than a render.
-    const inConversation = pathname.startsWith("/chat/c/");
+    const inConversation = conversationOnScreen(pathname);
 
     useChatStream(
         useCallback(
