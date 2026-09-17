@@ -321,6 +321,22 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
  *  screen away; past this it scrolls inside its own frame. */
 const MAX_FRAME_HEIGHT = 20000;
 
+/**
+ * The frame's next height, given what the message says it measures.
+ *
+ * A message sized in viewport units (`min-height: 100vh` is common in
+ * newsletters) measures exactly as tall as the frame it is in. Answering that
+ * with the height plus the margin grew the frame, which grew the message, which
+ * reported again: eight pixels a frame until the ceiling, a few thousand renders
+ * of the page while somebody was trying to use it. A message as tall as its
+ * frame is one that fills it, not one asking for more.
+ */
+export function nextFrameHeight(current: number, claimed: number): number {
+    const measured = Math.ceil(claimed);
+    if (Math.abs(measured - current) <= 1) return current;
+    return Math.min(Math.max(120, measured + 8), MAX_FRAME_HEIGHT);
+}
+
 /** The frame itself, exported for the print page - which must draw a message
  *  through exactly these three layers and nothing less. */
 export function SandboxedHtml({
@@ -396,7 +412,7 @@ export function SandboxedHtml({
             if (event.source !== frame.current?.contentWindow) return;
             const claimed = (event.data as { polarisMailHeight?: unknown } | null)?.polarisMailHeight;
             if (typeof claimed !== "number" || !Number.isFinite(claimed)) return;
-            setHeight(Math.min(Math.max(120, Math.ceil(claimed) + 8), MAX_FRAME_HEIGHT));
+            setHeight((current) => nextFrameHeight(current, claimed));
         }
         window.addEventListener("message", onMessage);
         return () => window.removeEventListener("message", onMessage);
