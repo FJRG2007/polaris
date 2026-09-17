@@ -181,6 +181,7 @@ final class LoginGate {
             entry.getValue().countdown.removeAllPlayers();
         }
         held.clear();
+        landing.clear();
         server = null;
     }
 
@@ -602,17 +603,16 @@ final class LoginGate {
     /**
      * Give back what they could do, and forgive the fall they did not choose.
      *
-     * Restored from what was read at the join rather than set to anything in
-     * particular, so a player in creative keeps their flight and a player in
-     * survival loses it - and, because a logout saves the player after this
-     * event, nobody is ever saved mid-login with flight they were only lent.
+     * Only this gate's own loan is taken back, by the id it was made under, so a
+     * player in creative, or one another mod let fly, keeps what that gave them
+     * and a player in survival is left on the ground again. The loan is transient
+     * and a logout saves the player after this event, so nobody is ever saved
+     * mid-login with flight they were only lent.
      */
     private void letGo(ServerPlayer player, Held waiting) {
         if (!waiting.aloft) return;
         waiting.aloft = false;
         AttributeInstance flight = player.getAttribute(NeoForgeMod.CREATIVE_FLIGHT);
-        // Only this gate's own loan is taken back, by its own id: a player in
-        // creative, or one another mod let fly, keeps what that gave them.
         if (flight != null) flight.removeModifier(HOLD_FLIGHT);
         player.onUpdateAbilities();
         player.resetFallDistance();

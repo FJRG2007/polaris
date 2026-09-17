@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
@@ -172,7 +173,10 @@ final class LoginGate implements Listener, CommandExecutor {
         for (Map.Entry<UUID, Held> entry : held.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             entry.getValue().bar.removeAll();
-            if (player != null) lighten(player, entry.getValue());
+            if (player != null) {
+                lighten(player, entry.getValue());
+                drop(player, entry.getValue());
+            }
         }
         held.clear();
         landing.clear();
@@ -198,11 +202,12 @@ final class LoginGate implements Listener, CommandExecutor {
         // The players on their way down from where this gate held them: the drop
         // is its doing, so the damage at the bottom of it is not theirs to take.
         for (Map.Entry<UUID, Long> entry : new ArrayList<>(landing.entrySet())) {
-            Player player = Bukkit.getPlayer(entry.getKey());
-            if (player == null || tick > entry.getValue()) {
+            // Read as an entity: a player's own ground flag is the deprecated one.
+            Entity falling = Bukkit.getPlayer(entry.getKey());
+            if (falling == null || tick > entry.getValue() || falling.isOnGround()) {
                 landing.remove(entry.getKey());
             } else {
-                player.setFallDistance(0f);
+                falling.setFallDistance(0f);
             }
         }
     }
@@ -323,18 +328,27 @@ final class LoginGate implements Listener, CommandExecutor {
     /**
      * Give back what they could do, and forgive the fall they did not choose.
      *
-     * Restored from what was read at the join rather than set to anything in
-     * particular, so a player in creative keeps their flight and a player in
-     * survival loses it - and, because a quit is handled before the player is
-     * saved, nobody is ever saved mid-login with flight they were only lent.
+     * Only this gate's own loan is taken back, against what was read at the join,
+     * so a player in creative keeps their flight and a player in survival loses
+     * it - and a gamemode given to them while they waited is left alone, because
+     * the flight that comes with it is not this gate's to take. A quit is handled
+     * before the player is saved, so nobody is ever saved mid-login with flight
+     * they were only lent.
      */
     private void drop(Player player, Held waiting) {
         if (!waiting.aloft) return;
         waiting.aloft = false;
-        player.setFlying(waiting.couldFly && waiting.wasFlying);
-        player.setAllowFlight(waiting.couldFly);
+        if (!grantsFlight(player.getGameMode())) {
+            if (!(waiting.couldFly && waiting.wasFlying)) player.setFlying(false);
+            if (!waiting.couldFly) player.setAllowFlight(false);
+        }
         player.setFallDistance(0f);
         landing.put(player.getUniqueId(), tick + LANDING_TICKS);
+    }
+
+    /** Whether the mode is itself what lets them fly, and so nothing to take back. */
+    private static boolean grantsFlight(GameMode mode) {
+        return mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR;
     }
 
     /** The bar across the top: how long is left, draining, red at the end. */
