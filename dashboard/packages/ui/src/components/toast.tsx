@@ -90,7 +90,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const show = useCallback((toast: Toast) => {
         next.current += 1;
         const id = toast.key ?? `toast-${next.current}`;
-        setShown((current) => [...current.filter((one) => one.id !== id), { ...toast, id }].slice(-MOST));
+        setShown((current) =>
+            [...current.filter((one) => one.id !== id), { ...toast, id }].slice(-MOST)
+        );
     }, []);
 
     const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
@@ -175,7 +177,9 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         >
             {toast.icon ? <span className="mt-0.5 shrink-0">{toast.icon}</span> : null}
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium" title={toast.title}>{toast.title}</span>
+                <span className="block truncate text-sm font-medium" title={toast.title}>
+                    {toast.title}
+                </span>
                 {toast.body ? (
                     <span className="mt-0.5 block line-clamp-2 text-xs text-muted-foreground">
                         {toast.body}
