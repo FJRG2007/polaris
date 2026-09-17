@@ -36,7 +36,7 @@ on:
       - "dashboard/patches/**"
       - "dashboard/scripts/**"
       - "dashboard/docker/**"
-      - "dashboard/resources/minecraft/**"
+      - "dashboard/resources/**"
       - "dashboard/mdns/**"
       - "dashboard/services/messaging-bridge/**"
       - "dashboard/services/edge-guard/**"
@@ -126,14 +126,15 @@ jobs:
           # mirrored by `WEB_IMAGE_PATHS` in the dashboard's update-service.ts, which
           # decides whether the update card says a build is on its way.
           #
-          # The Minecraft login mod and plugin are built into the web image and
-          # served from it, so a change to them is a change to that image.
+          # `resources` holds the Minecraft login mod and plugin and the vendored item
+          # icons, all built or copied into the web image, so a change there is a change
+          # to that image.
           #
           # The extension keeps its own gate below: its suites run through
           # `npm run test --workspaces`, and losing them would be the other way to get
           # this wrong.
           has '^dashboard/apps/extension/' && out extension true || out extension false
-          has '^dashboard/apps/web/|^dashboard/(packages|cli|patches|scripts)/|^dashboard/resources/minecraft/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
+          has '^dashboard/apps/web/|^dashboard/(packages|cli|patches|scripts)/|^dashboard/resources/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false

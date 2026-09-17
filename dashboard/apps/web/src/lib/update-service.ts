@@ -104,8 +104,8 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
  *  Counting it here would leave the card promising a build that is never published,
  *  which is the state this filter exists to keep off the screen. An app added later
  *  is outside the image until someone puts it in one, here and in the workflow. */
-const WEB_IMAGE_PATHS =
-    /^dashboard\/apps\/web\/|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/minecraft\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+export const WEB_IMAGE_PATHS =
+    /^dashboard\/apps\/web\/|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
 /** Check runs that decide whether the dashboard image is safe to install (mirrors
  *  dashboard-publish.yml: `changes` picks the images, `web` builds this one, and
