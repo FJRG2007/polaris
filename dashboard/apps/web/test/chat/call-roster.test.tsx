@@ -70,7 +70,9 @@ describe("the roster outside a call", () => {
     });
 
     it("draws a guest from the name they gave, asking for no picture", () => {
-        const { container } = render(<CallRoster people={[person("s2", "Visitor", false, false)]} />);
+        const { container } = render(
+            <CallRoster people={[person("s2", "Visitor", false, false)]} />
+        );
         expect(screen.getByText("Visitor")).toBeTruthy();
         expect(container.querySelector("img")).toBeNull();
     });

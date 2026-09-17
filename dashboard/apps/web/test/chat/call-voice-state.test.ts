@@ -75,8 +75,20 @@ vi.mock("@polaris/db", () => ({
                         startedAt: new Date(),
                         invites: [],
                         participants: [
-                            { id: "s1", name: "Host", userId: "host", muted: false, deafened: false },
-                            { id: "s2", name: "Visitor", userId: null, muted: true, deafened: false }
+                            {
+                                id: "s1",
+                                name: "Host",
+                                userId: "host",
+                                muted: false,
+                                deafened: false
+                            },
+                            {
+                                id: "s2",
+                                name: "Visitor",
+                                userId: null,
+                                muted: true,
+                                deafened: false
+                            }
                         ]
                     }
                 ];
