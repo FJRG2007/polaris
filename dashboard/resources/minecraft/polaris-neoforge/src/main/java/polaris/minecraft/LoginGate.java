@@ -57,7 +57,10 @@ import polaris.minecraft.PolarisClient.Reply;
  * A held player stands where they joined, in the dark, with what to type in the
  * middle of the screen and the time they have left in a bar across the top. They cannot be hurt, and can do nothing but
  * {@code /login} and {@code /register}: no chat, no other command, no blocks, no
- * items, no attacks. Before any of that, Polaris is asked whether the name is on
+ * items, no attacks. The ground under that spot can go while they wait - a block
+ * broken, a creeper - so they are lent flight for as long as they are held, with a
+ * short grace on landing so the fall that was never theirs is never charged to
+ * them. Before any of that, Polaris is asked whether the name is on
  * the server's player list at all, and from that network - a name that is not is
  * turned away before it can register a password for somebody else's account.
  * Passwords are never kept here - every one is checked by Polaris - so a server
