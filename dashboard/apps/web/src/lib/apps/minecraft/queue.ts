@@ -65,7 +65,9 @@ export const queuePayloadSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("give") }).merge(itemPayload),
     z.object({ kind: z.literal("clear") }).merge(itemPayload),
     z.object({ kind: z.literal("clear-all") }),
-    z.object({ kind: z.literal("set-slot"), slot: z.number().int().min(-128).max(127) }).merge(itemPayload),
+    z
+        .object({ kind: z.literal("set-slot"), slot: z.number().int().min(-128).max(127) })
+        .merge(itemPayload),
     z.object({ kind: z.literal("ban"), reason: z.string().trim().max(200).optional() }),
     z.object({ kind: z.literal("pardon") }),
     z.object({ kind: z.literal("op") }),

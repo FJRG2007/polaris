@@ -26,7 +26,12 @@ import { RelativeTime } from "@/components/relative-time";
 import type { WorldRules } from "@/lib/apps/minecraft/rules-service";
 import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
-import { DIFFICULTIES, ruleGroups, normalizeRuleValue, type GameRule } from "@/lib/apps/minecraft/rules";
+import {
+    DIFFICULTIES,
+    ruleGroups,
+    normalizeRuleValue,
+    type GameRule
+} from "@/lib/apps/minecraft/rules";
 import {
     readWorldRulesAction,
     setWorldDifficultyAction,
@@ -37,7 +42,8 @@ import {
 /** What a control says when its position is Polaris's note of an earlier reading
  *  and the control still works, which is the one case where it would otherwise
  *  read as what the world is being played under right now. */
-const REMEMBERED_NOTE = "This is the value Polaris last read, not one the server confirmed just now.";
+const REMEMBERED_NOTE =
+    "This is the value Polaris last read, not one the server confirmed just now.";
 
 /** What a row says when its value was set here and the server has not taken it. */
 const PENDING_NOTE = "Saved. Applied when the server is running.";
@@ -126,7 +132,12 @@ export function MinecraftRules({
         markPending(rule.id, result.queued === true);
         if (result.value !== undefined && result.value !== normalized) {
             setRules((current) =>
-                current ? { ...current, values: { ...current.values, [rule.id]: result.value as string } } : current
+                current
+                    ? {
+                          ...current,
+                          values: { ...current.values, [rule.id]: result.value as string }
+                      }
+                    : current
             );
         }
     }
@@ -171,7 +182,9 @@ export function MinecraftRules({
     const groups = ruleGroups()
         .map((group) => ({
             ...group,
-            rules: answered ? group.rules.filter((rule) => rules?.values[rule.id] !== undefined) : group.rules
+            rules: answered
+                ? group.rules.filter((rule) => rules?.values[rule.id] !== undefined)
+                : group.rules
         }))
         .filter((group) => group.rules.length > 0);
 
@@ -179,7 +192,8 @@ export function MinecraftRules({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                    Each of these applies straight away. Nobody is disconnected and the server is not restarted.
+                    Each of these applies straight away. Nobody is disconnected and the server is
+                    not restarted.
                 </p>
                 <Button
                     size="icon"
@@ -266,8 +280,8 @@ export function MinecraftRules({
                     {groups.length === 0 ? (
                         <Card>
                             <CardBody className="py-8 text-center text-sm text-muted-foreground">
-                                This server did not report any rules. Java servers from 1.13 answer this; Bedrock
-                                cannot be asked from here.
+                                This server did not report any rules. Java servers from 1.13 answer
+                                this; Bedrock cannot be asked from here.
                             </CardBody>
                         </Card>
                     ) : (
@@ -349,7 +363,9 @@ function RuleRow({
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
                     {rule.label}
-                    {busy ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" /> : null}
+                    {busy ? (
+                        <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                    ) : null}
                 </p>
                 {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
                 {failure ? <p className="text-xs text-danger">{failure}</p> : null}
@@ -357,7 +373,8 @@ function RuleRow({
                     <p className="text-xs text-warning">{PENDING_NOTE}</p>
                 ) : unknown ? (
                     <p className="text-xs text-warning">
-                        This server will not say what it is set to, so this is not its current value.
+                        This server will not say what it is set to, so this is not its current
+                        value.
                     </p>
                 ) : remembered ? (
                     <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>

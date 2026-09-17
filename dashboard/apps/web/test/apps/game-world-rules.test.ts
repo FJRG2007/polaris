@@ -134,9 +134,7 @@ const {
     rememberDifficulty,
     setWorldDifficulty,
     setWorldRule
-} = await import(
-    "@/lib/apps/minecraft/rules-service"
-);
+} = await import("@/lib/apps/minecraft/rules-service");
 
 const OWNER = "0190c1d2-0000-7000-8000-000000000001";
 const SERVER = "0190c1d2-0000-7000-8000-0000000000a1";

@@ -52,20 +52,24 @@ describe("a join password", () => {
     it("mints one that its own check accepts", () => {
         // The same source of randomness on both sides, so this is the generator
         // and the validator agreeing rather than a fixed string.
-        const password = access.generateJoinPassword((size) => new Uint8Array(Array.from({ length: size }, (_, i) => i * 7)));
+        const password = access.generateJoinPassword(
+            (size) => new Uint8Array(Array.from({ length: size }, (_, i) => i * 7))
+        );
         expect(access.isJoinPassword(password)).toBe(true);
     });
 });
 
 describe("the closed-server flag", () => {
     it("is added without disturbing the options somebody else set", () => {
-        expect(access.withExclusiveJoin("-PreventHibernation", true)).toBe("-PreventHibernation -exclusivejoin");
+        expect(access.withExclusiveJoin("-PreventHibernation", true)).toBe(
+            "-PreventHibernation -exclusivejoin"
+        );
     });
 
     it("is taken out without taking the rest with it", () => {
-        expect(access.withExclusiveJoin("-PreventHibernation -exclusivejoin -NoBattlEye", false)).toBe(
-            "-PreventHibernation -NoBattlEye"
-        );
+        expect(
+            access.withExclusiveJoin("-PreventHibernation -exclusivejoin -NoBattlEye", false)
+        ).toBe("-PreventHibernation -NoBattlEye");
     });
 
     it("is never added twice", () => {
@@ -81,7 +85,11 @@ describe("the closed-server flag", () => {
 
 describe("the allow list", () => {
     it("reads back what was written to the install", () => {
-        const list = access.withPlayer([], { steamId: ALICE, label: "Alice" }, "2026-01-01T00:00:00.000Z");
+        const list = access.withPlayer(
+            [],
+            { steamId: ALICE, label: "Alice" },
+            "2026-01-01T00:00:00.000Z"
+        );
         expect(access.readAllowList({ [access.ALLOW_LIST_KEY]: list })).toEqual(list);
     });
 
@@ -113,7 +121,11 @@ describe("the allow list", () => {
     });
 
     it("takes somebody off without touching anybody else", () => {
-        const list = access.withPlayer(access.withPlayer([], { steamId: ALICE, label: "Alice" }, "t"), { steamId: BOB, label: "Bob" }, "t");
+        const list = access.withPlayer(
+            access.withPlayer([], { steamId: ALICE, label: "Alice" }, "t"),
+            { steamId: BOB, label: "Bob" },
+            "t"
+        );
         expect(access.withoutPlayer(list, ALICE).map((entry) => entry.steamId)).toEqual([BOB]);
     });
 });

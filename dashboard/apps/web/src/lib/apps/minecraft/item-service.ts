@@ -54,12 +54,16 @@ export class ItemWriteError extends Error {
 const REFUSALS: Record<WriteRefusal, string> = {
     unreadable:
         "That stack carries data Polaris cannot write back exactly, so moving it would strip it. Give the item again instead.",
-    "too-long": "That stack carries more data than one command can hold, so it cannot be moved without losing some.",
+    "too-long":
+        "That stack carries more data than one command can hold, so it cannot be moved without losing some.",
     moved: "They moved that stack while you were dragging it. The slot was left alone.",
     gone: "That slot is empty now. The slot was left alone.",
-    unsupported: "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
-    occupied: "Drop part of a stack on an empty slot. Splitting onto an occupied one is not something the game does.",
-    indivisible: "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
+    unsupported:
+        "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
+    occupied:
+        "Drop part of a stack on an empty slot. Splitting onto an occupied one is not something the game does.",
+    indivisible:
+        "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
     recipient: "The other player has to be on the server to receive it. Nothing was moved.",
     same: "Pick a different player to send it to."
 };
@@ -144,7 +148,12 @@ async function storedCommand(installedAppId: string): Promise<ItemCommand | null
 }
 
 /** Empty one slot. */
-export async function clearSlot(ownerId: string, installedAppId: string, player: string, slot: number): Promise<void> {
+export async function clearSlot(
+    ownerId: string,
+    installedAppId: string,
+    player: string,
+    slot: number
+): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (server) => {
         await writeSlot(server, installedAppId, player, slot, AIR, 1);
     });
@@ -186,7 +195,10 @@ export async function moveStack(
 ): Promise<void> {
     if (from === to) return;
     await withServerContainer(ownerId, installedAppId, async (server) => {
-        const [source, target] = await Promise.all([readSlot(server, player, from), readSlot(server, player, to)]);
+        const [source, target] = await Promise.all([
+            readSlot(server, player, from),
+            readSlot(server, player, to)
+        ]);
         if (source === null) refuse("gone");
         if (!sameStack(source, expected.from) || !sameStack(target, expected.to)) refuse("moved");
 
@@ -196,7 +208,8 @@ export async function moveStack(
         const moving = itemArgument(source);
         if (!moving.ok) refuse(moving.why);
 
-        const part = count === undefined ? source.count : Math.max(1, Math.min(count, source.count));
+        const part =
+            count === undefined ? source.count : Math.max(1, Math.min(count, source.count));
         if (part < source.count) {
             // A split is two writes of the same item, so nothing has to be
             // reconstructed and nothing can be lost - but only for a stack whose
@@ -205,7 +218,14 @@ export async function moveStack(
             if (source.data !== null) refuse("indivisible");
             if (target !== null) refuse("occupied");
             await writeSlot(server, installedAppId, player, to, moving.value, part);
-            await writeSlot(server, installedAppId, player, from, moving.value, source.count - part);
+            await writeSlot(
+                server,
+                installedAppId,
+                player,
+                from,
+                moving.value,
+                source.count - part
+            );
             return;
         }
 
@@ -257,7 +277,9 @@ export async function giveItem(
         const said: string[] = [];
         let given = 0;
         for (const stack of stacks) {
-            said.push(stripFormatting(await server.say(["give", player, itemId, String(stack)])).trim());
+            said.push(
+                stripFormatting(await server.say(["give", player, itemId, String(stack)])).trim()
+            );
             given += stack;
         }
         return { given, output: said.filter(Boolean).join("\n") };

@@ -33,9 +33,23 @@ import { prisma } from "@polaris/db";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { noteReachedFrom } from "@/lib/apps/minecraft/reach";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "@/lib/apps/minecraft/parse";
-import { readContainerFile, readContainerFileState, writeContainerFile } from "@/lib/apps/container-files";
-import { isReadableRoster, withOfflineIdentities, withOfflineNames, withoutInventedIdentities, withoutName } from "@/lib/apps/minecraft/offline-identity";
+import {
+    parseJoinAddresses,
+    parseProperties,
+    parseWhitelistRefusal
+} from "@/lib/apps/minecraft/parse";
+import {
+    readContainerFile,
+    readContainerFileState,
+    writeContainerFile
+} from "@/lib/apps/container-files";
+import {
+    isReadableRoster,
+    withOfflineIdentities,
+    withOfflineNames,
+    withoutInventedIdentities,
+    withoutName
+} from "@/lib/apps/minecraft/offline-identity";
 import {
     editionOf,
     getServerPlayers,
@@ -117,7 +131,10 @@ async function resolve(ownerId: string, installedAppId: string): Promise<AccessI
 }
 
 /** Who may connect to this server. */
-export async function listPlayerAccess(ownerId: string, installedAppId: string): Promise<PlayerAccessView> {
+export async function listPlayerAccess(
+    ownerId: string,
+    installedAppId: string
+): Promise<PlayerAccessView> {
     const install = await resolve(ownerId, installedAppId);
     const [rows, links] = await Promise.all([
         prisma.gamePlayerAccess.findMany({
@@ -201,7 +218,8 @@ const ROSTER_UNREAD =
     "Polaris could not read this server's player list just now, and will not write over a list it cannot see. Try again in a moment.";
 
 /** Said when the file is right and the running server has not been told. */
-const RELOAD_UNREAD = "The server did not reload its list, so it will pick this up the next time it starts.";
+const RELOAD_UNREAD =
+    "The server did not reload its list, so it will pick this up the next time it starts.";
 
 /** Write a roster file, refusing in terms of the list rather than the shell's.
  *  What the container printed is a command's complaint about a path; the person
@@ -210,7 +228,9 @@ async function writeRoster(server: ServerContainer, path: string, content: strin
     try {
         await writeContainerFile(server, path, content);
     } catch {
-        throw new Error("The server's player list could not be written, so nothing on it was changed.");
+        throw new Error(
+            "The server's player list could not be written, so nothing on it was changed."
+        );
     }
 }
 
@@ -351,7 +371,11 @@ async function repairOnContainer(server: ServerContainer, file: RosterFile): Pro
  * ever true. Every entry under that name goes, including the duplicate a
  * half-repaired list holds.
  */
-async function dropOnContainer(server: ServerContainer, file: RosterFile, name: string): Promise<boolean> {
+async function dropOnContainer(
+    server: ServerContainer,
+    file: RosterFile,
+    name: string
+): Promise<boolean> {
     if (!(await inventsIdentities(server))) return false;
     const path = ROSTER_PATHS[file];
     const current = await readRoster(server, path);
@@ -383,7 +407,10 @@ async function dropOnContainer(server: ServerContainer, file: RosterFile, name: 
  * Nobody is put off a server by this. A player whose only entry is one the login
  * cannot compute is a player who could not have got on in the first place.
  */
-async function shedInventedWhitelist(server: ServerContainer, names: readonly string[]): Promise<void> {
+async function shedInventedWhitelist(
+    server: ServerContainer,
+    names: readonly string[]
+): Promise<void> {
     const current = await readRoster(server, WHITELIST_FILE);
     // Same rule as everywhere else here: a list that could not be read is not one
     // to write over.
@@ -395,13 +422,25 @@ async function shedInventedWhitelist(server: ServerContainer, names: readonly st
 }
 
 /** Put one player on the game's own whitelist, opening the server once for it. */
-export async function whitelistPlayer(ownerId: string, installedAppId: string, username: string): Promise<string> {
-    return withServerContainer(ownerId, installedAppId, (server) => putOnWhitelist(server, [username]));
+export async function whitelistPlayer(
+    ownerId: string,
+    installedAppId: string,
+    username: string
+): Promise<string> {
+    return withServerContainer(ownerId, installedAppId, (server) =>
+        putOnWhitelist(server, [username])
+    );
 }
 
 /** Take one player off it. */
-export async function unwhitelistPlayer(ownerId: string, installedAppId: string, username: string): Promise<string> {
-    return withServerContainer(ownerId, installedAppId, (server) => takeOffWhitelist(server, username));
+export async function unwhitelistPlayer(
+    ownerId: string,
+    installedAppId: string,
+    username: string
+): Promise<string> {
+    return withServerContainer(ownerId, installedAppId, (server) =>
+        takeOffWhitelist(server, username)
+    );
 }
 
 /** What a roster verb does to a file: which one, and in which direction. */
@@ -715,8 +754,10 @@ export async function grantPlayerAccess(
     const install = await resolve(ownerId, installedAppId);
     const username = input.username.trim();
     const address = input.address.trim().toLowerCase();
-    if (!isPlayerName(install.edition, username)) throw new Error("That is not a username this edition accepts");
-    if (!isAddressRule(address)) throw new Error("Give one address, a range like 203.0.113.0/24, or \"any\"");
+    if (!isPlayerName(install.edition, username))
+        throw new Error("That is not a username this edition accepts");
+    if (!isAddressRule(address))
+        throw new Error('Give one address, a range like 203.0.113.0/24, or "any"');
     if (await linkFor(installedAppId, username)) {
         throw new Error(
             `${username} is tied to a Polaris account, so where they connect from follows its sign-ins.`
@@ -745,7 +786,9 @@ export async function grantPlayerAccess(
     // loud, naming the part that did work so nobody adds them twice.
     await whitelistPlayer(ownerId, installedAppId, username).catch((caught: unknown) => {
         if (!(caught instanceof WhitelistRefused)) return null;
-        throw new Error(`${username} is on this server's player list, but the game would not take them: ${caught.message}`);
+        throw new Error(
+            `${username} is on this server's player list, but the game would not take them: ${caught.message}`
+        );
     });
 }
 
@@ -785,7 +828,11 @@ export async function revokePlayerAddress(
 
 /** Take a player off the list entirely and, if they are on right now, off the
  *  server. Every address they had goes with them. */
-export async function revokePlayerAccess(ownerId: string, installedAppId: string, username: string): Promise<void> {
+export async function revokePlayerAccess(
+    ownerId: string,
+    installedAppId: string,
+    username: string
+): Promise<void> {
     const install = await resolve(ownerId, installedAppId);
     await prisma.gamePlayerAccess.deleteMany({ where: { installedAppId, username } });
     const link = await linkFor(installedAppId, username);
@@ -805,7 +852,11 @@ export async function revokePlayerAccess(ownerId: string, installedAppId: string
 
 /** Turn the address half on or off for this server. The username half is the
  *  game's whitelist and is not affected. */
-export async function setAddressBinding(ownerId: string, installedAppId: string, enabled: boolean): Promise<void> {
+export async function setAddressBinding(
+    ownerId: string,
+    installedAppId: string,
+    enabled: boolean
+): Promise<void> {
     await resolve(ownerId, installedAppId);
     await patchInstallConfig(installedAppId, { bindAddresses: enabled });
 }
@@ -833,7 +884,10 @@ export interface AccessEnforcement {
  * no rules at all is left alone rather than emptied - that is a server whose list
  * has not been set up, not one whose list says "nobody".
  */
-export async function enforcePlayerAddresses(ownerId: string, installedAppId: string): Promise<AccessEnforcement> {
+export async function enforcePlayerAddresses(
+    ownerId: string,
+    installedAppId: string
+): Promise<AccessEnforcement> {
     const install = await resolve(ownerId, installedAppId);
     const nothing: AccessEnforcement = { kicked: [], unknown: [], reachedFromOutside: false };
     if (install.edition !== "java" || !install.applicationId) return nothing;
@@ -863,7 +917,9 @@ export async function enforcePlayerAddresses(ownerId: string, installedAppId: st
 
     if (status.players.players.length === 0) return nothing;
 
-    const log = await readAppRuntimeLog(install.applicationId, ownerId, JOIN_LOG_TAIL).catch(() => "");
+    const log = await readAppRuntimeLog(install.applicationId, ownerId, JOIN_LOG_TAIL).catch(
+        () => ""
+    );
     const addresses = parseJoinAddresses(log);
 
     // Reachability first, and for everyone on rather than only the allowed: a

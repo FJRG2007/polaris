@@ -29,7 +29,10 @@ export const dynamic = "force-dynamic";
  *  the operator makes the forward with this page open, and the answer has to reach
  *  them without a reload. The knock behind it is rate limited in `probeReach`, so
  *  the five-second poll costs one attempt every thirty seconds. */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     // Resolved once, here: the reads below all run on the owner's shelf, and this
     // is what decides whether the caller may see any of it. Named `server` because

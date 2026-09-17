@@ -40,7 +40,10 @@ import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config
 import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
-import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
+import {
+    readAppContainerMetricsOrNull,
+    readAppContainerRuntime
+} from "@/lib/app-container-metrics";
 
 /** Enough to reach past a crash's own noise to the line under it. Paid only for a
  *  container already judged to be looping. */
@@ -58,7 +61,8 @@ const MAX_COMMAND_LENGTH = 512;
  *  belt and braces - but a moderation screen is exactly where a crafted name would
  *  arrive. */
 function assertSafeCommand(command: string): void {
-    if (command.length === 0 || command.length > MAX_COMMAND_LENGTH) throw new Error("That command is not valid");
+    if (command.length === 0 || command.length > MAX_COMMAND_LENGTH)
+        throw new Error("That command is not valid");
     if (/[\0\r\n]/.test(command)) throw new Error("That command is not valid");
 }
 
@@ -83,7 +87,9 @@ const COMMAND_TIMEOUT_MS = 15_000;
 /** The output of a command that could not even be started, which is a different
  *  failure from one the server refused - and the only case worth retrying. */
 function couldNotStart(result: { code: number; output: string }): boolean {
-    return result.code === 126 || result.code === 127 || /not found|no such file/i.test(result.output);
+    return (
+        result.code === 126 || result.code === 127 || /not found|no such file/i.test(result.output)
+    );
 }
 
 /**
@@ -93,7 +99,11 @@ function couldNotStart(result: { code: number; output: string }): boolean {
  * is what failed: an image built without `gosu` would otherwise make every read
  * on the panel look like a server that is not answering.
  */
-export async function runArkCommand(ownerId: string, installedAppId: string, command: string): Promise<string> {
+export async function runArkCommand(
+    ownerId: string,
+    installedAppId: string,
+    command: string
+): Promise<string> {
     assertSafeCommand(command);
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const bounded = (argv: string[]): Promise<{ code: number; output: string }> =>
@@ -186,7 +196,10 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
     // Against the reading the sweep took a minute ago: a restart count on its own
     // cannot tell a server that is still looping from one that has just got out.
     if (runtime && isCrashLooping(runtime, readRestartWatch(install.config), new Date())) {
-        const loop = crashLoopOf(runtime, await readAppRuntimeLog(install.applicationId, ownerId, CRASH_LOG_TAIL).catch(() => ""));
+        const loop = crashLoopOf(
+            runtime,
+            await readAppRuntimeLog(install.applicationId, ownerId, CRASH_LOG_TAIL).catch(() => "")
+        );
         return {
             answering: false,
             containerRunning: false,
@@ -200,7 +213,8 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
             answering: false,
             containerRunning: false,
             players: [],
-            message: "The container is not running. Redeploy it, or read the logs to see why it stopped.",
+            message:
+                "The container is not running. Redeploy it, or read the logs to see why it stopped.",
             crashLoop: null
         };
     }
@@ -289,7 +303,11 @@ export async function readArkPorts(
         const parsed = Number.parseInt(vars.find((row) => row.key === key)?.value ?? "", 10);
         return Number.isFinite(parsed) ? parsed : null;
     };
-    return { max: number("MAX_PLAYERS"), gamePort: number("GAME_CLIENT_PORT"), queryPort: number("SERVER_LIST_PORT") };
+    return {
+        max: number("MAX_PLAYERS"),
+        gamePort: number("GAME_CLIENT_PORT"),
+        queryPort: number("SERVER_LIST_PORT")
+    };
 }
 
 export async function getArkStatus(ownerId: string, installedAppId: string): Promise<ArkStatus> {
@@ -302,7 +320,10 @@ export async function getArkStatus(ownerId: string, installedAppId: string): Pro
         getArkPlayers(ownerId, installedAppId),
         applicationId ? readAppContainerMetricsOrNull(applicationId, ownerId) : null,
         applicationId
-            ? prisma.application.findFirst({ where: { id: applicationId }, select: { desiredState: true } })
+            ? prisma.application.findFirst({
+                  where: { id: applicationId },
+                  select: { desiredState: true }
+              })
             : null,
         readArkPorts(applicationId)
     ]);
@@ -330,14 +351,21 @@ export interface ArkAccessView {
     readonly accounts: Readonly<Record<string, string>>;
 }
 
-export async function readArkAccess(ownerId: string, installedAppId: string): Promise<ArkAccessView> {
+export async function readArkAccess(
+    ownerId: string,
+    installedAppId: string
+): Promise<ArkAccessView> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { config: true, applicationId: true }
     });
     const options = install?.applicationId
         ? await prisma.envVar.findFirst({
-              where: { scopeType: "application", scopeId: install.applicationId, key: "ARK_EXTRA_OPTS" },
+              where: {
+                  scopeType: "application",
+                  scopeId: install.applicationId,
+                  key: "ARK_EXTRA_OPTS"
+              },
               select: { value: true }
           })
         : null;
@@ -393,7 +421,11 @@ export async function addAllowedPlayer(
         if (!person) throw new Error("That Polaris account does not exist");
     }
     const steamId = player.steamId.trim();
-    const list = arkAccess.withPlayer(await storedAllowList(installedAppId), { ...player, steamId }, new Date().toISOString());
+    const list = arkAccess.withPlayer(
+        await storedAllowList(installedAppId),
+        { ...player, steamId },
+        new Date().toISOString()
+    );
     await patchInstallConfig(installedAppId, { [arkAccess.ALLOW_LIST_KEY]: list });
     await applyAllowList(ownerId, installedAppId).catch(() => 0);
     return readArkAccess(ownerId, installedAppId);
@@ -420,7 +452,9 @@ export async function removeAllowedPlayer(
     if (known?.appliedAt && !known.held) {
         await runArkCommand(ownerId, installedAppId, `DisallowPlayerToJoinNoCheck ${steamId}`);
     }
-    await patchInstallConfig(installedAppId, { [arkAccess.ALLOW_LIST_KEY]: arkAccess.withoutPlayer(access.players, steamId) });
+    await patchInstallConfig(installedAppId, {
+        [arkAccess.ALLOW_LIST_KEY]: arkAccess.withoutPlayer(access.players, steamId)
+    });
     return readArkAccess(ownerId, installedAppId);
 }
 
@@ -495,7 +529,11 @@ async function requireApplication(ownerId: string, installedAppId: string): Prom
  * rewritten rather than replaced - an operator who added their own flags keeps
  * them. It only takes effect on the next start, which is what the screen says.
  */
-export async function setExclusiveJoin(ownerId: string, installedAppId: string, closed: boolean): Promise<void> {
+export async function setExclusiveJoin(
+    ownerId: string,
+    installedAppId: string,
+    closed: boolean
+): Promise<void> {
     await setLaunchFlag(ownerId, installedAppId, arkAccess.EXCLUSIVE_JOIN, closed);
 }
 
@@ -518,14 +556,23 @@ export async function setLaunchFlag(
         select: { value: true }
     });
     await setEnvVars("application", applicationId, ownerId, [
-        { key: "ARK_EXTRA_OPTS", value: arkAccess.withLaunchFlag(current?.value ?? "", flag, on), isSecret: false }
+        {
+            key: "ARK_EXTRA_OPTS",
+            value: arkAccess.withLaunchFlag(current?.value ?? "", flag, on),
+            isSecret: false
+        }
     ]);
 }
 
 /** Change the password players type to get in. Stored encrypted, and applied on
  *  the next start like every other value the image reads from its environment. */
-export async function setJoinPassword(ownerId: string, installedAppId: string, password: string): Promise<void> {
-    if (!arkAccess.isJoinPassword(password)) throw new Error("That password is not one ARK will carry");
+export async function setJoinPassword(
+    ownerId: string,
+    installedAppId: string,
+    password: string
+): Promise<void> {
+    if (!arkAccess.isJoinPassword(password))
+        throw new Error("That password is not one ARK will carry");
     const applicationId = await requireApplication(ownerId, installedAppId);
     await setEnvVars("application", applicationId, ownerId, [
         { key: "SERVER_PASSWORD", value: password, isSecret: true }
@@ -540,8 +587,13 @@ export async function setJoinPassword(ownerId: string, installedAppId: string, p
  * server whose admin password it will not take is one nobody can administer from
  * inside the game, and the only way back was to delete it.
  */
-export async function setAdminPassword(ownerId: string, installedAppId: string, password: string): Promise<void> {
-    if (!arkAccess.isJoinPassword(password)) throw new Error("That password is not one ARK will carry");
+export async function setAdminPassword(
+    ownerId: string,
+    installedAppId: string,
+    password: string
+): Promise<void> {
+    if (!arkAccess.isJoinPassword(password))
+        throw new Error("That password is not one ARK will carry");
     const applicationId = await requireApplication(ownerId, installedAppId);
     await setEnvVars("application", applicationId, ownerId, [
         { key: "ADMIN_PASSWORD", value: password, isSecret: true }
@@ -583,7 +635,10 @@ export async function revealArkPasswords(
         const row = rows.find((entry) => entry.key === key);
         return row ? revealEnvVar(row.id, ownerId).catch(() => null) : null;
     };
-    const [joinPassword, adminPassword] = await Promise.all([read("SERVER_PASSWORD"), read("ADMIN_PASSWORD")]);
+    const [joinPassword, adminPassword] = await Promise.all([
+        read("SERVER_PASSWORD"),
+        read("ADMIN_PASSWORD")
+    ]);
     return { joinPassword, adminPassword };
 }
 
@@ -593,7 +648,11 @@ export async function saveArkWorld(ownerId: string, installedAppId: string): Pro
 }
 
 /** Say something to everyone who is playing. */
-export async function broadcastToArk(ownerId: string, installedAppId: string, message: string): Promise<void> {
+export async function broadcastToArk(
+    ownerId: string,
+    installedAppId: string,
+    message: string
+): Promise<void> {
     await runArkCommand(ownerId, installedAppId, `Broadcast ${message}`);
 }
 
@@ -616,19 +675,31 @@ export async function messageArkPlayer(
 
 /** Throw somebody off. They can come straight back unless the allow list or a ban
  *  says otherwise, which is what makes it the mild one of the two. */
-export async function kickArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
+export async function kickArkPlayer(
+    ownerId: string,
+    installedAppId: string,
+    steamId: string
+): Promise<void> {
     if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
     await runArkCommand(ownerId, installedAppId, `KickPlayer ${steamId.trim()}`);
 }
 
 /** Refuse them from now on. Separate from the allow list: a ban holds even on a
  *  server that was opened to everybody. */
-export async function banArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
+export async function banArkPlayer(
+    ownerId: string,
+    installedAppId: string,
+    steamId: string
+): Promise<void> {
     if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
     await runArkCommand(ownerId, installedAppId, `BanPlayer ${steamId.trim()}`);
 }
 
-export async function unbanArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
+export async function unbanArkPlayer(
+    ownerId: string,
+    installedAppId: string,
+    steamId: string
+): Promise<void> {
     if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
     await runArkCommand(ownerId, installedAppId, `UnbanPlayer ${steamId.trim()}`);
 }
@@ -663,7 +734,11 @@ export async function readArkPlayerId(
  * inside the world geometry, or one standing somewhere they should not be. It
  * costs them what they are carrying, so the screen asks first.
  */
-export async function killArkPlayer(ownerId: string, installedAppId: string, playerId: string): Promise<string> {
+export async function killArkPlayer(
+    ownerId: string,
+    installedAppId: string,
+    playerId: string
+): Promise<string> {
     return runArkCommand(ownerId, installedAppId, `KillPlayer ${assertPlayerId(playerId)}`);
 }
 
@@ -679,7 +754,11 @@ export async function clearArkPlayerInventory(
     installedAppId: string,
     playerId: string
 ): Promise<string> {
-    return runArkCommand(ownerId, installedAppId, `ClearPlayerInventory ${assertPlayerId(playerId)} 1 1 1`);
+    return runArkCommand(
+        ownerId,
+        installedAppId,
+        `ClearPlayerInventory ${assertPlayerId(playerId)} 1 1 1`
+    );
 }
 
 /**
@@ -695,7 +774,11 @@ export async function giveArkExperience(
     playerId: string,
     amount: number
 ): Promise<string> {
-    return runArkCommand(ownerId, installedAppId, arkExperienceCommand(assertPlayerId(playerId), amount));
+    return runArkCommand(
+        ownerId,
+        installedAppId,
+        arkExperienceCommand(assertPlayerId(playerId), amount)
+    );
 }
 
 /** An in-game player id is digits and nothing else. It comes from a file Polaris
@@ -747,7 +830,9 @@ export async function setArkAdmin(
     if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
     const id = steamId.trim();
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const current = arkAdmins.parseAdminList((await readContainerFile(server, ADMIN_FILE)) ?? "");
+        const current = arkAdmins.parseAdminList(
+            (await readContainerFile(server, ADMIN_FILE)) ?? ""
+        );
         const next = admin ? arkAdmins.withAdmin(current, id) : arkAdmins.withoutAdmin(current, id);
         await writeContainerFile(server, ADMIN_FILE, arkAdmins.formatAdminList(next));
         return next;
@@ -801,7 +886,9 @@ export async function readArkProfiles(
     installedAppId: string,
     steamIds: readonly string[]
 ): Promise<Record<string, ArkProfile>> {
-    const wanted = [...new Set(steamIds)].filter((id) => arkAccess.isSteamId(id)).slice(0, MAX_PROFILE_READS);
+    const wanted = [...new Set(steamIds)]
+        .filter((id) => arkAccess.isSteamId(id))
+        .slice(0, MAX_PROFILE_READS);
     if (wanted.length === 0) return {};
     const install = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
@@ -830,7 +917,9 @@ export async function readArkProfiles(
     // Only when it moved. A write per read would be a database round trip for a
     // value that is the same one every time.
     if (directory && directory !== known) {
-        await patchInstallConfig(installedAppId, { [PROFILE_DIR_KEY]: directory }).catch(() => undefined);
+        await patchInstallConfig(installedAppId, { [PROFILE_DIR_KEY]: directory }).catch(
+            () => undefined
+        );
     }
     return parseProfileDump(found);
 }

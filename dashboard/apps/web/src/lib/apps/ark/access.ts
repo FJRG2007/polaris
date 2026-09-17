@@ -41,7 +41,8 @@ export function isJoinPassword(value: string): boolean {
 }
 
 /** What to say when a password is refused, in the terms it was refused on. */
-export const JOIN_PASSWORD_HINT = "8 to 32 letters and digits, and nothing else - ARK will not carry the rest";
+export const JOIN_PASSWORD_HINT =
+    "8 to 32 letters and digits, and nothing else - ARK will not carry the rest";
 
 /**
  * A join password nobody had to invent.
@@ -184,7 +185,10 @@ export function gateDecisions(
 }
 
 /** The list without one player. */
-export function withoutPlayer(list: readonly ArkAllowedPlayer[], steamId: string): ArkAllowedPlayer[] {
+export function withoutPlayer(
+    list: readonly ArkAllowedPlayer[],
+    steamId: string
+): ArkAllowedPlayer[] {
     return list.filter((entry) => entry.steamId !== steamId);
 }
 

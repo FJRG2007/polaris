@@ -144,7 +144,9 @@ export async function gameContextFor(app: {
         gameDomainSuffix(game.domainLabel).catch(() => null),
         ownerId ? gameServerFacts(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" && ownerId ? readArkAccess(ownerId, app.id).catch(() => null) : null,
-        game.id === "minecraft" && ownerId ? listPlayerAccess(ownerId, app.id).catch(() => null) : null,
+        game.id === "minecraft" && ownerId
+            ? listPlayerAccess(ownerId, app.id).catch(() => null)
+            : null,
         game.id === "fivem" && ownerId ? readFivemAccess(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" ? readArkPorts(app.applicationId).catch(() => null) : null,
         game.id === "fivem" ? readFivemPort(app.applicationId).catch(() => null) : null,
@@ -163,8 +165,12 @@ export async function gameContextFor(app: {
         canRoute: routesByHostname(app.catalogId),
         iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null,
         edition: game.id === "minecraft" ? editionOf(app.catalogId) : null,
-        blueprintId: typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : null,
-        mapId: typeof config[MAP_KEY] === "string" && config[MAP_KEY] ? (config[MAP_KEY] as string) : null,
+        blueprintId:
+            typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : null,
+        mapId:
+            typeof config[MAP_KEY] === "string" && config[MAP_KEY]
+                ? (config[MAP_KEY] as string)
+                : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),
         routineRuns: readRoutineRuns(config),

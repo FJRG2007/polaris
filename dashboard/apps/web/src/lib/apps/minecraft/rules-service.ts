@@ -118,9 +118,10 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
         };
     }
     assertKnownRuleNames();
-    const script = [...GAME_RULES.map((rule) => `rcon-cli gamerule ${rule.id}`), "rcon-cli difficulty"].join(
-        "; "
-    );
+    const script = [
+        ...GAME_RULES.map((rule) => `rcon-cli gamerule ${rule.id}`),
+        "rcon-cli difficulty"
+    ].join("; ");
     const result = await server.run(["sh", "-c", script]);
     const output = stripFormatting(result.output);
     const values = parseGameRules(output);
@@ -326,7 +327,8 @@ async function remember(
     if (same && fresh) return;
 
     const times: Record<string, string> = {};
-    for (const id of Object.keys(values)) times[id] = read.has(id) ? stamp : (before?.times?.[id] ?? stamp);
+    for (const id of Object.keys(values))
+        times[id] = read.has(id) ? stamp : (before?.times?.[id] ?? stamp);
     if (difficulty) {
         times[DIFFICULTY_FIELD] = read.has(DIFFICULTY_FIELD)
             ? stamp
@@ -347,7 +349,10 @@ async function rememberQuietly(
 /** The difficulty, remembered from wherever it was changed - the settings form
  *  writes the same value into the container's environment and would otherwise
  *  leave this screen showing the one before it. */
-export async function rememberDifficulty(installedAppId: string, difficulty: Difficulty): Promise<void> {
+export async function rememberDifficulty(
+    installedAppId: string,
+    difficulty: Difficulty
+): Promise<void> {
     await rememberQuietly(installedAppId, { difficulty });
 }
 
@@ -366,7 +371,9 @@ interface DesiredRule {
  *  it is now - a row for a rule this Polaris no longer has is left alone. */
 async function desiredRules(installedAppId: string, waitingOnly = false): Promise<DesiredRule[]> {
     const rows = await prisma.gameRuleSetting.findMany({
-        where: waitingOnly ? { installedAppId, appliedAt: null, failure: null } : { installedAppId },
+        where: waitingOnly
+            ? { installedAppId, appliedAt: null, failure: null }
+            : { installedAppId },
         select: { rule: true, value: true, appliedAt: true, failure: true }
     });
     return rows.filter((row) =>

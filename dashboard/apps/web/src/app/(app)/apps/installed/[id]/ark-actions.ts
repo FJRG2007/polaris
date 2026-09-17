@@ -28,15 +28,29 @@ import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
 import { giveArkItems, requireArkPlayerId } from "@/lib/apps/ark/item-service";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
-import { ARK_ITEM_KEY, MAX_ARK_GIVE, MAX_ARK_GIVE_ITEMS, MAX_ARK_QUALITY } from "@/lib/apps/ark/items";
+import {
+    ARK_ITEM_KEY,
+    MAX_ARK_GIVE,
+    MAX_ARK_GIVE_ITEMS,
+    MAX_ARK_QUALITY
+} from "@/lib/apps/ark/items";
 import { MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { readArkRules, setArkRules, type ArkRules } from "@/lib/apps/ark/settings-service";
 import { isWorkshopImage, parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
 import { ARK_MOD_SHELVES, shelfModIds, type ArkModSuggestion } from "@/lib/apps/ark/mod-catalog";
-import { readWorkshopItem, readWorkshopItems, searchWorkshop } from "@/lib/apps/ark/workshop-service";
-import { readArkMods, setArkMapMod, setArkMods, type ArkModsView } from "@/lib/apps/ark/mods-service";
+import {
+    readWorkshopItem,
+    readWorkshopItems,
+    searchWorkshop
+} from "@/lib/apps/ark/workshop-service";
+import {
+    readArkMods,
+    setArkMapMod,
+    setArkMods,
+    type ArkModsView
+} from "@/lib/apps/ark/mods-service";
 
 const playerSchema = z.object({
     installedAppId: z.string().trim().min(1),
@@ -55,9 +69,13 @@ export async function addArkPlayerAction(
     userId?: string | null
 ): Promise<{ access?: ark.ArkAccessView; error?: string }> {
     const parsed = playerSchema.safeParse({ installedAppId, steamId, label, userId });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         const view = await ark.addAllowedPlayer(access.ownerId, parsed.data.installedAppId, {
             steamId: parsed.data.steamId,
             label: parsed.data.label,
@@ -98,7 +116,11 @@ export async function readArkPlayerRecordAction(
         .object({
             installedAppId: z.string().uuid(),
             player: z.string().trim().min(1).max(64),
-            steamId: z.string().trim().regex(/^\d{17}$/).nullable()
+            steamId: z
+                .string()
+                .trim()
+                .regex(/^\d{17}$/)
+                .nullable()
         })
         .safeParse({ installedAppId, player, steamId });
     if (!parsed.success) return { error: "Check the details and try again" };
@@ -111,7 +133,9 @@ export async function readArkPlayerRecordAction(
             })
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read this player's history" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not read this player's history"
+        };
     }
 }
 
@@ -120,10 +144,18 @@ export async function removeArkPlayerAction(
     steamId: string
 ): Promise<{ access?: ark.ArkAccessView; error?: string }> {
     const parsed = playerSchema.safeParse({ installedAppId, steamId, label: "" });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
-        const view = await ark.removeAllowedPlayer(access.ownerId, parsed.data.installedAppId, parsed.data.steamId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
+        const view = await ark.removeAllowedPlayer(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId
+        );
         await recordAudit({
             actorId: user.id,
             action: "games.ark.disallow",
@@ -155,7 +187,9 @@ export async function setArkExclusiveJoinAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change who may join" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change who may join"
+        };
     }
 }
 
@@ -178,7 +212,9 @@ export async function setArkJoinPasswordAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the password" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change the password"
+        };
     }
 }
 
@@ -189,7 +225,10 @@ export async function setArkJoinPasswordAction(
  * a command that the server declined leaves nothing to read anywhere. Takes effect
  * on the next start, like every other launch option.
  */
-export async function setArkGameLogAction(installedAppId: string, on: boolean): Promise<{ error?: string }> {
+export async function setArkGameLogAction(
+    installedAppId: string,
+    on: boolean
+): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await ark.setLaunchFlag(access.ownerId, installedAppId, GAME_LOG, on);
@@ -225,7 +264,9 @@ export async function setArkAdminPasswordAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the password" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change the password"
+        };
     }
 }
 
@@ -274,9 +315,13 @@ export async function moderateArkPlayerAction(
     verb: "kick" | "ban" | "unban"
 ): Promise<{ error?: string }> {
     const parsed = moderateSchema.safeParse({ installedAppId, steamId, verb });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         const run = {
             kick: ark.kickArkPlayer,
             ban: ark.banArkPlayer,
@@ -292,7 +337,9 @@ export async function moderateArkPlayerAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -316,9 +363,13 @@ export async function actOnArkSurvivorAction(
     verb: "kill" | "strip"
 ): Promise<{ error?: string }> {
     const parsed = survivorSchema.safeParse({ installedAppId, steamId, verb });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         const playerId = await requireArkPlayerId(
             access.ownerId,
             parsed.data.installedAppId,
@@ -335,7 +386,9 @@ export async function actOnArkSurvivorAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -359,9 +412,13 @@ export async function giveArkExperienceAction(
     amount: number
 ): Promise<{ error?: string }> {
     const parsed = experienceSchema.safeParse({ installedAppId, steamId, amount });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         const playerId = await requireArkPlayerId(
             access.ownerId,
             parsed.data.installedAppId,
@@ -382,7 +439,9 @@ export async function giveArkExperienceAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -425,7 +484,8 @@ export async function giveArkItemsAction(
     input: ArkGiveInput
 ): Promise<{ items?: string[]; error?: string }> {
     const parsed = giveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, steamId, items } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -437,12 +497,19 @@ export async function giveArkItemsAction(
                 action: "games.ark.give",
                 targetType: "installedApp",
                 targetId: installedAppId,
-                metadata: { steamId, item: line.key, count: line.quantity, blueprint: line.blueprint }
+                metadata: {
+                    steamId,
+                    item: line.key,
+                    count: line.quantity,
+                    blueprint: line.blueprint
+                }
             });
         }
         return { items: given.map((result) => result.item.name) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -465,10 +532,9 @@ const rulesSchema = z.object({
     installedAppId: z.string().trim().min(1),
     // A value of null unpins a setting, which is not the same as writing the
     // game's default into it.
-    changes: z.record(z.string().trim().max(32), z.string().trim().max(32).nullable()).refine(
-        (value) => Object.keys(value).length <= 64,
-        "Too many settings at once"
-    )
+    changes: z
+        .record(z.string().trim().max(32), z.string().trim().max(32).nullable())
+        .refine((value) => Object.keys(value).length <= 64, "Too many settings at once")
 });
 
 /** What the server is set to, and what its own file says it is running with. */
@@ -497,10 +563,18 @@ export async function setArkRulesAction(
     changes: Record<string, string | null>
 ): Promise<{ rules?: ArkRules; error?: string }> {
     const parsed = rulesSchema.safeParse({ installedAppId, changes });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
-        const rules = await setArkRules(access.ownerId, parsed.data.installedAppId, parsed.data.changes);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        const rules = await setArkRules(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.changes
+        );
         await recordAudit({
             actorId: user.id,
             action: "games.ark.settings",
@@ -510,7 +584,9 @@ export async function setArkRulesAction(
         });
         return { rules };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -542,9 +618,13 @@ export async function setArkModsAction(
     ids: string[]
 ): Promise<{ mods?: ArkModsView; error?: string }> {
     const parsed = modListSchema.safeParse({ installedAppId, ids });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the mods and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the mods and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await setArkMods(access.ownerId, parsed.data.installedAppId, parsed.data.ids);
         await recordAudit({
             actorId: user.id,
@@ -580,9 +660,13 @@ export async function setArkMapModAction(
             id: z.string().trim().refine(isModId, "That is not a Steam Workshop id").nullable()
         })
         .safeParse({ installedAppId, id });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the map and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the map and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await setArkMapMod(access.ownerId, parsed.data.installedAppId, parsed.data.id);
         await recordAudit({
             actorId: user.id,
@@ -624,7 +708,10 @@ export async function lookUpArkModAction(
  * something to install rather than an empty search box.
  */
 export async function readArkModShelvesAction(installedAppId: string): Promise<{
-    shelves: { group: string; entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[] }[];
+    shelves: {
+        group: string;
+        entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[];
+    }[];
 }> {
     try {
         await requireGameServer("games.manage", installedAppId);
@@ -690,7 +777,9 @@ export async function restartArkServerAction(installedAppId: string): Promise<{ 
         revalidatePath(`/apps/installed/${parsed.data}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server could not be restarted" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server could not be restarted"
+        };
     }
 }
 
@@ -717,9 +806,13 @@ export async function setArkAdminAction(
     admin: boolean
 ): Promise<{ admins?: string[]; error?: string }> {
     const parsed = adminSchema.safeParse({ installedAppId, steamId, admin });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const admins = await ark.setArkAdmin(
             access.ownerId,
             parsed.data.installedAppId,
@@ -735,7 +828,9 @@ export async function setArkAdminAction(
         });
         return { admins };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
@@ -761,9 +856,13 @@ export async function timeoutArkPlayerAction(input: {
     reason?: string;
 }): Promise<{ until?: string; error?: string }> {
     const parsed = timeoutSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         const entry = await timeoutArkPlayer(
             access.ownerId,
             parsed.data.installedAppId,
@@ -776,25 +875,38 @@ export async function timeoutArkPlayerAction(input: {
             action: "games.ark.timeout",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { steamId: parsed.data.steamId, minutes: parsed.data.minutes, until: entry.until }
+            metadata: {
+                steamId: parsed.data.steamId,
+                minutes: parsed.data.minutes,
+                until: entry.until
+            }
         });
         return { until: entry.until };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+        return {
+            error: caught instanceof Error ? caught.message : "The server did not accept that"
+        };
     }
 }
 
 /** Let them back in early, and forget the note. */
-export async function liftArkTimeoutAction(installedAppId: string, steamId: string): Promise<{ error?: string }> {
+export async function liftArkTimeoutAction(
+    installedAppId: string,
+    steamId: string
+): Promise<{ error?: string }> {
     const parsed = z
         .object({
             installedAppId: z.string().trim().min(1),
             steamId: z.string().trim().refine(isSteamId, "That is not a Steam id")
         })
         .safeParse({ installedAppId, steamId });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
     try {
-        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.moderate",
+            parsed.data.installedAppId
+        );
         await liftArkTimeout(access.ownerId, parsed.data.installedAppId, parsed.data.steamId);
         await recordAudit({
             actorId: user.id,
@@ -823,7 +935,8 @@ export async function messageArkPlayerAction(
             message: z.string().trim().min(1, "Say something").max(200)
         })
         .safeParse({ installedAppId, steamId, message });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         await ark.messageArkPlayer(
@@ -850,7 +963,10 @@ export async function saveArkWorldAction(installedAppId: string): Promise<{ erro
 }
 
 /** Say something to everyone who is playing. */
-export async function broadcastArkAction(installedAppId: string, message: string): Promise<{ error?: string }> {
+export async function broadcastArkAction(
+    installedAppId: string,
+    message: string
+): Promise<{ error?: string }> {
     const parsed = z.string().trim().min(1).max(200).safeParse(message);
     if (!parsed.success) return { error: "Say something up to 200 characters" };
     try {
@@ -883,7 +999,8 @@ export async function findArkPlayerByUserAction(
     try {
         await requireGameServer("games.moderate", installedAppId);
         const found = await findGameIdentity(parsed.data, "steam");
-        if (!found) return { error: "Nobody here goes by that. Check the username or the email address." };
+        if (!found)
+            return { error: "Nobody here goes by that. Check the username or the email address." };
         if (!found.identity) {
             // Somebody who plays through Epic has no Steam id at all, and ARK's
             // own list refuses anything else - so the answer is about the server
@@ -894,7 +1011,9 @@ export async function findArkPlayerByUserAction(
                     error: `${found.name} has linked Epic Games rather than Steam. An ARK server's list only takes Steam ids, so they have to be let in another way.`
                 };
             }
-            return { error: `${found.name} has not linked a Steam account yet. They can do it under Connected accounts.` };
+            return {
+                error: `${found.name} has not linked a Steam account yet. They can do it under Connected accounts.`
+            };
         }
         return {
             userId: found.userId,
