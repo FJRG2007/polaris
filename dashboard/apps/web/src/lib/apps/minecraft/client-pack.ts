@@ -68,7 +68,9 @@ export interface ClientPack {
 /** The client-only mods an install carries, as its config holds them. */
 export function clientMods(config: InstallConfig): string[] {
     const held = config[CLIENT_MODS_KEY];
-    return Array.isArray(held) ? held.filter((entry): entry is string => typeof entry === "string") : [];
+    return Array.isArray(held)
+        ? held.filter((entry): entry is string => typeof entry === "string")
+        : [];
 }
 
 /** The same, from the raw column. */
@@ -86,7 +88,10 @@ export function clientModsOf(raw: string | null | undefined): string[] {
  */
 export function packToken(installedAppId: string): string {
     const secret = loadEnv().POLARIS_AUTH_SECRET || "";
-    return createHmac("sha256", secret).update(`minecraft-pack:${installedAppId}`).digest("base64url").slice(0, 32);
+    return createHmac("sha256", secret)
+        .update(`minecraft-pack:${installedAppId}`)
+        .digest("base64url")
+        .slice(0, 32);
 }
 
 /** Whether a token is the one for this server, compared without leaking where it
@@ -108,7 +113,10 @@ export async function resolvePack(input: {
 }): Promise<ClientPack> {
     const loader = loaderForType(input.software) ?? "";
     const version = /^[0-9][0-9.]*$/.test(input.version.trim()) ? input.version.trim() : "";
-    const server = parseProjectList(input.projects).map((entry) => ({ entry, where: "server" as const }));
+    const server = parseProjectList(input.projects).map((entry) => ({
+        entry,
+        where: "server" as const
+    }));
     const player = clientMods(input.config).map((entry) => ({ entry, where: "player" as const }));
     const mods: PackMod[] = [];
     const missing: string[] = [];
@@ -165,7 +173,10 @@ export function packUrl(base: string, installedAppId: string, file: string): str
  * PowerShell, which every supported Windows has; macOS and Linux go through the
  * shell they already have.
  */
-export function packCommands(base: string, installedAppId: string): Record<"windows" | "mac" | "linux", string> {
+export function packCommands(
+    base: string,
+    installedAppId: string
+): Record<"windows" | "mac" | "linux", string> {
     const ps = packUrl(base, installedAppId, "install.ps1");
     const sh = packUrl(base, installedAppId, "install.sh");
     return {

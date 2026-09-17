@@ -18,13 +18,14 @@ vi.mock("@/lib/apps/minecraft/modrinth", async (importOriginal) => {
     const real = await importOriginal<typeof import("@/lib/apps/minecraft/modrinth")>();
     return {
         ...real,
-        buildFor: vi.fn(async (entry: string) => builds.get(real.projectSlug(entry) ?? entry) ?? null)
+        buildFor: vi.fn(
+            async (entry: string) => builds.get(real.projectSlug(entry) ?? entry) ?? null
+        )
     };
 });
 
-const { clientMods, packCommands, packToken, packTokenMatches, packUrl, resolvePack } = await import(
-    "@/lib/apps/minecraft/client-pack"
-);
+const { clientMods, packCommands, packToken, packTokenMatches, packUrl, resolvePack } =
+    await import("@/lib/apps/minecraft/client-pack");
 
 function build(slug: string) {
     return {

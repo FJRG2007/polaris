@@ -26,7 +26,10 @@ const MAX_BYTES = 512 * 1024;
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"];
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     await requireGameServer("games.read", id);
 

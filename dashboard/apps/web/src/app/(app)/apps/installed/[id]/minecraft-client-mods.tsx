@@ -177,8 +177,8 @@ export function MinecraftClientMods({
                         <h3 className="text-sm font-medium">What the players install</h3>
                         <p className="text-xs text-muted-foreground">
                             The mods that run in their game and not on the server - a minimap, a
-                            world map, a HUD. The server never loads these, so nothing here
-                            restarts it.
+                            world map, a HUD. The server never loads these, so nothing here restarts
+                            it.
                         </p>
                     </div>
                     {changed && (
@@ -207,7 +207,12 @@ export function MinecraftClientMods({
                             >
                                 <ProjectIcon installedAppId={installedAppId} project={project} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={project.title}>{project.title}</p>
+                                    <p
+                                        className="truncate text-sm font-medium"
+                                        title={project.title}
+                                    >
+                                        {project.title}
+                                    </p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {project.description}
                                     </p>
@@ -305,10 +310,10 @@ export function MinecraftClientMods({
                             <h3 className="text-sm font-medium">Send this to the players</h3>
                             <p className="text-xs text-muted-foreground">
                                 One line installs the {serverMods + entries.length} mods for this
-                                server into their game, and running it again is how they update:
-                                it replaces what changed and takes away what came off the lists.
-                                Anything else in their mods folder is left alone. The link needs
-                                no account here.
+                                server into their game, and running it again is how they update: it
+                                replaces what changed and takes away what came off the lists.
+                                Anything else in their mods folder is left alone. The link needs no
+                                account here.
                             </p>
                             {changed && (
                                 <p className="mt-1 text-xs text-warning">

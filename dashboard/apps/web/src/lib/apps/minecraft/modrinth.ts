@@ -359,18 +359,18 @@ const someBuilds = <T extends z.ZodTypeAny>(build: T) =>
     );
 
 const versionSchema = someBuilds(
-        z.object({
-            dependencies: z
-                .array(
-                    z.object({
-                        project_id: z.string().max(64).nullish().catch(null),
-                        dependency_type: z.string().max(32).catch("")
-                    })
-                )
-                .max(64)
-                .catch([])
-        })
-    );
+    z.object({
+        dependencies: z
+            .array(
+                z.object({
+                    project_id: z.string().max(64).nullish().catch(null),
+                    dependency_type: z.string().max(32).catch("")
+                })
+            )
+            .max(64)
+            .catch([])
+    })
+);
 
 /** Two projects on the same list that their own publishers say cannot both be
  *  installed. */

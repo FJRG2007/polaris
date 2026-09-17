@@ -44,7 +44,11 @@ export function scriptName(server: string): string {
 /** A value of somebody else's on a line of its own: no tab to shift the fields
  *  after it, no newline to invent a line that is not there. */
 function oneLine(value: string): string {
-    return value.replace(/[\p{Cc}\p{Cf}]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+    return value
+        .replace(/[\p{Cc}\p{Cf}]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 120);
 }
 
 /**

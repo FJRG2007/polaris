@@ -53,7 +53,9 @@ function has(command: string, args: string[]): boolean {
 }
 
 const HAS_SH = has("sh", ["-c", "command -v curl"]);
-const POWERSHELL = ["pwsh", "powershell"].find((shell) => has(shell, ["-NoProfile", "-Command", "exit 0"]));
+const POWERSHELL = ["pwsh", "powershell"].find((shell) =>
+    has(shell, ["-NoProfile", "-Command", "exit 0"])
+);
 
 describe("the mod list both installers read", () => {
     it("is one tab-separated line per mod", () => {
@@ -170,7 +172,10 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
      * the loop that has to answer it, and the two would wait for each other for
      * ever.
      */
-    async function run(kind: "sh" | "ps1", dir: string): Promise<{ code: number | null; output: string }> {
+    async function run(
+        kind: "sh" | "ps1",
+        dir: string
+    ): Promise<{ code: number | null; output: string }> {
         const manifest = `${origin}/pack.tsv`;
         const script = join(
             mkdtempSync(join(tmpdir(), "polaris-pack-script-")),
@@ -291,12 +296,9 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         await exercise("sh");
     });
 
-    it.runIf(POWERSHELL)(
-        "install, keep and update a mods folder, from PowerShell",
-        async () => {
-            await exercise("ps1");
-        }
-    );
+    it.runIf(POWERSHELL)("install, keep and update a mods folder, from PowerShell", async () => {
+        await exercise("ps1");
+    });
 
     it.runIf(HAS_SH)("take nothing away on a partial or empty list, from a shell", async () => {
         await refuses("sh");
