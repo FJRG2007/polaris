@@ -53,6 +53,48 @@ function open() {
     return render(<ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />);
 }
 
+/** A saved connection reached over SSH, as the list hands one to the form. */
+function tunnelled(tunnel: Record<string, unknown>) {
+    return render(
+        <ConnectionDialog
+            connection={
+                {
+                    id: "11111111-1111-4111-8111-111111111111",
+                    name: "Production",
+                    engine: "postgres",
+                    origin: "saved",
+                    managedDatabaseId: null,
+                    where: "127.0.0.1:5432",
+                    database: null,
+                    username: "app",
+                    readOnly: false,
+                    tls: false,
+                    host: "127.0.0.1",
+                    port: 5432,
+                    tunnel,
+                    note: null,
+                    unreachable: false,
+                    lastUsedAt: null,
+                    createdAt: null
+                } as never
+            }
+            onClose={() => undefined}
+            onSaved={() => undefined}
+        />
+    );
+}
+
+const MANUAL_TUNNEL = {
+    mode: "manual",
+    host: "ssh.example.com",
+    port: 2222,
+    username: "root",
+    authMethod: "password",
+    jumpHostId: null,
+    jumpHostName: null,
+    jumpMissing: false
+};
+
 describe("the connection form", () => {
     it("picks the engine with its own mark, not a list of words", async () => {
         open();
@@ -89,6 +131,51 @@ describe("the connection form", () => {
 
         expect(await screen.findByText(/without the rest of a URL/)).toBeTruthy();
         expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(true);
+    });
+
+    it("says the server has to be picked rather than disabling Save in silence", async () => {
+        open();
+        await userEvent.type(screen.getByLabelText("Name"), "Production");
+        await userEvent.type(screen.getByLabelText("Host"), "127.0.0.1");
+        await userEvent.click(screen.getByRole("switch", { name: "Reach it over SSH" }));
+
+        expect(await screen.findByText("Pick the server to tunnel through.")).toBeTruthy();
+        expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(true);
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Server to tunnel through" }));
+        await userEvent.click(await screen.findByRole("option", { name: /lirio-0/ }));
+
+        expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(false);
+    });
+
+    it("asks for the secret again when the SSH login switches to a key", async () => {
+        tunnelled(MANUAL_TUNNEL);
+        const save = screen.getByRole("button", { name: /Save/ });
+        expect(save.hasAttribute("disabled")).toBe(false);
+
+        await userEvent.click(screen.getByRole("radio", { name: "Private key" }));
+
+        expect(save.hasAttribute("disabled")).toBe(true);
+        expect(screen.getByText(/Needed to sign in/)).toBeTruthy();
+    });
+
+    it("makes the reader answer the jump picker when that bastion was removed", async () => {
+        tunnelled({ ...MANUAL_TUNNEL, jumpMissing: true });
+        const save = screen.getByRole("button", { name: /Save/ });
+        expect(save.hasAttribute("disabled")).toBe(true);
+        expect(screen.getByText(/was removed from Servers/)).toBeTruthy();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Server to jump through" }));
+        await userEvent.click(await screen.findByRole("option", { name: "Straight to it" }));
+
+        expect(save.hasAttribute("disabled")).toBe(false);
+    });
+
+    it("says which server was removed rather than leaving an empty picker", async () => {
+        tunnelled({ mode: "server", hostId: null, hostName: null });
+
+        expect(await screen.findByText(/was removed from Servers/)).toBeTruthy();
+        expect(screen.getByRole("button", { name: /Save/ }).hasAttribute("disabled")).toBe(true);
     });
 
     it("sends what was filled in, read-only off", async () => {

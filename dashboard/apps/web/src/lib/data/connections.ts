@@ -31,9 +31,9 @@ import { loadEnv } from "@polaris/config";
 import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
 import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
-import { getHostConnection } from "@/lib/host-service";
+import { getHostConnection, HostCredentialsError } from "@/lib/host-service";
 import { databaseCredentials } from "@/lib/database-service";
-import { captureHostKey, type DataTunnel } from "./tunnel";
+import { captureHostKey, TunnelError, type DataTunnel } from "./tunnel";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { saveConnectionSchema, type SaveConnectionInput, type SshAuthMethod } from "./connection-schema";
 
@@ -512,23 +512,37 @@ async function tunnelColumns(
     }
     const credentials: SshCredentials = typed ?? readSshCredentials(stored as StoredTunnel);
 
-    const unchanged =
-        !typed &&
-        stored !== null &&
+    // The key already on record for this same login. A re-save keeps being
+    // checked against it - typing a new secret is a rotation, not a reason to
+    // trust whatever answers at that address - and only the route to it can have
+    // changed, so the jump server is no part of this.
+    const pinned: string | null =
+        stored?.sshHostKey &&
         stored.sshHost === ssh.host &&
         stored.sshPort === ssh.port &&
-        stored.sshUsername === ssh.username &&
-        (stored.sshJumpHostId ?? null) === ssh.jumpHostId &&
-        Boolean(stored.sshHostKey);
+        stored.sshUsername === ssh.username
+            ? stored.sshHostKey
+            : null;
 
-    let hostKey = unchanged ? (stored?.sshHostKey as string) : null;
+    const unchanged = !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
+
+    let hostKey = unchanged ? pinned : null;
     if (!hostKey) {
         try {
             hostKey = await captureHostKey(
-                { host: ssh.host, port: ssh.port, username: ssh.username, auth: toSshAuth(credentials) },
+                {
+                    host: ssh.host,
+                    port: ssh.port,
+                    username: ssh.username,
+                    auth: toSshAuth(credentials),
+                    ...(pinned ? { pinnedHostKey: [pinned] } : {})
+                },
                 jump ? serverOptions(jump) : null
             );
         } catch (error) {
+            // A key that stopped matching says so in its own words; anything else
+            // is an address, a user or a secret that did not work.
+            if (error instanceof TunnelError) throw new DataConnectionError(error.message);
             console.error("databases: the SSH login did not work", error);
             throw new DataConnectionError(
                 `Polaris could not sign in to ${ssh.host}:${ssh.port} over SSH${
@@ -586,11 +600,23 @@ function toSshAuth(credentials: SshCredentials): SshAuth {
 
 type OwnedServer = Awaited<ReturnType<typeof getHostConnection>>;
 
-/** A registered server this account owns, or the refusal given. */
+/**
+ * A registered server this account owns, or the refusal given.
+ *
+ * A server that is theirs but whose stored login cannot be read is a different
+ * thing from one that is not theirs, and is said as itself: telling somebody
+ * their own server is not theirs is untrue and leaves them nothing to do about it.
+ */
 async function ownServer(userId: string, hostId: string, refusal: string): Promise<OwnedServer> {
     try {
         return await getHostConnection(hostId, userId);
-    } catch {
+    } catch (error) {
+        if (error instanceof HostCredentialsError) {
+            console.error("databases: a tunnel server's stored login could not be read", error);
+            throw new DataConnectionError(
+                `Polaris cannot read the login stored for ${error.hostName}. Add that server again under Servers, then save this connection.`
+            );
+        }
         throw new DataConnectionError(refusal);
     }
 }

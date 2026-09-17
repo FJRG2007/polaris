@@ -126,4 +126,28 @@ describe("captureHostKey", () => {
     it("fails when the handshake never presented one", async () => {
         await expect(captureHostKey(TARGET, null, deps)).rejects.toThrow(/host key/);
     });
+
+    it("says the key changed when the server presents one the caller did not pin", async () => {
+        // What a real verifier does: the key is reported, then refused, and the
+        // credential is never sent.
+        const connect = async (options: SshConnectOptions) => {
+            options.onHostKey?.("SOMETHING-ELSE");
+            throw new Error("Handshake failed: no matching host key");
+        };
+
+        await expect(captureHostKey(TARGET, null, { connect, forward: deps.forward })).rejects.toThrow(
+            /different key than the one Polaris pinned/
+        );
+    });
+
+    it("passes a failure that was not the key through as itself", async () => {
+        const connect = async (options: SshConnectOptions) => {
+            options.onHostKey?.("AAAA");
+            throw new Error("All configured authentication methods failed");
+        };
+
+        await expect(captureHostKey(TARGET, null, { connect, forward: deps.forward })).rejects.toThrow(
+            /authentication methods failed/
+        );
+    });
 });

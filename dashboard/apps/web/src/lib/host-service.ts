@@ -72,19 +72,52 @@ export async function getHostConnectionUnscoped(hostId: string): Promise<HostCon
 
 type HostRow = Awaited<ReturnType<typeof prisma.host.findUnique>>;
 
-function connectionFor(row: HostRow): HostConnection {
-    if (!row) throw new Error("Host not found");
-    if (!row.encryptedCredential || !row.credentialNonce) {
-        throw new Error("Host has no stored credentials");
+/** No such host, or not this account's - the two are one answer on purpose, so
+ *  asking for somebody else's id cannot tell them apart. */
+export class HostNotFoundError extends Error {
+    constructor() {
+        super("Host not found");
+        this.name = "HostNotFoundError";
     }
-    const creds = readCredentials(
-        {
-            ciphertext: Buffer.from(row.encryptedCredential),
-            nonce: Buffer.from(row.credentialNonce),
-            keyId: row.credentialKeyId ?? ""
-        },
-        loadEnv().POLARIS_MASTER_KEY
-    );
+}
+
+/**
+ * The host is there and is theirs, but its stored login cannot be turned back
+ * into credentials - never stored, or sealed with a master key this instance no
+ * longer has. Distinct from not finding it, because the two need opposite things
+ * said to whoever is looking at the screen.
+ */
+export class HostCredentialsError extends Error {
+    constructor(
+        readonly hostName: string,
+        message: string
+    ) {
+        super(message);
+        this.name = "HostCredentialsError";
+    }
+}
+
+function connectionFor(row: HostRow): HostConnection {
+    if (!row) throw new HostNotFoundError();
+    if (!row.encryptedCredential || !row.credentialNonce) {
+        throw new HostCredentialsError(row.name, "Host has no stored credentials");
+    }
+    let creds;
+    try {
+        creds = readCredentials(
+            {
+                ciphertext: Buffer.from(row.encryptedCredential),
+                nonce: Buffer.from(row.credentialNonce),
+                keyId: row.credentialKeyId ?? ""
+            },
+            loadEnv().POLARIS_MASTER_KEY
+        );
+    } catch (error) {
+        throw new HostCredentialsError(
+            row.name,
+            `Host credentials could not be read: ${error instanceof Error ? error.message : String(error)}`
+        );
+    }
     return {
         id: row.id,
         name: row.name,

@@ -71,6 +71,10 @@ interface TunnelServer {
  *  empty value. */
 const NO_JUMP = "none";
 
+/** A jump picker nobody has answered yet. Only reached when the saved bastion was
+ *  removed: "straight to it" is then a choice to make, not a state to inherit. */
+const JUMP_UNPICKED = "";
+
 export function ConnectionDialog({
     connection,
     prefill = null,
@@ -124,7 +128,11 @@ export function ConnectionDialog({
     const [sshKey, setSshKey] = useState("");
     const [sshPassphrase, setSshPassphrase] = useState("");
     const [jumpId, setJumpId] = useState(
-        saved?.mode === "manual" ? (saved.jumpHostId ?? NO_JUMP) : NO_JUMP
+        saved?.mode === "manual"
+            ? saved.jumpMissing
+                ? JUMP_UNPICKED
+                : (saved.jumpHostId ?? NO_JUMP)
+            : NO_JUMP
     );
 
     const [saving, setSaving] = useState(false);
@@ -158,7 +166,7 @@ export function ConnectionDialog({
             password: sshAuth === "password" ? sshPassword : null,
             privateKey: sshAuth === "key" ? sshKey : null,
             passphrase: sshAuth === "key" ? sshPassphrase : null,
-            jumpHostId: jumpId === NO_JUMP ? null : jumpId
+            jumpHostId: jumpId === NO_JUMP || jumpId === JUMP_UNPICKED ? null : jumpId
         };
     }, [
         kind,
@@ -215,14 +223,28 @@ export function ConnectionDialog({
     const shown = (key: string, value: string): string | undefined =>
         value.trim() === "" ? undefined : issues[key];
 
+    // A stored SSH secret is only kept when the login still signs in the same
+    // way: switching from a password to a key leaves nothing to keep, so it has
+    // to be asked for here rather than refused by the server after a round trip.
+    const keepsSshSecret = saved?.mode === "manual" && saved.authMethod === sshAuth;
     const missingSecret =
         ssh?.mode === "manual" &&
-        saved?.mode !== "manual" &&
+        !keepsSshSecret &&
         (sshAuth === "password" ? sshPassword === "" : sshKey === "");
+
+    // The bastion this tunnel went through was removed, so its picker starts
+    // unanswered: a connection quietly becoming a direct one is nobody's choice.
+    const jumpGone = saved?.mode === "manual" && saved.jumpMissing;
+    const jumpUnpicked = ssh?.mode === "manual" && jumpGone && jumpId === JUMP_UNPICKED;
+
+    // The same for a tunnel through a registered server that was removed.
+    const serverGone = saved?.mode === "server" && saved.hostId === null;
+
     const complete =
         Object.keys(issues).length === 0 &&
         (kind === "managed" ? managedId !== "" && !chosenManaged?.refusal : true) &&
-        !missingSecret;
+        !missingSecret &&
+        !jumpUnpicked;
 
     const save = async () => {
         if (!complete || saving) return;
@@ -399,7 +421,15 @@ export function ConnectionDialog({
                                                 use another login here.
                                             </p>
                                         ) : (
-                                            <Field label="Server">
+                                            <Field
+                                                label="Server"
+                                                error={
+                                                    serverGone && serverId === ""
+                                                        ? "The server this connection tunnelled through was removed from Servers. Pick another."
+                                                        : undefined
+                                                }
+                                                hint={serverId === "" ? issues["ssh.hostId"] : undefined}
+                                            >
                                                 <Select
                                                     value={serverId}
                                                     onValueChange={setServerId}
@@ -467,9 +497,9 @@ export function ConnectionDialog({
                                                 <Field
                                                     label="SSH password"
                                                     hint={
-                                                        saved?.mode === "manual"
+                                                        keepsSshSecret
                                                             ? "Leave empty to keep the saved one."
-                                                            : undefined
+                                                            : "Needed to sign in to the SSH server."
                                                     }
                                                 >
                                                     <Input
@@ -485,9 +515,9 @@ export function ConnectionDialog({
                                                     <Field
                                                         label="Private key"
                                                         hint={
-                                                            saved?.mode === "manual"
+                                                            keepsSshSecret
                                                                 ? "Leave empty to keep the saved one."
-                                                                : "The key itself, not a path to it."
+                                                                : "The key itself, not a path to it. Needed to sign in."
                                                         }
                                                     >
                                                         <Textarea
@@ -512,15 +542,21 @@ export function ConnectionDialog({
                                                     </Field>
                                                 </>
                                             )}
-                                            {servers.length > 0 && (
+                                            {(servers.length > 0 || jumpGone) && (
                                                 <Field
                                                     label="Jump through"
+                                                    error={
+                                                        jumpUnpicked
+                                                            ? "The server this tunnel jumped through was removed from Servers. Pick another, or reach it straight."
+                                                            : undefined
+                                                    }
                                                     hint="A server Polaris already has, used to reach that SSH host."
                                                 >
                                                     <Select
                                                         value={jumpId}
                                                         onValueChange={setJumpId}
                                                         aria-label="Server to jump through"
+                                                        placeholder="Pick one..."
                                                         options={[
                                                             { value: NO_JUMP, label: "Straight to it" },
                                                             ...serverOptions

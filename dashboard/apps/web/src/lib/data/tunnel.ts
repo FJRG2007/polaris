@@ -20,7 +20,13 @@
  */
 
 import type { Client } from "ssh2";
-import { forwardOut, listenForward, openSshClient, type SshConnectOptions } from "@polaris/ssh";
+import {
+    forwardOut,
+    hostKeyAccepted,
+    listenForward,
+    openSshClient,
+    type SshConnectOptions
+} from "@polaris/ssh";
 
 /** A resolved tunnel: every login it needs, secrets included. Never logged, never
  *  returned to a browser. */
@@ -113,26 +119,42 @@ export async function openTunnel(
 /**
  * Sign in to a tunnel's SSH server once and return the key it presented, to pin
  * for every later connection. Through the jump server when there is one.
+ *
+ * `pinnedHostKey` is what is already on record for this login, and is left out
+ * only the first time one is saved. It is what makes a re-save safe: the verifier
+ * runs before the credential is sent, so a login typed again - a rotated
+ * password, a switch from a password to a key - is offered to the server whose
+ * key was pinned rather than to whatever answers at that address.
  */
 export async function captureHostKey(
-    target: Omit<SshConnectOptions, "pinnedHostKey" | "onHostKey" | "sock">,
+    target: Omit<SshConnectOptions, "onHostKey" | "sock">,
     jump: SshConnectOptions | null,
     deps: TunnelDeps = REAL
 ): Promise<string> {
     let presented: string | undefined;
-    const clients = await connectTunnel(
-        {
-            target: {
-                ...target,
-                onHostKey: (key) => {
-                    presented = key;
-                }
+    let clients: Client[];
+    try {
+        clients = await connectTunnel(
+            {
+                target: {
+                    ...target,
+                    onHostKey: (key) => {
+                        presented = key;
+                    }
+                },
+                jump,
+                label: target.host
             },
-            jump,
-            label: target.host
-        },
-        deps
-    );
+            deps
+        );
+    } catch (error) {
+        if (presented !== undefined && !hostKeyAccepted(presented, target.pinnedHostKey)) {
+            throw new TunnelError(
+                `${target.host}:${target.port} answered with a different key than the one Polaris pinned for this connection, so nothing was sent to it. If that server was rebuilt, remove this connection and add it again.`
+            );
+        }
+        throw error;
+    }
     for (const client of clients) client.end();
     if (!presented) throw new Error("Connected but never received a host key");
     return presented;

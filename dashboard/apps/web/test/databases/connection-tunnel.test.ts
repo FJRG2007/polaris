@@ -15,11 +15,13 @@ const BOB = "99999999-9999-4999-8999-999999999999";
 const SERVER = "22222222-2222-4222-8222-222222222222";
 const BASTION = "33333333-3333-4333-8333-333333333333";
 const CONNECTION = "44444444-4444-4444-8444-444444444444";
+const UNREADABLE = "55555555-5555-4555-8555-555555555555";
 
 let saved: Record<string, unknown>[] = [];
 let written: Record<string, unknown> | null = null;
 const captured: { target: Record<string, unknown>; jump: Record<string, unknown> | null }[] = [];
 let captureFails = false;
+let captureRefuses = "";
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -56,9 +58,18 @@ vi.mock("@polaris/storage", () => ({
     decryptCredentials: (blob: { ciphertext: Buffer }) => JSON.parse(blob.ciphertext.toString("utf8"))
 }));
 vi.mock("@/lib/database-service", () => ({ databaseCredentials: async () => ({}) }));
-vi.mock("@/lib/host-service", () => ({
-    getHostConnection: async (hostId: string, ownerId: string) => {
+vi.mock("@/lib/host-service", () => {
+    class HostCredentialsError extends Error {
+        constructor(readonly hostName: string, message: string) {
+            super(message);
+            this.name = "HostCredentialsError";
+        }
+    }
+    return { HostCredentialsError, getHostConnection };
+
+    async function getHostConnection(hostId: string, ownerId: string) {
         if (ownerId !== ALICE) throw new Error("Host not found");
+        if (hostId === UNREADABLE) throw new HostCredentialsError("nas-01", "Host has no stored credentials");
         if (hostId === SERVER) {
             return {
                 id: SERVER,
@@ -85,13 +96,14 @@ vi.mock("@/lib/host-service", () => ({
         }
         throw new Error("Host not found");
     }
-}));
+});
 vi.mock("@/lib/data/tunnel", async (importOriginal) => {
     const real = await importOriginal<typeof import("@/lib/data/tunnel")>();
     return {
         ...real,
         captureHostKey: async (target: Record<string, unknown>, jump: Record<string, unknown> | null) => {
             captured.push({ target, jump });
+            if (captureRefuses) throw new real.TunnelError(captureRefuses);
             if (captureFails) throw new Error("no route to host");
             return "SSHKEY";
         }
@@ -148,6 +160,7 @@ beforeEach(() => {
     written = null;
     captured.length = 0;
     captureFails = false;
+    captureRefuses = "";
 });
 
 describe("saving a tunnel through a registered server", () => {
@@ -163,6 +176,15 @@ describe("saving a tunnel through a registered server", () => {
         await expect(
             saveConnection(BOB, { ...base, ssh: { mode: "server", hostId: SERVER } })
         ).rejects.toThrow(/not one of yours/);
+    });
+
+    it("says a server's own login cannot be read rather than calling it somebody else's", async () => {
+        const failed = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        await expect(
+            saveConnection(ALICE, { ...base, ssh: { mode: "server", hostId: UNREADABLE } })
+        ).rejects.toThrow(/cannot read the login stored for nas-01/);
+        failed.mockRestore();
     });
 });
 
@@ -243,7 +265,76 @@ describe("saving a tunnel through a login typed in the form", () => {
         expect(written).toMatchObject({ name: "Renamed", sshHostKey: "SSHKEY" });
     });
 
-    it("signs in again when the address moved", async () => {
+    it("checks the pinned key when the secret is typed again, rather than re-trusting the address", async () => {
+        saved = [
+            row({
+                sshMode: "manual",
+                sshHost: "ssh.example.com",
+                sshPort: 2222,
+                sshUsername: "root",
+                sshAuthMethod: "password",
+                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshCredentialNonce: Buffer.from("nonce"),
+                sshCredentialKeyId: "k1",
+                sshHostKey: "SSHKEY"
+            })
+        ];
+
+        await saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: "rotated" } });
+
+        expect(captured[0]?.target).toMatchObject({ pinnedHostKey: ["SSHKEY"] });
+    });
+
+    it("checks it when the login switches from a password to a key too", async () => {
+        saved = [
+            row({
+                sshMode: "manual",
+                sshHost: "ssh.example.com",
+                sshPort: 2222,
+                sshUsername: "root",
+                sshAuthMethod: "password",
+                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshCredentialNonce: Buffer.from("nonce"),
+                sshCredentialKeyId: "k1",
+                sshHostKey: "SSHKEY"
+            })
+        ];
+
+        await saveConnection(ALICE, {
+            ...base,
+            id: CONNECTION,
+            ssh: { ...manual, authMethod: "key", password: null, privateKey: "PRIVATE" }
+        });
+
+        expect(captured[0]?.target).toMatchObject({
+            pinnedHostKey: ["SSHKEY"],
+            auth: { method: "key", privateKey: "PRIVATE" }
+        });
+    });
+
+    it("says the key changed rather than blaming the password, and stores nothing", async () => {
+        saved = [
+            row({
+                sshMode: "manual",
+                sshHost: "ssh.example.com",
+                sshPort: 2222,
+                sshUsername: "root",
+                sshAuthMethod: "password",
+                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshCredentialNonce: Buffer.from("nonce"),
+                sshCredentialKeyId: "k1",
+                sshHostKey: "SSHKEY"
+            })
+        ];
+        captureRefuses =
+            "ssh.example.com:2222 answered with a different key than the one Polaris pinned for this connection.";
+        await expect(
+            saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: "rotated" } })
+        ).rejects.toThrow(/different key than the one Polaris pinned/);
+        expect(written).toBeNull();
+    });
+
+    it("signs in with nothing pinned when the address moved", async () => {
         saved = [
             row({
                 sshMode: "manual",
@@ -261,6 +352,7 @@ describe("saving a tunnel through a login typed in the form", () => {
         await saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: null } });
 
         expect(captured).toHaveLength(1);
+        expect(captured[0]?.target).not.toHaveProperty("pinnedHostKey");
         expect(written).toMatchObject({ sshHostKey: "SSHKEY" });
     });
 });
