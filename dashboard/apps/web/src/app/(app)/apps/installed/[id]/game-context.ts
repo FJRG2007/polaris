@@ -16,17 +16,19 @@ import { prisma } from "@polaris/db";
 import { gameServerFacts } from "@/lib/apps/games-service";
 import type { ArkAccessView } from "@/lib/apps/ark/service";
 import { readInstallConfig } from "@/lib/apps/install-config";
+import { appBaseUrl, publicAppUrl } from "@/lib/domain-service";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { BLUEPRINT_KEY, MAP_KEY } from "@/lib/apps/games-create";
 import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
-import { readFivemAccess, readFivemPort, type FivemAccessView } from "@/lib/apps/fivem/service";
 import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
-import { rememberedRoster, type RememberedRoster } from "@/lib/apps/minecraft/roster-memory";
-import { rememberedLevels, type RememberedLevel } from "@/lib/apps/minecraft/level-memory";
-import { loginState, type LoginState } from "@/lib/apps/minecraft/polaris-login-service";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import { clientMods, packCommands } from "@/lib/apps/minecraft/client-pack";
 import { editionOf, type MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { loginState, type LoginState } from "@/lib/apps/minecraft/polaris-login-service";
+import { rememberedLevels, type RememberedLevel } from "@/lib/apps/minecraft/level-memory";
+import { rememberedRoster, type RememberedRoster } from "@/lib/apps/minecraft/roster-memory";
+import { readFivemAccess, readFivemPort, type FivemAccessView } from "@/lib/apps/fivem/service";
 import {
     readRoutineRuns,
     readSchedule,
@@ -107,6 +109,13 @@ export interface GameContext {
     /** Polaris login's state on a Minecraft server, so who has a password is
      *  on the first paint rather than a request later. */
     readonly login: LoginState | null;
+    /** The mods the players install and the server does not run - a map mod, a
+     *  minimap, anything with no server side. Kept beside the server's own list
+     *  because the people who need them are told about them here. */
+    readonly clientMods: readonly string[];
+    /** The one line a player runs to install or update all of it, per system.
+     *  Null for a game that has no such pack. */
+    readonly packCommands: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
 }
 
 /**
@@ -181,6 +190,12 @@ export async function gameContextFor(app: {
         queryPort: ports?.queryPort ?? null,
         rosterMemory,
         lastLevels,
-        login
+        login,
+        // What the players install, and the line that installs it. Resolved here
+        // so the screen has both before it paints.
+        clientMods: clientMods(config),
+        packCommands: minecraft
+            ? packCommands((await publicAppUrl().catch(() => null)) ?? (await appBaseUrl()), app.id)
+            : null
     };
 }

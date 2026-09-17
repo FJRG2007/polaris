@@ -37,7 +37,11 @@ const searchSchema = z.object({
         .regex(/^[0-9][0-9.]*$/)
         .optional()
         .or(z.literal("")),
-    category: z.string().trim().max(32).default("")
+    category: z.string().trim().max(32).default(""),
+    /** Whose mods are being looked for: the ones this server can run, or the ones
+     *  its players install. The second set is the mods with no server side, which
+     *  the first one deliberately hides. */
+    side: z.enum(["server", "player"]).default("server")
 });
 
 /** The list as the container holds it: comma separated, each entry possibly
@@ -65,7 +69,8 @@ export async function GET(
         query: url.searchParams.get("query") ?? "",
         loader: url.searchParams.get("loader") ?? "",
         version: url.searchParams.get("version") ?? "",
-        category: url.searchParams.get("category") ?? ""
+        category: url.searchParams.get("category") ?? "",
+        side: url.searchParams.get("side") ?? "server"
     };
 
     const installed = url.searchParams.get("installed");
@@ -119,7 +124,8 @@ export async function GET(
     return NextResponse.json({
         projects: await searchModrinth(parsed.data.query, parsed.data.loader, {
             version: parsed.data.version || null,
-            category: parsed.data.category
+            category: parsed.data.category,
+            side: parsed.data.side
         })
     });
 }

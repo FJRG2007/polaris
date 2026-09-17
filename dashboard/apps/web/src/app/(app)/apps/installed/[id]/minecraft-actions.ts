@@ -25,7 +25,8 @@ import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import type { PlayerStats } from "@/lib/apps/games-activity";
 import { requireGameServer } from "@/lib/apps/install-access";
-import { loaderForType } from "@/lib/apps/minecraft/modrinth";
+import { formatProjectList, loaderForType } from "@/lib/apps/minecraft/modrinth";
+import { CLIENT_MODS_KEY } from "@/lib/apps/minecraft/client-pack";
 import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
@@ -1815,6 +1816,46 @@ export async function projectFitsAction(input: {
  * on its own - somebody writing a description at four in the afternoon should not
  * have to choose between losing it and disconnecting everybody who is playing.
  */
+/**
+ * The mods the players install, which the server never does.
+ *
+ * Kept on the install rather than in the container's own list: a mod with no
+ * server side on that list is a mod the server tries to load and cannot. Nothing
+ * restarts for this - it changes what the pack link hands a player, and they run
+ * their command again.
+ */
+export async function updateClientModsAction(
+    installedAppId: string,
+    entries: string[]
+): Promise<{ error?: string }> {
+    const parsed = clientModsSchema.safeParse({ installedAppId, entries });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list" };
+    try {
+        const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await patchInstallConfig(parsed.data.installedAppId, {
+            [CLIENT_MODS_KEY]: formatProjectList(parsed.data.entries)
+                .split(",")
+                .filter((entry) => entry.length > 0)
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "game.client-mods",
+            targetType: "installed-app",
+            targetId: parsed.data.installedAppId,
+            metadata: { count: parsed.data.entries.length }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : "Could not save the list" };
+    }
+}
+
+const clientModsSchema = z.object({
+    installedAppId: z.string().uuid(),
+    entries: z.array(z.string().trim().min(1).max(120)).max(100)
+});
+
 export async function updateServerSettingsAction(
     installedAppId: string,
     values: Array<{ key: string; value: string }>,

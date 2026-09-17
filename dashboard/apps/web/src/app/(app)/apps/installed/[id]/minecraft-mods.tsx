@@ -23,8 +23,8 @@
 import { useConfirm } from "@/components/confirm-dialog";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
-import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "@/lib/apps/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
 import {
     ArrowUpCircle,
@@ -37,10 +37,11 @@ import {
     Trash2,
     TriangleAlert
 } from "lucide-react";
+import { ProjectIcon } from "./minecraft-project-icon";
 import * as modrinth from "@/lib/apps/minecraft/modrinth";
+import { MinecraftClientMods } from "./minecraft-client-mods";
 
 const DEPENDENCIES_KEY = "MODRINTH_DOWNLOAD_DEPENDENCIES";
-const VERSION_KEY = "VERSION";
 const SEARCH_DEBOUNCE_MS = 400;
 
 /** A version the browse can actually filter on. `LATEST` is the default and names
@@ -55,11 +56,19 @@ export function MinecraftMods({
     installedAppId,
     settings,
     playersOnline,
+    clientMods = [],
+    packCommands = null,
     onSaved
 }: {
     installedAppId: string;
     settings: InstalledAppSetting[];
     playersOnline: number;
+    /** The mods the players install and this server does not run. Kept apart from
+     *  the list above because the image ends the boot on a mod with no server
+     *  side - they are a thing to hand out, not a thing to install here. */
+    clientMods?: readonly string[];
+    /** The line a player runs to install both lists at once, per system. */
+    packCommands?: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
     onSaved: () => void;
 }) {
     const projectsSetting = settings.find((setting) => setting.key === PROJECTS_KEY);
@@ -336,6 +345,15 @@ export function MinecraftMods({
                 }
             />
 
+            <MinecraftClientMods
+                installedAppId={installedAppId}
+                loader={loader}
+                version={version}
+                entries={clientMods}
+                serverMods={projects.length}
+                packCommands={packCommands}
+            />
+
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -483,39 +501,6 @@ export function MinecraftMods({
     );
 }
 
-/**
- * One project's own icon.
- *
- * Through Polaris rather than straight from the CDN: an `<img src>` at a third
- * party announces to them who is looking at this screen and from where, and every
- * other request this feature makes is proxied for exactly that reason. Its
- * initials for a project that never uploaded one, so a list never goes ragged.
- */
-function ProjectIcon({
-    installedAppId,
-    project
-}: {
-    installedAppId: string;
-    project: { title: string; iconUrl: string | null };
-}) {
-    if (!project.iconUrl) {
-        return (
-            <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface text-xs font-medium text-muted-foreground">
-                {project.title.slice(0, 2).toUpperCase()}
-            </div>
-        );
-    }
-    return (
-        <img
-            src={`/api/apps/installed/${installedAppId}/minecraft/modrinth/icon?url=${encodeURIComponent(project.iconUrl)}`}
-            alt=""
-            aria-hidden
-            loading="lazy"
-            className="size-10 shrink-0 rounded-md border border-border object-cover"
-        />
-    );
-}
-
 function ProjectCard({
     installedAppId,
     project,
@@ -598,6 +583,7 @@ function unreadRow(entry: string): InstalledRow {
         categories: [],
         iconUrl: null,
         author: null,
+        clientOnly: false,
         known: true,
         fitsVersion: null,
         fitsLoader: true

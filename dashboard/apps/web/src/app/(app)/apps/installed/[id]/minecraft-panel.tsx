@@ -525,6 +525,8 @@ export function MinecraftPanel({
                     installedAppId={installedAppId}
                     settings={settings}
                     playersOnline={status?.players.online ?? 0}
+                    clientMods={game?.clientMods ?? []}
+                    packCommands={game?.packCommands ?? null}
                     onSaved={reloadSettings}
                 />
             )}
