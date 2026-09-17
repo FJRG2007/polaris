@@ -28,14 +28,14 @@ import { useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { saveProfileStyleAction } from "./actions";
-import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
-import { ProfileBanner } from "@/components/profile-banner";
-import { PictureEditor, usePicture } from "./avatar-card";
 import { Choice, Tile } from "./appearance-choice";
-import { NameEffectPicker, NameFontPicker } from "./name-style-picker";
+import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
+import { PictureEditor, usePicture } from "./avatar-card";
+import { ProfileBanner } from "@/components/profile-banner";
 import { BAND_CROP, FACE_CROP } from "@/components/image-cropper";
-import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
+import { NameEffectPicker, NameFontPicker } from "./name-style-picker";
 import { useProfileStyleRefresh } from "@/components/profile-style-store";
+import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
 import {
     Button,
     Card,
@@ -298,7 +298,7 @@ export function AppearanceCard({
                 <section className="flex flex-col gap-2">
                     <Field
                         label="Avatar decoration"
-                        hint="Drawn on your picture everywhere it appears, at whatever size it is drawn. Every one of them is free."
+                        hint="Drawn on your picture wherever you're introduced - your profile, messages, member lists - not in pickers or tables. Every one of them is free."
                     />
                     {/* A gallery rather than a row of chips, because a decoration
                         is a drawing and the only useful way to choose between
