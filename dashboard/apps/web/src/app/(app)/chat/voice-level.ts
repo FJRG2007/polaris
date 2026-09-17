@@ -23,6 +23,9 @@
 export interface VoiceLevel {
     /** 0 to 100, where 100 is full scale. */
     read: () => number;
+    /** The loudest sample in the current window, 0 to 1 of full scale. Zero is
+     *  a device producing nothing at all, which quiet never reads as. */
+    peak: () => number;
     stop: () => void;
 }
 
@@ -68,6 +71,13 @@ export function measureVoice(track: MediaStreamTrack): VoiceLevel | null {
             // something a bar can show. Squared-root rather than a decibel curve
             // because it has to line up with a slider somebody drags.
             return Math.min(100, Math.round(Math.sqrt(rms) * 140));
+        },
+        peak: () => {
+            if (stopped) return 0;
+            analyser.getFloatTimeDomainData(samples);
+            let loudest = 0;
+            for (const sample of samples) loudest = Math.max(loudest, Math.abs(sample));
+            return loudest;
         },
         stop: () => {
             if (stopped) return;

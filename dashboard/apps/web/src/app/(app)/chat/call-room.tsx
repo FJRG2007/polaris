@@ -479,7 +479,11 @@ export function CallRoom({
                 a noise filter running they are two different tracks, and a graph
                 that has stopped producing anything leaves the device reading
                 perfectly while the call carries silence. */}
-            <NoAudioNotice track={call.outgoing} micOn={call.micOn} />
+            <NoAudioNotice
+                track={call.outgoing}
+                device={call.localStream?.getAudioTracks()[0] ?? null}
+                micOn={call.micOn}
+            />
 
             {/* Said before anything else on the screen, and to everybody: a
                 call being written down is the one fact in a room that changes
