@@ -71,3 +71,51 @@ describe("the build toolchain", () => {
         expect(script.startsWith("set -e")).toBe(true);
     });
 });
+
+describe("a server Polaris sets up as root on behalf of its login", () => {
+    const asRoot = onboardingScript({
+        proxyNetwork: "polaris-net",
+        acmeEmail: "ops@example.com",
+        owner: "polaris"
+    });
+
+    it("hands the login the directories every later deploy writes into", () => {
+        // Deploys, routes and compose files are written as the login, not as root.
+        // Without this the server is set up and the first deploy still fails on a
+        // permission.
+        expect(asRoot).toContain("chown polaris /var/lib/polaris /var/lib/polaris/deploy /var/lib/polaris/volumes");
+        expect(asRoot).toContain("chown -R polaris /var/lib/polaris/deploy /var/lib/polaris/traefik/dynamic");
+    });
+
+    it("never takes the containers' own data away from them", () => {
+        // The volume root holds each container's files, owned by whoever the
+        // container runs as. A recursive chown there breaks every database.
+        expect(asRoot).not.toMatch(/chown -R [^\n]*\/var\/lib\/polaris\/volumes/);
+        expect(asRoot).not.toMatch(/chown[^\n]*\/var\/lib\/polaris\/traefik(\s|$)/);
+    });
+
+    it("lets the login use the container engine", () => {
+        expect(asRoot).toContain("usermod -aG docker polaris");
+    });
+
+    it("does it after the directories exist", () => {
+        expect(asRoot.indexOf("mkdir -p")).toBeLessThan(asRoot.indexOf("chown polaris"));
+    });
+
+    it("quotes a login name it did not choose", () => {
+        const odd = onboardingScript({
+            proxyNetwork: "polaris-net",
+            acmeEmail: "ops@example.com",
+            owner: "a b;rm -rf /"
+        });
+        expect(odd).toContain("chown 'a b;rm -rf /' /var/lib/polaris");
+        expect(odd).not.toContain("chown a b;rm");
+    });
+
+    it("changes nothing when there is no other login to hand it to", () => {
+        expect(onboardingScript({ proxyNetwork: "polaris-net", acmeEmail: "ops@example.com", owner: "root" })).toBe(
+            script
+        );
+        expect(script).not.toContain("chown");
+    });
+});

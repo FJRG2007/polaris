@@ -12,6 +12,8 @@ export interface DockerConnectionSummary {
     /** A global Host (managed in the Servers app), reached over SSH. Not
      *  deletable from here. */
     host?: boolean;
+    /** The Host behind a registered server, for asking whether it answers. */
+    hostId?: string;
 }
 
 /** Why the auto-provisioned local Docker host is not available, shown to admins

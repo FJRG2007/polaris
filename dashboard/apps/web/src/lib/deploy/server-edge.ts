@@ -27,6 +27,13 @@
  * without redeploying it. Running it again is how that is fixed, and the only way
  * to tell is to ask - so `readServerEdge` asks.
  *
+ * **It needs root, and Polaris does not sign in as root.** It installs Docker
+ * and the builder, and writes under `/var/lib/polaris`. The login Polaris holds
+ * is an ordinary account; a server enrolled with root access lets it act as root
+ * through password-less sudo, and that is what the script runs under. It then
+ * hands the directories the login writes into back to that login, because every
+ * deploy after this one runs as it.
+ *
  * Server-only.
  */
 
@@ -34,7 +41,55 @@ import { loadEnv } from "@polaris/config";
 import { onboardingScript } from "@polaris/deploy";
 import { publicAppUrl } from "@/lib/domain-service";
 import { getHostConnection } from "@/lib/host-service";
+import { recordServerEvent } from "@/lib/server-notes-service";
+import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { execCommand, openSshClient } from "@polaris/ssh";
+
+/**
+ * How the script is started on the server.
+ *
+ * The script arrives on stdin and is written to a private temporary file first,
+ * rather than being the command line: a command line is readable by every user
+ * on the machine, and this one carries the secret the guard verifies with. It is
+ * not fed to the shell on stdin either, because the installers it runs read stdin
+ * and would swallow the rest of the script.
+ */
+export function edgeLauncher(elevate: boolean): string {
+    return [
+        "f=$(mktemp) || exit 1",
+        "trap 'rm -f \"$f\"' EXIT",
+        'cat > "$f"',
+        'shell=$(command -v bash || command -v sh)',
+        `${elevate ? "sudo -n " : ""}"$shell" "$f"`
+    ].join("\n");
+}
+
+/** Why setting a server up cannot work with the access Polaris was given. */
+export const NEEDS_ROOT =
+    "Setting this server up needs root, and Polaris was not given it here: it installs Docker and writes under /var/lib/polaris. Remove the server and add it again with the command from Add server, which grants it.";
+
+/**
+ * The sentence for a failed setup, out of what the server printed.
+ *
+ * A refusal to write is the one failure with a known cause, so it is said as that
+ * cause - the raw `mkdir: ... Permission denied` names a path and nothing to do.
+ */
+export function setupFailure(complaint: string, elevated: boolean): string {
+    if (/permission denied|operation not permitted/i.test(complaint)) {
+        return elevated
+            ? "The server refused to let Polaris act as root, although it was enrolled with root access. Its sudo rule may have been removed: add the server again with the command from Add server."
+            : NEEDS_ROOT;
+    }
+    if (/sudo: a password is required|sudo: .*not allowed|may not run sudo/i.test(complaint)) {
+        return elevated
+            ? "The server no longer lets Polaris act as root without a password. Add the server again with the command from Add server, which puts that back."
+            : NEEDS_ROOT;
+    }
+    return (
+        complaint.trim().split(/\r?\n/).at(-1)?.slice(0, 200) ||
+        "That server refused to set itself up"
+    );
+}
 
 /** What a server's edge looks like right now. */
 export interface ServerEdgeState {
@@ -131,7 +186,12 @@ export async function prepareServerEdge(
 ): Promise<void> {
     const env = loadEnv();
     const connection = await getHostConnection(hostId, ownerId);
+    const asRoot = connection.username === "root";
+    const elevate = !asRoot && connection.sudo;
     const script = onboardingScript({
+        // What the login writes into after this, handed to it - only when the
+        // script runs as root on its behalf.
+        owner: elevate ? connection.username : undefined,
         proxyNetwork,
         // Where Let's Encrypt writes about an expiring certificate. Their own
         // registration requires one; an empty string is refused by the API, so the
@@ -155,7 +215,8 @@ export async function prepareServerEdge(
     });
     try {
         let complaint = "";
-        const result = await execCommand(client, script, {
+        const result = await execCommand(client, edgeLauncher(elevate), {
+            input: script,
             onStdout: (chunk) => onOutput?.(chunk.toString("utf8")),
             onStderr: (chunk) => {
                 const text = chunk.toString("utf8");
@@ -163,13 +224,30 @@ export async function prepareServerEdge(
                 onOutput?.(text);
             }
         });
-        if (result.code !== 0) {
-            throw new Error(
-                complaint.trim().split(/\r?\n/).at(-1)?.slice(0, 200) ||
-                    "That server refused to set itself up"
-            );
-        }
+        if (result.code !== 0) throw new Error(setupFailure(complaint, elevate));
     } finally {
         client.end();
+    }
+}
+
+/**
+ * Set up a server that has just been enrolled, without waiting for the button.
+ *
+ * Nothing is replaced: a server whose own edge is already running is left as it
+ * is, because setting up again stops what it serves for a moment and that is the
+ * operator's call. What happened is written into the server's history, since
+ * nobody is watching when this runs.
+ */
+export async function setUpNewServer(hostId: string, ownerId: string, name: string): Promise<void> {
+    try {
+        const state = await readServerEdge(hostId, ownerId);
+        if (state.error || state.traefik) return;
+        const target = await getOrCreateHostTarget(hostId, ownerId, name);
+        await prepareServerEdge(hostId, ownerId, target.proxyNetwork);
+        await recordServerEvent(hostId, null, "edge-ready");
+    } catch (error) {
+        await recordServerEvent(hostId, null, "edge-failed", {
+            to: error instanceof Error ? error.message : "It could not be set up"
+        }).catch(() => undefined);
     }
 }

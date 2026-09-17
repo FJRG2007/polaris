@@ -38,6 +38,15 @@ export interface OnboardingOptions {
     readonly authSecret?: string;
     /** Polaris base URL the guard redirects to for require-login sign-in. */
     readonly publicUrl?: string;
+    /**
+     * The login Polaris connects as, when the script runs as root on its behalf.
+     *
+     * Everything after setup - writing a compose file, pushing a route, running
+     * `docker compose` - happens as that login, not as root. So the directories
+     * it writes into are handed to it, and it joins the docker group, or the
+     * server is set up and the first deploy to it still fails on a permission.
+     */
+    readonly owner?: string;
 }
 
 /**
@@ -70,6 +79,27 @@ export const NIXPACKS_VERSION = "1.41.0";
  *  Shown wherever a build fails for want of it, because the operator reading that
  *  is already on a shell and the useful thing to hand them is the command. */
 export const BUILDER_UPGRADE_COMMAND = `NIXPACKS_VERSION=${NIXPACKS_VERSION} bash -c "$(curl -fsSL https://nixpacks.com/install.sh)"`;
+
+/**
+ * Hand what the login writes into over to it.
+ *
+ * Only the directories, never what is inside the volume root: that is each
+ * container's own data, owned by whatever user the container runs as, and a
+ * recursive chown there would break every database on the machine. The deploy
+ * root holds only compose files and the dynamic directory only route files, so
+ * those are handed over whole. The ACME store under `traefik/` stays root's.
+ */
+function ownerSteps(owner: string | undefined, deployRoot: string, volumeRoot: string): string[] {
+    if (!owner || owner === "root") return [];
+    const login = quoteArg(owner);
+    return [
+        `chown ${login} /var/lib/polaris ${deployRoot} ${volumeRoot}`,
+        `chown -R ${login} ${deployRoot} ${DYNAMIC_DIR}`,
+        // Takes effect on the login's next connection, which is every command
+        // Polaris sends after this one.
+        `if ! id -nG ${login} | tr ' ' '\\n' | grep -qx docker; then usermod -aG docker ${login} 2>/dev/null || addgroup ${login} docker 2>/dev/null || echo "could not add the login to the docker group" >&2; fi`
+    ];
+}
 
 /** Build the onboarding bash script for a remote server. */
 export function onboardingScript(options: OnboardingOptions): string {
@@ -119,6 +149,7 @@ export function onboardingScript(options: OnboardingOptions): string {
         "fi",
         "nixpacks --version",
         `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik ${DYNAMIC_DIR}`,
+        ...ownerSteps(options.owner, deployRoot, volumeRoot),
         `docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}`,
         'echo "== starting Traefik =="',
         "docker rm -f polaris-traefik >/dev/null 2>&1 || true",

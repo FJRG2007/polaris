@@ -51,6 +51,8 @@ export interface HostConnection {
     readonly username: string;
     readonly auth: SshAuth;
     readonly hostKey?: string;
+    /** Whether the login may act as root through password-less sudo. */
+    readonly sudo: boolean;
 }
 
 /** Decrypt a host's credentials into connection parameters for a connector. */
@@ -90,7 +92,8 @@ function connectionFor(row: HostRow): HostConnection {
         port: row.port,
         username: row.username,
         auth: toSshAuth(creds),
-        hostKey: row.hostKey ?? undefined
+        hostKey: row.hostKey ?? undefined,
+        sudo: row.sudo
     };
 }
 

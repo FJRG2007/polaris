@@ -8,7 +8,9 @@
  * the payload says about where the machine lives.
  */
 
+import { after } from "next/server";
 import { clientIp } from "@/lib/request-context";
+import { setUpNewServer } from "@/lib/deploy/server-edge";
 import { claimEnrollmentSchema } from "@polaris/core";
 import { claimEnrollment } from "@/lib/enrollment-service";
 
@@ -33,7 +35,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
         );
     }
 
-    const result = await claimEnrollment(token, parsed.data, await clientIp());
+    const { setup, ...result } = await claimEnrollment(token, parsed.data, await clientIp());
+    // After the answer, because the script on the machine is waiting for it and
+    // setting the server up takes minutes. Its outcome lands on the server's page.
+    if (setup) after(() => setUpNewServer(setup.hostId, setup.ownerId, setup.name));
     // 200 on refusal as well: the script reads the body, and an HTTP error would
     // have it print a status code instead of the sentence explaining what to fix.
     return Response.json(result);

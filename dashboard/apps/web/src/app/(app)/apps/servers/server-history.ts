@@ -17,6 +17,12 @@ export function describeServerEvent(line: ActivityLine): string {
             return line.toValue ? `${who} renamed it to ${line.toValue}` : `${who} renamed it`;
         case "environment":
             return `${who} set where it lives to ${line.toValue ?? "somewhere else"}`;
+        case "edge-ready":
+            return `${who} set it up to serve its own domains`;
+        case "edge-failed":
+            return line.toValue
+                ? `${who} could not set it up to serve its own domains: ${line.toValue}`
+                : `${who} could not set it up to serve its own domains`;
         default:
             return `${who} changed it`;
     }

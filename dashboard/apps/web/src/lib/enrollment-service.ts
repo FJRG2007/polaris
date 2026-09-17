@@ -32,6 +32,7 @@
  * really do hold the machine.
  */
 
+import { setsUpOnEnrollment } from "@/lib/enrollment-setup";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
@@ -294,6 +295,12 @@ export async function cancelEnrollment(id: string, userId: string): Promise<void
 export interface ClaimResult {
     ok: boolean;
     error?: string;
+    /**
+     * A server that can be set up to serve its own domains now, without anybody
+     * pressing the button: a Linux server enrolled with root. For the caller to
+     * start once the machine has had its answer - never sent back to it.
+     */
+    setup?: { hostId: string; ownerId: string; name: string };
 }
 
 /**
@@ -417,7 +424,12 @@ export async function claimEnrollment(
         }
     });
 
-    return { ok: true };
+    return {
+        ok: true,
+        setup: setsUpOnEnrollment(row.kind, payload)
+            ? { hostId: host.id, ownerId: row.createdById, name: payload.hostname }
+            : undefined
+    };
 }
 
 /**

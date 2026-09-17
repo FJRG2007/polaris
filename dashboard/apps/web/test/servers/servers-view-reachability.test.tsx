@@ -29,6 +29,7 @@ vi.mock("@/components/use-live-resource", () => ({
         refresh: () => {}
     })
 }));
+vi.mock("../../src/app/(app)/apps/servers/actions", () => ({ renameServerAction: async () => ({}) }));
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/host-dialog", () => ({ HostDialog: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/quick-enroll", () => ({ QuickEnroll: () => null }));

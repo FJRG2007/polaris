@@ -105,7 +105,8 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
             name: host.name,
             transport: "ssh",
             status: host.status,
-            host: true
+            host: true,
+            hostId: host.id
         }));
 
     return { connections: [...localHost, ...stored, ...hostTargets], canManage, localDiagnostic };

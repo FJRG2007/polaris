@@ -58,6 +58,16 @@ import {
 
 const REFRESH_MS = 5000;
 
+/** How often the registered servers are re-checked. One short socket each. */
+const HOST_STATUS_POLL_MS = 30_000;
+
+/** One server's reachability, as /api/containers/host-status reports it. */
+interface HostReachability {
+    id: string;
+    state: "up" | "down";
+    detail: string | null;
+}
+
 /** Which tab of a container's page a row's action opens. */
 type ContainerTab = "details" | "logs" | "files" | "console";
 
@@ -96,6 +106,28 @@ export function ContainersView({
         direction: "asc"
     });
 
+    // Whether the registered servers in the list are answering. Only polled when
+    // there is one: the local engine and a stored connection are not probed.
+    const { data: reachability } = useLiveResource<HostReachability[]>({
+        url: "/api/containers/host-status",
+        cacheKey: "containers.host-status",
+        intervalMs: HOST_STATUS_POLL_MS,
+        enabled: connections.some((connection) => connection.hostId),
+        select: (body) => (body as { servers: HostReachability[] }).servers
+    });
+    /** Why a server in the list is not answering, or null while it answers - and
+     *  while the answer is still on its way, which is not the same as down. */
+    const downReason = useCallback(
+        (connection: DockerConnectionSummary): string | null => {
+            if (!connection.hostId || !reachability) return null;
+            const status = reachability.find((entry) => entry.id === connection.hostId);
+            return status?.state === "down" ? (status.detail ?? "No answer") : null;
+        },
+        [reachability]
+    );
+    const selected = connections.find((connection) => connection.id === connectionId) ?? null;
+    const unreachable = selected ? downReason(selected) : null;
+
     // Seeded from the last answer this tab held for the host, polled while the
     // tab is in front, and folded in so only the numbers that moved re-render.
     const {
@@ -108,7 +140,9 @@ export function ContainersView({
         url: connectionId ? `/api/containers?c=${encodeURIComponent(connectionId)}` : "",
         cacheKey: `containers.${connectionId ?? "none"}`,
         intervalMs: REFRESH_MS,
-        enabled: connectionId !== null,
+        // Not asked of a server that is off: it would only spend its SSH connect
+        // timeout to fail, every five seconds.
+        enabled: connectionId !== null && unreachable === null,
         // Pausing stops the refresh, not the load: picking a different host while
         // paused still has to put that host on screen.
         paused: !live,
@@ -247,21 +281,38 @@ export function ContainersView({
                     ) : (
                         connections.map((connection) => (
                             <div key={connection.id} className="group flex items-center gap-1">
-                                <Link
-                                    href={`/apps/containers?c=${connection.id}`}
-                                    className={cn(
-                                        "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
-                                        connection.id === connectionId && "bg-muted font-medium"
-                                    )}
-                                >
-                                    <Server className="size-4 text-muted-foreground" />
-                                    <span className="flex-1 truncate" title={connection.name}>
-                                        {connection.name}
+                                {downReason(connection) ? (
+                                    // Off, so there is nothing to open: listing it
+                                    // would only spend its connect timeout to say so.
+                                    <span
+                                        aria-disabled="true"
+                                        title={`Not answering: ${downReason(connection)}`}
+                                        className={cn(
+                                            "flex flex-1 cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
+                                            connection.id === connectionId && "bg-muted font-medium"
+                                        )}
+                                    >
+                                        <Server className="size-4" />
+                                        <span className="flex-1 truncate">{connection.name}</span>
+                                        <Badge variant="danger">Offline</Badge>
                                     </span>
-                                    <Badge variant="neutral">
-                                        {connection.local ? "local" : connection.transport}
-                                    </Badge>
-                                </Link>
+                                ) : (
+                                    <Link
+                                        href={`/apps/containers?c=${connection.id}`}
+                                        className={cn(
+                                            "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
+                                            connection.id === connectionId && "bg-muted font-medium"
+                                        )}
+                                    >
+                                        <Server className="size-4 text-muted-foreground" />
+                                        <span className="flex-1 truncate" title={connection.name}>
+                                            {connection.name}
+                                        </span>
+                                        <Badge variant="neutral">
+                                            {connection.local ? "local" : connection.transport}
+                                        </Badge>
+                                    </Link>
+                                )}
                                 {connection.local || connection.host ? null : (
                                     <Button
                                         size="icon"
@@ -308,6 +359,24 @@ export function ContainersView({
                             The local host appears here automatically in the full edition. Use Add
                             host for a remote engine.
                         </span>
+                    </div>
+                ) : unreachable && selected ? (
+                    <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                        <p className="font-medium text-foreground">
+                            {selected.name} is not answering
+                        </p>
+                        <p className="mt-1">{unreachable}</p>
+                        <p className="mt-3">
+                            Its containers show here again as soon as it is back. Where it is and
+                            how Polaris reaches it are on{" "}
+                            <Link
+                                href={`/apps/servers/${selected.hostId}`}
+                                className="underline hover:text-foreground"
+                            >
+                                its server page
+                            </Link>
+                            .
+                        </p>
                     </div>
                 ) : (
                     <>
