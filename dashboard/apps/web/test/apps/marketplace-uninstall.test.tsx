@@ -59,13 +59,19 @@ describe("uninstalling from the marketplace grid", () => {
         expect(within(dialog).getByText(/worlds are never deleted by uninstalling/)).toBeTruthy();
 
         fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall" }));
-        expect(await screen.findByText(/Delete your game servers first \(Ark Island\)/)).toBeTruthy();
+        expect(
+            await screen.findByText(/Delete your game servers first \(Ark Island\)/)
+        ).toBeTruthy();
         expect(refresh).not.toHaveBeenCalled();
     });
 
     it("names Places' containers, and removes the card once it goes through", async () => {
         vi.mocked(uninstallInstalledAppAction).mockResolvedValue({});
-        render(<MarketplaceView installed={[installed({ id: "install-2", catalogId: "home", name: "Places" })]} />);
+        render(
+            <MarketplaceView
+                installed={[installed({ id: "install-2", catalogId: "home", name: "Places" })]}
+            />
+        );
 
         fireEvent.click(screen.getByRole("button", { name: "Uninstall Places" }));
         const dialog = await screen.findByRole("dialog");

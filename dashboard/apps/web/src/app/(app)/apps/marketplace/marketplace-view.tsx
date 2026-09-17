@@ -180,13 +180,17 @@ export function MarketplaceView({
     // install that the server would refuse.
     const singletonInstall = useMemo(() => {
         const map = new Map<string, string>();
-        for (const item of installed) if (!map.has(item.catalogId)) map.set(item.catalogId, item.id);
+        for (const item of installed)
+            if (!map.has(item.catalogId)) map.set(item.catalogId, item.id);
         return map;
     }, [installed]);
 
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader title="Marketplace" description="Install and run apps on your servers in one click." />
+            <PageHeader
+                title="Marketplace"
+                description="Install and run apps on your servers in one click."
+            />
 
             {/* Above everything, the way a store puts it: the first thing
                 somebody arriving with a name in mind reaches for. */}
@@ -257,7 +261,9 @@ function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): s
  * Order is otherwise left alone: the catalog's is deliberate.
  */
 function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
-    return [...apps].sort((left, right) => Number(left.comingSoon ?? false) - Number(right.comingSoon ?? false));
+    return [...apps].sort(
+        (left, right) => Number(left.comingSoon ?? false) - Number(right.comingSoon ?? false)
+    );
 }
 
 /**
@@ -462,7 +468,9 @@ function AppCard({
                 )}
                 <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     {installedCount > 0 ? (
-                        <span className="text-xs text-muted-foreground">{installedCount} installed</span>
+                        <span className="text-xs text-muted-foreground">
+                            {installedCount} installed
+                        </span>
                     ) : (
                         <span />
                     )}
@@ -514,11 +522,13 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
     const [serverId, setServerId] = useState("");
     const [targets, setTargets] = useState<InstallTarget[] | null>(null);
     const [connections, setConnections] = useState<StorageConnectionOption[]>([]);
-    const [storage, setStorage] = useState<Record<string, { backing: "local" | "nas"; connectionId?: string }>>(
-        () => Object.fromEntries(volumes.map((volume) => [volume.name, { backing: "local" as const }]))
+    const [storage, setStorage] = useState<
+        Record<string, { backing: "local" | "nas"; connectionId?: string }>
+    >(() =>
+        Object.fromEntries(volumes.map((volume) => [volume.name, { backing: "local" as const }]))
     );
-    const [env, setEnv] = useState<Record<string, string>>(
-        () => Object.fromEntries(envFields.map((field) => [field.key, field.default ?? ""]))
+    const [env, setEnv] = useState<Record<string, string>>(() =>
+        Object.fromEntries(envFields.map((field) => [field.key, field.default ?? ""]))
     );
     const [error, setError] = useState<string | null>(null);
 
@@ -551,7 +561,10 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                     connectionId: choice?.backing === "nas" ? choice.connectionId : undefined
                 };
             }),
-            env: envFields.map((field) => ({ key: field.key, value: env[field.key] ?? field.default ?? "" }))
+            env: envFields.map((field) => ({
+                key: field.key,
+                value: env[field.key] ?? field.default ?? ""
+            }))
         };
         const parsed = appInstallInputSchema.safeParse(input);
         if (!parsed.success) {
@@ -584,7 +597,11 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name</span>
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="My app" />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="My app"
+                        />
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -593,7 +610,10 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                             value={serverId}
                             onValueChange={setServerId}
                             placeholder={targets ? "Choose a server" : "Loading..."}
-                            options={(targets ?? []).map((target) => ({ value: target.id, label: target.name }))}
+                            options={(targets ?? []).map((target) => ({
+                                value: target.id,
+                                label: target.name
+                            }))}
                         />
                     </label>
 
@@ -601,16 +621,23 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                         <div className="flex flex-col gap-3">
                             <span className="text-sm font-medium">Storage</span>
                             {volumes.map((volume) => {
-                                const choice = storage[volume.name] ?? { backing: "local" as const };
+                                const choice = storage[volume.name] ?? {
+                                    backing: "local" as const
+                                };
                                 return (
-                                    <div key={volume.name} className="flex flex-col gap-2 rounded-md border border-border p-3">
+                                    <div
+                                        key={volume.name}
+                                        className="flex flex-col gap-2 rounded-md border border-border p-3"
+                                    >
                                         <span className="text-sm">{volume.label}</span>
                                         <Select
                                             value={choice.backing}
                                             onValueChange={(value) =>
                                                 setStorage((current) => ({
                                                     ...current,
-                                                    [volume.name]: { backing: value as "local" | "nas" }
+                                                    [volume.name]: {
+                                                        backing: value as "local" | "nas"
+                                                    }
                                                 }))
                                             }
                                             options={[
@@ -625,7 +652,10 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                                                     onValueChange={(value) =>
                                                         setStorage((current) => ({
                                                             ...current,
-                                                            [volume.name]: { backing: "nas", connectionId: value }
+                                                            [volume.name]: {
+                                                                backing: "nas",
+                                                                connectionId: value
+                                                            }
                                                         }))
                                                     }
                                                     placeholder="Choose a NAS"
@@ -655,7 +685,10 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                                         <Select
                                             value={env[field.key] ?? field.default ?? ""}
                                             onValueChange={(value) =>
-                                                setEnv((current) => ({ ...current, [field.key]: value }))
+                                                setEnv((current) => ({
+                                                    ...current,
+                                                    [field.key]: value
+                                                }))
                                             }
                                             options={field.options}
                                         />
@@ -664,11 +697,18 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                                             type={field.secret ? "password" : "text"}
                                             value={env[field.key] ?? ""}
                                             onChange={(event) =>
-                                                setEnv((current) => ({ ...current, [field.key]: event.target.value }))
+                                                setEnv((current) => ({
+                                                    ...current,
+                                                    [field.key]: event.target.value
+                                                }))
                                             }
                                         />
                                     )}
-                                    {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
+                                    {field.help && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {field.help}
+                                        </span>
+                                    )}
                                 </label>
                             ))}
                         </div>
