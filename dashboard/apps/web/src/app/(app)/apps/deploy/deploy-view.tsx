@@ -18,6 +18,7 @@ import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
 import { RepoConfigPreview } from "./repo-config-preview";
 import { DbEngineIcon } from "@/components/db-engine-icon";
+import { dbEngineOptions } from "@/components/db-engine-select";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
@@ -75,11 +76,7 @@ import {
     Trash2
 } from "lucide-react";
 
-const ENGINE_OPTIONS: SelectOption[] = MANAGED_ENGINES.map((engine) => ({
-    value: engine,
-    label: MANAGED_ENGINE_INFO[engine].label,
-    icon: <DbEngineIcon engine={engine} className="size-5" />
-}));
+const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(MANAGED_ENGINES);
 
 type DbInstance = Awaited<ReturnType<typeof deployActions.listDatabaseInstancesAction>>[number];
 type DbConnection = NonNullable<
