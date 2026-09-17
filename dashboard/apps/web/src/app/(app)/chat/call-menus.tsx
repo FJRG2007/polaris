@@ -205,8 +205,16 @@ export function StreamMenu({
                 {canPopOut() && (
                     <ContextMenuItem
                         onSelect={() => {
-                            if (popped) closePopOut();
-                            else void popOut(streamKey, stream);
+                            if (popped) {
+                                closePopOut();
+                                return;
+                            }
+                            void popOut(streamKey, stream).then((opened) => {
+                                // A browser that refused the window still owes
+                                // the reader the stream, so it goes on the
+                                // stage instead of nothing happening at all.
+                                if (!opened && !watching) onWatch();
+                            });
                         }}
                     >
                         <PictureInPicture2 className="size-3.5" />

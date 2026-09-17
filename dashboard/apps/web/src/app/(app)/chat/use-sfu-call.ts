@@ -62,7 +62,7 @@ import { pressDeafen, pressMic } from "./call-voice-controls";
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
 import type { MeetingView } from "@/lib/chat/meetings";
-import { callDevices, openMedia, refused, settle } from "./call-media";
+import { callDevices, isDenial, openMedia, refused, settle } from "./call-media";
 import { withCameraDevice } from "./camera-device";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -2154,19 +2154,43 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             return;
         }
         const level = levelNow("screen");
-        void navigator.mediaDevices
-            .getDisplayMedia({
-                video: quality.screenConstraints(level),
-                // Offered, never forced: the browser's picker has the box that
-                // says whether a tab's or the system's sound goes with it. Raw,
-                // because echo cancelling a film against the call is what
-                // turns music into mush.
-                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-                // Chrome's names for "offer the whole system's sound too" and
-                // "keep playing the tab here while it is shared".
-                ...({ systemAudio: "include", suppressLocalAudioPlayback: false } as object)
-            })
+        /**
+         * Ask for the screen, with its sound where the browser has any to
+         * offer.
+         *
+         * Asked twice rather than once, because a browser that cannot capture
+         * a screen's sound at all - Firefox, on most platforms - rejects the
+         * whole request rather than handing back a picture without one. Asking
+         * again for the picture alone is the difference between a share with no
+         * sound and no share at all. Not after a refusal, which is what
+         * cancelling the picker is.
+         */
+        const askForScreen = async (): Promise<MediaStream | null> => {
+            const video = quality.screenConstraints(level);
+            try {
+                return await navigator.mediaDevices.getDisplayMedia({
+                    video,
+                    // Offered, never forced: the browser's picker has the box
+                    // that says whether a tab's or the system's sound goes with
+                    // it. Raw, because echo cancelling a film against the call
+                    // is what turns music into mush.
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    },
+                    // Chrome's names for "offer the whole system's sound too"
+                    // and "keep playing the tab here while it is shared".
+                    ...({ systemAudio: "include", suppressLocalAudioPlayback: false } as object)
+                });
+            } catch (caught) {
+                if (isDenial(caught) || (caught as Error)?.name === "AbortError") return null;
+                return navigator.mediaDevices.getDisplayMedia({ video }).catch(() => null);
+            }
+        };
+        void askForScreen()
             .then(async (stream) => {
+                if (!stream) return;
                 const track = stream.getVideoTracks()[0];
                 const audio = stream.getAudioTracks()[0] ?? null;
                 if (!track) {
