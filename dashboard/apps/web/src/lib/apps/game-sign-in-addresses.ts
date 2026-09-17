@@ -8,8 +8,8 @@
  * new network opens it, and signing out - or the session expiring or being
  * revoked - closes it.
  *
- * Only a session that is actually in use counts: not expired, not waiting for
- * approval or refused, not locked. IPv4 only, because the game servers' address
+ * Only a session that is actually in use counts: not expired, seen and let
+ * through by Polaris, not waiting for approval or refused, not locked. IPv4 only, because the game servers' address
  * rules are.
  *
  * A session reached over the local network also counts for the network's public
@@ -21,6 +21,8 @@ import { prisma } from "@polaris/db";
 import { isIpv4, isPrivateIp } from "@polaris/core";
 import { networkPublicIp } from "@/lib/network-service";
 
+const IN_USE = { approval: "approved", lockedAt: null } as const;
+
 /** The addresses each of these accounts is signed in from, by user id. An
  *  account with no usable session has an empty list, never a missing one. */
 export async function signInAddresses(userIds: readonly string[]): Promise<Map<string, string[]>> {
@@ -29,20 +31,12 @@ export async function signInAddresses(userIds: readonly string[]): Promise<Map<s
     if (wanted.length === 0) return found;
 
     const rows = await prisma.session.findMany({
-        where: { userId: { in: wanted }, expiresAt: { gt: new Date() } },
-        select: {
-            userId: true,
-            ipAddress: true,
-            state: { select: { ip: true, approval: true, lockedAt: true } }
-        }
+        where: { userId: { in: wanted }, expiresAt: { gt: new Date() }, state: { is: IN_USE } },
+        select: { userId: true, ipAddress: true, state: { select: { ip: true } } }
     });
 
     let publicIp: string | null | undefined;
     for (const row of rows) {
-        // A session Polaris has not seen yet has no state row; it has not been
-        // refused either, so its own address stands.
-        if (row.state && (row.state.approval !== "approved" || row.state.lockedAt !== null))
-            continue;
         const ip = (row.state?.ip ?? row.ipAddress ?? "").trim();
         if (!isIpv4(ip)) continue;
         const held = found.get(row.userId) ?? [];
@@ -61,15 +55,8 @@ export async function signedIn(userIds: readonly string[]): Promise<Set<string>>
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return new Set();
     const rows = await prisma.session.findMany({
-        where: { userId: { in: wanted }, expiresAt: { gt: new Date() } },
-        select: { userId: true, state: { select: { approval: true, lockedAt: true } } }
+        where: { userId: { in: wanted }, expiresAt: { gt: new Date() }, state: { is: IN_USE } },
+        select: { userId: true }
     });
-    return new Set(
-        rows
-            .filter(
-                (row) =>
-                    !row.state || (row.state.approval === "approved" && row.state.lockedAt === null)
-            )
-            .map((row) => row.userId)
-    );
+    return new Set(rows.map((row) => row.userId));
 }

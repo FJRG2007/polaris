@@ -353,9 +353,9 @@ interface DesiredRule {
 
 /** Everything set from Polaris on this server, checked against the catalogue as
  *  it is now - a row for a rule this Polaris no longer has is left alone. */
-async function desiredRules(installedAppId: string): Promise<DesiredRule[]> {
+async function desiredRules(installedAppId: string, waitingOnly = false): Promise<DesiredRule[]> {
     const rows = await prisma.gameRuleSetting.findMany({
-        where: { installedAppId },
+        where: waitingOnly ? { installedAppId, appliedAt: null, failure: null } : { installedAppId },
         select: { rule: true, value: true, appliedAt: true, failure: true }
     });
     return rows.filter((row) =>
@@ -716,12 +716,11 @@ export async function recordDifficulty(
  *
  * For the cron, which reaches every server whether or not anybody has the rules
  * screen open. One indexed query says there is nothing to do, which is almost
- * every time.
+ * every time. A row this Polaris cannot apply - a rule no longer in the
+ * catalogue - is not work, or it would open the server on every pass.
  */
 export async function applyPendingRules(ownerId: string, installedAppId: string): Promise<void> {
-    const waiting = await prisma.gameRuleSetting.count({
-        where: { installedAppId, appliedAt: null, failure: null }
-    });
-    if (waiting === 0) return;
+    const waiting = await desiredRules(installedAppId, true);
+    if (waiting.length === 0) return;
     await readRulesFor(ownerId, installedAppId);
 }

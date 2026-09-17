@@ -1,6 +1,6 @@
 /**
  * Where a Polaris account is signed in from, as a game server's allow list reads
- * it: only sessions in use count, IPv4 only, and a session on the local network
+ * it: only sessions Polaris has seen and let through count, IPv4 only, and a session on the local network
  * also counts for the network's public address.
  */
 
@@ -16,8 +16,21 @@ let rows: Row[] = [];
 vi.mock("@polaris/db", () => ({
     prisma: {
         session: {
-            findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
-                rows.filter((row) => where.userId.in.includes(row.userId))
+            findMany: async ({
+                where
+            }: {
+                where: {
+                    userId: { in: string[] };
+                    state: { is: { approval: string; lockedAt: null } };
+                };
+            }) =>
+                rows.filter(
+                    (row) =>
+                        where.userId.in.includes(row.userId) &&
+                        row.state !== null &&
+                        row.state.approval === where.state.is.approval &&
+                        row.state.lockedAt === where.state.is.lockedAt
+                )
         }
     }
 }));
@@ -40,14 +53,18 @@ describe("the addresses an account is signed in from", () => {
                 ipAddress: "1.2.3.1",
                 state: { ip: "1.2.3.9", approval: "approved", lockedAt: null }
             },
-            { userId: ADA, ipAddress: "1.2.3.2", state: null }
+            {
+                userId: ADA,
+                ipAddress: "1.2.3.2",
+                state: { ip: null, approval: "approved", lockedAt: null }
+            }
         ];
         const found = await signInAddresses([ADA, BOB]);
         expect(found.get(ADA)).toEqual(["1.2.3.9", "1.2.3.2"]);
         expect(found.get(BOB)).toEqual([]);
     });
 
-    it("leave out a session waiting for approval, refused, locked, or on IPv6", async () => {
+    it("leave out a session not yet seen, waiting for approval, refused, locked, or on IPv6", async () => {
         rows = [
             {
                 userId: ADA,
@@ -64,7 +81,12 @@ describe("the addresses an account is signed in from", () => {
                 ipAddress: "1.2.3.3",
                 state: { ip: null, approval: "approved", lockedAt: new Date() }
             },
-            { userId: ADA, ipAddress: "2001:db8::1", state: null }
+            { userId: ADA, ipAddress: "1.2.3.4", state: null },
+            {
+                userId: ADA,
+                ipAddress: "2001:db8::1",
+                state: { ip: null, approval: "approved", lockedAt: null }
+            }
         ];
         expect((await signInAddresses([ADA])).get(ADA)).toEqual([]);
         // Signed in over IPv6 is still signed in, which is all ARK asks.
@@ -74,7 +96,13 @@ describe("the addresses an account is signed in from", () => {
     });
 
     it("count a session on the local network for the public address too", async () => {
-        rows = [{ userId: ADA, ipAddress: "192.168.1.20", state: null }];
+        rows = [
+            {
+                userId: ADA,
+                ipAddress: "192.168.1.20",
+                state: { ip: null, approval: "approved", lockedAt: null }
+            }
+        ];
         expect((await signInAddresses([ADA])).get(ADA)).toEqual(["192.168.1.20", "5.6.7.8"]);
         expect(await signedIn([ADA])).toEqual(new Set([ADA]));
     });

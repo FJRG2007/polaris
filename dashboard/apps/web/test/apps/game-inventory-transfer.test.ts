@@ -181,6 +181,33 @@ describe("sending everything", () => {
         ]);
     });
 
+    it("keeps a stack that changed after the bag was read", async () => {
+        const original = bags.get("Alice")!;
+        let listed = false;
+        bags.set(
+            "Alice",
+            new Proxy(original, {
+                get(target, key, receiver) {
+                    // The whole-bag read lists the slots; the player swaps one right after.
+                    if (key === "entries" && !listed) {
+                        listed = true;
+                        const snapshot = [...target.entries()];
+                        target.set(1, { id: "minecraft:dirt", count: 5 });
+                        return () => snapshot[Symbol.iterator]();
+                    }
+                    const value = Reflect.get(target, key, receiver);
+                    return typeof value === "function" ? value.bind(target) : value;
+                }
+            })
+        );
+        const result = await transferInventory(OWNER, SERVER, "Alice", "Bob");
+        expect(result).toEqual({ moved: 1, kept: 1 });
+        expect(bags.get("Alice")?.get(1)).toEqual({ id: "minecraft:dirt", count: 5 });
+        expect([...(bags.get("Bob")?.values() ?? [])]).toEqual([
+            { id: "minecraft:diamond", count: 10 }
+        ]);
+    });
+
     it("moves nothing when the recipient is not on", async () => {
         bags.delete("Bob");
         await expect(transferInventory(OWNER, SERVER, "Alice", "Bob")).rejects.toThrow(

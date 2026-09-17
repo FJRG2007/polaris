@@ -97,6 +97,9 @@ let talking: string | null = null;
 /** Every command the server was handed, in order. */
 const told: string[][] = [];
 
+/** How many times the server was opened. */
+let opened = 0;
+
 /** What the server answers to a `gamerule` set, when that differs from `talking`. */
 let setReply: string | null = null;
 
@@ -107,6 +110,7 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
         _installedAppId: string,
         run: (server: unknown) => Promise<unknown>
     ) => {
+        opened += 1;
         // A server that is off cannot be opened at all, and this is the shape of
         // the refusal: the daemon's, about a container, not the game's.
         if (talking === null) {
@@ -123,7 +127,14 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
     }
 }));
 
-const { readRulesFor, readWorldRules, rememberDifficulty, setWorldDifficulty, setWorldRule } = await import(
+const {
+    applyPendingRules,
+    readRulesFor,
+    readWorldRules,
+    rememberDifficulty,
+    setWorldDifficulty,
+    setWorldRule
+} = await import(
     "@/lib/apps/minecraft/rules-service"
 );
 
@@ -144,6 +155,7 @@ beforeEach(() => {
     setReply = null;
     settings.clear();
     told.length = 0;
+    opened = 0;
 });
 
 describe("what a server that will not answer is allowed to say", () => {
@@ -394,5 +406,32 @@ describe("what is set from Polaris", () => {
         expect(told).toContainEqual(["difficulty", "hard"]);
         expect(applied.difficulty).toBe("hard");
         expect(applied.pending).toEqual([]);
+    });
+});
+
+describe("the cron's look for waiting changes", () => {
+    const row = (rule: string, value: string): Setting => ({
+        id: rule,
+        installedAppId: SERVER,
+        rule,
+        value,
+        setAt: new Date(),
+        setById: null,
+        appliedAt: null,
+        failure: null
+    });
+
+    it("leaves the server alone when all that waits is a rule this Polaris does not have", async () => {
+        settings.set("retiredRule", row("retiredRule", "true"));
+        settings.set("difficulty", row("difficulty", "impossible"));
+        await applyPendingRules(OWNER, SERVER);
+        expect(opened).toBe(0);
+    });
+
+    it("opens the server when a known rule waits", async () => {
+        settings.set("keepInventory", row("keepInventory", "false"));
+        await applyPendingRules(OWNER, SERVER);
+        expect(told).toContainEqual(["gamerule", "keepInventory", "false"]);
+        expect(settings.get("keepInventory")?.appliedAt).not.toBeNull();
     });
 });

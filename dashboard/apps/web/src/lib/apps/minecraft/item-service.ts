@@ -15,8 +15,8 @@
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { normalizeItemId, stacksFor } from "./items";
-import { parseStack, type InventoryItem } from "./inventory";
 import { readLiveInventory } from "./inventory-service";
+import { parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
 import { recentlyGivenItems as recentlyGiven } from "@/lib/apps/recent-items";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
@@ -341,8 +341,10 @@ export interface BagTransfer {
  * Send everything one player carries to another, a stack at a time.
  *
  * Each stack is given, then taken, before the next one is touched, so stopping
- * part of the way - the recipient logged off - leaves both bags consistent. A
- * stack whose data cannot be written back stays with the sender and is counted.
+ * part of the way - the recipient logged off - leaves both bags consistent. Each
+ * stack is read again just before it is given, and one that changed since the
+ * bag was read stays where it is, as does one whose data cannot be written back.
+ * Both are counted as kept.
  */
 export async function transferInventory(
     ownerId: string,
@@ -360,6 +362,10 @@ export async function transferInventory(
         for (const [index, item] of reading.items.entries()) {
             const argument = itemArgument(item);
             if (!argument.ok) {
+                kept += 1;
+                continue;
+            }
+            if (!sameStack(await readSlot(server, from, item.slot), item)) {
                 kept += 1;
                 continue;
             }
