@@ -45,7 +45,7 @@ afterEach(() => {
 describe("the line a reader is on", () => {
     it("is the first message still on screen, and how far down it sits", () => {
         const scroller = list({ a: 0, b: 50, c: 100, d: 150 }, 120);
-        expect(readingPosition(scroller)).toEqual({ id: "message-c", offset: -20 });
+        expect(readingPosition(scroller)).toEqual({ id: "message-c", offset: 100 });
     });
 
     it("stays put when a page is added above it", () => {
@@ -56,15 +56,40 @@ describe("the line a reader is on", () => {
             const element = row as HTMLElement;
             element.dataset.top = String(Number(element.dataset.top) + 400);
         }
-        keepReading(scroller, was);
+        const kept = keepReading(scroller, was);
         expect(scroller.scrollTop).toBe(510);
-        expect(readingPosition(scroller)).toEqual(was);
+        expect(readingPosition(scroller)).toEqual(kept);
+        // Nothing moved since, so a second pass leaves the reader alone.
+        keepReading(scroller, kept);
+        expect(scroller.scrollTop).toBe(510);
+    });
+
+    it("does not change while the reader scrolls", () => {
+        const scroller = list({ b: 50, c: 100 }, 110);
+        const was = readingPosition(scroller);
+        scroller.scrollTop = 130;
+        keepReading(scroller, was);
+        expect(scroller.scrollTop).toBe(130);
+    });
+
+    it("still catches height that arrived while the reader was scrolling", () => {
+        const scroller = list({ b: 50, c: 100 }, 110);
+        const was = readingPosition(scroller);
+        // The reader scrolls up 20px and a picture above grows by 80px in the
+        // same frame, before anything has been re-measured.
+        scroller.scrollTop = 90;
+        for (const row of scroller.children) {
+            const element = row as HTMLElement;
+            element.dataset.top = String(Number(element.dataset.top) + 80);
+        }
+        keepReading(scroller, was);
+        expect(scroller.scrollTop).toBe(170);
     });
 
     it("is read again when the message left the window", () => {
         const scroller = list({ a: 0, b: 50 }, 10);
         const found = keepReading(scroller, { id: "message-gone", offset: 5 });
-        expect(found).toEqual({ id: "message-a", offset: -10 });
+        expect(found).toEqual({ id: "message-a", offset: 0 });
         expect(scroller.scrollTop).toBe(10);
     });
 });

@@ -10,7 +10,9 @@
  */
 
 /** The line a reader is on: the first message at the top of the list, and how
- *  far below the top edge it sits. */
+ *  far below the top of the content it sits. Measured against the content rather
+ *  than the screen, so the reader scrolling does not change it - only height
+ *  changing above the message does. */
 export interface ReadingPosition {
     readonly id: string;
     readonly offset: number;
@@ -39,7 +41,14 @@ export function readingPosition(scroller: HTMLElement): ReadingPosition | null {
         else low = middle + 1;
     }
     const row = rows[low] as HTMLElement;
-    return { id: row.id, offset: row.getBoundingClientRect().top - top };
+    return { id: row.id, offset: contentOffset(scroller, row) };
+}
+
+/** How far below the top of the scrolled content a row sits. */
+function contentOffset(scroller: HTMLElement, row: HTMLElement): number {
+    return (
+        row.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+    );
 }
 
 /**
@@ -56,8 +65,8 @@ export function keepReading(
     if (!was) return readingPosition(scroller);
     const row = scroller.ownerDocument.getElementById(was.id);
     if (!row || !scroller.contains(row)) return readingPosition(scroller);
-    const offset = row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    const offset = contentOffset(scroller, row);
     const moved = offset - was.offset;
     if (Math.abs(moved) >= 1) scroller.scrollTop += moved;
-    return was;
+    return { id: was.id, offset };
 }

@@ -138,6 +138,13 @@ const EDGE_SCREENS = 3;
  *  messages - the point where the way back to the present is offered. */
 const AWAY_SCREENS = 1.5;
 
+/** Whether the list is scrolled far enough above the newest message to count
+ *  as reading older messages. */
+function readingOlder(element: HTMLElement): boolean {
+    const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+    return below > element.clientHeight * AWAY_SCREENS;
+}
+
 /** How long a freshly opened conversation keeps putting itself at the bottom
  *  while everything late finishes arriving. */
 const SETTLE_MS = 1200;
@@ -620,6 +627,10 @@ export function ChannelView({
         // newest line.
         settling.current = 0;
         element.scrollIntoView({ block: "center" });
+        if (scroller.current) {
+            readingAt.current = readingPosition(scroller.current);
+            setAway(readingOlder(scroller.current));
+        }
         setHighlight(messageId);
         setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
         return true;
@@ -1024,10 +1035,9 @@ export function ChannelView({
             element.scrollTop += element.scrollHeight - anchor.current;
             anchor.current = null;
             readingAt.current = readingPosition(element);
-            return;
-        }
-        if (following.current) stick();
+        } else if (following.current) stick();
         else readingAt.current = keepReading(element, readingAt.current);
+        setAway(readingOlder(element));
     }, [shown, stick]);
 
     /**
@@ -1051,6 +1061,7 @@ export function ChannelView({
             // because it fights the bottom, so this is that anchoring, done
             // here for a reader who is not at the bottom.
             else readingAt.current = keepReading(element, readingAt.current);
+            setAway(readingOlder(element));
         });
         for (const child of element.children) watcher.observe(child);
         return () => watcher.disconnect();
@@ -1589,16 +1600,19 @@ export function ChannelView({
                         setUnseen(0);
                         catchUpMark(true);
                     } else if (Date.now() > settling.current) following.current = false;
-                    const isAway = below > element.clientHeight * AWAY_SCREENS;
-                    if (isAway !== away) setAway(isAway);
+                    setAway(readingOlder(element));
                     // Where the reader is, once a frame, for `keepReading`.
+                    // Height that grew since the last frame is put right
+                    // first, since this runs before the resize observer
+                    // would have seen it.
                     if (!following.current && !measuring.current) {
                         measuring.current = true;
                         requestAnimationFrame(() => {
                             measuring.current = false;
-                            if (scroller.current && anchor.current === null) {
-                                readingAt.current = readingPosition(scroller.current);
-                            }
+                            const list = scroller.current;
+                            if (!list || anchor.current !== null || following.current) return;
+                            keepReading(list, readingAt.current);
+                            readingAt.current = readingPosition(list);
                         });
                     }
                     // Both edges, because the window moves in both
