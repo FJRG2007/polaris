@@ -20,7 +20,8 @@ import { findMap } from "@/lib/apps/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
 import { saveServerAsTemplateAction } from "@/app/(app)/apps/games/actions";
 import { BookmarkPlus, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
-import { formatMemory, recommendedMemoryMb, findBlueprint } from "@/lib/apps/minecraft/blueprints";
+import { formatMemory, findBlueprint } from "@/lib/apps/minecraft/blueprints";
+import { blueprintHeapMb } from "@/lib/apps/minecraft/memory-plan";
 import {
     BlueprintFields,
     DEFAULT_SHAPE,
@@ -157,9 +158,7 @@ function ResetDialog({
 
     const blueprint = findBlueprint(shape.blueprintId);
     const seedError = shapeError(shape);
-    const memory = formatMemory(
-        recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal")
-    );
+    const memory = formatMemory(blueprintHeapMb(concurrentPlayers, blueprint));
     // Bedrock keeps player data inside the level database, where it cannot be
     // separated from the terrain, so there it is not offered.
     // Not onto a map, and not as a preference: carrying players means creating the

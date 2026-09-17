@@ -14,6 +14,7 @@
  */
 
 import { RestartPlanner } from "./restart-planner";
+import { MinecraftMemory } from "./minecraft-memory";
 import { Loader2, RotateCw, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -113,6 +114,10 @@ export function MinecraftSettings({
 
     return (
         <div className="flex flex-col gap-4">
+            {/* Above the fields, because it decides whether one of them is still
+                the thing that settles the heap. */}
+            <MinecraftMemory installedAppId={installedAppId} />
+
             {groups.map(({ group, fields }) => (
                 <Card key={group}>
                     <CardBody className="flex flex-col gap-3">

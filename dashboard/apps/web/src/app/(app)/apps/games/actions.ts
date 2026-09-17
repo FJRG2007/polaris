@@ -32,9 +32,9 @@ import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/g
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import {
     GAME_BLUEPRINTS,
-    recommendedMemoryMb,
     formatMemory
 } from "@/lib/apps/minecraft/blueprints";
+import { blueprintHeapMb } from "@/lib/apps/minecraft/memory-plan";
 import {
     deleteServerTemplate,
     listServerTemplates,
@@ -122,7 +122,7 @@ export async function suggestedMemoryAction(
 ): Promise<string> {
     await requirePermission("games.read");
     const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
-    return formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
+    return formatMemory(blueprintHeapMb(concurrentPlayers, blueprint));
 }
 
 /** The releases a blueprint can be built on, and the newest of them. */

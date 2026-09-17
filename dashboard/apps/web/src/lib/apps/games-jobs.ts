@@ -160,17 +160,29 @@ async function runWorldBackups(): Promise<{
     return { taken, pruned, failed, left };
 }
 
-async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
+async function runGameHealth(): Promise<{
+    checked: number;
+    stopped: number;
+    memoryRaised: number;
+}> {
     const { sweepCrashLoops } = await import("@/lib/apps/games-health");
+    // Beside it rather than inside it: one answers "is this server failing to
+    // start", the other "has this server outgrown what it was given", and a
+    // server can be perfectly healthy and still be out of memory.
+    const { sweepMemoryPlans } = await import("@/lib/apps/games-memory");
     let checked = 0;
     let stopped = 0;
+    let memoryRaised = 0;
     for (const ownerId of await ownersWithApps()) {
         const swept = await sweepCrashLoops(ownerId).catch(() => null);
-        if (!swept) continue;
-        checked += swept.checked;
-        stopped += swept.stopped;
+        if (swept) {
+            checked += swept.checked;
+            stopped += swept.stopped;
+        }
+        const memory = await sweepMemoryPlans(ownerId).catch(() => null);
+        if (memory) memoryRaised += memory.raised;
     }
-    return { checked, stopped };
+    return { checked, stopped, memoryRaised };
 }
 
 async function runInventories(): Promise<{ servers: number; snapshots: number; applied: number }> {

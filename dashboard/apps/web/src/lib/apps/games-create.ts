@@ -26,6 +26,7 @@ import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
+import { MEMORY_MODE_KEY, plannedHeapMb } from "@/lib/apps/minecraft/memory-plan";
 import { normalizeIdentifier } from "@/lib/apps/fivem/players";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { ALLOW_LIST_KEY, withPlayer } from "@/lib/apps/ark/access";
@@ -84,7 +85,6 @@ import {
     findBlueprint,
     formatMemory,
     GAME_BLUEPRINTS,
-    recommendedMemoryMb,
     requiredProjects,
     type GameBlueprint
 } from "@/lib/apps/minecraft/blueprints";
@@ -261,10 +261,6 @@ export async function minecraftShapeEnv(
 
     // Only the Java image runs a JVM to give a heap to.
     if (edition === "java") {
-        env.set(
-            "MEMORY",
-            formatMemory(recommendedMemoryMb(shape.concurrentPlayers, blueprint.weight))
-        );
         // What the operator chose, then what the blueprint insists on: a blueprint
         // that needs Paper is not a suggestion, it is what its plugins load into.
         const software = blueprint.software ?? shape.software ?? "PAPER";
@@ -281,6 +277,21 @@ export async function minecraftShapeEnv(
                 software,
                 projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map),
                 polarisLogin.loginOn(env)
+            )
+        );
+        // The heap last, because it is decided by the two lines above it: a mod
+        // loader costs about a gigabyte before a single mod is installed on it,
+        // and each mod on the list costs again. A server sized as if it were
+        // vanilla is one that runs out of memory while generating the world.
+        env.set(
+            "MEMORY",
+            formatMemory(
+                plannedHeapMb({
+                    concurrentPlayers: shape.concurrentPlayers,
+                    weight: blueprint.weight,
+                    loader: loaderForType(software) ?? "",
+                    mods: parseProjectList(env.get(PROJECTS_KEY) ?? "").length
+                })
             )
         );
     }
@@ -414,7 +425,12 @@ async function createMinecraftServer(
     await patchInstallConfig(install.installedAppId, {
         [BLUEPRINT_KEY]: blueprint.id,
         [MAP_KEY]: input.mapId ?? "",
-        [RELEASE_KEY]: env.get("VERSION") ?? ""
+        [RELEASE_KEY]: env.get("VERSION") ?? "",
+        // New servers are planned from the start: the heap follows the mods and
+        // the people, so nobody has to notice that installing a mod loader made
+        // the figure chosen today wrong. Servers made before this keep theirs -
+        // see `memory-plan.ts` for why that asymmetry is deliberate.
+        [MEMORY_MODE_KEY]: "auto"
     });
 
     // The address half of the pair, which the game has nowhere to keep. The image

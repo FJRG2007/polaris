@@ -221,27 +221,6 @@ export function hasCrossplay(projects: string | undefined): boolean {
     return (projects ?? "").split(/[,\n]/).some((entry) => projectSlug(entry)?.toLowerCase() === geyser);
 }
 
-/**
- * Memory for a server, from how many people will actually be on it.
- *
- * The number that matters is the concurrent one, not the slot count: a server
- * with 200 slots and eight players on it is an eight-player server. A gigabyte
- * carries the world and the server itself, each player costs about 50 MB of
- * chunks and entities, and a blueprint that runs a minigame engine needs more
- * than one that runs nothing. Rounded to half a gigabyte, because that is the
- * granularity anyone reasons in, and capped at 12 GB - past that the answer is
- * another server, not a bigger heap.
- */
-export function recommendedMemoryMb(concurrentPlayers: number, weight: BlueprintWeight = "normal"): number {
-    const base = weight === "heavy" ? 2048 : weight === "light" ? 768 : 1024;
-    // A parkour course keeps almost nothing per player; a minigame engine keeps
-    // scoreboards, arenas and entities for each of them.
-    const perPlayer = weight === "heavy" ? 80 : weight === "light" ? 35 : 50;
-    const raw = base + Math.max(0, concurrentPlayers) * perPlayer;
-    const rounded = Math.ceil(raw / 512) * 512;
-    return Math.min(Math.max(rounded, 1536), 12288);
-}
-
 /** The same figure as the image wants it ("2G", "2560M"). */
 export function formatMemory(megabytes: number): string {
     return megabytes % 1024 === 0 ? `${megabytes / 1024}G` : `${megabytes}M`;

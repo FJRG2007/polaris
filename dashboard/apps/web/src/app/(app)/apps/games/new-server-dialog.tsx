@@ -36,7 +36,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
-import { findBlueprint, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
+import { findBlueprint, formatMemory } from "@/lib/apps/minecraft/blueprints";
+import { blueprintHeapMb } from "@/lib/apps/minecraft/memory-plan";
 import type { ServerTemplateView } from "@/lib/apps/game-templates";
 import {
     createGameServerAction,
@@ -178,7 +179,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             ? formatMemory(expectedArkMemoryMb(concurrentPlayers))
             : game === "fivem"
               ? formatMemory(expectedFivemMemoryMb(concurrentPlayers))
-              : formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
+              : formatMemory(blueprintHeapMb(concurrentPlayers, blueprint));
     const machine = setup?.machines.find((entry) => entry.id === serverId) ?? null;
 
     // Crossplay is a Java server Bedrock can also join, so it cannot survive a

@@ -30,7 +30,14 @@ import { CLIENT_MODS_KEY } from "@/lib/apps/minecraft/client-pack";
 import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
-import { patchInstallConfig } from "@/lib/apps/install-config";
+import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { memoryCeilingMb, memoryMode, MEMORY_CEILING_KEY, MEMORY_MODE_KEY } from "@/lib/apps/minecraft/memory-plan";
+import {
+    applyPlannedMemory,
+    MEMORY_KEY,
+    planContextFor,
+    plannedMemoryFor
+} from "@/lib/apps/games-memory";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
@@ -1861,7 +1868,12 @@ export async function updateServerSettingsAction(
     values: Array<{ key: string; value: string }>,
     /** False stores the values and leaves the running server alone. */
     restart = true
-): Promise<{ error?: string }> {
+): Promise<{
+    error?: string;
+    /** What the heap was moved to, when saving this changed what the server has
+     *  to hold. Null-ish on every ordinary save. */
+    memory?: { fromMb: number; toMb: number; reason: string };
+}> {
     const parsed = settingsSchema.safeParse({ installedAppId, values });
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
@@ -1905,6 +1917,18 @@ export async function updateServerSettingsAction(
         for (const entry of moved) vars.push({ ...entry, isSecret: false });
 
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
+
+        // A mod list that just grew, or a move onto a mod loader, changes what
+        // this server needs to hold - so the heap is recomputed with the same
+        // save and picked up by the same restart, rather than left at whatever
+        // the server was created with until it runs out. Typing a figure by hand
+        // is the operator taking that back: the plan stops touching it.
+        const memory = await memoryAfterSave(
+            parsed.data.installedAppId,
+            access.ownerId,
+            vars.some((entry) => entry.key === MEMORY_KEY)
+        );
+
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
         // The same value the Rules screen shows. Both screens write the difficulty
         // and they disagreed in whichever direction you were not looking - but only
@@ -1921,9 +1945,117 @@ export async function updateServerSettingsAction(
             await recordDifficulty(parsed.data.installedAppId, difficulty, user.id);
         }
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
-        return {};
+        return memory ? { memory } : {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+    }
+}
+
+/**
+ * The heap, after a save that may have changed what the server has to hold.
+ *
+ * Returns what it changed so the screen can say so - a server that quietly starts
+ * using two gigabytes more than it did is a surprise, even when it is the right
+ * amount.
+ */
+async function memoryAfterSave(
+    installedAppId: string,
+    ownerId: string,
+    typedByHand: boolean
+): Promise<{ fromMb: number; toMb: number; reason: string } | null> {
+    if (typedByHand) {
+        await patchInstallConfig(installedAppId, { [MEMORY_MODE_KEY]: "fixed" }).catch(
+            () => undefined
+        );
+        return null;
+    }
+    const context = await planContextFor(installedAppId, ownerId);
+    return context ? await applyPlannedMemory(context).catch(() => null) : null;
+}
+
+/**
+ * Who decides this server's heap, and how far it may go.
+ *
+ * Automatic is Polaris keeping it in step with the server: the loader, the mods
+ * on the list, the people who actually play on it, never past the ceiling set
+ * here and never past what the machine can spare. Fixed is the figure under
+ * Settings and nothing else - which is what every server made before this had,
+ * and what a server keeps until somebody asks for otherwise.
+ */
+export async function setMemoryPlanAction(
+    installedAppId: string,
+    input: { mode: "auto" | "fixed"; ceilingMb: number }
+): Promise<{ plan?: MemoryPlanView; error?: string }> {
+    const parsed = memoryPlanSchema.safeParse({ installedAppId, ...input });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the values" };
+    try {
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        await patchInstallConfig(parsed.data.installedAppId, {
+            [MEMORY_MODE_KEY]: parsed.data.mode,
+            [MEMORY_CEILING_KEY]: parsed.data.ceilingMb
+        });
+        const context = await planContextFor(parsed.data.installedAppId, access.ownerId);
+        if (context && parsed.data.mode === "auto") {
+            await applyPlannedMemory(context).catch(() => null);
+        }
+        await recordAudit({
+            actorId: user.id,
+            action: "game.memory-plan",
+            targetType: "installed-app",
+            targetId: parsed.data.installedAppId,
+            metadata: { mode: parsed.data.mode, ceilingMb: parsed.data.ceilingMb }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return await readMemoryPlanAction(parsed.data.installedAppId);
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the plan" };
+    }
+}
+
+const memoryPlanSchema = z.object({
+    installedAppId: z.string().uuid(),
+    mode: z.enum(["auto", "fixed"]),
+    /** Bounded here as well as in the form: the ceiling is what stops a plan from
+     *  taking a machine down, so it cannot be a number somebody posted. */
+    ceilingMb: z.number().int().min(1536).max(65536)
+});
+
+/** What the memory card shows: who decides, the ceiling, what the server has now,
+ *  and what the plan makes of it. */
+export interface MemoryPlanView {
+    readonly mode: "auto" | "fixed";
+    readonly ceilingMb: number;
+    readonly currentMb: number;
+    readonly plannedMb: number;
+    readonly reason: string;
+}
+
+export async function readMemoryPlanAction(
+    installedAppId: string
+): Promise<{ plan?: MemoryPlanView; error?: string }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: "That server does not exist" };
+    try {
+        const { access } = await requireGameServer("games.read", parsed.data);
+        const context = await planContextFor(parsed.data, access.ownerId);
+        if (!context) return { error: "This server has not been deployed yet" };
+        const planned = await plannedMemoryFor(context);
+        if (!planned) return { error: "This server has no heap to plan" };
+        const config = readInstallConfig(context.config);
+        return {
+            plan: {
+                mode: memoryMode(config[MEMORY_MODE_KEY]),
+                ceilingMb: memoryCeilingMb(config[MEMORY_CEILING_KEY]),
+                currentMb: planned.currentMb,
+                plannedMb: planned.wantedMb,
+                reason: planned.reason
+            }
+        };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the plan" };
     }
 }
 /**
