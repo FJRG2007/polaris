@@ -21,6 +21,7 @@ import { prisma } from "@polaris/db";
 import { withinHours } from "@/lib/home/detection";
 import { parseDetection, cameraTarget } from "@/lib/home/cameras";
 import { recordDetection, type Detection } from "@/lib/home/events";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 import { createPullPoint, pullMessages, OnvifError, type OnvifEndpoint } from "@/lib/home/onvif";
 
 /** How long to wait after a camera refuses or disappears, before trying again.
@@ -39,7 +40,8 @@ const RESCAN_MS = 30_000;
  *  is underneath. */
 export function kindForTopic(topic: string): Detection["kind"] {
     const text = topic.toLowerCase();
-    if (text.includes("people") || text.includes("person") || text.includes("human")) return "person";
+    if (text.includes("people") || text.includes("person") || text.includes("human"))
+        return "person";
     if (text.includes("vehicle") || text.includes("car")) return "vehicle";
     if (text.includes("animal") || text.includes("pet")) return "animal";
     if (text.includes("face")) return "face";
@@ -66,9 +68,14 @@ function signatureOf(camera: {
     enabled: boolean;
     updatedAt: Date;
 }): string {
-    return [camera.address, camera.onvifPort, camera.username, camera.detector, camera.enabled, camera.updatedAt.toISOString()].join(
-        "|"
-    );
+    return [
+        camera.address,
+        camera.onvifPort,
+        camera.username,
+        camera.detector,
+        camera.enabled,
+        camera.updatedAt.toISOString()
+    ].join("|");
 }
 
 /**
@@ -78,7 +85,11 @@ function signatureOf(camera: {
  * freely, so a lost subscription is not an error - it is asked for again. What
  * counts as an error is the camera refusing, and that backs off.
  */
-async function watchCamera(cameraId: string, endpoint: OnvifEndpoint, cancelled: () => boolean): Promise<void> {
+async function watchCamera(
+    cameraId: string,
+    endpoint: OnvifEndpoint,
+    cancelled: () => boolean
+): Promise<void> {
     let subscription: string | null = null;
     while (!cancelled()) {
         try {
@@ -191,19 +202,22 @@ function sleep(ms: number): Promise<void> {
 
 /** Start, stop and restart the loops so they match what is in the database. */
 async function reconcile(): Promise<void> {
-    const cameras = await prisma.camera.findMany({
-        where: { enabled: true, detector: { notIn: ["none"] }, onvifPort: { not: null } },
-        select: {
-            id: true,
-            address: true,
-            onvifPort: true,
-            username: true,
-            detector: true,
-            enabled: true,
-            updatedAt: true,
-            installedAppId: true
-        }
-    });
+    // Places uninstalled: every camera stops being watched, and none is started.
+    const cameras = !(await isAppInstalled("home"))
+        ? []
+        : await prisma.camera.findMany({
+              where: { enabled: true, detector: { notIn: ["none"] }, onvifPort: { not: null } },
+              select: {
+                  id: true,
+                  address: true,
+                  onvifPort: true,
+                  username: true,
+                  detector: true,
+                  enabled: true,
+                  updatedAt: true,
+                  installedAppId: true
+              }
+          });
     const wanted = new Map(cameras.map((camera) => [camera.id, camera]));
 
     for (const [id, watch] of watches) {
@@ -247,7 +261,9 @@ export function startCameraWatcher(): void {
     if (started) return;
     started = true;
     const tick = () =>
-        void reconcile().catch((error) => console.error("polaris: camera watcher could not reconcile:", error));
+        void reconcile().catch((error) =>
+            console.error("polaris: camera watcher could not reconcile:", error)
+        );
     // Not immediately: boot is busy, and a camera that has been unwatched for a
     // week can wait another half minute.
     setTimeout(tick, 20_000).unref();

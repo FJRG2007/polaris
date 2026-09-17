@@ -19,6 +19,11 @@ import { availableHostPort } from "@/lib/apps/port-registry";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
+import {
+    appUninstallRefusal,
+    pauseOwnedServices,
+    resumeOwnedServices
+} from "@/lib/apps/app-lifecycle";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { isPluginLoader, loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
@@ -164,6 +169,9 @@ export async function installApp(
         // An app the switcher only draws once it exists has to appear on the next
         // screen, not at the end of a cache window.
         invalidateInstallPresence(app.id);
+        // The helper containers an earlier uninstall brought down, with their
+        // settings and data, come back with the app.
+        await resumeOwnedServices(app.id, actorId).catch(() => undefined);
         return { installedAppId: record.id, applicationId: null };
     }
 
@@ -542,6 +550,15 @@ export async function getInstalledAppSettings(
     }));
 }
 
+/** Whether anybody still has this app, after one install of it was removed. */
+async function isStillInstalled(catalogId: string): Promise<boolean> {
+    const left = await prisma.installedApp.findFirst({
+        where: { catalogId, status: { not: "removed" } },
+        select: { id: true }
+    });
+    return left !== null;
+}
+
 /** Remove an installed app: tear down its Deploy application (best effort, it may
  *  already be gone) and mark the install removed so it drops out of the lists.
  *  An instance-wide app is one install for everybody, so every copy of it goes. */
@@ -549,7 +566,10 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) throw new Error("Installed app not found");
     // The mail server's rule holds whichever door the uninstall came through.
-    const refusal = row.catalogId === MAIL_SERVER_APP ? await mailServerUninstallRefusal() : null;
+    const refusal =
+        row.catalogId === MAIL_SERVER_APP
+            ? await mailServerUninstallRefusal()
+            : await appUninstallRefusal(row);
     if (refusal) throw new Error(refusal);
     if (row.applicationId) {
         try {
@@ -567,6 +587,10 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
         });
     }
     invalidateInstallPresence(row.catalogId);
+    // The helper containers it ran come down with it; their data stays.
+    if (!(await isStillInstalled(row.catalogId))) {
+        await pauseOwnedServices(row.catalogId).catch(() => undefined);
+    }
     // And gone: a switcher still offering it opens a screen for something that
     // is no longer installed.
     publishAccessChange();

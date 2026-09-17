@@ -593,6 +593,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Game servers",
             href: "/apps/games",
             needs: "games.read",
+            requiresApp: "game-servers",
             icon: Gamepad2,
             keywords: [
                 "minecraft",
@@ -2123,7 +2124,16 @@ export function orgSubapp(slug: string): AppSubapp {
                 href: `${base}/billing`,
                 icon: Wallet,
                 permission: "settings.manage",
-                keywords: ["cost", "costs", "budget", "spend", "statement", "invoice", "usage", "charge back"]
+                keywords: [
+                    "cost",
+                    "costs",
+                    "budget",
+                    "spend",
+                    "statement",
+                    "invoice",
+                    "usage",
+                    "charge back"
+                ]
             },
             {
                 label: "Activity",

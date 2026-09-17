@@ -59,6 +59,7 @@ import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { isGameServerApp, sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -103,6 +104,19 @@ async function sweepEveryDisk(): Promise<{ local: number; servers: number }> {
     const local = await sweepHostSpace();
     const servers = await sweepServerSpace().catch(() => []);
     return { local: local.freed, servers: servers.reduce((total, one) => total + one.freed, 0) };
+}
+
+/**
+ * A job that only runs while its app is installed.
+ *
+ * Without the app there is nothing it should be doing, and an uninstalled app
+ * must not keep reaching into containers or cameras on its own.
+ */
+function whileInstalled(catalogId: string, run: () => Promise<unknown>): () => Promise<unknown> {
+    return async () => {
+        if (!(await isAppInstalled(catalogId))) return { skipped: `${catalogId} is not installed` };
+        return run();
+    };
 }
 
 export interface ScheduledJob {
@@ -598,7 +612,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         key: "game-firewall",
         everyMs: Number(process.env.POLARIS_GAME_FIREWALL_MS) || 2 * MINUTE,
         leaseMs: null,
-        run: runFirewall
+        run: whileInstalled("game-servers", runFirewall)
     },
     {
         key: "game-schedules",
@@ -616,13 +630,13 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // buys is that a slow one is not overtaken by the next. Twice the pass's
         // own budget, and under the scheduler's stuck-after mark.
         leaseMs: 20 * MINUTE,
-        run: runGameActivity
+        run: whileInstalled("game-servers", runGameActivity)
     },
     {
         key: "game-inventories",
         everyMs: Number(process.env.POLARIS_GAME_INVENTORY_MS) || 5 * MINUTE,
         leaseMs: null,
-        run: runInventories
+        run: whileInstalled("game-servers", runInventories)
     },
     {
         key: "game-health",
@@ -634,7 +648,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // writes a notification about it, and two runners doing that is a server
         // stopped twice and somebody told twice.
         leaseMs: 5 * MINUTE,
-        run: runGameHealth
+        run: whileInstalled("game-servers", runGameHealth)
     },
     {
         key: "game-world-backups",
@@ -650,7 +664,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // that mark expires both guards at once, which is the second runner this
         // is here to prevent.
         leaseMs: 20 * MINUTE,
-        run: runWorldBackups
+        run: whileInstalled("game-servers", runWorldBackups)
     },
     {
         key: "game-reach",
@@ -662,7 +676,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Unleased like the other read-only sweeps: two runners knock on the same
         // port and write the same timestamp, which is the same outcome.
         leaseMs: null,
-        run: sweepGameReach
+        run: whileInstalled("game-servers", sweepGameReach)
     },
     {
         key: "scheduled-deletions",
@@ -692,7 +706,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Leased, because two runners would each start a segment on the same
         // camera and write the same footage to the disk twice.
         leaseMs: 20 * MINUTE,
-        run: sweepContinuousRecording
+        run: whileInstalled("home", sweepContinuousRecording)
     },
     {
         key: "home-availability",
@@ -704,7 +718,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // each decide it was the one to write the outage down, and the house
         // would be told twice.
         leaseMs: 5 * MINUTE,
-        run: sweepCameraReachability
+        run: whileInstalled("home", sweepCameraReachability)
     },
     {
         key: "home-retention",
@@ -716,7 +730,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // cadence, so a pass that runs over does not have the next one start
         // beside it.
         leaseMs: 30 * MINUTE,
-        run: sweepHomeRetention
+        run: whileInstalled("home", sweepHomeRetention)
     },
     {
         key: "host-space",

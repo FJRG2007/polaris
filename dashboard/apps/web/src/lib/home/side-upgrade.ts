@@ -28,7 +28,9 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { deployApplication } from "@/lib/deploy-service";
+import { POLARIS_APP_CATALOG } from "@/lib/apps/catalog";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 
 /** The build these were last brought to. */
 const BUILD_KEY = "home.services.build";
@@ -49,14 +51,17 @@ const BUILD_KEY = "home.services.build";
 const ATTEMPT_KEY = "home.services.attemptedBuild";
 
 /**
- * The containers that are Polaris' rather than somebody's.
+ * The containers that are Polaris' rather than somebody's: the ones the catalog
+ * says Places runs (`ownedBy: "home"`), which Polaris builds and publishes.
  *
- * Named here rather than derived from `internal: true` in the catalog: that flag
- * is about what the marketplace offers, and being unlisted is not a reason to
- * restart something. These three are the ones Polaris builds, publishes and is
- * responsible for.
+ * Read from the catalog rather than written out here. `internal: true` is about
+ * what the marketplace offers and is not a reason to restart something, but
+ * `ownedBy` is exactly this - and a hand-written list named the relay by an id
+ * the catalog never used, so the relay was never brought to a new build.
  */
-const OWN_SERVICES = ["camera-relay", "vision-worker", "face-recognizer"];
+const OWN_SERVICES = POLARIS_APP_CATALOG.filter((app) => app.ownedBy === "home").map(
+    (app) => app.id
+);
 
 /**
  * Redeploy Home's own containers if they have not been brought to this build.
@@ -75,6 +80,9 @@ export async function upgradeHomeServices(): Promise<void> {
     // Tried already for this build and something did not come up. Retrying costs
     // the pull again, on a machine that may have failed for want of room.
     if ((await getSetting(ATTEMPT_KEY)) === build) return;
+    // Places uninstalled: its containers are down on purpose. Nothing is noted
+    // for this build, so they are brought up to date when it comes back.
+    if (!(await isAppInstalled("home"))) return;
     await setSetting(ATTEMPT_KEY, build);
 
     const installs = await prisma.installedApp.findMany({

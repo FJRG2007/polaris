@@ -36,6 +36,11 @@ document is the source of truth; keep it current as phases land.
   ready (assistantId field + the bridge send/receive API any assistant reuses).
 - Phase 5 - CODE DONE: one-click install and the Minecraft game-server app (see
   "Game servers" below). Not yet exercised against a live server.
+- Uninstall - DONE (a1bc462, 1d86cb4, 253d4a0): installed apps can be removed
+  from the marketplace card with a confirmation; Game servers refuses while
+  servers exist, Places pauses and resumes its helper containers, and nothing
+  that depends on an uninstalled app keeps running meanwhile (see "Uninstall"
+  below).
 
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
@@ -125,10 +130,52 @@ without a monolith:
 - `instanceWide` (`singleton` only): one install turns the feature on for
   everybody, not just the installer - the mail server, Places, Tools - because
   what it gates is read instance-wide (`lib/apps/install-presence.ts`)
+- `ownedBy`: only on an `internal` manifest - the catalog id of the app that
+  creates this one (a Minecraft server owned by `game-servers`; `camera-hub`,
+  `vision-worker`, `face-recognizer` owned by `home`). Drives which installs an
+  uninstall pauses and a reinstall resumes (`lib/apps/app-lifecycle.ts`)
 
 The catalog is code (`lib/apps/catalog.ts`); a DB row (`InstalledApp`) records
 each install (target, config, status, secret). Nav pillars/rails are partly
 derived from installed capabilities.
+
+### Uninstall
+
+Removing an install never deletes what somebody made with it. The generic path
+(`uninstallApp` in `lib/apps/install-service.ts`) tears down the Deploy
+application if there is one and marks the row removed; two apps need more than
+that, handled by `lib/apps/app-lifecycle.ts`:
+
+- **The marketplace's Installed cards each carry a Trash icon** beside the
+  link (kept outside the `<Link>` so pressing it never also opens the app),
+  confirmed with a dialog naming what the app is about to stop doing
+  (`uninstallDescription` in `marketplace-view.tsx`).
+- **Game servers is refused while the owner still has a server.** Deleting a
+  world is only ever confirmed from inside the server itself, never as a side
+  effect of uninstalling the app that runs it - the refusal names up to five
+  servers and counts the rest (`appUninstallRefusal`).
+- **An app's owned services pause with it and resume with it.** Places' helper
+  containers (matched by `ownedBy` in the catalog) come down through
+  `removeApplicationDeployment` when the last install of their owner is
+  uninstalled - config and volumes kept - and are flagged `pausedWithApp` in the
+  install's config only when they were actually running, so a helper the
+  operator had switched off stays off. Reinstalling the owner redeploys exactly
+  the ones that were paused (`pauseOwnedServices` / `resumeOwnedServices`).
+- **Nothing that depends on an app keeps working while it is uninstalled.** The
+  `game-*`/`home-*` cron jobs, the ONVIF camera watcher and
+  `upgradeHomeServices` all check `isAppInstalled` first and do nothing while
+  their app is absent; `upgradeHomeServices` also skips recording an attempted
+  build in that case, so its services are brought up to date on the run after
+  the app is reinstalled instead of staying on a stale build. It also now reads
+  its own service list from the catalog's `ownedBy` (rather than a hand-written
+  list that said `camera-relay` where the catalog says `camera-hub`, so the
+  relay was never brought to a new build by the Update button).
+- **An instance that never went through today's install screen still counts as
+  having Game servers.** `isAppInstalled("game-servers")` treats any existing
+  game server, or a row still under the old per-game manager id, as the app
+  being present (`IMPLIED_BY` in `lib/apps/install-presence.ts`), so its
+  `requiresApp`-gated rail entry does not disappear under an instance that has
+  not opened `/apps/games` since `adoptGameServersApp` last ran.
 
 ### Messaging domain model (normalized)
 
