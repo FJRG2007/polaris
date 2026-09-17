@@ -20,6 +20,8 @@ let answers: Map<string, unknown>;
 beforeEach(() => {
     asked = [];
     answers = new Map();
+    // Modrinth's answers are kept for a while; each test answers afresh.
+    modrinth.forgetModrinthAnswers();
     vi.stubGlobal("fetch", async (url: string) => {
         asked.push(url);
         // Matched on the path so a test does not have to reproduce the exact query
@@ -208,6 +210,92 @@ describe("conflicts between them", () => {
     it("does not go looking when there is only one thing installed", async () => {
         expect(await modrinth.readConflicts(["one"], "paper")).toEqual([]);
         expect(asked).toEqual([]);
+    });
+});
+
+describe("asking Modrinth", () => {
+    /** A list whose projects clash and depend on each other, so all three walks
+     *  have something to ask about. */
+    function list() {
+        answers = new Map<string, unknown>([
+            [
+                "/projects?ids=",
+                [
+                    {
+                        id: "AAAA",
+                        slug: "one",
+                        title: "One",
+                        game_versions: [],
+                        loaders: ["paper"]
+                    },
+                    { id: "BBBB", slug: "two", title: "Two", game_versions: [], loaders: ["paper"] }
+                ]
+            ],
+            [
+                "/project/one/version",
+                [
+                    {
+                        version_number: "1.0",
+                        dependencies: [{ project_id: "BBBB", dependency_type: "required" }]
+                    }
+                ]
+            ],
+            ["/project/two/version", [{ version_number: "2.0", dependencies: [] }]]
+        ]);
+    }
+
+    it("asks each address once for everything one screen reads", async () => {
+        // What the route does for one look at the list: the three walks at once.
+        list();
+        const entries = ["one", "two:1.0"];
+        await Promise.all([
+            modrinth.readInstalledProjects(entries, "paper", null),
+            modrinth.readConflicts(entries, "paper"),
+            modrinth.newestBuilds(entries, "paper", null),
+            modrinth.readRequirements(entries, "paper", null)
+        ]);
+        expect(asked.length).toBeGreaterThan(0);
+        expect(new Set(asked).size).toBe(asked.length);
+    });
+
+    it("answers the next edit from what it already has", async () => {
+        list();
+        await modrinth.readRequirements(["one", "two"], "paper", null);
+        const first = asked.length;
+        await modrinth.readRequirements(["one", "two"], "paper", null);
+        expect(asked.length).toBe(first);
+    });
+
+    it("asks again after a failure rather than keeping it", async () => {
+        await modrinth.readInstalledProjects(["one"], "paper", null);
+        expect(asked).toHaveLength(1);
+        list();
+        const [entry] = await modrinth.readInstalledProjects(["one"], "paper", null);
+        expect(asked).toHaveLength(2);
+        expect(entry?.known).toBe(true);
+    });
+
+    it("walks a long list a few projects at a time", async () => {
+        const slugs = Array.from({ length: 20 }, (_, index) => `p${index}`);
+        let open = 0;
+        let most = 0;
+        vi.stubGlobal("fetch", async (url: string) => {
+            if (url.includes("/projects?ids=")) {
+                return {
+                    ok: true,
+                    json: async () =>
+                        slugs.map((slug) => ({ id: slug, slug, game_versions: [], loaders: [] }))
+                } as unknown as Response;
+            }
+            open += 1;
+            most = Math.max(most, open);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            open -= 1;
+            return { ok: true, json: async () => [{ dependencies: [] }] } as unknown as Response;
+        });
+        await modrinth.readConflicts(slugs, "paper");
+        expect(most).toBeGreaterThan(1);
+        expect(most).toBeLessThanOrEqual(8);
     });
 });
 

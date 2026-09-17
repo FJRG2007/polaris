@@ -369,13 +369,10 @@ export async function readConflicts(
     const slugById = new Map(listed.data.map((entry) => [entry.id, entry.slug]));
     const onList = new Set(listed.data.map((entry) => entry.slug.toLowerCase()));
 
+    const releases = await walk(listed.data, (entry) => projectVersions(entry.slug, loader));
     const conflicts: ModrinthConflict[] = [];
-    for (const entry of listed.data) {
-        const versions = versionSchema.safeParse(
-            await modrinthJson(
-                `${modrinthApi}/project/${encodeURIComponent(entry.slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
-            ).catch(() => null)
-        );
+    for (const [index, entry] of listed.data.entries()) {
+        const versions = versionSchema.safeParse(releases[index]);
         if (!versions.success) continue;
         // The newest release only: an incompatibility declared two years ago and
         // since resolved is not something to warn a person about today.
@@ -389,16 +386,83 @@ export async function readConflicts(
     return conflicts;
 }
 
+/**
+ * How long an answer is reused.
+ *
+ * One look at the mods screen asks for the same projects from three walks - what
+ * they are, what they clash with, what they need - and asks again on every edit.
+ * Long enough that all of that is one request per address; short enough that a
+ * build published a moment ago is offered on the next visit.
+ */
+const ANSWER_TTL_MS = 5 * 60_000;
+/** A bound on the memory the answers hold, oldest dropped first. */
+const ANSWERS_KEPT = 500;
+
+/** Answers by address, kept as the promise so a question already on its way is
+ *  joined rather than asked twice. */
+const answers = new Map<string, { at: number; body: Promise<unknown> }>();
+
 /** One request to Modrinth, identified the way they ask for and bounded so a slow
  *  index cannot hold a page open. Throws on anything that is not an answer, which
  *  every caller here turns into "nothing is known" rather than into an error. */
-export async function modrinthJson(url: string): Promise<unknown> {
+export function modrinthJson(url: string): Promise<unknown> {
+    const now = Date.now();
+    const kept = answers.get(url);
+    if (kept && now - kept.at < ANSWER_TTL_MS) return kept.body;
+    const body = askModrinth(url);
+    answers.delete(url);
+    answers.set(url, { at: now, body });
+    if (answers.size > ANSWERS_KEPT) answers.delete(answers.keys().next().value as string);
+    // A failure is not an answer: the next screen asks again.
+    body.catch(() => {
+        if (answers.get(url)?.body === body) answers.delete(url);
+    });
+    return body;
+}
+
+async function askModrinth(url: string): Promise<unknown> {
     const response = await fetch(url, {
         headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
     if (!response.ok) throw new Error(`Modrinth answered ${response.status}`);
     return response.json();
+}
+
+/** Drop every kept answer. For tests, which answer the same address differently. */
+export function forgetModrinthAnswers(): void {
+    answers.clear();
+}
+
+/** How many questions one walk puts to Modrinth at a time. */
+const WALK_CONCURRENCY = 8;
+
+/**
+ * `items.map(run)`, a few at a time, in order.
+ *
+ * The walks below ask one question per project. One after another, a list of
+ * twenty is twenty round trips end to end; all at once, it is a burst against
+ * somebody else's rate limit.
+ */
+async function walk<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    async function worker(): Promise<void> {
+        while (next < items.length) {
+            const index = next++;
+            results[index] = await run(items[index] as T);
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(WALK_CONCURRENCY, items.length) }, worker));
+    return results;
+}
+
+/** A project's releases for one loader, newest first, or null when they could not
+ *  be read. One address for every walk here, so they share the answer. */
+function projectVersions(slug: string, loader: string): Promise<unknown> {
+    return modrinthJson(
+        `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
+    ).catch(() => null);
 }
 
 /** One entry of MODRINTH_PROJECTS, as the three things its syntax can carry. */
@@ -565,11 +629,7 @@ async function admittedBuild(
     version: string,
     release: ReleaseType
 ): Promise<string | null> {
-    const builds = buildSchema.safeParse(
-        await modrinthJson(
-            `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
-        ).catch(() => null)
-    );
+    const builds = buildSchema.safeParse(await projectVersions(slug, loader));
     if (!builds.success) return null;
     // Newest first is Modrinth's own order.
     const admitted = builds.data.find(
@@ -594,13 +654,14 @@ export async function newestBuilds(
 ): Promise<Map<string, string>> {
     const newest = new Map<string, string>();
     const wanted = (version ?? "").trim();
-    for (const entry of entries) {
-        const slug = projectSlug(entry);
-        const pin = pinnedBuild(entry);
-        if (!slug || !pin) continue;
-        const build = await admittedBuild(slug, loader, wanted, entryReleaseType(entry));
+    const pinned = entries.filter((entry) => projectSlug(entry) && pinnedBuild(entry));
+    const builds = await walk(pinned, (entry) =>
+        admittedBuild(projectSlug(entry) as string, loader, wanted, entryReleaseType(entry))
+    );
+    for (const [index, entry] of pinned.entries()) {
+        const build = builds[index] ?? null;
         // Nothing to say when the pin is already the newest it could be on.
-        if (build !== null && build !== pin) newest.set(entry, build);
+        if (build !== null && build !== pinnedBuild(entry)) newest.set(entry, build);
     }
     return newest;
 }
@@ -675,13 +736,10 @@ export async function readRequirements(
     }
 
     const needed: { by: string; id: string; release: ReleaseType }[] = [];
-    for (const project of listed.data) {
+    const releases = await walk(listed.data, (project) => projectVersions(project.slug, loader));
+    for (const [index, project] of listed.data.entries()) {
         const entry = entryFor.get(project.slug.toLowerCase()) ?? project.slug;
-        const versions = versionSchema.safeParse(
-            await modrinthJson(
-                `${modrinthApi}/project/${encodeURIComponent(project.slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
-            ).catch(() => null)
-        );
+        const versions = versionSchema.safeParse(releases[index]);
         if (!versions.success) continue;
         // The newest release only, for the reason `readConflicts` gives: what a
         // project needed two years ago is not what it needs today.
@@ -707,7 +765,19 @@ export async function readRequirements(
     if (!deps.success) return [];
     const projectById = new Map(deps.data.map((project) => [project.id, project]));
 
-    const buildable = new Map<string, boolean>();
+    // Each dependency is judged once, by the release type of the first entry that
+    // needs it.
+    const judged = new Map<string, ReleaseType>();
+    for (const one of needed) {
+        const dependency = projectById.get(one.id);
+        if (dependency && !judged.has(dependency.slug)) judged.set(dependency.slug, one.release);
+    }
+    const checks = [...judged];
+    const builds = await walk(checks, ([slug, release]) =>
+        admittedBuild(slug, loader, wanted, release)
+    );
+    const buildable = new Map(checks.map(([slug], index) => [slug, builds[index] !== null]));
+
     const seen = new Set<string>();
     const found: ModrinthRequirement[] = [];
     for (const one of needed) {
@@ -716,10 +786,6 @@ export async function readRequirements(
         const pair = `${one.by}\n${dependency.slug}`;
         if (seen.has(pair)) continue;
         seen.add(pair);
-        if (!buildable.has(dependency.slug)) {
-            const build = await admittedBuild(dependency.slug, loader, wanted, one.release);
-            buildable.set(dependency.slug, build !== null);
-        }
         found.push({
             slug: one.by,
             needs: dependency.slug,

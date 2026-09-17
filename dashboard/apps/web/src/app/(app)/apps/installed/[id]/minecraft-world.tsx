@@ -15,7 +15,6 @@
  * place for it to be wrong.
  */
 
-import Link from "next/link";
 import { formatBytes } from "@polaris/core";
 import * as world from "@/lib/apps/minecraft/world";
 import { CopyButton } from "@/components/copy-button";
@@ -551,13 +550,16 @@ export function GameServerBackups({
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Button size="icon" variant="ghost" asChild aria-label="Download this backup">
-                                        <Link
+                                        {/* A plain anchor: a router link prefetches what it
+                                            points at, and here that is the whole archive -
+                                            every backup on screen downloading at once. */}
+                                        <a
                                             href={`/api/apps/installed/${installedAppId}/minecraft/world/${encodeURIComponent(backup.name)}`}
                                             title="Download this backup"
                                             download
                                         >
                                             <Download className="size-4" />
-                                        </Link>
+                                        </a>
                                     </Button>
                                     <Button
                                         size="icon"

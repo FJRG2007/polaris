@@ -126,7 +126,7 @@ export function MinecraftMods({
     );
 
     const browse = useCallback(
-        async (term: string, tag: string) => {
+        async (term: string, tag: string, signal?: AbortSignal) => {
             if (!loader) {
                 setResults(null);
                 return;
@@ -135,7 +135,7 @@ export function MinecraftMods({
             try {
                 const response = await fetch(
                     `/api/apps/installed/${installedAppId}/minecraft/modrinth?${serverQuery({ query: term.trim(), category: tag })}`,
-                    { cache: "no-store" }
+                    { cache: "no-store", signal }
                 );
                 const data = (await response.json()) as {
                     projects?: modrinth.ModrinthProject[];
@@ -151,6 +151,9 @@ export function MinecraftMods({
                 setSearchFailed(false);
                 setError(null);
             } catch {
+                // Superseded by a newer search, or the screen was left: neither
+                // is a failure to show.
+                if (signal?.aborted) return;
                 // Resolved to a state rather than left on the skeletons: a browse
                 // that never came back is a thing to retry, and a page loading for
                 // ever says nothing about what to do.
@@ -158,7 +161,7 @@ export function MinecraftMods({
                 setSearchFailed(true);
                 setError("Could not reach Modrinth");
             } finally {
-                setSearching(false);
+                if (!signal?.aborted) setSearching(false);
             }
         },
         [installedAppId, loader, serverQuery]
@@ -172,19 +175,23 @@ export function MinecraftMods({
      * it - which is the only moment at which finding out is worth anything.
      */
     const readList = useCallback(
-        async (entries: readonly string[]) => {
+        async (entries: readonly string[], signal: AbortSignal) => {
             if (!loader || entries.length === 0) {
                 setOnList([]);
                 setConflicts([]);
                 setRequires([]);
                 return;
             }
+            // The list still renders from what is on screen when the read fails;
+            // only the titles and the warnings are missing, and the next edit asks
+            // again. Left on its skeletons, it could never be edited at all.
+            const unread = () => setOnList(entries.map(unreadRow));
             try {
                 const response = await fetch(
                     `/api/apps/installed/${installedAppId}/minecraft/modrinth?${serverQuery({ installed: entries.join(",") })}`,
-                    { cache: "no-store" }
+                    { cache: "no-store", signal }
                 );
-                if (!response.ok) return;
+                if (!response.ok) return unread();
                 const data = (await response.json()) as {
                     projects?: InstalledRow[];
                     conflicts?: modrinth.ModrinthConflict[];
@@ -194,8 +201,7 @@ export function MinecraftMods({
                 setConflicts(data.conflicts ?? []);
                 setRequires(data.requires ?? []);
             } catch {
-                // The list still renders from what is on screen; only the titles
-                // and the warnings are missing, and the next edit asks again.
+                if (!signal.aborted) unread();
             }
         },
         [installedAppId, loader, serverQuery]
@@ -203,14 +209,24 @@ export function MinecraftMods({
 
     // Browse as it is typed, but not on every keystroke. With nothing typed this
     // is the popular list for the chosen shelf, which is what a marketplace opens
-    // on rather than an empty page asking to be searched.
+    // on rather than an empty page asking to be searched. A search that has been
+    // overtaken, or whose screen was left, is cancelled rather than left running.
     useEffect(() => {
-        const timer = setTimeout(() => void browse(query, category), SEARCH_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
+        const abort = new AbortController();
+        const timer = setTimeout(
+            () => void browse(query, category, abort.signal),
+            SEARCH_DEBOUNCE_MS
+        );
+        return () => {
+            clearTimeout(timer);
+            abort.abort();
+        };
     }, [query, category, browse]);
 
     useEffect(() => {
-        void readList(projects);
+        const abort = new AbortController();
+        void readList(projects, abort.signal);
+        return () => abort.abort();
     }, [projects, readList]);
 
     /**
@@ -567,6 +583,25 @@ function ProjectCard({
 interface InstalledRow extends modrinth.InstalledProject {
     readonly pinned?: string | null;
     readonly newest?: string | null;
+}
+
+/** An entry drawn as itself, for when Modrinth could not be asked about it. Nothing
+ *  is claimed about it either way, so it carries no warning. */
+function unreadRow(entry: string): InstalledRow {
+    const slug = modrinth.projectSlug(entry) ?? entry;
+    return {
+        entry,
+        slug,
+        title: slug,
+        description: "",
+        downloads: 0,
+        categories: [],
+        iconUrl: null,
+        author: null,
+        known: true,
+        fitsVersion: null,
+        fitsLoader: true
+    };
 }
 
 function InstalledList({
