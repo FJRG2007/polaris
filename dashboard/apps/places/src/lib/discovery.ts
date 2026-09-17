@@ -281,7 +281,7 @@ export async function sweepSubnet(cidr: string): Promise<DiscoveredCamera[]> {
 export async function sweepFromServer(hostId: string, ownerId: string, cidr: string): Promise<DiscoveredCamera[]> {
     const hosts = hostsInCidr(cidr);
     if (hosts.length === 0) return [];
-    const { getHostConnection } = await Promise.resolve(host.hostService);
+    const { getHostConnection } = host.hostService;
     const { execCommand, openSshClient } = await import("@polaris/ssh");
     const connection = await getHostConnection(hostId, ownerId);
 

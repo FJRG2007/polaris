@@ -6,16 +6,30 @@
  * `lib/app-host/server.ts`, and a contract in the same way.
  *
  * Provided when this module is evaluated, which the dashboard's layout
- * guarantees by rendering `ProvideAppHostUi` above every app's screens.
+ * guarantees by rendering `ProvideAppHostUi` above every app's screens - so
+ * this module is in the chunk every authenticated page loads, and what it
+ * imports is paid for by screens that never draw any of it. A piece that
+ * carries a graph of its own is therefore loaded when it is first drawn
+ * rather than imported here; the small ones, drawn on most screens, are not
+ * worth a chunk of their own.
  */
 
+import dynamic from "next/dynamic";
 import { provideAppHostUi } from "@polaris/app-host/client";
-import { ShareDialog } from "@/components/access/share-dialog";
 import { TpLinkMark } from "@/components/brand-icons";
 import { useDisplayFormat } from "@/components/display-format";
 import { IntegrationLogo } from "@/components/logos";
-import { MediaPlayer } from "@/components/media-player";
 import { runAction } from "@/lib/run-action";
+
+const ShareDialog = dynamic(
+    () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
+    { ssr: false }
+);
+
+const MediaPlayer = dynamic(
+    () => import("@/components/media-player").then((module) => module.MediaPlayer),
+    { ssr: false }
+);
 
 export const clientHost = {
     accessShareDialog: { ShareDialog },

@@ -7,6 +7,11 @@
  * `[object Promise]` into a path, and nothing in the type system objects to a
  * promise inside a template string. So every service offered that way has to be
  * one that is already asynchronous in its own module.
+ *
+ * The client half is imported by the layout of every authenticated page, so what
+ * it imports is in the chunk a reader who never opens an app downloads anyway.
+ * A piece that carries a graph of its own is therefore loaded when it is first
+ * drawn, and one that is not has to say why.
  */
 
 import { join, resolve } from "node:path";
@@ -52,6 +57,52 @@ const offered = (() => {
  * evaluated, which a promise cannot be. Everything else loads on first use.
  */
 const EAGER = ["appsCatalog.POLARIS_APP_CATALOG", "appsCatalog.findApp"];
+
+const CLIENT = readFileSync(join(SRC, "components/app-host/client.tsx"), "utf8");
+
+/** Each piece loaded when it is first drawn rather than imported at the top. */
+const drawnLater = new Set(
+    [...CLIENT.matchAll(/^const (\w+) = dynamic\(\s*\(\) => import\("[^"]+"/gm)].map(
+        (match) => match[1] ?? ""
+    )
+);
+
+/** What the client host is given, one area to a line. */
+const clientBody = (/^export const clientHost = \{$([\s\S]*?)^\};$/m.exec(CLIENT)?.[1] ?? "")
+    .split("\n")
+    .filter((line) => line.trim() !== "");
+
+/** Every client piece the host offers, and the binding it is given. */
+const pieces = (() => {
+    const found: { area: string; name: string; from: string }[] = [];
+    for (const line of clientBody) {
+        const area = /^\s{4}(\w+): \{(.+)\},?$/.exec(line);
+        if (!area) continue;
+        for (const entry of (area[2] ?? "").split(",")) {
+            const named = /^\s*(\w+)(?::\s*(\w+))?\s*$/.exec(entry);
+            if (!named) continue;
+            const name = named[1] ?? "";
+            found.push({ area: area[1] ?? "", name, from: named[2] ?? name });
+        }
+    }
+    return found;
+})();
+
+/**
+ * Imported at the top rather than loaded when first drawn, and why that is
+ * allowed.
+ *
+ * A hook, a helper and two marks the shell's own screens draw anyway: a chunk
+ * apiece would cost a request to save nothing. Anything with a graph behind it
+ * - a dialog, a player, a component whose module reaches a server action - is
+ * drawn later.
+ */
+const EAGER_UI = [
+    "brandIcons.TpLinkMark",
+    "displayFormat.useDisplayFormat",
+    "logos.IntegrationLogo",
+    "runAction.runAction"
+];
 
 function sourceOf(module: string): string {
     for (const candidate of [`${module}.ts`, `${module}.tsx`]) {
@@ -116,6 +167,36 @@ describe("the services the dashboard offers apps", () => {
             }
         }
         expect(careless).toEqual([]);
+    });
+});
+
+describe("the client pieces the dashboard offers apps", () => {
+    it("are found at all, so this cannot pass by reading nothing", () => {
+        expect(pieces.length).toBeGreaterThan(3);
+        expect(drawnLater.size).toBeGreaterThan(0);
+    });
+
+    // A line this cannot read is a piece the checks below never see, which is
+    // how an allow-list passes a file it has stopped understanding.
+    it("leaves no line of the client host unread", () => {
+        const areas = new Set(pieces.map((piece) => piece.area));
+        expect(clientBody.filter((line) => !areas.has(/^\s{4}(\w+):/.exec(line)?.[1] ?? ""))).toEqual([]);
+    });
+
+    it.each(pieces)("$area $name is drawn later or named as an exception", (piece) => {
+        const where = `${piece.area}.${piece.name}`;
+        expect(drawnLater.has(piece.from) || EAGER_UI.includes(where), where).toBe(true);
+    });
+
+    it("names no exception the client host no longer offers", () => {
+        const where = pieces.map((piece) => `${piece.area}.${piece.name}`);
+        expect(EAGER_UI.filter((name) => !where.includes(name))).toEqual([]);
+    });
+
+    // Otherwise the piece is in the shell's chunk anyway and the deferral above
+    // buys nothing: `dynamic` splits what nothing else already pulled in.
+    it.each([...drawnLater])("%s is not also imported here", (name) => {
+        expect(new RegExp(`^import .*\\b${name}\\b.*from`, "m").test(CLIENT)).toBe(false);
     });
 });
 

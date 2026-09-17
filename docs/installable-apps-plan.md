@@ -105,9 +105,9 @@ load those into a core path that never uses them.
    `lib/apps/games-jobs.ts`, its firewall section and install panels are drawn
    by `app/(app)/apps/games/extension-slot.tsx`. Catalog data and port policy
    (`games-catalog`, `ark-maps`, `port-advice`, `port-block*`, `game-logo`) are
-   core. Places registers `lib/home/places-extension.ts`: its jobs, what it
-   starts at boot (its container upgrade and the camera watcher) and who it
-   reaches through a lent camera or door. Its footage storage setting
+   core. Places registers `apps/places/src/lib/places-extension.ts`: its jobs,
+   what it starts at boot (its container upgrade and the camera watcher) and who
+   it reaches through a lent camera or door. Its footage storage setting
    (`lib/footage-storage.ts`) is core; the zoom arithmetic moved on to `@polaris/ui/zoom`.
 2. **Move the app's code under its own workspace** (`apps/game-servers`,
    `apps/places`): services, routes, screens, jobs, tests - including the
