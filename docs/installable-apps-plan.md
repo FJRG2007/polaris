@@ -98,7 +98,7 @@ load those into a core path that never uses them.
 
 ## Phases
 
-1. **Core stops importing app code.** Done for Game servers. The registry is
+1. **Core stops importing app code.** Done for Game servers and Places (#186). The registry is
    `lib/app-extensions/` (types, registry, and `installed.ts`, the one list);
    the client half is `components/app-extensions/installed-client.tsx`. Game
    servers registers `lib/apps/games-extension.ts`, its jobs moved to
@@ -115,6 +115,16 @@ load those into a core path that never uses them.
    game tabs under `app/(app)/apps/installed/[id]`, `app/api/apps/games`,
    `app/api/minecraft`, and the `app/api/cron/game-*` triggers). Still compiled
    into the image, loaded through the registry. Verifiable here.
+
+   Needs a design first: the host API. The registry only covers core calling
+   the app. The other direction is still direct. Game servers' services import
+   about 40 core modules by path (`install-config`, `deploy-service`,
+   `env-var-service`, `session`, `domain-service`, `crash-loop` and others). A
+   workspace that imports the dashboard's `@/lib` depends on the dashboard, and
+   a bundle built from it cannot load without the dashboard's module graph. So
+   phase 2 starts by defining the host API: the core services an app may call,
+   exported from one package with a versioned contract. The app's imports then
+   move onto that package before its files move.
 3. **Bundles.** Build each app workspace into a bundle in CI; add the loader,
    the resolution hook, the catch-all routes and the import map; stop compiling
    the app workspaces into the dashboard image. Needs a container to verify.
