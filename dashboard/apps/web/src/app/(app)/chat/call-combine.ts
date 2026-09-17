@@ -55,6 +55,25 @@
 
 import { z } from "zod";
 
+/** The fewest people a call needs before combining means anything. With two,
+ *  the devices "in one room" are the whole call, and going quiet for each other
+ *  leaves nobody to talk to. */
+export const COMBINE_MIN_PEOPLE = 3;
+
+/**
+ * Whether combining is offered at all.
+ *
+ * Both counts, because each lags in a different way: the roster keeps a seat
+ * until its heartbeat runs out, and the media server drops somebody the moment
+ * their connection goes. The smaller one is the honest answer.
+ *
+ * @param seated Admitted seats in the roster, this browser's included.
+ * @param connected Other people on the media connection right now.
+ */
+export function combineOffered(seated: number, connected: number): boolean {
+    return Math.min(seated, connected + 1) >= COMBINE_MIN_PEOPLE;
+}
+
 /**
  * The seat whose device carries the room this browser is sitting in.
  *

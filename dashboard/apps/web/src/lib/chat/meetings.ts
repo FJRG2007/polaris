@@ -18,7 +18,8 @@
  *     them - a link that can be forwarded is a link that will be.
  */
 
-import { postNotice } from "./notices";
+import { postNotice, postNoticeBody } from "./notices";
+import { announcesCalls, callEndedBody } from "./notice-text";
 import { randomBytes } from "node:crypto";
 import { blockersOf } from "@/lib/blocks";
 import { whoMissedTheCall } from "./missed-call";
@@ -162,8 +163,8 @@ export async function startOrJoin(
     actor: ChatActor & { name: string },
     channelId: string
 ): Promise<MeetingSeat> {
-    await requireChannel(actor, channelId);
-    const meetingId = await liveMeetingId(actor, channelId);
+    const access = await requireChannel(actor, channelId);
+    let { meetingId, created } = await liveMeetingId(actor, channelId);
     // Swept first, and this is the line the whole thing turned on: a browser
     // that was closed mid-call leaves its seat behind, and a room with a seat
     // in it is not empty. So the next call into that conversation announced
@@ -174,9 +175,22 @@ export async function startOrJoin(
     // question about the room rather than about the room plus the person now
     // walking into it. An empty room is a call starting, which is what makes
     // everybody else's browser ring; an occupied one is somebody joining.
-    const wasEmpty = (await admittedCount(meetingId)) === 0;
+    let wasEmpty = (await admittedCount(meetingId)) === 0;
+    // A call nobody is really in any more is over, not one to walk back into:
+    // reused, it would ring with no start line, and its ending would be timed
+    // from, and credited to, whoever rang the abandoned one.
+    if (wasEmpty && !created) {
+        await closeMeeting(meetingId);
+        ({ meetingId, created } = await liveMeetingId(actor, channelId));
+        wasEmpty = (await admittedCount(meetingId)) === 0;
+    }
     const seat = await seatFor(meetingId, actor.id, actor.name);
     await announceCall(meetingId, wasEmpty ? "ringing" : "moved", actor.id, actor.name);
+    // Written by whoever created the call and nobody else: two people pressing
+    // call at the same moment make one call, and must make one line.
+    if (created && announcesCalls(access.kind)) {
+        await postNotice(channelId, "callStarted", { subjectId: actor.id });
+    }
     return seat;
 }
 
@@ -945,19 +959,22 @@ export async function requireSeated(seat: { meetingId: string; participantId: st
  * The create can lose a race with another tab pressing the same button, and the
  * unique `liveKey` is what makes that recoverable rather than a second room:
  * the loser reads back the one the winner made and walks into it. */
-async function liveMeetingId(actor: ChatActor, channelId: string): Promise<string> {
+async function liveMeetingId(
+    actor: ChatActor,
+    channelId: string
+): Promise<{ meetingId: string; created: boolean }> {
     const running = await prisma.meeting.findFirst({
         where: { channelId, endedAt: null },
         select: { id: true }
     });
-    if (running) return running.id;
+    if (running) return { meetingId: running.id, created: false };
 
     try {
         const created = await prisma.meeting.create({
             data: { channelId, hostId: actor.id, liveKey: channelId },
             select: { id: true }
         });
-        return created.id;
+        return { meetingId: created.id, created: true };
     } catch (caught) {
         if (!isUniqueViolation(caught)) throw caught;
         const raced = await prisma.meeting.findUnique({
@@ -965,7 +982,7 @@ async function liveMeetingId(actor: ChatActor, channelId: string): Promise<strin
             select: { id: true }
         });
         if (!raced) throw caught;
-        return raced.id;
+        return { meetingId: raced.id, created: false };
     }
 }
 
@@ -1107,7 +1124,7 @@ async function closeMeeting(meetingId: string): Promise<void> {
     // pressing the button - and each would otherwise announce it again.
     if (stillLive) {
         await announceCall(meetingId, "ended", "");
-        await noteMissedCall(meetingId);
+        await noteCallOutcome(meetingId);
     }
 }
 
@@ -1117,7 +1134,32 @@ async function closeMeeting(meetingId: string): Promise<void> {
 const MOST_MISSED_ALERTS = 25;
 
 /**
- * A call nobody picked up, said out loud.
+ * Whether this call's start has its line in the conversation.
+ *
+ * Asked rather than assumed, because a call that began before the lines existed
+ * has none, and saying "nobody answered" under nothing would leave the reader
+ * guessing which call.
+ */
+async function startWasAnnounced(
+    channelId: string,
+    hostId: string,
+    startedAt: Date
+): Promise<boolean> {
+    const line = await prisma.chatMessage.findFirst({
+        where: {
+            channelId,
+            kind: "system",
+            createdAt: { gte: startedAt },
+            body: { endsWith: `(polaris:user/${hostId}) started a call` }
+        },
+        select: { id: true }
+    });
+    return line !== null;
+}
+
+/**
+ * How a call ended, said out loud: how long it lasted, or that nobody picked
+ * it up.
  *
  * Every messenger does this and Polaris did not: a telephone rang in a tab
  * somebody was not looking at, gave up after half a minute, and left nothing
@@ -1137,7 +1179,7 @@ const MOST_MISSED_ALERTS = 25;
  * Best effort throughout. The call is over either way, and a conversation one
  * line short is a better outcome than an ending that reports itself as failed.
  */
-async function noteMissedCall(meetingId: string): Promise<void> {
+async function noteCallOutcome(meetingId: string): Promise<void> {
     try {
         const meeting = await prisma.meeting.findUnique({
             where: { id: meetingId },
@@ -1145,7 +1187,9 @@ async function noteMissedCall(meetingId: string): Promise<void> {
                 channelId: true,
                 hostId: true,
                 scheduledAt: true,
-                channel: { select: { members: { select: { userId: true } } } }
+                startedAt: true,
+                endedAt: true,
+                channel: { select: { kind: true, members: { select: { userId: true } } } }
             }
         });
         // A room somebody put in the diary and sent an address for is not a
@@ -1166,9 +1210,28 @@ async function noteMissedCall(meetingId: string): Promise<void> {
             unreachable: [...(await blockersOf(meeting.hostId, members))],
             answeredByGuest: seats.some((seat) => !seat.userId)
         });
-        if (missed.length === 0) return;
+        // Where the start was announced, the end is too: how long it lasted,
+        // worked out from the meeting row rather than kept anywhere else. A
+        // call nobody answered says that instead, under the line that already
+        // named who rang.
+        const announced = announcesCalls(meeting.channel?.kind ?? "");
+        if (missed.length === 0) {
+            if (announced && seats.length > 1) {
+                const lasted =
+                    (meeting.endedAt ?? new Date()).getTime() - meeting.startedAt.getTime();
+                await postNoticeBody(meeting.channelId, callEndedBody(lasted), meeting.hostId);
+            }
+            return;
+        }
 
-        await postNotice(meeting.channelId, "missedCall", { subjectId: meeting.hostId });
+        if (
+            announced &&
+            (await startWasAnnounced(meeting.channelId, meeting.hostId, meeting.startedAt))
+        ) {
+            await postNotice(meeting.channelId, "callUnanswered", { subjectId: meeting.hostId });
+        } else {
+            await postNotice(meeting.channelId, "missedCall", { subjectId: meeting.hostId });
+        }
 
         // The bell only while this is still a telephone call. Somebody ringing a
         // space channel of two hundred people is one line in the conversation and

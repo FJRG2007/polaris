@@ -69,15 +69,32 @@ export async function postNotice(
         const subject = people.get(subjectId) ?? { id: subjectId, name: "Somebody" };
         const by = byId && byId !== subjectId ? (people.get(byId) ?? null) : null;
 
-        await prisma.chatMessage.create({
-            data: { channelId, kind: "system", authorId: null, body: noticeBody(kind, subject, by) }
-        });
-        publishChatChange({ channelId, kind: "posted", actorId: byId ?? subjectId });
+        await writeNotice(channelId, noticeBody(kind, subject, by), byId ?? subjectId);
     } catch {
         // The membership change stands either way. A conversation that is one
         // line short of complete is a far better outcome than a join that
         // reports itself as having failed.
     }
+}
+
+/** A line with a body already worded, for the notices that name nobody. */
+export async function postNoticeBody(
+    channelId: string,
+    body: string,
+    actorId: string
+): Promise<void> {
+    try {
+        await writeNotice(channelId, body, actorId);
+    } catch {
+        // As above: never at the cost of what it describes.
+    }
+}
+
+async function writeNotice(channelId: string, body: string, actorId: string): Promise<void> {
+    await prisma.chatMessage.create({
+        data: { channelId, kind: "system", authorId: null, body }
+    });
+    publishChatChange({ channelId, kind: "posted", actorId });
 }
 
 /**

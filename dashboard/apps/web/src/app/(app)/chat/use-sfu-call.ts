@@ -58,6 +58,7 @@ import {
 } from "./call-signals";
 import { playCallSound } from "@/lib/call-sounds";
 import { callMuted, setCallMuted } from "./call-muted";
+import { pressDeafen, pressMic } from "./call-voice-controls";
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -73,6 +74,7 @@ import {
     AUDIO_GROUP,
     audioPlan,
     combineMessageSchema,
+    combineOffered,
     type AudioRole,
     type CombineMessage,
     type CombineRequest
@@ -311,6 +313,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [states, setStates] = useState<ReadonlyMap<string, PeerState>>(new Map());
     const [speaking, setSpeaking] = useState<ReadonlySet<string>>(new Set());
     const [micOn, setMicOn] = useState(true);
+    /** The same, for the buttons: they decide from what the person asked for,
+     *  which the track's own flag stops saying once a gate is closing it. */
+    const micOnRef = useRef(true);
+    micOnRef.current = micOn;
+    /** Whether the microphone was on when this browser deafened, so
+     *  undeafening gives back what it took. */
+    const micBeforeDeafen = useRef(true);
     const [cameraOn, setCameraOn] = useState(withVideo);
     const [hasCamera, setHasCamera] = useState(false);
     const [sharing, setSharing] = useState(false);
@@ -370,6 +379,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [combineAsked, setCombineAsked] = useState<string | null>(null);
     const [combineRequest, setCombineRequest] = useState<CombineRequest | null>(null);
     const [nearby, setNearby] = useState<ReadonlySet<string>>(new Set());
+    /** How many other people are on the media connection, for `combineOpen`. */
+    const [connected, setConnected] = useState(0);
+    /** Whether combining is open, for the paths that decide it outside a render:
+     *  a menu is a screen, and the rule belongs to the call rather than to
+     *  whatever happens to be drawn. */
+    const combineOpenRef = useRef(false);
     /** Whether this browser is telling the room it is recording. What is being
      *  written lives in `call-recorder`; this is the half everybody can see. */
     const [recording, setRecordingSaid] = useState(false);
@@ -765,6 +780,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
         setRemote((held) => settle(held, faces));
         setScreens((held) => settle(held, shared));
+        setConnected(current.remoteParticipants.size);
     }, []);
 
     /** What everybody's controls are set to: what they say about themselves,
@@ -1064,6 +1080,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setError("");
         setRemote(new Map());
         setScreens(new Map());
+        setConnected(0);
         setStates(new Map());
         setSpeaking(new Set());
         // The screen is reset, unlike the microphone and camera, because
@@ -1476,7 +1493,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const message = combineMessageSchema.safeParse(raw);
             if (!message.success) return;
             if (message.data.kind === "combine-ask") {
-                setCombineRequest({ from: participant.identity });
+                // A call of two has nothing to combine, whoever asked and
+                // whatever their screen believes.
+                if (combineOpenRef.current) setCombineRequest({ from: participant.identity });
                 return;
             }
             // Turned down. Only ever about the person this browser asked, so a
@@ -1704,6 +1723,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const combineWith = useCallback(
         (participantId: string) => {
+            if (!combineOpenRef.current) return;
             groupRef.current = participantId;
             setAudioGroup(participantId);
             setCombineAsked(null);
@@ -1734,13 +1754,29 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * their microphone and their speakers, and a call where anybody can silence
      * anybody from a menu is not a call.
      */
+    const seated =
+        meeting?.participants.filter((person) => person.admission === "admitted").length ?? 0;
+    const combineOpen = combineOffered(seated, connected);
+    useEffect(() => {
+        combineOpenRef.current = combineOpen;
+    }, [combineOpen]);
+
     const askToCombine = useCallback(
         (participantId: string) => {
+            if (!combineOpen) return;
             setCombineAsked(participantId);
             tell(participantId, { kind: "combine-ask" });
         },
-        [tell]
+        [combineOpen, tell]
     );
+
+    // Down to two people, whatever was pending is moot: a question on screen
+    // about combining with the only other person in the call has one answer.
+    useEffect(() => {
+        if (combineOpen) return;
+        setCombineAsked(null);
+        setCombineRequest(null);
+    }, [combineOpen]);
 
     /** Answer whoever asked. Yes is this browser pointing at them, which they
      *  see for themselves; no is the one message that has to be sent, or their
@@ -1961,12 +1997,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             reopen.current?.("audio", track.getSettings().deviceId ?? "default");
             return;
         }
-        // Unmuting while deafened undeafens as well: a deafened person is not
-        // heard, so a microphone that comes on has to bring the room back with
-        // it, or they would be talking to people told they cannot hear them.
-        // First, so it holds on a device that is quiet for a room too - the
-        // effect that gives that one its microphone back waits for this.
-        if (!track.enabled && deafenedRef.current) {
+        // Decided from what the person asked for, not from `track.enabled`:
+        // push to talk and voice activity close the track between sentences,
+        // and reading that as muted made the mute button do nothing. Unmuting
+        // while deafened undeafens too - see `call-voice-controls`.
+        const next = pressMic(
+            {
+                micOn: micOnRef.current,
+                deafened: deafenedRef.current,
+                micBeforeDeafen: micBeforeDeafen.current
+            },
+            roleRef.current === "companion"
+        );
+        if (deafenedRef.current && !next.deafened) {
             deafenedRef.current = false;
             setDeafened(false);
             say({ [DEAFENED]: "" });
@@ -1975,18 +2018,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // saying they want to be heard, which is a decision to stop sharing the
         // room's microphone rather than a mute to be argued with. The effect
         // below is what gives the microphone back.
-        if (!track.enabled && roleRef.current === "companion") {
+        if (next.leaveGroup) {
             micBeforeGroup.current = true;
             leaveCombine();
             return;
         }
-        setVoiceEnabled(!track.enabled);
-        setMicOn(track.enabled);
+        micOnRef.current = next.micOn;
+        setVoiceEnabled(next.micOn);
+        setMicOn(next.micOn);
         // Kept for the next room. Only a deliberate press is remembered:
         // deafening also silences the microphone, and coming back tomorrow
         // muted because you once put your headphones down is not what anybody
         // meant by it.
-        setCallMuted(!track.enabled);
+        setCallMuted(!next.micOn);
     }, [leaveCombine, say, setVoiceEnabled]);
 
     /**
@@ -2113,21 +2157,28 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * exactly what an attentive one does.
      */
     const toggleDeafen = useCallback(() => {
-        setDeafened((current) => {
-            const next = !current;
-            deafenedRef.current = next;
-            if (mic.current) {
-                // Undeafening gives the microphone back to everybody except a
-                // device that is quiet for a room: that one is silent because
-                // the laptop next to it is carrying the call, and handing it a
-                // live microphone here would put two of them in one room - the
-                // howl this browser went quiet to stop.
-                setVoiceEnabled(!next && roleRef.current !== "companion");
-                setMicOn(mic.current.enabled);
-            }
-            say({ [DEAFENED]: next ? "1" : "" });
-            return next;
-        });
+        // Undeafening gives back the microphone as it was before, and never to
+        // a device that is quiet for a room: that one is silent because the
+        // laptop next to it is carrying the call, and handing it a live
+        // microphone here would put two of them in one room - the howl this
+        // browser went quiet to stop.
+        const next = pressDeafen(
+            {
+                micOn: micOnRef.current,
+                deafened: deafenedRef.current,
+                micBeforeDeafen: micBeforeDeafen.current
+            },
+            roleRef.current === "companion"
+        );
+        deafenedRef.current = next.deafened;
+        micBeforeDeafen.current = next.micBeforeDeafen;
+        setDeafened(next.deafened);
+        if (mic.current) {
+            micOnRef.current = next.micOn;
+            setVoiceEnabled(next.micOn);
+            setMicOn(next.micOn);
+        }
+        say({ [DEAFENED]: next.deafened ? "1" : "" });
     }, [say, setVoiceEnabled]);
 
     /** Swap one input for another, mid-call. */
@@ -2908,6 +2959,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         audioRole,
         audioHost,
         audioMembers,
+        combineOpen,
         combineAsked,
         combineRequest,
         combineWith,

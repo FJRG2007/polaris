@@ -57,6 +57,11 @@ export function useVoiceGate({
     // every render of whatever is drawing it.
     const send = useRef(setSending);
     send.current = setSending;
+    /** Read by the cleanups below, which run after the render that changed it:
+     *  a gate standing down because somebody muted must not reopen the
+     *  microphone on its way out. */
+    const on = useRef(micOn);
+    on.current = micOn;
 
     // Read when the gate starts rather than followed: changing the mode while a
     // key is held would leave the microphone in whichever state that moment
@@ -123,7 +128,7 @@ export function useVoiceGate({
                 window.removeEventListener("keydown", down);
                 window.removeEventListener("keyup", up);
                 window.removeEventListener("blur", blur);
-                send.current(true);
+                if (on.current) send.current(true);
             };
         }
 
@@ -168,7 +173,7 @@ export function useVoiceGate({
             clearInterval(timer);
             if (closing) clearTimeout(closing);
             meter.stop();
-            send.current(true);
+            if (on.current) send.current(true);
         };
     }, [micOn, track]);
 }
