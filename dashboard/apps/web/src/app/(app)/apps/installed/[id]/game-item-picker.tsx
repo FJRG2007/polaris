@@ -31,6 +31,15 @@ export interface ItemPickerSource<T extends SearchableItem> {
     /** The catalogue, fetched once and shared by every picker in the tab. The
      *  caller owns the caching, because it also owns the failure. */
     readonly load: () => Promise<T[]>;
+    /**
+     * A second batch, from somewhere slower than the file `load` reads.
+     *
+     * Minecraft's is what the server's own mods add, which means reading their
+     * jars: seconds the first time, and nothing anybody should watch a spinner
+     * for. So it is appended when it arrives and the grid is drawn from the first
+     * batch meanwhile. Absent for a game whose catalogue is one file.
+     */
+    readonly more?: () => Promise<{ items: T[]; note: string | null }>;
     readonly search: (items: readonly T[], query: string, limit: number) => T[];
     /** One item's picture at whatever size the slot draws it. */
     readonly Icon: ComponentType<{ id: string; className?: string }>;
@@ -69,8 +78,10 @@ export function GameItemPicker<T extends SearchableItem>({
     recent?: readonly string[];
 }) {
     const [items, setItems] = useState<T[] | null>(null);
+    const [extra, setExtra] = useState<T[]>([]);
+    const [note, setNote] = useState<string | null>(null);
     const [failed, setFailed] = useState(false);
-    const { load, search, Icon, labelOf, typedId, placeholder, whenMissing } = source;
+    const { load, more, search, Icon, labelOf, typedId, placeholder, whenMissing } = source;
 
     useEffect(() => {
         let live = true;
@@ -83,10 +94,31 @@ export function GameItemPicker<T extends SearchableItem>({
         };
     }, [load]);
 
+    useEffect(() => {
+        if (!more) return;
+        let live = true;
+        // Never a reason to fail the picker: what this adds is extra, and what it
+        // could not add it says in a line under the grid.
+        more().then((second) => {
+            if (!live) return;
+            setExtra(second.items);
+            setNote(second.note);
+        }, () => undefined);
+        return () => {
+            live = false;
+        };
+    }, [more]);
+
     const searching = query.trim().length > 0;
+    // The second batch behind the first, so a catalogue that arrived late does not
+    // reorder a grid somebody is already looking at.
+    const all = useMemo(
+        () => (items === null ? null : extra.length === 0 ? items : [...items, ...extra]),
+        [items, extra]
+    );
     const matches = useMemo(() => {
-        if (!items) return [];
-        const found = search(items, query, SHOWN + 1);
+        if (all === null) return [];
+        const found = search(all, query, SHOWN + 1);
         // Recent goes in front of the list, not in place of it. What was given
         // here lately is the better first row, but the rest of the catalogue is
         // still what somebody browses when the thing they want was not given
@@ -94,17 +126,20 @@ export function GameItemPicker<T extends SearchableItem>({
         if (searching || !recent || recent.length === 0) return found;
         const lately = recent.map(
             (id) =>
-                items.find((item) => item.id === id) ??
+                all.find((item) => item.id === id) ??
                 ({ id, label: labelOf(id), search: id } as unknown as T)
         );
         return [...lately, ...found.filter((item) => !recent.includes(item.id))];
-    }, [items, query, searching, recent, search, labelOf]);
+    }, [all, query, searching, recent, search, labelOf]);
     const shown = matches.slice(0, SHOWN);
-    const more = matches.length > SHOWN;
+    const truncated = matches.length > SHOWN;
     // A written-out id nobody has a picture for is still a real item on a modded
     // server, so it is offered rather than refused.
     const typed = typedId?.(query) ?? null;
     const offerTyped = typed !== null && shown.every((item) => item.id !== typed);
+    // The catalogue's own entry for what is chosen, which is the only place the
+    // real name of a modded item is: `labelOf` can only title-case the id.
+    const chosen = value === null ? null : (all?.find((item) => item.id === value) ?? null);
 
     return (
         <div className="flex flex-col gap-2">
@@ -147,6 +182,7 @@ export function GameItemPicker<T extends SearchableItem>({
                                 key={item.id}
                                 id={item.id}
                                 label={item.label}
+                                from={item.from}
                                 Icon={Icon}
                                 selected={value === item.id}
                                 onSelect={onSelect}
@@ -159,11 +195,12 @@ export function GameItemPicker<T extends SearchableItem>({
                             </li>
                         )}
                     </ul>
-                    {more && (
+                    {truncated && (
                         <p className="text-xs text-muted-foreground">
                             More than {SHOWN} match. Type more to narrow it.
                         </p>
                     )}
+                    {note && <p className="text-xs text-muted-foreground">{note}</p>}
                 </>
             )}
 
@@ -171,10 +208,13 @@ export function GameItemPicker<T extends SearchableItem>({
                 {value ? (
                     <span className="flex items-center gap-1.5">
                         <Icon id={value} className="size-4" />
-                        <span className="font-medium">{labelOf(value)}</span>
+                        <span className="font-medium">{chosen?.label ?? labelOf(value)}</span>
                         <span className="truncate font-mono text-muted-foreground" title={value}>
                             {value}
                         </span>
+                        {chosen?.from && (
+                            <span className="shrink-0 text-muted-foreground">{chosen.from}</span>
+                        )}
                     </span>
                 ) : (
                     <span className="text-muted-foreground">Choose an item.</span>
@@ -187,6 +227,7 @@ export function GameItemPicker<T extends SearchableItem>({
 function Tile({
     id,
     label,
+    from,
     Icon,
     selected,
     onSelect,
@@ -194,17 +235,23 @@ function Tile({
 }: {
     id: string;
     label: string;
+    /** Which catalogue it came from, when it was not the game's own. */
+    from?: string;
     Icon: ComponentType<{ id: string; className?: string }>;
     selected: boolean;
     onSelect: (id: string) => void;
     onDragItem?: (id: string | null) => void;
 }) {
+    // The mod's name goes on the label rather than beside the picture: a tile is
+    // 40 pixels of texture, and two mods' versions of the same thing are otherwise
+    // the same tile twice.
+    const named = from ? `${label} (${from})` : label;
     return (
         <li>
             <button
                 type="button"
-                title={label}
-                aria-label={label}
+                title={named}
+                aria-label={named}
                 aria-pressed={selected}
                 onClick={() => onSelect(id)}
                 draggable={onDragItem !== undefined}

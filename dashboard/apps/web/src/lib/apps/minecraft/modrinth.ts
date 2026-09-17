@@ -650,6 +650,7 @@ export function repinEntry(entry: string, build: string): string {
 
 const buildSchema = someBuilds(
     z.object({
+        id: z.string().max(64).catch(""),
         version_number: z.string().max(64).catch(""),
         version_type: z.string().max(32).catch("release"),
         game_versions: z.array(z.string().max(32)).max(200).catch([]),
@@ -659,7 +660,11 @@ const buildSchema = someBuilds(
                     filename: z.string().max(200).catch(""),
                     url: z.string().max(512).catch(""),
                     primary: z.boolean().catch(false),
-                    hashes: z.object({ sha1: z.string().max(64).catch("") }).catch({ sha1: "" })
+                    size: z.number().nonnegative().catch(0),
+                    hashes: z
+                        .object({ sha1: z.string().max(64).catch("") })
+                        .partial()
+                        .catch({ sha1: "" })
                 })
             )
             .max(20)
@@ -698,20 +703,38 @@ async function admittedBuild(
     return admitted?.version_number ?? null;
 }
 
-/** One build, as the thing a player would download. */
+/** One build of one project, as the file it actually is. */
 export interface ModrinthBuild {
+    /** Modrinth's own id for the build. */
+    readonly versionId: string;
+    /** What the publisher numbered it. */
     readonly version: string;
     readonly filename: string;
+    /** On their CDN, checked before it is returned. */
     readonly url: string;
+    /** Lowercase hex. What the file is, rather than where it is - so a build that
+     *  has not changed is recognised as the same one however it is addressed. */
     readonly sha1: string;
+    readonly size: number;
 }
+
+/** A jar hash as Modrinth reports it. */
+const SHA1 = /^[0-9a-f]{40}$/;
 
 /**
  * The build an entry installs on this server, with the file behind it.
  *
- * The same three questions `admittedBuild` asks - the loader, the release, how
- * finished a build has to be - answered with the file, because that is what the
- * mod pack a player installs is made of.
+ * The same three questions `admittedBuild` asks - the loader, the release, and
+ * whether the entry admits a build that finished - answered with the file rather
+ * than with its number, because that is what the mod pack a player installs is
+ * made of, and what the reader that opens a jar to read its items has to fetch.
+ * An entry nailed to a version gets that version or nothing: a list that pins
+ * 1.9.0 and a reader that opens 1.10.1 would offer items the server does not
+ * have.
+ *
+ * Null for anything that cannot be resolved to one downloadable file on their own
+ * CDN with a hash to name it by, which is the same answer as "this entry adds
+ * nothing we can read".
  */
 export async function buildFor(
     entry: string,
@@ -733,12 +756,15 @@ export async function buildFor(
             (!VERSION.test(wanted) || build.game_versions.includes(wanted))
     );
     const file = admitted?.files.find((one) => one.primary) ?? admitted?.files[0];
-    if (!admitted || !file || !file.url || !file.filename) return null;
+    const sha1 = (file?.hashes?.sha1 ?? "").toLowerCase();
+    if (!admitted || !file || !isModrinthUrl(file.url) || !SHA1.test(sha1)) return null;
     return {
+        versionId: admitted.id,
         version: admitted.version_number,
         filename: file.filename,
         url: file.url,
-        sha1: file.hashes.sha1
+        sha1,
+        size: file.size
     };
 }
 

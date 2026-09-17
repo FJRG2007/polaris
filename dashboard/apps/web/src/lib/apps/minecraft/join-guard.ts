@@ -231,6 +231,18 @@ export const VERSION_KEY = "VERSION";
 export const SOFTWARE_KEY = "TYPE";
 
 /**
+ * The environment key the release is saved under.
+ *
+ * Beside the other two because the three are always read together: which builds
+ * of a project fit this server is the loader and the release at once, and every
+ * screen that asks Modrinth anything asks it with both.
+ *
+ * `LATEST` is a legitimate value and it is not a release, so a reader has to
+ * decide what an unknown release means to it rather than compare the string.
+ */
+export const VERSION_KEY = "VERSION";
+
+/**
  * The same list with the password-on-join project on it.
  *
  * Every server gets this, rather than the operator finding the switch: a server

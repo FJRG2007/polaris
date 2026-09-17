@@ -29,6 +29,15 @@ export interface SearchableItem {
      * ones that draw, without either of them being a better answer to the query.
      */
     readonly rank?: number;
+    /**
+     * Where the entry came from, when the catalogue is more than one source.
+     *
+     * Minecraft's is vanilla plus whatever the server's mods add, and a tile is
+     * 40 pixels of texture: two mods' versions of the same thing are otherwise
+     * indistinguishable. Absent for an entry that came from the game itself,
+     * which is the ordinary case and needs no caption.
+     */
+    readonly from?: string;
 }
 
 /**
