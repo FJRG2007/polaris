@@ -9,14 +9,12 @@ import { prisma } from "@polaris/db";
 import type { AppJob } from "@/lib/app-extensions/types";
 import { isGameServerApp } from "@/lib/apps/catalog";
 import { ownersWithApps } from "@/lib/cron/owners";
-import { sweepCrashLoops } from "@/lib/apps/games-health";
-import { drainQueue } from "@/lib/apps/minecraft/queue-service";
-import { getServerPlayers } from "@/lib/apps/minecraft/service";
-import { sweepGameActivity } from "@/lib/apps/games-activity-service";
-import { sweepWorldBackups } from "@/lib/apps/minecraft/world-service";
-import { sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
-import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
-import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
+
+// The services behind each job are loaded when the job runs, not when the job
+// table is read: the table is read by core's scheduler at startup.
+const games = () => import("@/lib/apps/games-service");
+const worlds = () => import("@/lib/apps/minecraft/world-service");
+const schedules = () => import("@/lib/apps/minecraft/schedule-service");
 
 const MINUTE = 60 * 1000;
 
@@ -36,6 +34,7 @@ async function runFirewall(): Promise<{
     let kicked = 0;
     let allowed = 0;
     for (const ownerId of await ownersWithApps()) {
+        const { syncFirewallBans } = await games();
         const result = await syncFirewallBans(ownerId).catch(() => null);
         if (!result) continue;
         servers += result.servers;
@@ -63,6 +62,8 @@ async function runGameActivity(): Promise<{
     skipped: number;
 }> {
     const owners = await ownersWithApps();
+    const { sweepGameActivity } = await import("@/lib/apps/games-activity-service");
+    const { runGameRoutines, sweepGameSchedules } = await schedules();
     // Bounded like the backup sweep, and now for the same reason: a scheduled
     // stop writes the world out and takes a copy of it first, which is `tar` over
     // a whole world inside the container and is allowed ninety seconds per server
@@ -129,6 +130,7 @@ async function runWorldBackups(): Promise<{
     left: number;
 }> {
     const owners = await ownersWithApps();
+    const { sweepWorldBackups } = await worlds();
     // Bounded like the sibling sweep, and for the reason its lease exists: `tar`
     // over a world takes as long as the world is big, a pass walks every owner,
     // and a pass that outlives the scheduler's own stuck-after mark releases the
@@ -159,6 +161,7 @@ async function runWorldBackups(): Promise<{
 }
 
 async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
+    const { sweepCrashLoops } = await import("@/lib/apps/games-health");
     let checked = 0;
     let stopped = 0;
     for (const ownerId of await ownersWithApps()) {
@@ -176,6 +179,9 @@ async function runInventories(): Promise<{ servers: number; snapshots: number; a
         select: { id: true, ownerId: true, catalogId: true }
     });
 
+    const { getServerPlayers } = await import("@/lib/apps/minecraft/service");
+    const { drainQueue } = await import("@/lib/apps/minecraft/queue-service");
+    const { sweepInventorySnapshots } = await import("@/lib/apps/minecraft/inventory-service");
     let servers = 0;
     let snapshots = 0;
     let applied = 0;
@@ -199,7 +205,7 @@ async function runInventories(): Promise<{ servers: number; snapshots: number; a
 }
 
 /** The jobs, with the keys their leases were always taken under. */
-export function gameServerJobs(): readonly AppJob[] {
+export function gameJobTable(): readonly AppJob[] {
     return [
         {
             key: "game-firewall",
@@ -269,7 +275,7 @@ export function gameServerJobs(): readonly AppJob[] {
             // Unleased like the other read-only sweeps: two runners knock on the same
             // port and write the same timestamp, which is the same outcome.
             leaseMs: null,
-            run: sweepGameReach
+            run: async () => (await games()).sweepGameReach()
         },
     ];
 }

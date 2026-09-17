@@ -6,12 +6,12 @@
  * this is what is registered there.
  */
 
-import { reachesPlaces } from "@/lib/home/sharing";
-import { startCameraWatcher } from "@/lib/home/watcher";
-import { upgradeHomeServices } from "@/lib/home/side-upgrade";
 import type { AppExtension } from "@/lib/app-extensions/types";
-import { sweepCameraReachability } from "@/lib/home/reachability";
-import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
+
+// Places' modules are loaded when a hook runs. This module is loaded with core's
+// registry, and what Places is built on reaches the session, the cameras and the
+// container runtime.
+const sweeps = () => import("@/lib/home/sweeps");
 
 const MINUTE = 60 * 1000;
 
@@ -27,7 +27,7 @@ export const placesExtension: AppExtension = {
             // Leased, because two runners would each start a segment on the same
             // camera and write the same footage to the disk twice.
             leaseMs: 20 * MINUTE,
-            run: sweepContinuousRecording
+            run: async () => (await sweeps()).sweepContinuousRecording()
         },
         {
             key: "home-availability",
@@ -39,7 +39,7 @@ export const placesExtension: AppExtension = {
             // each decide it was the one to write the outage down, and the house
             // would be told twice.
             leaseMs: 5 * MINUTE,
-            run: sweepCameraReachability
+            run: async () => (await import("@/lib/home/reachability")).sweepCameraReachability()
         },
         {
             key: "home-retention",
@@ -51,7 +51,7 @@ export const placesExtension: AppExtension = {
             // cadence, so a pass that runs over does not have the next one start
             // beside it.
             leaseMs: 30 * MINUTE,
-            run: sweepHomeRetention
+            run: async () => (await sweeps()).sweepHomeRetention()
         },
     ],
 
@@ -60,16 +60,20 @@ export const placesExtension: AppExtension = {
         // recognizer - to the version of Polaris that is running. They are built
         // and published by the same CI run as the dashboard and nothing else
         // upgrades them. Once per build, and only what is meant to be running.
-        void upgradeHomeServices().catch((error) =>
-            console.error("polaris: could not bring Home's own containers up to date:", error)
-        );
+        void import("@/lib/home/side-upgrade")
+            .then(({ upgradeHomeServices }) => upgradeHomeServices())
+            .catch((error) =>
+                console.error("polaris: could not bring Home's own containers up to date:", error)
+            );
         // Listen to the cameras that decide for themselves that something moved:
         // one long-poll per camera and no CPU. Does nothing without cameras.
-        startCameraWatcher();
+        void import("@/lib/home/watcher")
+            .then(({ startCameraWatcher }) => startCameraWatcher())
+            .catch((error) => console.error("polaris: could not start the camera watcher:", error));
     },
 
     // Places is the one app a single item of can be lent to somebody who holds
     // none of its permissions - one door, one camera - and somebody holding a key
     // to a door has an app to open.
-    reaches: reachesPlaces
+    reaches: async (userId) => (await import("@/lib/home/sharing")).reachesPlaces(userId)
 };
