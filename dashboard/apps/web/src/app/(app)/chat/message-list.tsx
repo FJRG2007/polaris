@@ -9,9 +9,9 @@
  * channel unreadable, because the eye has to skip past the same name to reach
  * each new line.
  *
- * A day separator sits between days. Timestamps are relative ("4 minutes ago"),
- * which is what somebody reading a conversation wants; the exact time is on the
- * hover, which is what somebody quoting one wants.
+ * A day separator sits between days. Timestamps are the clock time ("14:05",
+ * "Yesterday at 14:05", a date before that), which is how somebody reading back
+ * places a line; the full date and time is on the hover. See `message-time`.
  *
  * Deleted messages leave a line saying so rather than vanishing. A conversation
  * where replies suddenly answer nothing is worse than one that admits something
@@ -42,6 +42,7 @@ import { recentEmoji, rememberEmoji } from "./recents";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { MessageTime } from "@/components/message-time";
 import { MessageInfoDialog } from "./message-info-dialog";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView, ChatQuoteView } from "@/lib/chat/messages";
@@ -724,7 +725,7 @@ function Message({
     if (message.kind === "system") {
         return (
             <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
-                {message.body} <RelativeTime iso={message.createdAt} />
+                {message.body} <MessageTime iso={message.createdAt} />
             </p>
         );
     }
@@ -745,7 +746,7 @@ function Message({
                 >
                     Show
                 </button>
-                <RelativeTime iso={message.createdAt} />
+                <MessageTime iso={message.createdAt} />
             </p>
         );
     }
@@ -849,12 +850,10 @@ function Message({
                                     <PersonName id={message.authorId} name={author} />
                                 </span>
                             )}
-                            <span
-                                className="text-[0.6875rem] text-foreground-subtle"
-                                title={format.dateTime(message.createdAt)}
-                            >
-                                <RelativeTime iso={message.createdAt} />
-                            </span>
+                            <MessageTime
+                                iso={message.createdAt}
+                                className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
+                            />
                         </p>
                     )}
 
@@ -1595,7 +1594,7 @@ function QuotedMessageCard({
                 </span>
                 {reference.at && (
                     <span className="shrink-0 text-[0.6875rem] text-foreground-subtle">
-                        <RelativeTime iso={reference.at} />
+                        <MessageTime iso={reference.at} />
                     </span>
                 )}
             </span>

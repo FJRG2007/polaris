@@ -23,7 +23,7 @@ import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
 import { useEffect, useMemo, useState } from "react";
 import type { ChatSearchHit } from "@/lib/chat/search";
-import { RelativeTime } from "@/components/relative-time";
+import { MessageTime } from "@/components/message-time";
 import { referenced } from "./message-references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { Hash, Loader2, Search, Users, X } from "lucide-react";
@@ -216,7 +216,10 @@ export function SearchPanel({
                                         <span className="min-w-0 truncate" title={hit.channelName}>
                                             {hit.channelName}
                                         </span>
-                                        <RelativeTime iso={hit.message.createdAt} />
+                                        <MessageTime
+                                            iso={hit.message.createdAt}
+                                            className="shrink-0 whitespace-nowrap"
+                                        />
                                     </span>
                                     <span
                                         className={cn(
