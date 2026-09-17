@@ -29,13 +29,15 @@
 import Fuse from "fuse.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Search } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { appProvenance } from "@/lib/apps/provenance";
+import { Loader2, Search, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { appInstallInputSchema } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { uninstallInstalledAppAction } from "../installed/[id]/actions";
 import {
     appsByCategory,
     findApp,
@@ -278,42 +280,106 @@ function ownInstalls(installed: readonly InstalledAppView[]): InstalledAppView[]
     });
 }
 
+/**
+ * What uninstalling an app says it will do, before it does it.
+ *
+ * Nothing anybody made is deleted: the data stays for when the app comes back.
+ * An app that runs things of its own says what happens to those.
+ */
+function uninstallDescription(catalogId: string, name: string): string {
+    if (catalogId === "game-servers") {
+        return `${name} leaves the switcher and stops running its checks. Delete your game servers first; worlds are never deleted by uninstalling.`;
+    }
+    if (catalogId === "home") {
+        return `${name} leaves the switcher, and its camera and recognition containers stop. Your places, cameras and recordings are kept for when you install it again.`;
+    }
+    return `${name} leaves the switcher. What you made in it is kept for when you install it again.`;
+}
+
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
+    const router = useRouter();
+    const [confirm, confirmElement] = useConfirm();
+    const [removing, setRemoving] = useState<string | null>(null);
+    const [failure, setFailure] = useState<string | null>(null);
     const own = ownInstalls(installed);
     if (own.length === 0) return null;
 
+    async function uninstall(item: InstalledAppView): Promise<void> {
+        const agreed = await confirm({
+            title: `Uninstall ${item.name}?`,
+            description: uninstallDescription(item.catalogId, item.name),
+            confirmLabel: "Uninstall",
+            danger: true
+        });
+        if (!agreed) return;
+        setFailure(null);
+        setRemoving(item.id);
+        const result = await uninstallInstalledAppAction(item.id);
+        setRemoving(null);
+        if (result.error) {
+            setFailure(result.error);
+            return;
+        }
+        router.refresh();
+    }
+
     return (
         <section className="flex flex-col gap-3">
+            {confirmElement}
             <h2 className="text-sm font-medium text-muted-foreground">Installed</h2>
+            {failure && <p className="text-sm text-danger">{failure}</p>}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {own.map((item) => {
                     const manifest = findApp(item.catalogId);
                     return (
-                        <Link key={item.id} href={manifest?.opensAt ?? `/apps/installed/${item.id}`}>
-                            <Card className="transition-colors hover:border-border">
-                                <CardBody className="flex items-center gap-3 py-3">
-                                    {manifest ? (
-                                        <AppMark app={manifest} size={36} />
-                                    ) : (
-                                        <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md" />
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">{item.name}</p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {manifest?.category ?? item.catalogId}
-                                        </p>
-                                    </div>
-                                    <Badge
-                                        className={cn(
-                                            item.status === "failed" && "border-danger-edge text-danger",
-                                            item.status === "running" && "border-success-edge text-success"
+                        <div key={item.id} className="group relative">
+                            <Link href={manifest?.opensAt ?? `/apps/installed/${item.id}`}>
+                                <Card className="transition-colors hover:border-border">
+                                    <CardBody className="flex items-center gap-3 py-3 pr-12">
+                                        {manifest ? (
+                                            <AppMark app={manifest} size={36} />
+                                        ) : (
+                                            <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md" />
                                         )}
-                                    >
-                                        {STATUS_LABEL[item.status] ?? item.status}
-                                    </Badge>
-                                </CardBody>
-                            </Card>
-                        </Link>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium">
+                                                {item.name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {manifest?.category ?? item.catalogId}
+                                            </p>
+                                        </div>
+                                        <Badge
+                                            className={cn(
+                                                item.status === "failed" &&
+                                                    "border-danger-edge text-danger",
+                                                item.status === "running" &&
+                                                    "border-success-edge text-success"
+                                            )}
+                                        >
+                                            {STATUS_LABEL[item.status] ?? item.status}
+                                        </Badge>
+                                    </CardBody>
+                                </Card>
+                            </Link>
+                            {/* Beside the card rather than inside the link, so pressing
+                                it never also opens the app. */}
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={`Uninstall ${item.name}`}
+                                title={`Uninstall ${item.name}`}
+                                disabled={removing !== null}
+                                onClick={() => void uninstall(item)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-danger"
+                            >
+                                {removing === item.id ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="size-4" />
+                                )}
+                            </Button>
+                        </div>
                     );
                 })}
             </div>

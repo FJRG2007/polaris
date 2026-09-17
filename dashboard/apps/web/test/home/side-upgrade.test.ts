@@ -23,6 +23,8 @@ let installs: { applicationId: string; ownerId: string; catalogId: string }[] = 
 let states: Record<string, string> = {};
 
 const deployApplication = vi.fn(async () => undefined);
+/** Whether Places is installed. */
+let placesInstalled = true;
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_BUILD_SHA: build }) }));
 vi.mock("@polaris/db", () => ({
@@ -36,6 +38,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/deploy-service", () => ({ deployApplication }));
+vi.mock("@/lib/apps/install-presence", () => ({
+    isAppInstalled: async (catalogId: string) => catalogId === "home" && placesInstalled
+}));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: vi.fn(async (key: string) => settings[key] ?? null),
     setSetting: vi.fn(async (key: string, value: string | null) => {
@@ -50,8 +55,9 @@ beforeEach(() => {
     build = "abc123";
     settings = {};
     states = {};
+    placesInstalled = true;
     installs = [
-        { applicationId: "relay-app", ownerId: "owner-1", catalogId: "camera-relay" },
+        { applicationId: "relay-app", ownerId: "owner-1", catalogId: "camera-hub" },
         { applicationId: "vision-app", ownerId: "owner-1", catalogId: "vision-worker" }
     ];
     deployApplication.mockClear();
@@ -113,5 +119,29 @@ describe("bringing them to this build", () => {
         installs = [];
         await upgradeHomeServices();
         expect(settings["home.services.build"]).toBe("abc123");
+    });
+});
+
+describe("while Places is uninstalled", () => {
+    it("leaves its containers down, and brings them up to date once it is back", async () => {
+        placesInstalled = false;
+        await upgradeHomeServices();
+        expect(deployApplication).not.toHaveBeenCalled();
+
+        placesInstalled = true;
+        await upgradeHomeServices();
+        expect(deployApplication).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("which containers are Places' own", () => {
+    it("are the ones the catalog says it runs, the relay included", async () => {
+        const { POLARIS_APP_CATALOG } = await import("@/lib/apps/catalog");
+        const owned = POLARIS_APP_CATALOG.filter((app) => app.ownedBy === "home").map(
+            (app) => app.id
+        );
+        expect(owned).toEqual(
+            expect.arrayContaining(["camera-hub", "vision-worker", "face-recognizer"])
+        );
     });
 });

@@ -21,6 +21,7 @@ import { prisma } from "@polaris/db";
 import { withinHours } from "@/lib/home/detection";
 import { parseDetection, cameraTarget } from "@/lib/home/cameras";
 import { recordDetection, type Detection } from "@/lib/home/events";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 import { createPullPoint, pullMessages, OnvifError, type OnvifEndpoint } from "@/lib/home/onvif";
 
 /** How long to wait after a camera refuses or disappears, before trying again.
@@ -191,7 +192,10 @@ function sleep(ms: number): Promise<void> {
 
 /** Start, stop and restart the loops so they match what is in the database. */
 async function reconcile(): Promise<void> {
-    const cameras = await prisma.camera.findMany({
+    // Places uninstalled: every camera stops being watched, and none is started.
+    const cameras = !(await isAppInstalled("home"))
+        ? []
+        : await prisma.camera.findMany({
         where: { enabled: true, detector: { notIn: ["none"] }, onvifPort: { not: null } },
         select: {
             id: true,

@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
 const CACHE_TTL_MS = 15_000;
 
@@ -31,7 +32,24 @@ const cache = new Map<string, { present: boolean; at: number }>();
  * first time they are opened (see `mail-server/app-install`).
  */
 const IMPLIED_BY: Readonly<Record<string, () => Promise<boolean>>> = {
-    "mail-server": async () => (await prisma.mailServer.findFirst({ select: { id: true } })) !== null
+    "mail-server": async () =>
+        (await prisma.mailServer.findFirst({ select: { id: true } })) !== null,
+    // Game servers used to be a manager per game, and an instance may still hold
+    // only those rows, or only its servers. Either is Game servers being in use;
+    // the Game servers page adopts the row the first time it is opened.
+    [GAME_SERVERS_APP_ID]: async () =>
+        (await prisma.installedApp.findFirst({
+            where: {
+                status: { not: "removed" },
+                catalogId: {
+                    in: GAMES.flatMap((game) => [
+                        ...game.serverCatalogIds,
+                        ...(game.legacyManagerCatalogId ? [game.legacyManagerCatalogId] : [])
+                    ])
+                }
+            },
+            select: { id: true }
+        })) !== null
 };
 
 /** Whether any non-removed install of this catalog app exists, or anything that
