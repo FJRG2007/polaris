@@ -58,6 +58,7 @@ import {
 } from "./call-signals";
 import { playCallSound } from "@/lib/call-sounds";
 import { callMuted, setCallMuted } from "./call-muted";
+import { pressDeafen, pressMic } from "./call-voice-controls";
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -311,6 +312,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [states, setStates] = useState<ReadonlyMap<string, PeerState>>(new Map());
     const [speaking, setSpeaking] = useState<ReadonlySet<string>>(new Set());
     const [micOn, setMicOn] = useState(true);
+    /** The same, for the buttons: they decide from what the person asked for,
+     *  which the track's own flag stops saying once a gate is closing it. */
+    const micOnRef = useRef(true);
+    micOnRef.current = micOn;
+    /** Whether the microphone was on when this browser deafened, so
+     *  undeafening gives back what it took. */
+    const micBeforeDeafen = useRef(true);
     const [cameraOn, setCameraOn] = useState(withVideo);
     const [hasCamera, setHasCamera] = useState(false);
     const [sharing, setSharing] = useState(false);
@@ -1961,12 +1969,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             reopen.current?.("audio", track.getSettings().deviceId ?? "default");
             return;
         }
-        // Unmuting while deafened undeafens as well: a deafened person is not
-        // heard, so a microphone that comes on has to bring the room back with
-        // it, or they would be talking to people told they cannot hear them.
-        // First, so it holds on a device that is quiet for a room too - the
-        // effect that gives that one its microphone back waits for this.
-        if (!track.enabled && deafenedRef.current) {
+        // Decided from what the person asked for, not from `track.enabled`:
+        // push to talk and voice activity close the track between sentences,
+        // and reading that as muted made the mute button do nothing. Unmuting
+        // while deafened undeafens too - see `call-voice-controls`.
+        const next = pressMic(
+            {
+                micOn: micOnRef.current,
+                deafened: deafenedRef.current,
+                micBeforeDeafen: micBeforeDeafen.current
+            },
+            roleRef.current === "companion"
+        );
+        if (deafenedRef.current && !next.deafened) {
             deafenedRef.current = false;
             setDeafened(false);
             say({ [DEAFENED]: "" });
@@ -1975,18 +1990,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // saying they want to be heard, which is a decision to stop sharing the
         // room's microphone rather than a mute to be argued with. The effect
         // below is what gives the microphone back.
-        if (!track.enabled && roleRef.current === "companion") {
+        if (next.leaveGroup) {
             micBeforeGroup.current = true;
             leaveCombine();
             return;
         }
-        setVoiceEnabled(!track.enabled);
-        setMicOn(track.enabled);
+        micOnRef.current = next.micOn;
+        setVoiceEnabled(next.micOn);
+        setMicOn(next.micOn);
         // Kept for the next room. Only a deliberate press is remembered:
         // deafening also silences the microphone, and coming back tomorrow
         // muted because you once put your headphones down is not what anybody
         // meant by it.
-        setCallMuted(!track.enabled);
+        setCallMuted(!next.micOn);
     }, [leaveCombine, say, setVoiceEnabled]);
 
     /**
@@ -2113,21 +2129,28 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * exactly what an attentive one does.
      */
     const toggleDeafen = useCallback(() => {
-        setDeafened((current) => {
-            const next = !current;
-            deafenedRef.current = next;
-            if (mic.current) {
-                // Undeafening gives the microphone back to everybody except a
-                // device that is quiet for a room: that one is silent because
-                // the laptop next to it is carrying the call, and handing it a
-                // live microphone here would put two of them in one room - the
-                // howl this browser went quiet to stop.
-                setVoiceEnabled(!next && roleRef.current !== "companion");
-                setMicOn(mic.current.enabled);
-            }
-            say({ [DEAFENED]: next ? "1" : "" });
-            return next;
-        });
+        // Undeafening gives back the microphone as it was before, and never to
+        // a device that is quiet for a room: that one is silent because the
+        // laptop next to it is carrying the call, and handing it a live
+        // microphone here would put two of them in one room - the howl this
+        // browser went quiet to stop.
+        const next = pressDeafen(
+            {
+                micOn: micOnRef.current,
+                deafened: deafenedRef.current,
+                micBeforeDeafen: micBeforeDeafen.current
+            },
+            roleRef.current === "companion"
+        );
+        deafenedRef.current = next.deafened;
+        micBeforeDeafen.current = next.micBeforeDeafen;
+        setDeafened(next.deafened);
+        if (mic.current) {
+            micOnRef.current = next.micOn;
+            setVoiceEnabled(next.micOn);
+            setMicOn(next.micOn);
+        }
+        say({ [DEAFENED]: next.deafened ? "1" : "" });
     }, [say, setVoiceEnabled]);
 
     /** Swap one input for another, mid-call. */
