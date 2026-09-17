@@ -41,7 +41,14 @@ const { app, refs, updateApp, findUniqueDeployment, deployed } = vi.hoisted(() =
             networkMode: null,
             project: { id: "project-1", slug: "games", name: "Games", ownerId: "owner-1" }
         },
-        target: { id: "target-1", kind: "local", hostId: null, runtime: "compose", name: "Local", proxyNetwork: "polaris" },
+        target: {
+            id: "target-1",
+            kind: "local",
+            hostId: null,
+            runtime: "compose",
+            name: "Local",
+            proxyNetwork: "polaris"
+        },
         volumes: [],
         domains: []
     },
@@ -65,7 +72,10 @@ vi.mock("@polaris/db", () => ({
         environment: { findUnique: vi.fn(async () => null) },
         installedApp: { findFirst: vi.fn(async () => null) },
         deployment: {
-            create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "dep-1", ...data })),
+            create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+                id: "dep-1",
+                ...data
+            })),
             findFirst: vi.fn(async () => null),
             findUnique: findUniqueDeployment,
             update: vi.fn(async () => undefined)
@@ -74,7 +84,10 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/deploy/references", () => ({
-    resolveServiceReferences: async () => ({ env: { ...refs.env }, unresolved: [...refs.unresolved] })
+    resolveServiceReferences: async () => ({
+        env: { ...refs.env },
+        unresolved: [...refs.unresolved]
+    })
 }));
 vi.mock("@/lib/deploy/runtime", async (importOriginal) => ({
     ...(await importOriginal<typeof import("@/lib/deploy/runtime")>()),
@@ -100,8 +113,14 @@ vi.mock("@/lib/waf-service", () => ({
     }),
     resolveWafBatch: async () => new Map()
 }));
-vi.mock("@/lib/deploy/edge-state", () => ({ challengeActive: async () => false, floodedServices: async () => new Map() }));
-vi.mock("@/lib/deploy/service-networks", () => ({ hasTunnel: async () => false, networksForService: () => [] }));
+vi.mock("@/lib/deploy/edge-state", () => ({
+    challengeActive: async () => false,
+    floodedServices: async () => new Map()
+}));
+vi.mock("@/lib/deploy/service-networks", () => ({
+    hasTunnel: async () => false,
+    networksForService: () => []
+}));
 vi.mock("@/lib/deploy/github-deployment", () => ({
     announceDeployQueued: vi.fn(async () => undefined),
     announceDeployStarted: vi.fn(async () => undefined),
@@ -119,20 +138,22 @@ beforeEach(() => {
     deployed.length = 0;
     updateApp.mockClear();
     refs.unresolved = [];
-    findUniqueDeployment.mockReset().mockImplementation(async ({ where }: { where: { id: string } }) =>
-        where.id === "dep-0"
-            ? {
-                  id: "dep-0",
-                  status: "running",
-                  imageTag: KEPT,
-                  imageKept: true,
-                  commitSha: null,
-                  commitMessage: null,
-                  authorName: null,
-                  authorAvatarUrl: null
-              }
-            : { id: where.id, status: "queued" }
-    );
+    findUniqueDeployment
+        .mockReset()
+        .mockImplementation(async ({ where }: { where: { id: string } }) =>
+            where.id === "dep-0"
+                ? {
+                      id: "dep-0",
+                      status: "running",
+                      imageTag: KEPT,
+                      imageKept: true,
+                      commitSha: null,
+                      commitMessage: null,
+                      authorName: null,
+                      authorAvatarUrl: null
+                  }
+                : { id: where.id, status: "queued" }
+        );
 });
 
 describe("a Minecraft server restarted with its variables changed", () => {
@@ -161,7 +182,9 @@ describe("the image kept on the service", () => {
     it("is left alone when the deploy is refused", async () => {
         refs.env = { VERSION: "LATEST" };
         refs.unresolved = ["${{postgres.DATABASE_URL}}"];
-        await expect(deployApplication(APP, OWNER, "member-1")).rejects.toThrow("refers to nothing");
+        await expect(deployApplication(APP, OWNER, "member-1")).rejects.toThrow(
+            "refers to nothing"
+        );
         expect(updateApp).not.toHaveBeenCalled();
     });
 });

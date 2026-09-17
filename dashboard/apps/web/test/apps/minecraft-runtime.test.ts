@@ -12,7 +12,17 @@ import { javaTagFor, minecraftImageFor } from "@/lib/apps/minecraft/runtime";
 
 describe("the runtime a release needs", () => {
     it("is Java 25 from 26.x, and for LATEST, snapshots and the image's default", () => {
-        for (const version of ["26.1", "26.2", "27.0", "LATEST", "latest", " LATEST ", "", "SNAPSHOT", "26w14a"]) {
+        for (const version of [
+            "26.1",
+            "26.2",
+            "27.0",
+            "LATEST",
+            "latest",
+            " LATEST ",
+            "",
+            "SNAPSHOT",
+            "26w14a"
+        ]) {
             expect(javaTagFor(version), version).toBe("java25");
         }
     });
@@ -28,7 +38,9 @@ describe("the image a server deploys", () => {
     const managed = "itzg/minecraft-server:java21";
 
     it("follows the server's VERSION", () => {
-        expect(minecraftImageFor(managed, { VERSION: "LATEST" })).toBe("itzg/minecraft-server:java25");
+        expect(minecraftImageFor(managed, { VERSION: "LATEST" })).toBe(
+            "itzg/minecraft-server:java25"
+        );
         expect(minecraftImageFor("itzg/minecraft-server:java25", { VERSION: "1.21.4" })).toBe(
             "itzg/minecraft-server:java21"
         );
@@ -39,9 +51,9 @@ describe("the image a server deploys", () => {
         expect(minecraftImageFor("itzg/minecraft-server:java17", { VERSION: "LATEST" })).toBe(
             "itzg/minecraft-server:java17"
         );
-        expect(minecraftImageFor("itzg/minecraft-server:2026.9.1-java21", { VERSION: "LATEST" })).toBe(
-            "itzg/minecraft-server:2026.9.1-java21"
-        );
+        expect(
+            minecraftImageFor("itzg/minecraft-server:2026.9.1-java21", { VERSION: "LATEST" })
+        ).toBe("itzg/minecraft-server:2026.9.1-java21");
         expect(minecraftImageFor("nginx:1.27", { VERSION: "LATEST" })).toBe("nginx:1.27");
         expect(minecraftImageFor(undefined, { VERSION: "LATEST" })).toBeUndefined();
     });
