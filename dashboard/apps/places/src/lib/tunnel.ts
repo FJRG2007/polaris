@@ -21,9 +21,8 @@
  * Server-only.
  */
 
-import type { Client } from "ssh2";
-import { forwardOut, openSshClient } from "@polaris/ssh";
 import { createServer, type Server, type Socket } from "node:net";
+import { forwardOut, openSshClient, type Client } from "@polaris/ssh";
 import { host } from "@polaris/app-host";
 
 const { getHostConnection } = host.hostService;

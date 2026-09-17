@@ -14,6 +14,12 @@ const SLOTS: Record<Side, symbol> = {
 
 type Slots = { [key: symbol]: Record<string, Record<string, unknown>> | undefined };
 
+/** Keys a runtime reaches for on its own rather than services an app asked for:
+ *  `await` on an area object, `JSON.stringify` on one. Answering `undefined`
+ *  makes an area behave as the plain object it is, instead of failing with the
+ *  name of a service nobody wrote. */
+const PROBES = new Set(["then", "toJSON"]);
+
 export function provide(side: Side, services: object): void {
     (globalThis as unknown as Slots)[SLOTS[side]] = services as Record<string, Record<string, unknown>>;
 }
@@ -40,7 +46,7 @@ export function hostProxy<T extends object>(
                 {},
                 {
                     get: (_inner, name) => {
-                        if (typeof name !== "string") return undefined;
+                        if (typeof name !== "string" || PROBES.has(name)) return undefined;
                         const services = provided(side);
                         if (services) return lookup(services, side, area, name);
                         return unprovided(area, name);
@@ -58,7 +64,7 @@ export function lookup(
     name: string
 ): unknown {
     const found = services[area];
-    if (!found || !(name in found)) {
+    if (!found || !Object.hasOwn(found, name)) {
         throw new Error(`The dashboard offers apps no ${side} service "${area}.${name}"`);
     }
     return found[name];

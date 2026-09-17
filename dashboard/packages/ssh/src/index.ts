@@ -24,3 +24,6 @@ export {
 } from "./exec.js";
 export { LeasePool, SshPool, type Lease, type SshLease } from "./pool.js";
 export { generateSshKeyPair, publicKeyBlob, type SshKeyPair } from "./keygen.js";
+/** What these hand back. Re-exported so holding one is not a reason to depend
+ *  on ssh2 - this package is where that dependency lives. */
+export type { Client, ClientChannel, SFTPWrapper } from "ssh2";

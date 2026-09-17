@@ -189,7 +189,9 @@ async function conversationFor(rule: AlertRuleView, actorId: string | null): Pro
         kind: "channels",
         actorId: "",
         audience: [...rule.recipients]
-    });
+    }).catch((error) =>
+        console.error("polaris: could not announce the alert conversation:", error)
+    );
     return channel.id;
 }
 
@@ -355,7 +357,9 @@ export async function raiseAlerts(
                 kind: "posted",
                 actorId: "",
                 audience: [...rule.recipients]
-            });
+            }).catch((error) =>
+                console.error("polaris: could not announce the alert message:", error)
+            );
 
             // And the bell, for a rule that was asked for it. Through the
             // dispatcher rather than straight into the table, so it obeys the

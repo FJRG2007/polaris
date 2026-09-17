@@ -28,6 +28,10 @@ const PACKAGES: Readonly<Record<string, { dir: string; routes: readonly RegExp[]
 
 const ROUTE_FILE = /\/(page|layout|route|loading|error|not-found|template|default)\.tsx?$/;
 const REGISTRY = [/^lib\/app-extensions\/installed\.ts$/];
+/** What provides the host, which the app's module reads as it is evaluated. */
+const HOST_IMPORT = /^import "@\/lib\/app-host\/server";$/;
+/** What hands the request on, and so evaluates the app's module. */
+const HAND_OFF = /^export \{/;
 
 function walk(directory: string, found: string[] = []): string[] {
     for (const entry of readdirSync(directory)) {
@@ -78,24 +82,56 @@ describe("apps in packages of their own", () => {
             expect(reaches).toEqual([]);
         });
 
-        it(`a ${name} route bridge only hands the request to the app`, () => {
-            const bloated: string[] = [];
+        const bridges = (): { where: string; code: string[] }[] => {
+            const found: { where: string; code: string[] }[] = [];
             for (const file of walk(WEB_SRC)) {
                 const where = posix(relative(WEB_SRC, file));
                 if (!app.routes.some((pattern) => pattern.test(where)) || !ROUTE_FILE.test(`/${where}`)) continue;
                 const code = readFileSync(file, "utf8")
                     .split("\n")
                     .filter((line) => line.trim() && !line.trim().startsWith("//"));
+                found.push({ where, code });
+            }
+            return found;
+        };
+
+        it(`a ${name} route bridge only hands the request to the app`, () => {
+            const bloated: string[] = [];
+            for (const { where, code } of bridges()) {
                 const allowed = code.every(
                     (line) =>
                         /^"use client";$/.test(line) ||
-                        /^import "@\/lib\/app-host\/server";$/.test(line) ||
-                        line.startsWith("export {") ||
+                        HOST_IMPORT.test(line) ||
+                        HAND_OFF.test(line) ||
                         /^export const (dynamic|runtime|revalidate|maxDuration|dynamicParams|fetchCache) = /.test(line)
                 );
                 if (!allowed) bloated.push(where);
             }
             expect(bloated).toEqual([]);
+        });
+
+        // An app's module takes the dashboard's services from the host as it is
+        // evaluated, and naming the package is what evaluates it. A bridge or a
+        // registry line that leaves the host import out, or puts it after the
+        // one that loads the app, is a 500 on the first request a cold server
+        // sends that way - and every other check here would still pass.
+        it(`the dashboard provides the host before it loads ${name}`, () => {
+            const cold: string[] = [];
+            let loaders = 0;
+            for (const file of walk(WEB_SRC)) {
+                const code = readFileSync(file, "utf8").split("\n");
+                const loads = code.findIndex(
+                    (line) =>
+                        !line.startsWith("import type") &&
+                        specifiers(line).some((specifier) => specifier.startsWith(name))
+                );
+                if (loads < 0) continue;
+                loaders += 1;
+                const provides = code.findIndex((line) => HOST_IMPORT.test(line));
+                if (provides < 0 || provides > loads) cold.push(posix(relative(WEB_SRC, file)));
+            }
+            expect(cold).toEqual([]);
+            expect(loaders).toBeGreaterThan(5);
         });
     }
 });
