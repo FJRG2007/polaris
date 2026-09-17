@@ -42,7 +42,7 @@
 import * as core from "@polaris/core";
 import { lookup } from "node:dns/promises";
 import { Agent, fetch as guardedFetch } from "undici";
-import { createGate, createSharedFlight } from "@/lib/concurrency-gate";
+import { createGate, createSharedFlight, deadline } from "@/lib/concurrency-gate";
 
 /** What undici's fetch answers with. Named off the function so this cannot drift
  *  from the version installed. */
@@ -81,20 +81,25 @@ const sameName = createSharedFlight<VettedAddress[]>();
  * The same name asked twice while the first lookup is out is one lookup - which
  * is also what the check and the connect below are for a single fetch. Gives up
  * waiting after `FETCH_TIMEOUT_MS`; a lookup already running keeps its slot until
- * it finishes, which is exactly the bound the gate exists to keep.
+ * it finishes, which is exactly the bound the gate exists to keep, and one still
+ * in line when its last caller gives up leaves the line instead of running for
+ * nobody.
  */
-export function resolveName(hostname: string): Promise<VettedAddress[]> {
-    const answer = sameName(hostname.toLowerCase(), () =>
-        lookups.run(async () => {
-            const found = await lookup(hostname, { all: true });
-            return found.map((entry) => ({ address: entry.address, family: entry.family }));
-        })
-    );
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`${hostname} took too long to resolve`)), FETCH_TIMEOUT_MS);
-    });
-    return Promise.race([answer, late]).finally(() => clearTimeout(timer));
+export async function resolveName(hostname: string): Promise<VettedAddress[]> {
+    const wait = deadline(FETCH_TIMEOUT_MS, `${hostname} took too long to resolve`);
+    try {
+        return await sameName(
+            hostname.toLowerCase(),
+            (abandoned) =>
+                lookups.run(async () => {
+                    const found = await lookup(hostname, { all: true });
+                    return found.map((entry) => ({ address: entry.address, family: entry.family }));
+                }, abandoned),
+            wait.signal
+        );
+    } finally {
+        wait.clear();
+    }
 }
 
 /** An address Polaris is willing to consider at all. */

@@ -26,7 +26,7 @@ import { apiPermission } from "@/lib/api-session";
 import { markDomains } from "@/lib/mailbox/sender-domain";
 import { iconLinks, MAX_HTML_BYTES } from "@/lib/mailbox/site-icon";
 import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
-import { createGate, createSharedFlight } from "@/lib/concurrency-gate";
+import { createGate, createSharedFlight, deadline } from "@/lib/concurrency-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,7 +107,7 @@ function remembered(): Map<string, Remembered> {
 }
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ address: string }> }
 ): Promise<Response> {
     const user = await apiPermission("mail.use");
@@ -138,18 +138,28 @@ export async function GET(
         return held.bytes ? picture(held.bytes, held.type) : gone();
     }
 
-    const found = await sameDomain(domain, () =>
-        hunts.run(async () => {
-            const mark = await fetchMark(domain);
-            remembered().set(domain, {
-                at: Date.now(),
-                bytes: mark?.bytes ?? null,
-                type: mark?.type ?? ""
-            });
-            return mark;
-        })
-    );
-    return found ? picture(found.bytes, found.type) : gone();
+    const wait = deadline(BUDGET_MS, `${domain} waited too long for a hunt`, request.signal);
+    try {
+        const found = await sameDomain(
+            domain,
+            (abandoned) =>
+                hunts.run(async () => {
+                    const mark = await fetchMark(domain);
+                    remembered().set(domain, {
+                        at: Date.now(),
+                        bytes: mark?.bytes ?? null,
+                        type: mark?.type ?? ""
+                    });
+                    return mark;
+                }, abandoned),
+            wait.signal
+        );
+        return found ? picture(found.bytes, found.type) : gone();
+    } catch {
+        return busy();
+    } finally {
+        wait.clear();
+    }
 }
 
 /**
@@ -269,5 +279,14 @@ function gone(): Response {
     return new Response(null, {
         status: 404,
         headers: { "cache-control": "private, max-age=3600" }
+    });
+}
+
+/** No picture yet. Initials as well, but not remembered by the browser: the
+ *  mark may well be found on the next visit. */
+function busy(): Response {
+    return new Response(null, {
+        status: 503,
+        headers: { "cache-control": "no-store" }
     });
 }

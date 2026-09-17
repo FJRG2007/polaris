@@ -333,7 +333,7 @@ const MAX_FRAME_HEIGHT = 20000;
  */
 export function nextFrameHeight(current: number, claimed: number): number {
     const measured = Math.ceil(claimed);
-    if (Math.abs(measured - current) <= 1) return current;
+    if (measured <= current && measured >= current - 1) return current;
     return Math.min(Math.max(120, measured + 8), MAX_FRAME_HEIGHT);
 }
 

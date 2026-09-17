@@ -10,6 +10,8 @@ describe("nextFrameHeight", () => {
     it("fits the frame to what the message measures, with a margin", () => {
         expect(nextFrameHeight(240, 600)).toBe(608);
         expect(nextFrameHeight(608, 600)).toBe(608);
+        expect(nextFrameHeight(508, 509)).toBe(517);
+        expect(nextFrameHeight(508, 507.5)).toBe(508);
     });
 
     it("does not grow a message sized to the viewport it is drawn in", () => {

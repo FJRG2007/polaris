@@ -55,6 +55,29 @@ describe("createGate", () => {
         expect(gate.active).toBe(0);
     });
 
+    it("takes a waiting task out of the line when its signal aborts", async () => {
+        const gate = createGate(1);
+        const hold = deferred<void>();
+        const first = gate.run(() => hold.promise);
+        const leaving = new AbortController();
+        let ran = false;
+        const second = gate.run(async () => {
+            ran = true;
+        }, leaving.signal);
+        const third = gate.run(async () => "third");
+        expect(gate.waiting).toBe(2);
+
+        leaving.abort(new Error("gone"));
+        await expect(second).rejects.toThrow("gone");
+        expect(gate.waiting).toBe(1);
+
+        hold.resolve();
+        await first;
+        await expect(third).resolves.toBe("third");
+        expect(ran).toBe(false);
+        expect(gate.active).toBe(0);
+    });
+
     it("refuses a gate with no places", () => {
         expect(() => createGate(0)).toThrow();
     });
@@ -74,6 +97,38 @@ describe("createSharedFlight", () => {
         expect(runs).toBe(1);
         hold.resolve("mark");
         await expect(Promise.all([first, second])).resolves.toEqual(["mark", "mark"]);
+    });
+
+    it("abandons a run only once every caller has stopped waiting", async () => {
+        const shared = createSharedFlight<string>();
+        const hold = deferred<string>();
+        let seen: AbortSignal | undefined;
+        const task = (signal: AbortSignal) => {
+            seen = signal;
+            return hold.promise;
+        };
+        const one = new AbortController();
+        const two = new AbortController();
+        const first = shared("a", task, one.signal);
+        const second = shared("a", task, two.signal);
+        await tick();
+
+        one.abort(new Error("first gave up"));
+        await expect(first).rejects.toThrow("first gave up");
+        expect(seen?.aborted).toBe(false);
+
+        two.abort(new Error("second gave up"));
+        await expect(second).rejects.toThrow("second gave up");
+        expect(seen?.aborted).toBe(true);
+
+        let fresh = 0;
+        const again = shared("a", async () => {
+            fresh += 1;
+            return "again";
+        });
+        await expect(again).resolves.toBe("again");
+        expect(fresh).toBe(1);
+        hold.resolve("late");
     });
 
     it("starts again once the first run has settled, and keeps keys apart", async () => {

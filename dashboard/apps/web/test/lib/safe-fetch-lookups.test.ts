@@ -80,4 +80,32 @@ describe("resolveName", () => {
             await drain();
         }
     });
+
+    it("drops lookups whose callers gave up before they started", async () => {
+        vi.useFakeTimers();
+        try {
+            const names = Array.from({ length: 6 }, (_, index) => `slow${index}.example`);
+            const answers = names.map((name) =>
+                resolveName(name).catch((error: Error) => error.message)
+            );
+            await vi.advanceTimersByTimeAsync(5001);
+            const settled = await Promise.all(answers);
+            expect(settled.every((message) => String(message).includes("took too long"))).toBe(
+                true
+            );
+            expect(dns.calls).toEqual(["slow0.example", "slow1.example"]);
+
+            const fresh = resolveName("fresh.example");
+            dns.pending.splice(0).forEach((resolve) => resolve());
+            await vi.advanceTimersByTimeAsync(0);
+            expect(dns.calls).toContain("fresh.example");
+            dns.pending.splice(0).forEach((resolve) => resolve());
+            await vi.advanceTimersByTimeAsync(0);
+            await expect(fresh).resolves.toEqual([{ address: "93.184.216.34", family: 4 }]);
+            expect(dns.calls).toHaveLength(3);
+        } finally {
+            vi.useRealTimers();
+            await drain();
+        }
+    });
 });
