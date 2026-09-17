@@ -40,6 +40,8 @@ let pathname = "/deploy";
 let watched = true;
 let soundOn = true;
 const shown: Array<{ key?: string }> = [];
+const dismissed: string[] = [];
+const closed: string[] = [];
 const played: string[] = [];
 const notices: Array<{ tag: string }> = [];
 
@@ -53,7 +55,7 @@ vi.mock("@/components/toast-picture", () => ({ ToastPicture: () => null }));
 vi.mock("@polaris/ui", () => ({
     useToast: () => ({
         show: (toast: { key?: string }) => shown.push(toast),
-        dismiss: () => undefined
+        dismiss: (key: string) => dismissed.push(key)
     })
 }));
 vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
@@ -80,6 +82,7 @@ vi.mock("@/lib/call-sounds", () => ({ playCallSound: (name: string) => played.pu
 vi.mock("@/lib/notification-sound", () => ({ notificationSoundEnabled: () => soundOn }));
 vi.mock("@/lib/desktop-notify", () => ({
     tabIsWatched: () => watched,
+    closeDesktopNotice: (tag: string) => closed.push(tag),
     notifyDesktop: async (input: { tag: string }) => {
         notices.push(input);
         return null;
@@ -109,6 +112,8 @@ beforeEach(() => {
     shown.length = 0;
     played.length = 0;
     notices.length = 0;
+    dismissed.length = 0;
+    closed.length = 0;
     window.localStorage.clear();
 });
 
@@ -217,5 +222,31 @@ describe("a message arriving", () => {
         await arrive();
         expect(played).toEqual([]);
         expect(notices).toEqual([]);
+    });
+});
+
+describe("catching up in another window", () => {
+    it("withdraws the notice and the card raised by the tab that announced it", async () => {
+        watched = false;
+        await arrive();
+        expect(notices).toHaveLength(1);
+
+        // The reader opened the conversation somewhere else; the read reaches
+        // every tab of this account on the live channel.
+        act(() =>
+            onFrame?.({ kind: "read", channelId: CHANNEL, userId: "scope" }, { owner: true })
+        );
+        expect(closed).toEqual([`message:${CHANNEL}`]);
+        expect(dismissed).toEqual([`message:${CHANNEL}`]);
+    });
+
+    it("leaves them alone when it is the other side of the conversation catching up", async () => {
+        watched = false;
+        await arrive();
+        act(() =>
+            onFrame?.({ kind: "read", channelId: CHANNEL, userId: "grace" }, { owner: true })
+        );
+        expect(closed).toEqual([]);
+        expect(dismissed).toEqual([]);
     });
 });

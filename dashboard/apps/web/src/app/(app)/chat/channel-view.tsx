@@ -2050,6 +2050,9 @@ export function ChannelView({
                             call={call}
                             meetingId={inCall}
                             viewerId={viewerId}
+                            // Bringing somebody into the call adds them to the
+                            // conversation, so it answers to the same rule.
+                            mayInvite={channel.mayInvite}
                             onStage={setStaged}
                             onLeave={() => {
                                 leaveCall();

@@ -89,4 +89,39 @@ describe("the volume slider", () => {
         });
         expect(save).not.toHaveBeenCalled();
     });
+
+    it("saves a volume moved again while the first save is still going", async () => {
+        // The first save is left in flight while the slider moves on. What is
+        // compared has to be the volume the server last accepted, not the one
+        // this save is carrying, or the account keeps the old volume while
+        // every screen shows the new one.
+        let finish: (() => void) | null = null;
+        save.mockImplementation(async () => {
+            await new Promise<void>((resolve) => {
+                finish = resolve;
+            });
+            return {};
+        });
+        fireEvent.change(slider(), { target: { value: "40" } });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500);
+        });
+        expect(save).toHaveBeenCalledWith({ volume: 40 });
+
+        fireEvent.change(slider(), { target: { value: "60" } });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500);
+        });
+        expect(save).toHaveBeenCalledWith({ volume: 60 });
+        finish?.();
+    });
+
+    it("saves a volume chosen just before the page is left", async () => {
+        fireEvent.change(slider(), { target: { value: "15" } });
+        cleanup();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(save).toHaveBeenCalledWith({ volume: 15 });
+    });
 });

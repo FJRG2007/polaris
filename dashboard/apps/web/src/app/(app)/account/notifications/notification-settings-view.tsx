@@ -15,7 +15,14 @@ import { DeliveryLog } from "./delivery-log";
 import { DestinationsCard } from "./destinations-card";
 import { saveNotificationRuleAction, saveSoundVolumeAction } from "./actions";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
-import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    useSyncExternalStore,
+    useTransition
+} from "react";
 import type { DeliveryView } from "@/lib/notification-service";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
@@ -257,6 +264,13 @@ const VOLUME_SAVE_MS = 400;
 /**
  * The volume, applied the moment it moves and saved once it settles. A refused
  * save puts back the last volume the server accepted.
+ *
+ * What was last saved is held separately from what is on screen, and it is the
+ * only thing a save compares against: a slider moved again while a save is in
+ * flight would otherwise compare the new value with itself, decide nothing had
+ * changed, and leave the account on the old volume while every screen showed
+ * the new one. The pending save also survives leaving the page - a volume
+ * chosen and then navigated away from within the wait was simply lost.
  */
 function VolumeSlider({ disabled }: { disabled: boolean }) {
     const volume = useSyncExternalStore(
@@ -265,40 +279,48 @@ function VolumeSlider({ disabled }: { disabled: boolean }) {
         () => DEFAULT_SOUND_VOLUME
     );
     const [error, setError] = useState<string | null>(null);
+    /** The volume the server last accepted. Taken when the slider is first
+     *  moved rather than at render: the first render on the server, and the one
+     *  that hydrates it, both answer with the default rather than with the
+     *  account's own volume. */
     const saved = useRef<number | null>(null);
+    /** The volume waiting to be saved, and the wait itself. */
+    const waiting = useRef<number | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const commit = useCallback(async (next: number, preview: boolean) => {
+        waiting.current = null;
+        if (saved.current === next) return;
+        // Heard at the level just chosen, which is the question a slider asks.
+        // Not while leaving the page: a chime on the way out is a chime about
+        // nothing.
+        if (preview) playNotificationSound();
+        const before = saved.current ?? next;
+        saved.current = next;
+        const result = await saveSoundVolumeAction({ volume: next }).catch(() => ({
+            error: "Could not save the volume. Try again."
+        }));
+        if (!result.error) return;
+        setError(result.error);
+        saved.current = before;
+        adoptSoundVolume(before);
+    }, []);
 
     useEffect(
         () => () => {
             if (timer.current) clearTimeout(timer.current);
+            if (waiting.current !== null) void commit(waiting.current, false);
         },
-        []
+        [commit]
     );
 
     function change(next: number) {
         saved.current ??= volume;
         adoptSoundVolume(next);
         setError(null);
+        waiting.current = next;
         if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => void commit(next), VOLUME_SAVE_MS);
-    }
-
-    async function commit(next: number) {
-        const before = saved.current ?? next;
-        if (before === next) {
-            saved.current = null;
-            return;
-        }
-        // Heard at the level just chosen, which is the question a slider asks.
-        playNotificationSound();
-        const result = await saveSoundVolumeAction({ volume: next }).catch(() => ({
-            error: "Could not save the volume. Try again."
-        }));
-        if (result.error) {
-            setError(result.error);
-            adoptSoundVolume(before);
-        }
-        saved.current = null;
+        timer.current = setTimeout(() => void commit(next, true), VOLUME_SAVE_MS);
     }
 
     return (

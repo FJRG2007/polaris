@@ -37,7 +37,7 @@ import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
-import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { notificationSoundEnabled } from "@/lib/notification-sound";
 import {
     arrivalAlert,
@@ -62,6 +62,8 @@ export function MessageToasts() {
     here.current = pathname;
     const raise = useRef(toast.show);
     raise.current = toast.show;
+    const drop = useRef(toast.dismiss);
+    drop.current = toast.dismiss;
     const go = useRef(router.push);
     go.current = router.push;
 
@@ -79,6 +81,9 @@ export function MessageToasts() {
      */
     const announced = useRef(new Map<string, string>());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // The session scope, which is this account's id: it keys the claims that
+    // settle which tab of a device acts, and tells this reader's read frame
+    // apart from the other side of a conversation catching up.
     const device = useRef(scope);
     device.current = scope;
 
@@ -167,6 +172,19 @@ export function MessageToasts() {
     useChatStream(
         useCallback(
             (frame, context) => {
+                // Read, somewhere. The notice and the card belong to the tab
+                // that raised them, which is usually not the tab the reader
+                // caught up in - and a notice offering a message they have just
+                // read sends them back to it. The frame reaches every tab of
+                // this account, which is what makes this work across windows.
+                if (frame.kind === "read") {
+                    if (frame.userId !== device.current) return;
+                    pending.current.delete(frame.channelId);
+                    announced.current.delete(frame.channelId);
+                    closeDesktopNotice(`message:${frame.channelId}`);
+                    drop.current(`message:${frame.channelId}`);
+                    return;
+                }
                 if (frame.kind !== "posted") return;
                 // A tab that is neither being looked at nor holding the
                 // connection has nobody to tell and nothing to draw.

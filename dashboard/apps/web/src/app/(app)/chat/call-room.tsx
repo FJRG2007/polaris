@@ -146,7 +146,12 @@ export function CallRoom({
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
      *  a button that the server will refuse is worse than not offering it. */
-    viewerId
+    viewerId,
+    /** Whether this reader may bring somebody into the conversation this call
+     *  is in. False in a group whose owner keeps adding people to themselves,
+     *  where the service refuses it. Absent - a meeting of its own, a guest -
+     *  means there is no such rule to apply. */
+    mayInvite = true
 }: {
     meetingId: string;
     /**
@@ -171,6 +176,7 @@ export function CallRoom({
      *  does. */
     onStage?: (staged: boolean) => void;
     viewerId?: string;
+    mayInvite?: boolean;
 }) {
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
@@ -546,7 +552,7 @@ export function CallRoom({
                             )}
                         </button>
                     )}
-                    {viewerId && (
+                    {viewerId && mayInvite && (
                         <button
                             type="button"
                             onClick={() => setInviting(true)}
@@ -1105,7 +1111,7 @@ export function CallRoom({
                 </Button>
             </div>
 
-            {viewerId && (
+            {viewerId && mayInvite && (
                 <InviteToCallDialog
                     open={inviting}
                     onOpenChange={setInviting}
