@@ -46,5 +46,8 @@ export function sourceFor(kind: ResourceKind): BackupSource {
 
 /** Every source, for the discovery pass that offers what could be protected. */
 export function allSources(): readonly BackupSource[] {
-    return [...Object.values(SOURCES).filter((source): source is BackupSource => Boolean(source)), ...appBackupSources()];
+    return [
+        ...Object.values(SOURCES).filter((source): source is BackupSource => Boolean(source)),
+        ...appBackupSources()
+    ];
 }

@@ -74,17 +74,17 @@ game-servers-<build>.tgz
 
 What core asks an app today, grouped by the core screen that asks:
 
-| Core area | What it needs from Game servers |
-| --- | --- |
-| Deploy (`deploy-service`) | which image a Minecraft server's release runs |
+| Core area                                            | What it needs from Game servers                                            |
+| ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| Deploy (`deploy-service`)                            | which image a Minecraft server's release runs                              |
 | Marketplace / install (`install-service`, `catalog`) | port allocation for game ports, loader and software defaults, ARK map list |
-| Access (`install-access`, `container-files`) | per-server permissions, container file access |
-| Admin > Domains | game ports to forward, their live reachability, the port policy |
-| Firewall | the per-server player access panel |
-| Backups | the Minecraft world backup source |
-| Overview and home widgets | counts and state of game servers |
-| Router guide | which ports the router has to forward |
-| Cron | the game-* jobs |
+| Access (`install-access`, `container-files`)         | per-server permissions, container file access                              |
+| Admin > Domains                                      | game ports to forward, their live reachability, the port policy            |
+| Firewall                                             | the per-server player access panel                                         |
+| Backups                                              | the Minecraft world backup source                                          |
+| Overview and home widgets                            | counts and state of game servers                                           |
+| Router guide                                         | which ports the router has to forward                                      |
+| Cron                                                 | the game-\* jobs                                                           |
 
 The registry is a typed interface in core with one implementation per installed
 app. Core asks the registry and treats a missing app as "nothing to show". The

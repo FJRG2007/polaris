@@ -52,7 +52,7 @@ export const placesExtension: AppExtension = {
             // beside it.
             leaseMs: 30 * MINUTE,
             run: async () => (await sweeps()).sweepHomeRetention()
-        },
+        }
     ],
 
     onBoot: () => {

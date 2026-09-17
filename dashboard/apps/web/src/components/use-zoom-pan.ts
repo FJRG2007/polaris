@@ -129,7 +129,9 @@ export function useZoomPan(): ZoomPan {
                 if (!from) return;
                 const to = pointAt(event);
                 dragging.current = to;
-                setZoom((current) => panBy(current, to.x - from.x, to.y - from.y, covering.current));
+                setZoom((current) =>
+                    panBy(current, to.x - from.x, to.y - from.y, covering.current)
+                );
             },
             onPointerUp: () => (dragging.current = null),
             onPointerCancel: () => (dragging.current = null)

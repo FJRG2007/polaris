@@ -56,7 +56,8 @@ export default async function InstalledAppPage({
     // deploy one for an app that is not a game. Removing it is nobody's but the
     // owner's: "manage this server" was never an offer to take it away.
     const canManage =
-        held.includes("games.manage") || (await heldOn(user, installRef(id), ["deploy.manage"])).length > 0;
+        held.includes("games.manage") ||
+        (await heldOn(user, installRef(id), ["deploy.manage"])).length > 0;
     const canRemove = access.isOwner || user.isAdmin;
     // An unknown slug is a mistyped link, not an error worth a page of its own.
     // Only a game server has screens; anything else is its shell and nothing more.

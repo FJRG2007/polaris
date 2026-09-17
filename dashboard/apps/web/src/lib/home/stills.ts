@@ -89,7 +89,8 @@ export async function readStill(key: string): Promise<Buffer | null> {
         driver = await driverForTarget(parsed.targetId, LOCAL_FOLDER);
         const stream = await driver.readStream(parsed.path);
         const chunks: Buffer[] = [];
-        for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) chunks.push(Buffer.from(chunk));
+        for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>)
+            chunks.push(Buffer.from(chunk));
         return Buffer.concat(chunks);
     } catch (error) {
         console.error(`stills: could not read ${parsed.path} from ${parsed.targetId}:`, error);

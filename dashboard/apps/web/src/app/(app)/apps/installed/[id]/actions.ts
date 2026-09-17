@@ -42,7 +42,10 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
     }
 }
 
-export async function setInstalledAppRunningAction(id: string, running: boolean): Promise<{ error?: string }> {
+export async function setInstalledAppRunningAction(
+    id: string,
+    running: boolean
+): Promise<{ error?: string }> {
     try {
         const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
@@ -65,7 +68,12 @@ export async function uninstallInstalledAppAction(id: string): Promise<{ error?:
         await uninstallApp(access.ownerId, id);
         // The app is gone, so the access people were given to it is too.
         await clearResourceGrants(installRef(id));
-        await recordAudit({ actorId: user.id, action: "apps.uninstall", targetType: "installedApp", targetId: id });
+        await recordAudit({
+            actorId: user.id,
+            action: "apps.uninstall",
+            targetType: "installedApp",
+            targetId: id
+        });
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {

@@ -25,13 +25,17 @@ export interface GamesFirewallSectionProps {
 }
 
 export function GamesFirewallSection({ installedAppId, game, access }: GamesFirewallSectionProps) {
-    if (game === "minecraft") return <PlayerListPanel installedAppId={installedAppId} initial={access} />;
+    if (game === "minecraft")
+        return <PlayerListPanel installedAppId={installedAppId} initial={access} />;
     if (game === "fivem") {
         return (
             <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                A FiveM server is guarded by its own list of players rather than by the rules below - a game port
-                does not go through the web firewall.{" "}
-                <Link href={`/apps/installed/${installedAppId}/security`} className="text-primary hover:underline">
+                A FiveM server is guarded by its own list of players rather than by the rules below
+                - a game port does not go through the web firewall.{" "}
+                <Link
+                    href={`/apps/installed/${installedAppId}/security`}
+                    className="text-primary hover:underline"
+                >
                     Open who may join
                 </Link>
                 . Addresses blocked here are carried onto that list as well.
@@ -41,9 +45,12 @@ export function GamesFirewallSection({ installedAppId, game, access }: GamesFire
     if (game === "ark") {
         return (
             <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                An ARK server is guarded by its join password and its own allow list of Steam ids, not by the rules
-                below.{" "}
-                <Link href={`/apps/installed/${installedAppId}/security`} className="text-primary hover:underline">
+                An ARK server is guarded by its join password and its own allow list of Steam ids,
+                not by the rules below.{" "}
+                <Link
+                    href={`/apps/installed/${installedAppId}/security`}
+                    className="text-primary hover:underline"
+                >
                     Open who may join
                 </Link>
                 .

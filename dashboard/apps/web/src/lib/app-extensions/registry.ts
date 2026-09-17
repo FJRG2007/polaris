@@ -27,7 +27,10 @@ function extensions(): readonly AppExtension[] {
  * Without the app there is nothing it should be doing, and an uninstalled app
  * must not keep reaching into containers or cameras on its own.
  */
-export function whileInstalled(catalogId: string, run: () => Promise<unknown>): () => Promise<unknown> {
+export function whileInstalled(
+    catalogId: string,
+    run: () => Promise<unknown>
+): () => Promise<unknown> {
     return async () => {
         if (!(await isAppInstalled(catalogId))) return { skipped: `${catalogId} is not installed` };
         return run();
@@ -37,7 +40,10 @@ export function whileInstalled(catalogId: string, run: () => Promise<unknown>): 
 /** Every app's scheduled jobs, each running only while its app is installed. */
 export function appJobs(): AppJob[] {
     return extensions().flatMap((extension) =>
-        (extension.jobs?.() ?? []).map((job) => ({ ...job, run: whileInstalled(extension.id, job.run) }))
+        (extension.jobs?.() ?? []).map((job) => ({
+            ...job,
+            run: whileInstalled(extension.id, job.run)
+        }))
     );
 }
 
@@ -53,7 +59,9 @@ export function appBackupSource(kind: BackupSource["kind"]): BackupSource | null
 /** Every backup source the apps provide. */
 export function appBackupSources(): BackupSource[] {
     return extensions().flatMap((extension) =>
-        Object.values(extension.backupSources?.() ?? {}).filter((source): source is BackupSource => Boolean(source))
+        Object.values(extension.backupSources?.() ?? {}).filter((source): source is BackupSource =>
+            Boolean(source)
+        )
     );
 }
 
@@ -71,7 +79,10 @@ export function releaseImageFor(
 
 /** Whether an install's settings describe a server that loads plugins. Null when
  *  no app knows the catalog app. */
-export function isPluginServer(catalogId: string, env: ReadonlyMap<string, string>): boolean | null {
+export function isPluginServer(
+    catalogId: string,
+    env: ReadonlyMap<string, string>
+): boolean | null {
     for (const extension of extensions()) {
         const answer = extension.pluginServer?.(catalogId, env);
         if (answer !== null && answer !== undefined) return answer;
@@ -96,13 +107,17 @@ export async function adoptAppInstalls(ownerId: string): Promise<void> {
 
 /** Every game server this account can see, for the overview. */
 export async function gameServerSummaries(userId: string): Promise<GameServerSummary[]> {
-    const lists = await Promise.all(extensions().map((extension) => extension.gameServerSummaries?.(userId) ?? []));
+    const lists = await Promise.all(
+        extensions().map((extension) => extension.gameServerSummaries?.(userId) ?? [])
+    );
     return lists.flat();
 }
 
 /** Every port a router has to forward for the installed apps. */
 export async function forwardedPorts(): Promise<GamePortRow[]> {
-    const lists = await Promise.all(extensions().map((extension) => extension.forwardedPorts?.() ?? []));
+    const lists = await Promise.all(
+        extensions().map((extension) => extension.forwardedPorts?.() ?? [])
+    );
     return lists.flat();
 }
 
@@ -116,7 +131,10 @@ export async function readForwardedPorts(probe: boolean): Promise<GamePortsReadi
 }
 
 /** What an app shows on the firewall for a service it runs. */
-export async function firewallSlot(ownerId: string, applicationId: string): Promise<AppSlot | null> {
+export async function firewallSlot(
+    ownerId: string,
+    applicationId: string
+): Promise<AppSlot | null> {
     for (const extension of extensions()) {
         const slot = await extension.firewallSlot?.(ownerId, applicationId);
         if (slot) return slot;

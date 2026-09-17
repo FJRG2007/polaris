@@ -25,7 +25,10 @@ export function GameServersSlot({ slot, host }: { slot: AppSlot; host?: Installe
             return <GameServersHome />;
         case "server":
             return host ? (
-                <ServerPanel host={host} context={(slot.props as { context: GameContext | null }).context} />
+                <ServerPanel
+                    host={host}
+                    context={(slot.props as { context: GameContext | null }).context}
+                />
             ) : null;
         default:
             return null;
@@ -44,8 +47,8 @@ function GameServersHome() {
             <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
                 <p className="text-sm font-medium">Your servers live on the Game servers page</p>
                 <p className="max-w-md text-sm text-muted-foreground">
-                    Create as many as you want, of any game Polaris knows, each with its own address, console, players
-                    and settings. The app itself runs nothing.
+                    Create as many as you want, of any game Polaris knows, each with its own
+                    address, console, players and settings. The app itself runs nothing.
                 </p>
                 <Link href="/apps/games">
                     <Button size="sm">Open Game servers</Button>

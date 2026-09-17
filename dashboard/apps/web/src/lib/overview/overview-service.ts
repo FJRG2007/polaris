@@ -186,7 +186,10 @@ async function card<T>(load: () => Promise<T>): Promise<T | null> {
     }
 }
 
-export async function getOverviewData(user: SessionUser, wanted: readonly OverviewWidgetId[]): Promise<OverviewData> {
+export async function getOverviewData(
+    user: SessionUser,
+    wanted: readonly OverviewWidgetId[]
+): Promise<OverviewData> {
     const asked = new Set(wanted.filter(isServerOverviewWidget));
     if (asked.size === 0) return {};
 
@@ -201,20 +204,36 @@ export async function getOverviewData(user: SessionUser, wanted: readonly Overvi
 
     // Services, usage and alarms all come out of the same monitoring read, so
     // three cards cost one pass rather than three.
-    const watch = canDeploy && (asked.has("usage") || asked.has("alarms")) ? card(() => getWatchOverview(user.id)) : null;
+    const watch =
+        canDeploy && (asked.has("usage") || asked.has("alarms"))
+            ? card(() => getWatchOverview(user.id))
+            : null;
 
-    const [services, monitoring, events, tasks, storage, sessions, activity, games] = await Promise.all([
-        asked.has("services") && canDeploy ? card(() => deployedServices(user)) : Promise.resolve(undefined),
-        watch ?? Promise.resolve(undefined),
-        asked.has("alarms") && canDeploy ? card(() => listRecentAlarmEvents(user.id, CARD_ROWS)) : Promise.resolve(undefined),
-        asked.has("tasks") && canTasks ? card(() => assignedWork(user)) : Promise.resolve(undefined),
-        asked.has("storage") && canDrive ? card(() => storageUsage(user.id)) : Promise.resolve(undefined),
-        // The account's own two, which ask for no permission: everybody may read
-        // where their account is open and what was done with it.
-        asked.has("sessions") ? card(() => openSessions(user)) : Promise.resolve(undefined),
-        asked.has("activity") ? card(() => recentActivity(user.id)) : Promise.resolve(undefined),
-        asked.has("games") && canGames ? card(() => gameServers(user.id)) : Promise.resolve(undefined)
-    ]);
+    const [services, monitoring, events, tasks, storage, sessions, activity, games] =
+        await Promise.all([
+            asked.has("services") && canDeploy
+                ? card(() => deployedServices(user))
+                : Promise.resolve(undefined),
+            watch ?? Promise.resolve(undefined),
+            asked.has("alarms") && canDeploy
+                ? card(() => listRecentAlarmEvents(user.id, CARD_ROWS))
+                : Promise.resolve(undefined),
+            asked.has("tasks") && canTasks
+                ? card(() => assignedWork(user))
+                : Promise.resolve(undefined),
+            asked.has("storage") && canDrive
+                ? card(() => storageUsage(user.id))
+                : Promise.resolve(undefined),
+            // The account's own two, which ask for no permission: everybody may read
+            // where their account is open and what was done with it.
+            asked.has("sessions") ? card(() => openSessions(user)) : Promise.resolve(undefined),
+            asked.has("activity")
+                ? card(() => recentActivity(user.id))
+                : Promise.resolve(undefined),
+            asked.has("games") && canGames
+                ? card(() => gameServers(user.id))
+                : Promise.resolve(undefined)
+        ]);
 
     const data: OverviewData = {};
     if (asked.has("services")) data.services = canDeploy ? (services ?? null) : null;
@@ -272,7 +291,9 @@ async function gameServers(userId: string): Promise<OverviewGames> {
         // The game is named in the mark beside the row when the catalogue knows
         // it, so what is left to say is where it runs; a row whose game nothing
         // claims keeps the name, because then the mark is a dot.
-        detail: [server.game ? null : server.catalogName, server.serverName].filter(Boolean).join(" - "),
+        detail: [server.game ? null : server.catalogName, server.serverName]
+            .filter(Boolean)
+            .join(" - "),
         running: server.running,
         slots: server.slots,
         href: `${INSTALLED_BASE}/${server.id}`
@@ -284,7 +305,11 @@ async function gameServers(userId: string): Promise<OverviewGames> {
         // servers somebody can actually join are the list, and the count above it
         // is what says how many are not.
         servers: [...rows]
-            .sort((left, right) => Number(right.running) - Number(left.running) || left.name.localeCompare(right.name))
+            .sort(
+                (left, right) =>
+                    Number(right.running) - Number(left.running) ||
+                    left.name.localeCompare(right.name)
+            )
             .slice(0, CARD_ROWS)
     };
 }
@@ -314,7 +339,12 @@ async function openSessions(user: SessionUser): Promise<OverviewSessions> {
 /** What was done with this account lately, newest first. */
 async function recentActivity(userId: string): Promise<OverviewActivityEntry[]> {
     const entries = await listUserActivity(userId, { limit: CARD_ROWS });
-    return entries.map((entry) => ({ id: entry.id, action: entry.action, target: entry.target, at: entry.at }));
+    return entries.map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        target: entry.target,
+        at: entry.at
+    }));
 }
 
 /**
@@ -357,7 +387,9 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
     // wrong with it and nobody needs to be sent to look at it.
     const building = await inFlightDeployments(
         projects.flatMap((project) =>
-            project.environments.flatMap((environment) => environment.applications.map((application) => application.id))
+            project.environments.flatMap((environment) =>
+                environment.applications.map((application) => application.id)
+            )
         )
     );
 
@@ -378,7 +410,13 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
                     label: application.name,
                     detail: `${project.name} / ${environment.name}`,
                     state: up ? "up" : stopped || firstBuild ? "idle" : "down",
-                    stateLabel: up ? "Running" : stopped ? "Stopped" : firstBuild ? "Deploying" : "Not deployed",
+                    stateLabel: up
+                        ? "Running"
+                        : stopped
+                          ? "Stopped"
+                          : firstBuild
+                            ? "Deploying"
+                            : "Not deployed",
                     href: `/apps/deploy/${project.id}`
                 });
             }
@@ -392,7 +430,10 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
     // a stopped one can fall off the end; the count above the list is what says so,
     // and it turns amber the moment the two numbers differ.
     const rank = { up: 0, down: 1, idle: 2 } as const;
-    rows.sort((left, right) => rank[left.state] - rank[right.state] || left.label.localeCompare(right.label));
+    rows.sort(
+        (left, right) =>
+            rank[left.state] - rank[right.state] || left.label.localeCompare(right.label)
+    );
     return { rows: rows.slice(0, CARD_ROWS), running, total, projects: projects.length };
 }
 
@@ -412,31 +453,34 @@ async function assignedWork(user: SessionUser): Promise<OverviewTasks> {
  * same number a minute older.
  */
 async function storageUsage(userId: string): Promise<OverviewStorageEntry[]> {
-    const connections = (await listAccessibleConnections(userId, await scopeOrgIdFor(userId))).filter(
-        (connection) => !connection.id.startsWith(HOST_CONNECTION_PREFIX)
-    );
+    const connections = (
+        await listAccessibleConnections(userId, await scopeOrgIdFor(userId))
+    ).filter((connection) => !connection.id.startsWith(HOST_CONNECTION_PREFIX));
     if (connections.length === 0) return [];
 
     const samples = await latestSamples(
         "storage",
         connections.map((connection) => connection.id)
     );
-    return connections
-        .map((connection) => {
-            const sample = samples.get(connection.id);
-            return {
-                id: connection.id,
-                name: connection.name,
-                usedBytes: sample?.diskUsedBytes == null ? null : Number(sample.diskUsedBytes),
-                totalBytes: sample?.diskTotalBytes == null ? null : Number(sample.diskTotalBytes),
-                href: `/drive/overview#${connection.id}`
-            };
-        })
-        // A device that has never reported usage has nothing to draw, and a row of
-        // dashes is not worth a line of the card.
-        .filter((entry) => entry.usedBytes !== null || entry.totalBytes !== null)
-        .sort((left, right) => usedRatio(right) - usedRatio(left))
-        .slice(0, CARD_ROWS);
+    return (
+        connections
+            .map((connection) => {
+                const sample = samples.get(connection.id);
+                return {
+                    id: connection.id,
+                    name: connection.name,
+                    usedBytes: sample?.diskUsedBytes == null ? null : Number(sample.diskUsedBytes),
+                    totalBytes:
+                        sample?.diskTotalBytes == null ? null : Number(sample.diskTotalBytes),
+                    href: `/drive/overview#${connection.id}`
+                };
+            })
+            // A device that has never reported usage has nothing to draw, and a row of
+            // dashes is not worth a line of the card.
+            .filter((entry) => entry.usedBytes !== null || entry.totalBytes !== null)
+            .sort((left, right) => usedRatio(right) - usedRatio(left))
+            .slice(0, CARD_ROWS)
+    );
 }
 
 function usedRatio(entry: OverviewStorageEntry): number {
@@ -449,7 +493,10 @@ async function latestSamples(
     subjectType: MetricSubjectType,
     subjectIds: readonly string[]
 ): Promise<Map<string, { diskUsedBytes: bigint | null; diskTotalBytes: bigint | null }>> {
-    const found = new Map<string, { diskUsedBytes: bigint | null; diskTotalBytes: bigint | null }>();
+    const found = new Map<
+        string,
+        { diskUsedBytes: bigint | null; diskTotalBytes: bigint | null }
+    >();
     if (subjectIds.length === 0) return found;
     const rows = await prisma.metricSample.findMany({
         where: { subjectType, subjectId: { in: [...subjectIds] } },
@@ -462,7 +509,10 @@ async function latestSamples(
     });
     for (const row of rows) {
         if (found.has(row.subjectId)) continue;
-        found.set(row.subjectId, { diskUsedBytes: row.diskUsedBytes, diskTotalBytes: row.diskTotalBytes });
+        found.set(row.subjectId, {
+            diskUsedBytes: row.diskUsedBytes,
+            diskTotalBytes: row.diskTotalBytes
+        });
     }
     return found;
 }

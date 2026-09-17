@@ -731,7 +731,6 @@ export async function syncFirewallBans(
     return { servers, banned, kicked, allowed };
 }
 
-
 /**
  * The game server backing a deployed application, when it is one.
  *

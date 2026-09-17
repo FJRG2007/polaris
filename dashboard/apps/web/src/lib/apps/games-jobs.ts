@@ -276,6 +276,6 @@ export function gameJobTable(): readonly AppJob[] {
             // port and write the same timestamp, which is the same outcome.
             leaseMs: null,
             run: async () => (await games()).sweepGameReach()
-        },
+        }
     ];
 }

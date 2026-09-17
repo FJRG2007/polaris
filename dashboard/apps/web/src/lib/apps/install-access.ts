@@ -14,7 +14,12 @@ import { grantsForUser } from "@polaris/auth";
 import { isGameServerApp } from "@/lib/apps/catalog";
 import { requireUser, type SessionUser } from "@/lib/session";
 import { getInstalledApp, type InstalledAppDetail } from "@/lib/apps/install-service";
-import { heldOn, reachableResources, resourceAccess, type ResourceAccess } from "@/lib/resource-access";
+import {
+    heldOn,
+    reachableResources,
+    resourceAccess,
+    type ResourceAccess
+} from "@/lib/resource-access";
 
 /** The reference an installed app is addressed by. */
 export function installRef(installedAppId: string): core.ResourceRef {
@@ -76,7 +81,10 @@ export async function requireGameServerOwner(
 /** What this user may do on one game server, for a screen deciding which controls
  *  to draw. Only the games grants: the deploy ones belong to the install's own
  *  lifecycle, which the game screens do not offer. */
-export async function gamePermissionsFor(user: SessionUser, installedAppId: string): Promise<core.Permission[]> {
+export async function gamePermissionsFor(
+    user: SessionUser,
+    installedAppId: string
+): Promise<core.Permission[]> {
     // Every permission a game screen is gated on has to be asked for here. This is
     // the list the tab bar is built from, so one left out is a tab nobody can see -
     // including the person who owns the server.
@@ -89,7 +97,10 @@ export async function gamePermissionsFor(user: SessionUser, installedAppId: stri
 }
 
 /** Ids of the installs this user reaches beyond the ones they own. */
-export async function reachableInstallIds(user: SessionUser, permission: core.Permission): Promise<string[]> {
+export async function reachableInstallIds(
+    user: SessionUser,
+    permission: core.Permission
+): Promise<string[]> {
     return reachableResources(user, "install", permission);
 }
 

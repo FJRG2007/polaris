@@ -79,9 +79,15 @@ export default async function FirewallPage({
     const services: ScopeOption[] = [];
     for (const project of projects) {
         for (const environment of project.environments) {
-            environments.push({ id: environment.id, label: `${project.name} / ${environment.name}` });
+            environments.push({
+                id: environment.id,
+                label: `${project.name} / ${environment.name}`
+            });
             for (const application of environment.applications) {
-                services.push({ id: application.id, label: `${project.name} / ${environment.name} / ${application.name}` });
+                services.push({
+                    id: application.id,
+                    label: `${project.name} / ${environment.name} / ${application.name}`
+                });
             }
         }
     }
@@ -116,7 +122,9 @@ export default async function FirewallPage({
     const ruleScope = ruleScopeFor(kind);
 
     const options = scopeOptions(kind, catalog);
-    const scopeId = scopeNeedsTarget(kind) ? (options.find((option) => option.id === id)?.id ?? options[0]?.id ?? "") : "";
+    const scopeId = scopeNeedsTarget(kind)
+        ? (options.find((option) => option.id === id)?.id ?? options[0]?.id ?? "")
+        : "";
     if (scopeNeedsTarget(kind) && id && !options.some((option) => option.id === id)) {
         // An id that is not the caller's must not silently resolve to their first
         // project - that would be a link to someone else's rules quietly rewritten
@@ -128,7 +136,9 @@ export default async function FirewallPage({
     // a game server by its player list, not the HTTP rules below. Asked only when
     // one service is in scope, which is the only case where it can be one.
     const appSection =
-        ruleScope === "application" && scopeId ? await firewallSlot(user.id, scopeId).catch(() => null) : null;
+        ruleScope === "application" && scopeId
+            ? await firewallSlot(user.id, scopeId).catch(() => null)
+            : null;
     // Read once: the editor offers it for the allowlist, and the anomaly panel marks
     // the reader's own address so a finding about themselves reads as one.
     const callerIp = (await clientIp()) ?? null;
@@ -142,7 +152,10 @@ export default async function FirewallPage({
                         chosen scope is no longer next to the title - so the title
                         carries it. */}
                     {label ? (
-                        <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline" title={label}>
+                        <span
+                            className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline"
+                            title={label}
+                        >
                             {label}
                         </span>
                     ) : null}
@@ -152,8 +165,8 @@ export default async function FirewallPage({
 
             {scopeNeedsTarget(kind) && !scopeId ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    Nothing of that kind exists yet, so there is nothing to protect. Create one and its rules appear
-                    here.
+                    Nothing of that kind exists yet, so there is nothing to protect. Create one and
+                    its rules appear here.
                 </p>
             ) : (
                 <>
@@ -173,7 +186,9 @@ export default async function FirewallPage({
                         // the instance rather than to a project's members. Handed to the
                         // editor rather than rendered beside it: they belong under the
                         // rule LIST, and a rule opened from it is a page of its own.
-                        instancePanels={canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null}
+                        instancePanels={
+                            canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null
+                        }
                     />
                 </>
             )}

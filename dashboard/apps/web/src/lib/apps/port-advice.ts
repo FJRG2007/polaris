@@ -15,7 +15,12 @@
  */
 
 import type { ServerEnvironment } from "@polaris/core";
-import { describeBlock, DEFAULT_PORT_BLOCKS, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
+import {
+    describeBlock,
+    DEFAULT_PORT_BLOCKS,
+    type PortBlocks,
+    type PortPolicy
+} from "@/lib/apps/port-block";
 
 /** One port a game server answers on, as the router has to be told it. */
 export interface GamePort {
@@ -46,7 +51,11 @@ export interface GameReachAdvice {
  */
 export function describePorts(ports: readonly GamePort[]): string {
     const parts = (["tcp", "udp"] as const).flatMap((protocol) => {
-        const numbers = [...new Set(ports.filter((entry) => entry.protocol === protocol).map((entry) => entry.port))];
+        const numbers = [
+            ...new Set(
+                ports.filter((entry) => entry.protocol === protocol).map((entry) => entry.port)
+            )
+        ];
         return runsOf(numbers).map((run) => `${protocol.toUpperCase()} ${run}`);
     });
     if (parts.length <= 1) return parts[0] ?? "its port";
@@ -59,7 +68,11 @@ function runsOf(numbers: readonly number[]): string[] {
     const runs: string[] = [];
     for (let index = 0; index < sorted.length; ) {
         let end = index;
-        while (end + 1 < sorted.length && (sorted[end + 1] as number) === (sorted[end] as number) + 1) end += 1;
+        while (
+            end + 1 < sorted.length &&
+            (sorted[end + 1] as number) === (sorted[end] as number) + 1
+        )
+            end += 1;
         runs.push(end === index ? `${sorted[index]}` : `${sorted[index]}-${sorted[end]}`);
         index = end + 1;
     }
@@ -76,8 +89,12 @@ function plural(ports: readonly GamePort[]): boolean {
 /** The same sentence for the blocks these ports come from, which is what the
  *  range policy asks the operator to open: "TCP 25565-25664 and UDP 19132-19231". */
 export function describeBlocksFor(ports: readonly GamePort[], blocks: PortBlocks): string {
-    const used = (["tcp", "udp"] as const).filter((protocol) => ports.some((entry) => entry.protocol === protocol));
-    const parts = used.map((protocol) => `${protocol.toUpperCase()} ${describeBlock(blocks[protocol])}`);
+    const used = (["tcp", "udp"] as const).filter((protocol) =>
+        ports.some((entry) => entry.protocol === protocol)
+    );
+    const parts = used.map(
+        (protocol) => `${protocol.toUpperCase()} ${describeBlock(blocks[protocol])}`
+    );
     if (parts.length <= 1) return parts[0] ?? "its range";
     return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
@@ -112,7 +129,9 @@ export function gameStoppedAdvice(ports: readonly GamePort[]): GameReachAdvice {
     return {
         ok: false,
         actionable: false,
-        title: plural(ports) ? "Stopped, so its ports cannot be checked" : "Stopped, so its port cannot be checked",
+        title: plural(ports)
+            ? "Stopped, so its ports cannot be checked"
+            : "Stopped, so its port cannot be checked",
         detail: `Nothing answers on ${named} while this server is down, and from here that looks exactly like a port nobody has opened. Start it and Polaris checks this by itself.`,
         steps: [],
         forward: false

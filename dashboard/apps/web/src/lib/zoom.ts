@@ -53,7 +53,10 @@ export const FILLS: Cover = { x: 1, y: 1 };
 /** What a picture of this shape covers in a frame of that shape. Both are width
  *  over height; either being unknown means "assume it fills", which is what the
  *  first frame is drawn under. */
-export function coverOf(picture: number | null | undefined, frame: number | null | undefined): Cover {
+export function coverOf(
+    picture: number | null | undefined,
+    frame: number | null | undefined
+): Cover {
     if (!picture || !frame || picture <= 0 || frame <= 0) return FILLS;
     // Wider than the frame: it fits across and leaves a bar above and below.
     return picture > frame ? { x: 1, y: frame / picture } : { x: picture / frame, y: 1 };

@@ -40,7 +40,8 @@ function gameServerJobs() {
  * Every method forwards to the real source, so the engine never waits on it
  * until a world is actually being copied.
  */
-const worldSource = () => import("@/lib/backups/sources/minecraft").then((module) => module.minecraftWorldSource);
+const worldSource = () =>
+    import("@/lib/backups/sources/minecraft").then((module) => module.minecraftWorldSource);
 const lazyWorldSource: BackupSource = {
     kind: "minecraft-world",
     discover: async (ownerId) => (await worldSource()).discover(ownerId),
@@ -88,7 +89,8 @@ export const gameServersExtension: AppExtension = {
     afterStart: async (installedAppId) =>
         (await import("@/lib/apps/games-health")).clearCrashLoop(installedAppId),
 
-    adopt: async (ownerId) => (await import("@/lib/apps/game-install")).adoptGameServersApp(ownerId),
+    adopt: async (ownerId) =>
+        (await import("@/lib/apps/game-install")).adoptGameServersApp(ownerId),
 
     gameServerSummaries: async (userId) =>
         (await (await games()).listGameServerFacts(userId)).map((server) => ({

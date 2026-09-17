@@ -17,7 +17,14 @@ import { GameLogo } from "@/components/game-logo";
 import { findGame } from "@/lib/apps/games-catalog";
 import { PriorityMark } from "@/components/priority-mark";
 import { RelativeTime } from "@/components/relative-time";
-import { StateDot, WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
+import {
+    StateDot,
+    WidgetEmpty,
+    WidgetList,
+    WidgetRow,
+    WidgetRowsSkeleton,
+    WidgetUnavailable
+} from "../widget-card";
 import type {
     OverviewAlarms,
     OverviewGames,
@@ -48,12 +55,16 @@ function barTone(percent: number | null): string {
 
 export function ServicesWidget({ data }: { data: Loaded<OverviewServices> }) {
     if (data === undefined) return <WidgetRowsSkeleton />;
-    if (data === null) return <WidgetUnavailable>Deployments could not be read just now.</WidgetUnavailable>;
+    if (data === null)
+        return <WidgetUnavailable>Deployments could not be read just now.</WidgetUnavailable>;
     if (data.total === 0) {
         return (
             <WidgetEmpty
                 action={
-                    <Link href="/apps/deploy" className="text-xs font-medium text-primary hover:underline">
+                    <Link
+                        href="/apps/deploy"
+                        className="text-xs font-medium text-primary hover:underline"
+                    >
                         Deploy something
                     </Link>
                 }
@@ -66,7 +77,12 @@ export function ServicesWidget({ data }: { data: Loaded<OverviewServices> }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}>
+                <span
+                    className={cn(
+                        "text-xl font-semibold",
+                        data.running < data.total && "text-warning"
+                    )}
+                >
                     {data.running}
                 </span>
                 <span className="text-muted-foreground">
@@ -107,12 +123,19 @@ function Sparkline({ values, tone }: { values: (number | null)[]; tone: string }
             current = [];
             return;
         }
-        current.push(`${current.length === 0 ? "M" : "L"} ${(index * step).toFixed(2)} ${(100 - (value / max) * 100).toFixed(2)}`);
+        current.push(
+            `${current.length === 0 ? "M" : "L"} ${(index * step).toFixed(2)} ${(100 - (value / max) * 100).toFixed(2)}`
+        );
     });
     if (current.length > 1) runs.push(current.join(" "));
 
     return (
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-6 w-full" aria-hidden="true">
+        <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="h-6 w-full"
+            aria-hidden="true"
+        >
             {runs.map((path, index) => (
                 <path
                     key={index}
@@ -132,7 +155,8 @@ function Sparkline({ values, tone }: { values: (number | null)[]; tone: string }
 
 export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null) return <WidgetUnavailable>Usage could not be read just now.</WidgetUnavailable>;
+    if (data === null)
+        return <WidgetUnavailable>Usage could not be read just now.</WidgetUnavailable>;
     if (data.length === 0) return <WidgetEmpty>No machine has been sampled yet.</WidgetEmpty>;
 
     return (
@@ -140,10 +164,18 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
             {data.map((server) => (
                 <li key={server.id} className="flex flex-col gap-1">
                     <div className="flex items-baseline justify-between gap-2">
-                        <Link href={server.href} className="min-w-0 truncate text-sm hover:underline">
+                        <Link
+                            href={server.href}
+                            className="min-w-0 truncate text-sm hover:underline"
+                        >
                             {server.name}
                         </Link>
-                        <span className={cn("shrink-0 text-sm font-semibold tabular-nums", loadTone(server.cpuPercent))}>
+                        <span
+                            className={cn(
+                                "shrink-0 text-sm font-semibold tabular-nums",
+                                loadTone(server.cpuPercent)
+                            )}
+                        >
                             {server.cpuPercent == null ? "-" : `${Math.round(server.cpuPercent)}%`}
                         </span>
                     </div>
@@ -152,7 +184,9 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
                         {server.memUsedBytes == null
                             ? "Memory not reported"
                             : `${formatBytes(server.memUsedBytes)}${
-                                  server.memTotalBytes == null ? "" : ` / ${formatBytes(server.memTotalBytes)}`
+                                  server.memTotalBytes == null
+                                      ? ""
+                                      : ` / ${formatBytes(server.memTotalBytes)}`
                               } memory`}
                     </p>
                 </li>
@@ -163,12 +197,16 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
 
 export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null) return <WidgetUnavailable>Alarms could not be read just now.</WidgetUnavailable>;
+    if (data === null)
+        return <WidgetUnavailable>Alarms could not be read just now.</WidgetUnavailable>;
     if (data.firing === 0 && data.events.length === 0) {
         return (
             <WidgetEmpty
                 action={
-                    <Link href="/watch/alarms" className="text-xs font-medium text-primary hover:underline">
+                    <Link
+                        href="/watch/alarms"
+                        className="text-xs font-medium text-primary hover:underline"
+                    >
                         Set one up
                     </Link>
                 }
@@ -181,7 +219,9 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span className={cn("text-xl font-semibold", data.firing > 0 && "text-danger")}>{data.firing}</span>
+                <span className={cn("text-xl font-semibold", data.firing > 0 && "text-danger")}>
+                    {data.firing}
+                </span>
                 <span className="text-muted-foreground"> firing now</span>
             </p>
             {data.events.length > 0 ? (
@@ -193,10 +233,13 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
                                 label={event.kind === "resolved" ? "Resolved" : "Triggered"}
                             />
                             <span className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate text-sm" title={event.name}>{event.name}</span>
+                                <span className="truncate text-sm" title={event.name}>
+                                    {event.name}
+                                </span>
                                 <span className="truncate text-xs text-muted-foreground">
                                     {event.kind === "resolved" ? "Resolved" : "Triggered"}
-                                    {event.detail ? ` - ${event.detail}` : ""} <RelativeTime iso={event.createdAt} />
+                                    {event.detail ? ` - ${event.detail}` : ""}{" "}
+                                    <RelativeTime iso={event.createdAt} />
                                 </span>
                             </span>
                         </li>
@@ -209,12 +252,16 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
 
 export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }) {
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null) return <WidgetUnavailable>Storage could not be read just now.</WidgetUnavailable>;
+    if (data === null)
+        return <WidgetUnavailable>Storage could not be read just now.</WidgetUnavailable>;
     if (data.length === 0) {
         return (
             <WidgetEmpty
                 action={
-                    <Link href="/drive/overview" className="text-xs font-medium text-primary hover:underline">
+                    <Link
+                        href="/drive/overview"
+                        className="text-xs font-medium text-primary hover:underline"
+                    >
                         Connect a device
                     </Link>
                 }
@@ -234,7 +281,10 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                 return (
                     <li key={device.id} className="flex flex-col gap-1">
                         <div className="flex items-baseline justify-between gap-2">
-                            <Link href={device.href} className="min-w-0 truncate text-sm hover:underline">
+                            <Link
+                                href={device.href}
+                                className="min-w-0 truncate text-sm hover:underline"
+                            >
                                 {device.name}
                             </Link>
                             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -243,13 +293,20 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                             <div
-                                className={cn("h-full rounded-full transition-all", barTone(percent))}
+                                className={cn(
+                                    "h-full rounded-full transition-all",
+                                    barTone(percent)
+                                )}
                                 style={{ width: `${percent ?? 0}%` }}
                             />
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {device.usedBytes == null ? "Usage not reported" : formatBytes(device.usedBytes)}
-                            {device.totalBytes == null ? "" : ` of ${formatBytes(device.totalBytes)}`}
+                            {device.usedBytes == null
+                                ? "Usage not reported"
+                                : formatBytes(device.usedBytes)}
+                            {device.totalBytes == null
+                                ? ""
+                                : ` of ${formatBytes(device.totalBytes)}`}
                         </p>
                     </li>
                 );
@@ -268,12 +325,16 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
  */
 export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null) return <WidgetUnavailable>Your game servers could not be read just now.</WidgetUnavailable>;
+    if (data === null)
+        return <WidgetUnavailable>Your game servers could not be read just now.</WidgetUnavailable>;
     if (data.total === 0) {
         return (
             <WidgetEmpty
                 action={
-                    <Link href="/apps/games" className="text-xs font-medium text-primary hover:underline">
+                    <Link
+                        href="/apps/games"
+                        className="text-xs font-medium text-primary hover:underline"
+                    >
                         Create one
                     </Link>
                 }
@@ -286,7 +347,12 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}>
+                <span
+                    className={cn(
+                        "text-xl font-semibold",
+                        data.running < data.total && "text-warning"
+                    )}
+                >
                     {data.running}
                 </span>
                 <span className="text-muted-foreground">
@@ -319,7 +385,8 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
 /** The work assigned to somebody, most pressing first. */
 export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
     if (data === undefined) return <WidgetRowsSkeleton />;
-    if (data === null) return <WidgetUnavailable>Your work could not be read just now.</WidgetUnavailable>;
+    if (data === null)
+        return <WidgetUnavailable>Your work could not be read just now.</WidgetUnavailable>;
     if (data.assigned === 0) return <WidgetEmpty>Nothing is assigned to you.</WidgetEmpty>;
 
     return (
@@ -329,8 +396,12 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
             <p className="text-sm">
                 <span className="text-xl font-semibold tabular-nums">{data.assigned}</span>
                 <span className="text-muted-foreground"> assigned</span>
-                {data.overdue > 0 ? <span className="text-danger"> - {data.overdue} overdue</span> : null}
-                {data.dueToday > 0 ? <span className="text-warning"> - {data.dueToday} due today</span> : null}
+                {data.overdue > 0 ? (
+                    <span className="text-danger"> - {data.overdue} overdue</span>
+                ) : null}
+                {data.dueToday > 0 ? (
+                    <span className="text-warning"> - {data.dueToday} due today</span>
+                ) : null}
             </p>
             <WidgetList>
                 {data.rows.map((task) => (
@@ -342,7 +413,12 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
                         detail={`${task.reference} - ${task.list}`}
                         trailing={
                             task.dueDate ? (
-                                <span className={cn("shrink-0 text-xs", task.overdue ? "text-danger" : "text-muted-foreground")}>
+                                <span
+                                    className={cn(
+                                        "shrink-0 text-xs",
+                                        task.overdue ? "text-danger" : "text-muted-foreground"
+                                    )}
+                                >
                                     <RelativeTime iso={task.dueDate} />
                                 </span>
                             ) : null
