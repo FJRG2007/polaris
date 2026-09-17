@@ -15,6 +15,7 @@
 
 import * as core from "@polaris/core";
 import * as mentions from "@/lib/rich-text/mention-service";
+import { chatLookup } from "@/lib/search/chat-lookup";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { referenceHref, type ReferenceKind } from "@/components/rich-text/references";
 
@@ -37,7 +38,11 @@ export interface SearchHit {
  *  keys make a longer list cheap to walk. */
 const PER_SCOPE = 12;
 
-const SCOPE_KINDS: Record<core.RemoteSearchScope, ReferenceKind> = {
+/** The scopes answered from what somebody can mention; the Chat ones are
+ *  answered by `chat-lookup`. */
+type MentionScope = Exclude<core.RemoteSearchScope, core.ChatSearchScope>;
+
+const SCOPE_KINDS: Record<MentionScope, ReferenceKind> = {
     tasks: "task",
     docs: "doc",
     notes: "note",
@@ -52,8 +57,13 @@ const SCOPE_KINDS: Record<core.RemoteSearchScope, ReferenceKind> = {
  * same permission their screens are: search must not become the way to read the
  * name of something the app itself would refuse to open.
  */
-export async function canSearchScope(user: SessionUser, scope: core.RemoteSearchScope): Promise<boolean> {
+export async function canSearchScope(
+    user: SessionUser,
+    scope: core.RemoteSearchScope
+): Promise<boolean> {
     if (scope === "tasks" || scope === "docs") return userHasManage(user, "tasks.read");
+    // The same grant the Chat screens are behind.
+    if (core.isChatSearchScope(scope)) return userHasManage(user, "chat.use");
     return true;
 }
 
@@ -64,18 +74,23 @@ export async function canSearchScope(user: SessionUser, scope: core.RemoteSearch
  * @param input - The scope and what was typed after the command; an empty query
  *                answers with what was touched most recently.
  */
-export async function lookup(user: SessionUser, input: core.SearchLookupInput): Promise<SearchHit[]> {
+export async function lookup(
+    user: SessionUser,
+    input: core.SearchLookupInput
+): Promise<SearchHit[]> {
     if (!(await canSearchScope(user, input.scope))) return [];
+    if (core.isChatSearchScope(input.scope)) return chatLookup(user, input.scope, input.query);
+    const scope = input.scope;
     const candidates = await mentions.searchMentions(
         { id: user.id, isAdmin: user.isAdmin },
-        [SCOPE_KINDS[input.scope]],
+        [SCOPE_KINDS[scope]],
         input.query,
         PER_SCOPE
     );
-    return candidates.map((candidate) => toHit(input.scope, candidate));
+    return candidates.map((candidate) => toHit(scope, candidate));
 }
 
-function toHit(scope: core.RemoteSearchScope, candidate: mentions.MentionCandidate): SearchHit {
+function toHit(scope: MentionScope, candidate: mentions.MentionCandidate): SearchHit {
     return {
         id: candidate.id,
         scope,
@@ -98,6 +113,7 @@ function toHit(scope: core.RemoteSearchScope, candidate: mentions.MentionCandida
  * the address its chips already link to.
  */
 function hitHref(candidate: mentions.MentionCandidate): string {
-    if (candidate.kind === "user") return `/tasks/everything?assignee=${encodeURIComponent(candidate.id)}`;
+    if (candidate.kind === "user")
+        return `/tasks/everything?assignee=${encodeURIComponent(candidate.id)}`;
     return referenceHref(candidate.kind, candidate.id) ?? "/";
 }

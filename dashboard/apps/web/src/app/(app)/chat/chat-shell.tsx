@@ -18,13 +18,13 @@
 
 import { ServerRail } from "./server-rail";
 import { ChatSidebar } from "./chat-sidebar";
-import { usePaneCeiling } from "./pane-room";
 import { usePathname } from "next/navigation";
 import { useChatStream } from "./use-chat-stream";
 import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
 import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
-import { forgetPaneSize, readPaneSize, savePaneSize } from "./pane-preferences";
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useChatPane } from "./use-chat-pane";
+import { resetPaneLayout } from "./pane-preferences";
+import { useCallback, type CSSProperties, type ReactNode } from "react";
 
 /**
  * What the conversation list may be narrowed and widened to.
@@ -70,36 +70,11 @@ export function ChatShell({
 function ChatColumns({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const { refresh, viewerId } = useChat();
-    const [listWidth, setListWidth] = useState(LIST_PANE.fallback);
-    // What the window can actually spare, which is not the same as what the list
-    // may be: the ceiling below was written for the narrowest screen this is
-    // drawn on at all, and a width remembered from a wide one arrives on that
-    // screen unchanged.
-    const { ceiling, measure } = usePaneCeiling(LIST_PANE);
-
-    // Read after the first paint rather than during it. There is no localStorage
-    // on the server, so a width taken during render would be the fallback there
-    // and the stored one here - which is a hydration mismatch on the element the
-    // whole screen is laid out around.
-    useEffect(() => setListWidth(readPaneSize("list", LIST_PANE)), []);
-
-    const resize = useCallback((size: number) => {
-        setListWidth(size);
-        // Written as it moves, not on release: a drag that ends by closing the
-        // tab is still a decision somebody made. Settled rather than written on
-        // the spot - see `savePaneSize`, which is what keeps that true without a
-        // synchronous write for every pixel of the drag.
-        savePaneSize("list", size);
-    }, []);
-
-    const reset = useCallback(() => {
-        forgetPaneSize("list");
-        setListWidth(LIST_PANE.fallback);
-    }, []);
-
-    /** What is on screen: what somebody chose, held to what there is room for.
-     *  The choice itself is left alone, so it comes back with the room. */
-    const drawn = Math.min(listWidth, ceiling);
+    // Written as it moves, not on release: a drag that ends by closing the tab
+    // is still a decision somebody made. The window can spare less than the
+    // list may be, and a width remembered from a wide screen arrives on a
+    // narrow one unchanged - which is what the ceiling holds it to.
+    const { drawn, ceiling, measure, resize, reset } = useChatPane("list", LIST_PANE);
     // Inside a conversation on a phone the list steps aside; on anything wider
     // both are shown, which is why this decides a class rather than a render.
     const inConversation = pathname.startsWith("/chat/c/");
@@ -159,6 +134,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 max={ceiling}
                 onChange={resize}
                 onReset={reset}
+                onResetAll={resetPaneLayout}
                 label="Conversation list width"
                 className="hidden md:block"
             />

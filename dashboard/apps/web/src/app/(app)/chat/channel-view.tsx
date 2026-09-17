@@ -56,7 +56,16 @@ import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { callBandHeight, callBandLimit, type CallPlace } from "./call-band";
-import { forgetPaneSize, savePaneSize, storedPaneSize } from "./pane-preferences";
+import { SidePane } from "./side-pane";
+import { useCloseOnEscape } from "./close-on-escape";
+import { CALL_CHAT_PANE } from "./use-chat-pane";
+import {
+    forgetPaneSize,
+    onLayoutReset,
+    resetPaneLayout,
+    savePaneSize,
+    storedPaneSize
+} from "./pane-preferences";
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, ConfirmDeleteDialog, EmptyState, ResizeHandle, Skeleton, cn } from "@polaris/ui";
@@ -229,6 +238,17 @@ export function ChannelView({
      * decides inside the limit, it does not replace it.
      */
     const [bandHeight, setBandHeight] = useState<number | null>(null);
+    // "Reset layout" from any divider puts the call back to its share as well.
+    useEffect(() => onLayoutReset(() => setBandHeight(null)), []);
+
+    // Escape backs out one step at a time: the panel open beside the
+    // conversation first, then the conversation itself, back to the empty
+    // screen. Nothing is left or deleted - see `close-on-escape`.
+    useCloseOnEscape(() => {
+        if (thread) setThread(null);
+        else if (searching) setSearching(false);
+        else router.push("/chat");
+    });
     /** What the call is drawn at now, and the column it is drawn in - the two
      *  numbers the divider has to be held to, because the limit on the panel is a
      *  share of the second rather than a count of pixels. */
@@ -1971,6 +1991,7 @@ export function ChannelView({
                         max={bandLimit}
                         onChange={resizeBand}
                         onReset={resetBand}
+                        onResetAll={resetPaneLayout}
                         label="Call height"
                     />
                 )}
@@ -1983,9 +2004,15 @@ export function ChannelView({
                 it. Narrow on purpose: it is the place a link gets dropped
                 while people are talking, not the thing being looked at. */}
             {voiceRoom && (
-                <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-l lg:border-t-0">
+                <SidePane
+                    pane="call-chat"
+                    bounds={CALL_CHAT_PANE}
+                    beside="lg"
+                    label="Voice channel chat width"
+                    className="border-t border-border lg:border-l lg:border-t-0"
+                >
                     {conversation}
-                </aside>
+                </SidePane>
             )}
 
             {/* One side panel at a time on the right, and the roster is the one

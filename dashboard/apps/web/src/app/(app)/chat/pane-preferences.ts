@@ -178,3 +178,41 @@ export function forgetPaneSize(pane: string): void {
         // Nothing to undo: the value it would have removed is unreachable anyway.
     }
 }
+
+/** Everything on screen that holds a size, told when the whole layout is put back. */
+const resetListeners = new Set<() => void>();
+
+/**
+ * Hear about "Reset layout". Returns the way to stop hearing it.
+ *
+ * Every panel holds its own size in its own state, so forgetting the stored
+ * numbers is only half of putting the layout back: the panels already on
+ * screen have to be told to go back to their defaults too.
+ */
+export function onLayoutReset(listener: () => void): () => void {
+    resetListeners.add(listener);
+    return () => resetListeners.delete(listener);
+}
+
+/**
+ * Put every panel back where it started: forget each size this runtime
+ * remembers and tell whatever is drawn now.
+ *
+ * Only this runtime's, for the same reason each size is kept per runtime - the
+ * desktop app's layout is a separate decision from a browser tab's.
+ */
+export function resetPaneLayout(): void {
+    pending.clear();
+    try {
+        const suffix = `.${runtime()}`;
+        const keys: string[] = [];
+        for (let index = 0; index < window.localStorage.length; index++) {
+            const key = window.localStorage.key(index);
+            if (key?.startsWith(PREFIX) && key.endsWith(suffix)) keys.push(key);
+        }
+        for (const key of keys) window.localStorage.removeItem(key);
+    } catch {
+        // Nothing stored to forget; the panels below still go back.
+    }
+    for (const listener of [...resetListeners]) listener();
+}

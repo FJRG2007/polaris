@@ -20,7 +20,7 @@ import { Clock, CornerDownLeft, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
-import type { SearchScopeDefinition } from "@/lib/search/scopes";
+import { searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
 
 /** What every row is given, whatever it draws inside. */
 export interface RowProps {
@@ -75,9 +75,16 @@ export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) 
         <Row {...row} label={entry.label}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={entry.label}>{entry.label}</span>
+                <span className="block truncate text-sm" title={entry.label}>
+                    {entry.label}
+                </span>
                 {entry.context ? (
-                    <span className="block truncate text-xs text-muted-foreground" title={entry.context}>{entry.context}</span>
+                    <span
+                        className="block truncate text-xs text-muted-foreground"
+                        title={entry.context}
+                    >
+                        {entry.context}
+                    </span>
                 ) : null}
             </span>
         </Row>
@@ -91,7 +98,9 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
         <Row {...row} label={`Search ${scope.label}`}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={scope.placeholder}>{scope.placeholder}</span>
+                <span className="block truncate text-sm" title={scope.placeholder}>
+                    {scope.placeholder}
+                </span>
             </span>
             <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none text-muted-foreground">
                 {scope.sigil ?? `/${scope.keywords[0]}`}
@@ -107,11 +116,23 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
  * live data with a state of their own, not entries in a list of screens.
  */
 export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
-    const personId = hit.scope === "users" ? hit.id : null;
+    const person = hit.scope === "users" || hit.scope === "contacts";
+    const personId = person ? hit.id : null;
+    // A conversation, a channel or a message wears its kind, since it has no
+    // face or state of its own to wear.
+    const KindIcon =
+        hit.scope === "chats" || hit.scope === "channels" || hit.scope === "messages"
+            ? searchScope(hit.scope).icon
+            : null;
     return (
         <Row {...row} label={hit.label} personId={personId}>
-            {hit.scope === "users" ? (
-                <Avatar person={{ id: hit.id, name: hit.label, image: hit.image ?? null }} size={22} />
+            {person ? (
+                <Avatar
+                    person={{ id: hit.id, name: hit.label, image: hit.image ?? null }}
+                    size={22}
+                />
+            ) : KindIcon ? (
+                <KindIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             ) : hit.status ? (
                 <span
                     aria-hidden="true"
@@ -120,7 +141,10 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
                     style={{ backgroundColor: hit.status.color }}
                 />
             ) : (
-                <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                <span
+                    aria-hidden="true"
+                    className="size-2.5 shrink-0 rounded-full bg-muted-foreground/40"
+                />
             )}
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
@@ -134,11 +158,18 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
                     </span>
                 </span>
                 {hit.detail ? (
-                    <span className="block truncate text-xs text-muted-foreground" title={hit.detail}>{hit.detail}</span>
+                    <span
+                        className="block truncate text-xs text-muted-foreground"
+                        title={hit.detail}
+                    >
+                        {hit.detail}
+                    </span>
                 ) : null}
             </span>
             {hit.status ? (
-                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{hit.status.name}</span>
+                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                    {hit.status.name}
+                </span>
             ) : null}
         </Row>
     );
@@ -159,13 +190,20 @@ export function RecentRow({
     return (
         <Row {...row} label={entry.label}>
             {entry.kind === "result" ? (
-                <CornerDownLeft className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <CornerDownLeft
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                />
             ) : (
                 <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
-            <span className="min-w-0 flex-1 truncate text-sm" title={entry.label}>{entry.label}</span>
+            <span className="min-w-0 flex-1 truncate text-sm" title={entry.label}>
+                {entry.label}
+            </span>
             {scopeLabel ? (
-                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{scopeLabel}</span>
+                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                    {scopeLabel}
+                </span>
             ) : null}
             <button
                 type="button"
@@ -191,7 +229,10 @@ export function HitSkeleton() {
             {[0, 1, 2].map((row) => (
                 <div key={row} className="flex items-center gap-3 rounded-md px-2 py-2">
                     <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-muted" />
-                    <span className="h-3 flex-1 animate-pulse rounded bg-muted" style={{ maxWidth: `${70 - row * 12}%` }} />
+                    <span
+                        className="h-3 flex-1 animate-pulse rounded bg-muted"
+                        style={{ maxWidth: `${70 - row * 12}%` }}
+                    />
                 </div>
             ))}
         </div>

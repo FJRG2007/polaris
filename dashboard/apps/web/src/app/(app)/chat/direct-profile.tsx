@@ -47,6 +47,7 @@ import Link from "next/link";
 import { AtSign, MoreHorizontal, X } from "lucide-react";
 import { profileAction } from "./actions";
 import { useChat } from "./chat-context";
+import { SidePane } from "./side-pane";
 import { useWideScreen } from "./use-wide-screen";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
@@ -277,12 +278,18 @@ function PersonMenu({
     );
 }
 
+/** A little wider than the roster by default: this column carries sentences - a
+ *  handle, a name, what somebody wrote about themselves - where the roster
+ *  carries a list of names. */
+const PROFILE_PANE = { min: 224, max: 440, fallback: 272 };
+
 /**
  * The profile, as a column beside the conversation or as a dialog over it.
  *
  * The same decision the roster makes, and made the same way: below the width
  * where both fit, a column of eighty pixels of conversation helps nobody.
  */
+
 export function DirectProfile({
     person,
     channel,
@@ -360,13 +367,15 @@ export function DirectProfile({
     }
 
     return (
-        // A little wider than the roster, and wider again where there is room
-        // for it: this column carries sentences - a handle, a name, what
-        // somebody wrote about themselves - where the roster carries a list of
-        // names. The extra width waits for 1280 because at 1024 every pixel here
-        // comes off the conversation, which is already down to its last few
-        // words at that size (see `useWideScreen`).
-        <aside className="flex min-h-0 w-64 shrink-0 flex-col border-l border-border xl:w-72">
+        // Sized by whoever is reading, like the roster: at 1024 every pixel here
+        // comes off the conversation (see `useWideScreen`), and the ceiling
+        // keeps a width chosen on a wider screen from taking it.
+        <SidePane
+            pane="profile"
+            bounds={PROFILE_PANE}
+            label="Profile width"
+            className="border-l border-border"
+        >
             <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
                 <p className="text-xs font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                     Profile
@@ -389,6 +398,6 @@ export function DirectProfile({
                 {refusal}
             </div>
             {nickname}
-        </aside>
+        </SidePane>
     );
 }

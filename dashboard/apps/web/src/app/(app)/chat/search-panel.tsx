@@ -27,7 +27,12 @@ import { RelativeTime } from "@/components/relative-time";
 import { referenced } from "./message-references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { Hash, Loader2, Search, Users, X } from "lucide-react";
+import { SidePane } from "./side-pane";
 import { Button, Input, SegmentedControl, cn } from "@polaris/ui";
+
+/** Wide enough for a line of a message and its filters, narrow enough to leave
+ *  the conversation it is searching beside it. */
+const SEARCH_PANE = { min: 280, max: 520, fallback: 320 };
 
 export function SearchPanel({
     channelId,
@@ -85,7 +90,12 @@ export function SearchPanel({
     }, [query]);
 
     return (
-        <aside className="flex w-80 min-w-0 shrink-0 flex-col border-l border-border">
+        <SidePane
+            pane="search"
+            bounds={SEARCH_PANE}
+            label="Search width"
+            className="min-w-0 border-l border-border"
+        >
             <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-3">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
                 <span className="text-sm font-semibold">Search</span>
@@ -234,6 +244,6 @@ export function SearchPanel({
                     </ol>
                 )}
             </div>
-        </aside>
+        </SidePane>
     );
 }

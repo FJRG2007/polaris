@@ -20,14 +20,15 @@
 
 import Fuse from "fuse.js";
 import * as core from "@polaris/core";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import * as recentStore from "@/lib/search/recent";
 import { PlainNames } from "@/components/person-name";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
-import { Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
-import { searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
+import { Dialog, DialogContent, DialogTitle, Input, SegmentedControl, cn } from "@polaris/ui";
+import { CHAT_SCOPE_FILTERS, searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
 import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
 import {
     navigationEntries,
@@ -132,7 +133,10 @@ export function CommandPalette({
     installed?: string[];
 }) {
     const router = useRouter();
+    const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    /** The scope the panel is to open on, when whatever opened it asked for one. */
+    const presetRef = useRef<core.SearchScope | null>(null);
     const [query, setQuery] = useState("");
     const [scope, setScope] = useState<SearchScopeDefinition | null>(null);
     const [active, setActive] = useState(0);
@@ -158,13 +162,39 @@ export function CommandPalette({
 
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+            if (
+                event.key.toLowerCase() !== "k" ||
+                !(event.metaKey || event.ctrlKey) ||
+                event.altKey
+            )
+                return;
             // Browsers put Ctrl+K on the address bar; the dashboard claims it here.
             event.preventDefault();
-            setOpen((value) => !value);
+            // Inside Chat it is Chat's quick switcher, as it is in every chat app;
+            // Backspace on the empty field widens it to everything again.
+            presetRef.current = pathname.startsWith("/chat") ? "chat" : null;
+            setOpen((value) => {
+                // Closing uses no preset, and must not leave one for the next open.
+                if (value) presetRef.current = null;
+                return !value;
+            });
         }
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
+    }, [pathname]);
+
+    // Opened from a field somewhere else on the page, already narrowed.
+    useEffect(() => {
+        function onOpenRequest(event: Event) {
+            const wanted = requestedScope(event);
+            presetRef.current = wanted;
+            // Already open: the reset below does not run again, so narrow here.
+            setScope(wanted ? searchScope(wanted) : null);
+            setActive(0);
+            setOpen(true);
+        }
+        window.addEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
+        return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
     }, []);
 
     const loadResources = useCallback(() => {
@@ -187,7 +217,8 @@ export function CommandPalette({
     useEffect(() => {
         if (!open) return;
         setQuery("");
-        setScope(null);
+        setScope(presetRef.current ? searchScope(presetRef.current) : null);
+        presetRef.current = null;
         setActive(0);
         setHits([]);
         setFailure(null);
@@ -284,7 +315,8 @@ export function CommandPalette({
                 })
                     .then(async (response) => {
                         const body: { hits?: SearchHit[]; error?: string } = await response.json();
-                        if (!response.ok) throw new Error(body.error ?? "That search could not be run");
+                        if (!response.ok)
+                            throw new Error(body.error ?? "That search could not be run");
                         const found = body.hits ?? [];
                         rememberLookup(key, found);
                         setHits(found);
@@ -335,7 +367,9 @@ export function CommandPalette({
     const pool = useMemo(() => {
         if (!scope) return [...navigation, ...resourceEntries(resources)];
         if (!scope.resourceKind) return [];
-        return resourceEntries(resources.filter((resource) => resource.kind === scope.resourceKind));
+        return resourceEntries(
+            resources.filter((resource) => resource.kind === scope.resourceKind)
+        );
     }, [scope, navigation, resources]);
 
     const fuse = useMemo(
@@ -379,14 +413,24 @@ export function CommandPalette({
         const found: Row[] = [];
         if (!writingCommand) {
             if (scope && !scope.resourceKind) {
+                // All of Chat at once is four kinds of answer, each under its own
+                // heading; one scope is one heading.
+                const mixed = scope.id === "chat";
                 for (const hit of hits) {
-                    found.push({ kind: "hit", id: `hit:${hit.scope}:${hit.id}`, group: scope.label, hit });
+                    found.push({
+                        kind: "hit",
+                        id: `hit:${hit.scope}:${hit.id}`,
+                        group: mixed ? searchScope(hit.scope).label : scope.label,
+                        hit
+                    });
                 }
             } else {
                 // With nothing typed and no command, the panel is a map of the
                 // dashboard rather than a ranking, so the pages are listed as
                 // their apps order them.
-                const matches = trimmed ? fuse.search(trimmed, { limit: MAX_RESULTS }).map((match) => match.item) : pool;
+                const matches = trimmed
+                    ? fuse.search(trimmed, { limit: MAX_RESULTS }).map((match) => match.item)
+                    : pool;
                 const shown = trimmed || scope ? matches : navigation;
                 for (const entry of shown.slice(0, MAX_RESULTS)) {
                     found.push({
@@ -402,18 +446,28 @@ export function CommandPalette({
         // A search that already found the thing does not also need to remember
         // it: the live row is the same row, with the state it has now.
         const live = new Set(
-            found.map((row) => (row.kind === "hit" ? row.hit.href : row.kind === "entry" ? row.entry.href : ""))
+            found.map((row) =>
+                row.kind === "hit" ? row.hit.href : row.kind === "entry" ? row.entry.href : ""
+            )
         );
         const remembered: Row[] = recentRows
             .filter((entry) => !entry.href || !live.has(entry.href))
-            .map((entry) => ({ kind: "recent", id: `recent:${core.recentSearchKey(entry)}`, group: "Recent", entry }));
+            .map((entry) => ({
+                kind: "recent",
+                id: `recent:${core.recentSearchKey(entry)}`,
+                group: "Recent",
+                entry
+            }));
 
         return [...remembered, ...commands, ...found];
     }, [recentRows, suggestions, scope, hits, trimmed, query, fuse, pool, navigation]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
     /** Rows that are an answer rather than a memory or a command. */
-    const answers = useMemo(() => rows.filter((row) => row.kind === "hit" || row.kind === "entry").length, [rows]);
+    const answers = useMemo(
+        () => rows.filter((row) => row.kind === "hit" || row.kind === "entry").length,
+        [rows]
+    );
 
     // A shorter result list must not leave the highlight past its end.
     useEffect(() => {
@@ -421,7 +475,9 @@ export function CommandPalette({
     }, [rows.length]);
 
     useEffect(() => {
-        listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+        listRef.current
+            ?.querySelector('[data-active="true"]')
+            ?.scrollIntoView({ block: "nearest" });
     }, [active, rows]);
 
     function go(row: Row | undefined): void {
@@ -445,13 +501,23 @@ export function CommandPalette({
 
         const target =
             row.kind === "hit"
-                ? { label: row.hit.label, href: row.hit.href, scope: row.hit.scope as core.SearchScope | null }
+                ? {
+                      label: row.hit.label,
+                      href: row.hit.href,
+                      scope: row.hit.scope as core.SearchScope | null
+                  }
                 : row.kind === "recent"
                   ? { label: row.entry.label, href: row.entry.href!, scope: row.entry.scope }
                   : { label: row.entry.label, href: row.entry.href, scope: scope?.id ?? null };
 
         openedRef.current = true;
-        remember({ kind: "result", scope: target.scope, term: trimmed, label: target.label, href: target.href });
+        remember({
+            kind: "result",
+            scope: target.scope,
+            term: trimmed,
+            label: target.label,
+            href: target.href
+        });
         // Navigate before closing. Closing hands focus back to the trigger, and
         // a push issued in the same tick as that hand-off is dropped when the
         // panel was dismissed from the keyboard - the row opens on a click and
@@ -466,7 +532,9 @@ export function CommandPalette({
             setActive((current) => (rows.length === 0 ? 0 : (current + 1) % rows.length));
         } else if (event.key === "ArrowUp") {
             event.preventDefault();
-            setActive((current) => (rows.length === 0 ? 0 : (current - 1 + rows.length) % rows.length));
+            setActive((current) =>
+                rows.length === 0 ? 0 : (current - 1 + rows.length) % rows.length
+            );
         } else if (event.key === "Home") {
             event.preventDefault();
             setActive(0);
@@ -495,7 +563,10 @@ export function CommandPalette({
         <>
             <button
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={() => {
+                    presetRef.current = null;
+                    setOpen(true);
+                }}
                 title={`Search (${hint})`}
                 aria-label="Search Polaris"
                 aria-keyshortcuts="Control+K Meta+K"
@@ -515,7 +586,10 @@ export function CommandPalette({
                 <DialogContent showClose={false} className="max-w-xl overflow-hidden p-0">
                     <DialogTitle className="sr-only">Search Polaris</DialogTitle>
                     <div className="flex items-center gap-2 border-b border-border px-3">
-                        <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <Search
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
                         {scope && ScopeIcon ? (
                             <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 pl-2 pr-1 text-xs font-medium">
                                 <ScopeIcon className="size-3.5" aria-hidden="true" />
@@ -538,7 +612,9 @@ export function CommandPalette({
                             value={query}
                             onChange={(event) => onFieldChange(event.target.value)}
                             onKeyDown={onFieldKeyDown}
-                            placeholder={scope ? scope.placeholder : "Search, or type / for commands"}
+                            placeholder={
+                                scope ? scope.placeholder : "Search, or type / for commands"
+                            }
                             enterKeyHint="go"
                             autoCapitalize="none"
                             autoCorrect="off"
@@ -551,15 +627,41 @@ export function CommandPalette({
                             role="combobox"
                             aria-expanded
                             aria-autocomplete="list"
-                            aria-activedescendant={rows[active] ? rowElementId(rows[active]!) : undefined}
+                            aria-activedescendant={
+                                rows[active] ? rowElementId(rows[active]!) : undefined
+                            }
                             aria-controls="polaris-search-results"
                             bare
                             className="h-12"
                         />
                         {loading || searching ? (
-                            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />
+                            <Loader2
+                                className="size-4 shrink-0 animate-spin text-muted-foreground"
+                                aria-hidden="true"
+                            />
                         ) : null}
                     </div>
+
+                    {/* Chat's filters, one kind or all of them, keeping what was
+                        typed - the way a chat app's quick switcher narrows. */}
+                    {scope && core.isChatSearchScope(scope.id) ? (
+                        <div className="border-b border-border px-3 py-2">
+                            <SegmentedControl
+                                size="sm"
+                                aria-label="What to find"
+                                value={scope.id}
+                                onValueChange={(id) => {
+                                    setScope(searchScope(id));
+                                    setActive(0);
+                                    fieldRef.current?.focus();
+                                }}
+                                options={CHAT_SCOPE_FILTERS.map((filter) => ({
+                                    value: filter.id,
+                                    label: filter.id === "chat" ? "All" : filter.label
+                                }))}
+                            />
+                        </div>
+                    ) : null}
 
                     <div
                         ref={listRef}
@@ -574,110 +676,120 @@ export function CommandPalette({
                             their own names - somebody searching for a person
                             types the name that account is under. */}
                         <PlainNames>
-                        {failure ? (
-                            <p className="px-2 py-10 text-center text-sm text-danger">{failure}</p>
-                        ) : rows.length === 0 && searching ? (
-                            <HitSkeleton />
-                        ) : rows.length === 0 ? (
-                            <p className="px-2 py-10 text-center text-sm text-muted-foreground">
-                                {scope
-                                    ? trimmed
-                                        ? `No ${scope.label.toLowerCase()} match "${trimmed}".`
-                                        : `Nothing in ${scope.label.toLowerCase()} yet.`
-                                    : `Nothing matches "${trimmed}".`}
-                            </p>
-                        ) : (
-                            groups.map((group) => (
-                                <div
-                                    key={`${group.label}-${group.rows[0]?.position}`}
-                                    role="group"
-                                    aria-label={group.label}
-                                    className="mb-1 last:mb-0"
-                                >
-                                    <div className="flex items-center justify-between gap-2 px-2 py-1">
-                                        {/* The name is on the group, so announcing the
+                            {failure ? (
+                                <p className="px-2 py-10 text-center text-sm text-danger">
+                                    {failure}
+                                </p>
+                            ) : rows.length === 0 && searching ? (
+                                <HitSkeleton />
+                            ) : rows.length === 0 ? (
+                                <p className="px-2 py-10 text-center text-sm text-muted-foreground">
+                                    {scope
+                                        ? trimmed
+                                            ? `No ${scope.label.toLowerCase()} match "${trimmed}".`
+                                            : `Nothing in ${scope.label.toLowerCase()} yet.`
+                                        : `Nothing matches "${trimmed}".`}
+                                </p>
+                            ) : (
+                                groups.map((group) => (
+                                    <div
+                                        key={`${group.label}-${group.rows[0]?.position}`}
+                                        role="group"
+                                        aria-label={group.label}
+                                        className="mb-1 last:mb-0"
+                                    >
+                                        <div className="flex items-center justify-between gap-2 px-2 py-1">
+                                            {/* The name is on the group, so announcing the
                                             heading again would only repeat it. */}
-                                        <p
-                                            aria-hidden="true"
-                                            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                                        >
-                                            {group.label}
-                                        </p>
-                                        {group.label === "Recent" && !trimmed ? (
-                                            <button
-                                                type="button"
-                                                onClick={forgetAll}
-                                                className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                                            <p
+                                                aria-hidden="true"
+                                                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
                                             >
-                                                Clear
-                                            </button>
-                                        ) : null}
-                                    </div>
-                                    {group.rows.map(({ row, position }) => {
-                                        const selected = position === active;
-                                        const select = () => go(row);
-                                        const hover = () => setActive(position);
-                                        if (row.kind === "command") {
+                                                {group.label}
+                                            </p>
+                                            {group.label === "Recent" && !trimmed ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={forgetAll}
+                                                    className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                                                >
+                                                    Clear
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                        {group.rows.map(({ row, position }) => {
+                                            const selected = position === active;
+                                            const select = () => go(row);
+                                            const hover = () => setActive(position);
+                                            if (row.kind === "command") {
+                                                return (
+                                                    <CommandRow
+                                                        key={row.id}
+                                                        id={rowElementId(row)}
+                                                        scope={row.scope}
+                                                        selected={selected}
+                                                        onSelect={select}
+                                                        onHover={hover}
+                                                    />
+                                                );
+                                            }
+                                            if (row.kind === "hit") {
+                                                return (
+                                                    <HitRow
+                                                        key={row.id}
+                                                        id={rowElementId(row)}
+                                                        hit={row.hit}
+                                                        selected={selected}
+                                                        onSelect={select}
+                                                        onHover={hover}
+                                                    />
+                                                );
+                                            }
+                                            if (row.kind === "recent") {
+                                                return (
+                                                    <RecentRow
+                                                        key={row.id}
+                                                        id={rowElementId(row)}
+                                                        entry={row.entry}
+                                                        scopeLabel={
+                                                            row.entry.scope
+                                                                ? searchScope(row.entry.scope).label
+                                                                : null
+                                                        }
+                                                        selected={selected}
+                                                        onSelect={select}
+                                                        onHover={hover}
+                                                        onForget={() => forget(row.entry)}
+                                                    />
+                                                );
+                                            }
                                             return (
-                                                <CommandRow
-                                                    key={row.id}
-                                                    id={rowElementId(row)}
-                                                    scope={row.scope}
-                                                    selected={selected}
-                                                    onSelect={select}
-                                                    onHover={hover}
-                                                />
-                                            );
-                                        }
-                                        if (row.kind === "hit") {
-                                            return (
-                                                <HitRow
-                                                    key={row.id}
-                                                    id={rowElementId(row)}
-                                                    hit={row.hit}
-                                                    selected={selected}
-                                                    onSelect={select}
-                                                    onHover={hover}
-                                                />
-                                            );
-                                        }
-                                        if (row.kind === "recent") {
-                                            return (
-                                                <RecentRow
+                                                <EntryRow
                                                     key={row.id}
                                                     id={rowElementId(row)}
                                                     entry={row.entry}
-                                                    scopeLabel={
-                                                        row.entry.scope ? searchScope(row.entry.scope).label : null
-                                                    }
                                                     selected={selected}
                                                     onSelect={select}
                                                     onHover={hover}
-                                                    onForget={() => forget(row.entry)}
                                                 />
                                             );
-                                        }
-                                        return (
-                                            <EntryRow
-                                                key={row.id}
-                                                id={rowElementId(row)}
-                                                entry={row.entry}
-                                                selected={selected}
-                                                onSelect={select}
-                                                onHover={hover}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            ))
-                        )}
-                        {rows.length > 0 && searching ? <HitSkeleton /> : null}
+                                        })}
+                                    </div>
+                                ))
+                            )}
+                            {rows.length > 0 && searching ? <HitSkeleton /> : null}
                         </PlainNames>
                     </div>
 
                     <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                        <span className={cn(scope && "hidden sm:inline")}>Up and down to move, Enter to open</span>
-                        <span>{scope ? "Backspace clears the command" : "Type / for commands, @ for people"}</span>
+                        <span className={cn(scope && "hidden sm:inline")}>
+                            Up and down to move, Enter to open
+                        </span>
+                        <span>
+                            {scope
+                                ? "Backspace clears the command"
+                                : "Type / for commands, @ for people"}
+                        </span>
                     </div>
                 </DialogContent>
             </Dialog>

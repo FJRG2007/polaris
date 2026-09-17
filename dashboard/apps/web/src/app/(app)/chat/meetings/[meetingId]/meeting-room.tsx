@@ -27,6 +27,8 @@ import { useCallHold } from "@/app/(app)/chat/call-hold";
 import type { MeetingSummary } from "@/lib/chat/meetings";
 import { CallRoster } from "@/app/(app)/chat/call-roster";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
+import { SidePane } from "@/app/(app)/chat/side-pane";
+import { CALL_CHAT_PANE } from "@/app/(app)/chat/use-chat-pane";
 import { useRouter, useSearchParams } from "next/navigation";
 import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -301,9 +303,15 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 chat belongs to the meeting, and somebody who has not joined is
                 not in it to read or to be read by. */}
             {inCall && (
-                <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-l lg:border-t-0">
+                <SidePane
+                    pane="call-chat"
+                    bounds={CALL_CHAT_PANE}
+                    beside="lg"
+                    label="Meeting chat width"
+                    className="border-t border-border lg:border-l lg:border-t-0"
+                >
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
-                </aside>
+                </SidePane>
             )}
 
             <MeetingDetailsDialog

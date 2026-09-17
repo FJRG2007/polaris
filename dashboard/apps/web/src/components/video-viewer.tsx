@@ -35,7 +35,9 @@ export function VideoViewer({
 }) {
     useEffect(() => {
         const key = (event: KeyboardEvent) => {
-            if (event.key === "Escape") onClose();
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            onClose();
         };
         window.addEventListener("keydown", key);
         // The page behind must not scroll under it: a wheel over a full-screen
@@ -52,6 +54,7 @@ export function VideoViewer({
     return (
         <div
             role="dialog"
+            data-state="open"
             aria-modal="true"
             aria-label={name ? `Watching ${name}` : "Watching a video"}
             // The ground closes it; the player does not. A press that landed on
@@ -75,10 +78,7 @@ export function VideoViewer({
                 </p>
             )}
 
-            <div
-                className="w-full max-w-5xl"
-                onClick={(event) => event.stopPropagation()}
-            >
+            <div className="w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
                 <MediaPlayer
                     autoPlay
                     kind="video"

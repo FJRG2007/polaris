@@ -301,6 +301,8 @@ export function EmojiPicker({
         };
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
+                // Taken, so the conversation behind does not close on the same press.
+                event.preventDefault();
                 setOpen(false);
                 trigger.current?.focus();
             }
@@ -449,6 +451,7 @@ export function EmojiPicker({
                 <div
                     ref={panel}
                     role="dialog"
+                    data-state="open"
                     aria-label="Emoji, GIFs and stickers"
                     style={{
                         left: at.left,
