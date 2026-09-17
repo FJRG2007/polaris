@@ -13,7 +13,17 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { WEB_IMAGE_PATHS } from "../../src/lib/update-service";
 
-const WORKFLOW = join(__dirname, "..", "..", "..", "..", "..", ".github", "workflows", "dashboard-publish.yml");
+const WORKFLOW = join(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "..",
+    "..",
+    ".github",
+    "workflows",
+    "dashboard-publish.yml"
+);
 
 function workflowWebFilter(): string {
     const match = readFileSync(WORKFLOW, "utf8").match(/has '([^']+)' && out web true/);
