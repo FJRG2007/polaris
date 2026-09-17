@@ -90,6 +90,12 @@ The registry is a typed interface in core with one implementation per installed
 app. Core asks the registry and treats a missing app as "nothing to show". The
 app registers its implementation when its bundle loads.
 
+An extension module is loaded by every core module that asks the registry
+anything, not only by the app it belongs to, so it imports nothing heavy at the
+top: each hook loads the services it needs when it runs. Without that, an app
+extension that reached the database, the session or a container runtime would
+load those into a core path that never uses them.
+
 ## Phases
 
 1. **Core stops importing app code.** Done for Game servers. The registry is

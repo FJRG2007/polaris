@@ -1165,7 +1165,6 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
     }
 ];
 
-/** Look up an app manifest by id. */
 /** Whether an install of this catalog app is a game server. A catalog
  *  question, so the marketplace and the access checks can ask it whether or not
  *  Game servers is installed. */
@@ -1174,6 +1173,7 @@ export function isGameServerApp(catalogId: string): boolean {
     return manifest ? appHasCapability(manifest, "game-server") : false;
 }
 
+/** Look up an app manifest by id. */
 export function findApp(id: string): AppManifest | undefined {
     return POLARIS_APP_CATALOG.find((app) => app.id === id);
 }
