@@ -17,7 +17,10 @@ import { claimEnrollment } from "@/lib/enrollment-service";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }): Promise<Response> {
+export async function POST(
+    request: Request,
+    { params }: { params: Promise<{ token: string }> }
+): Promise<Response> {
     const { token } = await params;
 
     let body: unknown;

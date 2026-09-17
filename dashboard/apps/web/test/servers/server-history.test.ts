@@ -55,8 +55,14 @@ describe("setting a server up on its own", () => {
     it("says why it could not be", () => {
         expect(
             describeServerEvent(
-                line({ action: "edge-failed", authorName: null, toValue: "Error: port 80 is already allocated" })
+                line({
+                    action: "edge-failed",
+                    authorName: null,
+                    toValue: "Error: port 80 is already allocated"
+                })
             )
-        ).toBe("Polaris could not set it up to serve its own domains: Error: port 80 is already allocated");
+        ).toBe(
+            "Polaris could not set it up to serve its own domains: Error: port 80 is already allocated"
+        );
     });
 });

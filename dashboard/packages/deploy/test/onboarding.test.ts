@@ -67,7 +67,9 @@ describe("the build toolchain", () => {
     it("stays safe to re-run", () => {
         // Nothing in the added block removes or resets anything: it compares, and
         // installs only on a mismatch.
-        expect(onboardingScript({ proxyNetwork: "polaris-net", acmeEmail: "ops@example.com" })).toBe(script);
+        expect(
+            onboardingScript({ proxyNetwork: "polaris-net", acmeEmail: "ops@example.com" })
+        ).toBe(script);
         expect(script.startsWith("set -e")).toBe(true);
     });
 });
@@ -83,8 +85,12 @@ describe("a server Polaris sets up as root on behalf of its login", () => {
         // Deploys, routes and compose files are written as the login, not as root.
         // Without this the server is set up and the first deploy still fails on a
         // permission.
-        expect(asRoot).toContain("chown polaris /var/lib/polaris /var/lib/polaris/deploy /var/lib/polaris/volumes");
-        expect(asRoot).toContain("chown -R polaris /var/lib/polaris/deploy /var/lib/polaris/traefik/dynamic");
+        expect(asRoot).toContain(
+            "chown polaris /var/lib/polaris /var/lib/polaris/deploy /var/lib/polaris/volumes"
+        );
+        expect(asRoot).toContain(
+            "chown -R polaris /var/lib/polaris/deploy /var/lib/polaris/traefik/dynamic"
+        );
     });
 
     it("never takes the containers' own data away from them", () => {
@@ -113,9 +119,13 @@ describe("a server Polaris sets up as root on behalf of its login", () => {
     });
 
     it("changes nothing when there is no other login to hand it to", () => {
-        expect(onboardingScript({ proxyNetwork: "polaris-net", acmeEmail: "ops@example.com", owner: "root" })).toBe(
-            script
-        );
+        expect(
+            onboardingScript({
+                proxyNetwork: "polaris-net",
+                acmeEmail: "ops@example.com",
+                owner: "root"
+            })
+        ).toBe(script);
         expect(script).not.toContain("chown");
     });
 });
