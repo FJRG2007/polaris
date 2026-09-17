@@ -81,7 +81,11 @@ function SentFile({
 
     if (!readable) {
         return (
-            <a href={`/api/chat/attachments/${file.id}?download=1`} download={file.name} className={chip}>
+            <a
+                href={`/api/chat/attachments/${file.id}?download=1`}
+                download={file.name}
+                className={chip}
+            >
                 <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-[16rem] truncate" title={file.name}>
                     {file.name}
@@ -97,7 +101,9 @@ function SentFile({
                 type="button"
                 className={chip}
                 title={`Open ${file.name}`}
-                onClick={() => onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })}
+                onClick={() =>
+                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
+                }
             >
                 <FileText className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-[16rem] truncate">{file.name}</span>
@@ -933,59 +939,62 @@ function Message({
                                         className={file.spoiler ? undefined : "contents"}
                                         covered={file.spoiler}
                                     >
-                                    {file.inline ? (
-                                        <KeepableImage
-                                            href={`/api/chat/attachments/${file.id}`}
-                                            alt={file.name}
-                                            source={`attachment:${file.id}`}
-                                            name={file.name}
-                                            onOpen={() =>
-                                                onOpenImage({
-                                                    url: `/api/chat/attachments/${file.id}`,
-                                                    name: file.name,
-                                                    messageId: message.id,
-                                                    forwardable: message.forwardable
-                                                })
-                                            }
-                                        />
-                                    ) : isPlayable(file.contentType) ? (
-                                        <VoiceNote
-                                            href={`/api/chat/attachments/${file.id}`}
-                                            name={file.name}
-                                            recorded={isVoiceMessage(file.name, file.contentType)}
-                                            waveform={file.waveform}
-                                            durationMs={file.durationMs}
-                                        />
-                                    ) : isWatchable(file.contentType) ? (
-                                        // Watched where it was sent, and not a
-                                        // byte of it fetched until somebody
-                                        // presses play: a room with four clips
-                                        // in it would otherwise pull four files
-                                        // off the disk to draw the text above
-                                        // them. See `VideoPreview`.
-                                        <VideoPreview
-                                            name={file.name}
-                                            size={file.size}
-                                            src={`/api/chat/attachments/${file.id}`}
-                                            // A frame of the video itself, taken
-                                            // by the browser that sent it. A few
-                                            // kilobytes, and the difference
-                                            // between a list of black rectangles
-                                            // and a list somebody can read.
-                                            poster={
-                                                file.hasPoster
-                                                    ? `/api/chat/attachments/${file.id}?poster=1`
-                                                    : undefined
-                                            }
-                                            download={`/api/chat/attachments/${file.id}?download=1`}
-                                        />
-                                    ) : (
-                                        <SentFile
-                                            file={file}
-                                            at={message.createdAt}
-                                            onOpen={onOpenFile}
-                                        />
-                                    )}
+                                        {file.inline ? (
+                                            <KeepableImage
+                                                href={`/api/chat/attachments/${file.id}`}
+                                                alt={file.name}
+                                                source={`attachment:${file.id}`}
+                                                name={file.name}
+                                                onOpen={() =>
+                                                    onOpenImage({
+                                                        url: `/api/chat/attachments/${file.id}`,
+                                                        name: file.name,
+                                                        messageId: message.id,
+                                                        forwardable: message.forwardable
+                                                    })
+                                                }
+                                            />
+                                        ) : isPlayable(file.contentType) ? (
+                                            <VoiceNote
+                                                href={`/api/chat/attachments/${file.id}`}
+                                                name={file.name}
+                                                recorded={isVoiceMessage(
+                                                    file.name,
+                                                    file.contentType
+                                                )}
+                                                waveform={file.waveform}
+                                                durationMs={file.durationMs}
+                                            />
+                                        ) : isWatchable(file.contentType) ? (
+                                            // Watched where it was sent, and not a
+                                            // byte of it fetched until somebody
+                                            // presses play: a room with four clips
+                                            // in it would otherwise pull four files
+                                            // off the disk to draw the text above
+                                            // them. See `VideoPreview`.
+                                            <VideoPreview
+                                                name={file.name}
+                                                size={file.size}
+                                                src={`/api/chat/attachments/${file.id}`}
+                                                // A frame of the video itself, taken
+                                                // by the browser that sent it. A few
+                                                // kilobytes, and the difference
+                                                // between a list of black rectangles
+                                                // and a list somebody can read.
+                                                poster={
+                                                    file.hasPoster
+                                                        ? `/api/chat/attachments/${file.id}?poster=1`
+                                                        : undefined
+                                                }
+                                                download={`/api/chat/attachments/${file.id}?download=1`}
+                                            />
+                                        ) : (
+                                            <SentFile
+                                                file={file}
+                                                at={message.createdAt}
+                                                onOpen={onOpenFile}
+                                            />
+                                        )}
                                     </Spoiler>
                                 </li>
                             ))}
