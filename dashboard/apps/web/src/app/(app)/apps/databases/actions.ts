@@ -18,6 +18,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as browser from "@/lib/data/browser";
+import { listHosts } from "@/lib/host-service";
 import { requirePermission } from "@/lib/session";
 import * as connections from "@/lib/data/connections";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
@@ -205,6 +206,20 @@ export async function insightsAction(
     const me = await actor();
     const result = await guard(() => databaseInsights(me.id, String(id)));
     return result.error ? { error: result.error } : { insights: result.value };
+}
+
+/**
+ * The servers this account has registered, for the tunnel picker.
+ *
+ * Name and address only: the form offers a server to tunnel through, and what
+ * it signs in with stays on this side.
+ */
+export async function listTunnelServersAction(): Promise<{
+    servers: { id: string; name: string; address: string }[];
+}> {
+    const me = await actor();
+    const hosts = await listHosts(me.id);
+    return { servers: hosts.map((host) => ({ id: host.id, name: host.name, address: host.address })) };
 }
 
 /** The engines a connection can be made for, for the form's picker. Server-side

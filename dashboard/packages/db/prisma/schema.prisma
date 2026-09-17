@@ -1877,6 +1877,9 @@ model Host {
     groups        HostGroupMember[]
     backupDestinations BackupDestination[]
     agentSessions AgentSession[]
+    // Database connections tunnelled through this server, directly or as a jump.
+    dataTunnels   DataConnection[] @relation("DataConnectionSshHost")
+    dataJumps     DataConnection[] @relation("DataConnectionSshJump")
 
     @@index([ownerId])
 }
@@ -4893,9 +4896,16 @@ model AddressReputation {
 // instance, the company's own Postgres - is a host, a port and a secret this row
 // holds, envelope-encrypted the same way every other credential in Polaris is.
 //
-// `readOnly` defaults on. A browser opened on a production database must not be
-// one keystroke away from an UPDATE with no WHERE, and the person who wants to
-// write has to say so.
+// `readOnly` is a choice made in the form, off unless ticked. The databases
+// Polaris offers without anything saved are still opened read-only.
+//
+// A connection can be reached through an SSH tunnel, the way a desktop client
+// does it: `sshMode` is null for a direct connection, "server" to go through a
+// server registered in Servers (its login and pinned key are read from that row
+// every time), "manual" for an SSH login this row holds, and "manual-jump" for
+// that login reached through a registered server as a bastion. The database's
+// host and port are then as the SSH server sees them. A tunnel whose server was
+// removed is refused rather than silently opened as a direct connection.
 model DataConnection {
     id                  String    @id @default(uuid(7)) @db.Uuid
     ownerId             String    @db.Uuid
@@ -4914,18 +4924,40 @@ model DataConnection {
     credentialNonce     Bytes?
     credentialKeyId     String?
     tls                 Boolean   @default(false)
-    readOnly            Boolean   @default(true)
+    readOnly            Boolean   @default(false)
+    // null | server | manual | manual-jump
+    sshMode             String?
+    // The registered server the tunnel runs through ("server").
+    sshHostId           String?   @db.Uuid
+    // The SSH login this row holds ("manual" and "manual-jump").
+    sshHost             String?
+    sshPort             Int?
+    sshUsername         String?
+    // password | key - what the stored secret is, for the form.
+    sshAuthMethod       String?
+    // Envelope-encrypted secret (JSON: the same shape a server's credentials take).
+    sshEncryptedCredential Bytes?
+    sshCredentialNonce  Bytes?
+    sshCredentialKeyId  String?
+    // The SSH server's key (base64), pinned when the connection was saved.
+    sshHostKey          String?
+    // The registered server a "manual-jump" login is reached through.
+    sshJumpHostId       String?   @db.Uuid
     lastUsedAt          DateTime?
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
 
     owner   User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    sshServer Host?          @relation("DataConnectionSshHost", fields: [sshHostId], references: [id], onDelete: SetNull)
+    sshJump   Host?          @relation("DataConnectionSshJump", fields: [sshJumpHostId], references: [id], onDelete: SetNull)
     // Losing the database it points at takes the shortcut with it: what is left
     // is a name and an address that answers nothing.
     managed ManagedDatabase? @relation(fields: [managedDatabaseId], references: [id], onDelete: Cascade)
 
     @@index([ownerId])
     @@index([managedDatabaseId])
+    @@index([sshHostId])
+    @@index([sshJumpHostId])
 }
 model WafIpFeed {
     /// Feed id ("tor").

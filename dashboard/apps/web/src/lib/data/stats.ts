@@ -20,6 +20,7 @@
 import { withDriver } from "./open";
 import { addressOf } from "./connections";
 import type { DataAddress } from "./driver";
+import type { RedisDriver } from "./drivers/redis";
 
 /** One number, named for a chart. */
 export interface StatValue {
@@ -63,9 +64,11 @@ function gauge(key: string, label: string, value: number, unit: StatValue["unit"
 
 /** Redis reports everything in one text blob of `field:value` lines. */
 async function redisStats(address: DataAddress): Promise<DatabaseStats> {
-    const { RedisDriver } = await import("./drivers/redis");
-    const driver = new RedisDriver(address);
-    try {
+    // Through `withDriver` like every other read, so a tunnelled connection is
+    // reached through its tunnel rather than at an address only the far side
+    // can see.
+    return withDriver(address, async (opened) => {
+        const driver = opened as RedisDriver;
         const info = await driver.info();
         const read = (field: string): number => {
             const match = new RegExp(`^${field}:([^\r\n]+)`, "m").exec(info);
@@ -98,9 +101,7 @@ async function redisStats(address: DataAddress): Promise<DatabaseStats> {
                 gauge("net_out", "Bytes out", read("total_net_output_bytes"), "bytes")
             ]
         };
-    } finally {
-        await driver.close();
-    }
+    });
 }
 
 async function postgresStats(address: DataAddress): Promise<DatabaseStats> {

@@ -30,8 +30,14 @@ import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
+import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
+import { getHostConnection } from "@/lib/host-service";
 import { databaseCredentials } from "@/lib/database-service";
+import { captureHostKey, type DataTunnel } from "./tunnel";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { saveConnectionSchema, type SaveConnectionInput, type SshAuthMethod } from "./connection-schema";
+
+export type { SaveConnectionInput } from "./connection-schema";
 
 /** A database Polaris runs, opened without a connection having been saved. */
 const MANAGED_PREFIX = "managed:";
@@ -56,6 +62,11 @@ export interface DataConnectionView {
     readonly username: string | null;
     readonly readOnly: boolean;
     readonly tls: boolean;
+    /** The database's own address, for the form to edit. Null on a managed one. */
+    readonly host: string | null;
+    readonly port: number | null;
+    /** How it is reached when not directly. Never carries a secret. */
+    readonly tunnel: TunnelView | null;
     /** Something the row has to say before it is opened - that it cannot be
      *  reached from here, or why it is read-only. */
     readonly note: string | null;
@@ -66,23 +77,26 @@ export interface DataConnectionView {
     readonly createdAt: string | null;
 }
 
-/** What a browser may send to save one. Nothing here is trusted: the engine is
- *  checked against the list, the port against the range, and the host is a
- *  hostname rather than a URL somebody pasted. */
-export interface SaveConnectionInput {
-    readonly id?: string | null;
-    readonly name: string;
-    readonly engine: DataEngine;
-    readonly managedDatabaseId?: string | null;
-    readonly host?: string | null;
-    readonly port?: number | null;
-    readonly database?: string | null;
-    readonly username?: string | null;
-    /** Left absent on an edit to keep the stored one. */
-    readonly password?: string | null;
-    readonly tls?: boolean;
-    readonly readOnly?: boolean;
-}
+/** A connection's SSH tunnel, as a screen may see it. */
+export type TunnelView =
+    | {
+          readonly mode: "server";
+          /** Null once the server was removed from Servers. */
+          readonly hostId: string | null;
+          readonly hostName: string | null;
+      }
+    | {
+          readonly mode: "manual";
+          readonly host: string;
+          readonly port: number;
+          readonly username: string;
+          readonly authMethod: SshAuthMethod;
+          /** Set when the login is reached through a registered server. */
+          readonly jumpHostId: string | null;
+          readonly jumpHostName: string | null;
+          /** True when the jump server this login needs was removed. */
+          readonly jumpMissing: boolean;
+      };
 
 export class DataConnectionError extends Error {
     constructor(message: string) {
@@ -151,24 +165,89 @@ export async function listConnections(userId: string): Promise<DataConnectionVie
     const rows = await prisma.dataConnection.findMany({
         where: { ownerId: userId },
         orderBy: [{ lastUsedAt: "desc" }, { createdAt: "desc" }],
-        include: { managed: { select: { name: true, engine: true } } }
+        include: {
+            managed: { select: { name: true, engine: true } },
+            sshServer: { select: { name: true } },
+            sshJump: { select: { name: true } }
+        }
     });
-    return rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        engine: row.engine as DataEngine,
-        origin: "saved",
-        managedDatabaseId: row.managedDatabaseId,
-        where: row.managed ? row.managed.name : `${row.host ?? ""}:${row.port ?? ""}`,
-        database: row.database,
-        username: row.username,
-        readOnly: row.readOnly,
-        tls: row.tls,
-        note: null,
-        unreachable: false,
-        lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
-        createdAt: row.createdAt.toISOString()
-    }));
+    return rows.map((row) => {
+        const tunnel = row.managedDatabaseId ? null : tunnelView(row);
+        const broken = tunnel ? tunnelBroken(tunnel) : null;
+        const direct = `${row.host ?? ""}:${row.port ?? ""}`;
+        return {
+            id: row.id,
+            name: row.name,
+            engine: row.engine as DataEngine,
+            origin: "saved",
+            managedDatabaseId: row.managedDatabaseId,
+            where: row.managed
+                ? row.managed.name
+                : tunnel
+                  ? `${direct} via ${tunnelLabel(tunnel)}`
+                  : direct,
+            database: row.database,
+            username: row.username,
+            readOnly: row.readOnly,
+            tls: row.tls,
+            host: row.managedDatabaseId ? null : row.host,
+            port: row.managedDatabaseId ? null : row.port,
+            tunnel,
+            note: broken,
+            unreachable: broken !== null,
+            lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+            createdAt: row.createdAt.toISOString()
+        };
+    });
+}
+
+/** The columns a tunnel is read from. */
+interface TunnelColumns {
+    readonly sshMode?: string | null;
+    readonly sshHostId?: string | null;
+    readonly sshHost?: string | null;
+    readonly sshPort?: number | null;
+    readonly sshUsername?: string | null;
+    readonly sshAuthMethod?: string | null;
+    readonly sshJumpHostId?: string | null;
+    readonly sshServer?: { readonly name: string } | null;
+    readonly sshJump?: { readonly name: string } | null;
+}
+
+function tunnelView(row: TunnelColumns): TunnelView | null {
+    if (row.sshMode === "server") {
+        return { mode: "server", hostId: row.sshHostId ?? null, hostName: row.sshServer?.name ?? null };
+    }
+    if (row.sshMode === "manual" || row.sshMode === "manual-jump") {
+        return {
+            mode: "manual",
+            host: row.sshHost ?? "",
+            port: row.sshPort ?? 22,
+            username: row.sshUsername ?? "",
+            authMethod: row.sshAuthMethod === "password" ? "password" : "key",
+            jumpHostId: row.sshJumpHostId ?? null,
+            jumpHostName: row.sshJump?.name ?? null,
+            jumpMissing: row.sshMode === "manual-jump" && !row.sshJumpHostId
+        };
+    }
+    return null;
+}
+
+function tunnelLabel(tunnel: TunnelView): string {
+    if (tunnel.mode === "server") return tunnel.hostName ?? "a removed server";
+    const login = `${tunnel.username}@${tunnel.host}${tunnel.port === 22 ? "" : `:${tunnel.port}`}`;
+    return tunnel.jumpHostName ? `${login} through ${tunnel.jumpHostName}` : login;
+}
+
+/** Why a tunnel cannot be opened as saved, or null when it can. */
+function tunnelBroken(tunnel: TunnelView): string | null {
+    if (tunnel.mode === "server" && !tunnel.hostId) {
+        return "The server this connection tunnels through was removed from Servers. Edit it to pick another.";
+    }
+    if (tunnel.mode === "manual" && tunnel.jumpMissing) {
+        return "The server this tunnel jumps through was removed from Servers. Edit it to pick another.";
+    }
+    return null;
 }
 
 /** Said in the form and again on the list, because it is the one reason a
@@ -217,6 +296,9 @@ export async function listOpenable(userId: string): Promise<DataConnectionView[]
             // enough to write to it.
             readOnly: true,
             tls: false,
+            host: null,
+            port: null,
+            tunnel: null,
             note: entry.refusal ?? (entry.reachable ? null : UNREACHABLE),
             unreachable: !entry.reachable,
             lastUsedAt: null,
@@ -248,6 +330,9 @@ async function polarisDatabase(userId: string): Promise<DataConnectionView | nul
         username: address.username ?? null,
         readOnly: true,
         tls: address.tls,
+        host: null,
+        port: null,
+        tunnel: null,
         note: "Read-only. Polaris itself runs on this one.",
         unreachable: false,
         lastUsedAt: null,
@@ -303,29 +388,35 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
         if (target && isRedisCluster(target)) throw new DataConnectionError(REDIS_CLUSTER);
     }
 
+    const existing = parsed.id
+        ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
+        : null;
+    if (parsed.id && !existing) throw new DataConnectionError("That connection is not there any more.");
+
     const secret =
         parsed.password && !parsed.managedDatabaseId
             ? encryptCredentials({ password: parsed.password }, loadEnv().POLARIS_MASTER_KEY)
             : null;
+    const tunnel = parsed.managedDatabaseId ? CLEAR_TUNNEL : await tunnelColumns(userId, parsed, existing);
 
-    if (input.id) {
-        const existing = await prisma.dataConnection.findFirst({
-            where: { id: input.id, ownerId: userId },
-            select: { id: true }
-        });
-        if (!existing) throw new DataConnectionError("That connection is not there any more.");
+    const fields = {
+        name: parsed.name,
+        engine: parsed.engine,
+        managedDatabaseId: parsed.managedDatabaseId,
+        host: parsed.host,
+        port: parsed.port,
+        database: parsed.database,
+        username: parsed.username,
+        tls: parsed.tls,
+        readOnly: parsed.readOnly,
+        ...tunnel
+    };
+
+    if (existing) {
         await prisma.dataConnection.update({
             where: { id: existing.id },
             data: {
-                name: parsed.name,
-                engine: parsed.engine,
-                managedDatabaseId: parsed.managedDatabaseId,
-                host: parsed.host,
-                port: parsed.port,
-                database: parsed.database,
-                username: parsed.username,
-                tls: parsed.tls,
-                readOnly: parsed.readOnly,
+                ...fields,
                 // An edit that left the password alone keeps the stored one:
                 // asking for it again to rename a connection is how people end
                 // up keeping the password in a text file.
@@ -344,15 +435,7 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
     const created = await prisma.dataConnection.create({
         data: {
             ownerId: userId,
-            name: parsed.name,
-            engine: parsed.engine,
-            managedDatabaseId: parsed.managedDatabaseId,
-            host: parsed.host,
-            port: parsed.port,
-            database: parsed.database,
-            username: parsed.username,
-            tls: parsed.tls,
-            readOnly: parsed.readOnly,
+            ...fields,
             encryptedCredential: secret?.ciphertext ?? null,
             credentialNonce: secret?.nonce ?? null,
             credentialKeyId: secret?.keyId ?? null
@@ -361,6 +444,169 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
     });
     return created.id;
 }
+
+/** Every tunnel column, emptied: a direct connection, or a managed one. */
+const CLEAR_TUNNEL = {
+    sshMode: null,
+    sshHostId: null,
+    sshHost: null,
+    sshPort: null,
+    sshUsername: null,
+    sshAuthMethod: null,
+    sshEncryptedCredential: null,
+    sshCredentialNonce: null,
+    sshCredentialKeyId: null,
+    sshHostKey: null,
+    sshJumpHostId: null
+} as const;
+
+/** What a saved row already holds for its tunnel, when one is being edited. */
+interface StoredTunnel {
+    readonly sshMode: string | null;
+    readonly sshHost: string | null;
+    readonly sshPort: number | null;
+    readonly sshUsername: string | null;
+    readonly sshAuthMethod: string | null;
+    readonly sshEncryptedCredential: Uint8Array | null;
+    readonly sshCredentialNonce: Uint8Array | null;
+    readonly sshCredentialKeyId: string | null;
+    readonly sshHostKey: string | null;
+    readonly sshJumpHostId: string | null;
+}
+
+/**
+ * The tunnel columns for a save.
+ *
+ * A registered server is checked to be this account's and nothing of it is
+ * copied. A typed login is signed in to once - through the jump server when
+ * there is one - both to prove it works and to capture the key to pin; an edit
+ * that changed none of where it points or how it signs in keeps the pinned key
+ * and the stored secret instead of asking for them again.
+ */
+async function tunnelColumns(
+    userId: string,
+    parsed: ReturnType<typeof validate>,
+    existing: StoredTunnel | null
+) {
+    const ssh = parsed.ssh;
+    if (!ssh) return CLEAR_TUNNEL;
+
+    if (ssh.mode === "server") {
+        await ownServer(userId, ssh.hostId, "The server to tunnel through is not one of yours.");
+        return { ...CLEAR_TUNNEL, sshMode: "server", sshHostId: ssh.hostId };
+    }
+
+    const jump = ssh.jumpHostId
+        ? await ownServer(userId, ssh.jumpHostId, "The server to jump through is not one of yours.")
+        : null;
+
+    const stored = existing && (existing.sshMode === "manual" || existing.sshMode === "manual-jump") ? existing : null;
+    const typed = typedSecret(ssh);
+    const keepSecret = !typed && stored?.sshAuthMethod === ssh.authMethod && stored.sshEncryptedCredential;
+    if (!typed && !keepSecret) {
+        throw new DataConnectionError(
+            ssh.authMethod === "password"
+                ? "Enter the password for the SSH login."
+                : "Paste the private key for the SSH login."
+        );
+    }
+    const credentials: SshCredentials = typed ?? readSshCredentials(stored as StoredTunnel);
+
+    const unchanged =
+        !typed &&
+        stored !== null &&
+        stored.sshHost === ssh.host &&
+        stored.sshPort === ssh.port &&
+        stored.sshUsername === ssh.username &&
+        (stored.sshJumpHostId ?? null) === ssh.jumpHostId &&
+        Boolean(stored.sshHostKey);
+
+    let hostKey = unchanged ? (stored?.sshHostKey as string) : null;
+    if (!hostKey) {
+        try {
+            hostKey = await captureHostKey(
+                { host: ssh.host, port: ssh.port, username: ssh.username, auth: toSshAuth(credentials) },
+                jump ? serverOptions(jump) : null
+            );
+        } catch (error) {
+            console.error("databases: the SSH login did not work", error);
+            throw new DataConnectionError(
+                `Polaris could not sign in to ${ssh.host}:${ssh.port} over SSH${
+                    jump ? ` through ${jump.name}` : ""
+                }. Check the address, the user and the ${ssh.authMethod === "password" ? "password" : "key"}.`
+            );
+        }
+    }
+
+    const blob = typed ? encryptCredentials(typed, loadEnv().POLARIS_MASTER_KEY) : null;
+    return {
+        ...CLEAR_TUNNEL,
+        sshMode: jump ? "manual-jump" : "manual",
+        sshHost: ssh.host,
+        sshPort: ssh.port,
+        sshUsername: ssh.username,
+        sshAuthMethod: ssh.authMethod,
+        sshEncryptedCredential: blob ? blob.ciphertext : (stored?.sshEncryptedCredential ?? null),
+        sshCredentialNonce: blob ? blob.nonce : (stored?.sshCredentialNonce ?? null),
+        sshCredentialKeyId: blob ? blob.keyId : (stored?.sshCredentialKeyId ?? null),
+        sshHostKey: hostKey,
+        sshJumpHostId: jump ? jump.id : null
+    };
+}
+
+/** An SSH secret, in the shape a registered server's is stored in. */
+type SshCredentials =
+    | { method: "password"; password: string }
+    | { method: "key"; privateKey: string; passphrase?: string };
+
+function typedSecret(ssh: Extract<ReturnType<typeof validate>["ssh"], { mode: "manual" }>): SshCredentials | null {
+    if (ssh.authMethod === "password") return ssh.password ? { method: "password", password: ssh.password } : null;
+    if (!ssh.privateKey) return null;
+    return ssh.passphrase
+        ? { method: "key", privateKey: ssh.privateKey, passphrase: ssh.passphrase }
+        : { method: "key", privateKey: ssh.privateKey };
+}
+
+function readSshCredentials(row: StoredTunnel): SshCredentials {
+    return decryptCredentials<SshCredentials>(
+        {
+            ciphertext: Buffer.from(row.sshEncryptedCredential as Uint8Array),
+            nonce: Buffer.from(row.sshCredentialNonce as Uint8Array),
+            keyId: row.sshCredentialKeyId ?? ""
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+}
+
+function toSshAuth(credentials: SshCredentials): SshAuth {
+    return credentials.method === "password"
+        ? { method: "password", password: credentials.password }
+        : { method: "key", privateKey: credentials.privateKey, passphrase: credentials.passphrase };
+}
+
+type OwnedServer = Awaited<ReturnType<typeof getHostConnection>>;
+
+/** A registered server this account owns, or the refusal given. */
+async function ownServer(userId: string, hostId: string, refusal: string): Promise<OwnedServer> {
+    try {
+        return await getHostConnection(hostId, userId);
+    } catch {
+        throw new DataConnectionError(refusal);
+    }
+}
+
+function serverOptions(server: OwnedServer): SshConnectOptions {
+    return {
+        host: server.address,
+        port: server.port,
+        username: server.username,
+        auth: server.auth,
+        // A registered server is pinned when it is added; one with no key on
+        // record (added before pinning) is refused rather than trusted.
+        pinnedHostKey: server.hostKey ? [server.hostKey] : []
+    };
+}
+
 
 export async function deleteConnection(userId: string, id: string): Promise<void> {
     const deleted = await prisma.dataConnection.deleteMany({ where: { id, ownerId: userId } });
@@ -421,7 +667,46 @@ export async function addressOf(userId: string, id: string): Promise<DataAddress
         username: row.username,
         password,
         tls: row.tls,
-        readOnly: row.readOnly
+        readOnly: row.readOnly,
+        tunnel: await resolveTunnel(userId, row)
+    };
+}
+
+/**
+ * The logins a saved tunnel needs, re-read on every open: a registered server's
+ * from its own row, so rotating its key reaches every connection through it.
+ */
+async function resolveTunnel(userId: string, row: StoredTunnel & TunnelColumns): Promise<DataTunnel | null> {
+    const view = tunnelView(row);
+    if (!view) return null;
+    const broken = tunnelBroken(view);
+    if (broken) throw new DataConnectionError(broken);
+
+    if (view.mode === "server") {
+        const server = await ownServer(
+            userId,
+            view.hostId as string,
+            "The server this connection tunnels through is not one of yours any more."
+        );
+        return { target: serverOptions(server), jump: null, label: server.name };
+    }
+
+    if (!row.sshHostKey || !row.sshEncryptedCredential || !row.sshCredentialNonce) {
+        throw new DataConnectionError("This connection's SSH login is incomplete. Edit it and save it again.");
+    }
+    const jump = view.jumpHostId
+        ? await ownServer(userId, view.jumpHostId, "The server this tunnel jumps through is not one of yours any more.")
+        : null;
+    return {
+        target: {
+            host: view.host,
+            port: view.port,
+            username: view.username,
+            auth: toSshAuth(readSshCredentials(row)),
+            pinnedHostKey: [row.sshHostKey]
+        },
+        jump: jump ? serverOptions(jump) : null,
+        label: jump ? `${view.host} (through ${jump.name})` : view.host
     };
 }
 
@@ -495,66 +780,29 @@ function address(
     };
 }
 
-/** Checks a save before anything is stored. Everything a browser sent is
- *  suspect, including the parts a form would normally get right. */
-function validate(input: SaveConnectionInput): {
-    name: string;
-    engine: DataEngine;
-    managedDatabaseId: string | null;
-    host: string | null;
-    port: number | null;
-    database: string | null;
-    username: string | null;
-    password: string | null;
-    tls: boolean;
-    readOnly: boolean;
-} {
-    const name = String(input.name ?? "").trim();
-    if (!name) throw new DataConnectionError("Give the connection a name.");
-    if (name.length > 80) throw new DataConnectionError("That name is too long.");
-
-    const engine = input.engine;
-    if (!core.DB_ENGINES.includes(engine)) throw new DataConnectionError("Unknown engine.");
-
-    const managedDatabaseId = input.managedDatabaseId?.trim() || null;
-    if (managedDatabaseId) {
+/**
+ * Checks a save before anything is stored, with the schema the form validates
+ * against as it is typed. Everything a browser sent is suspect, including the
+ * parts a form would normally get right.
+ */
+function validate(input: SaveConnectionInput) {
+    const parsed = saveConnectionSchema.safeParse(input);
+    if (!parsed.success) {
+        throw new DataConnectionError(parsed.error.issues[0]?.message ?? "That connection is not valid.");
+    }
+    const value = parsed.data;
+    if (value.managedDatabaseId) {
         return {
-            name,
-            engine,
-            managedDatabaseId,
+            ...value,
             host: null,
             port: null,
             database: null,
             username: null,
             password: null,
             tls: false,
-            readOnly: input.readOnly !== false
+            ssh: null
         };
     }
-
-    const host = String(input.host ?? "").trim();
-    if (!host) throw new DataConnectionError("Give the address of the database.");
-    // A hostname or an address, not a URL: pasting a whole connection string in
-    // here silently produces a host nothing resolves.
-    if (/[\s/@]/.test(host)) {
-        throw new DataConnectionError("Enter a hostname or an IP address, without the rest of a URL.");
-    }
-
-    const port = Number(input.port ?? core.DB_ENGINE_INFO[engine].port);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new DataConnectionError("That is not a port.");
-    }
-
-    return {
-        name,
-        engine,
-        managedDatabaseId: null,
-        host,
-        port,
-        database: input.database?.trim() || null,
-        username: input.username?.trim() || null,
-        password: input.password ?? null,
-        tls: input.tls === true,
-        readOnly: input.readOnly !== false
-    };
+    // A port left out is the engine's own, which is what a client assumes too.
+    return { ...value, host: value.host as string, port: value.port ?? core.DB_ENGINE_INFO[value.engine].port };
 }

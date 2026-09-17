@@ -12,6 +12,7 @@
 
 import { Client } from "ssh2";
 import type { ConnectConfig } from "ssh2";
+import type { Duplex } from "node:stream";
 
 const DEFAULT_READY_TIMEOUT_MS = 15_000;
 
@@ -51,6 +52,9 @@ export interface SshConnectOptions {
     /** Invoked with the server's key (base64) as soon as it is presented. */
     readonly onHostKey?: (hostKey: string) => void;
     readonly readyTimeoutMs?: number;
+    /** An already-open stream to the server to speak SSH over instead of a new
+     *  TCP connection - a `direct-tcpip` channel from a jump host, typically. */
+    readonly sock?: Duplex;
 }
 
 /**
@@ -111,6 +115,7 @@ function buildConnectConfig(options: SshConnectOptions): ConnectConfig {
         readyTimeout: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
         keepaliveInterval: KEEPALIVE_INTERVAL_MS,
         keepaliveCountMax: KEEPALIVE_COUNT_MAX,
+        ...(options.sock ? { sock: options.sock as ConnectConfig["sock"] } : {}),
         hostVerifier: (key: Buffer): boolean => {
             const presented = key.toString("base64");
             options.onHostKey?.(presented);
