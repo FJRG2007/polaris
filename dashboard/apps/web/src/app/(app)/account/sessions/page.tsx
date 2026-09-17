@@ -13,6 +13,7 @@
 import { requireUser } from "@/lib/session";
 import { SessionsView } from "./sessions-view";
 import { listVaultClients } from "@/lib/vault/devices";
+import { listExtensionSessions } from "@/lib/extension/sessions";
 import { listTrustedDeviceRows, listUserSessions } from "@/lib/session-directory";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +23,12 @@ export default async function SessionsPage() {
     // The apps as well as the browsers. A client is a different credential from a
     // session and was listed only under the vault, so somebody who connected the
     // extension and came here to check found no trace of it.
-    const [sessions, trusted, clients] = await Promise.all([
+    const [sessions, trusted, extensions, clients] = await Promise.all([
         listUserSessions(user.id, user.sessionId),
         listTrustedDeviceRows(user.id),
+        // The browser extensions, which are connections rather than vault
+        // clients: they are listed and ended here like any other device.
+        listExtensionSessions(user.id),
         listVaultClients(user.id).catch(() => [])
     ]);
 
@@ -39,7 +43,12 @@ export default async function SessionsPage() {
                     Where your account is signed in, and which devices it stops asking.
                 </p>
             </div>
-            <SessionsView sessions={sessions} trusted={trusted} clients={clients} />
+            <SessionsView
+                sessions={sessions}
+                trusted={trusted}
+                extensions={extensions}
+                clients={clients}
+            />
         </div>
     );
 }

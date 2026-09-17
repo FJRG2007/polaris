@@ -22,6 +22,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
+import { revokeExtensionSession } from "@/lib/extension/sessions";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
     decideLoginApproval,
@@ -243,4 +244,34 @@ export async function decideLoginApprovalAction(
     );
     if (!result.error) revalidatePath("/account/sessions");
     return result;
+}
+
+/**
+ * End a browser extension's connection.
+ *
+ * The same gate the other device actions pass, and for the same reason: cutting
+ * off a device is an act somebody who has just arrived with a password should
+ * not be able to perform before the account has decided they are its owner.
+ *
+ * What the extension holds stops working on its next request, which it makes
+ * when it wakes and on a timer - and any vault it was let into goes with it.
+ */
+export async function disconnectExtensionAction(id: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = sessionIdSchema.safeParse(id);
+    if (!parsed.success) return { error: "Unknown connection." };
+
+    const ended = await revokeExtensionSession(user.id, parsed.data);
+    if (!ended.revoked) return { error: "That connection has already ended." };
+
+    await recordAudit({
+        actorId: user.id,
+        action: "account.extension.disconnected",
+        targetType: "extension",
+        targetId: parsed.data
+    });
+    revalidatePath("/account/sessions");
+    return {};
 }

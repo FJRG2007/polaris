@@ -71,7 +71,10 @@ async function orgClaims(userId: string) {
 /** Remember the client that just signed in, so its owner can recognize it. */
 async function rememberDevice(
     userId: string,
-    device: SignInInput["device"]
+    device: SignInInput["device"],
+    /** The browser extension connection this client was let in under, when it was
+     *  one. Ending that connection revokes this device's tokens with it. */
+    extensionSessionId: string | null = null
 ): Promise<string | null> {
     if (!device) return null;
     const row = await prisma.vaultDevice.upsert({
@@ -80,9 +83,18 @@ async function rememberDevice(
             userId,
             identifier: device.identifier,
             name: device.name,
-            type: device.type
+            type: device.type,
+            extensionSessionId
         },
-        update: { name: device.name, type: device.type, revisionDate: new Date() },
+        update: {
+            name: device.name,
+            type: device.type,
+            revisionDate: new Date(),
+            // Left alone when this sign-in names no connection, so a client that
+            // signs in again with a password keeps the connection it belongs to
+            // rather than quietly becoming unmanaged.
+            ...(extensionSessionId ? { extensionSessionId } : {})
+        },
         select: { id: true }
     });
     return row.id;
@@ -166,9 +178,10 @@ async function tokenBody(
  */
 export async function issueVaultToken(
     userId: string,
-    device: SignInInput["device"]
+    device: SignInInput["device"],
+    extensionSessionId: string | null = null
 ): Promise<Record<string, unknown>> {
-    const deviceId = await rememberDevice(userId, device);
+    const deviceId = await rememberDevice(userId, device, extensionSessionId);
     return tokenBody(userId, deviceId, device?.identifier ?? null);
 }
 

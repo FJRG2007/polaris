@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { deviceSchema } from "@polaris/core";
 import { preloginFor } from "@/lib/vault/account";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { readExtensionToken } from "@/lib/extension/sessions";
 import { issueClientKey } from "@/lib/vault/client-key";
 import { readAnyBody, readJsonBody, type VaultContext } from "@/lib/vault/api/router";
 import { clientHost, clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
@@ -192,9 +193,21 @@ export async function connectAuthorize(context: VaultContext): Promise<Response>
         return grantError("That public key is not one a vault key can be sealed to.");
     }
 
+    // The extension connects to the account before it asks for a vault, and the
+    // token it holds for that is what ties the two together. Optional here
+    // because this route is the way in for every client that signs in this way,
+    // not only the extension - but a token that IS presented has to be a live
+    // one, so a connection somebody ended cannot go on opening vaults.
+    const extensionToken = typeof body.extensionToken === "string" ? body.extensionToken : null;
+    const connection = extensionToken ? await readExtensionToken(extensionToken) : null;
+    if (extensionToken && !connection) {
+        return grantError("This extension's connection to Polaris has ended. Connect it again.", 401);
+    }
+
     const opened = await openVaultAuthorization(
         {
             publicKey,
+            extensionSessionId: connection?.id ?? null,
             deviceIdentifier: device.data.identifier,
             deviceName: device.data.name,
             deviceType: device.data.type,
@@ -246,7 +259,11 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
 
     // The same credential the password grant issues, because it reaches the same
     // surface; what differs is that it was earned in person rather than typed.
-    const token = await issueVaultToken(claim.claimed.userId, claim.claimed.device);
+    const token = await issueVaultToken(
+        claim.claimed.userId,
+        claim.claimed.device,
+        claim.claimed.extensionSessionId
+    );
     // The account credential, so one approval is the whole of it: a client that
     // has just been let in should not then ask for a second sign-in to find out
     // whose account it is on. Absent only when the account holds nothing this

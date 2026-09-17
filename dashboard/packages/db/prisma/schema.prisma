@@ -226,6 +226,7 @@ model User {
     apiKeys             ApiKey[]
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
+    extensionSessions    ExtensionSession[]
     trustedDevices      TrustedDevice[]
     accountDevices      AccountDevice[]
     deviceCodes         DeviceCode[]
@@ -3004,14 +3005,21 @@ model VaultDevice {
     name         String
     type         Int
     pushToken    String?
+    // The browser extension connection this client was let in under, when it was
+    // one. Ending that connection revokes this device's tokens with it, so a
+    // vault reached from an extension is cut off by the same press that cuts off
+    // the extension.
+    extensionSessionId String? @db.Uuid
     createdAt    DateTime @default(now())
     revisionDate DateTime @default(now())
 
     vault         VaultAccount        @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    extension     ExtensionSession?   @relation(fields: [extensionSessionId], references: [id], onDelete: SetNull)
     refreshTokens VaultRefreshToken[]
 
     @@unique([userId, identifier])
     @@index([userId])
+    @@index([extensionSessionId])
 }
 
 // A refresh token, stored as a hash for the same reason a share token is: what
@@ -3048,6 +3056,78 @@ model VaultRefreshToken {
 // the row is deleted the moment it is spent. There is deliberately no relation to
 // the account - the column is a plain id - because these rows outlive nothing and
 // a cascade would be the only thing the relation bought.
+// A browser extension that has been authorized to act for an account.
+//
+// The extension asks first and is told to go and be approved in Polaris: the
+// same device-authorization shape the vault sign-in uses, but for the account
+// rather than for the vault, and it is the first thing the extension does. What
+// it holds afterwards is one bearer token, stored here only as a hash, which it
+// presents on every request - so ending a connection from the Sessions screen
+// cuts it off on the next one, wherever that browser is.
+//
+// It is NOT a better-auth session: the extension holds no cookie, signs nothing
+// in a browsing context, and must not inherit a session's reach. What it is
+// allowed to do is decided per route, and today that is: say who it is, and be
+// the connection a vault client is let in under.
+model ExtensionSession {
+    id        String @id @default(uuid(7)) @db.Uuid
+    userId    String @db.Uuid
+    // What the extension calls this install, so one browser can be told from
+    // another on the same machine. Its own claim, never verified.
+    deviceId  String
+    name      String
+    // Read from the request that claimed it, not from anything the extension
+    // said about itself - the same rule the session list follows.
+    browser   String?
+    os        String?
+    ip        String?
+    userAgent String?
+    // Which of this deployment's names it was authorized on.
+    host      String?
+    // The bearer token, hashed. What is in the database cannot be replayed.
+    tokenHash String @unique
+    // The browser session that approved it, for the row that says who let it in.
+    approvedBySessionId String? @db.Uuid
+    createdAt  DateTime  @default(now())
+    lastSeenAt DateTime  @default(now())
+    // Set when it was ended. The row stays so the account's history still has it.
+    revokedAt  DateTime?
+
+    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    vaultDevices VaultDevice[]
+
+    @@unique([userId, deviceId])
+    @@index([userId])
+}
+
+// One extension waiting to be let in, before there is a session.
+//
+// Short-lived and single-use, like the vault's own: the short code is what a
+// person reads in the popup and approves in Polaris, and the long one is the
+// extension's proof that the approval it collects is its own.
+model ExtensionAuthorization {
+    id       String @id @default(uuid(7)) @db.Uuid
+    codeHash String @unique
+    userCode String @unique
+    deviceId String
+    // What the extension called itself, for the screen that decides.
+    deviceName String
+    // What the request looked like, read off the request rather than its body.
+    requestIp        String?
+    requestUserAgent String?
+    requestHost      String?
+    // pending | approved | denied
+    status String
+    // Who answered it. Only they may be signed in to by the claim.
+    userId String? @db.Uuid
+    // The session that answered, carried to the connection it creates.
+    approvedBySessionId String? @db.Uuid
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    @@index([expiresAt])
+}
+
 model VaultAuthorization {
     id         String  @id @default(uuid(7)) @db.Uuid
     // What the extension polls with, hashed like a refresh token: what is in the
@@ -3076,6 +3156,9 @@ model VaultAuthorization {
     requestIp        String?
     requestUserAgent String?
     requestHost      String?
+    // The extension connection that asked, when the asker was one. Carried to
+    // the device the claimed token is bound to.
+    extensionSessionId String? @db.Uuid
     expiresAt  DateTime
     createdAt  DateTime @default(now())
 

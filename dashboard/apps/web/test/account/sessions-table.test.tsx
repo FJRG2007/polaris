@@ -292,3 +292,52 @@ describe("the one-line origin", () => {
         expect(sessionOrigin(session({ ip: null, country: null, host: null }))).toBe("Unknown location");
     });
 });
+
+describe("a browser extension's connection", () => {
+    /** One connection, as the account's own Sessions screen is handed it. */
+    const connection = {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "Chrome on Windows",
+        browser: "Chrome",
+        os: "Windows",
+        ip: "192.168.1.131",
+        host: "polaris.local",
+        createdAt: "2026-09-01T10:00:00.000Z",
+        lastSeenAt: "2026-09-17T10:00:00.000Z",
+        vaultClients: 1
+    };
+
+    function renderWithExtension(onDisconnect?: () => void): string {
+        return renderToStaticMarkup(
+            <SessionsTable
+                sessions={[]}
+                extensions={[connection]}
+                busyId={null}
+                emptyLabel="Nothing is signed in."
+                onRevoke={() => {}}
+                {...(onDisconnect ? { onDisconnect } : {})}
+            />
+        );
+    }
+
+    it("is a row beside the browsers, with what it was seen from", () => {
+        const markup = renderWithExtension(() => {});
+        expect(markup).toContain("Chrome");
+        expect(markup).toContain("Windows");
+        expect(markup).toContain("192.168.1.131");
+        expect(markup).toContain("polaris.local");
+        expect(markup).toContain("Extension");
+    });
+
+    it("can be ended from here, like every other device", () => {
+        expect(renderWithExtension(() => {})).toContain("Disconnect Chrome");
+    });
+
+    it("offers no ending to a reader who is not its owner", () => {
+        expect(renderWithExtension()).not.toContain("Disconnect Chrome");
+    });
+
+    it("does not read as an empty list", () => {
+        expect(renderWithExtension(() => {})).not.toContain("Nothing is signed in.");
+    });
+});
