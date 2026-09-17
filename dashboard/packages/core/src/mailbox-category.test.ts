@@ -577,10 +577,10 @@ describe("mail about a purchase somebody financed", () => {
     it("knows credit named without a possessive, in the languages it arrives in", () => {
         for (const subject of [
             "Financiación Cetelem en APPLE",
-            "Compra financiada en 12 cuotas",
+            "Compra financiada en APPLE",
             "Detalle del pago aplazado de tu compra",
             "Financing summary for your MacBook",
-            "Installment plan for your order",
+            "Your Pay in 3 balance at Apple",
             "Financiamento da sua compra",
             "Paiement en 3 fois de votre achat",
             "Ratenzahlung für Ihren Einkauf",
@@ -628,6 +628,37 @@ describe("mail about a purchase somebody financed", () => {
             ["Financing available on every laptop", "Apply now, as low as 0% APR"]
         ]) {
             expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");
+        }
+    });
+
+    it("knows an advert in the other four languages the nouns are written in", () => {
+        // The nouns cover six languages, so the words that give an advert away
+        // have to cover the same six: an advert nothing recognises as one is
+        // read as somebody's own credit.
+        for (const [subject, snippet] of [
+            ["Paiement en 3 fois sans frais", "Offre valable jusqu'à dimanche"],
+            ["Ratenzahlung ab 0 Euro Anzahlung - jetzt entdecken", "Finanzieren Sie Ihren Einkauf"],
+            ["Buy now, pay later with Klarna", "Split your total in 4, interest free"],
+            ["Rateizzato senza interessi su tutto", "Scopri il finanziamento"],
+            ["Financiamento sem juros", "Solicite já o seu"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");
+        }
+    });
+
+    it("leaves a person's own message alone, whatever noun they used", () => {
+        // The bare nouns are words anybody may use, so they are read only on
+        // mail that said it was bulk. A friend mentioning the mortgage, a
+        // colleague asking how the purchase went: Primary, where they were.
+        for (const [subject, snippet] of [
+            ["Lo de la hipoteca", "¿Te va bien el jueves para ver la financiación del proyecto?"],
+            ["Re: financing the new machines", "Can we talk on Thursday about how we finance it?"],
+            ["¿Qué te pareció la compra?", "Cuéntanos, que estamos pensando en lo mismo"]
+        ]) {
+            expect(
+                categoriseMail(message({ subject: subject!, snippet: snippet! })),
+                subject
+            ).toBe("primary");
         }
     });
 

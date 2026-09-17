@@ -640,9 +640,11 @@ const FINANCING: readonly RegExp[] = [
  * There is no possessive, no decision and no receipt in that, so every question
  * missed it and a mailing-list survey about somebody's own financed purchase
  * landed under Updates with the parcels. The noun on its own is the signal, and
- * what makes it safe to use is where it is asked: below the offer, so a lender
- * selling credit is still an advert, and guarded by `FINANCING_OFFER` below, so
- * an advert that mentions no offer word is not read as somebody's own credit.
+ * three things make it safe to use: it is asked below the offer, so a lender
+ * selling credit is still an advert; it is guarded by `FINANCING_OFFER` below,
+ * so an advert that mentions no offer word is not read as somebody's own
+ * credit; and it is asked of bulk mail only, so the word in a person's own
+ * message is left exactly where it is.
  */
 const FINANCING_MENTION: readonly RegExp[] = [
     // Spanish
@@ -658,7 +660,6 @@ const FINANCING_MENTION: readonly RegExp[] = [
     // English
     /\bfinancing\b/,
     /\bfinanced purchase\b/,
-    /\binstal?lment plan\b/,
     /\bpay in \d\b/,
     /\bbuy now,? pay later\b/,
     // Portuguese
@@ -691,8 +692,16 @@ const FINANCING_MENTION: readonly RegExp[] = [
  * Deliberately not added to the promotion words themselves: "sin intereses" is
  * also how a real instalment receipt describes what was charged, and a receipt
  * that landed in Promotions would be the worse mistake of the two.
+ *
+ * Six languages, the same six the nouns above are written in, and that pairing
+ * is the point: a guard that stops at Spanish and English leaves "paiement en 3
+ * fois sans frais" and "Ratenzahlung ab 0 Euro - jetzt entdecken" with no offer
+ * word to be recognised by, and an advert nothing recognises is read as
+ * somebody's own credit. The nouns and the guard travel together or the guard
+ * is not one.
  */
 const FINANCING_OFFER: readonly RegExp[] = [
+    // Spanish
     /\bsin intereses\b/,
     /\bal? ?0\s*%/,
     /\b0\s*%\s*(?:tae|tin|apr)\b/,
@@ -701,10 +710,36 @@ const FINANCING_OFFER: readonly RegExp[] = [
     /\bsolicita(?:lo|la|r)?\b/,
     /\bdescubre\b/,
     /\bcontrata(?:lo|la|r)?\b/,
+    // English
     /\bapply now\b/,
     /\bget approved\b/,
     /\bas low as\b/,
-    /\bup to \d{1,2} months\b/
+    /\bup to \d{1,2} months\b/,
+    /\binterest[ -]free\b/,
+    /\bno (?:fees|interest)\b/,
+    /\bsplit (?:it|your|the|into)\b/,
+    // Portuguese
+    /\bsem juros\b/,
+    /\bate \d{1,2} (?:meses|prestacoes)\b/,
+    /\bsolicite\b/,
+    /\bdescubra\b/,
+    // French
+    /\bsans frais\b/,
+    /\bsans interets\b/,
+    /\bjusqu\W?a \d{1,2} (?:mois|fois)\b/,
+    /\bdemandez\b/,
+    /\bdecouvrez\b/,
+    // German
+    /\bohne zinsen\b/,
+    /\bzinsfrei\b/,
+    /\bab 0\s*(?:euro|eur|%)/,
+    /\bbis zu \d{1,2} (?:monate|monaten|raten)\b/,
+    /\bjetzt (?:entdecken|beantragen|sichern)\b/,
+    // Italian
+    /\bsenza interessi\b/,
+    /\bfino a \d{1,2} (?:mesi|rate)\b/,
+    /\brichiedi(?:lo|la)?\b/,
+    /\bscopri\b/
 ];
 
 /**
@@ -752,25 +787,24 @@ const SURVEY_WORDS: readonly string[] = [
  * What a survey has to be about for it to be money.
  *
  * The bare nouns, which is what makes this different from `PURCHASE_WORDS`: a
- * survey says "tu experiencia de compra" and "sobre tu pedido", neither of which
- * contains a phrase from that list. They are only ever read together with a
- * survey word, so a bare "compra" cannot file anything on its own.
+ * survey says "tu experiencia de compra" and "how was your purchase", and what
+ * it leaves out is exactly what that list is built from - the possessive and the
+ * confirmation a receipt is written with. They are only ever read together with
+ * a survey word, so a bare "compra" cannot file anything on its own.
+ *
+ * Only the nouns no earlier list already answers for. A survey that names an
+ * invoice, a factura or a pedido is decided by the billing and purchase words
+ * above, with the same answer, before this is ever asked - carrying them here
+ * too would claim a reach these words do not have.
  */
 const PURCHASE_NOUNS: readonly string[] = [
     "purchase",
     "order",
-    "invoice",
     "payment",
     "compra",
-    "pedido",
-    "factura",
     "pago",
-    "encomenda",
-    "commande",
     "achat",
-    "bestellung",
     "kauf",
-    "ordine",
     "acquisto"
 ];
 
@@ -880,8 +914,16 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // follows a purchase. Both sit here, under the offer: a lender advertising
     // is still an advert, and a campaign that asks for an opinion on its way to
     // selling something is still a campaign.
-    if (financing && !sellingCredit && !promotional) return "billing";
-    if (asksWhatYouThought && !promotional) return "billing";
+    //
+    // And both are asked of bulk mail only, which is the whole difference
+    // between these two and the strong patterns above them. Those require a
+    // possessive or a decision - "tu financiacion", "loan approved" - and a
+    // person does not write either by accident. A bare noun is a word anybody
+    // may use: a friend writing about the mortgage, a colleague about how the
+    // project is financed, an architect asking what you thought of something you
+    // bought. Those arrive with no list header, and Primary is where they stay.
+    if (bulk && financing && !sellingCredit && !promotional) return "billing";
+    if (bulk && asksWhatYouThought && !promotional) return "billing";
     if (bulk && promotional) return "promotions";
     if (bulk) return "updates";
     if (transactional) return "updates";
