@@ -67,6 +67,7 @@ import {
     storedPaneSize
 } from "./pane-preferences";
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
+import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, ConfirmDeleteDialog, EmptyState, ResizeHandle, Skeleton, cn } from "@polaris/ui";
 
@@ -126,9 +127,23 @@ function drawn(): Promise<void> {
  */
 const MAX_WINDOW = 200;
 
-/** How close to an edge starts the next page loading. Roughly a screenful, so
- *  it arrives before the reader gets there rather than after. */
-const NEAR_EDGE = 600;
+/** How close to an edge starts the next page loading, at the least. Measured in
+ *  screens as well (`EDGE_SCREENS`), whichever is further: a page that starts
+ *  loading a few screens early is on the page, and laid out, before the reader
+ *  reaches it - which is what keeps reading upwards from stalling and jumping. */
+const NEAR_EDGE = 1200;
+const EDGE_SCREENS = 3;
+
+/** How far above the newest message, in screens, counts as reading older
+ *  messages - the point where the way back to the present is offered. */
+const AWAY_SCREENS = 1.5;
+
+/** Whether the list is scrolled far enough above the newest message to count
+ *  as reading older messages. */
+function readingOlder(element: HTMLElement): boolean {
+    const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+    return below > element.clientHeight * AWAY_SCREENS;
+}
 
 /** How long a freshly opened conversation keeps putting itself at the bottom
  *  while everything late finishes arriving. */
@@ -193,6 +208,13 @@ export function ChannelView({
     // dragged to it - that is the one thing a chat must not do to somebody
     // mid-sentence - but they are told, and one press takes them there.
     const [unseen, setUnseen] = useState(0);
+    /** Whether the reader is far enough up to be reading older messages. */
+    const [away, setAway] = useState(false);
+    /** The line the reader is on while they are not following the bottom, kept
+     *  so anything that changes height above them - a picture arriving, a page
+     *  added - leaves them on it instead of moving the text under their eyes. */
+    const readingAt = useRef<ReadingPosition | null>(null);
+    const measuring = useRef(false);
     const [live, setLive] = useState<calls.LiveCall | null>(null);
     // The call this browser is sitting in, held above every screen so that
     // walking out of the conversation shrinks it into a bar rather than hanging
@@ -605,6 +627,10 @@ export function ChannelView({
         // newest line.
         settling.current = 0;
         element.scrollIntoView({ block: "center" });
+        if (scroller.current) {
+            readingAt.current = readingPosition(scroller.current);
+            setAway(readingOlder(scroller.current));
+        }
         setHighlight(messageId);
         setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
         return true;
@@ -1008,9 +1034,10 @@ export function ChannelView({
         if (anchor.current !== null) {
             element.scrollTop += element.scrollHeight - anchor.current;
             anchor.current = null;
-            return;
-        }
-        if (following.current) stick();
+            readingAt.current = readingPosition(element);
+        } else if (following.current) stick();
+        else readingAt.current = keepReading(element, readingAt.current);
+        setAway(readingOlder(element));
     }, [shown, stick]);
 
     /**
@@ -1026,7 +1053,15 @@ export function ChannelView({
         const element = scroller.current;
         if (!element || typeof ResizeObserver === "undefined") return;
         const watcher = new ResizeObserver(() => {
-            if (following.current && anchor.current === null) stick();
+            if (anchor.current !== null) return;
+            if (following.current) stick();
+            // Height that arrived above the reader - a picture, a link card, a
+            // player - would otherwise push the line they are reading down the
+            // screen. The list opts out of the browser's own scroll anchoring
+            // because it fights the bottom, so this is that anchoring, done
+            // here for a reader who is not at the bottom.
+            else readingAt.current = keepReading(element, readingAt.current);
+            setAway(readingOlder(element));
         });
         for (const child of element.children) watcher.observe(child);
         return () => watcher.disconnect();
@@ -1565,11 +1600,27 @@ export function ChannelView({
                         setUnseen(0);
                         catchUpMark(true);
                     } else if (Date.now() > settling.current) following.current = false;
+                    setAway(readingOlder(element));
+                    // Where the reader is, once a frame, for `keepReading`.
+                    // Height that grew since the last frame is put right
+                    // first, since this runs before the resize observer
+                    // would have seen it.
+                    if (!following.current && !measuring.current) {
+                        measuring.current = true;
+                        requestAnimationFrame(() => {
+                            measuring.current = false;
+                            const list = scroller.current;
+                            if (!list || anchor.current !== null || following.current) return;
+                            keepReading(list, readingAt.current);
+                            readingAt.current = readingPosition(list);
+                        });
+                    }
                     // Both edges, because the window moves in both
                     // directions: up into the history, and back down out of
                     // it. Each is a no-op when there is no page that way.
-                    if (element.scrollTop < NEAR_EDGE) void loadOlder();
-                    else if (below < NEAR_EDGE) void loadNewer();
+                    const edge = Math.max(NEAR_EDGE, element.clientHeight * EDGE_SCREENS);
+                    if (element.scrollTop < edge) void loadOlder();
+                    else if (below < edge) void loadNewer();
                 }}
                 className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2 [overflow-anchor:none]"
             >
@@ -1642,13 +1693,15 @@ export function ChannelView({
                             somebody reading - but before this they were not told
                             either, so a message that had arrived was a message they
                             found later by accident. */}
-                {(newerThan || unseen > 0) && (
-                    <div className="sticky bottom-2 flex justify-center">
+                {(newerThan || unseen > 0 || away) && (
+                    <div className="sticky bottom-0 z-10 px-3 pb-2">
                         <button
                             type="button"
                             onClick={() => {
                                 following.current = true;
                                 anchor.current = null;
+                                readingAt.current = null;
+                                setAway(false);
                                 setUnseen(0);
                                 // A window that has been trimmed has to fetch
                                 // its way back; one that is whole only has to
@@ -1663,14 +1716,19 @@ export function ChannelView({
                                     catchUpMark(true);
                                 }
                             }}
-                            className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
+                            className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-elevated px-3 py-1.5 text-xs shadow-md transition-colors hover:bg-card-hover"
                         >
-                            <ArrowDown className="size-3" />
-                            {unseen === 0
-                                ? "Jump to the newest"
-                                : unseen === 1
-                                  ? "1 new message"
-                                  : `${unseen} new messages`}
+                            <span className="truncate text-muted-foreground">
+                                {unseen === 0
+                                    ? "You're viewing older messages"
+                                    : unseen === 1
+                                      ? "1 new message"
+                                      : `${unseen} new messages`}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1 font-medium">
+                                Jump to present
+                                <ArrowDown className="size-3.5" />
+                            </span>
                         </button>
                     </div>
                 )}
