@@ -210,6 +210,25 @@ export function loginHealth(input: {
     return "silent";
 }
 
+/**
+ * Whether the server runs an older build of the mod than this dashboard serves.
+ *
+ * The jar is only fetched when the server boots, so an update to it waits for a
+ * restart. Only said of a server whose mod is on and has checked in: a silent one
+ * has a louder problem, and one with no check-in has not said what it runs.
+ */
+export function modOutdated(input: {
+    readonly on: boolean;
+    readonly health: LoginHealth;
+    /** What the server last said it runs. */
+    readonly running: string | null;
+    /** What this dashboard serves it, or null when the image did not say. */
+    readonly current: string | null;
+}): boolean {
+    const { on, health, running, current } = input;
+    return on && health === "ok" && running !== null && current !== null && running !== current;
+}
+
 /** What a player's name has to look like. The same rule the game applies to a
  *  name in offline mode: up to sixteen printable characters, no spaces. */
 export const PLAYER_NAME = /^[!-~]{1,16}$/;

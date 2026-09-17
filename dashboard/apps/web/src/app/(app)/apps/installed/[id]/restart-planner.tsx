@@ -28,6 +28,8 @@ export function RestartPlanner({
     running,
     changed,
     reason,
+    title = "Saved, and not yet in force",
+    detail = "The server reads this when it starts. Leave it and the next start picks it up; nothing is lost by waiting.",
     onRestarted
 }: {
     installedAppId: string;
@@ -40,6 +42,9 @@ export function RestartPlanner({
     /** What changed, in a few words, so a booked restart can say why it exists a
      *  day later. */
     reason: string;
+    /** What is waiting, for a change that is not a saved setting. */
+    title?: string;
+    detail?: string;
     onRestarted?: () => void;
 }) {
     const [pending, setPending] = useState<PendingRestart | null>(null);
@@ -119,7 +124,7 @@ export function RestartPlanner({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
                         <p className="text-sm font-medium">
-                            {pending ? "A restart is booked" : "Saved, and not yet in force"}
+                            {pending ? "A restart is booked" : title}
                         </p>
                         <p className="text-xs text-muted-foreground">
                             {pending ? (
@@ -135,7 +140,7 @@ export function RestartPlanner({
                                     </>
                                 )
                             ) : (
-                                "The server reads this when it starts. Leave it and the next start picks it up; nothing is lost by waiting."
+                                detail
                             )}
                         </p>
                     </div>
@@ -145,7 +150,11 @@ export function RestartPlanner({
                         </Button>
                     ) : (
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button variant="secondary" disabled={busy} onClick={() => void book("empty")}>
+                            <Button
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => void book("empty")}
+                            >
                                 <Users className="size-4" /> When nobody is playing
                             </Button>
                             <Button
@@ -156,7 +165,11 @@ export function RestartPlanner({
                                 <CalendarClock className="size-4" /> At a time
                             </Button>
                             <Button disabled={busy} onClick={() => void now()}>
-                                {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
+                                {busy ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <RotateCcw className="size-4" />
+                                )}
                                 Restart now
                             </Button>
                         </div>

@@ -45,6 +45,16 @@ export interface PlayerEntry {
     readonly lastSeen: string | null;
     /** Their own arrivals and departures, oldest first. */
     readonly sessions: readonly PlayerSessionEvent[];
+    /** The password they gave Polaris login, or null for none - which is also
+     *  what every row says on a server that does not use it. */
+    readonly password: PlayerPassword | null;
+}
+
+/** A password somebody registered with Polaris login. Only when it was last
+ *  used; the password itself never leaves the server. */
+export interface PlayerPassword {
+    /** ISO 8601, or null for somebody who registered and has not logged in since. */
+    readonly lastLoginAt: string | null;
 }
 
 /**
@@ -69,7 +79,9 @@ export function foldPlayers(
     now: number = Date.now(),
     /** When Polaris last watched each of them on this server, for the players the
      *  log no longer reaches back to. */
-    seen: Readonly<Record<string, PlayerSeen>> = {}
+    seen: Readonly<Record<string, PlayerSeen>> = {},
+    /** Who has a Polaris login password on this server, by name. */
+    passwords: readonly { readonly name: string; readonly lastLoginAt: string | null }[] = []
 ): PlayerEntry[] {
     const byKey = new Map<string, PlayerEntry>();
     const upsert = (name: string, patch: Partial<PlayerEntry>): void => {
@@ -85,7 +97,8 @@ export function foldPlayers(
             banned: false,
             presence: "never" as PlayerPresence,
             lastSeen: null,
-            sessions: []
+            sessions: [],
+            password: null
         };
         byKey.set(key, { ...current, ...patch });
     };
@@ -106,6 +119,9 @@ export function foldPlayers(
     // Somebody who has been on this server is somebody it knows, whether or not
     // any of its lists still mentions them.
     for (const event of sessions) upsert(event.name, {});
+    // So is somebody who set a password on it.
+    for (const entry of passwords)
+        upsert(entry.name, { password: { lastLoginAt: entry.lastLoginAt } });
 
     const history = sessionsByPlayer(sessions);
     for (const [key, entry] of byKey) {
@@ -150,5 +166,8 @@ function watched(activity: PlayerActivity, seen: PlayerSeen | null): PlayerActiv
     if (activity.lastSeen) return activity;
     const last = seen?.lastSeen ?? seen?.since ?? null;
     if (!last) return activity;
-    return { presence: activity.presence === "never" ? "offline" : activity.presence, lastSeen: last };
+    return {
+        presence: activity.presence === "never" ? "offline" : activity.presence,
+        lastSeen: last
+    };
 }

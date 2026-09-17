@@ -39,6 +39,34 @@ describe("which servers have a build", () => {
         );
         for (const file of login.MOD_FILES) expect(dockerfile).toContain(`/out/${file}`);
     });
+
+    it("says beside each build which version it reports", () => {
+        // What the panel compares a server's check-in against to say it needs a
+        // restart; without it no server is ever called out of date.
+        const dockerfile = readFileSync(
+            join(__dirname, "..", "..", "..", "..", "docker", "Dockerfile"),
+            "utf8"
+        );
+        for (const file of login.MOD_FILES) expect(dockerfile).toContain(`/out/${file}.version`);
+        expect(dockerfile).toContain('-Pmod_version="$version"');
+    });
+});
+
+describe("a server on an older build", () => {
+    const base = { on: true, health: "ok" as const, running: "0.1.0", current: "0.1.0+abc123" };
+
+    it("is one that checked in with another version than the one served", () => {
+        expect(login.modOutdated(base)).toBe(true);
+        expect(login.modOutdated({ ...base, running: "0.1.0+abc123" })).toBe(false);
+    });
+
+    it("is not said without both versions, or of a mod that is off or silent", () => {
+        expect(login.modOutdated({ ...base, running: null })).toBe(false);
+        expect(login.modOutdated({ ...base, current: null })).toBe(false);
+        expect(login.modOutdated({ ...base, on: false })).toBe(false);
+        expect(login.modOutdated({ ...base, health: "silent" })).toBe(false);
+        expect(login.modOutdated({ ...base, health: "waiting" })).toBe(false);
+    });
 });
 
 describe("the MODS list", () => {

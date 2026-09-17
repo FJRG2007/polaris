@@ -59,7 +59,12 @@ import {
     joinGuardSlugs,
     PROJECTS_KEY
 } from "@/lib/apps/minecraft/join-guard";
-import { LoginDetails, LoginSkeleton, useLoginState } from "./minecraft-polaris-login";
+import {
+    LoginDetails,
+    LoginSkeleton,
+    useLoginState,
+    type LoginStateHandle
+} from "./minecraft-polaris-login";
 
 /** Whether an entry names one of those projects, whatever version or suffix it
  *  was written with. */
@@ -81,6 +86,8 @@ export function MinecraftJoinPassword({
     projects,
     software,
     playersOnline,
+    login: shared,
+    onOpenPlayers,
     onSaved
 }: {
     installedAppId: string;
@@ -91,6 +98,10 @@ export function MinecraftJoinPassword({
     /** The server's `TYPE`, which decides whether it takes plugins or mods. */
     software: string;
     playersOnline: number;
+    /** The login state, when the page already reads it. */
+    login?: LoginStateHandle;
+    /** Where each player's password is shown and reset. */
+    onOpenPlayers?: () => void;
     onSaved: () => void;
 }) {
     const [confirm, confirmElement] = useConfirm();
@@ -101,7 +112,8 @@ export function MinecraftJoinPassword({
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
     // Only a mod loader can carry Polaris's mod, so only one is asked about it.
     const modCapable = java && modrinth.loaderForType(software) === "neoforge";
-    const login = useLoginState(installedAppId, modCapable);
+    const own = useLoginState(installedAppId, modCapable && !shared);
+    const login = shared ?? own;
     const modOn = login.state?.on === true;
     const foreign = java ? foreignLogin(projects) : null;
     const offerMod = Boolean(login.state?.build) && foreign === null;
@@ -255,11 +267,7 @@ export function MinecraftJoinPassword({
                 ) : modCapable && !login.loaded ? (
                     <LoginSkeleton />
                 ) : modOn && login.state ? (
-                    <LoginDetails
-                        installedAppId={installedAppId}
-                        state={login.state}
-                        onChanged={() => void login.reload()}
-                    />
+                    <LoginDetails state={login.state} onOpenPlayers={onOpenPlayers} />
                 ) : locked ? (
                     <p className="text-xs text-muted-foreground">
                         Players already log in with <span className="font-mono">{foreign}</span>,
