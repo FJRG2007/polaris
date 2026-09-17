@@ -52,7 +52,7 @@
  * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
  * new rule apply to tomorrow's mail and no further.
  */
-export const MAIL_CATEGORY_VERSION = 5;
+export const MAIL_CATEGORY_VERSION = 6;
 
 export const MAIL_CATEGORIES = [
     "primary",
@@ -628,6 +628,153 @@ const FINANCING: readonly RegExp[] = [
 ];
 
 /**
+ * Credit as a thing the reader already has, said without any of the words above.
+ *
+ * The strong patterns above answer "was credit applied for, approved or
+ * refused". They say nothing about the mail that comes AFTER that - the survey
+ * about the purchase it paid for, the note about the instalment plan, the
+ * lender writing about the arrangement itself:
+ *
+ *     Financiación Cetelem en APPLE. Tu opinión es muy importante para nosotros
+ *
+ * There is no possessive, no decision and no receipt in that, so every question
+ * missed it and a mailing-list survey about somebody's own financed purchase
+ * landed under Updates with the parcels. The noun on its own is the signal, and
+ * what makes it safe to use is where it is asked: below the offer, so a lender
+ * selling credit is still an advert, and guarded by `FINANCING_OFFER` below, so
+ * an advert that mentions no offer word is not read as somebody's own credit.
+ */
+const FINANCING_MENTION: readonly RegExp[] = [
+    // Spanish
+    /\bfinanciacion(?:es)?\b/,
+    /\bfinanciamiento\b/,
+    /\bfinanciad[oa]s?\b/,
+    /\ba plazos\b/,
+    /\bpagos? aplazados?\b/,
+    /\bpaga en \d\b/,
+    /\bprestamo personal\b/,
+    /\bcredito al consumo\b/,
+    /\bhipoteca\b/,
+    // English
+    /\bfinancing\b/,
+    /\bfinanced purchase\b/,
+    /\binstal?lment plan\b/,
+    /\bpay in \d\b/,
+    /\bbuy now,? pay later\b/,
+    // Portuguese
+    /\bfinanciamento\b/,
+    /\bprestacoes\b/,
+    /\bparcelado\b/,
+    // French
+    /\bfinancement\b/,
+    /\bpaiement en \d fois\b/,
+    /\bcredit a la consommation\b/,
+    // German
+    /\bratenzahlung\b/,
+    /\bratenkauf\b/,
+    /\bfinanzierung\b/,
+    // Italian
+    /\bfinanziamento\b/,
+    /\bpagamento rateale\b/,
+    /\brateizzato\b/
+];
+
+/**
+ * The language a lender sells credit in.
+ *
+ * What tells "your financing" from "financing available": an advert quotes a
+ * rate, a number of months, or asks for an application. None of these appears in
+ * mail about an arrangement somebody already has, and each of them appears in
+ * almost every advert that mentions no offer word at all - which is what would
+ * otherwise slip past `PROMOTION_WORDS` and be read as somebody's own credit.
+ *
+ * Deliberately not added to the promotion words themselves: "sin intereses" is
+ * also how a real instalment receipt describes what was charged, and a receipt
+ * that landed in Promotions would be the worse mistake of the two.
+ */
+const FINANCING_OFFER: readonly RegExp[] = [
+    /\bsin intereses\b/,
+    /\bal? ?0\s*%/,
+    /\b0\s*%\s*(?:tae|tin|apr)\b/,
+    /\btae\b/,
+    /\bhasta \d{1,2} (?:meses|cuotas)\b/,
+    /\bsolicita(?:lo|la|r)?\b/,
+    /\bdescubre\b/,
+    /\bcontrata(?:lo|la|r)?\b/,
+    /\bapply now\b/,
+    /\bget approved\b/,
+    /\bas low as\b/,
+    /\bup to \d{1,2} months\b/
+];
+
+/**
+ * Somebody being asked what they thought.
+ *
+ * A survey on its own is not money - "how did we do?" from a helpdesk belongs
+ * exactly where it lands today. A survey about a PURCHASE is the other half of
+ * that purchase, and the person looking for what they bought is the person it is
+ * addressed to, so it belongs with it rather than under the parcels.
+ */
+const SURVEY_WORDS: readonly string[] = [
+    // English
+    "survey",
+    "your feedback",
+    "rate your",
+    "how did we do",
+    "tell us what you think",
+    "questionnaire",
+    // Spanish
+    "encuesta",
+    "tu opinion",
+    "su opinion",
+    "tu experiencia",
+    "su experiencia",
+    "danos tu opinion",
+    "cuentanos",
+    "valora tu",
+    "valoracion",
+    "satisfaccion",
+    // Portuguese
+    "pesquisa de satisfacao",
+    "sua opiniao",
+    // French
+    "votre avis",
+    "enquete de satisfaction",
+    // German
+    "umfrage",
+    "ihre meinung",
+    // Italian
+    "sondaggio",
+    "la tua opinione"
+];
+
+/**
+ * What a survey has to be about for it to be money.
+ *
+ * The bare nouns, which is what makes this different from `PURCHASE_WORDS`: a
+ * survey says "tu experiencia de compra" and "sobre tu pedido", neither of which
+ * contains a phrase from that list. They are only ever read together with a
+ * survey word, so a bare "compra" cannot file anything on its own.
+ */
+const PURCHASE_NOUNS: readonly string[] = [
+    "purchase",
+    "order",
+    "invoice",
+    "payment",
+    "compra",
+    "pedido",
+    "factura",
+    "pago",
+    "encomenda",
+    "commande",
+    "achat",
+    "bestellung",
+    "kauf",
+    "ordine",
+    "acquisto"
+];
+
+/**
  * Words that mean something is on its way, or that a record was issued.
  *
  * What is left of the transactional pile once money has been taken out of it: a
@@ -707,6 +854,13 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     const purchased =
         PURCHASE_WORDS.some((word) => words.includes(word)) ||
         PAYMENT_SETTLED.some((pattern) => pattern.test(words));
+    // Credit somebody already has, and the two things that decide whether the
+    // word is theirs: an advert's own language, and a survey about a purchase.
+    const financing = FINANCING_MENTION.some((pattern) => pattern.test(words));
+    const sellingCredit = FINANCING_OFFER.some((pattern) => pattern.test(words));
+    const asksWhatYouThought =
+        SURVEY_WORDS.some((word) => words.includes(word)) &&
+        PURCHASE_NOUNS.some((word) => words.includes(word));
 
     // Money about to move comes before everything except a code, and before the
     // word that is selling something: half of these arrive dressed as an offer -
@@ -722,6 +876,12 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     if (billed) return "billing";
     if (transactional && !promotional) return "updates";
     if (purchased && !promotional) return "billing";
+    // Credit the reader has rather than credit being sold, and the survey that
+    // follows a purchase. Both sit here, under the offer: a lender advertising
+    // is still an advert, and a campaign that asks for an opinion on its way to
+    // selling something is still a campaign.
+    if (financing && !sellingCredit && !promotional) return "billing";
+    if (asksWhatYouThought && !promotional) return "billing";
     if (bulk && promotional) return "promotions";
     if (bulk) return "updates";
     if (transactional) return "updates";
