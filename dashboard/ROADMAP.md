@@ -130,6 +130,10 @@ Containers app (Docker):
       it straight away with its age, and a fresh pass starts once that has aged
       out. Gated on the same ownership check a driver open would prove, since a
       cache read resolves no driver to prove it for free
+- [x] A registered server in the Docker hosts list is disabled and marked offline
+      rather than opened, and a selected offline one is not polled - both read
+      `GET /api/containers/host-status` (owner-scoped, gated on `deploy.read`,
+      reusing the Servers app's own status sampler)
 - [ ] Live end-to-end run against a real Docker host (built + unit-tested; hostd proxy + local host + host-over-SSH not yet exercised on this Docker-off dev machine)
 - [ ] TLS-cert/pasted-key credential paths for one-off TCP hosts (encryption wired; UI present)
 - [ ] Container logs, images, compose stacks
@@ -139,6 +143,24 @@ Servers (global hosts):
 - [x] `@polaris/ssh` shared primitive: one authenticated ssh2 client + mandatory host-key pinning, used by BOTH the Docker connector and the SFTP driver (dedup; fixed SFTP blind-TOFU + dropped passphrase)
 - [x] `Host` model (owner-scoped, encrypted creds, pinned host key) + Servers app: add/list/delete with password or private-key(+passphrase) auth and trust-on-add (test-connect validates creds and captures the host key to pin)
 - [x] A Host registered once derives a Docker-over-SSH target in Containers AND an SFTP source in Drive
+- [x] A Linux server enrolled with root sets itself up right after enrollment
+      (Docker, the builder, its own edge) unless it already runs one, recorded
+      in the server's history either way; the onboarding script now runs over
+      `sudo -n` as root instead of as the ordinary login Polaris connects
+      with - running it as that plain login, unable to write `/var/lib/polaris`,
+      was the bug this fixed - delivered on stdin into a `mktemp` file instead
+      of the command line (which put `POLARIS_AUTH_SECRET` in `ps`) or piped to
+      a shell (the installers it runs read stdin themselves), then hands the
+      directories it wrote back to that login plus the docker group. Two setups
+      on the same server (the button and the enrollment run, or two clicks) are
+      serialized rather than let race. A failed sudo or permission names the
+      fix - re-add the server with the Add server command, which is what grants
+      root
+- [x] Servers list: right-click for a context menu (open, shell, files, rename,
+      copy address, where it lives, remove); F2 renames the hovered or selected
+      row in place with optimistic save and rollback on refusal; Delete opens
+      the existing remove confirmation. Both keys are ignored while typing or
+      while a dialog is open
 - [ ] Live SSH run against a real host (built + typechecked; not exercised on this machine)
 - [ ] OpenSSH user-certificate auth (deferred: ssh2 exposes no typed cert field; password + key ship now)
 - [ ] Edit a host; per-host SFTP root; VMs/deploys
