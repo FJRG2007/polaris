@@ -55,13 +55,13 @@ import {
 } from "./call-signals";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
+import { useCallVolume } from "./call-volumes";
+import { PersonMenu, StreamMenu } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
+import { setWatchedStreams } from "./call-stream-audio";
 import { callBareFaces, type CallPlace } from "./call-band";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
-import { useCallVolume } from "./call-volumes";
-import { setWatchedStreams } from "./call-stream-audio";
-import { PersonMenu, StreamMenu } from "./call-menus";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     arrivedKeys,
@@ -365,6 +365,63 @@ export function CallRoom({
             onWatch={() => setAway((was) => was.filter((key) => key !== stage.key))}
             menu={streamMenu(stage)}
         />
+    );
+    /**
+     * Everybody in the call, drawn as faces.
+     *
+     * One list for both places that draw one - the column beside a watched
+     * stream and the row where nothing is being watched - because they are the
+     * same people saying the same things, at two sizes. Written twice they drift,
+     * and they had: the column was a raised hand's place in the queue and your
+     * own reactions short of the row, so a reaction you sent was the one nobody
+     * could see while you were watching a stream.
+     *
+     * @param compact - Smaller, for the column beside a stream.
+     */
+    const faces = (compact: boolean) => (
+        <>
+            <Face
+                compact={compact}
+                name="You"
+                personId={mine?.userId ?? viewerId ?? null}
+                speaking={
+                    call.participantId !== null &&
+                    call.speaking.has(call.participantId) &&
+                    call.micOn
+                }
+                muted={!call.micOn}
+                deafened={call.deafened}
+                hand={call.handRaised}
+                handPlace={
+                    queued && call.participantId ? (places.get(call.participantId) ?? null) : null
+                }
+                reactions={reactionsFor(call.participantId)}
+                sameRoom={call.audioRole !== null}
+            />
+            {(admitted ?? [])
+                .filter((person) => person.id !== call.participantId)
+                .map((person) => (
+                    <Face
+                        key={person.id}
+                        compact={compact}
+                        name={person.name}
+                        personId={person.userId ?? null}
+                        guest={person.guest}
+                        speaking={call.speaking.has(person.id)}
+                        muted={call.states.get(person.id)?.muted}
+                        deafened={call.states.get(person.id)?.deafened}
+                        hand={call.states.get(person.id)?.hand}
+                        handPlace={queued ? (places.get(person.id) ?? null) : null}
+                        reactions={reactionsFor(person.id)}
+                        {...combining(person.id)}
+                        // The same key a tile uses, so turning somebody down in a
+                        // conversation and turning them down in a room are the
+                        // one decision: their account where they have one, their
+                        // seat where they do not.
+                        volumeKey={person.userId ?? person.id}
+                    />
+                ))}
+        </>
     );
     const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
     const live =
@@ -740,38 +797,7 @@ export function CallRoom({
                             aria-label="People in the call"
                             className="flex shrink-0 items-start gap-3 overflow-x-auto overscroll-contain sm:w-20 sm:flex-col sm:items-center sm:overflow-y-auto sm:overflow-x-hidden"
                         >
-                            <Face
-                                compact
-                                name="You"
-                                personId={mine?.userId ?? viewerId ?? null}
-                                speaking={
-                                    call.participantId !== null &&
-                                    call.speaking.has(call.participantId) &&
-                                    call.micOn
-                                }
-                                muted={!call.micOn}
-                                deafened={call.deafened}
-                                hand={call.handRaised}
-                                sameRoom={call.audioRole !== null}
-                            />
-                            {(admitted ?? [])
-                                .filter((person) => person.id !== call.participantId)
-                                .map((person) => (
-                                    <Face
-                                        compact
-                                        key={person.id}
-                                        name={person.name}
-                                        personId={person.userId ?? null}
-                                        guest={person.guest}
-                                        speaking={call.speaking.has(person.id)}
-                                        muted={call.states.get(person.id)?.muted}
-                                        deafened={call.states.get(person.id)?.deafened}
-                                        hand={call.states.get(person.id)?.hand}
-                                        reactions={reactionsFor(person.id)}
-                                        {...combining(person.id)}
-                                        volumeKey={person.userId ?? person.id}
-                                    />
-                                ))}
+                            {faces(true)}
                         </ul>
                     )}
                 </div>
@@ -847,48 +873,7 @@ export function CallRoom({
                                 {offer(stage, "h-24 w-40")}
                             </li>
                         ))}
-                    <Face
-                        name="You"
-                        personId={mine?.userId ?? viewerId ?? null}
-                        speaking={
-                            call.participantId !== null &&
-                            call.speaking.has(call.participantId) &&
-                            call.micOn
-                        }
-                        muted={!call.micOn}
-                        deafened={call.deafened}
-                        hand={call.handRaised}
-                        handPlace={
-                            queued && call.participantId
-                                ? (places.get(call.participantId) ?? null)
-                                : null
-                        }
-                        reactions={reactionsFor(call.participantId)}
-                        sameRoom={call.audioRole !== null}
-                    />
-                    {(admitted ?? [])
-                        .filter((person) => person.id !== call.participantId)
-                        .map((person) => (
-                            <Face
-                                key={person.id}
-                                name={person.name}
-                                personId={person.userId ?? null}
-                                guest={person.guest}
-                                speaking={call.speaking.has(person.id)}
-                                muted={call.states.get(person.id)?.muted}
-                                deafened={call.states.get(person.id)?.deafened}
-                                hand={call.states.get(person.id)?.hand}
-                                handPlace={queued ? (places.get(person.id) ?? null) : null}
-                                reactions={reactionsFor(person.id)}
-                                {...combining(person.id)}
-                                // The same key a tile uses, so turning somebody
-                                // down in a conversation and turning them down
-                                // in a room are the one decision: their account
-                                // where they have one, their seat where they do
-                                // not.
-                                volumeKey={person.userId ?? person.id}
-                            />
-                        ))}
+                    {faces(false)}
                 </ul>
             )}
 

@@ -4,9 +4,9 @@
  * and lowers the voices by the stream attenuation while it does.
  */
 
-import { act, cleanup, render } from "@testing-library/react";
 import { CallAudio } from "@/app/(app)/chat/call-audio";
 import type { CallState } from "@/app/(app)/chat/call-state";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setStreamMuted, setWatchedStreams } from "@/app/(app)/chat/call-stream-audio";
 
@@ -79,6 +79,21 @@ describe("a stream's sound", () => {
         act(() => setStreamMuted("bo", true));
         expect(playing(film)!.muted).toBe(true);
         expect(playing(voice)!.volume).toBe(1);
+    });
+
+    it("is never started audible where it was muted before", () => {
+        // What the mute was set to is read after mount, so a source attached in
+        // the pass before that read is a film bursting out of a silent page.
+        setStreamMuted("bo", true);
+        const started: boolean[] = [];
+        HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+            if (this.srcObject === film) started.push(this.muted);
+            return Promise.resolve();
+        };
+        render(<CallAudio call={call()} />);
+        act(() => setWatchedStreams(["screen:p-bo"]));
+        expect(started.every((muted) => muted)).toBe(true);
+        expect(playing(film)!.muted).toBe(true);
     });
 
     it("follows its own volume, not the sharer's voice", () => {

@@ -56,20 +56,20 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
-import { playCallSound } from "@/lib/call-sounds";
-import { callMuted, setCallMuted } from "./call-muted";
-import { pressDeafen, pressMic } from "./call-voice-controls";
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
-import type { MeetingView } from "@/lib/chat/meetings";
-import { callDevices, isDenial, openMedia, refused, settle } from "./call-media";
+import { playCallSound } from "@/lib/call-sounds";
 import { withCameraDevice } from "./camera-device";
-import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { callMuted, setCallMuted } from "./call-muted";
+import type { MeetingView } from "@/lib/chat/meetings";
+import { pressDeafen, pressMic } from "./call-voice-controls";
 import type { CallDevice, CallState, PeerState } from "./call-state";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
-import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
+import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
+import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
+import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import {
     AUDIO_GROUP,
     audioPlan,
@@ -2154,43 +2154,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             return;
         }
         const level = levelNow("screen");
-        /**
-         * Ask for the screen, with its sound where the browser has any to
-         * offer.
-         *
-         * Asked twice rather than once, because a browser that cannot capture
-         * a screen's sound at all - Firefox, on most platforms - rejects the
-         * whole request rather than handing back a picture without one. Asking
-         * again for the picture alone is the difference between a share with no
-         * sound and no share at all. Not after a refusal, which is what
-         * cancelling the picker is.
-         */
-        const askForScreen = async (): Promise<MediaStream | null> => {
-            const video = quality.screenConstraints(level);
-            try {
-                return await navigator.mediaDevices.getDisplayMedia({
-                    video,
-                    // Offered, never forced: the browser's picker has the box
-                    // that says whether a tab's or the system's sound goes with
-                    // it. Raw, because echo cancelling a film against the call
-                    // is what turns music into mush.
-                    audio: {
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false
-                    },
-                    // Chrome's names for "offer the whole system's sound too"
-                    // and "keep playing the tab here while it is shared".
-                    ...({ systemAudio: "include", suppressLocalAudioPlayback: false } as object)
-                });
-            } catch (caught) {
-                if (isDenial(caught) || (caught as Error)?.name === "AbortError") return null;
-                return navigator.mediaDevices.getDisplayMedia({ video }).catch(() => null);
-            }
-        };
-        void askForScreen()
+        // Asked for with its sound where this browser has any to offer, and
+        // without where it has not - see `openScreen`, which owns both the
+        // asking and what is remembered about a browser that cannot.
+        void openScreen(quality.screenConstraints(level))
             .then(async (stream) => {
-                if (!stream) return;
                 const track = stream.getVideoTracks()[0];
                 const audio = stream.getAudioTracks()[0] ?? null;
                 if (!track) {
@@ -2216,9 +2184,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 sharingRef.current = true;
                 sound("shareOn");
             })
-            .catch(() => {
+            .catch((caught) => {
                 // Cancelling the picker is the ordinary way out of this dialog,
                 // not a failure worth a line on the screen.
+                if (isDenial(caught) || (caught as Error)?.name === "AbortError") return;
+                // Anything else is a share that did not happen for a reason the
+                // reader cannot see. Said out loud rather than swallowed: a
+                // Share button that does nothing and says nothing is the one
+                // failure nobody can act on.
+                setError(refused(caught, "screen"));
             });
     }, [levelNow, publish, publishLocalPreview, sound]);
 
