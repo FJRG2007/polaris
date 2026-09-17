@@ -1,4 +1,5 @@
 import { storage } from "#imports";
+import * as link from "@/lib/link";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import * as accounts from "@/lib/accounts";
@@ -159,6 +160,29 @@ const parkedVaults = new Map<string, { vault: OpenVault; lockAt: number | null }
  * Local rather than session, because it is an instruction rather than a
  * credential and somebody who said "never here" means it after a restart too.
  */
+/**
+ * The connection to the Polaris account: the token this browser holds, and who
+ * it is connected as.
+ *
+ * `local:` rather than `session:`, unlike the vault's own credentials, and the
+ * difference is deliberate. A vault token opens somebody's passwords and is
+ * meant to die with the browser; this one says which account this extension acts
+ * for, is listed on that account's Sessions screen, and can be ended there at any
+ * moment - so a connection that vanished on every restart would be a row nobody
+ * could trust and a reconnection every morning.
+ */
+const LINK_TOKEN = storage.defineItem<string | null>("local:link.token", { fallback: null });
+const LINK_ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("local:link.account", {
+    fallback: null
+});
+/** What the connection reaches, as the server last answered. */
+const LINK_VAULT = storage.defineItem<boolean>("local:link.vault", { fallback: true });
+/** When the server was last asked about it, so opening the popup twenty times
+ *  does not ask twenty times. */
+const LINK_CHECKED = storage.defineItem<number | null>("session:link.checkedAt", {
+    fallback: null
+});
+
 const BLOCKED = storage.defineItem<string[]>("local:blocked.hosts", { fallback: [] });
 const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallback: null });
 /**
@@ -237,6 +261,20 @@ let asking: { publicKey: string; privateKey: Uint8Array } | null = null;
  * rather than a credential, and somebody who chose one minute still means it
  * tomorrow.
  */
+/** A connection request in flight, and what became of it. Same shape as the
+ *  vault's own, for the same reason: the popup does not outlive the tab. */
+interface LinkWaiting {
+    readonly deviceCode: string;
+    readonly userCode: string;
+    readonly pollMs: number;
+    readonly until: number;
+    readonly state: "pending" | "approved" | "denied" | "expired";
+}
+
+const LINK_WAITING = storage.defineItem<LinkWaiting | null>("session:link.waiting", {
+    fallback: null
+});
+
 const LOCK_AT = storage.defineItem<number | null>("session:vault.lockAt", { fallback: null });
 const TIMEOUT = storage.defineItem<number>("local:vault.timeoutMs", {
     fallback: DEFAULT_TIMEOUT_MS
@@ -691,6 +729,132 @@ async function collect(): Promise<void> {
     }
 }
 
+/**
+ * How often the server is asked whether this connection still stands.
+ *
+ * It is the only way a browser finds out that somebody ended it - there is no
+ * push - so it has to be often enough that "disconnect" means something in
+ * minutes rather than whenever the extension next happened to sync, and slow
+ * enough that a browser left open all day is not a poll every few seconds.
+ */
+const LINK_CHECK_MINUTES = 15;
+
+/** And the shortest gap between two checks made because somebody opened the
+ *  popup, which is a thing people do far more often than that. */
+const LINK_CHECK_FLOOR_MS = 60_000;
+
+/** Throw away everything this browser holds for its connection.
+ *
+ * The vault goes with it. A connection that has been ended must not leave an
+ * open vault behind it in a browser somebody thought they had cut off, and the
+ * server has already revoked that vault's tokens by the time this runs. The
+ * address stays, so the popup lands on "connect this browser" rather than asking
+ * which Polaris this is all over again. */
+async function dropLink(): Promise<void> {
+    await inTurn(async () => {
+        const leaving = await activeAccount();
+        if (leaving) parkedVaults.delete(leaving.id);
+        await clearActive();
+        await Promise.all([
+            LINK_TOKEN.setValue(null),
+            LINK_ACCOUNT.setValue(null),
+            LINK_CHECKED.setValue(null),
+            LINK_WAITING.setValue(null)
+        ]);
+        await badge();
+    });
+}
+
+/**
+ * Ask the server where this connection stands, and act on the answer.
+ *
+ * Only three answers are possible and each is acted on differently: still
+ * connected updates what the popup says about the account, `ended` drops
+ * everything, and an unreachable server changes nothing at all - a Polaris
+ * somebody is behind a tunnel from is not a connection that was revoked.
+ */
+async function refreshLink(force = false): Promise<void> {
+    const [origin, token, checkedAt] = await Promise.all([
+        currentOrigin(),
+        LINK_TOKEN.getValue(),
+        LINK_CHECKED.getValue()
+    ]);
+    if (!origin || !token) return;
+    if (!force && checkedAt !== null && Date.now() - checkedAt < LINK_CHECK_FLOOR_MS) return;
+    const state = await link.checkLink(origin, token);
+    if (state === null) return;
+    if (state === "ended") {
+        await dropLink();
+        return;
+    }
+    await Promise.all([
+        LINK_ACCOUNT.setValue({ name: state.account.name || null, email: state.account.email }),
+        LINK_VAULT.setValue(state.vault),
+        LINK_CHECKED.setValue(Date.now())
+    ]);
+}
+
+/** The collection running right now, so one request is never polled twice over. */
+let linking: Promise<void> | null = null;
+
+function startLinking(): void {
+    if (linking) return;
+    linking = collectLink().finally(() => {
+        linking = null;
+    });
+}
+
+/**
+ * Wait for somebody to approve the connection, here in the worker.
+ *
+ * Here rather than in the popup, for the reason the vault's own collection is:
+ * the last thing the button does is open a tab, which tears the popup down along
+ * with any timer it was holding.
+ */
+async function collectLink(): Promise<void> {
+    for (;;) {
+        const waiting = await LINK_WAITING.getValue();
+        if (!waiting || waiting.state !== "pending") return;
+        if (Date.now() >= waiting.until) {
+            await LINK_WAITING.setValue({ ...waiting, state: "expired" });
+            return;
+        }
+
+        await sleep(waiting.pollMs);
+
+        const still = await LINK_WAITING.getValue();
+        if (!still || still.state !== "pending" || still.deviceCode !== waiting.deviceCode) return;
+
+        const origin = await currentOrigin();
+        if (!origin) {
+            await LINK_WAITING.setValue({ ...still, state: "expired" });
+            return;
+        }
+        const claim = await link.claimLink(origin, still.deviceCode);
+        // Nothing at all is a server that could not be reached: the request is
+        // still alive on its side, so this keeps waiting.
+        if (!claim || claim.status === "pending") continue;
+        if (claim.status !== "approved") {
+            await LINK_WAITING.setValue({ ...still, state: claim.status });
+            return;
+        }
+
+        await Promise.all([
+            LINK_TOKEN.setValue(claim.token),
+            LINK_ACCOUNT.setValue({
+                name: claim.account.name || null,
+                email: claim.account.email
+            }),
+            LINK_CHECKED.setValue(Date.now())
+        ]);
+        // What the connection reaches, asked once now so the popup knows whether
+        // to offer a vault at all rather than finding out on the refusal.
+        await refreshLink(true);
+        await LINK_WAITING.setValue({ ...still, state: "approved" });
+        return;
+    }
+}
+
 /** Which key opens this item: its vault's, or the account's own. */
 function keyFor(cipher: Record<string, unknown>): SymmetricKey | null {
     if (!open) return null;
@@ -1012,17 +1176,31 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
 }
 
 async function status(): Promise<messages.VaultStatus> {
-    const [server, email, refreshToken, syncedAt, timeout, opened, parked, accountKey] =
-        await Promise.all([
-            currentOrigin(),
-            EMAIL.getValue(),
-            REFRESH.getValue(),
-            SYNCED_AT.getValue(),
-            TIMEOUT.getValue(),
-            vault(),
-            PARKED.getValue(),
-            ACCOUNT_KEY.getValue()
-        ]);
+    const [
+        server,
+        email,
+        refreshToken,
+        syncedAt,
+        timeout,
+        opened,
+        parked,
+        accountKey,
+        linkToken,
+        linkAccount,
+        canVault
+    ] = await Promise.all([
+        currentOrigin(),
+        EMAIL.getValue(),
+        REFRESH.getValue(),
+        SYNCED_AT.getValue(),
+        TIMEOUT.getValue(),
+        vault(),
+        PARKED.getValue(),
+        ACCOUNT_KEY.getValue(),
+        LINK_TOKEN.getValue(),
+        LINK_ACCOUNT.getValue(),
+        LINK_VAULT.getValue()
+    ]);
     // Only worth asking for once there is a session to ask about: a browser that
     // has not been let in yet would spend a request on every poll of a screen
     // that is showing it the sign-in button.
@@ -1046,6 +1224,9 @@ async function status(): Promise<messages.VaultStatus> {
     return {
         server,
         email,
+        linked: linkToken !== null,
+        linkedAccount: linkAccount,
+        canVault,
         connected: refreshToken !== null,
         // Only ever left behind by an approval on the dashboard. A vault opened
         // with the master password alone has a token and no account, which is the
@@ -1497,6 +1678,11 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     const answer = async (): Promise<messages.Reply> => {
         switch (request.kind) {
             case "status":
+                // Asked at most once a minute, and never awaited: the popup draws
+                // from what is held, and a connection that ended a moment ago
+                // shows as ended on the next draw rather than holding this one up
+                // behind a request to a server that may be unreachable.
+                void refreshLink();
                 return { ok: true, status: await status() };
 
             case "connect": {
@@ -1516,16 +1702,104 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, status: await status() };
             }
 
+            case "link": {
+                const origin = await currentOrigin();
+                if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+                // The same id the vault's clients are known by, so a browser that
+                // was signed in to a vault before connections existed is adopted
+                // by the connection rather than turning up twice.
+                const known = await device();
+                const opened = await link.openLink(origin, {
+                    id: known.identifier,
+                    name: known.name
+                });
+                if (!opened) {
+                    return {
+                        ok: false,
+                        error: "That server did not answer. It may be older than this extension."
+                    };
+                }
+                await LINK_WAITING.setValue({
+                    deviceCode: opened.deviceCode,
+                    userCode: opened.userCode,
+                    pollMs: opened.pollMs,
+                    until: readExpiry(opened.expiresAt),
+                    state: "pending"
+                });
+                startLinking();
+                // Opened here rather than in the popup: opening a tab is what
+                // closes the popup, so this worker is the only thing that can
+                // still be listening when somebody presses yes.
+                await browser.tabs.create({ url: `${origin}${opened.approveUrl}` });
+                return {
+                    ok: true,
+                    waiting: "pending",
+                    userCode: opened.userCode,
+                    pollMs: opened.pollMs
+                };
+            }
+
+            case "linkCheck": {
+                const waiting = await LINK_WAITING.getValue();
+                if (!waiting) {
+                    return {
+                        ok: true,
+                        waiting: "none",
+                        userCode: null,
+                        pollMs: link.DEFAULT_POLL_MS
+                    };
+                }
+                const { state, userCode, pollMs } = waiting;
+                if (state === "pending") {
+                    // A worker that came back since has no loop running; starting
+                    // it is what turns this into an answer rather than a wait
+                    // nothing will ever end.
+                    startLinking();
+                    return { ok: true, waiting: "pending", userCode, pollMs };
+                }
+                // Reported once and then forgotten: what follows every state
+                // below is asking again, not waiting longer.
+                await LINK_WAITING.setValue(null);
+                return { ok: true, waiting: state, userCode, pollMs };
+            }
+
+            case "linkCancel": {
+                await LINK_WAITING.setValue(null);
+                return { ok: true };
+            }
+
+            case "unlink": {
+                const [origin, token] = await Promise.all([
+                    currentOrigin(),
+                    LINK_TOKEN.getValue()
+                ]);
+                // Told, then forgotten. What makes it real here is the forgetting,
+                // so a server that could not be reached does not keep this browser
+                // connected to something somebody has finished with.
+                if (origin && token) await link.endLink(origin, token);
+                await dropLink();
+                return { ok: true, status: await status() };
+            }
+
             case "authorize": {
                 const origin = await currentOrigin();
                 if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+                // The connection comes first. A vault is something a connected
+                // extension is let into, so being let into one without a
+                // connection would be the old way round - and the server binds
+                // the two, so a token it does not recognise is refused there too.
+                const connection = await LINK_TOKEN.getValue();
+                if (!connection) {
+                    return { ok: false, error: "Connect this browser to Polaris first." };
+                }
                 // A pair for this one exchange. The public half goes to the server;
                 // the private half stays here and is the only thing that can open
                 // what comes back.
                 const pair = await generateRsaKeyPair();
                 const opened = await protocol.openAuthorization(vaultBase(origin), {
                     publicKey: pair.publicKey,
-                    device: await device()
+                    device: await device(),
+                    extensionToken: connection
                 });
                 if (!opened) return { ok: false, error: "That server did not answer." };
 
@@ -1942,9 +2216,16 @@ export default defineBackground(() => {
     // year. An extension loaded by hand never updates itself, so this is the only
     // thing that would ever tell somebody they are months behind.
     browser.alarms.create("update-check", { periodInMinutes: UPDATE_EVERY_MINUTES });
+    // And the one that makes ending a connection from Polaris mean something in
+    // this browser: there is nothing to push it here, so it has to ask.
+    browser.alarms.create("link-check", { periodInMinutes: LINK_CHECK_MINUTES });
     browser.alarms.onAlarm.addListener((alarm) => {
         if (alarm.name === "update-check") {
             void checkForUpdate();
+            return;
+        }
+        if (alarm.name === "link-check") {
+            void refreshLink(true);
             return;
         }
         if (alarm.name !== "vault-lock") return;
@@ -1962,6 +2243,9 @@ export default defineBackground(() => {
             // reaches an answer - it finds the private half gone and says so -
             // rather than leaving a code waiting on nothing.
             if (await WAITING.getValue()) startCollecting();
+            // The connection's own request is collected by a loop in this worker
+            // too, and a recycle takes that with it.
+            if (await LINK_WAITING.getValue()) startLinking();
         })();
     });
 
@@ -1973,4 +2257,7 @@ export default defineBackground(() => {
     // once a day would otherwise wait for the alarm's whole period before finding
     // out anything at all.
     void checkForUpdate();
+    // And this, which is what a browser that was disconnected while it was closed
+    // finds out on the way back up.
+    void refreshLink(true);
 });

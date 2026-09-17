@@ -51,6 +51,21 @@ export type AuthorizationWait = "none" | "pending" | "approved" | "denied" | "ex
 /** The state the popup draws itself from. */
 export interface VaultStatus {
     readonly server: string | null;
+    /**
+     * Whether this browser is connected to the Polaris account.
+     *
+     * The first step and the one everything else hangs off: the vault is
+     * something a connected extension may then be let into, not the way in. False
+     * on a fresh install, and false on one whose connection was ended from the
+     * account's Sessions screen - which is the same screen every other device is
+     * ended from.
+     */
+    readonly linked: boolean;
+    /** Who it is connected as, when it is. */
+    readonly linkedAccount: ExtensionAccount | null;
+    /** Whether that account may use a vault at all, so the popup offers one only
+     *  where there is one to offer rather than leading somebody to a refusal. */
+    readonly canVault: boolean;
     readonly email: string | null;
     /** Signed in, in the sense that there is a token: the vault may still be locked. */
     readonly connected: boolean;
@@ -108,6 +123,21 @@ export interface AccountRef {
 export type Request =
     | { readonly kind: "status" }
     | { readonly kind: "connect"; readonly typed: string }
+    /**
+     * Ask Polaris to connect this browser, and open the page that decides.
+     *
+     * The extension's first step. What comes back is the code somebody approves;
+     * the waiting itself happens in the worker, for the same reason the vault's
+     * does - opening the tab tears the popup down.
+     */
+    | { readonly kind: "link" }
+    /** Ask where that request stands. Reading only; the worker polls. */
+    | { readonly kind: "linkCheck" }
+    /** Drop the request in flight, so the worker stops collecting it. */
+    | { readonly kind: "linkCancel" }
+    /** End this browser's connection, from this side. Whatever it was let into
+     *  goes with it, the same as ending it from Polaris would. */
+    | { readonly kind: "unlink" }
     /**
      * Ask the server to let this extension in, and open the page that decides.
      *

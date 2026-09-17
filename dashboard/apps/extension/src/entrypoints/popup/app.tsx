@@ -115,16 +115,33 @@ export function App(): React.JSX.Element {
     // sign-in screen at somebody whose vault is open would be lying for a frame.
     if (!status) return <main className="pad" />;
 
+    // The order is the product's: which Polaris, then this browser connected to
+    // the account, then a vault if the account has one. The connection is what
+    // makes this extension somebody's - it is listed on their Sessions screen and
+    // ended from there - and the vault is one thing it may then be used for.
+    //
+    // The exception is a browser that was signed in to a vault before connections
+    // existed. It keeps working exactly as it did, and is asked to connect by a
+    // line above its own list rather than by a screen standing in front of it:
+    // taking somebody's logins away to make a point about a new step would be a
+    // worse thing to do than the step is worth.
+    const legacyVault = !status.linked && status.connected;
     const screen = !status.server ? (
         <Connect onDone={refresh} />
-    ) : // Signing in to the Polaris account is the way in, and the vault is what
-    // is behind it - not the other way round, and not an alternative to it. A
-    // session with a vault token and no account credential is one that was
-    // opened by typing the master password before this was required; it goes
-    // back through the approval rather than carrying on, because the extension
-    // has no idea whose account it is sitting on until it does.
+    ) : !status.linked && !legacyVault ? (
+        <LinkPolaris server={status.server} onDone={refresh} />
+    ) : // A vault token with no account credential is one opened by typing the
+    // master password before the approval was required; it goes back through the
+    // approval rather than carrying on, because the extension has no idea whose
+    // account it is sitting on until it does.
     !status.connected || !status.polarisSession ? (
-        <SignIn server={status.server} connected={status.connected} onDone={refresh} />
+        <SignIn
+            server={status.server}
+            connected={status.connected}
+            canVault={status.canVault}
+            account={status.linkedAccount}
+            onDone={refresh}
+        />
     ) : !status.unlocked ? (
         <Unlock onDone={refresh} />
     ) : (
@@ -134,6 +151,10 @@ export function App(): React.JSX.Element {
     return (
         <>
             <UpdateBanner notice={update} server={status.server} />
+            {/* Above whatever is showing, because it is about all of it: an
+                extension that is not connected is one this account cannot see or
+                end from Polaris. */}
+            {legacyVault ? <LinkBanner onDone={refresh} /> : null}
             {screen}
             {/* Under whichever screen is showing, rather than only over the item
                 list. A vault that is locked, and an account just set aside to add
@@ -221,6 +242,150 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
 }
 
 /**
+ * Connecting this browser to Polaris.
+ *
+ * The extension's first step and the only one that needs a person. It shows a
+ * short code, opens the page in Polaris that decides, and waits - in the worker,
+ * because opening that tab is what closes this popup.
+ *
+ * Nothing is typed here and no password ever is: what approves this is somebody
+ * already signed in to Polaris, in a browser Polaris can see.
+ */
+function LinkPolaris({
+    server,
+    onDone
+}: {
+    server: string;
+    onDone: () => Promise<void>;
+}): React.JSX.Element {
+    const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [waiting, setWaiting] = useState<{ userCode: string; pollMs: number } | null>(null);
+
+    const ask = async (): Promise<void> => {
+        setBusy(true);
+        setError(null);
+        const reply = await askBackground({ kind: "link" });
+        setBusy(false);
+        if (!reply.ok) {
+            setError(reply.error);
+            return;
+        }
+        if ("waiting" in reply && reply.userCode) {
+            setWaiting({ userCode: reply.userCode, pollMs: reply.pollMs });
+        }
+    };
+
+    /** What the worker says about the request in flight, as a screen. The worker
+     *  owns the waiting; this only draws where it got to. */
+    const read = useCallback(async (): Promise<void> => {
+        const reply = await askBackground({ kind: "linkCheck" });
+        if (!reply.ok) {
+            setWaiting(null);
+            setError(reply.error);
+            return;
+        }
+        if (!("waiting" in reply)) return;
+        if (reply.waiting === "pending" && reply.userCode) {
+            const found = { userCode: reply.userCode, pollMs: reply.pollMs };
+            setWaiting((was) =>
+                was && was.userCode === found.userCode && was.pollMs === found.pollMs ? was : found
+            );
+            return;
+        }
+        setWaiting(null);
+        if (reply.waiting === "approved") {
+            await onDone();
+            return;
+        }
+        if (reply.waiting === "none") return;
+        setError(
+            reply.waiting === "denied"
+                ? "That was turned down in Polaris."
+                : "That request ran out. Ask again."
+        );
+    }, [onDone]);
+
+    // A request left in flight, found again on the way back in: opening this
+    // popup is the only way back to it, since pressing the button opened a tab.
+    useEffect(() => {
+        void read();
+    }, [read]);
+
+    useEffect(() => {
+        if (!waiting) return;
+        const timer = window.setInterval(() => void read(), waiting.pollMs);
+        return () => window.clearInterval(timer);
+    }, [waiting, read]);
+
+    if (waiting) {
+        return (
+            <main className="pad">
+                <h1>Waiting for Polaris</h1>
+                <p className="muted">
+                    Approve this in the tab that opened. The code there should read:
+                </p>
+                <code className="value">{waiting.userCode}</code>
+                <p className="muted small">
+                    Nothing is connected until somebody signed in to Polaris says yes. You can close
+                    this; it carries on without it.
+                </p>
+                <button
+                    className="ghost"
+                    onClick={() => {
+                        setWaiting(null);
+                        void askBackground({ kind: "linkCancel" });
+                    }}
+                >
+                    Cancel
+                </button>
+            </main>
+        );
+    }
+
+    return (
+        <main className="pad">
+            <h1>Connect this browser</h1>
+            <p className="muted">{new URL(server).host}</p>
+            <Problem text={error} />
+            <button disabled={busy} onClick={() => void ask()}>
+                {busy ? "Asking" : "Connect to Polaris"}
+            </button>
+            <p className="muted small">
+                A tab opens on your Polaris and you approve it there. The connection appears under
+                Sessions, and you can end it from there at any time.
+            </p>
+            <button className="ghost" onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}>
+                Use a different Polaris
+            </button>
+        </main>
+    );
+}
+
+/** The line offered to a browser signed in to a vault from before connections
+ *  existed. Its vault keeps working; this is how it joins the list. */
+function LinkBanner({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element {
+    const [busy, setBusy] = useState(false);
+    return (
+        <div className="notice small">
+            This browser is not connected to your Polaris account yet, so it does not appear under
+            Sessions.{" "}
+            <button
+                className="as-link"
+                disabled={busy}
+                onClick={() => {
+                    setBusy(true);
+                    void askBackground({ kind: "link" }).then(onDone);
+                }}
+            >
+                Connect it
+            </button>
+            .
+        </div>
+    );
+}
+
+/**
  * Signing in, which is asking Polaris itself.
  *
  * A tab opens on the dashboard, somebody who is already signed in and has their
@@ -238,10 +403,17 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
 function SignIn({
     server,
     connected,
+    canVault,
+    account,
     onDone
 }: {
     server: string;
     connected: boolean;
+    /** Whether this account may use a vault at all. */
+    canVault: boolean;
+    /** Who this browser is connected as, so the screen says whose vault it is
+     *  about to open rather than naming a server. */
+    account: { name: string | null; email: string | null } | null;
     onDone: () => Promise<void>;
 }): React.JSX.Element {
     const [error, setError] = useState<string | null>(null);
@@ -264,7 +436,7 @@ function SignIn({
     };
 
     const leave = async (
-        request: { kind: "signOut" } | { kind: "forgetServer" }
+        request: { kind: "signOut" } | { kind: "forgetServer" } | { kind: "unlink" }
     ): Promise<void> => {
         setError(null);
         const reply = await askBackground(request);
@@ -351,13 +523,29 @@ function SignIn({
         );
     }
 
+    if (!canVault) {
+        return (
+            <main className="pad">
+                <h1>Connected</h1>
+                <p className="muted">{account?.email ?? new URL(server).host}</p>
+                <p className="muted small">
+                    This account does not have a vault, so there are no logins to fill here yet.
+                    Everything else this extension learns to do will work from this connection.
+                </p>
+                <button className="ghost" onClick={() => void leave({ kind: "unlink" })}>
+                    Disconnect this browser
+                </button>
+            </main>
+        );
+    }
+
     return (
         <main className="pad">
-            <h1>Sign in</h1>
-            <p className="muted">{new URL(server).host}</p>
+            <h1>Your vault</h1>
+            <p className="muted">{account?.email ?? new URL(server).host}</p>
             <Problem text={error} />
             <button disabled={busy} onClick={() => void ask()}>
-                {busy ? "Asking" : "Sign in to Polaris"}
+                {busy ? "Asking" : "Connect your vault"}
             </button>
             {/* What it needs, before what it does. The requirement was the last
                 clause of the sentence, under a button that said "Sign in with
@@ -366,9 +554,9 @@ function SignIn({
                 the password vault; saying so is not a smaller promise, it is the
                 true one. */}
             <p className="muted small">
-                Approving happens on your dashboard, with your vault open. It signs this extension
-                in to your account and hands the vault key over sealed, so only this extension can
-                open it.
+                Approving happens on your dashboard, with your vault open. The key is handed over
+                sealed, so only this extension can open it - and it is tied to this connection, so
+                disconnecting the browser closes the vault with it.
             </p>
             {/* The master password is no longer a way in, and the button that
                 offered it is gone rather than left to fail: it opens the vault
@@ -381,13 +569,14 @@ function SignIn({
                 happened to name first. */}
             {connected ? (
                 <button className="ghost" onClick={() => void leave({ kind: "signOut" })}>
-                    Sign out
+                    Sign out of the vault
                 </button>
-            ) : (
-                <button className="ghost" onClick={() => void leave({ kind: "forgetServer" })}>
-                    Use a different Polaris
-                </button>
-            )}
+            ) : null}
+            {/* Ending the connection, which is the same act as ending it from the
+                account's Sessions screen and takes the vault with it. */}
+            <button className="ghost" onClick={() => void leave({ kind: "unlink" })}>
+                Disconnect this browser
+            </button>
         </main>
     );
 }
