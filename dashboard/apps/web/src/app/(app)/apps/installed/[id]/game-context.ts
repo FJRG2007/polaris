@@ -16,7 +16,7 @@ import { prisma } from "@polaris/db";
 import { gameServerFacts } from "@/lib/apps/games-service";
 import type { ArkAccessView } from "@/lib/apps/ark/service";
 import { readInstallConfig } from "@/lib/apps/install-config";
-import { appBaseUrl, publicAppUrl } from "@/lib/domain-service";
+import { appBaseUrl } from "@/lib/domain-service";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { BLUEPRINT_KEY, MAP_KEY } from "@/lib/apps/games-create";
 import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
@@ -146,7 +146,8 @@ export async function gameContextFor(app: {
         fivemPort,
         rosterMemory,
         lastLevels,
-        login
+        login,
+        packBase
     ] = await Promise.all([
         // Each game's servers live under a label of their own, so the address
         // picker has to be told which one it is naming a server in.
@@ -163,7 +164,8 @@ export async function gameContextFor(app: {
         minecraft ? rememberedLevels(app.id).catch(() => ({})) : {},
         minecraft && ownerId && editionOf(app.catalogId) === "java"
             ? loginState(app.id, app.applicationId, ownerId).catch(() => null)
-            : null
+            : null,
+        minecraft ? appBaseUrl().catch(() => null) : null
     ]);
     const config = readInstallConfig(install?.config);
     return {
@@ -194,8 +196,6 @@ export async function gameContextFor(app: {
         // What the players install, and the line that installs it. Resolved here
         // so the screen has both before it paints.
         clientMods: clientMods(config),
-        packCommands: minecraft
-            ? packCommands((await publicAppUrl().catch(() => null)) ?? (await appBaseUrl()), app.id)
-            : null
+        packCommands: packBase ? packCommands(packBase, app.id) : null
     };
 }

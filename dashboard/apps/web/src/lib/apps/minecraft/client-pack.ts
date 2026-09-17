@@ -26,7 +26,15 @@
 import { loadEnv } from "@polaris/config";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { readInstallConfig, type InstallConfig } from "@/lib/apps/install-config";
-import { buildFor, loaderForType, parseProjectList, projectSlug } from "./modrinth";
+import {
+    buildFor,
+    isModrinthUrl,
+    loaderForType,
+    parseProjectList,
+    projectSlug,
+    walk,
+    type ModrinthBuild
+} from "./modrinth";
 
 /** Where the client-only mods for a server are kept: on the install, beside the
  *  rest of what somebody chose for it, never in the container's own list - the
@@ -105,18 +113,43 @@ export async function resolvePack(input: {
     const mods: PackMod[] = [];
     const missing: string[] = [];
     if (!loader) return { server: input.name, loader, version, mods, missing };
-    for (const { entry, where } of [...server, ...player]) {
-        // A file the image installs by path, not a project: nothing to resolve
-        // and nothing a player could download.
-        if (!projectSlug(entry)) continue;
-        const build = await buildFor(entry, loader, version || null);
-        if (!build) {
+    // A file the image installs by path, not a project: nothing to resolve and
+    // nothing a player could download.
+    const asked = [...server, ...player].filter(({ entry }) => projectSlug(entry));
+    const builds = await walk(asked, ({ entry }) => buildFor(entry, loader, version || null));
+    for (const [index, { entry, where }] of asked.entries()) {
+        const build = builds[index] ?? null;
+        if (!build || !installableFile(build)) {
             missing.push(entry);
             continue;
         }
-        mods.push({ entry, where, ...build });
+        // The shell compares the checksum as text against what sha1sum prints,
+        // which is lowercase.
+        const sha1 = CHECKSUM.test(build.sha1) ? build.sha1.toLowerCase() : "";
+        mods.push({ entry, where, ...build, sha1 });
     }
     return { server: input.name, loader, version, mods, missing };
+}
+
+/** A jar name and nothing else: no folder to escape the mods folder with, no tab
+ *  or newline to shift the line the installers read it off. */
+const JAR = /^(?!\.)[A-Za-z0-9._+ ()-]{1,120}\.jar$/;
+
+/** Modrinth's own sha1, as the installers compare it. Anything else is no
+ *  checksum rather than a checksum that can never match. */
+const CHECKSUM = /^[A-Fa-f0-9]{40}$/;
+
+/**
+ * Whether a build is a file a script may be told to download.
+ *
+ * What comes back is somebody else's database, and it ends up as a path and a URL
+ * on a player's machine: a name with a separator in it writes outside the mods
+ * folder, and a URL anywhere but Modrinth is Polaris handing a stranger's download
+ * to a friend of the operator. Neither is installed - the entry is reported as
+ * unresolved, which is what "we could not get you this one" already means here.
+ */
+function installableFile(build: ModrinthBuild): boolean {
+    return JAR.test(build.filename) && !build.filename.includes("..") && isModrinthUrl(build.url);
 }
 
 /** The address a player is given, for one machine's kind of shell. */

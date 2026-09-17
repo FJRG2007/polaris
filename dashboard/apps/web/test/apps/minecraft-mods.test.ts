@@ -115,11 +115,11 @@ describe("what a server is offered", () => {
 
 describe("an icon url", () => {
     it("has to be Modrinth over https", () => {
-        expect(modrinth.isModrinthIcon("https://cdn.modrinth.com/data/x/icon.png")).toBe(true);
-        expect(modrinth.isModrinthIcon("http://cdn.modrinth.com/data/x/icon.png")).toBe(false);
-        expect(modrinth.isModrinthIcon("https://cdn.modrinth.com.evil.example/x.png")).toBe(false);
-        expect(modrinth.isModrinthIcon("javascript:alert(1)")).toBe(false);
-        expect(modrinth.isModrinthIcon(null)).toBe(false);
+        expect(modrinth.isModrinthUrl("https://cdn.modrinth.com/data/x/icon.png")).toBe(true);
+        expect(modrinth.isModrinthUrl("http://cdn.modrinth.com/data/x/icon.png")).toBe(false);
+        expect(modrinth.isModrinthUrl("https://cdn.modrinth.com.evil.example/x.png")).toBe(false);
+        expect(modrinth.isModrinthUrl("javascript:alert(1)")).toBe(false);
+        expect(modrinth.isModrinthUrl(null)).toBe(false);
     });
 });
 

@@ -304,12 +304,17 @@ export function MinecraftClientMods({
                         <div>
                             <h3 className="text-sm font-medium">Send this to the players</h3>
                             <p className="text-xs text-muted-foreground">
-                                One line installs the {serverMods + list.length} mods for this
+                                One line installs the {serverMods + entries.length} mods for this
                                 server into their game, and running it again is how they update:
                                 it replaces what changed and takes away what came off the lists.
                                 Anything else in their mods folder is left alone. The link needs
                                 no account here.
                             </p>
+                            {changed && (
+                                <p className="mt-1 text-xs text-warning">
+                                    What you just changed is not in it yet. Save first.
+                                </p>
+                            )}
                         </div>
                         {SYSTEMS.map((system) => (
                             <div key={system.key} className="flex items-center gap-2">

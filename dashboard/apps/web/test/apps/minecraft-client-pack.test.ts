@@ -23,8 +23,17 @@ import {
     PACK_RECORD,
     packTable,
     powershellInstaller,
+    scriptName,
+    scriptUrl,
     shellInstaller
 } from "@/lib/apps/minecraft/pack-scripts";
+
+/**
+ * A name typed by an operator, written the way somebody would to get a command
+ * onto every player's machine. It is used for every generated script here, so
+ * anything that would end the comment it sits in ends the tests too.
+ */
+const HOSTILE = 'Offgrid\nrm -rf "$HOME/.minecraft"\n#';
 
 /** A jar is only ever bytes to these scripts, so the fixtures are bytes. */
 const JARS: Record<string, string> = {
@@ -53,10 +62,55 @@ describe("the mod list both installers read", () => {
         );
     });
 
+    it("carries what could not be resolved, on one line and without its own tabs", () => {
+        expect(packTable([], ["xaeros-minimap", "sodium\tand\nmore"])).toBe(
+            "!\txaeros-minimap\n!\tsodium and more\n"
+        );
+    });
+
     it("says in both scripts which server it is for", () => {
         expect(shellInstaller("https://polaris.test/pack.tsv", "Offgrid")).toContain('"Offgrid"');
         expect(powershellInstaller("https://polaris.test/pack.tsv", "Offgrid")).toContain(
             '"Offgrid"'
+        );
+    });
+});
+
+/**
+ * What the operator types and what the player's request carried both end up
+ * inside a script that is piped into an interpreter on somebody else's machine.
+ * Neither may be able to end the line it is written on.
+ */
+describe("what a script may carry of somebody else's text", () => {
+    it("keeps a name to one line, and to what a name is made of", () => {
+        expect(scriptName(HOSTILE)).toBe("Offgrid rm -rf HOME .minecraft");
+        expect(scriptName("Ñandú survival")).toBe("Ñandú survival");
+        expect(scriptName("\n\n")).toBe("this server");
+        expect(scriptName("x".repeat(80))).toHaveLength(48);
+    });
+
+    it("leaves every line of both scripts a comment or the code that was meant", () => {
+        const url = "https://polaris.test/pack.tsv";
+        for (const build of [shellInstaller, powershellInstaller]) {
+            const script = build(url, HOSTILE);
+            // The name cannot add a line, so the script is the one a plain name
+            // makes, with a longer comment on it.
+            expect(script.split("\n")).toHaveLength(build(url, "Offgrid").split("\n").length);
+            expect(script).not.toContain('rm -rf "$HOME');
+            expect(script.split("\n").filter((line) => line.includes("Offgrid"))).toEqual([
+                script.split("\n")[build === shellInstaller ? 1 : 0]
+            ]);
+            const header = script.split("\n").slice(0, build === shellInstaller ? 3 : 2);
+            expect(header.every((line) => line.startsWith("#"))).toBe(true);
+        }
+    });
+
+    it("encodes an address that could otherwise run a command", () => {
+        expect(scriptUrl("https://polaris.test/api/minecraft/pack/a-b/tok_en/pack.tsv")).toBe(
+            "https://polaris.test/api/minecraft/pack/a-b/tok_en/pack.tsv"
+        );
+        expect(scriptUrl('https://a$(id)"x.test/pack.tsv')).toBe(
+            "https://a%24(id)%22x.test/pack.tsv"
         );
     });
 });
@@ -72,6 +126,7 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
     let server: Server;
     let origin = "";
     let list: string[] = [];
+    let missing: string[] = [];
 
     beforeAll(async () => {
         server = createServer((request, response) => {
@@ -82,7 +137,8 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
                         filename: jar,
                         sha1: sha1(JARS[jar] ?? ""),
                         url: `${origin}/${jar}`
-                    }))
+                    })),
+                    missing
                 );
                 response.writeHead(200, { "content-type": "text/plain" });
                 response.end(body);
@@ -123,8 +179,8 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         writeFileSync(
             script,
             kind === "sh"
-                ? shellInstaller(manifest, "Offgrid")
-                : powershellInstaller(manifest, "Offgrid"),
+                ? shellInstaller(manifest, HOSTILE)
+                : powershellInstaller(manifest, HOSTILE),
             "utf8"
         );
         const [command, args] =
@@ -148,6 +204,7 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
     /** The same three assertions for either script: install, leave alone, update. */
     async function exercise(kind: "sh" | "ps1"): Promise<void> {
         const dir = mkdtempSync(join(tmpdir(), "polaris-mods-"));
+        missing = [];
         try {
             // Something of the player's own, which nothing here may touch.
             writeFileSync(join(dir, "their-own-minimap.jar"), "not ours", "utf8");
@@ -180,6 +237,56 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         }
     }
 
+    /**
+     * The runs that must not cost the player a jar.
+     *
+     * A list that came back empty and a list that came back short are the two
+     * shapes a Modrinth outage takes, and on either of them the folder has to be
+     * exactly as it was: a mod taken away here is a friend who cannot join, and
+     * the reason is on a server neither of them can see.
+     */
+    async function refuses(kind: "sh" | "ps1"): Promise<void> {
+        const dir = mkdtempSync(join(tmpdir(), "polaris-mods-"));
+        missing = [];
+        try {
+            list = ["alpha-1.0.jar", "beta-2.0.jar"];
+            expect((await run(kind, dir)).code).toBe(0);
+
+            // One entry the server could not resolve: the jar it stands for is
+            // still needed, so nothing is taken away and the player is told.
+            list = ["alpha-1.0.jar"];
+            missing = ["beta"];
+            const partial = await run(kind, dir);
+            expect(partial.code, partial.output).toBe(0);
+            expect(partial.output).toContain("no build could be worked out for beta");
+            expect(partial.output).toContain("nothing was taken away");
+            expect(readdirSync(dir).sort()).toEqual(
+                [PACK_RECORD, "alpha-1.0.jar", "beta-2.0.jar"].sort()
+            );
+
+            // Nothing at all: a failure rather than a server that dropped
+            // everything, and it ends before the folder is touched.
+            list = [];
+            missing = [];
+            const empty = await run(kind, dir);
+            expect(empty.code, empty.output).not.toBe(0);
+            expect(empty.output).toContain("the mod list came back empty");
+            expect(readdirSync(dir).sort()).toEqual(
+                [PACK_RECORD, "alpha-1.0.jar", "beta-2.0.jar"].sort()
+            );
+
+            // And the record still knows the unresolved jar is this pack's, so
+            // the run where the server really does drop it takes it away.
+            list = ["alpha-1.0.jar"];
+            const dropped = await run(kind, dir);
+            expect(dropped.code, dropped.output).toBe(0);
+            expect(readdirSync(dir).sort()).toEqual([PACK_RECORD, "alpha-1.0.jar"].sort());
+        } finally {
+            missing = [];
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }
+
     it.runIf(HAS_SH)("install, keep and update a mods folder, from a shell", async () => {
         await exercise("sh");
     });
@@ -188,6 +295,17 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         "install, keep and update a mods folder, from PowerShell",
         async () => {
             await exercise("ps1");
+        }
+    );
+
+    it.runIf(HAS_SH)("take nothing away on a partial or empty list, from a shell", async () => {
+        await refuses("sh");
+    });
+
+    it.runIf(POWERSHELL)(
+        "take nothing away on a partial or empty list, from PowerShell",
+        async () => {
+            await refuses("ps1");
         }
     );
 });

@@ -160,21 +160,22 @@ function hitToProject(hit: z.infer<typeof searchResponseSchema>["hits"][number])
         categories: hit.categories,
         // Only Modrinth's own CDN. An icon_url is a URL out of somebody else's
         // database, and the page it lands on is one an operator is logged into.
-        iconUrl: isModrinthIcon(hit.icon_url) ? (hit.icon_url ?? null) : null,
+        iconUrl: isModrinthUrl(hit.icon_url) ? (hit.icon_url ?? null) : null,
         author: hit.author ?? null,
         clientOnly: hit.server_side === "unsupported"
     };
 }
 
 /**
- * Whether a URL is an icon on Modrinth's own CDN.
+ * Whether a URL is on Modrinth's own CDN.
  *
- * An `icon_url` is a URL out of somebody else's database, and what it reaches is
- * fetched by Polaris and rendered inside a dashboard an operator is logged into.
- * So it has to be https, and it has to be them - anything else is dropped and the
- * row draws its initials instead.
+ * Every URL here comes out of somebody else's database, and what it reaches is
+ * either fetched by Polaris and rendered inside a dashboard an operator is logged
+ * into, or downloaded onto a player's machine by the installer. So it has to be
+ * https, and it has to be them - an icon that is not draws its initials instead,
+ * and a file that is not is reported rather than installed.
  */
-export function isModrinthIcon(url: string | null | undefined): boolean {
+export function isModrinthUrl(url: string | null | undefined): boolean {
     if (!url) return false;
     try {
         const parsed = new URL(url);
@@ -327,7 +328,7 @@ export async function readInstalledProjects(
             description: project.description,
             downloads: project.downloads,
             categories: project.categories,
-            iconUrl: isModrinthIcon(project.icon_url) ? (project.icon_url ?? null) : null,
+            iconUrl: isModrinthUrl(project.icon_url) ? (project.icon_url ?? null) : null,
             author: null,
             clientOnly: project.server_side === "unsupported",
             known: true,
@@ -479,11 +480,13 @@ const WALK_CONCURRENCY = 8;
 /**
  * `items.map(run)`, a few at a time, in order.
  *
- * The walks below ask one question per project. One after another, a list of
+ * The walks here ask one question per project. One after another, a list of
  * twenty is twenty round trips end to end; all at once, it is a burst against
- * somebody else's rate limit.
+ * somebody else's rate limit. Exported because the pack a player installs is the
+ * same shape of walk over the same API, and a second answer to how many at once
+ * is a second rate limit to get wrong.
  */
-async function walk<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {
+export async function walk<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {
     const results = new Array<R>(items.length);
     let next = 0;
     async function worker(): Promise<void> {

@@ -15,8 +15,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { publicAppUrl } from "@/lib/domain-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
+import { appBaseUrl, requestOrigin } from "@/lib/domain-service";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "@/lib/apps/minecraft/join-guard";
 import { packTokenMatches, packUrl, resolvePack } from "@/lib/apps/minecraft/client-pack";
 import { packTable, powershellInstaller, shellInstaller } from "@/lib/apps/minecraft/pack-scripts";
@@ -40,6 +40,18 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     });
     if (!install?.applicationId) return new Response("Not found", { status: 404 });
 
+    // The two scripts carry the server's name and the address of the list, and
+    // nothing out of the list itself - so neither is worth resolving a pack for,
+    // and a player fetching one does not spend a walk of Modrinth requests.
+    if (file === "install.sh" || file === "install.ps1") {
+        const manifest = packUrl(await packBase(request), id, "pack.tsv");
+        const script =
+            file === "install.ps1"
+                ? powershellInstaller(manifest, install.name)
+                : shellInstaller(manifest, install.name);
+        return text(script, "text/plain; charset=utf-8");
+    }
+
     const env = await prisma.envVar.findMany({
         where: {
             scopeType: "application",
@@ -58,21 +70,25 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
         config: readInstallConfig(install.config)
     });
 
-    // Where this Polaris is reachable from outside, since the script runs on
-    // somebody else's machine; the address the request arrived on is the
-    // fallback, which is right for a player on the same network.
-    const base = (await publicAppUrl().catch(() => null)) ?? new URL(request.url).origin;
-    const manifest = packUrl(base, id, "pack.tsv");
-
-    if (file === "pack.tsv") return text(packTable(pack.mods), "text/plain; charset=utf-8");
     if (file === "manifest.json") {
         return Response.json(pack, { headers: { "cache-control": "no-store" } });
     }
-    const script =
-        file === "install.ps1"
-            ? powershellInstaller(manifest, pack.server)
-            : shellInstaller(manifest, pack.server);
-    return text(script, "text/plain; charset=utf-8");
+    return text(packTable(pack.mods, pack.missing), "text/plain; charset=utf-8");
+}
+
+/**
+ * The address the script fetches the list from.
+ *
+ * The one the player just reached, rather than one Polaris picks for itself: on a
+ * LAN-only install the operator's own address is a name only this network knows,
+ * and anything else baked into the script is a player whose install dies on a URL
+ * that never resolves. `request.url` is not that address - it is the socket the
+ * proxy forwards to - so it is the forwarded host or nothing, and nothing falls
+ * back to the address Polaris publishes.
+ */
+async function packBase(request: Request): Promise<string> {
+    const forwarded = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    return forwarded ? requestOrigin(request) : await appBaseUrl();
 }
 
 function text(body: string, type: string): Response {

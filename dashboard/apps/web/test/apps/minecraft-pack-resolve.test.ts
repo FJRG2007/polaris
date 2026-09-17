@@ -72,6 +72,40 @@ describe("the pack a player installs", () => {
         expect(pack.missing).toEqual(["xaeros-minimap"]);
     });
 
+    it("reports a file it would not put on a player's machine rather than listing it", async () => {
+        builds.set("securitycraft", {
+            ...build("securitycraft"),
+            filename: "../../evil.jar"
+        });
+        builds.set("xaeros-minimap", {
+            ...build("xaeros-minimap"),
+            url: "https://evil.example/xaeros.jar"
+        });
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "securitycraft?",
+            config: { clientMods: ["xaeros-minimap"] }
+        });
+
+        expect(pack.mods).toEqual([]);
+        expect(pack.missing).toEqual(["securitycraft?", "xaeros-minimap"]);
+    });
+
+    it("carries a checksum only when it is one, so a run never compares against nonsense", async () => {
+        builds.set("securitycraft", { ...build("securitycraft"), sha1: "not-a-checksum" });
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "securitycraft?",
+            config: {}
+        });
+
+        expect(pack.mods[0]?.sha1).toBe("");
+    });
+
     it("has nothing to hand out for a server whose software loads no mods", async () => {
         const pack = await resolvePack({
             name: "Bedrock",
