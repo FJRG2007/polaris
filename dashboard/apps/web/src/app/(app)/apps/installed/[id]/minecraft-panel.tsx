@@ -603,6 +603,7 @@ export function MinecraftPanel({
                         )}
                         playersOnline={status?.players.online ?? 0}
                         running={isRunning}
+                        withMemory
                         onSaved={reloadSettings}
                     />
                     <MinecraftReset

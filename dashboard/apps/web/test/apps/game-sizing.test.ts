@@ -10,26 +10,38 @@
 
 import { describe, expect, it } from "vitest";
 import { parseMemoryMb } from "@/lib/apps/games-service";
-import { blueprintsFor, findBlueprint, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
+import { blueprintsFor, findBlueprint, formatMemory } from "@/lib/apps/minecraft/blueprints";
+import { plannedHeapMb } from "@/lib/apps/minecraft/memory-plan";
 
-describe("recommendedMemoryMb", () => {
+describe("the heap a server is sized with", () => {
     it("gives a small server enough to run at all", () => {
-        expect(recommendedMemoryMb(1)).toBeGreaterThanOrEqual(1536);
+        expect(plannedHeapMb({ concurrentPlayers: 1 })).toBeGreaterThanOrEqual(1536);
     });
 
     it("grows with the players actually on, not the slots", () => {
-        expect(recommendedMemoryMb(40)).toBeGreaterThan(recommendedMemoryMb(8));
+        expect(plannedHeapMb({ concurrentPlayers: 40 })).toBeGreaterThan(
+            plannedHeapMb({ concurrentPlayers: 8 })
+        );
     });
 
     it("asks a minigame blueprint for more than a survival one at the same size", () => {
-        expect(recommendedMemoryMb(20, "heavy")).toBeGreaterThan(recommendedMemoryMb(20, "normal"));
-        expect(recommendedMemoryMb(20, "light")).toBeLessThan(recommendedMemoryMb(20, "normal"));
+        expect(plannedHeapMb({ concurrentPlayers: 20, weight: "heavy" })).toBeGreaterThan(
+            plannedHeapMb({ concurrentPlayers: 20, weight: "normal" })
+        );
+        expect(plannedHeapMb({ concurrentPlayers: 20, weight: "light" })).toBeLessThan(
+            plannedHeapMb({ concurrentPlayers: 20, weight: "normal" })
+        );
     });
 
-    // Past this the answer is a second server, not a bigger heap - and a number
-    // above what the machine has would simply fail to start.
-    it("stops at a heap a machine can actually give", () => {
-        expect(recommendedMemoryMb(1000, "heavy")).toBeLessThanOrEqual(12288);
+    // What stops a runaway figure is no longer part of this sum: the ceiling the
+    // operator set and what the machine actually has are applied where the plan is
+    // applied, and they are asserted in the memory-plan tests.
+    it("grows with a mod loader and with the mods on it", () => {
+        const vanilla = plannedHeapMb({ concurrentPlayers: 8 });
+        const loader = plannedHeapMb({ concurrentPlayers: 8, loader: "neoforge" });
+        const modded = plannedHeapMb({ concurrentPlayers: 8, loader: "neoforge", mods: 10 });
+        expect(loader).toBeGreaterThan(vanilla);
+        expect(modded).toBeGreaterThan(loader);
     });
 
     it("lands on figures the image understands", () => {

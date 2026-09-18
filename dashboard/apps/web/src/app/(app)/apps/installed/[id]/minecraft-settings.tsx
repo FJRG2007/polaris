@@ -14,18 +14,21 @@
  */
 
 import { RestartPlanner } from "./restart-planner";
+import { MinecraftMemory } from "./minecraft-memory";
 import { Loader2, RotateCw, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import { memoryChangeSentence } from "@/lib/apps/minecraft/memory-plan";
 
 export function MinecraftSettings({
     installedAppId,
     settings,
     playersOnline,
     running = true,
+    withMemory = false,
     onSaved
 }: {
     installedAppId: string;
@@ -34,12 +37,40 @@ export function MinecraftSettings({
     /** Whether the server is up. A stopped one needs no restart at all: what was
      *  saved is what it will start with. */
     running?: boolean;
+    /** Whether the Memory card belongs above these fields. Only the Minecraft
+     *  Settings tab carries the heap. */
+    withMemory?: boolean;
     onSaved: () => void;
 }) {
-    const [values, setValues] = useState<Record<string, string>>(() =>
-        Object.fromEntries(settings.map((setting) => [setting.key, setting.value]))
+    const stored = useMemo(
+        () => Object.fromEntries(settings.map((setting) => [setting.key, setting.value])),
+        [settings]
     );
+    const [values, setValues] = useState<Record<string, string>>(stored);
+    /** What the fields were last seeded from. When the stored values move under
+     *  them (a save, a planned heap), every field nobody is editing follows. */
+    const [seeded, setSeeded] = useState<Record<string, string>>(stored);
+    if (
+        Object.keys(stored).length !== Object.keys(seeded).length ||
+        Object.keys(stored).some((key) => stored[key] !== seeded[key])
+    ) {
+        setSeeded(stored);
+        setValues((current) =>
+            Object.fromEntries(
+                Object.entries(stored).map(([key, value]) => [
+                    key,
+                    current[key] !== undefined && current[key] !== seeded[key]
+                        ? current[key]
+                        : value
+                ])
+            )
+        );
+    }
     const [error, setError] = useState<string | null>(null);
+    /** What the last save did to the heap, said once under the fields. */
+    const [memoryNote, setMemoryNote] = useState<string | null>(null);
+    /** Bumped on every save so the memory card reads what was just stored. */
+    const [saves, setSaves] = useState(0);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     /** Something was saved and deliberately not applied, so the restart card is
@@ -69,6 +100,7 @@ export function MinecraftSettings({
 
     async function save(restart: boolean): Promise<void> {
         setError(null);
+        setMemoryNote(null);
         const warning =
             playersOnline > 0
                 ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
@@ -95,6 +127,14 @@ export function MinecraftSettings({
                 setError(result.error);
                 return;
             }
+            setMemoryNote(
+                result.memory
+                    ? memoryChangeSentence(result.memory, restart)
+                    : result.memoryFixed
+                      ? "The memory you typed is now the server's figure, and Polaris no longer adjusts it. Switch it back under Memory above."
+                      : null
+            );
+            setSaves((count) => count + 1);
             // Saved and not applied: the card below is how it gets applied later.
             setWaiting(!restart && running);
             onSaved();
@@ -113,6 +153,10 @@ export function MinecraftSettings({
 
     return (
         <div className="flex flex-col gap-4">
+            {/* Above the fields, because it decides whether one of them is still
+                the thing that settles the heap. */}
+            {withMemory && <MinecraftMemory installedAppId={installedAppId} refresh={saves} />}
+
             {groups.map(({ group, fields }) => (
                 <Card key={group}>
                     <CardBody className="flex flex-col gap-3">
@@ -124,7 +168,10 @@ export function MinecraftSettings({
                                     <Select
                                         value={values[field.key] ?? ""}
                                         onValueChange={(value) =>
-                                            setValues((current) => ({ ...current, [field.key]: value }))
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.key]: value
+                                            }))
                                         }
                                         options={field.options}
                                     />
@@ -132,11 +179,18 @@ export function MinecraftSettings({
                                     <Input
                                         value={values[field.key] ?? ""}
                                         onChange={(event) =>
-                                            setValues((current) => ({ ...current, [field.key]: event.target.value }))
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.key]: event.target.value
+                                            }))
                                         }
                                     />
                                 )}
-                                {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
+                                {field.help && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {field.help}
+                                    </span>
+                                )}
                             </label>
                         ))}
                     </CardBody>
@@ -144,6 +198,7 @@ export function MinecraftSettings({
             ))}
 
             {error && <p className="text-sm text-danger">{error}</p>}
+            {memoryNote && <p className="text-sm text-muted-foreground">{memoryNote}</p>}
 
             {/* Saved and waiting: now, when the last person leaves, or at a time. */}
             <RestartPlanner
@@ -172,11 +227,22 @@ export function MinecraftSettings({
                         onClick={() => void save(false)}
                         disabled={pending || changed.length === 0}
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Save className="size-4" />
+                        )}
                         Save
                     </Button>
-                    <Button onClick={() => void save(true)} disabled={pending || changed.length === 0}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+                    <Button
+                        onClick={() => void save(true)}
+                        disabled={pending || changed.length === 0}
+                    >
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <RotateCw className="size-4" />
+                        )}
                         Save and restart
                     </Button>
                 </div>

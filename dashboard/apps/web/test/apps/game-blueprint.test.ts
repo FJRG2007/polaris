@@ -325,6 +325,18 @@ describe("the world a blueprint opens on", () => {
         // A heavier game for the same number of players gets a heavier heap.
         expect(env.get("MEMORY")).toBe("3G");
     });
+
+    it("never writes a heap past the default ceiling, however many are expected", async () => {
+        const env = await envFor("survival", { software: "NEOFORGE", concurrentPlayers: 1000 });
+        expect(env.get("MEMORY")).toBe("8G");
+    });
+
+    it("sizes the heap for the software chosen, not the blueprint's default", async () => {
+        const paper = await envFor("survival");
+        const fabric = await envFor("survival", { software: "FABRIC" });
+        expect(paper.get("MEMORY")).toBe("2G");
+        expect(fabric.get("MEMORY")).toBe("3G");
+    });
 });
 
 describe("resetting a server onto another blueprint", () => {

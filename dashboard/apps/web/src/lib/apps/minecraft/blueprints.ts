@@ -102,7 +102,8 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
     {
         id: "parkour",
         name: "Infinite parkour",
-        summary: "A course that generates as you run it, with times to beat. Installs InfiniteParkour.",
+        summary:
+            "A course that generates as you run it, with times to beat. Installs InfiniteParkour.",
         editions: ["java"],
         software: "PAPER",
         projects: ["infiniteparkour"],
@@ -218,28 +219,9 @@ export function hasCrossplay(projects: string | undefined): boolean {
     // Both sides through the same parser: the entry carries a release type, and
     // comparing the raw strings would stop matching the day one is added to it.
     const geyser = projectSlug(CROSSPLAY_PROJECTS[0])?.toLowerCase();
-    return (projects ?? "").split(/[,\n]/).some((entry) => projectSlug(entry)?.toLowerCase() === geyser);
-}
-
-/**
- * Memory for a server, from how many people will actually be on it.
- *
- * The number that matters is the concurrent one, not the slot count: a server
- * with 200 slots and eight players on it is an eight-player server. A gigabyte
- * carries the world and the server itself, each player costs about 50 MB of
- * chunks and entities, and a blueprint that runs a minigame engine needs more
- * than one that runs nothing. Rounded to half a gigabyte, because that is the
- * granularity anyone reasons in, and capped at 12 GB - past that the answer is
- * another server, not a bigger heap.
- */
-export function recommendedMemoryMb(concurrentPlayers: number, weight: BlueprintWeight = "normal"): number {
-    const base = weight === "heavy" ? 2048 : weight === "light" ? 768 : 1024;
-    // A parkour course keeps almost nothing per player; a minigame engine keeps
-    // scoreboards, arenas and entities for each of them.
-    const perPlayer = weight === "heavy" ? 80 : weight === "light" ? 35 : 50;
-    const raw = base + Math.max(0, concurrentPlayers) * perPlayer;
-    const rounded = Math.ceil(raw / 512) * 512;
-    return Math.min(Math.max(rounded, 1536), 12288);
+    return (projects ?? "")
+        .split(/[,\n]/)
+        .some((entry) => projectSlug(entry)?.toLowerCase() === geyser);
 }
 
 /** The same figure as the image wants it ("2G", "2560M"). */
