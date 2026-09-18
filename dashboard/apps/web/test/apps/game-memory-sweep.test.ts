@@ -124,7 +124,8 @@ beforeEach(() => {
         TYPE: "NEOFORGE",
         VERSION: "1.21.4",
         MAX_PLAYERS: "20",
-        MODRINTH_PROJECTS: "corpse:beta,dynamic-torches,security-craft?,comforts,trashslot,rechiseled"
+        MODRINTH_PROJECTS:
+            "corpse:beta,dynamic-torches,security-craft?,comforts,trashslot,rechiseled"
     };
     saved = [];
     patched = [];

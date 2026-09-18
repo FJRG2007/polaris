@@ -18,7 +18,11 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Card, CardBody, Select, Skeleton } from "@polaris/ui";
-import { readMemoryPlanAction, setMemoryPlanAction, type MemoryPlanView } from "./minecraft-actions";
+import {
+    readMemoryPlanAction,
+    setMemoryPlanAction,
+    type MemoryPlanView
+} from "./minecraft-actions";
 
 /** The ceilings worth offering. Past eight gigabytes the answer is a second
  *  server rather than a bigger heap - the pauses the collector takes on one that
@@ -83,7 +87,9 @@ export function MinecraftMemory({
     if (note && !plan) {
         return (
             <Card>
-                <CardBody className="py-6 text-center text-sm text-muted-foreground">{note}</CardBody>
+                <CardBody className="py-6 text-center text-sm text-muted-foreground">
+                    {note}
+                </CardBody>
             </Card>
         );
     }
@@ -140,8 +146,8 @@ export function MinecraftMemory({
                                         ? `This server wants ${inGigabytes(plan.plannedMb)} for ${plan.reason}. It picks that up at its next restart.`
                                         : `${inGigabytes(plan.plannedMb)} covers ${plan.reason}, which is what it has.`}{" "}
                                     Polaris raises it when the server grows or runs out, never past{" "}
-                                    {inGigabytes(plan.ceilingMb)} and never past what the machine can
-                                    spare, and never lowers it on its own.
+                                    {inGigabytes(plan.ceilingMb)} and never past what the machine
+                                    can spare, and never lowers it on its own.
                                 </p>
                             </>
                         ) : (

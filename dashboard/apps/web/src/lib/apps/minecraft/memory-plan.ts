@@ -143,7 +143,8 @@ export interface HeapBounds {
  * promising more heap than it has and taking everything on it down at once.
  */
 export function clampHeapMb(planned: number, bounds: HeapBounds): number {
-    const ceiling = bounds.ceilingMb && bounds.ceilingMb > 0 ? bounds.ceilingMb : DEFAULT_CEILING_MB;
+    const ceiling =
+        bounds.ceilingMb && bounds.ceilingMb > 0 ? bounds.ceilingMb : DEFAULT_CEILING_MB;
     let limit = Math.min(planned, ceiling);
     const total = bounds.machineTotalMb ?? 0;
     if (total > 0) {

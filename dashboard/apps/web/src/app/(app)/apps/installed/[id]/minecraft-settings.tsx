@@ -59,7 +59,9 @@ export function MinecraftSettings({
             Object.fromEntries(
                 Object.entries(stored).map(([key, value]) => [
                     key,
-                    current[key] !== undefined && current[key] !== seeded[key] ? current[key] : value
+                    current[key] !== undefined && current[key] !== seeded[key]
+                        ? current[key]
+                        : value
                 ])
             )
         );
@@ -166,7 +168,10 @@ export function MinecraftSettings({
                                     <Select
                                         value={values[field.key] ?? ""}
                                         onValueChange={(value) =>
-                                            setValues((current) => ({ ...current, [field.key]: value }))
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.key]: value
+                                            }))
                                         }
                                         options={field.options}
                                     />
@@ -174,11 +179,18 @@ export function MinecraftSettings({
                                     <Input
                                         value={values[field.key] ?? ""}
                                         onChange={(event) =>
-                                            setValues((current) => ({ ...current, [field.key]: event.target.value }))
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.key]: event.target.value
+                                            }))
                                         }
                                     />
                                 )}
-                                {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
+                                {field.help && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {field.help}
+                                    </span>
+                                )}
                             </label>
                         ))}
                     </CardBody>
@@ -215,11 +227,22 @@ export function MinecraftSettings({
                         onClick={() => void save(false)}
                         disabled={pending || changed.length === 0}
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Save className="size-4" />
+                        )}
                         Save
                     </Button>
-                    <Button onClick={() => void save(true)} disabled={pending || changed.length === 0}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+                    <Button
+                        onClick={() => void save(true)}
+                        disabled={pending || changed.length === 0}
+                    >
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <RotateCw className="size-4" />
+                        )}
                         Save and restart
                     </Button>
                 </div>

@@ -19,12 +19,18 @@ describe("the heap a server is sized with", () => {
     });
 
     it("grows with the players actually on, not the slots", () => {
-        expect(plannedHeapMb({ concurrentPlayers: 40 })).toBeGreaterThan(plannedHeapMb({ concurrentPlayers: 8 }));
+        expect(plannedHeapMb({ concurrentPlayers: 40 })).toBeGreaterThan(
+            plannedHeapMb({ concurrentPlayers: 8 })
+        );
     });
 
     it("asks a minigame blueprint for more than a survival one at the same size", () => {
-        expect(plannedHeapMb({ concurrentPlayers: 20, weight: "heavy" })).toBeGreaterThan(plannedHeapMb({ concurrentPlayers: 20, weight: "normal" }));
-        expect(plannedHeapMb({ concurrentPlayers: 20, weight: "light" })).toBeLessThan(plannedHeapMb({ concurrentPlayers: 20, weight: "normal" }));
+        expect(plannedHeapMb({ concurrentPlayers: 20, weight: "heavy" })).toBeGreaterThan(
+            plannedHeapMb({ concurrentPlayers: 20, weight: "normal" })
+        );
+        expect(plannedHeapMb({ concurrentPlayers: 20, weight: "light" })).toBeLessThan(
+            plannedHeapMb({ concurrentPlayers: 20, weight: "normal" })
+        );
     });
 
     // What stops a runaway figure is no longer part of this sum: the ceiling the

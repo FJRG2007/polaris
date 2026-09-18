@@ -102,7 +102,8 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
     {
         id: "parkour",
         name: "Infinite parkour",
-        summary: "A course that generates as you run it, with times to beat. Installs InfiniteParkour.",
+        summary:
+            "A course that generates as you run it, with times to beat. Installs InfiniteParkour.",
         editions: ["java"],
         software: "PAPER",
         projects: ["infiniteparkour"],
@@ -218,7 +219,9 @@ export function hasCrossplay(projects: string | undefined): boolean {
     // Both sides through the same parser: the entry carries a release type, and
     // comparing the raw strings would stop matching the day one is added to it.
     const geyser = projectSlug(CROSSPLAY_PROJECTS[0])?.toLowerCase();
-    return (projects ?? "").split(/[,\n]/).some((entry) => projectSlug(entry)?.toLowerCase() === geyser);
+    return (projects ?? "")
+        .split(/[,\n]/)
+        .some((entry) => projectSlug(entry)?.toLowerCase() === geyser);
 }
 
 /** The same figure as the image wants it ("2G", "2560M"). */

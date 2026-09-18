@@ -211,8 +211,9 @@ async function machineOf(
 export async function applyPlannedMemory(
     context: PlanContext,
     now: Date = new Date()
-): Promise<{ fromMb: number; toMb: number; reason: string; } | null> {
-    if (plan.memoryMode(readInstallConfig(context.config)[plan.MEMORY_MODE_KEY]) !== "auto") return null;
+): Promise<{ fromMb: number; toMb: number; reason: string } | null> {
+    if (plan.memoryMode(readInstallConfig(context.config)[plan.MEMORY_MODE_KEY]) !== "auto")
+        return null;
     const planned = await plannedMemoryFor(context, now);
     return planned ? writePlannedMemory(context, planned, false) : null;
 }
@@ -224,7 +225,7 @@ async function writePlannedMemory(
     context: PlanContext,
     planned: PlannedMemory,
     exhausted: boolean
-): Promise<{ fromMb: number; toMb: number; reason: string; } | null> {
+): Promise<{ fromMb: number; toMb: number; reason: string } | null> {
     const floor = exhausted ? (plan.raisedHeapMb(planned.currentMb, planned.bounds) ?? 0) : 0;
     const target = Math.max(planned.wantedMb, floor);
     // Only upwards, and - for a server that is merely growing - only when the

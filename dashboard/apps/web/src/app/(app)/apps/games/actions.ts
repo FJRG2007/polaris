@@ -22,7 +22,11 @@ import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { clearQueue } from "@/lib/apps/minecraft/queue-service";
 import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { releaseVersions } from "@/lib/apps/minecraft/blueprint-version";
-import { blueprintVersions, createGameServer, expectedMinecraftHeapMb } from "@/lib/apps/games-create";
+import {
+    blueprintVersions,
+    createGameServer,
+    expectedMinecraftHeapMb
+} from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { clearGameServerPrefs, setGameServerPref } from "@/lib/apps/games-prefs";
@@ -31,10 +35,7 @@ import { isTemplateName, type ServerTemplateView } from "@/lib/apps/game-templat
 import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
-import {
-    GAME_BLUEPRINTS,
-    formatMemory
-} from "@/lib/apps/minecraft/blueprints";
+import { GAME_BLUEPRINTS, formatMemory } from "@/lib/apps/minecraft/blueprints";
 import {
     deleteServerTemplate,
     listServerTemplates,
