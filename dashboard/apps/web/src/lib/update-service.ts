@@ -99,13 +99,12 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
  *  path filter). Used only to tell "a build is pending" from "a commit landed that
  *  never produces a new image" - a daemon-only or docs commit is not an update.
  *
- *  `apps/web` by name rather than all of `apps/`: the image installs and builds that
- *  one app, so the browser extension beside it ships in nothing a deployment runs.
- *  Counting it here would leave the card promising a build that is never published,
- *  which is the state this filter exists to keep off the screen. An app added later
- *  is outside the image until someone puts it in one, here and in the workflow. */
+ *  Every app under `apps/` but the browser extension: the image builds the
+ *  dashboard and the app packages it carries, while the extension ships in nothing
+ *  a deployment runs. Counting it would leave the card promising a build that is
+ *  never published, which is the state this filter exists to keep off the screen. */
 export const WEB_IMAGE_PATHS =
-    /^dashboard\/apps\/web\/|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+    /^dashboard\/apps\/(?!extension\/)|^dashboard\/(packages|cli|patches|scripts)\/|^dashboard\/resources\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
 /** Check runs that decide whether the dashboard image is safe to install (mirrors
  *  dashboard-publish.yml: `changes` picks the images, `web` builds this one, and

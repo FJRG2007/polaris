@@ -13,11 +13,7 @@
  */
 
 import { z } from "zod";
-import { host } from "@polaris/app-host";
-import type { AppHostTypes } from "@polaris/app-host";
-
-const { searchCatalog } = host.appsCatalogSearch;
-type SearchableItem = AppHostTypes["SearchableItem"];
+import { searchCatalog, type SearchableItem } from "@polaris/core/catalog-search";
 
 /** An item id as the game writes it, the namespace optional because `give Alice
  *  stone` is what an operator types. Shared with the form and the server action so

@@ -17,11 +17,7 @@
  * nothing here talks to anybody at runtime.
  */
 
-import { host } from "@polaris/app-host";
-import type { AppHostTypes } from "@polaris/app-host";
-
-const { searchCatalog } = host.appsCatalogSearch;
-type SearchableItem = AppHostTypes["SearchableItem"];
+import { searchCatalog, type SearchableItem } from "@polaris/core/catalog-search";
 
 /** An item's class, which is what the picture is named after and what a screen
  *  sends back. Deliberately strict: it is turned into a URL and looked up in a

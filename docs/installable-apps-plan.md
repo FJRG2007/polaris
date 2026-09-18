@@ -158,7 +158,11 @@ load those into a core path that never uses them.
      page, route or server action.
    - What is pure and shared moves to a package instead of the host: the zoom
      arithmetic went to `@polaris/ui/zoom`, `LOCAL_TARGET` was already in
-     `@polaris/core`.
+     `@polaris/core`. So does anything an app runs in the browser: the server
+     host exists only in the Node process, which is why the item search the
+     game panels run on every keystroke is `@polaris/core/catalog-search`, and
+     `app-host-contract.test.ts` fails if a module a client component reaches
+     imports the server host.
 
 3. **Bundles.** Build each app workspace into a bundle in CI; add the loader,
    the resolution hook, the catch-all routes and the import map; stop compiling

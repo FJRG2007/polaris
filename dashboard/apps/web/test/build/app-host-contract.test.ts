@@ -14,8 +14,8 @@
  * drawn, and one that is not has to say why.
  */
 
-import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { dirname, join, resolve } from "node:path";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
 const SRC = resolve(__dirname, "../../src");
@@ -77,12 +77,10 @@ const EAGER = [
     "appsCatalog.promptedEnvVars",
     "appsCatalog.tunableEnvVars",
     "appsInstallDefaults.defaultInstallInput",
-    // Arithmetic over values the app already has: a fuzzy search over a list it
-    // passes in, what a port range means, what a reading of ports says, how a
+    // Arithmetic over values the app already has: what a port range means, what a reading of ports says, how a
     // backup selector is built, what an address is, how wide a chart window is,
     // what kind of image some bytes are. No database, no session, no network,
     // and each is called inside a synchronous render or a sort comparator.
-    "appsCatalogSearch.searchCatalog",
     "appsInstallConfig.readInstallConfig",
     "appsPortAdvice.describeBlocksFor",
     "appsPortAdvice.describePorts",
@@ -296,6 +294,53 @@ describe("the client pieces the dashboard offers apps", () => {
     // buys nothing: `dynamic` splits what nothing else already pulled in.
     it.each([...drawnLater])("%s is not also imported here", (name) => {
         expect(new RegExp(`^import .*\\b${name}\\b.*from`, "m").test(CLIENT)).toBe(false);
+    });
+});
+
+// The server host is provided in the Node process and nowhere else, so an app
+// module that takes a service from it and also runs in the browser fails there
+// with "called before the dashboard provided its services" - on the first
+// keystroke, not at build time. Pure logic both halves need belongs in
+// @polaris/core; what the browser needs from the dashboard, in the client host.
+describe("an app's browser code", () => {
+    it("never takes a service from the server host", () => {
+        const files = appFiles();
+        const text = new Map(files.map((file) => [file, readFileSync(file, "utf8")]));
+        const directive = (file: string, kind: string) =>
+            new RegExp(`^\\s*["']use ${kind}["']`).test(text.get(file) ?? "");
+        const imports = (file: string): string[] =>
+            [
+                ...(text.get(file) ?? "").matchAll(
+                    /^(?:import|export)\s+(?!type\b)(?:[^;]*?\s+from\s+)?["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/gm
+                )
+            ]
+                .map((match) => match[1] ?? match[2] ?? "")
+                .filter((specifier) => specifier.startsWith("."))
+                .flatMap((specifier) => {
+                    const base = resolve(dirname(file), specifier);
+                    const found = [`${base}.ts`, `${base}.tsx`, join(base, "index.ts"), join(base, "index.tsx")].find(
+                        (candidate) => text.has(candidate)
+                    );
+                    return found ? [found] : [];
+                });
+        const clients = files.filter((file) => directive(file, "client"));
+        const reached = new Map<string, string>();
+        for (const client of clients) {
+            const stack = [client];
+            while (stack.length > 0) {
+                const file = stack.pop() as string;
+                // A server action reaches the browser as a reference, not as code.
+                if (reached.has(file) || directive(file, "server")) continue;
+                reached.set(file, client);
+                stack.push(...imports(file));
+            }
+        }
+        const serverHost = /^import\s+(?!type\b)[^;]*?from\s+["']@polaris\/app-host["']/m;
+        const leaks = [...reached]
+            .filter(([file]) => serverHost.test(text.get(file) ?? ""))
+            .map(([file, client]) => `${file} (drawn by ${client})`);
+        expect(clients.length).toBeGreaterThan(10);
+        expect(leaks).toEqual([]);
     });
 });
 
