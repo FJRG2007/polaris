@@ -631,6 +631,41 @@ describe("mail about a purchase somebody financed", () => {
         }
     });
 
+    it("leaves news that names credit and a purchase, but not whose, where it was", () => {
+        for (const [subject, snippet] of [
+            [
+                "Hipoteca para la compra de vivienda: así afecta la subida del Euribor",
+                "Las claves de la semana"
+            ],
+            ["Acme secures financing for the purchase of a new plant", "This week in business"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+    });
+
+    it("does not read ordinary newsletter phrasing as a survey", () => {
+        // "rate your" inside "integrate your", and the soft words - experience,
+        // feedback, valuation - that newsletters use without asking anything.
+        for (const [subject, snippet] of [
+            ["Integrate your payment provider in minutes", "Our new SDK is out"],
+            ["Accelerate your payments with one API", "Now in the dashboard"],
+            ["Mejora tu experiencia de compra con la nueva app", "Ya disponible"],
+            ["Valoración de tu vivienda antes de la compra", "Guía para propietarios"],
+            ["Thanks for your feedback - new payment options", "What changed this month"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+    });
+
+    it("leaves a shop's newsletter with a pay-later footer with the bulk mail", () => {
+        for (const [subject, snippet] of [
+            ["New arrivals are in", "Pay in 4 with Klarna at checkout"],
+            ["Ya llegó la nueva colección", "Paga en 3 con PayPal"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+    });
+
     it("reads the purchase nouns as whole words", () => {
         // "in order to", "border", "pagoda" and "Verkauf" are not a purchase.
         for (const [subject, snippet] of [
@@ -679,10 +714,9 @@ describe("mail about a purchase somebody financed", () => {
             ["Re: financing the new machines", "Can we talk on Thursday about how we finance it?"],
             ["¿Qué te pareció la compra?", "Cuéntanos, que estamos pensando en lo mismo"]
         ]) {
-            expect(
-                categoriseMail(message({ subject: subject!, snippet: snippet! })),
-                subject
-            ).toBe("primary");
+            expect(categoriseMail(message({ subject: subject!, snippet: snippet! })), subject).toBe(
+                "primary"
+            );
         }
     });
 
@@ -698,9 +732,9 @@ describe("mail about a purchase somebody financed", () => {
     it("still files what it always did", () => {
         // The words that were already money stay money, and a parcel stays a
         // parcel: this rule sits under both.
-        expect(survey({ subject: "Tu pedido ha sido enviado", snippet: "Seguimiento disponible" })).toBe(
-            "updates"
-        );
+        expect(
+            survey({ subject: "Tu pedido ha sido enviado", snippet: "Seguimiento disponible" })
+        ).toBe("updates");
         expect(
             survey({ subject: "Tu factura de octubre", snippet: "Importe pendiente 12,00 EUR" })
         ).toBe("billing");

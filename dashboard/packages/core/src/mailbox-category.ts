@@ -681,8 +681,8 @@ const FINANCING_MENTION: readonly RegExp[] = [
  * Newsletters use them all day with no purchase in sight - "así afecta a tu
  * hipoteca", "closes a $40M financing round", "proyecto financiado por la Unión
  * Europea". So a bulk mail that names one of these is somebody's own credit only
- * when it also names the purchase (`PURCHASE_NOUNS`) or asks what they thought
- * (`SURVEY_WORDS`), which is the lender writing and not a digest.
+ * when it also names the purchase as theirs (`OWN_PURCHASE`) or asks what they
+ * thought (`SURVEY_WORDS`), which is the lender writing and not a digest.
  */
 const FINANCING_NOUNS: readonly RegExp[] = [
     // Spanish
@@ -732,6 +732,7 @@ const FINANCING_OFFER: readonly RegExp[] = [
     /\bsolicita(?:lo|la|r)?\b/,
     /\bdescubre\b/,
     /\bcontrata(?:lo|la|r)?\b/,
+    /\bpaga en \d con\b/,
     // English
     /\bapply now\b/,
     /\bget approved\b/,
@@ -740,6 +741,7 @@ const FINANCING_OFFER: readonly RegExp[] = [
     /\binterest[ -]free\b/,
     /\bno (?:fees|interest)\b/,
     /\bsplit (?:it|your|the|into)\b/,
+    /\bpay in \d with\b/,
     // Portuguese
     /\bsem juros\b/,
     /\bate \d{1,2} (?:meses|prestacoes)\b/,
@@ -772,37 +774,32 @@ const FINANCING_OFFER: readonly RegExp[] = [
  * that purchase, and the person looking for what they bought is the person it is
  * addressed to, so it belongs with it rather than under the parcels.
  */
-const SURVEY_WORDS: readonly string[] = [
+const SURVEY_WORDS: readonly RegExp[] = [
     // English
-    "survey",
-    "your feedback",
-    "rate your",
-    "how did we do",
-    "tell us what you think",
-    "questionnaire",
+    /\bsurveys?\b/,
+    /\bquestionnaire\b/,
+    /\brate your\b/,
+    /\bhow did we do\b/,
+    /\btell us what you think\b/,
+    /\byour feedback on\b/,
+    /\b(?:share|leave|give us) your feedback\b/,
     // Spanish
-    "encuesta",
-    "tu opinion",
-    "su opinion",
-    "tu experiencia",
-    "su experiencia",
-    "danos tu opinion",
-    "cuentanos",
-    "valora tu",
-    "valoracion",
-    "satisfaccion",
+    /\bencuestas?\b/,
+    /\b(?:tu|su) opinion\b/,
+    /\bque te (?:ha parecido|parecio)\b/,
+    /\bvalora tu (?:compra|pedido|experiencia)\b/,
     // Portuguese
-    "pesquisa de satisfacao",
-    "sua opiniao",
+    /\bpesquisa de satisfacao\b/,
+    /\bsua opiniao\b/,
     // French
-    "votre avis",
-    "enquete de satisfaction",
+    /\bvotre avis\b/,
+    /\benquete de satisfaction\b/,
     // German
-    "umfrage",
-    "ihre meinung",
+    /\bumfragen?\b/,
+    /\bihre meinung\b/,
     // Italian
-    "sondaggio",
-    "la tua opinione"
+    /\bsondaggio\b/,
+    /\bla tua opinione\b/
 ];
 
 /**
@@ -812,8 +809,7 @@ const SURVEY_WORDS: readonly string[] = [
  * survey says "tu experiencia de compra" and "how was your purchase", and what
  * it leaves out is exactly what that list is built from - the possessive and the
  * confirmation a receipt is written with. They are only ever read together with
- * a survey word or a word for credit, so a bare "compra" cannot file anything on
- * its own.
+ * a survey word, so a bare "compra" cannot file anything on its own.
  *
  * Whole words only, and never the "order" of "in order to": the word is also in
  * "border" and "reorder", "pago" in "pagoda", "kauf" in "Verkauf".
@@ -823,7 +819,19 @@ const SURVEY_WORDS: readonly string[] = [
  * above, with the same answer, before this is ever asked - carrying them here
  * too would claim a reach these words do not have.
  */
-const PURCHASE_NOUNS = /\b(?:purchase|(?<!\bin )order|payment|compra|pago|achat|(?:ein)?kauf|acquist[oi])s?\b/;
+const PURCHASE_NOUNS =
+    /\b(?:purchase|(?<!\bin )order|payment|compra|pago|achat|(?:ein)?kauf|acquist[oi])s?\b/;
+
+/**
+ * The same nouns, said to be the reader's own: behind a possessive, with room
+ * for the one word a name puts between them - "your MacBook purchase".
+ *
+ * What a word for credit needs beside it when nobody asked for an opinion. News
+ * names credit and a purchase in one breath all day - "hipoteca para la compra
+ * de vivienda", "secures financing for the purchase of" - and never says whose.
+ */
+const OWN_PURCHASE =
+    /\b(?:your|tu|su|sua|seu|votre|ihr(?:e|en|em|er)?|tuo|tua)\s+(?:\S+\s+)?(?:purchase|order|payment|compra|pago|achat|(?:ein)?kauf|acquist[oi])s?\b/;
 
 /**
  * Words that mean something is on its way, or that a record was issued.
@@ -908,10 +916,11 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // Credit somebody already has, and the two things that decide whether the
     // word is theirs: an advert's own language, and a survey about a purchase.
     const aboutPurchase = PURCHASE_NOUNS.test(words);
-    const asksOpinion = SURVEY_WORDS.some((word) => words.includes(word));
+    const asksOpinion = SURVEY_WORDS.some((pattern) => pattern.test(words));
     const financing =
         FINANCING_MENTION.some((pattern) => pattern.test(words)) ||
-        (FINANCING_NOUNS.some((pattern) => pattern.test(words)) && (aboutPurchase || asksOpinion));
+        (FINANCING_NOUNS.some((pattern) => pattern.test(words)) &&
+            (OWN_PURCHASE.test(words) || asksOpinion));
     const sellingCredit = FINANCING_OFFER.some((pattern) => pattern.test(words));
     const asksWhatYouThought = asksOpinion && aboutPurchase;
 
