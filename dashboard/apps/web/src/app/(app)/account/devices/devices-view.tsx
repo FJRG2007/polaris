@@ -77,7 +77,13 @@ export function DevicesView() {
 
 /** Which microphone, how much is done to it, how loud it goes out - and whether
  *  it is working at all. */
-function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showThreshold: boolean }) {
+function MicrophoneCard({
+    threshold,
+    showThreshold
+}: {
+    threshold: number;
+    showThreshold: boolean;
+}) {
     const { devices, chosenId, choose } = useMicrophones();
     const [cleanup, setCleanup] = useMicCleanup();
     const [gain, setGain] = useMicGain();
@@ -184,12 +190,16 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
                         aria-label="Microphone"
                         options={
                             devices.length > 0
-                                ? devices.map((device) => ({ value: device.id, label: device.label }))
+                                ? devices.map((device) => ({
+                                      value: device.id,
+                                      label: device.label
+                                  }))
                                 : [{ value: "", label: "Press Test it to see what is here" }]
                         }
                     />
                     <span className="text-xs text-muted-foreground">
-                        The names only appear once a microphone has been allowed once, which the test does.
+                        The names only appear once a microphone has been allowed once, which the
+                        test does.
                     </span>
                 </label>
 
@@ -227,7 +237,10 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
                         value={cleanup}
                         onValueChange={(value) => setCleanup(value as typeof cleanup)}
                         aria-label="Background noise"
-                        options={NOISE_LEVELS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                        options={NOISE_LEVELS.map((entry) => ({
+                            value: entry.value,
+                            label: entry.label
+                        }))}
                     />
                     <span className="text-xs text-muted-foreground">
                         {NOISE_LEVELS.find((entry) => entry.value === cleanup)?.help ?? ""}
@@ -238,7 +251,8 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
                         anywhere to read; this is where it is readable. */}
                     {filterState?.problem ? (
                         <span className="text-xs text-warning">
-                            It could not start, so you are going out unfiltered: {filterState.problem}
+                            It could not start, so you are going out unfiltered:{" "}
+                            {filterState.problem}
                         </span>
                     ) : filterState ? (
                         <span className="text-xs text-success">
@@ -341,7 +355,10 @@ function CameraCard() {
                         aria-label="Camera"
                         options={
                             devices.length > 0
-                                ? devices.map((device) => ({ value: device.id, label: device.label }))
+                                ? devices.map((device) => ({
+                                      value: device.id,
+                                      label: device.label
+                                  }))
                                 : [{ value: "", label: "Press Show me to see what is here" }]
                         }
                     />
@@ -361,7 +378,8 @@ function CameraCard() {
                 />
                 {!showing ? (
                     <p className="text-xs text-muted-foreground">
-                        Nothing is opened until you press it, and it closes when you leave this screen.
+                        Nothing is opened until you press it, and it closes when you leave this
+                        screen.
                     </p>
                 ) : null}
 
@@ -403,9 +421,14 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                         value={voice.inputMode}
                         onValueChange={(value) => setVoice({ inputMode: value as InputMode })}
                         aria-label="Input mode"
-                        options={INPUT_MODES.map((mode) => ({ value: mode, label: INPUT_MODE_LABELS[mode] }))}
+                        options={INPUT_MODES.map((mode) => ({
+                            value: mode,
+                            label: INPUT_MODE_LABELS[mode]
+                        }))}
                     />
-                    <span className="text-xs text-muted-foreground">{INPUT_MODE_NOTES[voice.inputMode]}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {INPUT_MODE_NOTES[voice.inputMode]}
+                    </span>
                 </label>
 
                 {voice.inputMode === "ptt" ? (
@@ -439,12 +462,14 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             step={1}
                             value={voice.activityThreshold}
                             aria-label="Voice activity threshold"
-                            onChange={(event) => setVoice({ activityThreshold: Number(event.target.value) })}
+                            onChange={(event) =>
+                                setVoice({ activityThreshold: Number(event.target.value) })
+                            }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
                         <span className="text-xs text-muted-foreground">
-                            Test the microphone above while you set this: the mark on the bar is where it
-                            opens, and the bar turns green past it.
+                            Test the microphone above while you set this: the mark on the bar is
+                            where it opens, and the bar turns green past it.
                         </span>
                     </div>
                 ) : null}
@@ -453,7 +478,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                     <div className="flex flex-col gap-1">
                         <span className="flex items-center justify-between gap-2 text-sm">
                             Stay open after you stop
-                            <span className="tabular-nums text-muted-foreground">{voice.pttReleaseMs} ms</span>
+                            <span className="tabular-nums text-muted-foreground">
+                                {voice.pttReleaseMs} ms
+                            </span>
                         </span>
                         <input
                             type="range"
@@ -462,7 +489,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             step={50}
                             value={voice.pttReleaseMs}
                             aria-label="Release delay"
-                            onChange={(event) => setVoice({ pttReleaseMs: Number(event.target.value) })}
+                            onChange={(event) =>
+                                setVoice({ pttReleaseMs: Number(event.target.value) })
+                            }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
                         <span className="text-xs text-muted-foreground">
@@ -483,8 +512,8 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                 <div className="flex flex-col gap-1">
                     <h2 className="text-sm font-medium">Advanced</h2>
                     <p className="text-xs text-muted-foreground">
-                        Leave these alone unless something is wrong. Each one is set to what Polaris did
-                        before this screen existed.
+                        Leave these alone unless something is wrong. Each one is set to what Polaris
+                        did before this screen existed.
                     </p>
                 </div>
 
@@ -528,7 +557,9 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                     <div className="flex flex-col gap-1">
                         <span className="flex items-center justify-between gap-2 text-sm">
                             How far
-                            <span className="tabular-nums text-muted-foreground">{voice.attenuation}%</span>
+                            <span className="tabular-nums text-muted-foreground">
+                                {voice.attenuation}%
+                            </span>
                         </span>
                         <input
                             type="range"
@@ -537,7 +568,9 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                             step={5}
                             value={voice.attenuation}
                             aria-label="How far the call is quietened"
-                            onChange={(event) => setVoice({ attenuation: Number(event.target.value) })}
+                            onChange={(event) =>
+                                setVoice({ attenuation: Number(event.target.value) })
+                            }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
                         <span className="text-xs text-muted-foreground">
@@ -545,6 +578,29 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                         </span>
                     </div>
                 ) : null}
+                <div className="flex flex-col gap-1">
+                    <span className="flex items-center justify-between gap-2 text-sm">
+                        Lower voices while a stream plays
+                        <span className="tabular-nums text-muted-foreground">
+                            {voice.streamAttenuation}%
+                        </span>
+                    </span>
+                    <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={voice.streamAttenuation}
+                        aria-label="How far voices are lowered while a stream plays"
+                        onChange={(event) =>
+                            setVoice({ streamAttenuation: Number(event.target.value) })
+                        }
+                        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        While you watch a stream that has sound. Zero leaves voices alone.
+                    </span>
+                </div>
             </CardBody>
         </Card>
     );

@@ -34,9 +34,18 @@ import { Volume2 } from "lucide-react";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
 import { useVoiceSettings } from "./voice-settings";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
 import { playThroughChosenSpeaker, SPEAKER_CHANGED } from "./speaker-device";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    closePopOut,
+    poppedStream,
+    setWatchedStreams,
+    streamVolumeKey,
+    useStreamMuted,
+    useWatchedStreams,
+    voiceScale
+} from "./call-stream-audio";
 
 export function CallAudio({ call }: { call: CallState }) {
     /**
@@ -83,7 +92,53 @@ export function CallAudio({ call }: { call: CallState }) {
     const [voice] = useVoiceSettings();
     const ducking =
         voice.attenuate && call.participantId !== null && call.speaking.has(call.participantId);
-    const scale = ducking ? Math.max(0, 1 - voice.attenuation / 100) : 1;
+
+    /**
+     * The screens whose sound plays here: the ones being watched, on the stage
+     * or popped out, that carry any. A share nobody opened stays silent.
+     */
+    const watching = useWatchedStreams();
+    const streams = others.filter((person) => {
+        const stream = call.screens.get(person.id);
+        return (
+            stream !== undefined &&
+            stream.getAudioTracks().length > 0 &&
+            watching.includes(`screen:${person.id}`)
+        );
+    });
+    /** Which of those can actually be heard, so voices are lowered only while
+     *  a stream really plays - see `voiceScale`. */
+    const [audible, setAudible] = useState<ReadonlySet<string>>(new Set());
+    const hear = useCallback((id: string, on: boolean) => {
+        setAudible((current) => {
+            if (current.has(id) === on) return current;
+            const next = new Set(current);
+            if (on) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    }, []);
+    const streamPlaying = !silent && streams.some((person) => audible.has(person.id));
+    const scale = voiceScale({
+        ducking: ducking ? voice.attenuation : 0,
+        streamPlaying,
+        streamAttenuation: voice.streamAttenuation
+    });
+
+    // A floating window for a share that has ended would be a black rectangle
+    // on top of everything, and one outliving the call is worse.
+    const sharedKeys = [...call.screens.keys()].map((id) => `screen:${id}`).join(" ");
+    useEffect(() => {
+        const key = poppedStream();
+        if (key && !sharedKeys.split(" ").includes(key)) closePopOut();
+    }, [sharedKeys]);
+    useEffect(
+        () => () => {
+            closePopOut();
+            setWatchedStreams([]);
+        },
+        []
+    );
 
     /**
      * Forget whoever is no longer here.
@@ -99,7 +154,10 @@ export function CallAudio({ call }: { call: CallState }) {
      * Keyed by the ids rather than the array: the roster is rebuilt on every
      * refresh, and depending on the array itself would run this on each one.
      */
-    const present = others.map((person) => person.id).join(" ");
+    const present = [
+        ...others.map((person) => person.id),
+        ...streams.map((person) => `stream:${person.id}`)
+    ].join(" ");
     useEffect(() => {
         const here = new Set(present ? present.split(" ") : []);
         for (const id of unblock.current.keys()) {
@@ -132,6 +190,18 @@ export function CallAudio({ call }: { call: CallState }) {
                 />
             ))}
 
+            {streams.map((person) => (
+                <StreamAudio
+                    key={`stream:${person.id}`}
+                    id={person.id}
+                    stream={call.screens.get(person.id) ?? null}
+                    person={person.userId ?? person.id}
+                    silent={silent}
+                    onAudible={hear}
+                    onPlayState={report}
+                />
+            ))}
+
             {/* A browser is entitled to refuse to start audio, and it refuses
                 silently. A press is all it wants, so this asks for one - once
                 for the room, wherever in Polaris the reader happens to be. */}
@@ -157,6 +227,73 @@ export function CallAudio({ call }: { call: CallState }) {
     );
 }
 
+/**
+ * Whether the pass that reads this browser's own settings has been and gone.
+ *
+ * Volumes, and a stream's mute, are read out of local storage after mount
+ * rather than during the render: the server has no storage, and a value that
+ * differed between the two would fail hydration. Which leaves one pass in which
+ * the defaults are in force - audible, and as loud as sent - and a source
+ * attached during that pass is a stream somebody had muted, or turned all the
+ * way down, playing at full volume for a frame. On a voice that is a syllable;
+ * on a film or a game it is a burst of sound out of a page that was supposed to
+ * be silent, and everybody's voices duck under it while it lasts.
+ *
+ * Every reader of those stores does its reading in a mount effect and this is
+ * set in one too, so by the time it is true all of them have run: whatever is
+ * held about this sound is in hand before anything is played.
+ */
+function useSettled(): boolean {
+    const [settled, setSettled] = useState(false);
+    useEffect(() => setSettled(true), []);
+    return settled;
+}
+
+/**
+ * One watched stream's sound, at the volume and mute this reader chose for that
+ * sharer's streams.
+ */
+function StreamAudio({
+    id,
+    stream,
+    person,
+    silent,
+    onAudible,
+    onPlayState
+}: {
+    id: string;
+    stream: MediaStream | null;
+    /** Their account where they have one, their seat where they do not. */
+    person: string;
+    silent: boolean;
+    onAudible: (id: string, audible: boolean) => void;
+    onPlayState: (id: string, blocked: boolean, press: () => void) => void;
+}) {
+    const volumeKey = streamVolumeKey(person);
+    const [muted] = useStreamMuted(person);
+    const [volume] = useCallVolume(volumeKey);
+    // Not before the mute and the volume have been read: a stream reported as
+    // heard on the strength of the defaults lowers everybody's voices for a
+    // pass, for a sound that has not started and may be muted - see
+    // `useSettled`.
+    const audible = useSettled() && !muted && volume > 0;
+    useEffect(() => {
+        onAudible(id, audible);
+        return () => onAudible(id, false);
+    }, [audible, id, onAudible]);
+
+    return (
+        <RemoteAudio
+            id={`stream:${id}`}
+            stream={stream}
+            volumeKey={volumeKey}
+            muted={silent || muted}
+            scale={1}
+            onPlayState={onPlayState}
+        />
+    );
+}
+
 function RemoteAudio({
     id,
     stream,
@@ -179,6 +316,10 @@ function RemoteAudio({
     const element = useRef<HTMLAudioElement>(null);
     const [chosen] = useCallVolume(volumeKey);
     const volume = chosen * scale;
+    // Nothing is attached, and so nothing plays, until what this browser
+    // remembers about this sound has been read - see `useSettled`.
+    const ready = useSettled();
+    const playable = ready ? stream : null;
     /** The graph playing this person, while they are turned up past 1. */
     const boost = useRef<Boost | null>(null);
     /** Whether this person is boosted at all, which decides which of the two
@@ -216,10 +357,19 @@ function RemoteAudio({
             .catch(() => onPlayState(id, true, start));
     }, [id, onPlayState]);
 
+    // Before the source is attached rather than after it, so a source is never
+    // started at a volume it is about to be moved off: within one pass the
+    // effects run in the order they are written, and the one below calls play().
+    useEffect(() => {
+        // Never both at once: whichever is not playing is at zero rather than
+        // merely quiet, or a boosted voice arrives twice.
+        if (element.current) element.current.volume = boosted ? 0 : Math.min(1, volume);
+    }, [boosted, volume, playable]);
+
     useEffect(() => {
         const audio = element.current;
         if (!audio) return;
-        if (!stream) {
+        if (!playable) {
             // Nothing to play. Let go of whatever was attached and take back any
             // refusal recorded against this person - the prompt is drawn while
             // ANYBODY is refused, and a refusal left behind for a stream that no
@@ -231,9 +381,9 @@ function RemoteAudio({
             onPlayState(id, false, start);
             return;
         }
-        audio.srcObject = stream;
+        audio.srcObject = playable;
         start();
-    }, [id, stream, start, onPlayState]);
+    }, [id, playable, start, onPlayState]);
 
     /**
      * Who plays this person: the element, or the graph.
@@ -253,20 +403,20 @@ function RemoteAudio({
      *  rebuilt rather than turned up while it plays the track before it. */
     const built = useRef<MediaStream | null>(null);
     useEffect(() => {
-        if (!stream || wanted <= 1) {
+        if (!playable || wanted <= 1) {
             boost.current?.stop();
             boost.current = null;
             built.current = null;
             setBoosted(false);
             return;
         }
-        if (built.current !== stream) {
+        if (built.current !== playable) {
             boost.current?.stop();
-            boost.current = boostStream(stream, wanted);
-            built.current = boost.current ? stream : null;
+            boost.current = boostStream(playable, wanted);
+            built.current = boost.current ? playable : null;
         } else boost.current?.set(wanted);
         setBoosted(boost.current !== null);
-    }, [stream, wanted]);
+    }, [playable, wanted]);
 
     // Let go of the graph with the component. Left running, it goes on playing
     // somebody who has left the call.
@@ -287,14 +437,9 @@ function RemoteAudio({
         return () => window.removeEventListener(SPEAKER_CHANGED, follow);
     }, []);
 
-    useEffect(() => {
-        // Never both at once: whichever is not playing is at zero rather than
-        // merely quiet, or a boosted voice arrives twice.
-        if (element.current) element.current.volume = boosted ? 0 : Math.min(1, volume);
-    }, [boosted, volume, stream]);
-
     // Never drawn. It is an element because that is what plays a stream - and,
     // for a boosted one, because that is what keeps the stream flowing into the
-    // graph that plays it.
-    return <audio ref={element} autoPlay playsInline muted={muted} className="hidden" />;
+    // graph that plays it. Silent until the stored mute has been read, so the
+    // first pass cannot start one that was meant to stay quiet.
+    return <audio ref={element} autoPlay playsInline muted={muted || !ready} className="hidden" />;
 }

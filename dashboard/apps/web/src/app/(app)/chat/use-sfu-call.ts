@@ -56,20 +56,20 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
-import { playCallSound } from "@/lib/call-sounds";
-import { callMuted, setCallMuted } from "./call-muted";
-import { pressDeafen, pressMic } from "./call-voice-controls";
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
-import type { MeetingView } from "@/lib/chat/meetings";
-import { callDevices, openMedia, refused, settle } from "./call-media";
+import { playCallSound } from "@/lib/call-sounds";
 import { withCameraDevice } from "./camera-device";
-import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { callMuted, setCallMuted } from "./call-muted";
+import type { MeetingView } from "@/lib/chat/meetings";
+import { pressDeafen, pressMic } from "./call-voice-controls";
 import type { CallDevice, CallState, PeerState } from "./call-state";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
-import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
+import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
+import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
+import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import {
     AUDIO_GROUP,
     audioPlan,
@@ -516,6 +516,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const mic = useRef<MediaStreamTrack | null>(null);
     const camera = useRef<MediaStreamTrack | null>(null);
     const screen = useRef<MediaStreamTrack | null>(null);
+    /** The sound of the shared screen, when the browser offered some - a tab's
+     *  audio, or the whole system's. */
+    const screenAudio = useRef<MediaStreamTrack | null>(null);
     // The microphone with a model between it and the call, when one is running.
     const filtered = useRef<FilteredMic | null>(null);
     const licensed = useRef<{ moduleUrl: string; token: string } | null>(null);
@@ -776,7 +779,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // A screen tile with nothing live in it is not a screen: left out, so
             // the big tile closes when somebody stops sharing rather than
             // freezing on the last frame they sent.
-            if (display.length > 0) shared.set(participant.identity, display);
+            // Its sound alone is not a screen either - the picture is what
+            // makes one, and the sound rides along with it.
+            if (display.some((track) => track.kind === "video")) {
+                shared.set(participant.identity, display);
+            }
         }
         setRemote((held) => settle(held, faces));
         setScreens((held) => settle(held, shared));
@@ -875,6 +882,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             }
             const screening = source === SCREEN;
             const level = levelNow(screening ? "screen" : "camera");
+            if (source === SCREEN_AUDIO) {
+                try {
+                    // A film or a game rather than a voice: no gaps cut into
+                    // the quiet parts, and the bits music needs.
+                    await local.publishTrack(track, {
+                        source,
+                        dtx: false,
+                        audioPreset: { maxBitrate: 96_000 }
+                    });
+                    return true;
+                } catch (caught) {
+                    console.error("call: the screen's sound could not be published", caught);
+                    return false;
+                }
+            }
             try {
                 await local.publishTrack(track, {
                     source,
@@ -1439,6 +1461,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             settleMic();
             await publish(CAMERA, camera.current);
             if (screen.current) await publish(SCREEN, screen.current);
+            if (screenAudio.current) await publish(SCREEN_AUDIO, screenAudio.current);
             // Everything else about this browser, including the facts a
             // reconnection would otherwise drop. A device that came back without
             // saying it is quiet for a room reappears as a second live microphone
@@ -1655,7 +1678,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // nobody ever closes.
             void filtered.current?.stop();
             filtered.current = null;
-            for (const track of [mic.current, camera.current, screen.current]) track?.stop();
+            for (const track of [
+                mic.current,
+                camera.current,
+                screen.current,
+                screenAudio.current
+            ]) {
+                track?.stop();
+            }
+            screenAudio.current = null;
             mic.current = null;
             setMicTrack(null);
             camera.current = null;
@@ -2105,22 +2136,35 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * face costs nothing to keep on and everybody can share at once.
      */
     const toggleShare = useCallback(() => {
-        if (screen.current) {
-            screen.current.stop();
+        /** Take the screen and its sound down together, however it ended. */
+        const stopSharing = () => {
             screen.current = null;
+            screenAudio.current?.stop();
+            screenAudio.current = null;
             void publish(SCREEN, null);
+            void publish(SCREEN_AUDIO, null);
             publishLocalPreview();
             setSharing(false);
             sharingRef.current = false;
             sound("shareOff");
+        };
+        if (screen.current) {
+            screen.current.stop();
+            stopSharing();
             return;
         }
         const level = levelNow("screen");
-        void navigator.mediaDevices
-            .getDisplayMedia({ video: quality.screenConstraints(level) })
+        // Asked for with its sound where this browser has any to offer, and
+        // without where it has not - see `openScreen`, which owns both the
+        // asking and what is remembered about a browser that cannot.
+        void openScreen(quality.screenConstraints(level))
             .then(async (stream) => {
                 const track = stream.getVideoTracks()[0];
-                if (!track) return;
+                const audio = stream.getAudioTracks()[0] ?? null;
+                if (!track) {
+                    audio?.stop();
+                    return;
+                }
                 // What the encoder is looking at, said out loud. Without it the
                 // browser guesses from the track alone and guesses "motion",
                 // which spends the whole allowance smoothing a page of text that
@@ -2129,23 +2173,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // The browser's own "stop sharing" bar ends the track without
                 // going through this hook, and the call has to notice.
                 track.onended = () => {
-                    screen.current = null;
-                    void publish(SCREEN, null);
-                    publishLocalPreview();
-                    setSharing(false);
-                    sharingRef.current = false;
-                    sound("shareOff");
+                    if (screen.current === track) stopSharing();
                 };
                 screen.current = track;
+                screenAudio.current = audio;
                 await publish(SCREEN, track);
+                if (audio) await publish(SCREEN_AUDIO, audio);
                 publishLocalPreview();
                 setSharing(true);
                 sharingRef.current = true;
                 sound("shareOn");
             })
-            .catch(() => {
+            .catch((caught) => {
                 // Cancelling the picker is the ordinary way out of this dialog,
                 // not a failure worth a line on the screen.
+                if (isDenial(caught) || (caught as Error)?.name === "AbortError") return;
+                // Anything else is a share that did not happen for a reason the
+                // reader cannot see. Said out loud rather than swallowed: a
+                // Share button that does nothing and says nothing is the one
+                // failure nobody can act on.
+                setError(refused(caught, "screen"));
             });
     }, [levelNow, publish, publishLocalPreview, sound]);
 

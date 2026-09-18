@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Getting hold of a microphone and a camera, and saying what happened when it
- * did not work.
+ * Getting hold of a microphone, a camera or a screen, and saying what happened
+ * when it did not work.
  *
  * Shared by both ways a call is carried, because opening the devices is the one
  * part that is the same either way - and because the sentences below are the
@@ -74,6 +74,95 @@ export async function openMedia(
                 };
             }
         }
+    }
+}
+
+/** Where a browser that cannot capture a screen's sound is written down, so it
+ *  is asked for one once rather than on every press. */
+const NO_SCREEN_SOUND = "polaris.call.no-screen-sound";
+
+/** Whether a screen's sound is worth asking this browser for at all. */
+function screenSoundWorthAsking(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+        return window.localStorage.getItem(NO_SCREEN_SOUND) !== "1";
+    } catch {
+        // Storage refused. Asking is the right guess: every browser that can
+        // carry a screen's sound is one that would have answered yes here.
+        return true;
+    }
+}
+
+/** Written down the moment a browser says it cannot, and never unwritten: this
+ *  is a fact about the engine, not about the moment. */
+function rememberNoScreenSound(): void {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(NO_SCREEN_SOUND, "1");
+    } catch {
+        // The share still happens; this browser will simply be asked the long
+        // way round again next time.
+    }
+}
+
+/**
+ * Open a screen, with its sound where this browser has any to offer.
+ *
+ * Asked in two goes rather than one, for the reason `openMedia` is asked in
+ * three: a browser that cannot capture a screen's sound at all - Firefox, on
+ * most platforms - rejects the whole request rather than handing back a picture
+ * without one, and a share with no sound is worth having where no share at all
+ * is not.
+ *
+ * The second go is not free, though, which is why it is not simply left to run
+ * every time. `getDisplayMedia` requires the press that opened it and spends it
+ * as it goes, so a retry issued after the first request has already been
+ * rejected has no activation left to spend and is refused before any picker
+ * appears - which is a Share button that does nothing at all. So a browser that
+ * has once refused the sound is not asked for it again: the fact is remembered
+ * here, per browser, and from then on the first request is the one that works.
+ * Learned from a refusal rather than guessed at from the name of an engine,
+ * because the guess is the part that ages badly.
+ *
+ * @param video - The size to ask the screen for, from `call-quality`.
+ */
+export async function openScreen(video: MediaTrackConstraints): Promise<MediaStream> {
+    const ask = (withSound: boolean) =>
+        navigator.mediaDevices.getDisplayMedia(
+            withSound
+                ? {
+                      video,
+                      // Offered, never forced: the browser's picker has the box
+                      // that says whether a tab's or the system's sound goes
+                      // with it. Raw, because echo cancelling a film against the
+                      // call is what turns music into mush.
+                      audio: {
+                          echoCancellation: false,
+                          noiseSuppression: false,
+                          autoGainControl: false
+                      },
+                      // Chrome's names for "offer the whole system's sound too"
+                      // and "keep playing the tab here while it is shared".
+                      ...({ systemAudio: "include", suppressLocalAudioPlayback: false } as object)
+                  }
+                : { video }
+        );
+
+    if (!screenSoundWorthAsking()) return ask(false);
+    try {
+        return await ask(true);
+    } catch (caught) {
+        // A refusal is the reader's own answer - cancelling the picker is what
+        // it usually is - and asking the same question twice over one press is
+        // not something to do with it.
+        if (isDenial(caught) || (caught as Error)?.name === "AbortError") throw caught;
+        // The sound is the only difference between the two requests, so this is
+        // the browser saying it cannot carry one. Written down before the retry
+        // rather than after it, because the retry is the half that may have
+        // nothing left to spend - and once this is written there is no first
+        // request to spend it.
+        rememberNoScreenSound();
+        return await ask(false);
     }
 }
 
