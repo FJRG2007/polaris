@@ -75,6 +75,9 @@ jobs:
             polaris-updater
             polaris-messaging-bridge
             polaris-edge-guard
+            polaris-camera-relay
+            polaris-vision
+            polaris-face
           # The buildkit cache, pruned by the other rule below. Its tags (web,
           # guard, hostd-amd64, ...) are none of them `latest` and all of them
           # live, so keeping only what `latest` names would delete the cache after
