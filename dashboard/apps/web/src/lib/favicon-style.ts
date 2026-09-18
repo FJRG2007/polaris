@@ -115,3 +115,17 @@ export function faviconBadge(style: FaviconStyle, waiting: number): FaviconBadge
     if (!label) return null;
     return style === "dot" ? { kind: "dot" } : { kind: "count", label };
 }
+
+/** A prefix this module put on a title, and nothing a page named itself. */
+const TITLE_BADGE = /^(?:\(\d+\+?\) |\u2022 )/;
+
+/**
+ * The tab's title with what is waiting in front of it - "(3) Chat", or a dot -
+ * following the same choice as the icon. Idempotent: an old prefix is replaced,
+ * never stacked, so it can be applied to a title that already carries one.
+ */
+export function titleWithBadge(title: string, badge: FaviconBadge | null): string {
+    const plain = title.replace(TITLE_BADGE, "");
+    if (!badge) return plain;
+    return badge.kind === "count" ? `(${badge.label}) ${plain}` : `\u2022 ${plain}`;
+}

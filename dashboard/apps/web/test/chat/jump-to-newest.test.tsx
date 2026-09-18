@@ -181,7 +181,21 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.restoreAllMocks();
+    setAttention("visible", true);
 });
+
+/** What the browser says about this tab: whether it is shown, and focused. */
+let visibility: DocumentVisibilityState = "visible";
+Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    get: () => visibility
+});
+
+function setAttention(shown: DocumentVisibilityState, focused: boolean): void {
+    visibility = shown;
+    vi.spyOn(document, "hasFocus").mockReturnValue(focused);
+}
 
 /** Put the reader part way up a conversation that is taller than the window. */
 function readingUpwards(container: HTMLElement): HTMLElement {
@@ -247,5 +261,40 @@ describe("reading older messages", () => {
         // Back at the bottom: the list is scrolled to its end and the bar goes.
         expect(scroller.scrollTop).toBe(4000);
         await waitFor(() => expect(screen.queryByText("You're viewing older messages")).toBeNull());
+    });
+});
+
+describe("a conversation nobody is looking at", () => {
+    it("is not read when it was opened in a background tab, and is once the tab is shown", async () => {
+        setAttention("hidden", false);
+        render(<ChannelView channelId="c1" />);
+        await screen.findByText("m2");
+        // Long enough for the mark to have gone out if it were going to.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(marked).toEqual([]);
+
+        setAttention("visible", true);
+        document.dispatchEvent(new Event("visibilitychange"));
+        await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m2" }]));
+    });
+
+    it("leaves what arrives behind another window unread until the reader comes back", async () => {
+        setAttention("visible", true);
+        render(<ChannelView channelId="c1" />);
+        await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m2" }]));
+
+        // Another program comes to the front; the page is still "visible".
+        setAttention("visible", false);
+        window.dispatchEvent(new Event("blur"));
+        marked = [];
+        arrived = [message("m3", "grace")];
+        onFrame?.({ kind: "posted", seq: 1, channels: ["c1"] }, { owner: true });
+        await screen.findByText("m3");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(marked).toEqual([]);
+
+        setAttention("visible", true);
+        window.dispatchEvent(new Event("focus"));
+        await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m3" }]));
     });
 });

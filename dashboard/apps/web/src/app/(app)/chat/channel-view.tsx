@@ -53,6 +53,7 @@ import type * as messagesLib from "@/lib/chat/messages";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
+import { closeDesktopNotice } from "@/lib/desktop-notify";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
@@ -71,7 +72,15 @@ import {
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button, ConfirmDeleteDialog, EmptyState, ResizeHandle, Skeleton, cn } from "@polaris/ui";
+import {
+    Button,
+    ConfirmDeleteDialog,
+    EmptyState,
+    ResizeHandle,
+    Skeleton,
+    cn,
+    useToast
+} from "@polaris/ui";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -306,6 +315,7 @@ export function ChannelView({
     // arrived while it sat behind another window, and without catching up here the
     // channel would stay bold until the next message turned up.
     const attending = useAttention(() => catchUpMarkRef.current?.(true));
+    const dismissToast = useToast().dismiss;
     // How long the list insists on the bottom after a conversation opens.
     // Everything that lands late - pictures, link cards, players, a font - grows
     // it, and the browser's own scroll anchoring moves the position while that
@@ -1127,15 +1137,23 @@ export function ChannelView({
             // browser will tell us - and `hasFocus` is false in places a person is
             // plainly reading, so a gesture must not have to argue with it.
             if (!deliberate && !attending.current) return;
+            // A tab opened in the background has not been read either, however
+            // it was opened: nobody can be reading a page that is not shown.
+            if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
             const newest = held.current[held.current.length - 1];
             if (!newest || marked.current === newest.id) return;
             marked.current = newest.id;
             void actions.markReadAction({ channelId, messageId: newest.id });
+            // What announced these messages while nobody was looking has been
+            // answered now, and a notice left behind would send the reader back
+            // to something they have just read.
+            closeDesktopNotice(`message:${channelId}`);
+            dismissToast(`message:${channelId}`);
             // Whether a read actually went out, which is what lets the caller below
             // tell "nothing to mark yet" apart from "marked".
             return true;
         },
-        [channelId]
+        [channelId, dismissToast]
     );
 
     catchUpMarkRef.current = catchUpMark;
@@ -2032,6 +2050,11 @@ export function ChannelView({
                             call={call}
                             meetingId={inCall}
                             viewerId={viewerId}
+                            // Bringing somebody into the call adds them to
+                            // the conversation, so it answers to the same rule -
+                            // except in a one-to-one, which nobody is added to:
+                            // the call moves into a new group instead.
+                            mayInvite={channel.kind === "dm" || channel.mayInvite}
                             onStage={setStaged}
                             onLeave={() => {
                                 leaveCall();

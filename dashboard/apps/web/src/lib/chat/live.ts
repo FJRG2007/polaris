@@ -45,6 +45,10 @@ export interface ChatChange {
      *      the person they were reading, whose ticks have just moved. Addressed
      *      through `audience`, because who may know is a setting. */
     readonly kind: "posted" | "channels" | "typing" | "call" | "appearance" | "read";
+    /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
+     *  back to unread. The same fact changing, so it is the same frame, but the
+     *  opposite instruction for anything that withdraws a notice about it. */
+    readonly unread?: true;
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is

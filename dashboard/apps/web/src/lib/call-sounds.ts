@@ -20,6 +20,8 @@
  * function anyway, so no caller has to care.
  */
 
+import { soundGain } from "@/lib/notification-sound";
+
 /** One note: where it starts, where it ends, and how long it takes. */
 interface Note {
     /** Hertz. */
@@ -222,6 +224,10 @@ function audio(): AudioContext | null {
 
 /** Play one sound, once. Does nothing at all where audio is not available. */
 export function playCallSound(name: CallSound): void {
+    // The account's volume, applied to every tone here. Zero is silence rather
+    // than a scheduled tone: a gain ramp to zero throws.
+    const level = soundGain();
+    if (level <= 0) return;
     const ctx = audio();
     if (!ctx) return;
     const start = ctx.currentTime;
@@ -229,10 +235,10 @@ export function playCallSound(name: CallSound): void {
         // One partial, or three of them. `sound` is the whole note: the tone
         // itself is the first call and a bell adds its octave and its twelfth
         // over the top, each quieter and all fading together.
-        sound(ctx, note, start, 1, 1);
+        sound(ctx, note, start, 1, level);
         if (!note.bell) continue;
-        sound(ctx, note, start, 2, OCTAVE_SHARE);
-        sound(ctx, note, start, 3, TWELFTH_SHARE);
+        sound(ctx, note, start, 2, OCTAVE_SHARE * level);
+        sound(ctx, note, start, 3, TWELFTH_SHARE * level);
     }
 }
 
@@ -255,7 +261,9 @@ function sound(
             start + note.at + note.seconds
         );
     }
-    const peak = (note.gain ?? DEFAULT_GAIN) * share;
+    // Kept above the floor the envelope starts from, so a very low volume still
+    // rises rather than ramping downwards.
+    const peak = Math.max((note.gain ?? DEFAULT_GAIN) * share, 0.0002);
     const from = start + note.at;
     const to = from + note.seconds;
     gain.gain.setValueAtTime(0.0001, from);

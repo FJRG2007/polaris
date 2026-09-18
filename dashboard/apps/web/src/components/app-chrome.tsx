@@ -58,6 +58,9 @@ import { adminWaiting as countAdminWaiting } from "@/lib/admin-waiting";
 import { AdminWaitingProvider, NO_ADMIN_WAITING } from "@/components/admin-waiting";
 import { EVERY_SHELF, unreadCounts } from "@/lib/mailbox/views";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
+import { SoundVolumeSeed } from "@/components/sound-volume-seed";
+import { getSoundVolume } from "@/lib/notifications/sound-volume-service";
+import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import { buildStamp } from "@/lib/build-stamp";
 import { NewBuildBanner } from "@/components/new-build-banner";
 import { SnapshotBuild } from "@/components/snapshot-build";
@@ -91,7 +94,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         scope,
         organizations,
         presence,
-        status
+        status,
+        soundVolume
     ] = await Promise.all([
         listNotifications(user.id),
         resolveDisplayPreferencesFor(user.id),
@@ -106,7 +110,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         resolveScope(user.id),
         scopeChoices(user.id),
         presenceChoiceOf(user.id),
-        ownStatus(user.id)
+        ownStatus(user.id),
+        // A sound at the wrong volume is not worth failing the page over.
+        getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME)
     ]);
     // Seeded here rather than fetched by the provider, so the badge on the tab
     // icon is right on the first paint instead of appearing a second into the
@@ -184,6 +190,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                         hasChat={apps.ids.includes("chat")}
                                                     >
                                                         <NotificationFavicon />
+                                                        <SoundVolumeSeed volume={soundVolume} />
                                                         {/* An app granted or taken back is a
                                     switcher that lies until the page is drawn
                                     again, and nobody reloads a page they were

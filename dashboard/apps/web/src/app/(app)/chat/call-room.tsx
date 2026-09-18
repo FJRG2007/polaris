@@ -146,7 +146,12 @@ export function CallRoom({
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
      *  a button that the server will refuse is worse than not offering it. */
-    viewerId
+    viewerId,
+    /** Whether this reader may bring somebody into the conversation this call
+     *  is in. False in a group whose owner keeps adding people to themselves,
+     *  where the service refuses it. Absent - a meeting of its own, a guest -
+     *  means there is no such rule to apply. */
+    mayInvite = true
 }: {
     meetingId: string;
     /**
@@ -171,6 +176,7 @@ export function CallRoom({
      *  does. */
     onStage?: (staged: boolean) => void;
     viewerId?: string;
+    mayInvite?: boolean;
 }) {
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
@@ -546,12 +552,12 @@ export function CallRoom({
                             )}
                         </button>
                     )}
-                    {viewerId && (
+                    {viewerId && (mayInvite || canShare) && (
                         <button
                             type="button"
                             onClick={() => setInviting(true)}
-                            aria-label="Add people"
-                            title="Add people"
+                            aria-label={mayInvite ? "Add people" : "Share a link to this call"}
+                            title={mayInvite ? "Add people" : "Share a link to this call"}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <UserPlus className="size-4" />
@@ -1105,9 +1111,13 @@ export function CallRoom({
                 </Button>
             </div>
 
-            {viewerId && (
+            {viewerId && (mayInvite || canShare) && (
                 <InviteToCallDialog
                     open={inviting}
+                    // Whether people in Polaris may be picked. The link beside
+                    // the picker is the host's own and answers to nothing here:
+                    // it adds nobody to the conversation.
+                    mayInvite={mayInvite}
                     onOpenChange={setInviting}
                     meetingId={meetingId}
                     already={(admitted ?? [])
@@ -2056,6 +2066,7 @@ function InviteToCallDialog({
     onOpenChange,
     meetingId,
     already,
+    mayInvite,
     canShare,
     guestToken,
     onShared,
@@ -2067,6 +2078,9 @@ function InviteToCallDialog({
     /** Who is in the call, so nobody is offered a person that picking would do
      *  nothing about. */
     already: readonly string[];
+    /** Whether this reader may bring people in at all. False leaves the link,
+     *  which is the host's own and adds nobody to the conversation. */
+    mayInvite: boolean;
     /** Whether this reader may open the call to people with no account. The
      *  host's decision and nobody else's, so the section is simply absent for
      *  everybody else rather than drawn and refused. */
@@ -2143,19 +2157,22 @@ function InviteToCallDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add people</DialogTitle>
+                    <DialogTitle>{mayInvite ? "Add people" : "Anybody with a link"}</DialogTitle>
                     <DialogDescription>
-                        Their telephone rings. Bringing somebody into a one-to-one call makes it a
-                        group with the three of you in it.
+                        {mayInvite
+                            ? "Their telephone rings. Bringing somebody into a one-to-one call makes it a group with the three of you in it."
+                            : "Only the owner of this group adds people to it. A link still lets somebody with no account ask to join this call."}
                     </DialogDescription>
                 </DialogHeader>
 
-                <PeoplePicker
-                    picked={picked}
-                    onChange={setPicked}
-                    exclude={already}
-                    search={searchPeopleAction}
-                />
+                {mayInvite && (
+                    <PeoplePicker
+                        picked={picked}
+                        onChange={setPicked}
+                        exclude={already}
+                        search={searchPeopleAction}
+                    />
+                )}
 
                 {/* The other way to bring somebody in, for the people who
                     have no account here. Beside the picker rather than a button
@@ -2193,10 +2210,12 @@ function InviteToCallDialog({
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         Close
                     </Button>
-                    <Button disabled={busy || picked.length === 0} onClick={() => void bring()}>
-                        {busy && <Loader2 className="size-4 animate-spin" />}
-                        Add
-                    </Button>
+                    {mayInvite && (
+                        <Button disabled={busy || picked.length === 0} onClick={() => void bring()}>
+                            {busy && <Loader2 className="size-4 animate-spin" />}
+                            Add
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

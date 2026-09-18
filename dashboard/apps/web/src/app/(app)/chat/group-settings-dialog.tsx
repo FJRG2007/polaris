@@ -5,8 +5,9 @@
  *
  * A group has no administrators - everybody in one is equal in it, which is what
  * makes it a group rather than a channel - so it has an owner instead: whoever
- * started it, until they hand it over. Two things are theirs and nobody else's:
- * whether the rest of the group may change how it looks, and who runs it next.
+ * started it, until they hand it over. Three things are theirs and nobody else's:
+ * whether the rest of the group may change how it looks, whether they may add
+ * people, and who runs it next.
  *
  * Only shown to the owner. A screen that offers a switch the server will refuse
  * is worse than one that does not offer it, and the owner is the only person for
@@ -29,6 +30,11 @@ import {
     DialogTitle,
     Switch
 } from "@polaris/ui";
+
+interface GroupOptions {
+    membersMayEdit?: boolean;
+    membersMayInvite?: boolean;
+}
 
 export function GroupSettingsDialog({
     channel,
@@ -55,11 +61,27 @@ export function GroupSettingsDialog({
 
     const others = members.filter((member) => member.userId !== channel.ownerId);
 
-    const setSwitch = async (next: boolean) => {
+    // Shown as flipped while the server answers, and put back if it refuses.
+    const [pending, setPending] = useState<GroupOptions>({});
+    useEffect(() => setPending({}), [channel.membersMayEdit, channel.membersMayInvite]);
+    const shown = {
+        membersMayEdit: pending.membersMayEdit ?? channel.membersMayEdit,
+        membersMayInvite: pending.membersMayInvite ?? channel.membersMayInvite
+    };
+
+    const setSwitch = async (change: GroupOptions) => {
         setBusy(true);
         setError("");
-        await runAction(() => setGroupOptionsAction(channel.id, next), setError);
+        setPending((was) => ({ ...was, ...change }));
+        const result = await runAction(() => setGroupOptionsAction(channel.id, change), setError);
         setBusy(false);
+        if (!result || result.error) {
+            // Said, not only undone: `runAction` reports what throws, and this
+            // action answers with its refusal instead of throwing it.
+            if (result?.error) setError(result.error);
+            setPending({});
+            return;
+        }
         onChanged();
     };
 
@@ -95,10 +117,25 @@ export function GroupSettingsDialog({
                             </span>
                         </span>
                         <Switch
-                            checked={channel.membersMayEdit}
+                            checked={shown.membersMayEdit}
                             disabled={busy}
-                            onChange={(next: boolean) => void setSwitch(next)}
+                            onChange={(next: boolean) => void setSwitch({ membersMayEdit: next })}
                             aria-label="Let anybody change the name and picture"
+                        />
+                    </label>
+
+                    <label className="flex items-start justify-between gap-3">
+                        <span className="flex min-w-0 flex-col">
+                            <span className="text-sm font-medium">Let anybody add people</span>
+                            <span className="text-xs text-muted-foreground">
+                                Off, only you can add people to this group.
+                            </span>
+                        </span>
+                        <Switch
+                            checked={shown.membersMayInvite}
+                            disabled={busy}
+                            onChange={(next: boolean) => void setSwitch({ membersMayInvite: next })}
+                            aria-label="Let anybody add people"
                         />
                     </label>
 

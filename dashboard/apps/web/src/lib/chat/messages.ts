@@ -1167,10 +1167,13 @@ export async function markUnread(actor: ChatActor, input: core.ChatMarkUnreadInp
     });
 
     // The same frame a read sends, because it is the same fact changing: the
-    // rail on the desktop they left open, and this tab's own badge.
+    // rail on the desktop they left open, and this tab's own badge. Said to be
+    // the backwards one, because a conversation somebody has just put back to
+    // unread must not have its notice withdrawn as though they had read it.
     publishChatChange({
         channelId: input.channelId,
         kind: "read",
+        unread: true,
         actorId: actor.id,
         audience: await readAudience(actor, channel)
     });

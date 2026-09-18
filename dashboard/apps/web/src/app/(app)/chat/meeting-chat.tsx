@@ -32,7 +32,7 @@ import type { CallState } from "./call-state";
 import { useAppUrl } from "@/components/app-url";
 import { MessageSquare, Download } from "lucide-react";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
-import { RelativeTime } from "@/components/relative-time";
+import { MessageTime } from "@/components/message-time";
 import { PersonName } from "@/components/person-name";
 import { RichText } from "@/components/rich-text/rich-text";
 import { MAX_MEETING_LINE } from "@/lib/chat/meeting-limits";
@@ -256,9 +256,14 @@ export function MeetingChat({
                                                 guest
                                             </span>
                                         )}
-                                        <span className="shrink-0 text-[0.625rem] text-foreground-subtle">
-                                            <RelativeTime iso={line.at} />
-                                        </span>
+                                        {/* The clock reading the room will refer to
+                                            afterwards - "she said it at 14:05" - the same
+                                            as every other message, rather than how long
+                                            ago it was. */}
+                                        <MessageTime
+                                            iso={line.at}
+                                            className="shrink-0 text-[0.625rem] text-foreground-subtle"
+                                        />
                                     </span>
 
                                     {line.body && (

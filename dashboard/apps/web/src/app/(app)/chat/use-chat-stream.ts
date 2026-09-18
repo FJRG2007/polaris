@@ -26,7 +26,15 @@ const frameSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("channels") }),
     // Somebody caught up. Theirs to take an unread count down with, and the
     // other side's to move the ticks under their own messages.
-    z.object({ kind: z.literal("read"), channelId: z.string(), userId: z.string() }),
+    z.object({
+        kind: z.literal("read"),
+        channelId: z.string(),
+        userId: z.string(),
+        // The mark went backwards: somebody put the conversation back to
+        // unread. Absent from a server that predates it, which is a tab left
+        // open across a deploy, and absent means the ordinary catch-up.
+        unread: z.literal(true).optional()
+    }),
     z.object({
         kind: z.literal("typing"),
         channelId: z.string(),

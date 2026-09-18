@@ -28,6 +28,7 @@ import {
     channelAccess,
     messageable,
     picturesAllowed,
+    invitesAllowed,
     reachableSpaceIds,
     requireChannel,
     requireSpace,
@@ -107,6 +108,11 @@ export interface ChatChannelView {
     readonly ownerId: string | null;
     /** Whether the owner has let the rest of the group change how it looks. */
     readonly membersMayEdit: boolean;
+    /** Whether the owner has let the rest of the group add people to it. */
+    readonly membersMayInvite: boolean;
+    /** Whether this reader may add people here. Only decides what the screen
+     *  offers; adding asks the same question again. */
+    readonly mayInvite: boolean;
     /** How long somebody waits between messages here, in seconds. Zero is off.
      *  Read by the composer so the wait is shown while it applies rather than
      *  discovered by being refused. */
@@ -649,6 +655,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             ownerId: true,
             createdById: true,
             membersMayEdit: true,
+            membersMayInvite: true,
             slowmode: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
@@ -731,6 +738,8 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
+            membersMayInvite: channel.membersMayInvite,
+            mayInvite: invitesAllowed({ ...channel, mayAdminister }, actor.id),
             slowmode: channel.slowmode,
             others: channel.spaceId ? [] : others,
             blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id))
@@ -1009,20 +1018,29 @@ export async function renameGroup(
 /**
  * What the owner of a group has decided about it.
  *
- * One switch today, and it is the one people ask for first: whether the rest of
- * the group may change its name and its picture. Off to begin with, because a
- * group photo anybody can change is a group photo that changes - and on is a
- * decision somebody made rather than the state everybody starts in.
+ * Two switches. Whether the rest of the group may change its name and its
+ * picture - off to begin with, because a group photo anybody can change is a
+ * group photo that changes. And whether they may add people - on to begin with,
+ * because that is how every group worked before the owner could close it.
+ * Either may be sent alone; the other is left as it was.
  */
 export async function setGroupOptions(
     actor: ChatActor,
     channelId: string,
-    options: { membersMayEdit: boolean }
+    options: { membersMayEdit?: boolean; membersMayInvite?: boolean }
 ): Promise<void> {
     await requireGroupOwner(actor, channelId);
+    if (options.membersMayEdit === undefined && options.membersMayInvite === undefined) return;
     await prisma.chatChannel.update({
         where: { id: channelId },
-        data: { membersMayEdit: options.membersMayEdit }
+        data: {
+            ...(options.membersMayEdit !== undefined
+                ? { membersMayEdit: options.membersMayEdit }
+                : {}),
+            ...(options.membersMayInvite !== undefined
+                ? { membersMayInvite: options.membersMayInvite }
+                : {})
+        }
     });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
 }
@@ -1089,6 +1107,23 @@ export async function addChannelMembers(
     const group = access.kind === "group";
     if (!access.mayAdminister && !group) {
         throw new ChatAccessError("You cannot add people to that channel");
+    }
+    if (group) {
+        // Asked of the row, not of the screen: a button hidden from somebody is
+        // not a rule, and the call's "add people" reaches here as well.
+        const room = await prisma.chatChannel.findUnique({
+            where: { id: channelId },
+            select: {
+                kind: true,
+                spaceId: true,
+                ownerId: true,
+                createdById: true,
+                membersMayInvite: true
+            }
+        });
+        if (!room || !invitesAllowed({ ...room, mayAdminister: access.mayAdminister }, actor.id)) {
+            throw new ChatAccessError("Only the owner of this group can add people to it");
+        }
     }
 
     const wanted = [...new Set(userIds)];

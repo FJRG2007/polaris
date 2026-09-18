@@ -20,7 +20,7 @@ import { EmptyState, Skeleton } from "@polaris/ui";
 import { PersonName } from "@/components/person-name";
 import { starAction, starredAction } from "../actions";
 import { useCallback, useEffect, useState } from "react";
-import { RelativeTime } from "@/components/relative-time";
+import { MessageTime } from "@/components/message-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { ArrowLeft, Hash, Star, Users } from "lucide-react";
@@ -89,7 +89,10 @@ export function SavedView() {
                                                 name={message.authorName ?? "Somebody who has left"}
                                             />
                                         </span>
-                                        <RelativeTime iso={message.createdAt} />
+                                        <MessageTime
+                                            iso={message.createdAt}
+                                            className="shrink-0 whitespace-nowrap"
+                                        />
                                         <span className="ml-auto flex items-center gap-1">
                                             {channel && (
                                                 <Link

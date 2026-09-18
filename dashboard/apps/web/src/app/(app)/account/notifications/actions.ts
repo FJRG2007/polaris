@@ -13,6 +13,8 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { testDestination } from "@/lib/notifications/dispatch";
+import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
+import { saveSoundVolume } from "@/lib/notifications/sound-volume-service";
 import { destinationInputSchema, isNotificationEvent, notificationRuleSchema } from "@polaris/core";
 import { getNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications/preferences";
 import {
@@ -96,6 +98,15 @@ export async function loadNotificationHistoryAction(input: unknown): Promise<Not
         event: parsed.data.event ?? null,
         unreadOnly: parsed.data.unreadOnly ?? false
     });
+}
+
+/** How loud Polaris' sounds are for this account, as a percentage. */
+export async function saveSoundVolumeAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.object({ volume: soundVolumeSchema }).safeParse(input);
+    if (!parsed.success) return { error: "Pick a volume between 0 and 100." };
+    await saveSoundVolume(user.id, parsed.data.volume);
+    return {};
 }
 
 const saveRuleSchema = z.object({

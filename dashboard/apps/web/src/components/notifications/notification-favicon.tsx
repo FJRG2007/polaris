@@ -14,7 +14,9 @@
  *
  * Whether that shows as a number, a dot, or nothing at all is the device's
  * choice - see `favicon-style` - and it is followed while the page is open, so
- * changing it in Settings redraws the tab there and then.
+ * changing it in Settings redraws the tab there and then. The tab's title
+ * carries the same thing in front of it, because a row of pinned or crowded tabs
+ * shows the title where the icon is too small to read.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -26,6 +28,7 @@ import {
     faviconBadge,
     faviconStyle,
     onFaviconStyleChange,
+    titleWithBadge,
     type FaviconStyle
 } from "@/lib/favicon-style";
 
@@ -57,6 +60,24 @@ export function NotificationFavicon() {
         }
         const badged = drawFavicon(badge);
         if (badged) applyFavicon({ href: badged, type: "image/png" });
+    }, [style, waiting]);
+
+    useEffect(() => {
+        const badge = faviconBadge(style, waiting);
+        const apply = () => {
+            const next = titleWithBadge(document.title, badge);
+            if (next !== document.title) document.title = next;
+        };
+        apply();
+        // Every navigation writes the page's own title back, so the prefix is
+        // put in front again whenever the head changes. Writing an identical
+        // title is skipped above, which is what ends the loop this would be.
+        const watcher = new MutationObserver(apply);
+        watcher.observe(document.head, { subtree: true, childList: true, characterData: true });
+        return () => {
+            watcher.disconnect();
+            document.title = titleWithBadge(document.title, null);
+        };
     }, [style, waiting]);
 
     useEffect(() => () => {

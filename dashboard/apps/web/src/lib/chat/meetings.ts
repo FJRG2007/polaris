@@ -241,7 +241,14 @@ export async function inviteToCall(
     if (!channel) throw new ChatAccessError("That call has ended");
 
     if (channel.kind !== "dm") {
-        await addMembers(from, wanted);
+        // Only the people who are not in the conversation already. Everybody
+        // picked here is being brought into the CALL, and most of them are
+        // usually in the room it belongs to - asking to add those would be
+        // refused in a group whose owner keeps adding people to themselves, and
+        // then the telephone would never ring for anybody.
+        const inside = new Set(channel.members.map((row) => row.userId));
+        const newcomers = wanted.filter((userId) => !inside.has(userId));
+        if (newcomers.length > 0) await addMembers(from, newcomers);
         // Rung, and rung at the people being brought in. `startOrJoin` decides
         // between ringing and moving from whether the room was empty, which is
         // the right question for somebody walking in and the wrong one here:
