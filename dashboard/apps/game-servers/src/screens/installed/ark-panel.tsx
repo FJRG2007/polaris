@@ -35,10 +35,9 @@ import type { PlayerSeen } from "../../lib/games-activity";
 import type { ServerPresence } from "../../lib/games-service";
 import { useGamePresence } from "../../components/use-game-presence";
 import { presenceLine, seenFor } from "../../lib/games-activity";
-import { findArkMap, mapRequirementHint } from "../../lib/ark/maps";
+import { findArkMap, mapRequirementHint } from "@polaris/core";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { ArkAccessView, ArkStatus } from "../../lib/ark/service";
-import type { GameReachAdvice } from "../../lib/minecraft/reach-advice";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -113,6 +112,7 @@ const { ToolbarSwitch } = hostUi.toolbarSwitch;
 const { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } = hostUi.appAppsInstalledIdTabs;
 const { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } = hostUi.metricsHistory;
 type InstalledAppSetting = AppHostTypes["InstalledAppSetting"];
+type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 
 /**
  * How long after one read finishes before the next one starts. Measured from the

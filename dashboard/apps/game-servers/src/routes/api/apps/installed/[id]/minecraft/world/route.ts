@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readWorldView } from "../../../../../lib/minecraft/world-service";
+import { readWorldView } from "../../../../../../../lib/minecraft/world-service";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

@@ -8,7 +8,7 @@ import {
     readInstalledProjects,
     readRequirements,
     searchModrinth
-} from "../../../../../lib/minecraft/modrinth";
+} from "../../../../../../../lib/minecraft/modrinth";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import { isArkMap } from "./ark/maps";
+import { isArkMap } from "@polaris/core";
 import { isWorldMap } from "./minecraft/maps";
 import { isBiome, isLevelType, isSeed } from "./minecraft/world";
 import { isIdentifier } from "./fivem/players";

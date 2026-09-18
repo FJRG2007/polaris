@@ -30,7 +30,7 @@ import { expectedArkMemoryMb } from "../lib/ark/config";
 import { isIdentifier } from "../lib/fivem/players";
 import { expectedFivemMemoryMb } from "../lib/fivem/config";
 import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "../lib/fivem/config";
-import { ARK_MAPS, mapRequirementHint } from "../lib/ark/maps";
+import { ARK_MAPS, mapRequirementHint } from "@polaris/core";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "../lib/minecraft/access";
 import { createGameServerSchema, isModIdList } from "../lib/games-schema";

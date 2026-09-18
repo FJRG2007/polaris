@@ -1,5 +1,5 @@
 import { Readable } from "node:stream";
-import { backupPathInContainer } from "../../../../../../lib/minecraft/world-service";
+import { backupPathInContainer } from "../../../../../../../../lib/minecraft/world-service";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

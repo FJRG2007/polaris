@@ -11,7 +11,7 @@
  * runtime.
  */
 
-import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark-maps";
+import { ARK_MAPS, DEFAULT_ARK_MAP } from "@polaris/core";
 import {
     Bot,
     Gamepad2,

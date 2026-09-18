@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { parseJoinAddresses } from "@polaris-app/game-servers/src/lib/minecraft/parse";
-import { describePorts, gameReachAdvice } from "@polaris-app/game-servers/src/lib/minecraft/reach-advice";
+import { describePorts, gameReachAdvice } from "@/lib/apps/port-advice";
 import {
     accessRefusal,
     addressesFor,
