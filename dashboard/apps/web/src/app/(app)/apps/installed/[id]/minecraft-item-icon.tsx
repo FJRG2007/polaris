@@ -22,7 +22,12 @@ import { cn } from "@polaris/ui";
 import { Package } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { itemIconUrl, pictureFit } from "@/lib/apps/minecraft/items";
-import { modItemPictureFor, modItemsVersion, noModItems, subscribeModItems } from "./minecraft-mod-items";
+import {
+    modItemPictureFor,
+    modItemsVersion,
+    noModItems,
+    subscribeModItems
+} from "./minecraft-mod-items";
 
 export function ItemIcon({ id, className }: { id: string; className?: string }) {
     // Keyed by id rather than a bare boolean: the same icon element is reused as

@@ -121,7 +121,10 @@ const EMPTY: ServerModItems = { items: [], unread: [], skipped: [], complete: tr
  * this downloads files, and what it downloads should be decided by what the
  * server is actually configured to install.
  */
-export async function serverModItems(ownerId: string, installedAppId: string): Promise<ServerModItems> {
+export async function serverModItems(
+    ownerId: string,
+    installedAppId: string
+): Promise<ServerModItems> {
     const settings = await readSettings(ownerId, installedAppId);
     const loader = loaderForType(settings.software);
     // A plugin server loads no client assets, so there is nothing of this kind to
@@ -194,7 +197,8 @@ async function readSettings(
     });
     if (!install?.applicationId) return { software: "", version: null, projects: "" };
     const vars = await listEnvVars("application", install.applicationId, ownerId).catch(() => []);
-    const value = (key: string): string => vars.find((item) => item.key === key)?.value?.trim() ?? "";
+    const value = (key: string): string =>
+        vars.find((item) => item.key === key)?.value?.trim() ?? "";
     const version = value(VERSION_KEY);
     return {
         software: value(SOFTWARE_KEY),
@@ -285,7 +289,9 @@ async function sharedRead(
 }
 
 /** The catalogue kept for one build, or null when there is not one. */
-async function readCatalog(build: string): Promise<{ title: string; items: modItems.ModItem[] } | null> {
+async function readCatalog(
+    build: string
+): Promise<{ title: string; items: modItems.ModItem[] } | null> {
     try {
         const raw = await readFile(join(buildFolder(build), "catalog.json"), "utf8");
         const parsed = catalogSchema.safeParse(JSON.parse(raw));
@@ -360,7 +366,10 @@ async function readBuild(
     const catalog = catalogSchema.safeParse({ title: slug, items: read.items });
     const kept = catalog.success
         ? catalog.data
-        : { title: slug, items: read.items.filter((item) => modItemSchema.safeParse(item).success) };
+        : {
+              title: slug,
+              items: read.items.filter((item) => modItemSchema.safeParse(item).success)
+          };
     await keep(sha1, kept, read.icons);
     return { build: sha1, title: kept.title, items: kept.items };
 }
@@ -385,7 +394,10 @@ function beforeDeadline<T>(work: Promise<T>, until: number): Promise<T> {
  * already in this heap by the time anything compares it against the cap. Counted
  * here instead, and the connection dropped the moment it goes past.
  */
-async function bounded(body: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array | null> {
+async function bounded(
+    body: ReadableStream<Uint8Array>,
+    limit: number
+): Promise<Uint8Array | null> {
     const reader = body.getReader();
     const chunks: Uint8Array[] = [];
     let size = 0;

@@ -526,8 +526,7 @@ configured means the machine's own address, as before.
   drag is refused and says which. Vanilla has no `/data modify` for players, so a
   move is two `item replace` writes and each re-reads its slot first; a stack the
   player moved underneath refuses instead of overwriting.
-- **The item palette searches what the server's mods add, not only vanilla's
-  1396.** The grid draws the vanilla catalogue at once and appends a second
+- **The item palette searches what the server's mods add, not only vanilla's 1396.** The grid draws the vanilla catalogue at once and appends a second
   batch fetched from the server's own route
   (`/api/apps/installed/[id]/minecraft/items`) as soon as it arrives, so a slow
   first read on a heavily-modded server never blocks the picker opening.

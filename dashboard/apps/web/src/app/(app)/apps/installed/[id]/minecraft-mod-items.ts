@@ -147,7 +147,9 @@ async function fetchModItems(installedAppId: string): Promise<ModItemsLoad> {
 export function noteFor(payload: unknown, found: number): string | null {
     const lines: string[] = [];
     if (found > 0) {
-        lines.push(`Also searching ${found} items this server's mods add. Type a mod's name for just those.`);
+        lines.push(
+            `Also searching ${found} items this server's mods add. Type a mod's name for just those.`
+        );
     }
     const answer = payload as { unread?: unknown; skipped?: unknown; complete?: unknown } | null;
     const unread = namesIn(answer?.unread);
@@ -156,7 +158,9 @@ export function noteFor(payload: unknown, found: number): string | null {
     }
     const skipped = namesIn(answer?.skipped);
     if (skipped !== null) {
-        lines.push(`Not searching ${skipped}: only the first mods on a long list are read. They can still be typed as ids.`);
+        lines.push(
+            `Not searching ${skipped}: only the first mods on a long list are read. They can still be typed as ids.`
+        );
     }
     if (answer?.complete === false) {
         lines.push("Some mods are still being read. Open the picker again to see their items.");
@@ -166,7 +170,9 @@ export function noteFor(payload: unknown, found: number): string | null {
 
 /** Up to four names from a list in the answer, and how many more there are. */
 function namesIn(list: unknown): string | null {
-    const names = Array.isArray(list) ? list.filter((name): name is string => typeof name === "string") : [];
+    const names = Array.isArray(list)
+        ? list.filter((name): name is string => typeof name === "string")
+        : [];
     if (names.length === 0) return null;
     const shown = names.slice(0, 4).join(", ");
     return names.length > 4 ? `${shown} and ${names.length - 4} more` : shown;

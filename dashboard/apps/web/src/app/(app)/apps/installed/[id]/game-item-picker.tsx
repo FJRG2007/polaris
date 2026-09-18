@@ -99,11 +99,14 @@ export function GameItemPicker<T extends SearchableItem>({
         let live = true;
         // Never a reason to fail the picker: what this adds is extra, and what it
         // could not add it says in a line under the grid.
-        more().then((second) => {
-            if (!live) return;
-            setExtra(second.items);
-            setNote(second.note);
-        }, () => undefined);
+        more().then(
+            (second) => {
+                if (!live) return;
+                setExtra(second.items);
+                setNote(second.note);
+            },
+            () => undefined
+        );
         return () => {
             live = false;
         };

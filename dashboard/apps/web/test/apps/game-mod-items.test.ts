@@ -330,7 +330,13 @@ describe("what the panel does with them", () => {
     it("drops anything out of the answer that is not a modded item", () => {
         const read = readModItems({
             items: [
-                { id: "securitycraft:keycard_lv1", label: "Level 1 Keycard", mod: "security-craft", build, icon: null },
+                {
+                    id: "securitycraft:keycard_lv1",
+                    label: "Level 1 Keycard",
+                    mod: "security-craft",
+                    build,
+                    icon: null
+                },
                 // Vanilla is already in the picker, and twice is twice.
                 { id: "minecraft:stone", label: "Stone", mod: "x", build, icon: null },
                 { id: "not an id", label: "No", mod: "x", build, icon: null },
@@ -509,8 +515,20 @@ describe("the build a jar is read from", () => {
 
     it("takes the newest build that fits, with the file to read", async () => {
         answer([
-            { id: "MV471ZmP", version_number: "v1.10.1", version_type: "release", game_versions: ["1.21.4"], files: [file("SecurityCraft v1.10.1.jar")] },
-            { id: "older", version_number: "v1.10.0", version_type: "release", game_versions: ["1.21.4"], files: [file("SecurityCraft v1.10.0.jar")] }
+            {
+                id: "MV471ZmP",
+                version_number: "v1.10.1",
+                version_type: "release",
+                game_versions: ["1.21.4"],
+                files: [file("SecurityCraft v1.10.1.jar")]
+            },
+            {
+                id: "older",
+                version_number: "v1.10.0",
+                version_type: "release",
+                game_versions: ["1.21.4"],
+                files: [file("SecurityCraft v1.10.0.jar")]
+            }
         ]);
         const build = await buildFor("security-craft", "neoforge", "1.21.4");
         expect(build?.version).toBe("v1.10.1");
@@ -523,7 +541,13 @@ describe("the build a jar is read from", () => {
         // loader: a list long enough to refuse is the common case, not the odd
         // one, and refusing it reported the most popular mods as unreadable.
         answer([
-            { id: "newest", version_number: "v1.10.1", version_type: "release", game_versions: ["1.21.4"], files: [file("SecurityCraft v1.10.1.jar")] },
+            {
+                id: "newest",
+                version_number: "v1.10.1",
+                version_type: "release",
+                game_versions: ["1.21.4"],
+                files: [file("SecurityCraft v1.10.1.jar")]
+            },
             ...Array.from({ length: 400 }, (_, index) => ({
                 id: `old-${index}`,
                 version_number: `v1.0.${index}`,
@@ -537,23 +561,51 @@ describe("the build a jar is read from", () => {
 
     it("reads the build an entry is pinned to rather than the newest", async () => {
         answer([
-            { id: "new", version_number: "v1.10.1", version_type: "release", game_versions: ["1.21.4"], files: [file("new.jar")] },
-            { id: "pinned", version_number: "v1.9.0", version_type: "release", game_versions: ["1.21.4"], files: [file("pinned.jar")] }
+            {
+                id: "new",
+                version_number: "v1.10.1",
+                version_type: "release",
+                game_versions: ["1.21.4"],
+                files: [file("new.jar")]
+            },
+            {
+                id: "pinned",
+                version_number: "v1.9.0",
+                version_type: "release",
+                game_versions: ["1.21.4"],
+                files: [file("pinned.jar")]
+            }
         ]);
-        expect((await buildFor("security-craft:v1.9.0", "neoforge", "1.21.4"))?.filename).toBe("pinned.jar");
+        expect((await buildFor("security-craft:v1.9.0", "neoforge", "1.21.4"))?.filename).toBe(
+            "pinned.jar"
+        );
     });
 
     it("leaves alone a build for another release, and one the entry does not admit", async () => {
         answer([
-            { id: "a", version_number: "v2", version_type: "release", game_versions: ["1.21.6"], files: [file("other.jar")] }
+            {
+                id: "a",
+                version_number: "v2",
+                version_type: "release",
+                game_versions: ["1.21.6"],
+                files: [file("other.jar")]
+            }
         ]);
         expect(await buildFor("security-craft", "neoforge", "1.21.4")).toBeNull();
 
         answer([
-            { id: "b", version_number: "v2", version_type: "beta", game_versions: ["1.21.4"], files: [file("beta.jar")] }
+            {
+                id: "b",
+                version_number: "v2",
+                version_type: "beta",
+                game_versions: ["1.21.4"],
+                files: [file("beta.jar")]
+            }
         ]);
         expect(await buildFor("security-craft", "neoforge", "1.21.4")).toBeNull();
-        expect((await buildFor("security-craft:beta", "neoforge", "1.21.4"))?.filename).toBe("beta.jar");
+        expect((await buildFor("security-craft:beta", "neoforge", "1.21.4"))?.filename).toBe(
+            "beta.jar"
+        );
     });
 
     it("refuses a file that is not on their own CDN, or has no hash to name it by", async () => {

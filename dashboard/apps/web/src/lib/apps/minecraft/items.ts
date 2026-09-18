@@ -208,7 +208,10 @@ export function readModItems(payload: unknown): ModItemView[] {
         if (id === null || id.startsWith(`${VANILLA}:`)) continue;
         items.push({
             id,
-            label: typeof entry.label === "string" && entry.label.length > 0 ? entry.label : itemLabel(id),
+            label:
+                typeof entry.label === "string" && entry.label.length > 0
+                    ? entry.label
+                    : itemLabel(id),
             mod: typeof entry.mod === "string" ? entry.mod : "",
             build: typeof entry.build === "string" && isBuildKey(entry.build) ? entry.build : "",
             icon: readModIcon(entry.icon)
@@ -265,7 +268,9 @@ export function modItemPicture(
     if (item.icon === null) return null;
     if (item.icon.kind === "vanilla") {
         const name = vanillaTextureName(item.icon.texture, vanilla);
-        return name === null ? null : { url: `${ICON_BASE}/${VANILLA}_${name}.png`, width: 1, height: 1 };
+        return name === null
+            ? null
+            : { url: `${ICON_BASE}/${VANILLA}_${name}.png`, width: 1, height: 1 };
     }
     if (!isBuildKey(item.build)) return null;
     const asked = new URLSearchParams({ build: item.build, name: item.icon.name });
@@ -314,7 +319,11 @@ export function pictureFit(picture: ItemPicture): { width: string; height: strin
 /** The catalog entries matching what somebody typed, best first - see
  *  `catalog-search`, which is where the ranking lives now that ARK's items are
  *  searched the same way. */
-export function searchItems(items: readonly CatalogItem[], query: string, limit: number): CatalogItem[] {
+export function searchItems(
+    items: readonly CatalogItem[],
+    query: string,
+    limit: number
+): CatalogItem[] {
     return searchCatalog(items, query, limit);
 }
 
@@ -379,7 +388,8 @@ function endsWithWord(name: string, word: string): boolean {
 
 export function maxStackFor(id: string): number {
     const name = itemName(normalizeItemId(id) ?? id);
-    if (name.startsWith("bucket_of") || ONE_AT_A_TIME.some((word) => endsWithWord(name, word))) return 1;
+    if (name.startsWith("bucket_of") || ONE_AT_A_TIME.some((word) => endsWithWord(name, word)))
+        return 1;
     if (SIXTEEN.some((word) => endsWithWord(name, word))) return 16;
     return 64;
 }
