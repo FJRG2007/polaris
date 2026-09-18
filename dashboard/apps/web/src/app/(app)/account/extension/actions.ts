@@ -69,7 +69,9 @@ export async function describeConnectionAction(
 }
 
 /** Connect it, or turn it away. */
-export async function answerConnectionAction(input: unknown): Promise<{ ok?: true; error?: string }> {
+export async function answerConnectionAction(
+    input: unknown
+): Promise<{ ok?: true; error?: string }> {
     const user = await requireUser();
     // A browser that has just signed in for the first time does not get to hand
     // a standing credential to an extension while the account is still deciding

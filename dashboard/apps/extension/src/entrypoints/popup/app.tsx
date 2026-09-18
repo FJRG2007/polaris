@@ -355,7 +355,10 @@ function LinkPolaris({
                 A tab opens on your Polaris and you approve it there. The connection appears under
                 Sessions, and you can end it from there at any time.
             </p>
-            <button className="ghost" onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}>
+            <button
+                className="ghost"
+                onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}
+            >
                 Use a different Polaris
             </button>
         </main>

@@ -201,7 +201,10 @@ export async function connectAuthorize(context: VaultContext): Promise<Response>
     const extensionToken = typeof body.extensionToken === "string" ? body.extensionToken : null;
     const connection = extensionToken ? await readExtensionToken(extensionToken) : null;
     if (extensionToken && !connection) {
-        return grantError("This extension's connection to Polaris has ended. Connect it again.", 401);
+        return grantError(
+            "This extension's connection to Polaris has ended. Connect it again.",
+            401
+        );
     }
 
     const opened = await openVaultAuthorization(

@@ -1836,10 +1836,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "unlink": {
-                const [origin, token] = await Promise.all([
-                    currentOrigin(),
-                    LINK_TOKEN.getValue()
-                ]);
+                const [origin, token] = await Promise.all([currentOrigin(), LINK_TOKEN.getValue()]);
                 // Told, then forgotten. What makes it real here is the forgetting,
                 // so a server that could not be reached does not keep this browser
                 // connected to something somebody has finished with.

@@ -87,13 +87,18 @@ describe("the session table", () => {
 
     it("gives the session a name of its own, so two identical rows can be told apart", () => {
         // Three rows all reading "Chrome on Windows" is the case this exists for.
-        const markup = render([session({ id: "a", name: "Pegasus" }), session({ id: "b", name: "Onyx" })]);
+        const markup = render([
+            session({ id: "a", name: "Pegasus" }),
+            session({ id: "b", name: "Onyx" })
+        ]);
         expect(markup).toContain("Pegasus");
         expect(markup).toContain("Onyx");
     });
 
     it("states the browser and the system with the version each one claimed", () => {
-        const markup = render([session({ browser: "Firefox", browserVersion: "130", os: "iOS", osVersion: "17.5" })]);
+        const markup = render([
+            session({ browser: "Firefox", browserVersion: "130", os: "iOS", osVersion: "17.5" })
+        ]);
         expect(markup).toContain("Firefox");
         expect(markup).toContain("130");
         expect(markup).toContain("iOS");
@@ -159,7 +164,9 @@ describe("the session table", () => {
     });
 
     it("renders a row per session rather than dropping any", () => {
-        const sessions = Array.from({ length: 6 }, (_, index) => session({ id: `session-${index}` }));
+        const sessions = Array.from({ length: 6 }, (_, index) =>
+            session({ id: `session-${index}` })
+        );
         expect(render(sessions).match(/<tr/g)).toHaveLength(7);
     });
 
@@ -178,13 +185,19 @@ describe("the session table", () => {
     // The one worth noticing at a glance: the account has a second step armed and
     // this sign-in was let past it because the browser had been remembered.
     it("shows a skipped second step rather than a session that merely lacks one", () => {
-        const markup = render([session({ signIn: { method: "password", secondFactor: "trusted-device" } })]);
+        const markup = render([
+            session({ signIn: { method: "password", secondFactor: "trusted-device" } })
+        ]);
         expect(markup).toContain("Password + Remembered device");
     });
 
     it("shows a scanned code and a passkey as the ways in they are", () => {
-        expect(render([session({ signIn: { method: "qr-code", secondFactor: null } })])).toContain("QR code");
-        expect(render([session({ signIn: { method: "passkey", secondFactor: null } })])).toContain("Passkey");
+        expect(render([session({ signIn: { method: "qr-code", secondFactor: null } })])).toContain(
+            "QR code"
+        );
+        expect(render([session({ signIn: { method: "passkey", secondFactor: null } })])).toContain(
+            "Passkey"
+        );
     });
 
     // Silence would read as "a password and nothing else", which is a claim
@@ -205,7 +218,10 @@ describe("the session table", () => {
 
     it("says a scanned code was scanned rather than approved", () => {
         const markup = render([
-            session({ signIn: { method: "qr-code", secondFactor: null }, authorizedBy: authorizer() })
+            session({
+                signIn: { method: "qr-code", secondFactor: null },
+                authorizedBy: authorizer()
+            })
         ]);
         expect(markup).toContain("Code scanned by");
     });
@@ -216,7 +232,9 @@ describe("the session table", () => {
         const markup = render([session({ authorizedBy: authorizer({ live: false }) })]);
         expect(markup).toContain("Safari on iOS");
         expect(markup).toContain("Signed out since");
-        expect(markup).not.toContain("/account/activity?session=22222222-2222-4222-8222-222222222222");
+        expect(markup).not.toContain(
+            "/account/activity?session=22222222-2222-4222-8222-222222222222"
+        );
     });
 
     it("says nothing about an authorizer for the sessions nobody had to answer for", () => {
@@ -289,7 +307,9 @@ describe("the one-line origin", () => {
     });
 
     it("says something when nothing at all is known", () => {
-        expect(sessionOrigin(session({ ip: null, country: null, host: null }))).toBe("Unknown location");
+        expect(sessionOrigin(session({ ip: null, country: null, host: null }))).toBe(
+            "Unknown location"
+        );
     });
 });
 

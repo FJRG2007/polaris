@@ -50,7 +50,11 @@ function match(row: Row, where: Row): boolean {
 
 /** What a row looks like once the rows it is read with are attached - the
  *  account behind a connection, which the service reads through `select`. */
-function table(rows: () => Row[], set: (next: Row[]) => void, join: (row: Row) => Row = (row) => row) {
+function table(
+    rows: () => Row[],
+    set: (next: Row[]) => void,
+    join: (row: Row) => Row = (row) => row
+) {
     const found = (where: Row): Row | null => {
         const hit = rows().find((row) => match(row, where));
         return hit ? join(hit) : null;
@@ -113,7 +117,10 @@ vi.mock("@polaris/db", () => ({
             return table(
                 () => sessions,
                 (next) => (sessions = next),
-                (row) => ({ ...row, user: users.find((one) => one["id"] === row["userId"]) ?? null })
+                (row) => ({
+                    ...row,
+                    user: users.find((one) => one["id"] === row["userId"]) ?? null
+                })
             );
         },
         get vaultDevice() {
@@ -147,7 +154,11 @@ const {
     revokeExtensionSession
 } = await import("@/lib/extension/sessions");
 
-const SEEN = { ip: "203.0.113.4", userAgent: "Mozilla/5.0 (Windows NT 10.0) Chrome/131.0", host: "polaris.example" };
+const SEEN = {
+    ip: "203.0.113.4",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0) Chrome/131.0",
+    host: "polaris.example"
+};
 
 /** Deterministic codes, so a test can name the one it expects. */
 const fixedRandom = (size: number) => new Uint8Array(size).fill(3);
@@ -162,7 +173,14 @@ beforeEach(() => {
 
 async function connect(): Promise<{ token: string; sessionId: string }> {
     const opened = await openExtensionConnection(
-        { deviceId: "install-1", deviceName: "Chrome on Windows", ...SEEN, requestIp: SEEN.ip, requestUserAgent: SEEN.userAgent, requestHost: SEEN.host },
+        {
+            deviceId: "install-1",
+            deviceName: "Chrome on Windows",
+            ...SEEN,
+            requestIp: SEEN.ip,
+            requestUserAgent: SEEN.userAgent,
+            requestHost: SEEN.host
+        },
         fixedRandom
     );
     await answerExtensionConnection({
@@ -231,7 +249,9 @@ describe("collecting it", () => {
             fixedRandom
         );
 
-        expect(await claimExtensionConnection(opened!.deviceCode, SEEN)).toEqual({ status: "pending" });
+        expect(await claimExtensionConnection(opened!.deviceCode, SEEN)).toEqual({
+            status: "pending"
+        });
 
         await answerExtensionConnection({
             userId: ALICE,
@@ -246,7 +266,9 @@ describe("collecting it", () => {
         const token = claim.status === "approved" ? claim.token : "";
         expect(sessions[0]?.["tokenHash"]).toBe(hashToken(token));
         // And spent: a second poll gets nothing.
-        expect(await claimExtensionConnection(opened!.deviceCode, SEEN)).toEqual({ status: "expired" });
+        expect(await claimExtensionConnection(opened!.deviceCode, SEEN)).toEqual({
+            status: "expired"
+        });
     });
 
     it("says so when it was turned away", async () => {
@@ -267,12 +289,19 @@ describe("collecting it", () => {
             sessionId: "session-1"
         });
 
-        expect(await claimExtensionConnection(opened!.deviceCode, SEEN)).toEqual({ status: "denied" });
+        expect(await claimExtensionConnection(opened!.deviceCode, SEEN)).toEqual({
+            status: "denied"
+        });
         expect(sessions).toHaveLength(0);
     });
 
     it("adopts the vault client this same install was already signed in as", async () => {
-        devices.push({ id: "device-1", userId: ALICE, identifier: "install-1", extensionSessionId: null });
+        devices.push({
+            id: "device-1",
+            userId: ALICE,
+            identifier: "install-1",
+            extensionSessionId: null
+        });
 
         const { sessionId } = await connect();
 
@@ -309,7 +338,12 @@ describe("the token", () => {
 describe("ending a connection", () => {
     it("revokes the vault tokens of the client it let in", async () => {
         const { sessionId } = await connect();
-        devices.push({ id: "device-1", userId: ALICE, identifier: "install-1", extensionSessionId: sessionId });
+        devices.push({
+            id: "device-1",
+            userId: ALICE,
+            identifier: "install-1",
+            extensionSessionId: sessionId
+        });
         refreshTokens.push({ id: "token-1", deviceId: "device-1", revokedAt: null });
 
         const ended = await revokeExtensionSession(ALICE, sessionId);
@@ -321,7 +355,10 @@ describe("ending a connection", () => {
     it("belongs to its owner and nobody else", async () => {
         const { sessionId, token } = await connect();
 
-        const ended = await revokeExtensionSession("22222222-2222-4222-8222-222222222222", sessionId);
+        const ended = await revokeExtensionSession(
+            "22222222-2222-4222-8222-222222222222",
+            sessionId
+        );
 
         expect(ended.revoked).toBe(false);
         expect(await readExtensionToken(token)).toMatchObject({ userId: ALICE });

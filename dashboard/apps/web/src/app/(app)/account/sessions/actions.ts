@@ -230,9 +230,15 @@ export async function decideLoginApprovalAction(
         // refusing a sign-in is always allowed, from any device.
         const blocked = await newDeviceRefusal(user);
         if (blocked) return { error: blocked };
-        const throttle = await rateLimit(`signin-approval:${user.id}`, APPROVAL_LIMIT, APPROVAL_WINDOW_MS);
+        const throttle = await rateLimit(
+            `signin-approval:${user.id}`,
+            APPROVAL_LIMIT,
+            APPROVAL_WINDOW_MS
+        );
         if (!throttle.ok) {
-            return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+            return {
+                error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.`
+            };
         }
     }
     const result = await decideLoginApproval(

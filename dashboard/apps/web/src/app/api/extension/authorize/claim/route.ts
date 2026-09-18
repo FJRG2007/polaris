@@ -33,7 +33,8 @@ export async function POST(request: Request): Promise<Response> {
 
     const body = await request.json().catch(() => null);
     const asked = claimSchema.safeParse(body);
-    if (!asked.success) return Response.json({ error: "A device code is required." }, { status: 400 });
+    if (!asked.success)
+        return Response.json({ error: "A device code is required." }, { status: 400 });
 
     const claim = await claimExtensionConnection(asked.data.deviceCode, {
         ip: (await clientIp()) ?? null,

@@ -173,7 +173,10 @@ export async function claimLink(origin: string, deviceCode: string): Promise<Lin
  * here - and null when the server could not be reached at all, which is not a
  * reason to throw anything away.
  */
-export async function checkLink(origin: string, token: string): Promise<LinkState | "ended" | null> {
+export async function checkLink(
+    origin: string,
+    token: string
+): Promise<LinkState | "ended" | null> {
     const reply = await ask(url(origin, "session"), {
         method: "GET",
         headers: { authorization: `Bearer ${token}` }

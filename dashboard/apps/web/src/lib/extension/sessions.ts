@@ -28,11 +28,7 @@
 import { prisma } from "@polaris/db";
 import { describeClient } from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
-import {
-    AUTHORIZATION_POLL_MS,
-    AUTHORIZATION_TTL_MS,
-    newUserCode
-} from "@/lib/device-code";
+import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 
 /** What the extension is handed when it asks. */
 export interface OpenedConnection {
@@ -213,7 +209,11 @@ export type ClaimedConnection =
  */
 export async function claimExtensionConnection(
     deviceCode: string,
-    seen: { readonly ip: string | null; readonly userAgent: string | null; readonly host: string | null },
+    seen: {
+        readonly ip: string | null;
+        readonly userAgent: string | null;
+        readonly host: string | null;
+    },
     now = new Date()
 ): Promise<ClaimedConnection> {
     const row = await prisma.extensionAuthorization.findUnique({
@@ -302,7 +302,11 @@ export async function claimExtensionConnection(
  */
 export async function readExtensionToken(
     token: string | null,
-    seen?: { readonly ip: string | null; readonly userAgent: string | null; readonly host: string | null }
+    seen?: {
+        readonly ip: string | null;
+        readonly userAgent: string | null;
+        readonly host: string | null;
+    }
 ): Promise<ExtensionPrincipal | null> {
     if (!token) return null;
     const row = await prisma.extensionSession.findUnique({
