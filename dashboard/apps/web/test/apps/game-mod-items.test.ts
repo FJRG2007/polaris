@@ -32,8 +32,10 @@ import {
     readJarItems,
     type JarFiles
 } from "@/lib/apps/minecraft/mod-items";
+import { noteFor } from "@/app/(app)/apps/installed/[id]/minecraft-mod-items";
 import {
     modCatalogItems,
+    searchItems,
     modItemPicture,
     pictureFit,
     readModItems,
@@ -317,6 +319,39 @@ describe("what the panel does with them", () => {
             ]
         });
         expect(read[0]?.icon).toBeNull();
+    });
+
+    it("finds a modded item by the namespace its ids carry, not only by the list's spelling", () => {
+        // The two names for one mod: `security-craft` is what the mod list says
+        // and `securitycraft` is what every id it registers says, and an operator
+        // has only ever seen one of them.
+        const items = modCatalogItems([
+            {
+                id: "securitycraft:keycard_lv1",
+                label: "Level 1 Keycard",
+                mod: "security-craft",
+                build,
+                icon: null
+            }
+        ]);
+        expect(searchItems(items, "securitycraft", 10).map((item) => item.id)).toEqual([
+            "securitycraft:keycard_lv1"
+        ]);
+        expect(searchItems(items, "security-craft", 10)).toHaveLength(1);
+        expect(searchItems(items, "keycard", 10)).toHaveLength(1);
+    });
+
+    it("says the modded items are there, and which mods could not be read", () => {
+        // Without this the picker looks exactly as it did before: modded entries
+        // rank behind vanilla, so an operator who types nothing sees the same
+        // grid and concludes their mods are still missing.
+        expect(noteFor({}, 4464)).toBe(
+            "Also searching 4464 items this server's mods add. Type a mod's name for just those."
+        );
+        expect(noteFor({ unread: ["rechiseled"] }, 0)).toBe(
+            "Could not read the items rechiseled adds. They can still be typed as ids."
+        );
+        expect(noteFor({}, 0)).toBeNull();
     });
 
     it("searches a modded item by its mod as well as its name", () => {

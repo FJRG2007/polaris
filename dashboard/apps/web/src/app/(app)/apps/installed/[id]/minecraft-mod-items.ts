@@ -116,18 +116,33 @@ async function fetchModItems(installedAppId: string): Promise<ModItemsLoad> {
         for (const listener of listeners) listener();
     }
 
-    return { items: modCatalogItems(items), note: unreadNote(payload) };
+    return { items: modCatalogItems(items), note: noteFor(payload, items.length) };
 }
 
-/** What to say about the mods whose jars could not be read. Nothing at all when
- *  they all were, which is the ordinary case. */
-function unreadNote(payload: unknown): string | null {
+/**
+ * The line under the grid.
+ *
+ * Which says the modded items are there at all, and that is the point of it: they
+ * are ranked behind the vanilla ones, so an operator who types nothing sees the
+ * same 120 vanilla tiles they saw before and concludes their mods are still
+ * missing. Naming the mod to type is what turns the catalogue into something
+ * findable rather than something that has to be guessed at.
+ *
+ * Nothing at all on a server with no mods, which is where this started.
+ */
+export function noteFor(payload: unknown, found: number): string | null {
+    const lines: string[] = [];
+    if (found > 0) {
+        lines.push(`Also searching ${found} items this server's mods add. Type a mod's name for just those.`);
+    }
     const unread = (payload as { unread?: unknown } | null)?.unread;
     const names = Array.isArray(unread)
         ? unread.filter((name): name is string => typeof name === "string").slice(0, 4)
         : [];
-    if (names.length === 0) return null;
-    return `Could not read the items ${names.join(", ")} adds. They can still be typed as ids.`;
+    if (names.length > 0) {
+        lines.push(`Could not read the items ${names.join(", ")} adds. They can still be typed as ids.`);
+    }
+    return lines.length > 0 ? lines.join(" ") : null;
 }
 
 /** The picture for a modded item, once its server's catalogue has been read. */

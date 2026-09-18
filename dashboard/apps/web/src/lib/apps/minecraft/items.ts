@@ -228,12 +228,25 @@ export function modCatalogItems(items: readonly ModItemView[]): CatalogItem[] {
     return items.map((item) => ({
         id: item.id,
         label: item.label,
-        search: `${item.label.toLowerCase()} ${itemName(item.id)} ${item.mod.toLowerCase()}`.trim(),
+        // The namespace as well as the mod's name on the list, because the two are
+        // spelled differently and an operator has only ever seen one of them:
+        // SecurityCraft is `security-craft` on the mod list and `securitycraft` in
+        // every id it registers, and a search box that answers only to the first
+        // is one the obvious query misses.
+        search: `${item.label.toLowerCase()} ${itemName(item.id)} ${modNamespace(item.id)} ${item.mod.toLowerCase()}`
+            .replace(/\s+/g, " ")
+            .trim(),
         // Behind the vanilla entry of the same name, so a search for "stone"
         // answers with stone before it answers with a mod's version of it.
         rank: 1,
         ...(item.mod.length > 0 ? { from: item.mod } : {})
     }));
+}
+
+/** The namespace an id belongs to, which is the other name a mod goes by. */
+function modNamespace(id: string): string {
+    const colon = id.indexOf(":");
+    return colon === -1 ? "" : id.slice(0, colon);
 }
 
 /**
