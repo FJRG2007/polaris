@@ -28,6 +28,7 @@ import { useChatStream } from "./use-chat-stream";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
+import { useCallHotkeys } from "./call-hotkeys";
 import { rememberCall, takeRememberedCall } from "./call-resume";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -43,6 +44,8 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     const [session, setSession] = useState<CallSession | null>(null);
     const [withVideo, setWithVideo] = useState(false);
     const call = useCall(session?.meetingId ?? null, { video: withVideo });
+    // Wherever the reader is in Polaris, for as long as they are in a call.
+    useCallHotkeys(call, session !== null);
     const recording = useCallRecorder(call);
     /** The recorder as it is now, for the callbacks that have to reach it
      *  without being rebuilt every time it counts a second. */

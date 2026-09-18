@@ -182,27 +182,6 @@ export function CallRoom({
     const [asking, setAsking] = useState(false);
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
-    /**
-     * The two keys every voice application has: F9 mutes, F10 deafens.
-     *
-     * Bound while the room is on screen and nowhere else, and taken from the
-     * browser rather than left to it - F10 opens a menu bar in some of them, and
-     * a shortcut that sometimes opens a menu instead of muting you is worse than
-     * no shortcut. Function keys type nothing, so this is safe over a composer
-     * somebody is writing in.
-     */
-    useEffect(() => {
-        const onKey = (event: KeyboardEvent) => {
-            if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-            if (event.key !== "F9" && event.key !== "F10") return;
-            event.preventDefault();
-            if (event.key === "F9") call.toggleMic();
-            else call.toggleDeafen();
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [call]);
-
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
     /** Whether the call is being written down, and by whom - this browser
      *  included, since the person recording needs telling as much as anybody. */

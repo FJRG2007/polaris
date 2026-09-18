@@ -17,6 +17,7 @@ import { Loader2, Video } from "lucide-react";
 import { useCall } from "@/app/(app)/chat/use-call";
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { CallAudio } from "@/app/(app)/chat/call-audio";
+import { useCallHotkeys } from "@/app/(app)/chat/call-hotkeys";
 import { PublicShell } from "@/components/public-shell";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
@@ -183,6 +184,7 @@ function GuestRoom({
     onLeave: () => void;
 }) {
     const call = useCall(meetingId, { video: true });
+    useCallHotkeys(call, true);
     return (
         <>
             <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
