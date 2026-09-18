@@ -134,6 +134,14 @@ export interface ModrinthProject {
  *  into a query string and compared against what a project reports. */
 const VERSION = /^[0-9][0-9.]{0,15}$/;
 
+/** Whether a value names one release of the game rather than something that is
+ *  not a version at all - `LATEST`, an unset variable, a typo. The one reader of
+ *  that shape, so the side that installs mods and the side that reads their items
+ *  cannot drift apart on what counts as pinned. */
+export function isGameVersion(value: string): boolean {
+    return VERSION.test(value);
+}
+
 const searchResponseSchema = z.object({
     hits: z
         .array(
@@ -167,13 +175,14 @@ function hitToProject(hit: z.infer<typeof searchResponseSchema>["hits"][number])
 }
 
 /**
- * Whether a URL is on Modrinth's own CDN.
+ * Whether a URL is served by Modrinth themselves.
  *
- * Every URL here comes out of somebody else's database, and what it reaches is
- * either fetched by Polaris and rendered inside a dashboard an operator is logged
- * into, or downloaded onto a player's machine by the installer. So it has to be
- * https, and it has to be them - an icon that is not draws its initials instead,
- * and a file that is not is reported rather than installed.
+ * The check behind every address out of their API that Polaris then fetches - an
+ * icon for a row, a jar to read a mod's items out of. It is a URL out of somebody
+ * else's database and what it reaches is fetched by this server and rendered
+ * inside a dashboard an operator is logged into, or downloaded onto a player's
+ * machine by the installer, so the host has to be theirs and the transport has to
+ * be https. Anything else is dropped, and the row draws its initials instead.
  */
 export function isModrinthUrl(url: string | null | undefined): boolean {
     if (!url) return false;
@@ -223,7 +232,7 @@ export async function searchModrinth(
         );
     }
     const version = (options.version ?? "").trim();
-    if (VERSION.test(version)) facets.push([`versions:${version}`]);
+    if (isGameVersion(version)) facets.push([`versions:${version}`]);
     if (options.category) facets.push([`categories:${options.category}`]);
 
     const params = new URLSearchParams({
@@ -332,7 +341,7 @@ export async function readInstalledProjects(
             author: null,
             clientOnly: project.server_side === "unsupported",
             known: true,
-            fitsVersion: VERSION.test(pinned) ? project.game_versions.includes(pinned) : null,
+            fitsVersion: isGameVersion(pinned) ? project.game_versions.includes(pinned) : null,
             // A project that lists no loader at all is a datapoint Modrinth is
             // missing, not a refusal - so it is not held against it.
             fitsLoader: project.loaders.length === 0 || project.loaders.includes(loader)
@@ -650,6 +659,7 @@ export function repinEntry(entry: string, build: string): string {
 
 const buildSchema = someBuilds(
     z.object({
+        id: z.string().max(64).catch(""),
         version_number: z.string().max(64).catch(""),
         version_type: z.string().max(32).catch("release"),
         game_versions: z.array(z.string().max(32)).max(200).catch([]),
@@ -659,7 +669,11 @@ const buildSchema = someBuilds(
                     filename: z.string().max(200).catch(""),
                     url: z.string().max(512).catch(""),
                     primary: z.boolean().catch(false),
-                    hashes: z.object({ sha1: z.string().max(64).catch("") }).catch({ sha1: "" })
+                    size: z.number().nonnegative().catch(0),
+                    hashes: z
+                        .object({ sha1: z.string().max(64).catch("") })
+                        .partial()
+                        .catch({ sha1: "" })
                 })
             )
             .max(20)
@@ -693,25 +707,43 @@ async function admittedBuild(
         (build) =>
             build.version_number.length > 0 &&
             admitsBuild(release, build.version_type) &&
-            (!VERSION.test(version) || build.game_versions.includes(version))
+            (!isGameVersion(version) || build.game_versions.includes(version))
     );
     return admitted?.version_number ?? null;
 }
 
-/** One build, as the thing a player would download. */
+/** One build of one project, as the file it actually is. */
 export interface ModrinthBuild {
+    /** Modrinth's own id for the build. */
+    readonly versionId: string;
+    /** What the publisher numbered it. */
     readonly version: string;
     readonly filename: string;
+    /** On their CDN, checked before it is returned. */
     readonly url: string;
+    /** Lowercase hex. What the file is, rather than where it is - so a build that
+     *  has not changed is recognised as the same one however it is addressed. */
     readonly sha1: string;
+    readonly size: number;
 }
+
+/** A jar hash as Modrinth reports it. */
+const SHA1 = /^[0-9a-f]{40}$/;
 
 /**
  * The build an entry installs on this server, with the file behind it.
  *
- * The same three questions `admittedBuild` asks - the loader, the release, how
- * finished a build has to be - answered with the file, because that is what the
- * mod pack a player installs is made of.
+ * The same three questions `admittedBuild` asks - the loader, the release, and
+ * whether the entry admits a build that finished - answered with the file rather
+ * than with its number, because that is what the mod pack a player installs is
+ * made of, and what the reader that opens a jar to read its items has to fetch.
+ * An entry nailed to a version gets that version or nothing: a list that pins
+ * 1.9.0 and a reader that opens 1.10.1 would offer items the server does not
+ * have.
+ *
+ * Null for anything that cannot be resolved to one downloadable file on their own
+ * CDN with a hash to name it by, which is the same answer as "this entry adds
+ * nothing we can read".
  */
 export async function buildFor(
     entry: string,
@@ -730,15 +762,18 @@ export async function buildFor(
             build.version_number.length > 0 &&
             (pin === null || build.version_number === pin) &&
             admitsBuild(release, build.version_type) &&
-            (!VERSION.test(wanted) || build.game_versions.includes(wanted))
+            (!isGameVersion(wanted) || build.game_versions.includes(wanted))
     );
     const file = admitted?.files.find((one) => one.primary) ?? admitted?.files[0];
-    if (!admitted || !file || !file.url || !file.filename) return null;
+    const sha1 = (file?.hashes?.sha1 ?? "").toLowerCase();
+    if (!admitted || !file || !isModrinthUrl(file.url) || !SHA1.test(sha1)) return null;
     return {
+        versionId: admitted.id,
         version: admitted.version_number,
         filename: file.filename,
         url: file.url,
-        sha1: file.hashes.sha1
+        sha1,
+        size: file.size
     };
 }
 

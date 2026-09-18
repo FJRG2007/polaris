@@ -29,6 +29,15 @@ export interface SearchableItem {
      * ones that draw, without either of them being a better answer to the query.
      */
     readonly rank?: number;
+    /**
+     * Where the entry came from, when the catalogue is more than one source.
+     *
+     * Minecraft's is vanilla plus whatever the server's mods add, and a tile is
+     * 40 pixels of texture: two mods' versions of the same thing are otherwise
+     * indistinguishable. Absent for an entry that came from the game itself,
+     * which is the ordinary case and needs no caption.
+     */
+    readonly from?: string;
 }
 
 /**
@@ -79,8 +88,15 @@ function fuzzyIndex<T extends SearchableItem>(items: readonly T[]): Fuse<T> {
  * which names one item exactly - dragging in every other diamond behind it, and
  * an operator who typed enough to be precise should be answered precisely.
  */
-export function searchCatalog<T extends SearchableItem>(items: readonly T[], query: string, limit: number): T[] {
-    const needle = query.trim().toLowerCase().replace(/[\s_]+/g, " ");
+export function searchCatalog<T extends SearchableItem>(
+    items: readonly T[],
+    query: string,
+    limit: number
+): T[] {
+    const needle = query
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_]+/g, " ");
     if (needle.length === 0) return items.slice(0, limit);
     const scored: { item: T; score: number }[] = [];
     for (const item of items) {
@@ -88,7 +104,14 @@ export function searchCatalog<T extends SearchableItem>(items: readonly T[], que
         const at = haystack.indexOf(needle);
         if (at === -1) continue;
         // Exact, then starts-with, then a word boundary, then anywhere.
-        const score = item.label.toLowerCase() === needle ? 0 : at === 0 ? 1 : haystack[at - 1] === " " ? 2 : 3;
+        const score =
+            item.label.toLowerCase() === needle
+                ? 0
+                : at === 0
+                  ? 1
+                  : haystack[at - 1] === " "
+                    ? 2
+                    : 3;
         scored.push({ item, score });
     }
     scored.sort(

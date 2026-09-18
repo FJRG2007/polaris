@@ -468,6 +468,7 @@ export function InventoryEditor({
                     The two buttons under it are for when they do not care. */}
                 <div className={cn("min-h-0 flex-1", pending && "pointer-events-none opacity-60")}>
                     <ItemPicker
+                        installedAppId={installedAppId}
                         value={picked}
                         query={query}
                         recent={recent}

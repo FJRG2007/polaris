@@ -4,54 +4,28 @@
  * The item picker, holding Minecraft's half of it: where the catalogue is, what
  * draws a picture, and that a written-out id is worth offering.
  *
- * Typing has to keep working here and the grid alone is not enough: the icon set
- * is one Minecraft version's, and a modded or newer id belongs to no picture in
- * it. So a query that is itself a valid id is offered as one, and the field stays
- * the source of truth.
+ * Two catalogues rather than one. The vanilla set is a static file, the same on
+ * every server, and it is what the grid draws the instant it opens. What the
+ * server's own mods add is a question only that server can answer - it means
+ * reading the jars on its mod list - so it arrives second and is appended, which
+ * is why the picker never waits on it.
+ *
+ * Typing still works and still matters: a server can carry a mod installed from a
+ * file rather than from Modrinth, and nothing here will have read that one.
  */
 
+import { useMemo } from "react";
 import { ItemIcon } from "./minecraft-item-icon";
+import { loadModItems, loadVanillaItems } from "./minecraft-mod-items";
 import { GameItemPicker, type ItemPickerSource } from "./game-item-picker";
-import {
-    ITEM_CATALOG_URL,
-    itemLabel,
-    readItemCatalog,
-    searchItems,
-    typedItemId,
-    type CatalogItem
-} from "@/lib/apps/minecraft/items";
+import { itemLabel, searchItems, typedItemId, type CatalogItem } from "@/lib/apps/minecraft/items";
 
-/** The manifest never changes between deploys, so it is fetched once per tab and
- *  every later picker opens against what is already in memory. */
-let catalog: Promise<CatalogItem[]> | null = null;
-
-function loadCatalog(): Promise<CatalogItem[]> {
-    catalog ??= fetch(ITEM_CATALOG_URL)
-        .then((response) => {
-            if (!response.ok) throw new Error(`The item list answered ${response.status}`);
-            return response.json();
-        })
-        .then(readItemCatalog)
-        .catch((caught: unknown) => {
-            // Not cached as a failure: the picker degrades to a typed id, and the
-            // next open should be allowed to try again rather than inherit this.
-            catalog = null;
-            throw caught;
-        });
-    return catalog;
-}
-
-const source: ItemPickerSource<CatalogItem> = {
-    load: loadCatalog,
-    search: searchItems,
-    Icon: ItemIcon,
-    labelOf: itemLabel,
-    typedId: typedItemId,
-    placeholder: "Search items, or write minecraft:diamond",
-    whenMissing: "The item pictures did not load, so type the id - it looks like minecraft:diamond."
-};
-
-export function ItemPicker(props: {
+export function ItemPicker({
+    installedAppId,
+    ...props
+}: {
+    /** Which server, because what a mod adds is that server's own answer. */
+    installedAppId: string;
     value: string | null;
     query: string;
     onQueryChange: (query: string) => void;
@@ -59,5 +33,22 @@ export function ItemPicker(props: {
     onDragItem?: (id: string | null) => void;
     recent?: readonly string[];
 }) {
+    // Per server, and stable across renders: the grid reloads whenever this
+    // changes identity, and the modded half of it is a request.
+    const source = useMemo<ItemPickerSource<CatalogItem>>(
+        () => ({
+            load: loadVanillaItems,
+            more: () => loadModItems(installedAppId),
+            search: searchItems,
+            Icon: ItemIcon,
+            labelOf: itemLabel,
+            typedId: typedItemId,
+            placeholder: "Search items, or write minecraft:diamond",
+            whenMissing:
+                "The item pictures did not load, so type the id - it looks like minecraft:diamond."
+        }),
+        [installedAppId]
+    );
+
     return <GameItemPicker<CatalogItem> source={source} {...props} />;
 }
