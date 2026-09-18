@@ -15,10 +15,10 @@ dashboard loads no asset from a CDN.
 
 ## How they reach the app
 
-`apps/web/scripts/copy-mcicons-assets.mjs` stages this folder into
-`apps/web/public/mcicons` and writes `items.json` (the ids, for the item picker).
-It runs from the web app's `predev` and `prebuild` hooks, so a local install picks
-the icons up with everything else. The staged copy is not committed.
+`apps/game-servers/scripts/stage-assets.mjs` stages this folder into the Game
+servers bundle and writes `items.json` (the ids, for the item picker); a server
+that installed Game servers serves them from there. The staged copy is not
+committed.
 
 ## Refreshing them
 

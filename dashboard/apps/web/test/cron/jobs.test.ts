@@ -24,7 +24,17 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { SCHEDULED_JOBS } = await import("../../src/lib/cron/jobs");
+const { SCHEDULED_JOBS: CORE_JOBS } = await import("../../src/lib/cron/jobs");
+const { placesExtension } = await import("@polaris-app/places/src/lib/places-extension");
+const { gameServersExtension } = await import("@polaris-app/game-servers/src/lib/games-extension");
+
+/** Polaris' own jobs and the installed apps', as the schedule runs them with both
+ *  apps installed. The apps' come from their packages, as their bundles would. */
+const SCHEDULED_JOBS = [
+    ...CORE_JOBS,
+    ...(placesExtension.jobs?.() ?? []),
+    ...(gameServersExtension.jobs?.() ?? [])
+];
 
 describe("the work Polaris runs on a schedule", () => {
     it("loads at all, with every service behind it", () => {

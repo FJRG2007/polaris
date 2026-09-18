@@ -168,8 +168,14 @@ export async function installApp(
         // An app the switcher only draws once it exists has to appear on the next
         // screen, not at the end of a cache window.
         invalidateInstallPresence(app.id);
-        // Its code, when it comes as a bundle.
-        await (await import("@/lib/app-bundles/lifecycle")).appInstalled(app.id);
+        // Its code. An install that could not bring it is undone, and says why.
+        try {
+            await (await import("@/lib/app-bundles/lifecycle")).appInstalled(app.id);
+        } catch (error) {
+            await prisma.installedApp.delete({ where: { id: record.id } });
+            invalidateInstallPresence(app.id);
+            throw error;
+        }
         // The helper containers an earlier uninstall brought down, with their
         // settings and data, come back with the app.
         await resumeOwnedServices(app.id, actorId).catch(() => undefined);

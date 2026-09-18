@@ -7,7 +7,13 @@
     "polaris": {
         "id": "game-servers",
         "extension": "src/lib/games-extension.ts#gameServersExtension",
-        "slot": "src/screens/extension-slot.tsx#GameServersSlot"
+        "slot": "src/screens/extension-slot.tsx#GameServersSlot",
+        "prepare": "scripts/stage-assets.mjs",
+        "assets": {
+            "mcicons": ".assets/mcicons",
+            "arkicons": ".assets/arkicons",
+            "minecraft-mods": ".assets/minecraft-mods"
+        }
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",

@@ -6,8 +6,8 @@
  * one into the other - the canonical id, the words for it, and the picture -
  * rather than each screen doing its own `replace(/^minecraft:/, "")`.
  *
- * The pictures are the vendored McIcons set (resources/mcicons), staged into
- * public/mcicons at build time and named after the id. That naming is the whole
+ * The pictures are the vendored McIcons set (resources/mcicons), shipped in this
+ * app's bundle (scripts/stage-assets.mjs) and named after the id. That naming is the whole
  * lookup: there is no table to keep in step, and an id the set does not cover
  * resolves to a URL that 404s, which the slot renders as a placeholder.
  */
@@ -21,7 +21,7 @@ import { searchCatalog, type SearchableItem } from "@polaris/core/catalog-search
 export const ITEM_ID_PATTERN = /^(?:[a-z0-9_.-]+:)?[a-z0-9_.-]{1,64}$/;
 
 /** Where the staged icon set is served from. */
-const ICON_BASE = "/mcicons";
+const ICON_BASE = "/api/app-bundles/game-servers/current/assets/mcicons";
 
 /** The namespace the icon set covers, and the one an unqualified id belongs to. */
 const VANILLA = "minecraft";

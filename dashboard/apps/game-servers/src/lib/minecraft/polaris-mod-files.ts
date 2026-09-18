@@ -1,21 +1,23 @@
 /**
- * The login mod's builds as this dashboard image carries them.
+ * The login mod's builds as this app's bundle carries them.
  *
- * The image puts each jar in one folder, beside a `.version` file holding the
- * version that jar reports when a server checks in. That version carries a
- * fingerprint of the mod's source, so it changes whenever the jar does - which is
- * what lets the panel tell a server still running an older build from one that
- * is current, without anybody remembering to raise a number.
+ * The image build puts each jar in the bundle's `assets/minecraft-mods`, beside
+ * a `.version` file holding the version that jar reports when a server checks in.
+ * That version carries a fingerprint of the mod's source, so it changes whenever
+ * the jar does - which is what lets the panel tell a server still running an
+ * older build from one that is current, without anybody remembering to raise a
+ * number.
  */
 
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { MOD_FILES } from "./polaris-login";
 
-/** Where the image puts the builds. Overridable for a development checkout that
- *  built them somewhere else. */
+/** Where the bundle carries the builds: beside its server half, which is where
+ *  `__dirname` points when the dashboard loads it. Overridable for a development
+ *  checkout that built them somewhere else. */
 export function modDir(): string {
-    return process.env.POLARIS_MINECRAFT_MODS_DIR || "/app/minecraft-mods";
+    return process.env.POLARIS_MINECRAFT_MODS_DIR || path.join(__dirname, "..", "assets", "minecraft-mods");
 }
 
 /** Where one build lives, or null for a name that is not one. */

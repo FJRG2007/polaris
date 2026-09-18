@@ -17,9 +17,7 @@ const nextConfig = {
     transpilePackages: [
         "@polaris/ui",
         "@polaris/file-parse",
-        "@polaris/app-host",
-        "@polaris-app/places",
-        "@polaris-app/game-servers"
+        "@polaris/app-host"
     ],
     serverExternalPackages: [
         "@prisma/client",

@@ -96,7 +96,7 @@ describe("searchArkItems", () => {
 
 describe("arkItemIconUrl", () => {
     it("names the picture after the class", () => {
-        expect(arkItemIconUrl("PrimalItemResource_Wood")).toBe("/arkicons/PrimalItemResource_Wood.webp");
+        expect(arkItemIconUrl("PrimalItemResource_Wood")).toBe("/api/app-bundles/game-servers/current/assets/arkicons/PrimalItemResource_Wood.webp");
     });
 
     it("refuses to build a URL out of anything else", () => {

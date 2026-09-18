@@ -36,8 +36,8 @@ export const ARK_ITEM_KEY = /^[A-Za-z0-9_]{1,80}$/;
 export const ARK_BLUEPRINT_PATH = /^\/Game\/[A-Za-z0-9_./-]{3,200}$/;
 
 /** Where the staged pictures and the browser's copy of the catalogue are served
- *  from. Written by `copy-arkicons-assets.mjs` at build time. */
-const ICON_BASE = "/arkicons";
+ *  from: this app's bundle, where `scripts/stage-assets.mjs` put them. */
+const ICON_BASE = "/api/app-bundles/game-servers/current/assets/arkicons";
 
 export const ARK_ITEM_CATALOG_URL = `${ICON_BASE}/items.json`;
 

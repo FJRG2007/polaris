@@ -20,10 +20,10 @@ from a CDN and no build step reaches the network.
 
 ## How they reach the app
 
-`apps/web/scripts/copy-arkicons-assets.mjs` stages `icons/` into
-`apps/web/public/arkicons` and writes `items.json` beside it - the catalogue minus
-the blueprint paths, which is what the item picker searches. It runs from the web
-app's `predev` and `prebuild` hooks. The staged copy is not committed.
+`apps/game-servers/scripts/stage-assets.mjs` stages `icons/` into the Game
+servers bundle and writes `items.json` beside it - the catalogue minus the
+blueprint paths, which is what the item picker searches. The staged copy is not
+committed.
 
 The paths stay on the server on purpose. A screen sends back an item's class and
 the give action looks the path up from the committed catalogue, so a browser cannot

@@ -164,9 +164,11 @@ load those into a core path that never uses them.
      `app-host-contract.test.ts` fails if a module a client component reaches
      imports the server host.
 
-3. **Bundles.** Built and loaded; the in-image copy is still compiled in and is
-   what answers unless a server is switched to bundles. How it was built, and
-   where it departs from the model above:
+3. **Bundles.** Done: an app's code is only on a server that installed it. The
+   dashboard image carries no app code, only the index of which bundle belongs to
+   its build (#210 shipped the bundle path beside the in-image copy; the copy was
+   removed once a live box had run on bundles). How it was built, and where it
+   departs from the model above:
 
    - **The bundler** is `packages/app-host/bundler/build.mjs` (esbuild). An app
      says what it is in its package.json under `polaris`: its catalog id, its
@@ -225,8 +227,15 @@ load those into a core path that never uses them.
    since nothing published them. Uninstalling unloads the app and deletes its
    folder; its data stays.
 
-   During this release a server serves apps from bundles only when
-   `/var/lib/polaris/apps/use-bundles` exists, and falls back to the in-image
-   copy for any app whose bundle is not loaded. Removing the in-image copy is
-   the next step, once a live box has run on bundles.
+   An installed app whose bundle cannot be had shows why on its own screen, with
+   a Try again button, and is retried in the background every five minutes; an
+   install that cannot bring its code is undone and says why. What an app ships
+   besides code travels in its bundle too: Game servers' item icons and the
+   login mod's jars (`apps/game-servers/scripts/stage-assets.mjs`, the
+   Dockerfile's `app-bundles-build` stage), served from
+   `/api/app-bundles/<app>/current/assets/...`.
+
+   An app's jobs are read on every scheduler tick (`scheduledJobs()`), since
+   they arrive with its code. `npm run dev:up` builds the bundles into
+   `dashboard/.app-bundles` for a local dashboard.
 5. **Places** went through the same phases with Game servers.

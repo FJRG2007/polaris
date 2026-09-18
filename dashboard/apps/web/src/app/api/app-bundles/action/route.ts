@@ -14,7 +14,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { getURLFromRedirectError } from "next/dist/client/components/redirect";
 import { loadedBundle } from "@/lib/app-bundles/loader";
-import { bundlesPreferred } from "@/lib/app-bundles/code";
 import { runAction } from "@/lib/app-bundles/action-context";
 import { fromWire, toWire } from "@/lib/app-bundles/wire";
 
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return refuse(400, "That request could not be read.");
     const { app, module, name } = parsed.data;
 
-    const bundle = bundlesPreferred() ? loadedBundle(app) : undefined;
+    const bundle = loadedBundle(app);
     const declared = bundle?.manifest.actions[module];
     const load = bundle?.server.actions[module];
     if (!bundle || !declared?.includes(name) || !load) {

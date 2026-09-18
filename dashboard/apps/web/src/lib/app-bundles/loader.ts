@@ -11,7 +11,7 @@
  * Server-only.
  */
 
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { compileFunction } from "node:vm";
 import { readFile } from "node:fs/promises";
 import { sharedPiece, sharedServerModules } from "./shared-server";
@@ -75,7 +75,7 @@ async function evaluate(id: string, dir: string): Promise<LoadedBundle> {
         filename
     });
     const module = { exports: {} as Record<string, unknown> };
-    run.call(module.exports, module.exports, require, module, filename, dir);
+    run.call(module.exports, module.exports, require, module, filename, dirname(filename));
     const server = module.exports as unknown as BundleServer;
     if (!server.extension || server.extension.id !== id || !server.routes || !server.actions) {
         throw new Error(`${id}'s bundle does not describe ${id}`);

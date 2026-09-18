@@ -32,9 +32,10 @@ import JSZip from "jszip";
 import * as esbuild from "esbuild";
 import { createHash } from "node:crypto";
 import { builtinModules } from "node:module";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 /** The libraries a bundle takes from the dashboard instead of carrying. */
 export const SHARED = /^(react|react-dom|next|zod|@polaris\/[a-z0-9-]+)(\/.*)?$/;
@@ -81,6 +82,7 @@ function readApp(dir) {
         extensionFile: resolve(dir, extensionFile),
         extensionExport,
         slot: app.slot ? app.slot.split("#") : null,
+        prepare: app.prepare ? resolve(dir, app.prepare) : null,
         assets: app.assets ?? {}
     };
 }
@@ -173,6 +175,8 @@ async function exportsOf(file) {
 /** Build one app. Writes `<out>/<id>/...` and `<out>/<id>.zip`, returns the manifest. */
 export async function buildAppBundle(dir, out, build = "") {
     const app = readApp(dir);
+    // What the app stages for its bundle besides code (its icons, say).
+    if (app.prepare) execFileSync(process.execPath, [app.prepare], { cwd: dir, stdio: "inherit" });
     const src = join(dir, "src");
     const routesDir = join(src, "routes");
     const files = walk(src);
@@ -260,6 +264,12 @@ export async function buildAppBundle(dir, out, build = "") {
     const assets = [];
     for (const [name, from] of Object.entries(app.assets)) {
         const source = resolve(dir, from);
+        // Something only the image build makes (the login mod's jars need a JDK)
+        // is absent from a bundle built anywhere else, and said so.
+        if (!existsSync(source)) {
+            process.stderr.write(`[app-bundles] ${app.id}: no ${name} at ${source}; built without it\n`);
+            continue;
+        }
         for (const file of statSync(source).isDirectory() ? walkAll(source) : [source]) {
             const to = posix(join("assets", name, relative(source, file)));
             mkdirSync(dirname(join(target, to)), { recursive: true });

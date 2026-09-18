@@ -163,7 +163,7 @@ function verify(bytes: Buffer, ref: BundleRef): void {
     const actual = createHash("sha256").update(bytes).digest("hex");
     if (actual !== hexOf(ref.digest)) {
         throw new BundleUnavailable(
-            "What was downloaded is not what this Polaris was built with, so it was not installed."
+            "What was downloaded is not what this Polaris was built with, so it was refused."
         );
     }
 }
