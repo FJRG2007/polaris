@@ -21,60 +21,12 @@ import { CopyButton } from "@polaris/ui";
 import { ProjectIcon } from "./minecraft-project-icon";
 import * as modrinth from "../../lib/minecraft/modrinth";
 import { updateClientModsAction } from "./minecraft-actions";
+import type { PackEntry } from "../../lib/minecraft/client-pack";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Input, Skeleton } from "@polaris/ui";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 
 const SEARCH_DEBOUNCE_MS = 400;
-
-/** One of the server's mods a player installs too. */
-interface ServerMod {
-    readonly slug: string;
-    readonly title: string;
-    readonly description: string;
-    readonly iconUrl: string | null;
-    /** The mods on the list that pulled it in, for a library nobody chose. */
-    readonly neededBy: readonly string[];
-}
-
-/**
- * The server's mods that go in a player's game too, with the libraries they need.
- *
- * The same answer the install command gives: everything on the list but the
- * server-only mods, plus the required libraries the server installs on its own -
- * a list that shows TrashSlot and not Balm is a list a player copies by hand and
- * then cannot start the game with.
- */
-export function serverMods(
-    projects: readonly modrinth.InstalledProject[],
-    requires: readonly modrinth.ModrinthRequirement[]
-): ServerMod[] {
-    const mods: ServerMod[] = projects
-        .filter((project) => !project.serverOnly)
-        .map(({ slug, title, description, iconUrl }) => ({
-            slug,
-            title,
-            description,
-            iconUrl,
-            neededBy: []
-        }));
-    const titleOf = new Map(mods.map((mod) => [mod.slug.toLowerCase(), mod.title]));
-    const libraries = new Map<string, ServerMod>();
-    for (const need of requires) {
-        const by = titleOf.get(need.slug.toLowerCase());
-        if (!by || need.onList || need.needsServerOnly) continue;
-        const key = need.needs.toLowerCase();
-        const known = libraries.get(key);
-        libraries.set(key, {
-            slug: need.needs,
-            title: need.needsTitle,
-            description: "",
-            iconUrl: null,
-            neededBy: known ? [...new Set([...known.neededBy, by])] : [by]
-        });
-    }
-    return [...mods, ...libraries.values()];
-}
 
 /** What each command is for, in the order somebody scans for their own machine. */
 const SYSTEMS = [
@@ -88,8 +40,7 @@ export function MinecraftClientMods({
     loader,
     version,
     entries,
-    serverProjects,
-    requires,
+    serverEntries,
     packCommands
 }: {
     installedAppId: string;
@@ -98,16 +49,14 @@ export function MinecraftClientMods({
      *  newest - in which case nothing can be filtered by release. */
     version: string;
     entries: readonly string[];
-    /** The server's list as the screen above read it, null until it answers - so
-     *  this one does not read it again. */
-    serverProjects: readonly modrinth.InstalledProject[] | null;
-    /** What those mods need, as the screen above read it. */
-    requires: readonly modrinth.ModrinthRequirement[];
+    /** The server's list as the screen above holds it. */
+    serverEntries: readonly string[];
     packCommands: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
 }) {
     const [list, setList] = useState<string[]>([...entries]);
     const [rows, setRows] = useState<modrinth.InstalledProject[] | null>(null);
     const [query, setQuery] = useState("");
+    const [pack, setPack] = useState<PackEntry[] | "unread" | null>(null);
     const [results, setResults] = useState<modrinth.ModrinthProject[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -168,6 +117,26 @@ export function MinecraftClientMods({
         [installedAppId, loader, query_]
     );
 
+    /** Everything the install command hands out for these two lists, read from
+     *  the same place the command reads it. */
+    const readPack = useCallback(
+        async (player: readonly string[], server: readonly string[], signal: AbortSignal) => {
+            if (!loader) return;
+            try {
+                const response = await fetch(
+                    `/api/apps/installed/${installedAppId}/minecraft/modrinth?${query_({ pack: "1", server: server.join(","), player: player.join(",") })}`,
+                    { cache: "no-store", signal }
+                );
+                if (!response.ok) throw new Error("unread");
+                const data = (await response.json()) as { pack?: PackEntry[] };
+                setPack(data.pack ?? []);
+            } catch {
+                if (!signal.aborted) setPack("unread");
+            }
+        },
+        [installedAppId, loader, query_]
+    );
+
     /**
      * The search, over what a player can install rather than what a server can run.
      *
@@ -206,6 +175,12 @@ export function MinecraftClientMods({
 
     useEffect(() => {
         const abort = new AbortController();
+        void readPack(list, serverEntries, abort.signal);
+        return () => abort.abort();
+    }, [list, serverEntries, readPack]);
+
+    useEffect(() => {
+        const abort = new AbortController();
         const timer = setTimeout(() => void browse(query, abort.signal), SEARCH_DEBOUNCE_MS);
         return () => {
             clearTimeout(timer);
@@ -221,7 +196,7 @@ export function MinecraftClientMods({
         });
     }
 
-    const fromServer = serverMods(serverProjects ?? [], requires);
+    const fromServer = Array.isArray(pack) ? pack.filter((mod) => mod.where === "server") : [];
 
     if (!loader || modrinth.isPluginLoader(loader)) return null;
 
@@ -253,8 +228,13 @@ export function MinecraftClientMods({
                             These run on both sides. Change them in the server&apos;s list above.
                         </p>
                     </div>
-                    {serverProjects === null ? (
+                    {pack === null ? (
                         <Skeleton className="h-12 w-full" />
+                    ) : pack === "unread" ? (
+                        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            Modrinth could not be reached, so this list is not shown. The command
+                            below still installs all of it.
+                        </p>
                     ) : fromServer.length === 0 ? (
                         <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
                             None of the server&apos;s mods run in the game.
@@ -263,7 +243,7 @@ export function MinecraftClientMods({
                         <ul className="flex flex-col gap-2">
                             {fromServer.map((project) => (
                                 <li
-                                    key={project.slug}
+                                    key={project.key}
                                     className="flex items-center gap-3 rounded-md border border-border p-2"
                                 >
                                     <ProjectIcon installedAppId={installedAppId} project={project} />
@@ -281,7 +261,7 @@ export function MinecraftClientMods({
                                         </p>
                                     </div>
                                     <a
-                                        href={`https://modrinth.com/project/${project.slug}`}
+                                        href={`https://modrinth.com/project/${encodeURIComponent(project.key)}`}
                                         target="_blank"
                                         rel="noreferrer noopener"
                                         className="text-muted-foreground hover:text-foreground"
@@ -421,7 +401,8 @@ export function MinecraftClientMods({
                         <div>
                             <h3 className="text-sm font-medium">Send this to the players</h3>
                             <p className="text-xs text-muted-foreground">
-                                One line installs the {fromServer.length + entries.length} mods for
+                                One line installs{" "}
+                                {Array.isArray(pack) ? `the ${pack.length} mods` : "the mods"} for
                                 this server into their game, and running it again is how they update: it
                                 replaces what changed and takes away what came off the lists.
                                 Anything else in their mods folder is left alone. The link needs no

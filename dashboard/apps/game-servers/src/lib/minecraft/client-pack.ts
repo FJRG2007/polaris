@@ -119,18 +119,15 @@ export async function resolvePack(input: {
 }): Promise<ClientPack> {
     const loader = loaderForType(input.software) ?? "";
     const version = /^[0-9][0-9.]*$/.test(input.version.trim()) ? input.version.trim() : "";
-    const server = parseProjectList(input.projects).map((entry) => ({
-        entry,
-        where: "server" as const
-    }));
-    const player = clientMods(input.config).map((entry) => ({ entry, where: "player" as const }));
     const mods: PackMod[] = [];
     const missing: string[] = [];
     if (!loader) return { server: input.name, loader, version, mods, missing };
-    // A file the image installs by path, not a project: nothing to resolve and
-    // nothing a player could download.
-    const listed = [...server, ...player].filter(({ entry }) => projectSlug(entry));
-    const asked = await withRequirements(await playerSide(listed, loader, version), loader, version);
+    const asked = await packEntries({
+        server: parseProjectList(input.projects),
+        player: clientMods(input.config),
+        loader,
+        version
+    });
     const builds = await walk(asked, ({ entry }) => buildFor(entry, loader, version || null));
     for (const [index, { entry, where }] of asked.entries()) {
         const build = builds[index] ?? null;
@@ -146,26 +143,82 @@ export async function resolvePack(input: {
     return { server: input.name, loader, version, mods, missing };
 }
 
-type PackEntry = { readonly entry: string; readonly where: PackMod["where"] };
+/** One project the pack installs, before it is resolved to a file. */
+export interface PackEntry {
+    /** As the list holds it, or the dependency with the release type it was
+     *  judged by. */
+    readonly entry: string;
+    readonly where: PackMod["where"];
+    /** The project as Modrinth names it, lowercased: what an id and a slug for the
+     *  same project have in common. */
+    readonly key: string;
+    readonly title: string;
+    readonly description: string;
+    readonly iconUrl: string | null;
+    /** The projects that pulled it in, by title, for a library nobody chose. */
+    readonly neededBy: readonly string[];
+}
 
 /**
- * The entries a player puts in their own game: all of them but the server-only.
+ * Every project a player installs, before any of it is resolved to a file.
+ *
+ * The one answer the install command and the mods screen both give, so the screen
+ * cannot show a list the command does not install.
+ */
+export async function packEntries(input: {
+    readonly server: readonly string[];
+    readonly player: readonly string[];
+    readonly loader: string;
+    readonly version: string;
+}): Promise<PackEntry[]> {
+    // A file the image installs by path, not a project: nothing to resolve and
+    // nothing a player could download.
+    const listed = [
+        ...input.server.map((entry) => ({ entry, where: "server" as const })),
+        ...input.player.map((entry) => ({ entry, where: "player" as const }))
+    ].filter(({ entry }) => projectSlug(entry));
+    return withRequirements(
+        await playerSide(listed, input.loader, input.version),
+        input.loader,
+        input.version
+    );
+}
+
+/**
+ * The entries a player puts in their own game: all of them but the server-only,
+ * once each.
  *
  * A server-only mod in a player's folder is at best a jar that does nothing and at
  * worst one that stops the game from starting. When Modrinth cannot be asked, the
  * list is kept whole - a spare jar is the cheaper mistake than a missing one.
  */
 async function playerSide(
-    listed: readonly PackEntry[],
+    listed: readonly { readonly entry: string; readonly where: PackMod["where"] }[],
     loader: string,
     version: string
 ): Promise<PackEntry[]> {
-    const sides = await readInstalledProjects(
+    const projects = await readInstalledProjects(
         listed.map(({ entry }) => entry),
         loader,
         version || null
     );
-    return listed.filter((_, index) => !sides[index]?.serverOnly);
+    const kept = new Map<string, PackEntry>();
+    for (const [index, { entry, where }] of listed.entries()) {
+        const project = projects[index];
+        if (project?.serverOnly) continue;
+        const key = (project?.slug ?? projectSlug(entry) ?? entry).toLowerCase();
+        if (kept.has(key)) continue;
+        kept.set(key, {
+            entry,
+            where,
+            key,
+            title: project?.title || key,
+            description: project?.description ?? "",
+            iconUrl: project?.iconUrl ?? null,
+            neededBy: []
+        });
+    }
+    return [...kept.values()];
 }
 
 /** How many layers of "needs" are followed. Libraries rarely need more than one;
@@ -179,7 +232,8 @@ const REQUIREMENT_DEPTH = 3;
  * TrashSlot and never Balm - and a player given only the list gets a game that
  * refuses to start over the missing library. The same declarations the mods
  * screen reads decide what is added here, so the two cannot disagree about what a
- * mod needs. A dependency takes the side of whatever needed it.
+ * mod needs. A dependency takes the side of whatever needed it, and the release
+ * type its availability was judged by.
  */
 async function withRequirements(
     entries: readonly PackEntry[],
@@ -187,26 +241,35 @@ async function withRequirements(
     version: string
 ): Promise<PackEntry[]> {
     const all = [...entries];
-    const seen = new Set(all.map(({ entry }) => (projectSlug(entry) ?? entry).toLowerCase()));
+    const seen = new Set(all.map(({ key }) => key));
     let layer = all;
     for (let depth = 0; depth < REQUIREMENT_DEPTH && layer.length > 0; depth++) {
-        const whereOf = new Map(
-            layer.map(({ entry, where }) => [(projectSlug(entry) ?? entry).toLowerCase(), where])
-        );
+        const byKey = new Map(layer.map((one) => [one.key, one]));
         const needs = await readRequirements(
             layer.map(({ entry }) => entry),
             loader,
             version || null
         );
-        const next: PackEntry[] = [];
+        const next = new Map<string, PackEntry>();
         for (const need of needs) {
-            const slug = need.needs.toLowerCase();
-            if (need.needsServerOnly || seen.has(slug)) continue;
-            seen.add(slug);
-            next.push({ entry: need.needs, where: whereOf.get(need.slug.toLowerCase()) ?? "server" });
+            const key = need.needs.toLowerCase();
+            if (need.needsServerOnly || need.onList || seen.has(key)) continue;
+            const by = byKey.get(need.slug.toLowerCase());
+            const known = next.get(key);
+            next.set(key, {
+                entry: need.release === "release" ? need.needs : `${need.needs}:${need.release}`,
+                key,
+                title: need.needsTitle || need.needs,
+                description: "",
+                iconUrl: null,
+                ...known,
+                where: known?.where === "server" || !by ? "server" : by.where,
+                neededBy: [...new Set([...(known?.neededBy ?? []), ...(by ? [by.title] : [])])]
+            });
         }
-        all.push(...next);
-        layer = next;
+        for (const key of next.keys()) seen.add(key);
+        layer = [...next.values()];
+        all.push(...layer);
     }
     return all;
 }

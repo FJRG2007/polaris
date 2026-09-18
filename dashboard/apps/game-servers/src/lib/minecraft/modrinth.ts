@@ -308,6 +308,7 @@ export async function readInstalledProjects(
     const slugs = entries.map((entry) => ({ entry, slug: projectSlug(entry) }));
     const askable = slugs.flatMap((item) => (item.slug ? [item.slug] : []));
     const found = new Map<string, z.infer<typeof projectSchema>>();
+    const byId = new Map<string, z.infer<typeof projectSchema>>();
     if (askable.length > 0) {
         const parsed = projectsSchema.safeParse(
             await modrinthJson(
@@ -315,12 +316,15 @@ export async function readInstalledProjects(
             ).catch(() => null)
         );
         if (parsed.success)
-            for (const project of parsed.data) found.set(project.slug.toLowerCase(), project);
+            for (const project of parsed.data) {
+                found.set(project.slug.toLowerCase(), project);
+                if (project.id) byId.set(project.id, project);
+            }
     }
 
     const pinned = (version ?? "").trim();
     return slugs.map(({ entry, slug }) => {
-        const project = slug ? found.get(slug.toLowerCase()) : undefined;
+        const project = slug ? (found.get(slug.toLowerCase()) ?? byId.get(slug)) : undefined;
         if (!project) {
             return {
                 entry,
@@ -840,6 +844,9 @@ export interface ModrinthRequirement {
     /** Whether that dependency only runs on the server, so the players' install
      *  leaves it out like any other server-only mod. */
     readonly needsServerOnly: boolean;
+    /** The release type `available` was judged by: the one the entry that needs
+     *  it asks for. */
+    readonly release: ReleaseType;
 }
 
 /**
@@ -886,7 +893,10 @@ export async function readRequirements(
     const needed: { by: string; id: string; release: ReleaseType }[] = [];
     const releases = await walk(listed.data, (project) => projectVersions(project.slug, loader));
     for (const [index, project] of listed.data.entries()) {
-        const entry = entryFor.get(project.slug.toLowerCase()) ?? project.slug;
+        const entry =
+            entryFor.get(project.slug.toLowerCase()) ??
+            entryFor.get(project.id.toLowerCase()) ??
+            project.slug;
         const versions = versionSchema.safeParse(releases[index]);
         if (!versions.success) continue;
         // The newest release only, for the reason `readConflicts` gives: what a
@@ -940,7 +950,8 @@ export async function readRequirements(
             needsTitle: dependency.title || dependency.slug,
             available: buildable.get(dependency.slug) ?? false,
             onList: onList.has(dependency.slug.toLowerCase()),
-            needsServerOnly: dependency.client_side === "unsupported"
+            needsServerOnly: dependency.client_side === "unsupported",
+            release: judged.get(dependency.slug) ?? "release"
         });
     }
     return found;

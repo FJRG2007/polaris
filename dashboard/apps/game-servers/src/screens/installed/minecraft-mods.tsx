@@ -359,8 +359,7 @@ export function MinecraftMods({
                 loader={loader}
                 version={version}
                 entries={clientMods}
-                serverProjects={onList}
-                requires={requires}
+                serverEntries={projects}
                 packCommands={packCommands}
             />
 
