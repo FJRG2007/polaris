@@ -21,7 +21,11 @@ export default async function AlertsPage() {
                     title="Alerts"
                     description="What is worth interrupting somebody for. Each one arrives as a message in a conversation with the people it names."
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <AlertsView canManage={canManage} />
         </div>

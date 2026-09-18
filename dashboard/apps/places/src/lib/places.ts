@@ -20,12 +20,7 @@ import { PLACE_KINDS, type PlaceView } from "./place-kinds";
 
 // Re-exported so server code has one import for "places"; the browser reaches
 // for the pure module directly.
-export {
-    PLACE_KINDS,
-    PLACE_KIND_LABELS,
-    type PlaceKind,
-    type PlaceView
-} from "./place-kinds";
+export { PLACE_KINDS, PLACE_KIND_LABELS, type PlaceKind, type PlaceView } from "./place-kinds";
 
 /** What the first place is called when Polaris has to invent one. */
 const FIRST_PLACE = "Home";

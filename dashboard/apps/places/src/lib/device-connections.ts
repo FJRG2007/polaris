@@ -280,7 +280,10 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 label: "Data centre",
                 hint: "The one the project was created in. Devices exist in that one only, so anywhere else answers as though the account were empty.",
                 defaultValue: "eu",
-                choices: TUYA_REGIONS.map((region) => ({ value: region.value, label: region.label }))
+                choices: TUYA_REGIONS.map((region) => ({
+                    value: region.value,
+                    label: region.label
+                }))
             }
         ],
         kinds: ["switch", "outlet", "light"],
@@ -315,12 +318,16 @@ export interface DeviceBrand {
 
 /** The brands, in the order their first connection appears. */
 export function deviceBrands(): readonly DeviceBrand[] {
-    const brands = new Map<string, { brand: string; logo: string; count: number; kinds: DeviceKind[] }>();
+    const brands = new Map<
+        string,
+        { brand: string; logo: string; count: number; kinds: DeviceKind[] }
+    >();
     for (const connection of DEVICE_CONNECTIONS) {
         const held = brands.get(connection.brand);
         if (held) {
             held.count += 1;
-            for (const kind of connection.kinds) if (!held.kinds.includes(kind)) held.kinds.push(kind);
+            for (const kind of connection.kinds)
+                if (!held.kinds.includes(kind)) held.kinds.push(kind);
             continue;
         }
         brands.set(connection.brand, {

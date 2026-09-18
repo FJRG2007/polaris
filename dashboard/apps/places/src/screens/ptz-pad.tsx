@@ -18,7 +18,12 @@ import type { PtzDirection } from "../lib/ptz";
 import { useCallback, useEffect, useRef } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus } from "lucide-react";
 
-const ARROWS: { direction: PtzDirection; label: string; icon: typeof ArrowUp; className: string }[] = [
+const ARROWS: {
+    direction: PtzDirection;
+    label: string;
+    icon: typeof ArrowUp;
+    className: string;
+}[] = [
     { direction: "up", label: "Up", icon: ArrowUp, className: "col-start-2 row-start-1" },
     { direction: "left", label: "Left", icon: ArrowLeft, className: "col-start-1 row-start-2" },
     { direction: "right", label: "Right", icon: ArrowRight, className: "col-start-3 row-start-2" },

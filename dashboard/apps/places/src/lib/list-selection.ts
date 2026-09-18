@@ -62,8 +62,10 @@ export function afterClick(
 ): SelectionState {
     const key = keys[index];
     if (!key) return { selected: new Set(current), anchor };
-    if (modifiers.shiftKey) return { selected: rangeBetween(keys, anchor ?? index, index), anchor: anchor ?? index };
-    if (modifiers.ctrlKey || modifiers.metaKey) return { selected: toggled(current, key), anchor: index };
+    if (modifiers.shiftKey)
+        return { selected: rangeBetween(keys, anchor ?? index, index), anchor: anchor ?? index };
+    if (modifiers.ctrlKey || modifiers.metaKey)
+        return { selected: toggled(current, key), anchor: index };
     return { selected: new Set([key]), anchor: index };
 }
 
@@ -85,7 +87,12 @@ export function afterMove(
     if (keys.length === 0) return { selected: new Set(current), anchor, cursor: 0 };
     const start = cursor ?? anchor ?? -1;
     const next = start < 0 ? (delta > 0 ? 0 : keys.length - 1) : clamp(start + delta, keys.length);
-    if (extend) return { selected: rangeBetween(keys, anchor ?? next, next), anchor: anchor ?? next, cursor: next };
+    if (extend)
+        return {
+            selected: rangeBetween(keys, anchor ?? next, next),
+            anchor: anchor ?? next,
+            cursor: next
+        };
     const key = keys[next];
     return { selected: key ? new Set([key]) : new Set(), anchor: next, cursor: next };
 }
@@ -99,7 +106,11 @@ export function afterMove(
  * the near end, then clamp" is three chances to get the empty list or the first
  * press wrong.
  */
-export function focusAfterMove(keys: readonly string[], focused: string | null, delta: number): string | null {
+export function focusAfterMove(
+    keys: readonly string[],
+    focused: string | null,
+    delta: number
+): string | null {
     if (keys.length === 0) return null;
     const index = focused === null ? -1 : keys.indexOf(focused);
     const next = index < 0 ? (delta > 0 ? 0 : keys.length - 1) : clamp(index + delta, keys.length);

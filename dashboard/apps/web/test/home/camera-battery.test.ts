@@ -43,11 +43,9 @@ describe("a battery Tapo, as the relay is told about it", () => {
     });
 
     it("never falls back to RTSP, whatever paths were left on the row", () => {
-        const source = relaySource(
-            { ...c410, mainPath: "/stream1", subPath: "/stream2" },
-            "main",
-            { password: "hunter2" }
-        );
+        const source = relaySource({ ...c410, mainPath: "/stream1", subPath: "/stream2" }, "main", {
+            password: "hunter2"
+        });
         expect(source.startsWith("tapo://")).toBe(true);
     });
 

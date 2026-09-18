@@ -85,7 +85,12 @@ function startReaper(): void {
     reaper.unref?.();
 }
 
-async function open(hostId: string, ownerId: string, remoteHost: string, remotePort: number): Promise<Tunnel> {
+async function open(
+    hostId: string,
+    ownerId: string,
+    remoteHost: string,
+    remotePort: number
+): Promise<Tunnel> {
     const connection = await getHostConnection(hostId, ownerId);
     const client = await openSshClient({
         host: connection.address,

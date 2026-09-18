@@ -21,7 +21,11 @@ export default async function ClipsPage() {
                     title="Clips"
                     description="Recordings, newest first. Anything you keep survives the retention window."
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <ClipsView canManage={canManage} />
         </div>

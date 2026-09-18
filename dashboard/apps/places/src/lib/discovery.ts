@@ -214,7 +214,11 @@ export function hostsInCidr(cidr: string): string[] {
     const bits = Number.parseInt(bitsText ?? "", 10);
     if (!base || !Number.isFinite(bits) || bits < 22 || bits > 32) return [];
     const octets = base.split(".").map((part) => Number.parseInt(part, 10));
-    if (octets.length !== 4 || octets.some((octet) => !Number.isFinite(octet) || octet < 0 || octet > 255)) return [];
+    if (
+        octets.length !== 4 ||
+        octets.some((octet) => !Number.isFinite(octet) || octet < 0 || octet > 255)
+    )
+        return [];
     const start = ((octets[0]! << 24) | (octets[1]! << 16) | (octets[2]! << 8) | octets[3]!) >>> 0;
     const size = 2 ** (32 - bits);
     const network = start & (size === 2 ** 32 ? 0 : ~(size - 1) >>> 0);
@@ -222,7 +226,9 @@ export function hostsInCidr(cidr: string): string[] {
     // Network and broadcast addresses are not hosts, so a /24 sweeps .1 to .254.
     for (let offset = 1; offset < size - 1; offset += 1) {
         const value = (network + offset) >>> 0;
-        addresses.push([value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join("."));
+        addresses.push(
+            [value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join(".")
+        );
     }
     return addresses;
 }
@@ -278,7 +284,11 @@ export async function sweepSubnet(cidr: string): Promise<DiscoveredCamera[]> {
  * with a timeout in it, every server has bash, and nothing is left behind on the
  * machine afterwards.
  */
-export async function sweepFromServer(hostId: string, ownerId: string, cidr: string): Promise<DiscoveredCamera[]> {
+export async function sweepFromServer(
+    hostId: string,
+    ownerId: string,
+    cidr: string
+): Promise<DiscoveredCamera[]> {
     const hosts = hostsInCidr(cidr);
     if (hosts.length === 0) return [];
     const { getHostConnection } = host.hostService;
@@ -307,7 +317,9 @@ export async function sweepFromServer(hostId: string, ownerId: string, cidr: str
     });
     try {
         let output = "";
-        await execCommand(client, command, { onStdout: (chunk) => (output += chunk.toString("utf8")) });
+        await execCommand(client, command, {
+            onStdout: (chunk) => (output += chunk.toString("utf8"))
+        });
         // One line per open door, so an address that answered both arrives
         // twice. Merged by address, because a camera is one entry however many
         // ports it has.
@@ -353,5 +365,7 @@ export async function discoverCameras(
     const merged = new Map<string, DiscoveredCamera>();
     for (const camera of swept) merged.set(camera.address, camera);
     for (const camera of probed) merged.set(camera.address, camera);
-    return [...merged.values()].sort((left, right) => left.address.localeCompare(right.address, undefined, { numeric: true }));
+    return [...merged.values()].sort((left, right) =>
+        left.address.localeCompare(right.address, undefined, { numeric: true })
+    );
 }

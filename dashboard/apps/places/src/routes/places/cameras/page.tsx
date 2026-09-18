@@ -30,7 +30,11 @@ export default async function CamerasPage({
                     title="Cameras"
                     description="What each camera is, how Polaris reaches it, and what it is allowed to notice."
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <CamerasView canManage={canManage} openId={open ?? null} />
         </div>

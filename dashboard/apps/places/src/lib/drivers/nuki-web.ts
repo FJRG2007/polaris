@@ -126,7 +126,8 @@ const LOG_FAILURES: Readonly<Record<number, string>> = {
 /** One entry of their log, as a row of ours. */
 export function translateLog(entry: nuki.NukiLog): DeviceHistoryEntry {
     const at = new Date(entry.date);
-    const failure = entry.state === 0 ? null : (LOG_FAILURES[entry.state] ?? "the lock reported an error");
+    const failure =
+        entry.state === 0 ? null : (LOG_FAILURES[entry.state] ?? "the lock reported an error");
     return {
         externalId: entry.id,
         deviceExternalId: entry.smartlockId === undefined ? "" : String(entry.smartlockId),
@@ -215,7 +216,9 @@ export const nukiWebDriver: DeviceDriver = {
         // worth showing, so a refusal here is not allowed to fail the read that
         // follows it.
         await Promise.all(
-            externalIds.map((externalId) => nuki.syncSmartlock(key, externalId).catch(() => undefined))
+            externalIds.map((externalId) =>
+                nuki.syncSmartlock(key, externalId).catch(() => undefined)
+            )
         );
         // Their server answers the request before the lock has answered it. The
         // pause is the difference between reading the state somebody just asked

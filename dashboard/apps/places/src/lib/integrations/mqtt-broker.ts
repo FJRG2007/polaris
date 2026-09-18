@@ -182,7 +182,9 @@ export async function publish(
                 },
                 (error) => {
                     if (error) {
-                        reject(new BrokerError("The broker would not take that command.", "refused"));
+                        reject(
+                            new BrokerError("The broker would not take that command.", "refused")
+                        );
                         return;
                     }
                     resolve();

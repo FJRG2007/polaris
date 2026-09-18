@@ -74,15 +74,17 @@ export function DiscoverDialog({
                 <DialogHeader>
                     <DialogTitle>Look for cameras</DialogTitle>
                     <DialogDescription>
-                        Polaris asks the network first. Give it an address range as well if your cameras sit behind a
-                        repeater or an access point that blocks that.
+                        Polaris asks the network first. Give it an address range as well if your
+                        cameras sit behind a repeater or an access point that blocks that.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <div className="flex items-end gap-2">
                         <label className="flex flex-1 flex-col gap-1.5">
-                            <span className="text-[0.75rem] font-medium text-muted-foreground">Address range</span>
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                Address range
+                            </span>
                             <Input
                                 value={subnet}
                                 onChange={(event) => setSubnet(event.target.value)}
@@ -100,18 +102,24 @@ export function DiscoverDialog({
                     </div>
                     {servers.length > 0 ? (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[0.75rem] font-medium text-muted-foreground">Look from</span>
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                Look from
+                            </span>
                             <Select
                                 value={from}
                                 onValueChange={setFrom}
                                 options={[
                                     { value: "", label: "Polaris itself" },
-                                    ...servers.map((server) => ({ value: server.id, label: server.label }))
+                                    ...servers.map((server) => ({
+                                        value: server.id,
+                                        label: server.label
+                                    }))
                                 ]}
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                For a camera on a network Polaris cannot reach - another building, a guest network, the
-                                far side of a repeater. That machine does the looking.
+                                For a camera on a network Polaris cannot reach - another building, a
+                                guest network, the far side of a repeater. That machine does the
+                                looking.
                             </span>
                         </label>
                     ) : null}
@@ -122,26 +130,35 @@ export function DiscoverDialog({
                 {found !== null ? (
                     found.length === 0 ? (
                         <p className="mt-4 text-[0.8125rem] text-muted-foreground">
-                            Nothing answered. If the camera is on another network, add it by address and choose the
-                            server that can see it.
+                            Nothing answered. If the camera is on another network, add it by address
+                            and choose the server that can see it.
                         </p>
                     ) : (
                         <ul className="mt-4 flex flex-col divide-y divide-border rounded-lg border border-border">
                             {found.map((camera) => (
-                                <li key={camera.address} className="flex items-center justify-between gap-3 px-3 py-2">
+                                <li
+                                    key={camera.address}
+                                    className="flex items-center justify-between gap-3 px-3 py-2"
+                                >
                                     <div className="min-w-0">
                                         <p className="truncate text-[0.8125rem] text-foreground">
                                             {camera.name ?? camera.address}
                                         </p>
                                         <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {camera.name ? `${camera.address} - ` : ""}
-                                            {camera.via === "probe" ? "answered ONVIF" : "has a stream port open"}
+                                            {camera.via === "probe"
+                                                ? "answered ONVIF"
+                                                : "has a stream port open"}
                                         </p>
                                     </div>
                                     {known.has(camera.address) ? (
                                         <Badge variant="neutral">Added</Badge>
                                     ) : (
-                                        <Button size="sm" variant="secondary" onClick={() => onPick(camera)}>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => onPick(camera)}
+                                        >
                                             Add
                                         </Button>
                                     )}

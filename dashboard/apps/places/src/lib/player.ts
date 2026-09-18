@@ -21,7 +21,9 @@ export type Transport = "mp4" | "hls";
  *  markup is replaced on hydration before anything is fetched. */
 export function preferredTransport(): Transport {
     if (typeof document === "undefined") return "mp4";
-    return document.createElement("video").canPlayType("application/vnd.apple.mpegurl") ? "hls" : "mp4";
+    return document.createElement("video").canPlayType("application/vnd.apple.mpegurl")
+        ? "hls"
+        : "mp4";
 }
 
 /** The other one, for when the first did not start. */

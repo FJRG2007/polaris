@@ -24,7 +24,9 @@ import type { AppExtension } from "@/lib/app-extensions/types";
 import type { SessionUser } from "@/lib/session";
 
 /** A service that is loaded when it is first called, so it always answers later. */
-type Later<F> = F extends (...args: infer A) => infer R ? (...args: A) => Promise<Awaited<R>> : never;
+type Later<F> = F extends (...args: infer A) => infer R
+    ? (...args: A) => Promise<Awaited<R>>
+    : never;
 
 function later<M, K extends keyof M>(load: () => Promise<M>, name: K): Later<M[K]> {
     return (async (...args: unknown[]) => {
@@ -57,7 +59,7 @@ const load = {
     notificationsPreferences: once(() => import("@/lib/notifications/preferences")),
     session: once(() => import("@/lib/session")),
     settingStore: once(() => import("@/lib/setting-store")),
-    storageTarget: once(() => import("@/lib/storage-target")),
+    storageTarget: once(() => import("@/lib/storage-target"))
 };
 
 export const serverHost = {
@@ -66,74 +68,74 @@ export const serverHost = {
         grantedSubjects: later(load.accessGrants, "grantedSubjects"),
         liveGrants: later(load.accessGrants, "liveGrants"),
         reachesAnySubject: later(load.accessGrants, "reachesAnySubject"),
-        spendGrant: later(load.accessGrants, "spendGrant"),
+        spendGrant: later(load.accessGrants, "spendGrant")
     },
     apiSession: {
-        apiUser: later(load.apiSession, "apiUser"),
+        apiUser: later(load.apiSession, "apiUser")
     },
     appsCatalog: {
         catalogApps: appsCatalog.catalogApps,
-        findApp: appsCatalog.findApp,
+        findApp: appsCatalog.findApp
     },
     appsInstallPresence: {
-        isAppInstalled: later(load.appsInstallPresence, "isAppInstalled"),
+        isAppInstalled: later(load.appsInstallPresence, "isAppInstalled")
     },
     appsInstallSecret: {
         installEnvSecret: later(load.appsInstallSecret, "installEnvSecret"),
-        installEnvValue: later(load.appsInstallSecret, "installEnvValue"),
+        installEnvValue: later(load.appsInstallSecret, "installEnvValue")
     },
     appsInstallService: {
-        installApp: later(load.appsInstallService, "installApp"),
+        installApp: later(load.appsInstallService, "installApp")
     },
     auditService: {
-        recordAudit: later(load.auditService, "recordAudit"),
+        recordAudit: later(load.auditService, "recordAudit")
     },
     chatLive: {
-        publishChatChange: later(load.chatLive, "publishChatChange"),
+        publishChatChange: later(load.chatLive, "publishChatChange")
     },
     deployDial: {
-        localDialHost: later(load.deployDial, "localDialHost"),
+        localDialHost: later(load.deployDial, "localDialHost")
     },
     deployReleases: {
-        serviceRef: later(load.deployReleases, "serviceRef"),
+        serviceRef: later(load.deployReleases, "serviceRef")
     },
     deployService: {
         deployApplication: later(load.deployService, "deployApplication"),
         hostPortForApp: later(load.deployService, "hostPortForApp"),
-        setApplicationRunning: later(load.deployService, "setApplicationRunning"),
+        setApplicationRunning: later(load.deployService, "setApplicationRunning")
     },
     domainService: {
-        appBaseUrl: later(load.domainService, "appBaseUrl"),
+        appBaseUrl: later(load.domainService, "appBaseUrl")
     },
     footageStorage: {
-        footageTarget: later(load.footageStorage, "footageTarget"),
+        footageTarget: later(load.footageStorage, "footageTarget")
     },
     hostService: {
         getHostConnection: later(load.hostService, "getHostConnection"),
-        listHosts: later(load.hostService, "listHosts"),
+        listHosts: later(load.hostService, "listHosts")
     },
     notificationsDispatch: {
-        notify: later(load.notificationsDispatch, "notify"),
+        notify: later(load.notificationsDispatch, "notify")
     },
     notificationsPreferences: {
-        ruleFor: later(load.notificationsPreferences, "ruleFor"),
+        ruleFor: later(load.notificationsPreferences, "ruleFor")
     },
     session: {
         homePathForUser: later(load.session, "homePathForUser"),
         requirePermission: later(load.session, "requirePermission"),
         requireUser: later(load.session, "requireUser"),
         sessionCan: later(load.session, "sessionCan"),
-        sessionCanAny: later(load.session, "sessionCanAny"),
+        sessionCanAny: later(load.session, "sessionCanAny")
     },
     settingStore: {
         getSetting: later(load.settingStore, "getSetting"),
-        setSetting: later(load.settingStore, "setSetting"),
+        setSetting: later(load.settingStore, "setSetting")
     },
     storageTarget: {
         driverForTarget: later(load.storageTarget, "driverForTarget"),
         placeFile: later(load.storageTarget, "placeFile"),
         safeName: later(load.storageTarget, "safeName"),
-        storageTargetOptions: later(load.storageTarget, "storageTargetOptions"),
+        storageTargetOptions: later(load.storageTarget, "storageTargetOptions")
     }
 } satisfies Record<string, Record<string, (...args: never[]) => unknown>>;
 

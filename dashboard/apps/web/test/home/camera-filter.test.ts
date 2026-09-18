@@ -40,8 +40,7 @@ describe("the areas a house is using", () => {
 });
 
 describe("typing into the list", () => {
-    const names = (query: string) =>
-        filterCameras(CAMERAS, { query }).map((camera) => camera.name);
+    const names = (query: string) => filterCameras(CAMERAS, { query }).map((camera) => camera.name);
 
     it("finds a camera by its name, in any case", () => {
         expect(names("garage")).toEqual(["Garage"]);

@@ -17,7 +17,10 @@ const { sessionCan } = host.session;
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    _request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "home.read"))) return new Response("Forbidden", { status: 403 });

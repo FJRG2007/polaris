@@ -349,7 +349,9 @@ export function ZonesDialog({
 
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1">
-                            <p className="text-[0.75rem] font-medium text-muted-foreground">Areas</p>
+                            <p className="text-[0.75rem] font-medium text-muted-foreground">
+                                Areas
+                            </p>
                             {loading ? (
                                 <p className="text-[0.8125rem] text-foreground-subtle">
                                     Reading them...

@@ -21,7 +21,11 @@ export default async function PeoplePage() {
                     title="People"
                     description="Teach the cameras who lives here, so everybody else is the one worth reporting. The photographs stay on the machine running the recognizer."
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <PeopleView canManage={canManage} />
         </div>

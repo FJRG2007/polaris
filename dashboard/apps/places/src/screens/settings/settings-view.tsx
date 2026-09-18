@@ -163,7 +163,9 @@ export function HomeSettingsView({
     const setEnabled = async (next: boolean) => {
         setSwitching(true);
         setError(null);
-        setSettings((current) => (current ? { ...current, faceEnabled: next, faceRunning: next } : current));
+        setSettings((current) =>
+            current ? { ...current, faceEnabled: next, faceRunning: next } : current
+        );
         const result = await runAction(() => actions.setFaceEnabledAction(next), setError);
         setSwitching(false);
         if (result?.error) {
@@ -195,7 +197,10 @@ export function HomeSettingsView({
         setSavingDefaults(true);
         setSavedDefaults(false);
         setError(null);
-        const result = await runAction(() => actions.setDetectionDefaultsAction(defaults), setError);
+        const result = await runAction(
+            () => actions.setDetectionDefaultsAction(defaults),
+            setError
+        );
         setSavingDefaults(false);
         if (result?.error) {
             setError(result.error);
@@ -233,12 +238,15 @@ export function HomeSettingsView({
         <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-2">
                 <div>
-                    <h2 className="text-[0.8125rem] font-semibold text-foreground">Where footage goes</h2>
+                    <h2 className="text-[0.8125rem] font-semibold text-foreground">
+                        Where footage goes
+                    </h2>
                     <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                         Recordings and the pictures that go with events are written to{" "}
-                        <span className="text-foreground">{storage}</span>. That is set for the whole instance under
-                        Uploads, beside where photos and attachments go - one place for one decision. A camera that
-                        wants its own disk says so on its own settings.
+                        <span className="text-foreground">{storage}</span>. That is set for the
+                        whole instance under Uploads, beside where photos and attachments go - one
+                        place for one decision. A camera that wants its own disk says so on its own
+                        settings.
                     </p>
                 </div>
                 {canAdmin ? (
@@ -250,11 +258,14 @@ export function HomeSettingsView({
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-[0.8125rem] font-semibold text-foreground">How sensitive a new camera is</h2>
+                    <h2 className="text-[0.8125rem] font-semibold text-foreground">
+                        How sensitive a new camera is
+                    </h2>
                     <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
-                        Nobody guesses these right the first time, and they are not the same for a hallway and a garden
-                        facing a hedge. Set them once here, from the camera you have already tuned, and every camera
-                        added afterwards starts there. Each camera can still disagree.
+                        Nobody guesses these right the first time, and they are not the same for a
+                        hallway and a garden facing a hedge. Set them once here, from the camera you
+                        have already tuned, and every camera added afterwards starts there. Each
+                        camera can still disagree.
                     </p>
                 </div>
 
@@ -272,14 +283,18 @@ export function HomeSettingsView({
                                 max={100}
                                 value={defaults.sensitivity}
                                 onChange={(event) => {
-                                    setDefaults({ ...defaults, sensitivity: Number(event.target.value) });
+                                    setDefaults({
+                                        ...defaults,
+                                        sensitivity: Number(event.target.value)
+                                    });
                                     setSavedDefaults(false);
                                 }}
                                 className="w-64 accent-primary"
                                 aria-label="Sensitivity"
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                Higher notices smaller changes. Too high and every shadow is an event.
+                                Higher notices smaller changes. Too high and every shadow is an
+                                event.
                             </span>
                         </label>
 
@@ -290,7 +305,10 @@ export function HomeSettingsView({
                             <Input
                                 value={String(defaults.settleSeconds)}
                                 onChange={(event) => {
-                                    setDefaults({ ...defaults, settleSeconds: Number(event.target.value) || 0 });
+                                    setDefaults({
+                                        ...defaults,
+                                        settleSeconds: Number(event.target.value) || 0
+                                    });
                                     setSavedDefaults(false);
                                 }}
                                 className="w-24"
@@ -298,8 +316,9 @@ export function HomeSettingsView({
                                 aria-label="Settle seconds"
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                Seconds. This is the one that stops moths, gusts and passing lorries: nearly every
-                                false alarm is over within a second or two, and a person is not.
+                                Seconds. This is the one that stops moths, gusts and passing
+                                lorries: nearly every false alarm is over within a second or two,
+                                and a person is not.
                             </span>
                         </label>
 
@@ -310,7 +329,10 @@ export function HomeSettingsView({
                             <Input
                                 value={String(defaults.minGapSeconds)}
                                 onChange={(event) => {
-                                    setDefaults({ ...defaults, minGapSeconds: Number(event.target.value) || 1 });
+                                    setDefaults({
+                                        ...defaults,
+                                        minGapSeconds: Number(event.target.value) || 1
+                                    });
                                     setSavedDefaults(false);
                                 }}
                                 className="w-24"
@@ -318,13 +340,20 @@ export function HomeSettingsView({
                                 aria-label="Wait between detections"
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                Seconds. Somebody standing at a door is one thing that happened, not sixty.
+                                Seconds. Somebody standing at a door is one thing that happened, not
+                                sixty.
                             </span>
                         </label>
 
                         <div className="flex items-center gap-2">
-                            <Button variant="secondary" onClick={saveDefaults} disabled={savingDefaults}>
-                                {savingDefaults ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                            <Button
+                                variant="secondary"
+                                onClick={saveDefaults}
+                                disabled={savingDefaults}
+                            >
+                                {savingDefaults ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 Save
                             </Button>
                             {savedDefaults ? (
@@ -341,12 +370,15 @@ export function HomeSettingsView({
             <section className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h2 className="text-[0.8125rem] font-semibold text-foreground">Face recognition</h2>
+                        <h2 className="text-[0.8125rem] font-semibold text-foreground">
+                            Face recognition
+                        </h2>
                         <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
-                            Off unless you turn it on. It puts names to the people you have taught it under People,
-                            and only after a camera has already seen somebody - the pictures and what is learned from
-                            them stay on the machine it runs on. While it is on it holds its models in memory, so
-                            leave it off if you only want cameras to say that somebody is there.
+                            Off unless you turn it on. It puts names to the people you have taught
+                            it under People, and only after a camera has already seen somebody - the
+                            pictures and what is learned from them stay on the machine it runs on.
+                            While it is on it holds its models in memory, so leave it off if you
+                            only want cameras to say that somebody is there.
                         </p>
                     </div>
                     {settings === null ? (
@@ -376,8 +408,8 @@ export function HomeSettingsView({
                                 Off, but still running on {settings.installedOn ?? "this server"}.
                             </p>
                             <p className="text-[0.6875rem] text-foreground-subtle">
-                                Nothing is asking it anything. Stopping it gives back the memory it holds its models
-                                in; turning recognition back on starts it again.
+                                Nothing is asking it anything. Stopping it gives back the memory it
+                                holds its models in; turning recognition back on starts it again.
                             </p>
                             <Button
                                 variant="secondary"
@@ -386,13 +418,16 @@ export function HomeSettingsView({
                                 disabled={switching}
                                 onClick={() => void setEnabled(false)}
                             >
-                                {switching ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                                {switching ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 Stop it
                             </Button>
                         </div>
                     ) : (
                         <p className="text-[0.75rem] text-foreground-subtle">
-                            Cameras report that somebody is there, and never who. Nothing is running for it.
+                            Cameras report that somebody is there, and never who. Nothing is running
+                            for it.
                         </p>
                     )
                 ) : (
@@ -455,7 +490,8 @@ export function HomeSettingsView({
                                     {installing ? "Installing" : "Install it"}
                                 </Button>
                                 <span className="pb-2 text-[0.6875rem] text-foreground-subtle">
-                                    A few hundred megabytes, once. It runs on the processor - no graphics card needed.
+                                    A few hundred megabytes, once. It runs on the processor - no
+                                    graphics card needed.
                                 </span>
                             </div>
                         )}
@@ -464,46 +500,60 @@ export function HomeSettingsView({
                             wins: an address typed underneath a running install
                             would look saved and do nothing. */}
                         {settings.installedOn ? null : manual ? (
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-[0.75rem] font-medium text-muted-foreground">Address</span>
-                                <Input
-                                    value={url}
-                                    onChange={(event) => setUrl(event.target.value)}
-                                    className="w-72"
-                                    placeholder="http://192.168.1.20:8000"
-                                    aria-label="Recognizer address"
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-[0.75rem] font-medium text-muted-foreground">Key</span>
-                                {/* enigma:allow-no-breach-check - this is a key the
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                                <label className="flex flex-col gap-1.5">
+                                    <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                        Address
+                                    </span>
+                                    <Input
+                                        value={url}
+                                        onChange={(event) => setUrl(event.target.value)}
+                                        className="w-72"
+                                        placeholder="http://192.168.1.20:8000"
+                                        aria-label="Recognizer address"
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1.5">
+                                    <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                        Key
+                                    </span>
+                                    {/* enigma:allow-no-breach-check - this is a key the
                                     recognizer minted in its own interface, not a
                                     password anybody is choosing here.
                                     enigma:allow-identity-password - it belongs to a
                                     service, so there is no account identity for it
                                     to resemble. */}
-                                <Input
-                                    value={key}
-                                    onChange={(event) => setKey(event.target.value)}
-                                    className="w-72"
-                                    type="password"
-                                    autoComplete="off"
-                                    aria-label="Recognition key"
-                                    placeholder={settings.hasFaceKey ? "Stored. Type to replace it." : "Paste the key"}
-                                />
-                            </label>
-                            <Button variant="secondary" onClick={saveRecognizer} disabled={saving}>
-                                {saving ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                                Save
-                            </Button>
-                            {saved ? (
-                                <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
-                                    <CircleCheck className="size-3.5 shrink-0 text-success" />
-                                    Saved
-                                </span>
-                            ) : null}
-                        </div>
+                                    <Input
+                                        value={key}
+                                        onChange={(event) => setKey(event.target.value)}
+                                        className="w-72"
+                                        type="password"
+                                        autoComplete="off"
+                                        aria-label="Recognition key"
+                                        placeholder={
+                                            settings.hasFaceKey
+                                                ? "Stored. Type to replace it."
+                                                : "Paste the key"
+                                        }
+                                    />
+                                </label>
+                                <Button
+                                    variant="secondary"
+                                    onClick={saveRecognizer}
+                                    disabled={saving}
+                                >
+                                    {saving ? (
+                                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                                    ) : null}
+                                    Save
+                                </Button>
+                                {saved ? (
+                                    <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
+                                        <CircleCheck className="size-3.5 shrink-0 text-success" />
+                                        Saved
+                                    </span>
+                                ) : null}
+                            </div>
                         ) : (
                             <Button
                                 variant="ghost"
@@ -517,8 +567,8 @@ export function HomeSettingsView({
 
                         {!settings.recognizerReady ? (
                             <p className="text-[0.6875rem] text-foreground-subtle">
-                                Until there is one, cameras set to recognize faces still report that somebody is there -
-                                just not who.
+                                Until there is one, cameras set to recognize faces still report that
+                                somebody is there - just not who.
                             </p>
                         ) : null}
                     </>

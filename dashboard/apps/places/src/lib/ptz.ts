@@ -72,7 +72,11 @@ async function controlsFor(installedAppId: string, cameraId: string): Promise<Co
 }
 
 /** Start moving. Pair it with `stop`. */
-export async function move(installedAppId: string, cameraId: string, direction: PtzDirection): Promise<void> {
+export async function move(
+    installedAppId: string,
+    cameraId: string,
+    direction: PtzDirection
+): Promise<void> {
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) throw new HomeError("This camera does not move");
     await ptzMove(controls.endpoint, controls.profileToken, VECTORS[direction]);
@@ -89,13 +93,20 @@ export async function stop(installedAppId: string, cameraId: string): Promise<vo
 
 /** The positions already saved on the camera itself. Polaris keeps none of its
  *  own: the camera remembers them, and it is the thing that has to reach them. */
-export async function presets(installedAppId: string, cameraId: string): Promise<{ token: string; name: string }[]> {
+export async function presets(
+    installedAppId: string,
+    cameraId: string
+): Promise<{ token: string; name: string }[]> {
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) return [];
     return getPresets(controls.endpoint, controls.profileToken).catch(() => []);
 }
 
-export async function goTo(installedAppId: string, cameraId: string, preset: string): Promise<void> {
+export async function goTo(
+    installedAppId: string,
+    cameraId: string,
+    preset: string
+): Promise<void> {
     const controls = await controlsFor(installedAppId, cameraId);
     if (!controls) throw new HomeError("This camera does not move");
     await gotoPreset(controls.endpoint, controls.profileToken, preset);

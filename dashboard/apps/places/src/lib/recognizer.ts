@@ -118,7 +118,11 @@ async function writeSecrets(installedAppId: string, secrets: HomeSecrets): Promi
  * container is up long before its models are warm, and it says so on its own
  * health endpoint - this only wires the address.
  */
-export async function installRecognizer(ownerId: string, actorId: string, serverId: string): Promise<void> {
+export async function installRecognizer(
+    ownerId: string,
+    actorId: string,
+    serverId: string
+): Promise<void> {
     const home = await homeInstall();
     if (!home) throw new HomeError("Home is not installed");
     await assertServer(ownerId, serverId);
@@ -162,7 +166,11 @@ export async function installRecognizer(ownerId: string, actorId: string, server
  * dialled by this server and by every vision worker, so a malformed one is a
  * failure repeated on several machines with no obvious cause.
  */
-export async function setFaceRecognition(installedAppId: string, baseUrl: string, apiKey: string): Promise<void> {
+export async function setFaceRecognition(
+    installedAppId: string,
+    baseUrl: string,
+    apiKey: string
+): Promise<void> {
     const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
     if (trimmedUrl) {
         let parsed: URL;
@@ -288,7 +296,11 @@ export async function setFaceEnabled(installedAppId: string, enabled: boolean): 
     await writeSecrets(installedAppId, { ...current, faceEnabled: enabled });
     if (!current.faceInstallId) return;
     const row = await prisma.installedApp.findFirst({
-        where: { id: current.faceInstallId, status: { not: "removed" }, applicationId: { not: null } },
+        where: {
+            id: current.faceInstallId,
+            status: { not: "removed" },
+            applicationId: { not: null }
+        },
         select: { applicationId: true, ownerId: true }
     });
     if (!row?.applicationId) return;

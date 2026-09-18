@@ -89,7 +89,9 @@ export const DEVICE_STATE_LABELS: Readonly<Record<DeviceState, string>> = {
  * and calling the first of those "Locked" was the vendor's number leaking through
  * a word.
  */
-const KIND_STATE_LABELS: Readonly<Partial<Record<DeviceKind, Partial<Record<DeviceState, string>>>>> = {
+const KIND_STATE_LABELS: Readonly<
+    Partial<Record<DeviceKind, Partial<Record<DeviceState, string>>>>
+> = {
     lock: { unlatched: "Latch open" },
     opener: { locked: "Idle", unlatched: "Letting through" }
 };
@@ -215,7 +217,9 @@ export function settledState(action: DeviceAction): DeviceState | null {
 /** Whether a word off a device row is one this app knows. A device synced by a
  *  newer build and read by an older one is the case this exists for. */
 export function deviceState(value: string): DeviceState {
-    return (DEVICE_STATES as readonly string[]).includes(value) ? (value as DeviceState) : "unknown";
+    return (DEVICE_STATES as readonly string[]).includes(value)
+        ? (value as DeviceState)
+        : "unknown";
 }
 
 export function doorState(value: string): DoorState {

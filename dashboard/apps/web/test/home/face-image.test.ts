@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { FACE_EXTENSION, FACE_IMAGE_TYPES, faceImageType } from "@polaris-app/places/src/lib/face-image";
+import {
+    FACE_EXTENSION,
+    FACE_IMAGE_TYPES,
+    faceImageType
+} from "@polaris-app/places/src/lib/face-image";
 
 describe("the type a face photograph is sent as", () => {
     it("keeps the three the recognizer reads", () => {

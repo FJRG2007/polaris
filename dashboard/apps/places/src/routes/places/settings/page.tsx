@@ -19,7 +19,10 @@ export default async function HomeSettingsPage() {
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-            <PageHeader title="Settings" description="Where the house keeps what it records, and what recognizes faces." />
+            <PageHeader
+                title="Settings"
+                description="Where the house keeps what it records, and what recognizes faces."
+            />
             <HomeSettingsView storage={footage.name} canAdmin={user.isAdmin} />
         </div>
     );

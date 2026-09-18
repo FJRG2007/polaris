@@ -20,12 +20,7 @@
 
 import { HomeError } from "../home-error";
 import * as tuya from "../integrations/tuya-api";
-import {
-    DriverError,
-    type Credentials,
-    type DeviceDriver,
-    type DeviceSnapshot
-} from "./contract";
+import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
 export const TUYA_CLOUD = "tuya-cloud";
 

@@ -21,7 +21,10 @@ type Slots = { [key: symbol]: Record<string, Record<string, unknown>> | undefine
 const PROBES = new Set(["then", "toJSON"]);
 
 export function provide(side: Side, services: object): void {
-    (globalThis as unknown as Slots)[SLOTS[side]] = services as Record<string, Record<string, unknown>>;
+    (globalThis as unknown as Slots)[SLOTS[side]] = services as Record<
+        string,
+        Record<string, unknown>
+    >;
 }
 
 export function provided(side: Side): Record<string, Record<string, unknown>> | undefined {

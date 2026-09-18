@@ -9,19 +9,31 @@
 
 import { describe, expect, it } from "vitest";
 import { rewriteMasterPlaylist } from "@polaris-app/places/src/lib/live";
-import { hlsAssetPath, hlsMasterPath, isHlsFile, streamName } from "@polaris-app/places/src/lib/relay";
-import { otherTransport, preferredTransport, stillSrc, streamSrc } from "@polaris-app/places/src/lib/player";
+import {
+    hlsAssetPath,
+    hlsMasterPath,
+    isHlsFile,
+    streamName
+} from "@polaris-app/places/src/lib/relay";
+import {
+    otherTransport,
+    preferredTransport,
+    stillSrc,
+    streamSrc
+} from "@polaris-app/places/src/lib/player";
 
 describe("the master playlist", () => {
     it("points at a sibling of itself rather than one directory deeper", () => {
-        const header = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=192000,CODECS=\"avc1.640029\"\n";
+        const header = '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=192000,CODECS="avc1.640029"\n';
         expect(rewriteMasterPlaylist(`${header}hls/playlist.m3u8?id=aB3xY9zQ`)).toBe(
             `${header}playlist.m3u8?id=aB3xY9zQ`
         );
     });
 
     it("leaves a playlist that was already relative alone", () => {
-        expect(rewriteMasterPlaylist("#EXTM3U\nplaylist.m3u8?id=abc")).toBe("#EXTM3U\nplaylist.m3u8?id=abc");
+        expect(rewriteMasterPlaylist("#EXTM3U\nplaylist.m3u8?id=abc")).toBe(
+            "#EXTM3U\nplaylist.m3u8?id=abc"
+        );
     });
 
     it("does not touch a segment that happens to mention the same words", () => {
@@ -32,11 +44,15 @@ describe("the master playlist", () => {
 
 describe("what the relay is asked for", () => {
     it("asks for fragmented MP4 segments, which is the flavour Safari plays", () => {
-        expect(hlsMasterPath("cam1", "main")).toBe(`/api/stream.m3u8?src=${encodeURIComponent(streamName("cam1", "main"))}&mp4`);
+        expect(hlsMasterPath("cam1", "main")).toBe(
+            `/api/stream.m3u8?src=${encodeURIComponent(streamName("cam1", "main"))}&mp4`
+        );
     });
 
     it("carries the session and the sequence a player was given, and nothing else", () => {
-        expect(hlsAssetPath("segment.m4s", "aB3xY9zQ", "12")).toBe("/api/hls/segment.m4s?id=aB3xY9zQ&n=12");
+        expect(hlsAssetPath("segment.m4s", "aB3xY9zQ", "12")).toBe(
+            "/api/hls/segment.m4s?id=aB3xY9zQ&n=12"
+        );
         expect(hlsAssetPath("init.mp4", "aB3xY9zQ", null)).toBe("/api/hls/init.mp4?id=aB3xY9zQ");
     });
 

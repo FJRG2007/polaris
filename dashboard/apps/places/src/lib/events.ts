@@ -501,10 +501,7 @@ function toEventView(
  * Scoped through the cameras of this house rather than trusting the id in the
  * request: an event id from anywhere else must not resolve.
  */
-async function camerasFor(
-    installedAppId: string,
-    query: EventQuery
-): Promise<Map<string, string>> {
+async function camerasFor(installedAppId: string, query: EventQuery): Promise<Map<string, string>> {
     const cameras = await prisma.camera.findMany({
         where: {
             installedAppId,

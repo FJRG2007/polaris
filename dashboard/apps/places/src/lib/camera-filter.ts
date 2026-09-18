@@ -71,11 +71,7 @@ export function filterCameras<T extends FilterableCamera>(
     cameras: readonly T[],
     filter: { query?: string; zone?: string | null } = {}
 ): readonly T[] {
-    const words = (filter.query ?? "")
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
+    const words = (filter.query ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
     const zone = filter.zone;
     return cameras.filter((camera) => {
         if (zone !== null && zone !== undefined && camera.zone.trim() !== zone) return false;

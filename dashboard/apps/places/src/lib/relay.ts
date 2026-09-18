@@ -18,12 +18,7 @@
  */
 
 import { redactSource, relaySource } from "./vendors";
-import {
-    RELAY_LOG_TAIL,
-    UNEXPLAINED,
-    explainRelayFailure,
-    relaySaid
-} from "./relay-failure";
+import { RELAY_LOG_TAIL, UNEXPLAINED, explainRelayFailure, relaySaid } from "./relay-failure";
 import { HomeError } from "./home-error";
 import type { CameraTarget } from "./cameras";
 import { assertServer, findService, serviceUrls, type ServiceUrls } from "./side-service";

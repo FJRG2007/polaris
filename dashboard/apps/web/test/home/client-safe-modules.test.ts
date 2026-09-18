@@ -32,7 +32,16 @@ const CLIENT_SAFE = [
 
 /** What a browser has none of. `node:` is the one that actually failed a build;
  *  the rest are the doors into this app's own server half. */
-const FORBIDDEN = [/^node:/, /^@polaris\/app-host$/, /^@polaris\/db$/, /^@polaris\/storage$/, /^@polaris\/config$/, /^mqtt$/, /^fs$/, /^net$/];
+const FORBIDDEN = [
+    /^node:/,
+    /^@polaris\/app-host$/,
+    /^@polaris\/db$/,
+    /^@polaris\/storage$/,
+    /^@polaris\/config$/,
+    /^mqtt$/,
+    /^fs$/,
+    /^net$/
+];
 
 /** Every module specifier a file imports, type-only ones excluded: `import type`
  *  is erased before anything is bundled, which is what makes it the right way for
@@ -47,7 +56,10 @@ function importsOf(source: string): string[] {
         // `import { type Foo, type Bar }` is erased too; a clause with a value in
         // it is not.
         const named = /^\{([\s\S]*)\}$/.exec(clause.trim())?.[1];
-        if (named && named.split(",").every((part) => part.trim() === "" || /^type\s/.test(part.trim()))) {
+        if (
+            named &&
+            named.split(",").every((part) => part.trim() === "" || /^type\s/.test(part.trim()))
+        ) {
             continue;
         }
         found.push(specifier);
@@ -95,7 +107,9 @@ describe("what a client-safe module is allowed to reach", () => {
                 FORBIDDEN.some((forbidden) => forbidden.test(edge.specifier))
             );
             expect(
-                offending.map((edge) => `${edge.file.slice(SOURCE.length + 1)} -> ${edge.specifier}`)
+                offending.map(
+                    (edge) => `${edge.file.slice(SOURCE.length + 1)} -> ${edge.specifier}`
+                )
             ).toEqual([]);
         });
     }

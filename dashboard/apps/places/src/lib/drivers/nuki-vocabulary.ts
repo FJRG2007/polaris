@@ -40,7 +40,8 @@ const VARIANT_NAMES: Readonly<Record<number, string>> = {
 };
 
 export function nukiModel(type: number, variant?: number): string {
-    if (type === 5 && variant !== undefined && VARIANT_NAMES[variant]) return VARIANT_NAMES[variant];
+    if (type === 5 && variant !== undefined && VARIANT_NAMES[variant])
+        return VARIANT_NAMES[variant];
     return MODEL_NAMES[type] ?? "Nuki device";
 }
 

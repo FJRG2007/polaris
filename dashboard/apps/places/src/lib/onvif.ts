@@ -50,7 +50,13 @@ function securityHeader(username?: string | null, password?: string | null): str
     const nonce = randomBytes(16);
     const created = new Date().toISOString();
     const digest = createHash("sha1")
-        .update(Buffer.concat([nonce, Buffer.from(created, "utf8"), Buffer.from(password ?? "", "utf8")]))
+        .update(
+            Buffer.concat([
+                nonce,
+                Buffer.from(created, "utf8"),
+                Buffer.from(password ?? "", "utf8")
+            ])
+        )
         .digest("base64");
     return `<s:Header><Security s:mustUnderstand="1" xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><UsernameToken><Username>${escapeXml(username)}</Username><Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">${digest}</Password><Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary">${nonce.toString("base64")}</Nonce><Created xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">${created}</Created></UsernameToken></Security></s:Header>`;
 }
@@ -70,9 +76,9 @@ function escapeXml(value: string): string {
  * local name is the only thing that works across makes.
  */
 export function tagValue(xml: string, localName: string): string | null {
-    const match = new RegExp(`<(?:[A-Za-z0-9._-]+:)?${localName}\\b[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9._-]+:)?${localName}>`).exec(
-        xml
-    );
+    const match = new RegExp(
+        `<(?:[A-Za-z0-9._-]+:)?${localName}\\b[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9._-]+:)?${localName}>`
+    ).exec(xml);
     return match?.[1]?.trim() ?? null;
 }
 
@@ -87,7 +93,10 @@ export function tagValues(xml: string, localName: string): string[] {
 
 /** Every value of an attribute across repeated elements (profile tokens). */
 export function attrValues(xml: string, localName: string, attribute: string): string[] {
-    const pattern = new RegExp(`<(?:[A-Za-z0-9._-]+:)?${localName}\\b[^>]*?\\b${attribute}="([^"]+)"`, "g");
+    const pattern = new RegExp(
+        `<(?:[A-Za-z0-9._-]+:)?${localName}\\b[^>]*?\\b${attribute}="([^"]+)"`,
+        "g"
+    );
     return [...xml.matchAll(pattern)].map((match) => match[1] ?? "");
 }
 
@@ -145,7 +154,7 @@ export async function getDeviceInformation(endpoint: OnvifEndpoint): Promise<Dev
     const xml = await call(
         endpoint,
         DEVICE_SERVICE,
-        "<GetDeviceInformation xmlns=\"http://www.onvif.org/ver10/device/wsdl\"/>"
+        '<GetDeviceInformation xmlns="http://www.onvif.org/ver10/device/wsdl"/>'
     );
     return {
         manufacturer: tagValue(xml, "Manufacturer") ?? "",
@@ -242,7 +251,7 @@ export async function getServices(endpoint: OnvifEndpoint): Promise<OnvifService
     const xml = await call(
         endpoint,
         DEVICE_SERVICE,
-        "<GetCapabilities xmlns=\"http://www.onvif.org/ver10/device/wsdl\"><Category>All</Category></GetCapabilities>"
+        '<GetCapabilities xmlns="http://www.onvif.org/ver10/device/wsdl"><Category>All</Category></GetCapabilities>'
     ).catch(() => "");
 
     const value = parseServices(xml);
@@ -270,7 +279,7 @@ export async function getProfiles(endpoint: OnvifEndpoint): Promise<MediaProfile
     const xml = await call(
         endpoint,
         (await getServices(endpoint)).media,
-        "<GetProfiles xmlns=\"http://www.onvif.org/ver10/media/wsdl\"/>"
+        '<GetProfiles xmlns="http://www.onvif.org/ver10/media/wsdl"/>'
     );
     const tokens = attrValues(xml, "Profiles", "token");
     const names = tagValues(xml, "Name");
@@ -292,7 +301,10 @@ export async function getProfiles(endpoint: OnvifEndpoint): Promise<MediaProfile
  * stripped if it embedded any - Polaris keeps those in one place, encrypted, and
  * a URL that carries them is one that ends up in a log.
  */
-export async function getStreamUri(endpoint: OnvifEndpoint, profileToken: string): Promise<string | null> {
+export async function getStreamUri(
+    endpoint: OnvifEndpoint,
+    profileToken: string
+): Promise<string | null> {
     const xml = await call(
         endpoint,
         (await getServices(endpoint)).media,
@@ -318,7 +330,11 @@ export interface PtzVector {
  * so every caller pairs this with ptzStop, and the UI sends it on both mouse-up
  * and mouse-leave.
  */
-export async function ptzMove(endpoint: OnvifEndpoint, profileToken: string, vector: PtzVector): Promise<void> {
+export async function ptzMove(
+    endpoint: OnvifEndpoint,
+    profileToken: string,
+    vector: PtzVector
+): Promise<void> {
     const clamp = (value: number) => Math.max(-1, Math.min(1, value)).toFixed(2);
     await call(
         endpoint,
@@ -341,7 +357,10 @@ export interface PtzPreset {
 }
 
 /** The positions somebody already saved on this camera. */
-export async function getPresets(endpoint: OnvifEndpoint, profileToken: string): Promise<PtzPreset[]> {
+export async function getPresets(
+    endpoint: OnvifEndpoint,
+    profileToken: string
+): Promise<PtzPreset[]> {
     const xml = await call(
         endpoint,
         (await getServices(endpoint)).ptz,
@@ -352,7 +371,11 @@ export async function getPresets(endpoint: OnvifEndpoint, profileToken: string):
     return tokens.map((token, index) => ({ token, name: names[index] ?? token }));
 }
 
-export async function gotoPreset(endpoint: OnvifEndpoint, profileToken: string, preset: string): Promise<void> {
+export async function gotoPreset(
+    endpoint: OnvifEndpoint,
+    profileToken: string,
+    preset: string
+): Promise<void> {
     await call(
         endpoint,
         (await getServices(endpoint)).ptz,
@@ -373,7 +396,7 @@ export async function createPullPoint(endpoint: OnvifEndpoint): Promise<string |
     const xml = await call(
         endpoint,
         (await getServices(endpoint)).events,
-        "<CreatePullPointSubscription xmlns=\"http://www.onvif.org/ver10/events/wsdl\"><InitialTerminationTime>PT60S</InitialTerminationTime></CreatePullPointSubscription>"
+        '<CreatePullPointSubscription xmlns="http://www.onvif.org/ver10/events/wsdl"><InitialTerminationTime>PT60S</InitialTerminationTime></CreatePullPointSubscription>'
     );
     // The camera answers with the address its mailbox lives at, which is usually
     // a full URL on itself.
@@ -408,7 +431,9 @@ export async function pullMessages(
     const topics = tagValues(xml, "Topic");
     // The camera reports the state as an attribute of an item named Value, and
     // both spellings are in the wild.
-    const values = [...xml.matchAll(/\bName="IsMotion"[^>]*\bValue="([^"]+)"/g)].map((match) => match[1]);
+    const values = [...xml.matchAll(/\bName="IsMotion"[^>]*\bValue="([^"]+)"/g)].map(
+        (match) => match[1]
+    );
     return topics.map((topic, index) => ({
         topic,
         active: (values[index] ?? "true").toLowerCase() === "true"
@@ -456,6 +481,10 @@ export async function probeCamera(endpoint: OnvifEndpoint): Promise<CameraProbe>
     // Asked rather than assumed: a make that generally moves says nothing about
     // the one bolted to a wall, and an arrow that does nothing is worse than no
     // arrow.
-    const ptz = main ? await getPresets(endpoint, main.token).then(() => true).catch(() => false) : false;
+    const ptz = main
+        ? await getPresets(endpoint, main.token)
+              .then(() => true)
+              .catch(() => false)
+        : false;
     return { device, profiles, mainUrl, subUrl, ptz };
 }

@@ -63,9 +63,12 @@ async function faceCounts(): Promise<Map<string, number>> {
         headers: { "x-api-key": endpoint.apiKey }
     }).catch(() => null);
     if (!response?.ok) return new Map();
-    const body = (await response.json().catch(() => null)) as { faces?: { subject: string }[] } | null;
+    const body = (await response.json().catch(() => null)) as {
+        faces?: { subject: string }[];
+    } | null;
     const counts = new Map<string, number>();
-    for (const face of body?.faces ?? []) counts.set(face.subject, (counts.get(face.subject) ?? 0) + 1);
+    for (const face of body?.faces ?? [])
+        counts.set(face.subject, (counts.get(face.subject) ?? 0) + 1);
     return counts;
 }
 
@@ -84,7 +87,10 @@ async function faceCounts(): Promise<Map<string, number>> {
  * suffix is always free.
  */
 async function freeSubject(installedAppId: string, name: string): Promise<string> {
-    const rows = await prisma.homePerson.findMany({ where: { installedAppId }, select: { subjectId: true } });
+    const rows = await prisma.homePerson.findMany({
+        where: { installedAppId },
+        select: { subjectId: true }
+    });
     const taken = new Set(rows.map((row) => row.subjectId));
     if (!taken.has(name)) return name;
     for (let suffix = 2; ; suffix++) {
@@ -100,7 +106,11 @@ export async function addPerson(installedAppId: string, name: string): Promise<P
     const trimmed = name.trim();
     if (!trimmed) throw new HomeError("Give them a name");
     const row = await prisma.homePerson.create({
-        data: { installedAppId, name: trimmed, subjectId: await freeSubject(installedAppId, trimmed) }
+        data: {
+            installedAppId,
+            name: trimmed,
+            subjectId: await freeSubject(installedAppId, trimmed)
+        }
     });
     return { id: row.id, name: row.name, subjectId: row.subjectId, notify: row.notify, faces: 0 };
 }
@@ -117,10 +127,17 @@ export async function addPerson(installedAppId: string, name: string): Promise<P
  * they read back under the new name because the screen resolves the subject
  * rather than storing the label twice.
  */
-export async function renamePerson(installedAppId: string, id: string, name: string): Promise<PersonView> {
+export async function renamePerson(
+    installedAppId: string,
+    id: string,
+    name: string
+): Promise<PersonView> {
     const trimmed = name.trim();
     if (!trimmed) throw new HomeError("Give them a name");
-    const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    const person = await prisma.homePerson.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!person) throw new HomeError("Not found");
     const row = await prisma.homePerson.update({ where: { id }, data: { name: trimmed } });
     const counts = await faceCounts();
@@ -136,8 +153,15 @@ export async function renamePerson(installedAppId: string, id: string, name: str
 /** Whether seeing them is worth reporting. Off by default: a household is taught
  *  to the recognizer so that it STOPS raising alerts about them, not so that
  *  every arrival home becomes one. */
-export async function setNotify(installedAppId: string, id: string, notify: boolean): Promise<void> {
-    const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { id: true } });
+export async function setNotify(
+    installedAppId: string,
+    id: string,
+    notify: boolean
+): Promise<void> {
+    const person = await prisma.homePerson.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!person) throw new HomeError("Not found");
     await prisma.homePerson.update({ where: { id }, data: { notify } });
 }
@@ -156,7 +180,10 @@ export async function addFace(
     /** What the file is, already narrowed to a format the recognizer reads. */
     contentType: FaceImageType = "image/jpeg"
 ): Promise<void> {
-    const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { subjectId: true } });
+    const person = await prisma.homePerson.findFirst({
+        where: { id, installedAppId },
+        select: { subjectId: true }
+    });
     if (!person) throw new HomeError("Not found");
     const endpoint = await faceEndpoint();
     if (!endpoint) throw new HomeError("Face recognition is not set up yet");
@@ -166,7 +193,11 @@ export async function addFace(
     // bytes and would not care, but the address field is still there for a house
     // running its own - and a service handed WebP bytes labelled as a JPEG is
     // entitled to refuse them.
-    form.append("file", new Blob([image], { type: contentType }), `face${FACE_EXTENSION[contentType]}`);
+    form.append(
+        "file",
+        new Blob([image], { type: contentType }),
+        `face${FACE_EXTENSION[contentType]}`
+    );
     const response = await fetch(
         `${endpoint.baseUrl}/api/v1/recognition/faces?subject=${encodeURIComponent(person.subjectId)}`,
         { method: "POST", headers: { "x-api-key": endpoint.apiKey }, body: form }
@@ -189,7 +220,10 @@ export async function addFace(
  * be reached, the removal fails and says so rather than half-happening.
  */
 export async function removePerson(installedAppId: string, id: string): Promise<void> {
-    const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { subjectId: true } });
+    const person = await prisma.homePerson.findFirst({
+        where: { id, installedAppId },
+        select: { subjectId: true }
+    });
     if (!person) throw new HomeError("Not found");
     const endpoint = await faceEndpoint();
     if (endpoint) {

@@ -17,12 +17,7 @@
 import { HomeError } from "../home-error";
 import * as mqtt from "../integrations/nuki-mqtt";
 import * as nuki from "./nuki-vocabulary";
-import {
-    DriverError,
-    type Credentials,
-    type DeviceDriver,
-    type DeviceSnapshot
-} from "./contract";
+import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
 export const NUKI_LOCAL = "nuki-local";
 
@@ -47,7 +42,8 @@ async function speaking<T>(run: () => Promise<T>): Promise<T> {
     try {
         return await run();
     } catch (caught) {
-        if (caught instanceof mqtt.NukiMqttError) throw new DriverError(caught.message, caught.kind);
+        if (caught instanceof mqtt.NukiMqttError)
+            throw new DriverError(caught.message, caught.kind);
         throw caught;
     }
 }

@@ -74,7 +74,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
 
     const added = (person: PersonView) => {
         setAdding(false);
-        setPeople((current) => [...(current ?? []), person].sort((a, b) => a.name.localeCompare(b.name)));
+        setPeople((current) =>
+            [...(current ?? []), person].sort((a, b) => a.name.localeCompare(b.name))
+        );
     };
 
     const pickPhoto = (person: PersonView) => {
@@ -95,7 +97,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
             return;
         }
         setPeople((current) =>
-            (current ?? []).map((person) => (person.id === id ? { ...person, faces: person.faces + 1 } : person))
+            (current ?? []).map((person) =>
+                person.id === id ? { ...person, faces: person.faces + 1 } : person
+            )
         );
     };
 
@@ -122,13 +126,20 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         setRenaming(null);
         if (!wanted || wanted === person.name) return;
         setPeople((current) =>
-            (current ?? []).map((item) => (item.id === person.id ? { ...item, name: wanted } : item))
+            (current ?? []).map((item) =>
+                item.id === person.id ? { ...item, name: wanted } : item
+            )
         );
-        const result = await runAction(() => actions.renamePersonAction(person.id, wanted), setError);
+        const result = await runAction(
+            () => actions.renamePersonAction(person.id, wanted),
+            setError
+        );
         if (result?.error) {
             setError(result.error);
             setPeople((current) =>
-                (current ?? []).map((item) => (item.id === person.id ? { ...item, name: person.name } : item))
+                (current ?? []).map((item) =>
+                    item.id === person.id ? { ...item, name: person.name } : item
+                )
             );
         }
     };
@@ -163,7 +174,8 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         <div className="flex flex-col gap-4">
             {!ready ? (
                 <p className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[0.75rem] text-muted-foreground">
-                    Nothing is recognizing faces yet. Names written here start working the moment something is.
+                    Nothing is recognizing faces yet. Names written here start working the moment
+                    something is.
                     <Button asChild variant="secondary" size="sm">
                         <Link href="/places/settings">Set it up</Link>
                     </Button>
@@ -205,15 +217,15 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                     {people.map((person) => (
                         <ContextMenu key={person.id}>
                             <ContextMenuTrigger asChild>
-                        <li
-                            onClick={() => setFocused(person.id)}
-                            onContextMenu={() => setFocused(person.id)}
-                            onDoubleClick={() => canManage && startRename(person)}
-                            className={cn(
-                                "flex items-center justify-between gap-3 px-3 py-2",
-                                focused === person.id && "bg-primary/10"
-                            )}
-                        >
+                                <li
+                                    onClick={() => setFocused(person.id)}
+                                    onContextMenu={() => setFocused(person.id)}
+                                    onDoubleClick={() => canManage && startRename(person)}
+                                    className={cn(
+                                        "flex items-center justify-between gap-3 px-3 py-2",
+                                        focused === person.id && "bg-primary/10"
+                                    )}
+                                >
                                     <div className="min-w-0">
                                         {renaming === person.id ? (
                                             <Input
@@ -234,7 +246,12 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 }}
                                             />
                                         ) : (
-                                            <p className="truncate text-[0.8125rem] text-foreground" title={person.name}>{person.name}</p>
+                                            <p
+                                                className="truncate text-[0.8125rem] text-foreground"
+                                                title={person.name}
+                                            >
+                                                {person.name}
+                                            </p>
                                         )}
                                         <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {person.faces === 0
@@ -244,7 +261,10 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                         {person.faces > 0 && person.faces < 3 ? (
-                                            <Badge variant="warning" title="A few photographs recognize a person; one recognizes a photograph">
+                                            <Badge
+                                                variant="warning"
+                                                title="A few photographs recognize a person; one recognizes a photograph"
+                                            >
                                                 Add more
                                             </Badge>
                                         ) : null}
@@ -256,10 +276,15 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 onChange={(value) => {
                                                     setPeople((current) =>
                                                         (current ?? []).map((item) =>
-                                                            item.id === person.id ? { ...item, notify: value } : item
+                                                            item.id === person.id
+                                                                ? { ...item, notify: value }
+                                                                : item
                                                         )
                                                     );
-                                                    void actions.setPersonNotifyAction(person.id, value);
+                                                    void actions.setPersonNotifyAction(
+                                                        person.id,
+                                                        value
+                                                    );
                                                 }}
                                             />
                                         </label>
@@ -301,18 +326,26 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                             <Pencil className="size-4 shrink-0" />
                                             Rename
                                         </ContextMenuItem>
-                                        <ContextMenuItem disabled={!ready} onSelect={() => pickPhoto(person)}>
+                                        <ContextMenuItem
+                                            disabled={!ready}
+                                            onSelect={() => pickPhoto(person)}
+                                        >
                                             <ImagePlus className="size-4 shrink-0" />
                                             Add a photograph
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
-                                        <ContextMenuItem variant="danger" onSelect={() => setRemoving(person)}>
+                                        <ContextMenuItem
+                                            variant="danger"
+                                            onSelect={() => setRemoving(person)}
+                                        >
                                             <Trash2 className="size-4 shrink-0" />
                                             Forget them
                                         </ContextMenuItem>
                                     </>
                                 ) : (
-                                    <ContextMenuItem disabled>Nothing to change here</ContextMenuItem>
+                                    <ContextMenuItem disabled>
+                                        Nothing to change here
+                                    </ContextMenuItem>
                                 )}
                             </ContextMenuContent>
                         </ContextMenu>
@@ -321,7 +354,11 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
             )}
 
             {adding ? (
-                <PersonDialog recognizerReady={ready} onClose={() => setAdding(false)} onSaved={added} />
+                <PersonDialog
+                    recognizerReady={ready}
+                    onClose={() => setAdding(false)}
+                    onSaved={added}
+                />
             ) : null}
 
             <input

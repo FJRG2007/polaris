@@ -123,7 +123,10 @@ async function call(
         throw new NukiError("Nuki refused the token. It may have been revoked.", "unauthorized");
     }
     if (response.status === 429) {
-        throw new NukiError("Nuki is answering too many requests at once. Try again in a minute.", "rate-limited");
+        throw new NukiError(
+            "Nuki is answering too many requests at once. Try again in a minute.",
+            "rate-limited"
+        );
     }
 
     const text = await response.text().catch(() => "");
@@ -137,7 +140,10 @@ async function call(
     }
 
     if (!response.ok) {
-        throw new NukiError(detailOf(payload) || `Nuki refused the request (HTTP ${response.status}).`, "refused");
+        throw new NukiError(
+            detailOf(payload) || `Nuki refused the request (HTTP ${response.status}).`,
+            "refused"
+        );
     }
     return payload;
 }
@@ -180,7 +186,10 @@ export async function performAction(
     action: number,
     option = 0
 ): Promise<void> {
-    await call(token, "POST", `/smartlock/${encodeURIComponent(smartlockId)}/action`, { action, option });
+    await call(token, "POST", `/smartlock/${encodeURIComponent(smartlockId)}/action`, {
+        action,
+        option
+    });
 }
 
 /**
@@ -208,7 +217,9 @@ export async function syncSmartlock(token: string, smartlockId: string): Promise
  */
 export async function listLogs(token: string, limit: number): Promise<NukiLog[]> {
     const capped = Math.max(1, Math.min(200, Math.trunc(limit)));
-    const parsed = z.array(logSchema).safeParse(await call(token, "GET", `/smartlock/log?limit=${capped}`));
+    const parsed = z
+        .array(logSchema)
+        .safeParse(await call(token, "GET", `/smartlock/log?limit=${capped}`));
     if (!parsed.success) throw new NukiError("Nuki answered with something unexpected.", "refused");
     return parsed.data;
 }

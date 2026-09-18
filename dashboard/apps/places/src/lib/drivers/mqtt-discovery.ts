@@ -26,12 +26,7 @@ import { z } from "zod";
 import { HomeError } from "../home-error";
 import * as broker from "../integrations/mqtt-broker";
 import type { DeviceKind } from "../device-kinds";
-import {
-    DriverError,
-    type Credentials,
-    type DeviceDriver,
-    type DeviceSnapshot
-} from "./contract";
+import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
 export const MQTT_DISCOVERY = "mqtt-discovery";
 
@@ -164,7 +159,8 @@ async function speaking<T>(run: () => Promise<T>): Promise<T> {
     try {
         return await run();
     } catch (caught) {
-        if (caught instanceof broker.BrokerError) throw new DriverError(caught.message, caught.kind);
+        if (caught instanceof broker.BrokerError)
+            throw new DriverError(caught.message, caught.kind);
         throw caught;
     }
 }
@@ -201,7 +197,8 @@ function idOf(config: Config, topic: string): string {
 function nameOf(config: Config, topic: string): string {
     const device = config.device?.name?.trim();
     const own = config.name?.trim();
-    if (device && own && !own.toLowerCase().startsWith(device.toLowerCase())) return `${device} ${own}`;
+    if (device && own && !own.toLowerCase().startsWith(device.toLowerCase()))
+        return `${device} ${own}`;
     return device || own || topic.split("/").at(-2) || "Device";
 }
 
@@ -214,7 +211,11 @@ function nameOf(config: Config, topic: string): string {
  * business running - so the common shapes are read directly and anything else
  * reads as unknown rather than as a guess.
  */
-function stateOf(config: Config, raw: string | undefined, kind: DeviceKind): DeviceSnapshot["state"] {
+function stateOf(
+    config: Config,
+    raw: string | undefined,
+    kind: DeviceKind
+): DeviceSnapshot["state"] {
     if (raw === undefined) return "unknown";
     const text = raw.trim();
     let value = text;
@@ -347,7 +348,10 @@ async function readAll(
         if (availability) topics.add(availability);
     }
 
-    const held = topics.size > 0 ? await speaking(() => broker.readRetained(address, [...topics])) : new Map();
+    const held =
+        topics.size > 0
+            ? await speaking(() => broker.readRetained(address, [...topics]))
+            : new Map();
     return { found, held };
 }
 

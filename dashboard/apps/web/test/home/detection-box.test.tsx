@@ -39,7 +39,12 @@ describe("DetectionBox", () => {
 
     it("crops rather than letterboxes when the picture was fitted to fill", () => {
         const html = renderToStaticMarkup(
-            <DetectionBox box={{ x1: 0, y1: 0, x2: 1, y2: 1 }} picture={4 / 3} tile={16 / 9} fit="cover" />
+            <DetectionBox
+                box={{ x1: 0, y1: 0, x2: 1, y2: 1 }}
+                picture={4 / 3}
+                tile={16 / 9}
+                fit="cover"
+            />
         );
         const outer = /<span aria-hidden="true"[^>]*style="([^"]*)"/.exec(html);
         const style = outer?.[1] ?? "";

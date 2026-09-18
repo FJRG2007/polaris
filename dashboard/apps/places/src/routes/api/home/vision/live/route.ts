@@ -75,7 +75,9 @@ export async function POST(request: Request): Promise<Response> {
         camera.id,
         // A box with no width or height is not somewhere: it is a line, and
         // drawn it is a one-pixel scratch nobody can read.
-        parsed.data.boxes.filter((entry) => entry.box.x2 > entry.box.x1 && entry.box.y2 > entry.box.y1)
+        parsed.data.boxes.filter(
+            (entry) => entry.box.x2 > entry.box.x1 && entry.box.y2 > entry.box.y1
+        )
     );
     return Response.json({ ok: true });
 }

@@ -42,7 +42,9 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
 export function driverFor(connection: string): DeviceDriver {
     const driver = DRIVERS[connection];
     if (!driver) {
-        throw new HomeError("That connection was made by a version of Polaris that is no longer here");
+        throw new HomeError(
+            "That connection was made by a version of Polaris that is no longer here"
+        );
     }
     return driver;
 }

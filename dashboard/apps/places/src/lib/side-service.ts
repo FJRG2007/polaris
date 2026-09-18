@@ -75,15 +75,24 @@ export interface ServiceUrls {
  *  where none of these can be found. */
 export async function targetIdFor(serverId: string): Promise<string | null> {
     if (serverId === "local") {
-        const local = await prisma.deployTarget.findFirst({ where: { kind: "local" }, select: { id: true } });
+        const local = await prisma.deployTarget.findFirst({
+            where: { kind: "local" },
+            select: { id: true }
+        });
         return local?.id ?? null;
     }
-    const target = await prisma.deployTarget.findFirst({ where: { hostId: serverId }, select: { id: true } });
+    const target = await prisma.deployTarget.findFirst({
+        where: { hostId: serverId },
+        select: { id: true }
+    });
     return target?.id ?? null;
 }
 
 /** One of Home's services on one server, or null when that server has none. */
-export async function findService(catalogId: string, serverId: string): Promise<SideService | null> {
+export async function findService(
+    catalogId: string,
+    serverId: string
+): Promise<SideService | null> {
     const targetId = await targetIdFor(serverId);
     const row = await prisma.installedApp.findFirst({
         where: {
@@ -111,10 +120,15 @@ export async function findService(catalogId: string, serverId: string): Promise<
  * down that SSH connection. Which of the two is in use is decided by knocking
  * once and remembering the answer, so it costs nothing per request.
  */
-export async function serviceUrls(applicationId: string, ownerId: string): Promise<ServiceUrls | null> {
+export async function serviceUrls(
+    applicationId: string,
+    ownerId: string
+): Promise<ServiceUrls | null> {
     const application = await prisma.application.findFirst({
         where: { id: applicationId },
-        select: { target: { select: { kind: true, hostId: true, host: { select: { address: true } } } } }
+        select: {
+            target: { select: { kind: true, hostId: true, host: { select: { address: true } } } }
+        }
     });
     if (!application) return null;
     const local = application.target.kind === "local";
@@ -124,7 +138,9 @@ export async function serviceUrls(applicationId: string, ownerId: string): Promi
     // is merely wasteful; for video it is every byte of every stream taking a
     // round trip through the router, which is exactly what a camera that "takes
     // ages and then stutters" looks like.
-    const dialHost = local ? await localDialHost() : (application.target.host?.address?.trim() ?? null);
+    const dialHost = local
+        ? await localDialHost()
+        : (application.target.host?.address?.trim() ?? null);
     if (!dialHost) return null;
 
     const port = await hostPortForApp(applicationId);
@@ -153,7 +169,11 @@ export async function serviceUrls(applicationId: string, ownerId: string): Promi
 async function containerUrl(applicationId: string): Promise<string | null> {
     const application = await prisma.application.findFirst({
         where: { id: applicationId },
-        select: { id: true, slug: true, environment: { select: { project: { select: { slug: true } } } } }
+        select: {
+            id: true,
+            slug: true,
+            environment: { select: { project: { select: { slug: true } } } }
+        }
     });
     if (!application?.environment?.project) return null;
     const install = await prisma.installedApp.findFirst({
@@ -174,7 +194,8 @@ async function containerUrl(applicationId: string): Promise<string | null> {
 export async function assertServer(ownerId: string, serverId: string): Promise<void> {
     if (serverId === "local") return;
     const hosts = await listHosts(ownerId);
-    if (!hosts.some((host) => host.id === serverId)) throw new HomeError("That server is not connected");
+    if (!hosts.some((host) => host.id === serverId))
+        throw new HomeError("That server is not connected");
 }
 
 /** Whether a port answers, remembered for a while.

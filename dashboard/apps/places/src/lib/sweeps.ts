@@ -107,7 +107,9 @@ export async function sweepHomeRetention(): Promise<{ clips: number; events: num
         );
     }
     if (oldEvents.length > 0) {
-        await prisma.cameraEvent.deleteMany({ where: { id: { in: oldEvents.map((event) => event.id) } } });
+        await prisma.cameraEvent.deleteMany({
+            where: { id: { in: oldEvents.map((event) => event.id) } }
+        });
     }
     return { clips, events: oldEvents.length };
 }

@@ -128,9 +128,9 @@ describe("a picture that does not fill the frame", () => {
     it("works out what it covers from the two shapes", () => {
         // A 4:3 camera in a 16:9 dialog: it fits across the height and leaves a
         // bar down each side.
-        expect(coverOf(4 / 3, 16 / 9)).toEqual({ x: (4 / 3) / (16 / 9), y: 1 });
+        expect(coverOf(4 / 3, 16 / 9)).toEqual({ x: 4 / 3 / (16 / 9), y: 1 });
         // And the other way round.
-        expect(coverOf(21 / 9, 16 / 9)).toEqual({ x: 1, y: (16 / 9) / (21 / 9) });
+        expect(coverOf(21 / 9, 16 / 9)).toEqual({ x: 1, y: 16 / 9 / (21 / 9) });
         expect(coverOf(16 / 9, 16 / 9)).toEqual({ x: 1, y: 1 });
     });
 

@@ -50,7 +50,10 @@ const SMOOTH_CACHE_MS = 250;
 
 /** The relay serving one camera, or a refusal that says which of the two things
  *  went wrong - there is no relay yet, or there is one and it is not answering. */
-async function relayForCamera(installedAppId: string, cameraId: string): Promise<{ endpoint: RelayEndpoint; cameraId: string }> {
+async function relayForCamera(
+    installedAppId: string,
+    cameraId: string
+): Promise<{ endpoint: RelayEndpoint; cameraId: string }> {
     const camera = await getCamera(installedAppId, cameraId);
     if (!camera) throw new CameraOfflineError("No such camera");
     if (!camera.enabled) throw new CameraOfflineError("This camera is switched off");
@@ -115,7 +118,11 @@ export async function cameraStream(
     signal?: AbortSignal
 ): Promise<Response> {
     const { endpoint } = await relayForCamera(installedAppId, cameraId);
-    const upstream = await relayStream(endpoint, streamPath(cameraId, "mp4", quality), signal ? { signal } : undefined);
+    const upstream = await relayStream(
+        endpoint,
+        streamPath(cameraId, "mp4", quality),
+        signal ? { signal } : undefined
+    );
     if (!upstream.ok || !upstream.body) throw new CameraOfflineError("The camera is not answering");
     return new Response(upstream.body, {
         headers: {
@@ -168,17 +175,27 @@ export async function cameraHls(
     const passthrough = signal ? { signal } : undefined;
 
     if (file === "stream.m3u8") {
-        const upstream = await relayStream(endpoint, hlsMasterPath(cameraId, query.quality), passthrough);
+        const upstream = await relayStream(
+            endpoint,
+            hlsMasterPath(cameraId, query.quality),
+            passthrough
+        );
         if (!upstream.ok) throw new CameraOfflineError("The camera is not answering");
         return playlist(rewriteMasterPlaylist(await upstream.text()));
     }
 
     // A player only ever asks for these with a session the relay gave it a moment
     // ago. One that does not look like one is not worth dialling out for.
-    if (!query.session || !SESSION.test(query.session)) throw new CameraOfflineError("That stream has ended");
-    if (query.sequence && !SEQUENCE.test(query.sequence)) throw new CameraOfflineError("That stream has ended");
+    if (!query.session || !SESSION.test(query.session))
+        throw new CameraOfflineError("That stream has ended");
+    if (query.sequence && !SEQUENCE.test(query.sequence))
+        throw new CameraOfflineError("That stream has ended");
 
-    const upstream = await relayStream(endpoint, hlsAssetPath(file, query.session, query.sequence), passthrough);
+    const upstream = await relayStream(
+        endpoint,
+        hlsAssetPath(file, query.session, query.sequence),
+        passthrough
+    );
     // A segment the relay no longer holds is an ordinary part of live HLS: the
     // player asks again. Passing the status through is what lets it.
     if (!upstream.ok) return new Response(null, { status: upstream.status === 404 ? 404 : 503 });

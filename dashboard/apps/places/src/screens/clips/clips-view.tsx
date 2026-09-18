@@ -173,7 +173,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
     const keep = async (targets: ClipView[], next: boolean) => {
         const ids = new Set(targets.filter((clip) => clip.pinned !== next).map((clip) => clip.id));
         if (ids.size === 0) return;
-        setClips((current) => (current ?? []).map((item) => (ids.has(item.id) ? { ...item, pinned: next } : item)));
+        setClips((current) =>
+            (current ?? []).map((item) => (ids.has(item.id) ? { ...item, pinned: next } : item))
+        );
         const failed: string[] = [];
         for (const id of ids) {
             const result = await runAction(() => actions.pinClipAction(id, next), setError);
@@ -181,7 +183,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
         }
         if (failed.length === 0) return;
         const back = new Set(failed);
-        setClips((current) => (current ?? []).map((item) => (back.has(item.id) ? { ...item, pinned: !next } : item)));
+        setClips((current) =>
+            (current ?? []).map((item) => (back.has(item.id) ? { ...item, pinned: !next } : item))
+        );
     };
 
     /**
@@ -251,7 +255,12 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
             setPlaying((current) => (current === only.id ? null : only.id));
             return;
         }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Home" || event.key === "End") {
+        if (
+            event.key === "ArrowDown" ||
+            event.key === "ArrowUp" ||
+            event.key === "Home" ||
+            event.key === "End"
+        ) {
             event.preventDefault();
             const delta =
                 event.key === "ArrowDown"
@@ -261,7 +270,14 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                       : event.key === "End"
                         ? rows.length
                         : -rows.length;
-            const next = afterMove(selected, keys, cursor.current, anchor.current, delta, event.shiftKey);
+            const next = afterMove(
+                selected,
+                keys,
+                cursor.current,
+                anchor.current,
+                delta,
+                event.shiftKey
+            );
             setSelected(next.selected);
             anchor.current = next.anchor;
             cursor.current = next.cursor;
@@ -287,7 +303,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                 />
                 {chosen.length > 0 ? (
                     <div className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1">
-                        <span className="text-[0.75rem] text-foreground-subtle">{chosen.length} selected</span>
+                        <span className="text-[0.75rem] text-foreground-subtle">
+                            {chosen.length} selected
+                        </span>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -295,7 +313,11 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                             title={allKept ? "Stop keeping these" : "Keep these"}
                             onClick={() => keep(chosen, !allKept)}
                         >
-                            {allKept ? <PinOff className="size-4 shrink-0" /> : <Pin className="size-4 shrink-0" />}
+                            {allKept ? (
+                                <PinOff className="size-4 shrink-0" />
+                            ) : (
+                                <Pin className="size-4 shrink-0" />
+                            )}
                         </Button>
                         {canManage ? (
                             <Button
@@ -348,7 +370,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             aria-selected={isSelected}
                                             onClick={(event) => clickRow(event, index)}
                                             onDoubleClick={() =>
-                                                setPlaying((current) => (current === clip.id ? null : clip.id))
+                                                setPlaying((current) =>
+                                                    current === clip.id ? null : clip.id
+                                                )
                                             }
                                             className={cn(
                                                 "flex cursor-default flex-col gap-3 px-3 py-2",
@@ -362,16 +386,25 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                     </p>
                                                     <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                                         {REASON_LABEL[clip.reason] ?? clip.reason} -{" "}
-                                                        {duration(clip.durationMs)} - {size(clip.bytes)}
+                                                        {duration(clip.durationMs)} -{" "}
+                                                        {size(clip.bytes)}
                                                     </p>
                                                 </div>
                                                 <div className="flex shrink-0 items-center gap-1">
-                                                    {clip.pinned ? <Badge variant="neutral">Kept</Badge> : null}
+                                                    {clip.pinned ? (
+                                                        <Badge variant="neutral">Kept</Badge>
+                                                    ) : null}
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        aria-label={playing === clip.id ? "Stop" : "Play this clip"}
-                                                        title={playing === clip.id ? "Stop" : "Play"}
+                                                        aria-label={
+                                                            playing === clip.id
+                                                                ? "Stop"
+                                                                : "Play this clip"
+                                                        }
+                                                        title={
+                                                            playing === clip.id ? "Stop" : "Play"
+                                                        }
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             setPlaying((current) =>
@@ -389,9 +422,15 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                         variant="ghost"
                                                         size="icon"
                                                         aria-label={
-                                                            clip.pinned ? "Stop keeping this" : "Keep this one"
+                                                            clip.pinned
+                                                                ? "Stop keeping this"
+                                                                : "Keep this one"
                                                         }
-                                                        title={clip.pinned ? "Stop keeping this" : "Keep this one"}
+                                                        title={
+                                                            clip.pinned
+                                                                ? "Stop keeping this"
+                                                                : "Keep this one"
+                                                        }
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             keep([clip], !clip.pinned);
@@ -461,7 +500,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                         </ContextMenuLabel>
                                         <ContextMenuItem
                                             onSelect={() =>
-                                                setPlaying((current) => (current === clip.id ? null : clip.id))
+                                                setPlaying((current) =>
+                                                    current === clip.id ? null : clip.id
+                                                )
                                             }
                                         >
                                             <Play className="size-4 shrink-0" />
@@ -470,7 +511,10 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                         <ContextMenuItem
                                             onSelect={() => {
                                                 const targets = targetsFor(clip, index);
-                                                keep(targets, !targets.every((item) => item.pinned));
+                                                keep(
+                                                    targets,
+                                                    !targets.every((item) => item.pinned)
+                                                );
                                             }}
                                         >
                                             <Pin className="size-4 shrink-0" />
@@ -479,7 +523,10 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                         <ContextMenuItem
                                             onSelect={() => {
                                                 for (const target of targetsFor(clip, index)) {
-                                                    download(target, format.dateTime(target.startedAt));
+                                                    download(
+                                                        target,
+                                                        format.dateTime(target.startedAt)
+                                                    );
                                                 }
                                             }}
                                         >
@@ -487,7 +534,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             Download
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
-                                        <ContextMenuItem onSelect={() => setSelected(new Set(keys))}>
+                                        <ContextMenuItem
+                                            onSelect={() => setSelected(new Set(keys))}
+                                        >
                                             Select all
                                         </ContextMenuItem>
                                         {canManage ? (
@@ -495,7 +544,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                 <ContextMenuSeparator />
                                                 <ContextMenuItem
                                                     variant="danger"
-                                                    onSelect={() => setRemoving(targetsFor(clip, index))}
+                                                    onSelect={() =>
+                                                        setRemoving(targetsFor(clip, index))
+                                                    }
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
                                                     Delete
@@ -509,8 +560,15 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                     </ul>
                     {!done ? (
                         <div className="flex justify-center">
-                            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-                                {loadingMore ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 Show older
                             </Button>
                         </div>

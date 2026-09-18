@@ -223,7 +223,10 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
 
 /** One make by id, or the generic profile for anything unrecognized. */
 export function cameraVendor(id: string): CameraVendor {
-    return CAMERA_VENDORS.find((vendor) => vendor.id === id) ?? CAMERA_VENDORS[CAMERA_VENDORS.length - 1]!;
+    return (
+        CAMERA_VENDORS.find((vendor) => vendor.id === id) ??
+        CAMERA_VENDORS[CAMERA_VENDORS.length - 1]!
+    );
 }
 
 /**
@@ -276,7 +279,10 @@ export function rtspUrl(
     const credentials = auth.username
         ? `${encodeURIComponent(auth.username)}:${encodeURIComponent(auth.password ?? "")}@`
         : "";
-    const host = camera.address.includes(":") && !camera.address.startsWith("[") ? `[${camera.address}]` : camera.address;
+    const host =
+        camera.address.includes(":") && !camera.address.startsWith("[")
+            ? `[${camera.address}]`
+            : camera.address;
     const suffix = path.startsWith("/") || path === "" ? path : `/${path}`;
     return `rtsp://${credentials}${host}:${camera.rtspPort}${suffix}`;
 }
@@ -314,7 +320,13 @@ export function redactSource(text: string): string {
  * the small one to analyze.
  */
 export function relaySource(
-    camera: { vendor: string; address: string; rtspPort: number; mainPath?: string | null; subPath?: string | null },
+    camera: {
+        vendor: string;
+        address: string;
+        rtspPort: number;
+        mainPath?: string | null;
+        subPath?: string | null;
+    },
     quality: "main" | "sub",
     auth: CameraAuth = {}
 ): string {
@@ -326,6 +338,9 @@ export function relaySource(
         // subtype=1 is the small stream, 0 the full one.
         return `${vendor.nativeScheme}://${credentials}@${camera.address}?subtype=${quality === "sub" ? 1 : 0}`;
     }
-    const path = quality === "sub" ? camera.subPath || camera.mainPath || vendor.mainPath : camera.mainPath || vendor.mainPath;
+    const path =
+        quality === "sub"
+            ? camera.subPath || camera.mainPath || vendor.mainPath
+            : camera.mainPath || vendor.mainPath;
     return rtspUrl(camera, path ?? "", auth);
 }

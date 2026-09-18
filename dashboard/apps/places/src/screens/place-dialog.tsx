@@ -83,7 +83,9 @@ export function PlaceDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[0.75rem] font-medium text-muted-foreground">What it is</span>
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
+                            What it is
+                        </span>
                         <Select
                             value={kind}
                             onValueChange={setKind}
@@ -94,7 +96,9 @@ export function PlaceDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[0.75rem] font-medium text-muted-foreground">Where it is</span>
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
+                            Where it is
+                        </span>
                         <Input
                             value={address}
                             onChange={(event) => setAddress(event.target.value)}

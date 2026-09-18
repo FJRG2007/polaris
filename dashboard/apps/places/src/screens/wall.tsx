@@ -54,7 +54,13 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
     if (cameras === null) return <WallSkeleton />;
 
     if (error && cameras.length === 0) {
-        return <EmptyState icon={<Cctv />} title="The cameras could not be listed" description={error} />;
+        return (
+            <EmptyState
+                icon={<Cctv />}
+                title="The cameras could not be listed"
+                description={error}
+            />
+        );
     }
 
     if (cameras.length === 0) {
@@ -133,7 +139,10 @@ function WallSkeleton() {
     return (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((index) => (
-                <div key={index} className="overflow-hidden rounded-lg border border-border bg-card">
+                <div
+                    key={index}
+                    className="overflow-hidden rounded-lg border border-border bg-card"
+                >
                     <Skeleton className="aspect-video w-full rounded-none" />
                     <div className="border-t border-border px-3 py-2">
                         <Skeleton className="h-3.5 w-28" />

@@ -19,7 +19,10 @@ export const dynamic = "force-dynamic";
 
 const RANGE = /^bytes=(\d+)-(\d*)$/;
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "home.read"))) return new Response("Forbidden", { status: 403 });
@@ -31,7 +34,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const start = match ? Number.parseInt(match[1] ?? "0", 10) : 0;
     const end = match?.[2] ? Number.parseInt(match[2], 10) : undefined;
 
-    const clip = await openClip(install.id, id, match ? { start, ...(end === undefined ? {} : { end }) } : undefined);
+    const clip = await openClip(
+        install.id,
+        id,
+        match ? { start, ...(end === undefined ? {} : { end }) } : undefined
+    );
     if (!clip) return new Response("Not found", { status: 404 });
 
     const last = end ?? clip.bytes - 1;

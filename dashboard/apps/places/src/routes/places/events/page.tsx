@@ -24,7 +24,11 @@ export default async function EventsPage() {
                     title="Events"
                     description="Everything the cameras noticed. Narrow it to one camera, one person or one night, and open any of it to see the footage of that moment."
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <EventsView canControl={canControl} />
         </div>

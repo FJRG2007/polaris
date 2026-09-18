@@ -54,7 +54,13 @@ import {
     ZoomOut
 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
-import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "../lib/player";
+import {
+    otherTransport,
+    preferredTransport,
+    stillSrc,
+    streamSrc,
+    type Transport
+} from "../lib/player";
 
 /**
  * Paced by arrival rather than by a clock, so a slow link stretches the gap
@@ -347,26 +353,29 @@ export function CameraViewer({
      * rest of the dialog's life. A callback ref cannot miss it: it is called
      * with the node the moment there is one, and with null when it goes.
      */
-    const holdFrame = useCallback((element: HTMLDivElement | null) => {
-        detachWheel.current?.();
-        detachWheel.current = null;
-        frame.current = element;
-        if (!element) return;
-        const onWheel = (event: WheelEvent) => {
-            event.preventDefault();
-            // Proportional to how hard the wheel was turned, rather than a fixed
-            // step per event. A notch is a small push and a trackpad sends a
-            // stream of tiny ones, and a step and a half on each of those is a
-            // picture that leaps past whatever was being aimed at.
-            const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
-            const amount = Math.max(-240, Math.min(240, event.deltaY * lines));
-            setZoom((current) =>
-                zoomBy(current, Math.exp(-amount / 320), pointAt(event), covering.current)
-            );
-        };
-        element.addEventListener("wheel", onWheel, { passive: false });
-        detachWheel.current = () => element.removeEventListener("wheel", onWheel);
-    }, [pointAt]);
+    const holdFrame = useCallback(
+        (element: HTMLDivElement | null) => {
+            detachWheel.current?.();
+            detachWheel.current = null;
+            frame.current = element;
+            if (!element) return;
+            const onWheel = (event: WheelEvent) => {
+                event.preventDefault();
+                // Proportional to how hard the wheel was turned, rather than a fixed
+                // step per event. A notch is a small push and a trackpad sends a
+                // stream of tiny ones, and a step and a half on each of those is a
+                // picture that leaps past whatever was being aimed at.
+                const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+                const amount = Math.max(-240, Math.min(240, event.deltaY * lines));
+                setZoom((current) =>
+                    zoomBy(current, Math.exp(-amount / 320), pointAt(event), covering.current)
+                );
+            };
+            element.addEventListener("wheel", onWheel, { passive: false });
+            detachWheel.current = () => element.removeEventListener("wheel", onWheel);
+        },
+        [pointAt]
+    );
 
     /** The pointer moved: show the chrome, and start the clock on hiding it. */
     const wakeChrome = useCallback(() => {
@@ -407,7 +416,9 @@ export function CameraViewer({
                             // A second press puts it back rather than pushing
                             // further in: the way out has to be as easy as the
                             // way in, and there is no other gesture for it.
-                            isZoomed(current) ? NO_ZOOM : zoomBy(current, ZOOM_STEP * 2, pointAt(event), cover)
+                            isZoomed(current)
+                                ? NO_ZOOM
+                                : zoomBy(current, ZOOM_STEP * 2, pointAt(event), cover)
                         )
                     }
                     onPointerDown={(event) => {
@@ -426,84 +437,87 @@ export function CameraViewer({
                     onPointerUp={() => (dragging.current = null)}
                     onPointerCancel={() => (dragging.current = null)}
                 >
-                {/* No transition on this. It is dragged and wheeled, and an
+                    {/* No transition on this. It is dragged and wheeled, and an
                     eased transform lags a finger by its own duration - which
                     reads as a picture that will not follow rather than as a
                     picture that is being animated nicely. */}
-                <div
-                    className="relative origin-center will-change-transform"
-                    style={{ transform: zoomTransform(zoom, cover) }}
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a live
+                    <div
+                        className="relative origin-center will-change-transform"
+                        style={{ transform: zoomTransform(zoom, cover) }}
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- a live
                         frame is never the same twice, so there is nothing for the
                         image optimizer to cache and it would only add a hop. */}
-                    <img
-                        src={stillSrc(
-                            camera.id,
-                            stamp,
-                            trying ? MOVING_WIDTH : FRAME_WIDTH,
-                            // Only while the pictures are the view. Once the
-                            // stream is playing nothing asks for one at all.
-                            trying
-                        )}
-                        alt={camera.name}
-                        className={cn("w-full bg-black", surface, playing && "invisible")}
-                        onLoad={(loaded) => {
-                            setDrawn(true);
-                            const { naturalWidth, naturalHeight } = loaded.currentTarget;
-                            if (naturalWidth > 0 && naturalHeight > 0) {
-                                setShape(naturalWidth / naturalHeight);
-                            }
-                            if (!playing) after(trying ? FRAME_GAP_MS : COLD_GAP_MS);
-                        }}
-                        onError={() => {
-                            setDrawn(false);
-                            if (!playing) after(FRAME_RETRY_MS);
-                        }}
-                    />
-                    {trying ? (
-                        <video
-                            ref={video}
-                            // Keyed on the format so swapping really re-creates the
-                            // element: a <video> handed a new src after an error
-                            // keeps the error and never tries again.
-                            // Keyed on the pause as well, so starting again
-                            // re-creates the element and reconnects to live
-                            // rather than resuming a buffer from a minute ago.
-                            key={`${transport}-${paused ? "held" : "live"}`}
-                            src={streamSrc(camera.id, "main", transport)}
-                            className={cn("absolute inset-0 w-full bg-black", surface, !playing && "invisible")}
-                            autoPlay={!paused}
-                            muted={muted}
-                            playsInline
-                            controls={false}
-                            // Each of these is the stream saying it is still
-                            // coming, which is what the clock above is against.
-                            onLoadStart={stirred}
-                            onLoadedMetadata={(loaded) => {
-                                stirred();
-                                const { videoWidth, videoHeight } = loaded.currentTarget;
-                                if (videoWidth > 0 && videoHeight > 0) {
-                                    setShape(videoWidth / videoHeight);
+                        <img
+                            src={stillSrc(
+                                camera.id,
+                                stamp,
+                                trying ? MOVING_WIDTH : FRAME_WIDTH,
+                                // Only while the pictures are the view. Once the
+                                // stream is playing nothing asks for one at all.
+                                trying
+                            )}
+                            alt={camera.name}
+                            className={cn("w-full bg-black", surface, playing && "invisible")}
+                            onLoad={(loaded) => {
+                                setDrawn(true);
+                                const { naturalWidth, naturalHeight } = loaded.currentTarget;
+                                if (naturalWidth > 0 && naturalHeight > 0) {
+                                    setShape(naturalWidth / naturalHeight);
                                 }
+                                if (!playing) after(trying ? FRAME_GAP_MS : COLD_GAP_MS);
                             }}
-                            onProgress={stirred}
-                            onCanPlay={stirred}
-                            onPlaying={() => setPlaying(true)}
-                            onError={failed}
+                            onError={() => {
+                                setDrawn(false);
+                                if (!playing) after(FRAME_RETRY_MS);
+                            }}
                         />
-                    ) : null}
+                        {trying ? (
+                            <video
+                                ref={video}
+                                // Keyed on the format so swapping really re-creates the
+                                // element: a <video> handed a new src after an error
+                                // keeps the error and never tries again.
+                                // Keyed on the pause as well, so starting again
+                                // re-creates the element and reconnects to live
+                                // rather than resuming a buffer from a minute ago.
+                                key={`${transport}-${paused ? "held" : "live"}`}
+                                src={streamSrc(camera.id, "main", transport)}
+                                className={cn(
+                                    "absolute inset-0 w-full bg-black",
+                                    surface,
+                                    !playing && "invisible"
+                                )}
+                                autoPlay={!paused}
+                                muted={muted}
+                                playsInline
+                                controls={false}
+                                // Each of these is the stream saying it is still
+                                // coming, which is what the clock above is against.
+                                onLoadStart={stirred}
+                                onLoadedMetadata={(loaded) => {
+                                    stirred();
+                                    const { videoWidth, videoHeight } = loaded.currentTarget;
+                                    if (videoWidth > 0 && videoHeight > 0) {
+                                        setShape(videoWidth / videoHeight);
+                                    }
+                                }}
+                                onProgress={stirred}
+                                onCanPlay={stirred}
+                                onPlaying={() => setPlaying(true)}
+                                onError={failed}
+                            />
+                        ) : null}
 
-                    {boxes.map((found) => (
-                        <DetectionBox
-                            key={found.id}
-                            box={found.box}
-                            label={boxLabel(found.label, found.score)}
-                            picture={shape}
-                            tile={surfaceShape}
-                        />
-                    ))}
-
+                        {boxes.map((found) => (
+                            <DetectionBox
+                                key={found.id}
+                                box={found.box}
+                                label={boxLabel(found.label, found.score)}
+                                picture={shape}
+                                tile={surfaceShape}
+                            />
+                        ))}
                     </div>
 
                     {drawn === false && !playing ? (
@@ -551,8 +565,20 @@ export function CameraViewer({
                         )}
                     >
                         <div className="min-w-0">
-                            <p className="truncate text-[0.8125rem] font-medium text-white" title={camera.name}>{camera.name}</p>
-                            {camera.zone ? <p className="truncate text-[0.6875rem] text-white/70" title={camera.zone}>{camera.zone}</p> : null}
+                            <p
+                                className="truncate text-[0.8125rem] font-medium text-white"
+                                title={camera.name}
+                            >
+                                {camera.name}
+                            </p>
+                            {camera.zone ? (
+                                <p
+                                    className="truncate text-[0.6875rem] text-white/70"
+                                    title={camera.zone}
+                                >
+                                    {camera.zone}
+                                </p>
+                            ) : null}
                         </div>
                     </div>
 
@@ -611,13 +637,19 @@ export function CameraViewer({
                         <Control
                             label="Zoom out"
                             disabled={!isZoomed(zoom)}
-                            onClick={() => setZoom((current) => zoomBy(current, 1 / ZOOM_STEP, undefined, cover))}
+                            onClick={() =>
+                                setZoom((current) =>
+                                    zoomBy(current, 1 / ZOOM_STEP, undefined, cover)
+                                )
+                            }
                         >
                             <ZoomOut className="size-4 shrink-0" />
                         </Control>
                         <Control
                             label="Zoom in"
-                            onClick={() => setZoom((current) => zoomBy(current, ZOOM_STEP, undefined, cover))}
+                            onClick={() =>
+                                setZoom((current) => zoomBy(current, ZOOM_STEP, undefined, cover))
+                            }
                         >
                             <ZoomIn className="size-4 shrink-0" />
                         </Control>

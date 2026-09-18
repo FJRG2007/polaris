@@ -34,5 +34,7 @@ export const FACE_EXTENSION: Record<FaceImageType, string> = {
  */
 export function faceImageType(contentType: string | undefined): FaceImageType {
     const base = (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
-    return FACE_IMAGE_TYPES.includes(base as FaceImageType) ? (base as FaceImageType) : "image/jpeg";
+    return FACE_IMAGE_TYPES.includes(base as FaceImageType)
+        ? (base as FaceImageType)
+        : "image/jpeg";
 }

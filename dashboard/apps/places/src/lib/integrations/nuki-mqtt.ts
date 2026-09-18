@@ -77,7 +77,11 @@ export async function readBroker(broker: NukiBroker): Promise<BrokerContents> {
  * gone. Their firmware asks publishers for ten seconds, and that is what this
  * sets.
  */
-export async function sendAction(broker: NukiBroker, deviceId: string, action: number): Promise<void> {
+export async function sendAction(
+    broker: NukiBroker,
+    deviceId: string,
+    action: number
+): Promise<void> {
     await publish(broker, `${broker.prefix}/${deviceId}/lockAction`, String(action), {
         qos: 2,
         expirySeconds: 10

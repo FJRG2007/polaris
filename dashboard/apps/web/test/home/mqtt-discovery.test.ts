@@ -25,7 +25,13 @@ vi.mock("@polaris-app/places/src/lib/integrations/mqtt-broker", () => ({
 
 const { mqttDiscoveryDriver } = await import("@polaris-app/places/src/lib/drivers/mqtt-discovery");
 
-const BROKER = { host: "192.168.1.20", port: "1883", username: "", password: "", prefix: "homeassistant" };
+const BROKER = {
+    host: "192.168.1.20",
+    port: "1883",
+    username: "",
+    password: "",
+    prefix: "homeassistant"
+};
 
 /** The two reads the driver makes, in order: the descriptions, then everything
  *  they pointed at. */
@@ -33,7 +39,9 @@ function broker(configs: Record<string, unknown>, states: Record<string, string>
     mocks.readRetained.mockReset();
     mocks.readRetained.mockImplementation(async (_address: unknown, filters: string[]) => {
         if (filters.some((filter) => filter.endsWith("/config"))) {
-            return new Map(Object.entries(configs).map(([topic, body]) => [topic, JSON.stringify(body)]));
+            return new Map(
+                Object.entries(configs).map(([topic, body]) => [topic, JSON.stringify(body)])
+            );
         }
         return new Map(Object.entries(states));
     });

@@ -123,13 +123,19 @@ function signature(
     const contentSha = body ? createHash("sha256").update(body).digest("hex") : EMPTY_BODY_SHA;
     const stringToSign = `${method}\n${contentSha}\n\n${path}`;
     const payload = `${credentials.accessId}${accessToken}${t}${nonce}${stringToSign}`;
-    return createHmac("sha256", credentials.accessSecret).update(payload).digest("hex").toUpperCase();
+    return createHmac("sha256", credentials.accessSecret)
+        .update(payload)
+        .digest("hex")
+        .toUpperCase();
 }
 
 /** A path with its query in the order the signature expects: sorted by key,
  *  ascending. Built here rather than at a call site because a query assembled in
  *  a different order signs a different string and is refused with no clue why. */
-function pathWithQuery(path: string, query: Readonly<Record<string, string | number | undefined>>): string {
+function pathWithQuery(
+    path: string,
+    query: Readonly<Record<string, string | number | undefined>>
+): string {
     const entries = Object.entries(query)
         .filter(([, value]) => value !== undefined && value !== "")
         .map(([key, value]) => [key, String(value)] as const)
@@ -197,7 +203,10 @@ async function call(
                 "unauthorized"
             );
         }
-        throw new TuyaError(detail ? `Tuya refused the request: ${detail}.` : "Tuya refused the request.", "refused");
+        throw new TuyaError(
+            detail ? `Tuya refused the request: ${detail}.` : "Tuya refused the request.",
+            "refused"
+        );
     }
 
     return parsed.data.result;
@@ -220,7 +229,9 @@ const tokens = new Map<string, { token: string; uid: string; expiresAt: number }
 
 const TOKEN_MARGIN_MS = 60_000;
 
-export async function tuyaToken(credentials: TuyaCredentials): Promise<{ token: string; uid: string }> {
+export async function tuyaToken(
+    credentials: TuyaCredentials
+): Promise<{ token: string; uid: string }> {
     const key = `${credentials.region}:${credentials.accessId}`;
     const held = tokens.get(key);
     if (held && held.expiresAt > Date.now()) return { token: held.token, uid: held.uid };
@@ -278,7 +289,8 @@ export async function listTuyaDevices(credentials: TuyaCredentials): Promise<Tuy
         });
         const result = await call(credentials, "GET", path, { accessToken: token });
         const parsed = deviceListSchema.safeParse(result);
-        if (!parsed.success) throw new TuyaError("Tuya answered with something unexpected.", "refused");
+        if (!parsed.success)
+            throw new TuyaError("Tuya answered with something unexpected.", "refused");
         devices.push(...parsed.data.devices);
         if (!parsed.data.has_more || !parsed.data.last_row_key) break;
         cursor = parsed.data.last_row_key;
@@ -289,7 +301,10 @@ export async function listTuyaDevices(credentials: TuyaCredentials): Promise<Tuy
 /** One device's data points, now. Used before a command rather than on a read:
  *  what a plug calls its own switch is its own business, and the answer is in
  *  here. */
-export async function tuyaStatus(credentials: TuyaCredentials, deviceId: string): Promise<TuyaStatus[]> {
+export async function tuyaStatus(
+    credentials: TuyaCredentials,
+    deviceId: string
+): Promise<TuyaStatus[]> {
     const { token } = await tuyaToken(credentials);
     const result = await call(
         credentials,

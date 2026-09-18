@@ -313,7 +313,8 @@ export function CameraDialog({
 
     /** Whether leaving the field empty means "use the one already stored for this
      *  account" rather than "connect with nothing". */
-    const inheritsPassword = sharedPassword && usesAccountPassword(vendorId) && !camera?.hasPassword;
+    const inheritsPassword =
+        sharedPassword && usesAccountPassword(vendorId) && !camera?.hasPassword;
     /** On a make with its own protocol the password is the entire credential -
      *  there is no account name beside it - so an empty one cannot connect and
      *  is not worth a round trip to find that out. Unless there is one to
@@ -411,7 +412,7 @@ export function CameraDialog({
                   // is the reassurance that costs an evening.
                   "Something is answering there. Save it, and ask again to try the video."
                 : [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") ||
-                  "The camera answered"
+                      "The camera answered"
         );
     };
 
@@ -553,12 +554,15 @@ export function CameraDialog({
                             <p
                                 className={cn(
                                     "text-[0.75rem] leading-relaxed",
-                                    battery && (needsSomewhereToRun(form.detector) || form.recording !== "off")
+                                    battery &&
+                                        (needsSomewhereToRun(form.detector) ||
+                                            form.recording !== "off")
                                         ? "text-warning"
                                         : "text-muted-foreground"
                                 )}
                             >
-                                {battery && (needsSomewhereToRun(form.detector) || form.recording !== "off")
+                                {battery &&
+                                (needsSomewhereToRun(form.detector) || form.recording !== "off")
                                     ? BATTERY_COST_WARNING
                                     : POWER_NOTES[form.power]}
                             </p>
@@ -573,8 +577,9 @@ export function CameraDialog({
                             camera refuses and the password gets the blame. */}
                         {vendor.appConsent ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                Recent firmware refuses every local connection until it is allowed. In the
-                                Tapo app: <span className="text-foreground">{vendor.appConsent}</span>.
+                                Recent firmware refuses every local connection until it is allowed.
+                                In the Tapo app:{" "}
+                                <span className="text-foreground">{vendor.appConsent}</span>.
                             </p>
                         ) : null}
                         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -615,14 +620,14 @@ export function CameraDialog({
                                         : inheritsPassword
                                           ? "Leave it blank to use the password from your other TP-Link cameras - it is one password for the whole account."
                                           : usesRtsp
-                                          ? undefined
-                                          : // The question everybody asks at this
-                                            // field, answered at it: the camera
-                                            // checks the password by itself and
-                                            // never asks who is presenting it,
-                                            // so there is no address to give and
-                                            // its absence is not a missing step.
-                                            "The password for your TP-Link account. There is no email or account name to give - the camera checks the password and nothing else."
+                                            ? undefined
+                                            : // The question everybody asks at this
+                                              // field, answered at it: the camera
+                                              // checks the password by itself and
+                                              // never asks who is presenting it,
+                                              // so there is no address to give and
+                                              // its absence is not a missing step.
+                                              "The password for your TP-Link account. There is no email or account name to give - the camera checks the password and nothing else."
                                 }
                             >
                                 {/* enigma:allow-no-breach-check - nothing is being
@@ -733,7 +738,10 @@ export function CameraDialog({
                         {form.detector === "faces" && recognizes === false ? (
                             <p className="text-[0.75rem] leading-relaxed text-warning">
                                 {DETECTOR_META.faces.requires}{" "}
-                                <Link href="/places/settings" className="underline underline-offset-2">
+                                <Link
+                                    href="/places/settings"
+                                    className="underline underline-offset-2"
+                                >
                                     Open Settings
                                 </Link>
                             </p>
@@ -745,9 +753,9 @@ export function CameraDialog({
                         ) : null}
                         {battery && !ownAlerts && form.detector === "none" ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                A camera like this has no way to tell Polaris what it saw, so its own alerts
-                                stay in the Tapo app. Polaris connects when you open it, and lets go when you
-                                leave.
+                                A camera like this has no way to tell Polaris what it saw, so its
+                                own alerts stay in the Tapo app. Polaris connects when you open it,
+                                and lets go when you leave.
                             </p>
                         ) : null}
                         {camera?.id && form.detector !== "none" ? (
@@ -755,8 +763,8 @@ export function CameraDialog({
                         ) : null}
                         {form.detector === "faces" && recognizes === true ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                Face recognition is on. Teach it who lives here under People and this camera
-                                starts using their names.
+                                Face recognition is on. Teach it who lives here under People and
+                                this camera starts using their names.
                             </p>
                         ) : null}
 
@@ -1066,15 +1074,17 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
     if (activity === null) {
         return (
             <p className="text-[0.75rem] leading-relaxed text-warning">
-                No detector has reported on this camera. If you have just saved it, give it a minute - the
-                worker asks for its cameras every half minute.
+                No detector has reported on this camera. If you have just saved it, give it a minute
+                - the worker asks for its cameras every half minute.
             </p>
         );
     }
 
     const lines = [
         activity.watching ? "Watching this camera." : "Not connected to this camera right now.",
-        activity.motionAt ? `Movement ${since(activity.motionAt)}.` : "Nothing has moved in front of it yet.",
+        activity.motionAt
+            ? `Movement ${since(activity.motionAt)}.`
+            : "Nothing has moved in front of it yet.",
         activity.lookedAt
             ? activity.foundAt
                 ? `Last looked properly ${since(activity.lookedAt)}, and found ${activity.found ?? "something"} ${since(activity.foundAt)}.`
@@ -1084,9 +1094,13 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
 
     return (
         <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface px-3 py-2">
-            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">{lines.join(" ")}</p>
+            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
+                {lines.join(" ")}
+            </p>
             {activity.limitedTo ? (
-                <p className="text-[0.75rem] leading-relaxed text-warning">It is {activity.limitedTo}.</p>
+                <p className="text-[0.75rem] leading-relaxed text-warning">
+                    It is {activity.limitedTo}.
+                </p>
             ) : null}
         </div>
     );

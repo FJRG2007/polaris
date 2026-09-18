@@ -102,7 +102,9 @@ export function PersonDialog({
         setProgress("");
 
         if (refused.length > 0) {
-            setError(`${refused.length} of ${chosen.length} photographs were not accepted. ${refused[0]}`);
+            setError(
+                `${refused.length} of ${chosen.length} photographs were not accepted. ${refused[0]}`
+            );
             // The person exists either way, so the list is told about them.
             onSaved({ ...created.person, faces: chosen.length - refused.length });
             return;
@@ -116,8 +118,8 @@ export function PersonDialog({
                 <DialogHeader>
                     <DialogTitle>Add somebody</DialogTitle>
                     <DialogDescription>
-                        Their name, and a few photographs of their face. Without photographs the cameras still see
-                        them - they are just reported as a stranger.
+                        Their name, and a few photographs of their face. Without photographs the
+                        cameras still see them - they are just reported as a stranger.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -135,7 +137,9 @@ export function PersonDialog({
                     </label>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-[0.75rem] font-medium text-muted-foreground">Photographs</span>
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
+                            Photographs
+                        </span>
                         {chosen.length > 0 ? (
                             <ul className="flex flex-wrap gap-2">
                                 {chosen.map((item, index) => (

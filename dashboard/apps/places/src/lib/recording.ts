@@ -172,7 +172,12 @@ export async function getClip(installedAppId: string, id: string): Promise<ClipV
 /** The house's footage, newest first, bounded and keyset-paged like the events. */
 export async function listClips(
     installedAppId: string,
-    query: { placeId?: string | null; cameraId?: string | null; before?: Date | null; limit?: number } = {}
+    query: {
+        placeId?: string | null;
+        cameraId?: string | null;
+        before?: Date | null;
+        limit?: number;
+    } = {}
 ): Promise<ClipView[]> {
     const limit = Math.min(Math.max(query.limit ?? 40, 1), 200);
     const cameras = await prisma.camera.findMany({
@@ -238,7 +243,10 @@ export async function momentOf(
 
     // A second or two before it, because the useful part of "somebody appeared"
     // is the moment before they were there.
-    const offset = Math.max(0, Math.floor((event.at.getTime() - clip.startedAt.getTime()) / 1000) - 2);
+    const offset = Math.max(
+        0,
+        Math.floor((event.at.getTime() - clip.startedAt.getTime()) / 1000) - 2
+    );
     return { clipId: clip.id, offsetSeconds: offset };
 }
 
@@ -264,7 +272,11 @@ export async function openClip(
     installedAppId: string,
     id: string,
     range?: { start: number; end?: number }
-): Promise<{ stream: ReadableStream<Uint8Array>; bytes: number; dispose: () => Promise<void> } | null> {
+): Promise<{
+    stream: ReadableStream<Uint8Array>;
+    bytes: number;
+    dispose: () => Promise<void>;
+} | null> {
     const clip = await prisma.cameraClip.findFirst({
         where: { id, camera: { installedAppId } },
         select: { path: true, bytes: true }
@@ -275,7 +287,11 @@ export async function openClip(
     const driver = await driverForTarget(clip.path.slice(0, split), LOCAL_FOLDER);
     try {
         const stream = await driver.readStream(clip.path.slice(split + 1), range);
-        return { stream, bytes: Number(clip.bytes), dispose: async () => void (await driver.dispose?.()) };
+        return {
+            stream,
+            bytes: Number(clip.bytes),
+            dispose: async () => void (await driver.dispose?.())
+        };
     } catch {
         await driver.dispose?.();
         return null;

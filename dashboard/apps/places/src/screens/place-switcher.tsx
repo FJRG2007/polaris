@@ -75,7 +75,14 @@ export function PlaceSwitcher({
                 className="w-56"
                 options={
                     canManage
-                        ? [...options, { value: "new", label: "Add a place", icon: <Plus className="size-4 shrink-0" /> }]
+                        ? [
+                              ...options,
+                              {
+                                  value: "new",
+                                  label: "Add a place",
+                                  icon: <Plus className="size-4 shrink-0" />
+                              }
+                          ]
                         : options
                 }
             />

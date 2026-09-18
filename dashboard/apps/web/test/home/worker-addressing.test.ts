@@ -57,11 +57,17 @@ vi.mock("@polaris-app/places/src/lib/relay", () => ({
     relayServerFor: (value: string) => value,
     streamName: (id: string, quality: string) => `${id}-${quality}`
 }));
-vi.mock("@polaris-app/places/src/lib/recognizer", () => ({ recognizerFor: vi.fn(async () => faces) }));
-vi.mock("@polaris-app/places/src/lib/camera-zones", () => ({ zonesByCamera: vi.fn(async () => new Map()) }));
+vi.mock("@polaris-app/places/src/lib/recognizer", () => ({
+    recognizerFor: vi.fn(async () => faces)
+}));
+vi.mock("@polaris-app/places/src/lib/camera-zones", () => ({
+    zonesByCamera: vi.fn(async () => new Map())
+}));
 vi.mock("@/lib/apps/install-service", () => ({ installApp: vi.fn() }));
 vi.mock("@/lib/apps/install-secret", () => ({ installEnvSecret: vi.fn() }));
-vi.mock("@/lib/domain-service", () => ({ appBaseUrl: vi.fn(async () => "https://polaris.example") }));
+vi.mock("@/lib/domain-service", () => ({
+    appBaseUrl: vi.fn(async () => "https://polaris.example")
+}));
 vi.mock("@polaris-app/places/src/lib/side-service", () => ({
     assertServer: vi.fn(),
     findService: vi.fn(async () => null)
