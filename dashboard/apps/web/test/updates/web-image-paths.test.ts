@@ -25,10 +25,14 @@ const WORKFLOW = join(
     "dashboard-publish.yml"
 );
 
+/** The filter as one pattern: every app under `dashboard/apps` but the one it
+ *  excludes, then the rest of what it names. */
 function workflowWebFilter(): string {
-    const match = readFileSync(WORKFLOW, "utf8").match(/has '([^']+)' && out web true/);
-    if (!match) throw new Error("the web filter was not found in dashboard-publish.yml");
-    return match[1];
+    const text = readFileSync(WORKFLOW, "utf8");
+    const rest = text.match(/has '([^']+)' && web=true/);
+    const excluded = text.match(/grep -qvE '\^dashboard\/apps\/([\w-]+)\/' && web=true/);
+    if (!rest || !excluded) throw new Error("the web filter was not found in dashboard-publish.yml");
+    return `^dashboard/apps/(?!${excluded[1]}/)|${rest[1]}`;
 }
 
 describe("WEB_IMAGE_PATHS", () => {
@@ -44,5 +48,11 @@ describe("WEB_IMAGE_PATHS", () => {
             "dashboard/resources/arkicons/icons/raptor.png"
         ])
             expect(WEB_IMAGE_PATHS.test(file)).toBe(true);
+    });
+
+    it("counts every app package but the browser extension", () => {
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/places/src/lib/places-extension.ts")).toBe(true);
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/game-servers/package.json")).toBe(true);
+        expect(WEB_IMAGE_PATHS.test("dashboard/apps/extension/src/popup.tsx")).toBe(false);
     });
 });

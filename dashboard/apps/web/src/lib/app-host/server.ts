@@ -18,7 +18,6 @@
  */
 
 import { provideAppHost } from "@polaris/app-host";
-import * as appsCatalogSearch from "@/lib/apps/catalog-search";
 import * as appsCatalog from "@/lib/apps/catalog";
 import * as appsInstallDefaults from "@/lib/apps/install-defaults";
 import * as appsPortAdvice from "@/lib/apps/port-advice";
@@ -34,7 +33,6 @@ import { readInstallConfig } from "@/lib/apps/install-config-value";
 import type { InstalledSlotHost } from "@/components/app-extensions/installed-client";
 import type { LiveGrant } from "@/lib/access/grants";
 import type { AppExtension, AppJob, AppSlot } from "@/lib/app-extensions/types";
-import type { SearchableItem } from "@/lib/apps/catalog-search";
 import type { InstallConfig } from "@/lib/apps/install-config";
 import type { InstallSeed, InstalledAppSetting } from "@/lib/apps/install-service";
 import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-sharing";
@@ -145,9 +143,6 @@ export const serverHost = {
         normalizeEnvValue: appsCatalog.normalizeEnvValue,
         promptedEnvVars: appsCatalog.promptedEnvVars,
         tunableEnvVars: appsCatalog.tunableEnvVars
-    },
-    appsCatalogSearch: {
-        searchCatalog: appsCatalogSearch.searchCatalog
     },
     appsInstallAccess: {
         gamePermissionsFor: later(load.appsInstallAccess, "gamePermissionsFor"),
@@ -360,7 +355,6 @@ declare module "@polaris/app-host" {
         InstalledAppSetting: InstalledAppSetting;
         InstalledSlotHost: InstalledSlotHost;
         LiveGrant: LiveGrant;
-        SearchableItem: SearchableItem;
         SessionUser: SessionUser;
         SourceResource: SourceResource;
         StagedArtifact: StagedArtifact;

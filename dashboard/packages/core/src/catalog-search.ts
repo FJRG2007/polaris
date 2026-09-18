@@ -5,7 +5,9 @@
  * grid of a thousand pictures nobody scrolls, a search box, and an operator who
  * types "dimaond". The ranking below is what turns that into an answer, and it is
  * here rather than in one game's module because Minecraft and ARK both need it and
- * neither should be the other's dependency.
+ * neither should be the other's dependency. It is in this package rather than
+ * offered by the dashboard's server host because it runs in the browser, on
+ * every keystroke of an item picker, where that host does not exist.
  *
  * The entries are whatever a catalogue holds, as long as it can say what a thing
  * is called and what words find it.

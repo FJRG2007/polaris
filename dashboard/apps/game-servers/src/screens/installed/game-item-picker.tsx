@@ -20,9 +20,7 @@ import { Input, cn } from "@polaris/ui";
 import { Loader2, Search } from "lucide-react";
 import { DRAG_EFFECT_ALLOWED } from "./minecraft-inventory";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
-import type { AppHostTypes } from "@polaris/app-host";
-
-type SearchableItem = AppHostTypes["SearchableItem"];
+import type { SearchableItem } from "@polaris/core/catalog-search";
 
 /** How many tiles are drawn before the operator is asked to type more. A whole
  *  catalogue is a thousand pictures or two; a grid of all of them is a scroll
