@@ -1173,6 +1173,11 @@ export function isGameServerApp(catalogId: string): boolean {
     return manifest ? appHasCapability(manifest, "game-server") : false;
 }
 
+/** Every app manifest, offered or not. */
+export function catalogApps(): readonly AppManifest[] {
+    return POLARIS_APP_CATALOG;
+}
+
 /** Look up an app manifest by id. */
 export function findApp(id: string): AppManifest | undefined {
     return POLARIS_APP_CATALOG.find((app) => app.id === id);

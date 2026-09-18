@@ -37,7 +37,7 @@ const lazy = [...HOST.matchAll(/^\s{8}(\w+): later\(load\.(\w+), "(\w+)"\),$/gm)
 
 /** Every service the host offers at all, however it is provided. */
 const offered = (() => {
-    const body = /^export const serverHost = \{$([\s\S]*?)^\};$/m.exec(HOST)?.[1] ?? "";
+    const body = /^export const serverHost = \{$([\s\S]*?)^\}(?: satisfies [^;]+)?;$/m.exec(HOST)?.[1] ?? "";
     const found: { area: string; name: string; from: string }[] = [];
     let area = "";
     for (const line of body.split("\n")) {
@@ -53,10 +53,10 @@ const offered = (() => {
  * Offered as it is rather than loaded on first use, and why that is allowed.
  *
  * `appsCatalog` is a list and a lookup into it - code, no database, no session,
- * nothing a test replaces - and both are read while an app's module is being
- * evaluated, which a promise cannot be. Everything else loads on first use.
+ * nothing a test replaces - and an app filters it synchronously, which a promise
+ * cannot be. Everything else loads on first use.
  */
-const EAGER = ["appsCatalog.POLARIS_APP_CATALOG", "appsCatalog.findApp"];
+const EAGER = ["appsCatalog.catalogApps", "appsCatalog.findApp"];
 
 const CLIENT = readFileSync(join(SRC, "components/app-host/client.tsx"), "utf8");
 
@@ -125,6 +125,20 @@ describe("the services the dashboard offers apps", () => {
         const lazily = /^later\(load\.\w+, "\w+"\)$/.test(service.from);
         const where = `${service.area}.${service.name}`;
         expect(lazily || EAGER.includes(where), where).toBe(true);
+    });
+
+    // An app may take a service at its top level before the dashboard has
+    // provided any, and is handed a stand-in that calls through later. Only a
+    // function can stand in like that, so a value offered here would reach such
+    // an app as a function.
+    it("offers nothing but functions", async () => {
+        const { serverHost } = await import("@/lib/app-host/server");
+        const values = Object.entries(serverHost).flatMap(([area, services]) =>
+            Object.entries(services)
+                .filter(([, service]) => typeof service !== "function")
+                .map(([name]) => `${area}.${name}`)
+        );
+        expect(values).toEqual([]);
     });
 
     it("names no exception the host no longer offers", () => {

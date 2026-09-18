@@ -30,7 +30,7 @@ import { loadEnv } from "@polaris/config";
 import { host } from "@polaris/app-host";
 
 const { deployApplication } = host.deployService;
-const { POLARIS_APP_CATALOG } = host.appsCatalog;
+const { catalogApps } = host.appsCatalog;
 const { getSetting, setSetting } = host.settingStore;
 const { isAppInstalled } = host.appsInstallPresence;
 
@@ -61,9 +61,11 @@ const ATTEMPT_KEY = "home.services.attemptedBuild";
  * `ownedBy` is exactly this - and a hand-written list named the relay by an id
  * the catalog never used, so the relay was never brought to a new build.
  */
-const OWN_SERVICES = POLARIS_APP_CATALOG.filter((app) => app.ownedBy === "home").map(
-    (app) => app.id
-);
+function ownServices(): string[] {
+    return catalogApps()
+        .filter((app) => app.ownedBy === "home")
+        .map((app) => app.id);
+}
 
 /**
  * Redeploy Home's own containers if they have not been brought to this build.
@@ -89,7 +91,7 @@ export async function upgradeHomeServices(): Promise<void> {
 
     const installs = await prisma.installedApp.findMany({
         where: {
-            catalogId: { in: OWN_SERVICES },
+            catalogId: { in: ownServices() },
             status: { not: "removed" },
             applicationId: { not: null }
         },

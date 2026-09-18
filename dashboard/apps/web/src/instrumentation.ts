@@ -7,6 +7,11 @@
 
 export async function register(): Promise<void> {
     if (process.env.NEXT_RUNTIME !== "nodejs") return;
+    // First, before anything can answer a request: an installed app's server
+    // action is loaded on its own, without the page or route that would
+    // otherwise have provided the dashboard's services to it.
+    await import("./lib/app-host/server");
+
     process.on("uncaughtException", (error) => {
         console.error("polaris: uncaught exception (server kept alive):", error);
     });

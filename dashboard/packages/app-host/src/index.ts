@@ -16,7 +16,7 @@
  * Server side. An app's client components use `@polaris/app-host/client`.
  */
 
-import { hostProxy, provide } from "./registry";
+import { hostProxy, lookup, provide, provided } from "./registry";
 
 /** Every server service an app may call, by area. Filled in by the dashboard. */
 export interface AppHost {}
@@ -29,15 +29,29 @@ export function provideAppHost(services: AppHost): void {
     provide("server", services);
 }
 
+function resolve(area: string, name: string): (...args: unknown[]) => unknown {
+    const services = provided("server");
+    if (!services) {
+        throw new Error(
+            `An app called "${area}.${name}" before the dashboard provided its services`
+        );
+    }
+    return lookup(services, "server", area, name) as (...args: unknown[]) => unknown;
+}
+
 /**
  * The dashboard's server services.
  *
- * Nothing on the server may run an app's code before the dashboard has provided
- * these, so asking for one earlier is a fault in how the app was loaded and is
- * reported as one, rather than handed back as something that fails later.
+ * Every one is a function, so a name looked up before the dashboard has provided
+ * them is handed back as a stand-in that finds the real service when it is
+ * called. Whichever of an app's modules a request reaches first - a page, a
+ * route, a server action - may take what it needs at its top level. Calling a
+ * service while a module is still being evaluated is what cannot work, and is
+ * reported when it happens.
  */
-export const host: AppHost = hostProxy<AppHost>("server", (area, name) => {
-    throw new Error(
-        `An app asked for "${area}.${name}" before the dashboard provided its services`
-    );
-});
+export const host: AppHost = hostProxy<AppHost>(
+    "server",
+    (area, name) =>
+        (...args: unknown[]) =>
+            resolve(area, name)(...args)
+);

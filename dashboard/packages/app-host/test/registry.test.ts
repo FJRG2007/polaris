@@ -49,3 +49,25 @@ describe("the services an app reads", () => {
         expect(() => proxy.greetings.hello).toThrow(/asked for "greetings.hello" too early/);
     });
 });
+
+describe("the server services an app takes before the dashboard provides them", () => {
+    const slot = Symbol.for("polaris.app-host.server");
+    const unprovide = () => delete (globalThis as Record<symbol, unknown>)[slot];
+
+    it("can be taken at a module's top level and called once provided", async () => {
+        unprovide();
+        const { host, provideAppHost } = await import("../src/index");
+        const area = (host as unknown as Record<string, Record<string, unknown>>).greetings;
+        const hello = area?.hello as () => string;
+        provideAppHost({ greetings: { hello: () => "hello" } } as never);
+        expect(hello()).toBe("hello");
+    });
+
+    it("says so when one is called before then", async () => {
+        unprovide();
+        const { host } = await import("../src/index");
+        const area = (host as unknown as Record<string, Record<string, unknown>>).greetings;
+        const hello = area?.hello as () => string;
+        expect(() => hello()).toThrow(/called "greetings.hello" before the dashboard provided/);
+    });
+});

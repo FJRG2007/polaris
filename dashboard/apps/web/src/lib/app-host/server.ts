@@ -13,7 +13,8 @@
  * of those modules therefore replaces it for the apps too.
  *
  * Imported for its effect by everything that can run an app's server code:
- * the app registry, and each route an app answers.
+ * server start (`instrumentation.ts`), the app registry, and each route an app
+ * answers.
  */
 
 import { provideAppHost } from "@polaris/app-host";
@@ -71,7 +72,7 @@ export const serverHost = {
         apiUser: later(load.apiSession, "apiUser"),
     },
     appsCatalog: {
-        POLARIS_APP_CATALOG: appsCatalog.POLARIS_APP_CATALOG,
+        catalogApps: appsCatalog.catalogApps,
         findApp: appsCatalog.findApp,
     },
     appsInstallPresence: {
@@ -134,7 +135,7 @@ export const serverHost = {
         safeName: later(load.storageTarget, "safeName"),
         storageTargetOptions: later(load.storageTarget, "storageTargetOptions"),
     }
-};
+} satisfies Record<string, Record<string, (...args: never[]) => unknown>>;
 
 type ServerHost = typeof serverHost;
 
