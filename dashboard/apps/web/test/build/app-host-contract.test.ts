@@ -23,21 +23,22 @@ const HOST = readFileSync(join(SRC, "lib/app-host/server.ts"), "utf8");
 
 /** Each area loaded on first use, and the module it loads. */
 const loads = new Map(
-    [...HOST.matchAll(/^\s{4}(\w+): once\(\(\) => import\("@\/([^"]+)"\)\),$/gm)].map((match) => [
+    [...HOST.matchAll(/^\s{4}(\w+): once\(\(\) => import\("@\/([^"]+)"\)\),?$/gm)].map((match) => [
         match[1] ?? "",
         match[2] ?? ""
     ])
 );
 
 /** Every service offered from one of those areas. */
-const lazy = [...HOST.matchAll(/^\s{8}(\w+): later\(load\.(\w+), "(\w+)"\),$/gm)].map((match) => ({
+const lazy = [...HOST.matchAll(/^\s{8}(\w+): later\(load\.(\w+), "(\w+)"\),?$/gm)].map((match) => ({
     name: match[3] ?? "",
     area: match[2] ?? ""
 }));
 
 /** Every service the host offers at all, however it is provided. */
 const offered = (() => {
-    const body = /^export const serverHost = \{$([\s\S]*?)^\}(?: satisfies [^;]+)?;$/m.exec(HOST)?.[1] ?? "";
+    const body =
+        /^export const serverHost = \{$([\s\S]*?)^\}(?: satisfies [^;]+)?;$/m.exec(HOST)?.[1] ?? "";
     const found: { area: string; name: string; from: string }[] = [];
     let area = "";
     for (const line of body.split("\n")) {
@@ -156,7 +157,8 @@ describe("the services the dashboard offers apps", () => {
             "m"
         );
         const asyncArrow = new RegExp(`^export\\s+const\\s+${name}\\s*=\\s*async\\b`, "m");
-        const declaration = new RegExp(`^export\\s+function\\s+${name}\\b[^{]*`, "m").exec(source)?.[0] ?? "";
+        const declaration =
+            new RegExp(`^export\\s+function\\s+${name}\\b[^{]*`, "m").exec(source)?.[0] ?? "";
         const ok =
             asyncFunction.test(source) ||
             asyncArrow.test(source) ||
@@ -171,12 +173,16 @@ describe("the services the dashboard offers apps", () => {
         for (const file of appFiles()) {
             const text = readFileSync(file, "utf8");
             for (const match of text.matchAll(new RegExp(`(\\w*\\s*)\\b${name}\\(`, "g"))) {
-                if (!/^(await|void)\s+$/.test(match[1] ?? "")) careless.push(`${file}: ${match[0]}`);
+                if (!/^(await|void)\s+$/.test(match[1] ?? ""))
+                    careless.push(`${file}: ${match[0]}`);
                 // What it used to be could not fail, so a call nobody waits for
                 // was safe to leave alone. It is a promise now, and one nobody
                 // has taken the rejection of is the whole process on its next
                 // tick, long after the request that started it has answered.
-                if (/^void\s+$/.test(match[1] ?? "") && !caught(text, (match.index ?? 0) + match[0].length))
+                if (
+                    /^void\s+$/.test(match[1] ?? "") &&
+                    !caught(text, (match.index ?? 0) + match[0].length)
+                )
                     careless.push(`${file}: void ${name}(...) with nothing to catch it`);
             }
         }
@@ -194,7 +200,9 @@ describe("the client pieces the dashboard offers apps", () => {
     // how an allow-list passes a file it has stopped understanding.
     it("leaves no line of the client host unread", () => {
         const areas = new Set(pieces.map((piece) => piece.area));
-        expect(clientBody.filter((line) => !areas.has(/^\s{4}(\w+):/.exec(line)?.[1] ?? ""))).toEqual([]);
+        expect(
+            clientBody.filter((line) => !areas.has(/^\s{4}(\w+):/.exec(line)?.[1] ?? ""))
+        ).toEqual([]);
     });
 
     it.each(pieces)("$area $name is drawn later or named as an exception", (piece) => {
@@ -253,7 +261,8 @@ function appFiles(): string[] {
     };
     for (const app of readdirSync(apps)) {
         const src = join(apps, app, "src");
-        if (app !== "web" && existsSync(join(apps, app, "package.json")) && existsSync(src)) walk(src);
+        if (app !== "web" && existsSync(join(apps, app, "package.json")) && existsSync(src))
+            walk(src);
     }
     return found;
 }
