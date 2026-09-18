@@ -136,6 +136,11 @@ it: the vault's second factor IS the account's, not a second one.
   `<origin>/vault/#/send/...` shape an official client mints lands inside the
   dashboard, which asks a stranger to sign in - so for somebody outside, copy the
   link from Polaris.
+- **The browser extension's vault client belongs to its own connection to the
+  account first.** That connection - approved once at `/account/extension` - is
+  what an extension's vault client is let in under, so ending it there or from
+  the Sessions screen ends the vault client with it, not only the connection.
+  See `dashboard/apps/extension/README.md` for how that connection works.
 
 ## Not implemented yet
 
