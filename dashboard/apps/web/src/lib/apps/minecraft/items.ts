@@ -12,6 +12,7 @@
  * resolves to a URL that 404s, which the slot renders as a placeholder.
  */
 
+import { z } from "zod";
 import { searchCatalog, type SearchableItem } from "@/lib/apps/catalog-search";
 
 /** An item id as the game writes it, the namespace optional because `give Alice
@@ -106,6 +107,47 @@ export function readItemCatalog(manifest: unknown): CatalogItem[] {
     return items;
 }
 
+/** The largest a texture may claim to be. A 16x16 is the normal one; past this
+ *  is an atlas or a lie, and neither belongs in an inventory slot. */
+export const MAX_TEXTURE_SIDE = 4096;
+
+/**
+ * Where an item's picture comes from.
+ *
+ * Spelled out once, as a schema rather than as a type, because all three places
+ * that handle it handle bytes somebody else wrote: the reader that pulls it out
+ * of a downloaded jar, the cache file it is written into and read back from, and
+ * the panel that receives it over the API. A shape written down three times is
+ * three things to keep in step; this is one, and it is checked at every crossing.
+ */
+export const modItemIconSchema = z.union([
+    /** A PNG carried by the jar, kept under `name`, at its own pixel size - which
+     *  the panel needs because a mod texture is not always square. */
+    z.object({
+        kind: z.literal("mod"),
+        name: z.string().refine(isIconName),
+        width: z.number().int().positive().max(MAX_TEXTURE_SIDE),
+        height: z.number().int().positive().max(MAX_TEXTURE_SIDE)
+    }),
+    /** A texture the jar does not carry, as the model names it - `block/stone`.
+     *  Resolved against the vendored vanilla set by `vanillaTextureName`. */
+    z.object({ kind: z.literal("vanilla"), texture: z.string().max(200) })
+]);
+
+export type ModItemIcon = z.infer<typeof modItemIconSchema>;
+
+/** One item a mod adds, as it is read out of the jar and written back out of the
+ *  cache. */
+export const modItemSchema = z.object({
+    /** Namespaced, ready for `give`. */
+    id: z.string().max(160),
+    /** What the game calls it, in the language the panel is in. */
+    label: z.string().max(120),
+    icon: modItemIconSchema.nullable()
+});
+
+export type ModItem = z.infer<typeof modItemSchema>;
+
 /**
  * One item a mod adds, as the server's own route reports it.
  *
@@ -114,19 +156,12 @@ export function readItemCatalog(manifest: unknown): CatalogItem[] {
  * the build it came out of, or the vanilla texture the mod's model points at -
  * most of what a mod adds is a variation on something the game already draws.
  */
-export interface ModItemView {
-    readonly id: string;
-    readonly label: string;
+export interface ModItemView extends ModItem {
     /** Which mod, by the name on the server's list. */
     readonly mod: string;
     /** The build its picture is kept under. */
     readonly build: string;
-    readonly icon: ModItemIconView | null;
 }
-
-export type ModItemIconView =
-    | { readonly kind: "mod"; readonly name: string; readonly width: number; readonly height: number }
-    | { readonly kind: "vanilla"; readonly texture: string };
 
 /** A picture and how to draw it. Mod textures are not always square - an animated
  *  one is a column of frames, a connected one a row of variants - and a strip
@@ -182,20 +217,9 @@ export function readModItems(payload: unknown): ModItemView[] {
     return items;
 }
 
-function readModIcon(value: unknown): ModItemIconView | null {
-    if (value === null || typeof value !== "object") return null;
-    const icon = value as Record<string, unknown>;
-    if (icon.kind === "mod") {
-        const { name, width, height } = icon;
-        if (typeof name !== "string" || !isIconName(name)) return null;
-        if (typeof width !== "number" || typeof height !== "number") return null;
-        if (width <= 0 || height <= 0) return null;
-        return { kind: "mod", name, width, height };
-    }
-    if (icon.kind === "vanilla" && typeof icon.texture === "string") {
-        return { kind: "vanilla", texture: icon.texture };
-    }
-    return null;
+function readModIcon(value: unknown): ModItemIcon | null {
+    const parsed = modItemIconSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
 }
 
 /** The modded items as catalog entries, searchable beside the vanilla ones. The

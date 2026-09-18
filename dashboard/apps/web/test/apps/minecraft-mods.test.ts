@@ -113,8 +113,8 @@ describe("what a server is offered", () => {
     });
 });
 
-describe("an icon url", () => {
-    it("has to be Modrinth over https", () => {
+describe("a url out of their api", () => {
+    it("has to be Modrinth over https before anything here fetches it", () => {
         expect(modrinth.isModrinthUrl("https://cdn.modrinth.com/data/x/icon.png")).toBe(true);
         expect(modrinth.isModrinthUrl("http://cdn.modrinth.com/data/x/icon.png")).toBe(false);
         expect(modrinth.isModrinthUrl("https://cdn.modrinth.com.evil.example/x.png")).toBe(false);

@@ -38,7 +38,14 @@
  * can be asserted against a jar assembled in a test.
  */
 
-import { isIconName, itemLabel, normalizeItemId } from "./items";
+import {
+    MAX_TEXTURE_SIDE,
+    isIconName,
+    itemLabel,
+    normalizeItemId,
+    type ModItem,
+    type ModItemIcon
+} from "./items";
 
 /** A jar, as much of one as this needs. */
 export interface JarFiles {
@@ -48,22 +55,9 @@ export interface JarFiles {
     read(path: string): Promise<Uint8Array | null>;
 }
 
-/** Where an item's picture comes from. */
-export type ModItemIcon =
-    /** A PNG carried by the jar, kept under `name`, at its own pixel size - which
-     *  the panel needs because a mod texture is not always square. */
-    | { readonly kind: "mod"; readonly name: string; readonly width: number; readonly height: number }
-    /** A texture the jar does not carry, as the model names it - `block/stone`.
-     *  Resolved against the vendored vanilla set by `vanillaTextureName`. */
-    | { readonly kind: "vanilla"; readonly texture: string };
-
-export interface ModItem {
-    /** Namespaced, ready for `give`. */
-    readonly id: string;
-    /** What the game calls it, in the language the panel is in. */
-    readonly label: string;
-    readonly icon: ModItemIcon | null;
-}
+/** An item and its picture, as `items` spells both out - one shape between the
+ *  jar it is read from, the cache it is kept in, and the panel it is drawn on. */
+export type { ModItem, ModItemIcon };
 
 export interface JarItems {
     readonly items: readonly ModItem[];
@@ -172,7 +166,9 @@ export function pngSize(bytes: Uint8Array): { width: number; height: number } | 
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const width = view.getUint32(16);
     const height = view.getUint32(20);
-    if (width === 0 || height === 0 || width > 4096 || height > 4096) return null;
+    if (width === 0 || height === 0 || width > MAX_TEXTURE_SIDE || height > MAX_TEXTURE_SIDE) {
+        return null;
+    }
     return { width, height };
 }
 

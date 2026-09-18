@@ -437,6 +437,23 @@ describe("the build a jar is read from", () => {
         expect(build?.filename).toBe("SecurityCraft v1.10.1.jar");
     });
 
+    it("reads a project that has published more builds than the list is cut to", async () => {
+        // JEI, Create and Fabric API all answer with hundreds of builds for one
+        // loader: a list long enough to refuse is the common case, not the odd
+        // one, and refusing it reported the most popular mods as unreadable.
+        answer([
+            { id: "newest", version_number: "v1.10.1", version_type: "release", game_versions: ["1.21.4"], files: [file("SecurityCraft v1.10.1.jar")] },
+            ...Array.from({ length: 400 }, (_, index) => ({
+                id: `old-${index}`,
+                version_number: `v1.0.${index}`,
+                version_type: "release",
+                game_versions: ["1.21.4"],
+                files: [file(`old-${index}.jar`)]
+            }))
+        ]);
+        expect((await buildFor("security-craft", "neoforge", "1.21.4"))?.version).toBe("v1.10.1");
+    });
+
     it("reads the build an entry is pinned to rather than the newest", async () => {
         answer([
             { id: "new", version_number: "v1.10.1", version_type: "release", game_versions: ["1.21.4"], files: [file("new.jar")] },

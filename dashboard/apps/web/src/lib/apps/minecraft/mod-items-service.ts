@@ -25,14 +25,21 @@ import { z } from "zod";
 import JSZip from "jszip";
 import { prisma } from "@polaris/db";
 import * as modItems from "./mod-items";
-import { isBuildKey, isIconName } from "./items";
+import { isBuildKey, isIconName, modItemSchema } from "./items";
 import { createHash } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { dirname, join } from "node:path";
 import { listEnvVars } from "@/lib/env-var-service";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "./join-guard";
-import { buildFor, isPluginLoader, loaderForType, parseProjectList, projectSlug } from "./modrinth";
+import {
+    buildFor,
+    isGameVersion,
+    isPluginLoader,
+    loaderForType,
+    parseProjectList,
+    projectSlug
+} from "./modrinth";
 
 /** How many entries on a list are read. Past this is a modpack, and a modpack is
  *  not something to resolve one jar at a time while somebody waits. */
@@ -69,6 +76,11 @@ const MAX_READ_BYTES = 64 * 1024 * 1024;
  * bounds the first visit on a server with a long list. What is not reached in
  * time is simply not read this time: the ones that were are kept, and the next
  * time the picker is opened it starts from those and continues.
+ *
+ * A ceiling rather than a place to stop starting work: a download begun with a
+ * second left is given that second and not the whole `DOWNLOAD_TIMEOUT_MS`, so
+ * the answer cannot run past this and be cut by an edge timeout - which would
+ * hand the panel nothing at all in place of the list already assembled.
  */
 const READ_BUDGET_MS = 45_000;
 
@@ -88,9 +100,6 @@ export interface ServerModItems {
 }
 
 const EMPTY: ServerModItems = { items: [], unread: [] };
-
-/** The version an entry is pinned to, when it is a version at all. */
-const VERSION = /^[0-9][0-9.]*$/;
 
 /**
  * Everything the mods on one server add.
@@ -118,9 +127,19 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
         // Out of time is not the same as unreadable, and is not reported as it:
         // what is left is read on the next open, from a cache that is by then one
         // mod shorter.
-        if (Date.now() > until) break;
-        const read = await catalogFor(entry, slug, loader, settings.version).catch(() => null);
+        const left = until - Date.now();
+        if (left <= 0) break;
+        const read = await catalogFor(
+            entry,
+            slug,
+            loader,
+            settings.version,
+            Math.min(DOWNLOAD_TIMEOUT_MS, left)
+        ).catch(() => null);
         if (read === null) {
+            // A download the clock cut short is that same case rather than a mod
+            // whose jar cannot be read, so it is left rather than reported.
+            if (Date.now() >= until) break;
             unread.push(slug);
             continue;
         }
@@ -128,6 +147,9 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
             if (items.length >= MAX_ITEMS) break;
             items.push({ ...item, mod: read.title, build: read.build });
         }
+        // Past the cap the rest of the list is jars downloaded and read for items
+        // that are then dropped, so the walk stops here and not just the copy.
+        if (items.length >= MAX_ITEMS) break;
     }
     return { items, unread };
 }
@@ -156,32 +178,14 @@ async function readSettings(
         // LATEST is a real value here and it is not a version: a server whose
         // release nobody knows is one where every build of a mod is a candidate,
         // which is what passing null means downstream.
-        version: VERSION.test(version) ? version : null,
+        version: isGameVersion(version) ? version : null,
         projects: value(PROJECTS_KEY)
     };
 }
 
 const catalogSchema = z.object({
     title: z.string().max(120),
-    items: z
-        .array(
-            z.object({
-                id: z.string().max(160),
-                label: z.string().max(120),
-                icon: z
-                    .union([
-                        z.object({
-                            kind: z.literal("mod"),
-                            name: z.string().max(200),
-                            width: z.number().int().positive().max(4096),
-                            height: z.number().int().positive().max(4096)
-                        }),
-                        z.object({ kind: z.literal("vanilla"), texture: z.string().max(200) })
-                    ])
-                    .nullable()
-            })
-        )
-        .max(MAX_ITEMS)
+    items: z.array(modItemSchema).max(MAX_ITEMS)
 });
 
 interface BuildCatalog {
@@ -206,7 +210,8 @@ async function catalogFor(
     entry: string,
     slug: string,
     loader: string,
-    version: string | null
+    version: string | null,
+    timeoutMs: number
 ): Promise<BuildCatalog> {
     const build = await buildFor(entry, loader, version);
     if (build === null) throw new Error(`No build of ${slug} to read`);
@@ -215,7 +220,9 @@ async function catalogFor(
     if (kept !== null) return { build: build.sha1, title: kept.title, items: kept.items };
 
     const key = build.sha1;
-    const inFlight = reading.get(key) ?? readBuild(build.sha1, build.url, slug).finally(() => reading.delete(key));
+    const inFlight =
+        reading.get(key) ??
+        readBuild(build.sha1, build.url, slug, timeoutMs).finally(() => reading.delete(key));
     reading.set(key, inFlight);
     const read = await inFlight;
     if (read === null) throw new Error(`Could not read ${build.filename}`);
@@ -246,16 +253,21 @@ async function readCatalog(build: string): Promise<{ title: string; items: modIt
  * unverified one would file the wrong mod's items under a key that is then
  * treated as correct forever.
  */
-async function readBuild(sha1: string, url: string, slug: string): Promise<BuildCatalog | null> {
+async function readBuild(
+    sha1: string,
+    url: string,
+    slug: string,
+    timeoutMs: number
+): Promise<BuildCatalog | null> {
     let bytes: Uint8Array;
     try {
-        const answer = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
-        if (!answer.ok) return null;
+        const answer = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!answer.ok || answer.body === null) return null;
         const length = Number(answer.headers.get("content-length") ?? "0");
         if (length > MAX_JAR_BYTES) return null;
-        const body = await answer.arrayBuffer();
-        if (body.byteLength === 0 || body.byteLength > MAX_JAR_BYTES) return null;
-        bytes = new Uint8Array(body);
+        const body = await bounded(answer.body, MAX_JAR_BYTES);
+        if (body === null || body.byteLength === 0) return null;
+        bytes = body;
     } catch {
         return null;
     }
@@ -269,8 +281,9 @@ async function readBuild(sha1: string, url: string, slug: string): Promise<Build
             paths: Object.keys(zip.files),
             read: async (path: string) => {
                 const entry = zip.files[path];
-                if (!entry || entry.dir || spent > MAX_READ_BYTES) return null;
-                const body = await entry.async("uint8array");
+                if (!entry || entry.dir) return null;
+                const body = await inflated(entry, MAX_READ_BYTES - spent);
+                if (body === null) return null;
                 spent += body.byteLength;
                 return body;
             }
@@ -283,6 +296,92 @@ async function readBuild(sha1: string, url: string, slug: string): Promise<Build
     const catalog = { title: slug, items: read.items };
     await keep(sha1, catalog, read.icons);
     return { build: sha1, title: catalog.title, items: catalog.items };
+}
+
+/**
+ * Everything a response carries, as long as it fits in `limit`.
+ *
+ * `arrayBuffer()` reads whatever is sent, and `content-length` is a claim by the
+ * same server that sends the body: absent or understated, the whole download is
+ * already in this heap by the time anything compares it against the cap. Counted
+ * here instead, and the connection dropped the moment it goes past.
+ */
+async function bounded(body: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array | null> {
+    const reader = body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    let room = true;
+    try {
+        for (;;) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            size += chunk.value.byteLength;
+            if (size > limit) {
+                room = false;
+                break;
+            }
+            chunks.push(chunk.value);
+        }
+    } finally {
+        await reader.cancel().catch(() => undefined);
+    }
+    return room ? concat(chunks, size) : null;
+}
+
+/**
+ * One zip entry's bytes, as long as they fit in `room`.
+ *
+ * `async("uint8array")` inflates the entry whole before anything can see how big
+ * it turned out, so an entry that claims a kilobyte and expands to a gigabyte is
+ * in this heap before the budget is ever looked at. It is streamed instead and
+ * dropped the moment it passes what is left, which costs one block rather than
+ * the process. A refused read is a missing file to the reader above, which is one
+ * item without a picture.
+ */
+function inflated(entry: JSZip.JSZipObject, room: number): Promise<Uint8Array | null> {
+    if (room <= 0) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        let settled = false;
+        const stop = (value: Uint8Array | null): void => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        // JSZip's own streaming reader, which its bundled typings leave out: the
+        // two helpers they do describe both read the whole entry first.
+        const stream = (entry as unknown as Streamed).internalStream("uint8array");
+        stream
+            .on("data", (chunk) => {
+                if (settled) return;
+                size += chunk.byteLength;
+                if (size > room) {
+                    stream.pause();
+                    stop(null);
+                    return;
+                }
+                chunks.push(chunk);
+            })
+            .on("error", () => stop(null))
+            .on("end", () => stop(concat(chunks, size)))
+            .resume();
+    });
+}
+
+/** A zip entry as something that can be read a block at a time. */
+interface Streamed {
+    internalStream(type: "uint8array"): JSZip.JSZipStreamHelper<Uint8Array>;
+}
+
+function concat(chunks: readonly Uint8Array[], size: number): Uint8Array {
+    const all = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) {
+        all.set(chunk, at);
+        at += chunk.byteLength;
+    }
+    return all;
 }
 
 /**
