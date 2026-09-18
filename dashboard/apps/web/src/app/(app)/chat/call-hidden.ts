@@ -16,7 +16,7 @@
  * statement about the screen somebody is reading on, not about their account.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 const KEY = "polaris.chat.calls-hidden";
 
@@ -33,8 +33,12 @@ const CHANGED = "polaris:chat-calls-hidden";
  */
 const KEPT = 20;
 
+/** The list as last written, when storage refused to take it. */
+let unsaved: readonly string[] | null = null;
+
 function read(): readonly string[] {
     if (typeof window === "undefined") return [];
+    if (unsaved) return unsaved;
     try {
         const raw = window.localStorage.getItem(KEY);
         if (!raw) return [];
@@ -64,39 +68,39 @@ export function setCallHidden(meetingId: string, hidden: boolean): void {
     try {
         if (next.length === 0) window.localStorage.removeItem(KEY);
         else window.localStorage.setItem(KEY, JSON.stringify(next));
+        unsaved = null;
     } catch {
         // It still applies to this tab; it just will not be remembered.
+        unsaved = next;
     }
     window.dispatchEvent(new Event(CHANGED));
+}
+
+function subscribe(onChange: () => void): () => void {
+    window.addEventListener(CHANGED, onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+        window.removeEventListener(CHANGED, onChange);
+        window.removeEventListener("storage", onChange);
+    };
 }
 
 /**
  * Whether this call is put away, and the switch.
  *
- * Read after mount rather than during render: the server has no local storage,
- * and a value read while rendering would not match what it sent.
+ * Read from the store during render, so the answer is there on the first paint
+ * of a call rather than a frame later. The server has no local storage and
+ * answers "shown", which is what hydration compares against.
  */
 export function useCallHidden(meetingId: string | null): [boolean, (hidden: boolean) => void] {
-    const [hidden, setHidden] = useState(false);
-    useEffect(() => {
-        if (!meetingId) {
-            setHidden(false);
-            return;
-        }
-        const onChange = () => setHidden(callHidden(meetingId));
-        onChange();
-        window.addEventListener(CHANGED, onChange);
-        window.addEventListener("storage", onChange);
-        return () => {
-            window.removeEventListener(CHANGED, onChange);
-            window.removeEventListener("storage", onChange);
-        };
-    }, [meetingId]);
+    const hidden = useSyncExternalStore(
+        subscribe,
+        () => (meetingId ? callHidden(meetingId) : false),
+        () => false
+    );
     const change = useCallback(
         (next: boolean) => {
-            if (!meetingId) return;
-            setHidden(next);
-            setCallHidden(meetingId, next);
+            if (meetingId) setCallHidden(meetingId, next);
         },
         [meetingId]
     );
