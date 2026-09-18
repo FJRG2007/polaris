@@ -21,7 +21,10 @@ const needs = new Map<string, string[]>();
 const ids = new Map<string, string>();
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOriginal) => {
-    const real = await importOriginal<typeof import("@polaris-app/game-servers/src/lib/minecraft/modrinth")>();
+    const real =
+        await importOriginal<
+            typeof import("@polaris-app/game-servers/src/lib/minecraft/modrinth")
+        >();
     return {
         ...real,
         buildFor: vi.fn(

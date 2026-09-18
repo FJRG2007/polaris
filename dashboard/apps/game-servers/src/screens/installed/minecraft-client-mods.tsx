@@ -246,7 +246,10 @@ export function MinecraftClientMods({
                                     key={project.key}
                                     className="flex items-center gap-3 rounded-md border border-border p-2"
                                 >
-                                    <ProjectIcon installedAppId={installedAppId} project={project} />
+                                    <ProjectIcon
+                                        installedAppId={installedAppId}
+                                        project={project}
+                                    />
                                     <div className="min-w-0 flex-1">
                                         <p
                                             className="truncate text-sm font-medium"
@@ -403,10 +406,10 @@ export function MinecraftClientMods({
                             <p className="text-xs text-muted-foreground">
                                 One line installs{" "}
                                 {Array.isArray(pack) ? `the ${pack.length} mods` : "the mods"} for
-                                this server into their game, and running it again is how they update: it
-                                replaces what changed and takes away what came off the lists.
-                                Anything else in their mods folder is left alone. The link needs no
-                                account here.
+                                this server into their game, and running it again is how they
+                                update: it replaces what changed and takes away what came off the
+                                lists. Anything else in their mods folder is left alone. The link
+                                needs no account here.
                             </p>
                             {changed && (
                                 <p className="mt-1 text-xs text-warning">
