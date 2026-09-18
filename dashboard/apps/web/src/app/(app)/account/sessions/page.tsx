@@ -32,6 +32,12 @@ export default async function SessionsPage() {
         listVaultClients(user.id).catch(() => [])
     ]);
 
+    // One browser, one row. A vault client let in under a connection is that
+    // connection's own row above - same browser, same address, same press to end
+    // it - so listing it again would have somebody counting two devices where
+    // they have one, and reaching for the wrong one to cut off.
+    const apps = clients.filter((client) => client.connection === null);
+
     // Wider than the rest of the account pages: this one is a table, and the
     // address and domain columns are the point of it. Held to the same width as
     // the security page so the two read as one place.
@@ -47,7 +53,7 @@ export default async function SessionsPage() {
                 sessions={sessions}
                 trusted={trusted}
                 extensions={extensions}
-                clients={clients}
+                clients={apps}
             />
         </div>
     );

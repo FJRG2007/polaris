@@ -26,6 +26,27 @@ export interface WrappedKeys {
 }
 
 /**
+ * The connection this browser holds to one account.
+ *
+ * It belongs to the account rather than to the browser, which is the whole of
+ * why it is here: Polaris lists one connection per account and ends it per
+ * account, so a browser signed in to two accounts holds two, and the one that
+ * is in front has to move with the account that is in front. A single
+ * browser-wide connection would send the first account's token to approve the
+ * second account's vault, which the server refuses - correctly - as somebody
+ * else's extension.
+ */
+export interface ParkedLink {
+    /** What the connection is proved with. Never shown, never sent anywhere but
+     *  the server it was issued by. */
+    readonly token: string;
+    readonly name: string | null;
+    readonly email: string | null;
+    /** Whether that account may use a vault at all, as the server last said. */
+    readonly vault: boolean;
+}
+
+/**
  * One account, with everything needed to make it the active one again.
  *
  * It carries a refresh token, so wherever this is stored is storage for a
@@ -42,6 +63,9 @@ export interface ParkedAccount {
     readonly refresh: string;
     readonly wrapped: WrappedKeys | null;
     readonly accountKey: string | null;
+    /** The connection this browser holds to it, when it has one. Null for a
+     *  browser signed in to a vault from before connections existed. */
+    readonly link: ParkedLink | null;
 }
 
 /** As much of an account as a row needs in order to name it. */

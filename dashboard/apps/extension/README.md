@@ -17,6 +17,10 @@ connected extension can be let into your vault, which is a second approval made 
 the vault itself, and ending the connection closes the vault with it. An account
 with no vault still has a working extension - it has nothing to fill yet.
 
+More than one account in this browser means more than one connection: Polaris
+issues and ends them per account, so each one is approved on its own and travels
+with the account you switch to. Ending one says nothing about the others.
+
 An extension that was signed in to a vault before any of this existed keeps
 working exactly as it did, and is asked to connect by a line above its own list.
 Connecting adopts what it already had rather than replacing it.

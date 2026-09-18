@@ -236,7 +236,11 @@ export async function answerVaultAuthorization(
             return { error: "That extension's connection to Polaris has ended. Connect it again." };
         }
         if (connection.userId !== input.userId) {
-            return { error: "That request came from an extension connected to another account." };
+            return {
+                error:
+                    "That request came from an extension connected to another account. " +
+                    "Disconnect it in the extension, then connect it again from here."
+            };
         }
     }
     // Only a pending, unexpired row is answerable, and the update says so in its
@@ -305,6 +309,22 @@ export async function claimVaultAuthorization(
         return { status: "denied" };
     }
     if (row.status !== "approved" || !row.userId || !row.wrappedKey) return { status: "pending" };
+
+    // The connection is checked again here, not only where the approval was
+    // given: a connection ended between the two is one whose vault client must
+    // never be minted, and a token issued from this claim would be bound to a
+    // row somebody has already cut off. The approval dies with it rather than
+    // waiting to be collected by an extension that is no longer connected.
+    if (row.extensionSessionId) {
+        const connection = await prisma.extensionSession.findUnique({
+            where: { id: row.extensionSessionId },
+            select: { userId: true, revokedAt: true }
+        });
+        if (!connection || connection.revokedAt || connection.userId !== row.userId) {
+            await prisma.vaultAuthorization.deleteMany({ where: { id: row.id } });
+            return { status: "denied" };
+        }
+    }
 
     // Deleted by id AND status, so the row is spent exactly once even if two polls
     // arrive together: the second finds nothing to delete and is told to keep

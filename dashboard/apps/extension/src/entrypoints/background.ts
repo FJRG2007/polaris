@@ -139,6 +139,11 @@ const ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("session:va
  *
  * What is NOT in here is any vault key. Those stay in memory, in `parkedVaults`
  * below, for the same reason the active one does.
+ *
+ * Each row also carries that account's connection to Polaris, which the account
+ * in front holds in `LINK_TOKEN`. A restart takes those with the rest of the row
+ * - the connection itself lives on, listed on its account's Sessions screen, and
+ * is picked up again the next time this browser is connected for that account.
  */
 const PARKED = storage.defineItem<accounts.ParkedAccount[]>("session:vault.parked", {
     fallback: []
@@ -170,6 +175,12 @@ const parkedVaults = new Map<string, { vault: OpenVault; lockAt: number | null }
  * for, is listed on that account's Sessions screen, and can be ended there at any
  * moment - so a connection that vanished on every restart would be a row nobody
  * could trust and a reconnection every morning.
+ *
+ * These hold the connection of the account IN FRONT, the same way the vault's own
+ * items do. A browser signed in to two accounts holds two connections - Polaris
+ * issues and ends them per account - so the parked ones travel with the accounts
+ * they belong to, in `PARKED`, and are moved in and out of here by `makeActive`
+ * and `activeAccount`.
  */
 const LINK_TOKEN = storage.defineItem<string | null>("local:link.token", { fallback: null });
 const LINK_ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("local:link.account", {
@@ -743,24 +754,40 @@ const LINK_CHECK_MINUTES = 15;
  *  popup, which is a thing people do far more often than that. */
 const LINK_CHECK_FLOOR_MS = 60_000;
 
-/** Throw away everything this browser holds for its connection.
+/**
+ * Forget the connection in front, without touching the vault it was for.
+ *
+ * On its own this is only used where the account in front is changing hands -
+ * the connection belongs to the account, so a slot being emptied for another one
+ * must not leave the previous account's token in it to be sent as the next
+ * account's proof. Ending a connection is `dropLink`, which takes the vault too.
+ */
+async function forgetLink(): Promise<void> {
+    await Promise.all([
+        LINK_TOKEN.setValue(null),
+        LINK_ACCOUNT.setValue(null),
+        LINK_VAULT.setValue(true),
+        LINK_CHECKED.setValue(null),
+        LINK_WAITING.setValue(null)
+    ]);
+}
+
+/** Throw away everything this browser holds for the connection in front.
  *
  * The vault goes with it. A connection that has been ended must not leave an
  * open vault behind it in a browser somebody thought they had cut off, and the
  * server has already revoked that vault's tokens by the time this runs. The
- * address stays, so the popup lands on "connect this browser" rather than asking
- * which Polaris this is all over again. */
+ * other accounts are left alone, and that is not an omission: each holds a
+ * connection of its own, listed and ended separately on Polaris, and ending one
+ * account's is not a statement about anybody else's. The address stays, so the
+ * popup lands on "connect this browser" rather than asking which Polaris this is
+ * all over again. */
 async function dropLink(): Promise<void> {
     await inTurn(async () => {
         const leaving = await activeAccount();
         if (leaving) parkedVaults.delete(leaving.id);
         await clearActive();
-        await Promise.all([
-            LINK_TOKEN.setValue(null),
-            LINK_ACCOUNT.setValue(null),
-            LINK_CHECKED.setValue(null),
-            LINK_WAITING.setValue(null)
-        ]);
+        await forgetLink();
         await badge();
     });
 }
@@ -850,6 +877,12 @@ async function collectLink(): Promise<void> {
         // What the connection reaches, asked once now so the popup knows whether
         // to offer a vault at all rather than finding out on the refusal.
         await refreshLink(true);
+        // Polaris keeps one connection per account and install, so approving this
+        // replaced whatever token a parked row for the same account was holding.
+        // That row is dropped rather than left to be switched back to: its token
+        // is spent, and the first check after the switch would read the refusal as
+        // a disconnection and close its vault.
+        await inTurn(() => dropParked(accounts.accountId(origin, claim.account.email)));
         await LINK_WAITING.setValue({ ...still, state: "approved" });
         return;
     }
@@ -1037,14 +1070,18 @@ async function readAccount(): Promise<messages.ExtensionAccount | null> {
  * state right after signing out and while somebody is adding their second account.
  */
 async function activeAccount(): Promise<accounts.ParkedAccount | null> {
-    const [origin, email, refresh, wrapped, accountKey, who] = await Promise.all([
-        currentOrigin(),
-        EMAIL.getValue(),
-        REFRESH.getValue(),
-        WRAPPED.getValue(),
-        ACCOUNT_KEY.getValue(),
-        ACCOUNT.getValue()
-    ]);
+    const [origin, email, refresh, wrapped, accountKey, who, linkToken, linkAccount, linkVault] =
+        await Promise.all([
+            currentOrigin(),
+            EMAIL.getValue(),
+            REFRESH.getValue(),
+            WRAPPED.getValue(),
+            ACCOUNT_KEY.getValue(),
+            ACCOUNT.getValue(),
+            LINK_TOKEN.getValue(),
+            LINK_ACCOUNT.getValue(),
+            LINK_VAULT.getValue()
+        ]);
     if (!origin || !refresh) return null;
     return {
         id: accounts.accountId(origin, email),
@@ -1053,7 +1090,19 @@ async function activeAccount(): Promise<accounts.ParkedAccount | null> {
         name: who?.name ?? null,
         refresh,
         wrapped,
-        accountKey
+        accountKey,
+        // The connection travels with the account, because that is whose it is.
+        // Left behind, it would be the token this browser sends to have another
+        // account's vault approved - which the server refuses as somebody else's
+        // extension, and rightly.
+        link: linkToken
+            ? {
+                  token: linkToken,
+                  name: linkAccount?.name ?? null,
+                  email: linkAccount?.email ?? null,
+                  vault: linkVault
+              }
+            : null
     };
 }
 
@@ -1122,7 +1171,12 @@ async function clearActive(): Promise<void> {
         REVISION.setValue(null),
         EMAIL.setValue(null),
         ACCOUNT_KEY.setValue(null),
-        ACCOUNT.setValue(null)
+        ACCOUNT.setValue(null),
+        // Not the connection, which outlives a vault sign-out - only the memory
+        // of when it was last checked. The account in front is changing, so the
+        // next draw asks the server where the connection stands instead of
+        // trusting an answer given about the way things were before.
+        LINK_CHECKED.setValue(null)
     ]);
 }
 
@@ -1167,7 +1221,20 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
         CIPHERS.setValue(null),
         SYNCED_AT.setValue(null),
         REVISION.setValue(null),
-        LOCK_AT.setValue(alive ? (held?.lockAt ?? null) : null)
+        LOCK_AT.setValue(alive ? (held?.lockAt ?? null) : null),
+        // And its connection, which is the credential that says whose extension
+        // this is while that account is in front. Null where it has none, so the
+        // popup asks an account signed in before connections existed to connect
+        // rather than showing it somebody else's.
+        LINK_TOKEN.setValue(account.link?.token ?? null),
+        LINK_ACCOUNT.setValue(
+            account.link ? { name: account.link.name, email: account.link.email } : null
+        ),
+        LINK_VAULT.setValue(account.link?.vault ?? true),
+        // Asked again on the next draw rather than trusted from before it was set
+        // aside: a connection somebody ended while this account was parked is one
+        // this browser has to find out about on the way back to it.
+        LINK_CHECKED.setValue(null)
     ]);
     // Whatever else named this account in the list goes with the switch. The
     // caller has usually taken it out already; what this catches is a row left
@@ -1967,6 +2034,12 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     // and the first has to still be there to go back to.
                     await parkActive(await PARKED.getValue());
                     await clearActive();
+                    // The connection was parked with it a line above. Emptying the
+                    // slot is what makes the second account connect as itself: left
+                    // here, the first account's token would be sent to have the
+                    // second account's vault approved, and the approval would be
+                    // refused as an extension connected to another account.
+                    await forgetLink();
                     // The address is deliberately kept, so this lands on "Sign in with
                     // Polaris" rather than on "which Polaris". A second account is
                     // usually on the same server, and clearing it would spend a

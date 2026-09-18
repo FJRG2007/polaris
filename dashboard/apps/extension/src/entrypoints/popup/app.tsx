@@ -366,21 +366,34 @@ function LinkPolaris({
  *  existed. Its vault keeps working; this is how it joins the list. */
 function LinkBanner({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element {
     const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // The refusal is the answer this press is most likely to get: the browser it
+    // is offered to is, by definition, one that was signed in before any of this
+    // existed, and the server it is signed in to may well predate it too. Shown
+    // rather than swallowed - a button that goes quiet is one somebody presses
+    // again all afternoon.
+    const ask = async (): Promise<void> => {
+        setBusy(true);
+        setError(null);
+        const reply = await askBackground({ kind: "link" });
+        setBusy(false);
+        if (!reply.ok) {
+            setError(reply.error);
+            return;
+        }
+        await onDone();
+    };
+
     return (
         <div className="notice small">
             This browser is not connected to your Polaris account yet, so it does not appear under
             Sessions.{" "}
-            <button
-                className="as-link"
-                disabled={busy}
-                onClick={() => {
-                    setBusy(true);
-                    void askBackground({ kind: "link" }).then(onDone);
-                }}
-            >
+            <button className="as-link" disabled={busy} onClick={() => void ask()}>
                 Connect it
             </button>
             .
+            <Problem text={error} />
         </div>
     );
 }

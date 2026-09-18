@@ -26,6 +26,7 @@ function account(fields: Partial<ParkedAccount> & { id: string }): ParkedAccount
         refresh: "refresh-token",
         wrapped: null,
         accountKey: null,
+        link: null,
         ...fields
     };
 }

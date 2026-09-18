@@ -28,6 +28,18 @@ export interface VaultClientRow {
     readonly firstSeenAt: string;
     /** When it last asked this vault for anything. */
     readonly lastSeenAt: string;
+    /**
+     * The browser extension connection this client was let in under, while that
+     * connection is still live.
+     *
+     * What it is for is not showing the same browser twice: a connected
+     * extension is already a row of its own on the Sessions screen, carrying the
+     * address it was seen from and the press that ends it, and the vault it was
+     * let into goes with that press. Null for every other client, and for one
+     * whose connection has since been ended - that one is a vault client like
+     * any other again, and hiding it would be hiding access nobody can end.
+     */
+    readonly connection: string | null;
 }
 
 /**
@@ -42,7 +54,15 @@ export async function listVaultClients(userId: string): Promise<VaultClientRow[]
     const rows = await prisma.vaultDevice.findMany({
         where: { userId },
         orderBy: { revisionDate: "desc" },
-        select: { id: true, name: true, type: true, createdAt: true, revisionDate: true }
+        select: {
+            id: true,
+            name: true,
+            type: true,
+            createdAt: true,
+            revisionDate: true,
+            extensionSessionId: true,
+            extension: { select: { revokedAt: true } }
+        }
     });
     return rows.map((row) => ({
         id: row.id,
@@ -50,6 +70,7 @@ export async function listVaultClients(userId: string): Promise<VaultClientRow[]
         label: core.deviceTypeLabel(row.type),
         kind: core.vaultClientKind(row.type),
         firstSeenAt: row.createdAt.toISOString(),
-        lastSeenAt: row.revisionDate.toISOString()
+        lastSeenAt: row.revisionDate.toISOString(),
+        connection: row.extension && !row.extension.revokedAt ? row.extensionSessionId : null
     }));
 }
