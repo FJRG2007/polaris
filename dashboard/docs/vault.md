@@ -53,11 +53,11 @@ holds it has to wrap it to your public key first, in their browser.
 Every account starts with one vault of its own. Beside it, `/vault/vaults` makes
 as many as `MAX_OWNED_VAULTS` more, and an organization can be given one:
 
-| Kind                | Who owns it              | Who may change its shape                       | What it is called            |
-| ------------------- | ------------------------ | ---------------------------------------------- | ---------------------------- |
-| The account's own   | The account              | Its owner                                      | "My own vault"               |
-| One of your own     | The account that made it | Its owner, or a member made an administrator   | Whatever it was named        |
-| An organization's   | The Polaris organization | Anybody with the `vault.manage` permission     | The organization's name      |
+| Kind              | Who owns it              | Who may change its shape                     | What it is called       |
+| ----------------- | ------------------------ | -------------------------------------------- | ----------------------- |
+| The account's own | The account              | Its owner                                    | "My own vault"          |
+| One of your own   | The account that made it | Its owner, or a member made an administrator | Whatever it was named   |
+| An organization's | The Polaris organization | Anybody with the `vault.manage` permission   | The organization's name |
 
 The two extra kinds are one row and one set of rules: a vault is a key and the
 people who hold it, and "mine alone" is that with one member. Clients read both
@@ -136,6 +136,11 @@ it: the vault's second factor IS the account's, not a second one.
   `<origin>/vault/#/send/...` shape an official client mints lands inside the
   dashboard, which asks a stranger to sign in - so for somebody outside, copy the
   link from Polaris.
+- **The browser extension's vault client belongs to its own connection to the
+  account first.** That connection - approved once at `/account/extension` - is
+  what an extension's vault client is let in under, so ending it there or from
+  the Sessions screen ends the vault client with it, not only the connection.
+  See `dashboard/apps/extension/README.md` for how that connection works.
 
 ## Not implemented yet
 

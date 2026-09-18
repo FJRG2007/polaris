@@ -63,6 +63,17 @@ export interface AuthorizationRequest {
     readonly deviceIdentifier: string;
     readonly deviceName: string;
     readonly deviceType: number;
+    /**
+     * The browser extension connection the request came from, when it came from
+     * one.
+     *
+     * What binds the two flows together: the extension is connected to an
+     * account first, and a vault it is then let into belongs to that connection -
+     * so ending the connection ends the vault client with it, and an approval
+     * given by a different account is refused rather than quietly handing one
+     * account's vault to an extension connected as somebody else.
+     */
+    readonly extensionSessionId?: string | null;
     /** From the request rather than from the client: what the approval screen
      *  shows must not be something the asker could dress up. */
     readonly requestIp: string | null;
@@ -124,6 +135,7 @@ export async function openVaultAuthorization(
                     deviceIdentifier: input.deviceIdentifier,
                     deviceName: input.deviceName,
                     deviceType: input.deviceType,
+                    extensionSessionId: input.extensionSessionId ?? null,
                     requestIp: input.requestIp,
                     requestUserAgent: input.requestUserAgent,
                     requestHost: input.requestHost,
@@ -207,6 +219,30 @@ export async function answerVaultAuthorization(
     if (input.approve && !input.wrappedKey) {
         return { error: "Unlock your vault before letting a client in." };
     }
+
+    // A request that came from a connected extension belongs to the account that
+    // extension is connected as. Approving it from another account would hand
+    // that account's vault key to somebody else's extension.
+    const asked = await prisma.vaultAuthorization.findUnique({
+        where: { userCode: input.userCode },
+        select: { extensionSessionId: true }
+    });
+    if (asked?.extensionSessionId) {
+        const connection = await prisma.extensionSession.findUnique({
+            where: { id: asked.extensionSessionId },
+            select: { userId: true, revokedAt: true }
+        });
+        if (!connection || connection.revokedAt) {
+            return { error: "That extension's connection to Polaris has ended. Connect it again." };
+        }
+        if (connection.userId !== input.userId) {
+            return {
+                error:
+                    "That request came from an extension connected to another account. " +
+                    "Disconnect it in the extension, then connect it again from here."
+            };
+        }
+    }
     // Only a pending, unexpired row is answerable, and the update says so in its
     // own where clause: two dashboards answering at once must not both succeed.
     const answered = await prisma.vaultAuthorization.updateMany({
@@ -229,6 +265,9 @@ export type AuthorizationStatus = "pending" | "approved" | "denied" | "expired";
 /** An approval, spent. */
 export interface ClaimedAuthorization {
     readonly userId: string;
+    /** The extension connection it belongs to, carried to the device the token
+     *  is bound to. */
+    readonly extensionSessionId: string | null;
     /** The vault key sealed to the extension's public half. */
     readonly wrappedKey: string;
     readonly device: { readonly identifier: string; readonly name: string; readonly type: number };
@@ -256,6 +295,7 @@ export async function claimVaultAuthorization(
             deviceIdentifier: true,
             deviceName: true,
             deviceType: true,
+            extensionSessionId: true,
             expiresAt: true
         }
     });
@@ -270,6 +310,22 @@ export async function claimVaultAuthorization(
     }
     if (row.status !== "approved" || !row.userId || !row.wrappedKey) return { status: "pending" };
 
+    // The connection is checked again here, not only where the approval was
+    // given: a connection ended between the two is one whose vault client must
+    // never be minted, and a token issued from this claim would be bound to a
+    // row somebody has already cut off. The approval dies with it rather than
+    // waiting to be collected by an extension that is no longer connected.
+    if (row.extensionSessionId) {
+        const connection = await prisma.extensionSession.findUnique({
+            where: { id: row.extensionSessionId },
+            select: { userId: true, revokedAt: true }
+        });
+        if (!connection || connection.revokedAt || connection.userId !== row.userId) {
+            await prisma.vaultAuthorization.deleteMany({ where: { id: row.id } });
+            return { status: "denied" };
+        }
+    }
+
     // Deleted by id AND status, so the row is spent exactly once even if two polls
     // arrive together: the second finds nothing to delete and is told to keep
     // waiting rather than being handed a second copy of the same credential.
@@ -282,6 +338,7 @@ export async function claimVaultAuthorization(
         status: "approved",
         claimed: {
             userId: row.userId,
+            extensionSessionId: row.extensionSessionId,
             wrappedKey: row.wrappedKey,
             device: {
                 identifier: row.deviceIdentifier,

@@ -24,11 +24,21 @@ interface Row {
     requestIp: string | null;
     requestUserAgent: string | null;
     requestHost: string | null;
+    extensionSessionId: string | null;
     expiresAt: Date;
     createdAt: Date;
 }
 
+/** A browser extension's connection to an account, as the two checks that read
+ *  one need it: who it belongs to, and whether it has been ended. */
+interface Connection {
+    id: string;
+    userId: string;
+    revokedAt: Date | null;
+}
+
 let rows: Row[] = [];
+let connections: Connection[] = [];
 let nextId = 1;
 /** Stand in the gap between the read that looks for a collision and the write that
  *  loses to one: the next lookup answers "free" for a code that is not. */
@@ -87,6 +97,10 @@ vi.mock("@polaris/db", () => ({
                 rows = rows.filter((row) => !matches(row, where));
                 return { count: before - rows.length };
             }
+        },
+        extensionSession: {
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                connections.find((one) => one.id === where.id) ?? null
         }
     }
 }));
@@ -138,6 +152,7 @@ function draws(...picks: number[][]): (size: number) => Uint8Array {
 
 beforeEach(() => {
     rows = [];
+    connections = [];
     nextId = 1;
     missNextRead = false;
 });
@@ -196,6 +211,7 @@ describe("opening a request", () => {
             wrappedKey: null,
             status: "pending",
             userId: null,
+            extensionSessionId: null,
             expiresAt: new Date(NOW.getTime() - 1000),
             createdAt: new Date(NOW.getTime() - 600_000)
         });
@@ -364,5 +380,86 @@ describe("spending it", () => {
         );
         expect(late.status).toBe("expired");
         expect(rows).toHaveLength(0);
+    });
+});
+
+/**
+ * A request the browser extension opened under its connection to an account.
+ *
+ * The connection is what ties the vault client to something that can be ended:
+ * ending it revokes the vault tokens it let in. That only holds if the
+ * connection is checked at both ends of the exchange - when somebody approves,
+ * and again when the extension collects - because the two are minutes apart and
+ * a disconnection in between is exactly the case this exists for.
+ */
+describe("a request that came from a connected extension", () => {
+    const FROM_EXTENSION = { ...REQUEST, extensionSessionId: "connection-1" } as const;
+
+    async function waiting(): Promise<{ userCode: string; deviceCode: string }> {
+        connections.push({ id: "connection-1", userId: "u1", revokedAt: null });
+        return openVaultAuthorization(FROM_EXTENSION, bytes(5), NOW);
+    }
+
+    it("is refused by an account the extension is not connected as", async () => {
+        const opened = await waiting();
+        const answered = await answerVaultAuthorization(
+            { userId: "u2", userCode: opened.userCode, approve: true, wrappedKey: "SEALED" },
+            NOW
+        );
+        expect(answered.error).toBeTruthy();
+        expect(rows[0]!.status).toBe("pending");
+    });
+
+    it("cannot be approved once the connection has been ended", async () => {
+        const opened = await waiting();
+        connections[0]!.revokedAt = NOW;
+        const answered = await answerVaultAuthorization(
+            { userId: "u1", userCode: opened.userCode, approve: true, wrappedKey: "SEALED" },
+            NOW
+        );
+        expect(answered.error).toBeTruthy();
+        expect(rows[0]!.status).toBe("pending");
+    });
+
+    it("cannot be collected once the connection has been ended", async () => {
+        // The window this closes: approved while the connection stood, collected
+        // after somebody disconnected it. The token minted from that claim would
+        // be bound to a connection nothing can end again, which is the one thing
+        // ending a connection is supposed to make impossible.
+        const opened = await waiting();
+        await answerVaultAuthorization(
+            { userId: "u1", userCode: opened.userCode, approve: true, wrappedKey: "SEALED" },
+            NOW
+        );
+        connections[0]!.revokedAt = NOW;
+        const claim = await claimVaultAuthorization(opened.deviceCode, NOW);
+        expect(claim.status).toBe("denied");
+        expect(claim.claimed).toBeUndefined();
+        // And the approval is gone with it, rather than waiting for a reconnection
+        // to collect a key nobody approved for that connection.
+        expect(rows).toHaveLength(0);
+    });
+
+    it("carries the connection to the client it lets in", async () => {
+        const opened = await waiting();
+        await answerVaultAuthorization(
+            { userId: "u1", userCode: opened.userCode, approve: true, wrappedKey: "SEALED" },
+            NOW
+        );
+        const claim = await claimVaultAuthorization(opened.deviceCode, NOW);
+        expect(claim.claimed?.extensionSessionId).toBe("connection-1");
+    });
+
+    it("leaves a request from anything else alone", async () => {
+        // Every other client signs in this way too, and none of them has a
+        // connection to check.
+        const opened = await openVaultAuthorization(REQUEST, bytes(5), NOW);
+        expect(
+            await answerVaultAuthorization(
+                { userId: "u1", userCode: opened.userCode, approve: true, wrappedKey: "SEALED" },
+                NOW
+            )
+        ).toEqual({});
+        expect((await claimVaultAuthorization(opened.deviceCode, NOW)).status).toBe("approved");
     });
 });

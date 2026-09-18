@@ -1,9 +1,35 @@
 # The Polaris browser extension
 
-The vault in the toolbar: unlock, find the login for the page you are on, fill
-it. Chrome and Firefox from one source, built with [WXT](https://wxt.dev).
+Polaris in the toolbar. Chrome and Firefox from one source, built with
+[WXT](https://wxt.dev).
 
-## Why it can speak to Polaris at all
+## The first step is connecting the browser, not opening a vault
+
+This extension connects to your **account**. You point it at your Polaris, it
+shows a short code, and you approve that code in a Polaris you are already signed
+in to (`/account/extension`). What it holds afterwards is one token for that
+connection, and the connection is listed on your own Sessions screen beside every
+browser you are signed in on - so you can see it, see where it was last used, and
+end it from there, which cuts this browser off on its next request.
+
+Your logins are the first thing that connection is used for and not the way in: a
+connected extension can be let into your vault, which is a second approval made in
+the vault itself, and ending the connection closes the vault with it. An account
+with no vault still has a working extension - it has nothing to fill yet.
+
+More than one account in this browser means more than one connection: Polaris
+issues and ends them per account, so each one is approved on its own and travels
+with the account you switch to. Ending one says nothing about the others.
+
+An extension that was signed in to a vault before any of this existed keeps
+working exactly as it did, and is asked to connect by a line above its own list.
+Connecting adopts what it already had rather than replacing it.
+
+The routes involved are `POST /api/extension/authorize`, its `/claim`, and
+`GET`/`DELETE /api/extension/session` - the last of which is what a disconnection
+is answered on, with a 401 that tells this browser to drop everything it holds.
+
+## Why it can speak to the vault at all
 
 Polaris already answers the Bitwarden client protocol at `https://<your
 polaris>/vault` - that is how the official clients work against it, and it is
@@ -45,6 +71,7 @@ asking to read every page you open.
 
 ```
 src/lib/server.ts        which Polaris this belongs to, and permission for it
+src/lib/link.ts          the connection to the account: ask, collect, check, end
 src/lib/protocol.ts      the Bitwarden protocol client: be let in, sync, refresh
 src/lib/accounts.ts      more than one signed-in account, and switching between them
 src/lib/matching.ts      whether an item belongs to this page, and which comes first

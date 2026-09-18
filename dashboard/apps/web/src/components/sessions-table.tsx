@@ -23,6 +23,7 @@ import { signInSummary } from "@polaris/core";
 import { Badge, Button, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
+import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import type { SessionView } from "@/lib/session-directory";
 import { addressLine, DeviceAddress } from "@/components/device-address";
 import { clientKindLabel, readClientDevice } from "@/lib/vault/client-device";
@@ -110,10 +111,12 @@ function ClientCell({
 
 export function SessionsTable({
     sessions,
+    extensions = [],
     clients = [],
     busyId,
     activityHref,
     onRevoke,
+    onDisconnect,
     onPin,
     emptyLabel,
     compact = false
@@ -133,6 +136,18 @@ export function SessionsTable({
      * so rather than being left blank.
      */
     clients?: VaultClientRow[];
+    /**
+     * The browser extensions connected to this account.
+     *
+     * A row like the sessions above it and not like the clients below: a
+     * connection is observed - Polaris saw the request that made it and sees
+     * every one it makes since - so it has an address, a name it arrived on and
+     * a last-active of its own, and ending one is a press here rather than a
+     * trip to another screen.
+     */
+    extensions?: ExtensionSessionView[];
+    /** Ends one connection. Left out where the reader is not its owner. */
+    onDisconnect?: (extension: ExtensionSessionView) => void;
     /** The session with an action in flight, or "all" while every other one ends. */
     busyId: string | null;
     /** Where this session's history is read. Left out where the reader has no
@@ -192,7 +207,7 @@ export function SessionsTable({
                     </tr>
                 </thead>
                 <tbody>
-                    {sessions.length === 0 && clients.length === 0 ? (
+                    {sessions.length === 0 && extensions.length === 0 && clients.length === 0 ? (
                         <tr>
                             <td
                                 colSpan={compact ? 2 : 7}
@@ -332,6 +347,83 @@ export function SessionsTable({
                             </tr>
                         ))
                     )}
+                    {/* The extensions, between the browsers and the apps: each is
+                        a connection Polaris made and watches, so it carries the same
+                        columns a session does and the same way of ending it. */}
+                    {extensions.map((extension) => (
+                        <tr key={`extension-${extension.id}`} className="border-t border-border">
+                            <td className="w-full max-w-0 px-3 py-2">
+                                <div className="flex items-center gap-3">
+                                    <BrowserMark browser={extension.browser} />
+                                    <div className="min-w-0">
+                                        <p className="flex flex-wrap items-center gap-1.5">
+                                            <span className="min-w-0 truncate font-medium">
+                                                {extension.browser}
+                                            </span>
+                                            <span className="min-w-0 truncate text-muted-foreground">
+                                                {extension.os}
+                                            </span>
+                                            <Badge variant="neutral">Extension</Badge>
+                                        </p>
+                                        <p
+                                            className={cn(
+                                                "truncate text-xs text-muted-foreground",
+                                                !compact && "lg:hidden"
+                                            )}
+                                        >
+                                            {extension.ip ?? "Address not recorded"} - last active{" "}
+                                            <RelativeTime iso={extension.lastSeenAt} />
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+                            {compact ? null : (
+                                <>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                        Extension
+                                    </td>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                        <ClientCell
+                                            mark={<SystemMark os={extension.os} />}
+                                            name={extension.os}
+                                            version={null}
+                                        />
+                                    </td>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
+                                        {extension.ip ?? (
+                                            <span className="text-muted-foreground">
+                                                Not recorded
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
+                                        <span className="block truncate">
+                                            {extension.host ?? "Not recorded"}
+                                        </span>
+                                    </td>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        <RelativeTime iso={extension.lastSeenAt} />
+                                    </td>
+                                </>
+                            )}
+                            <td className="px-3 py-2">
+                                <div className="flex justify-end gap-1">
+                                    {onDisconnect ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            title="Disconnect"
+                                            aria-label={`Disconnect ${extension.browser}`}
+                                            disabled={busyId !== null}
+                                            onClick={() => onDisconnect(extension)}
+                                        >
+                                            <LogOut className="size-4" />
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
                     {/* The apps, under the browsers and in the same columns. What
                         a client reports is a name and a type, so the device column
                         is read back out of that name - which is how a row says

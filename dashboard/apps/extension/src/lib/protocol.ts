@@ -182,6 +182,15 @@ export async function openAuthorization(
     input: {
         readonly publicKey: string;
         readonly device: { readonly identifier: string; readonly name: string };
+        /**
+         * The token this extension holds for its connection to the account.
+         *
+         * Sent so the vault client is let in UNDER that connection: Polaris then
+         * lists the two together and ending the connection ends the vault client
+         * with it. A vault reached from an extension nobody can disconnect is
+         * exactly the state this replaces.
+         */
+        readonly extensionToken?: string | null;
     }
 ): Promise<AuthorizationOpened | null> {
     const reply = await ask(vaultUrl(base, "identity/connect/authorize"), {
@@ -191,7 +200,8 @@ export async function openAuthorization(
             publicKey: input.publicKey,
             deviceIdentifier: input.device.identifier,
             deviceName: input.device.name,
-            deviceType: String(deviceType())
+            deviceType: String(deviceType()),
+            extensionToken: input.extensionToken ?? undefined
         }).toString()
     });
     if (!reply || !reply.ok) return null;

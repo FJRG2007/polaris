@@ -113,10 +113,10 @@ export default async function DownloadsPage() {
 
                     <p className="border-t border-border/60 pt-4 text-muted-foreground">
                         Already have it?{" "}
-                        <Link className="underline" href="/vault/clients">
-                            Connect it to your vault
+                        <Link className="underline" href="/account/extension">
+                            Connect it to this account
                         </Link>
-                        .
+                        . Your vault is the second step, from the extension itself.
                     </p>
                 </CardBody>
             </Card>

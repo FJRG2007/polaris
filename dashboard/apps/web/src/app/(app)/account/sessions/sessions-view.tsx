@@ -19,12 +19,14 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
+import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
 import { describeSignIn, signInSummary } from "@polaris/core";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import {
     decideLoginApprovalAction,
+    disconnectExtensionAction,
     noteSignOutAction,
     revokeOtherSessionsAction,
     pinSessionAction,
@@ -63,12 +65,16 @@ function Origin({ session }: { session: SessionView }) {
 export function SessionsView({
     sessions,
     trusted,
+    extensions,
     clients
 }: {
     sessions: SessionView[];
     /** Browsers allowed to skip the second-factor challenge. Empty on an account
      *  that has never armed one, which is when the card stays away. */
     trusted: TrustedDeviceRow[];
+    /** The browser extensions connected to this account, ended from here like
+     *  any other device. */
+    extensions: ExtensionSessionView[];
     /** Apps signed in to this account - the extension, and anything else that was
      *  let in. They belong in the table above rather than in a card of their own:
      *  the extension is this account signed in from the same machine as the row
@@ -106,6 +112,32 @@ export function SessionsView({
         setBusyId(session.id);
         setError(null);
         const result = await revokeSessionAction(session.id);
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
+    /**
+     * End one extension's connection.
+     *
+     * What it takes with it is said before it is done: a connection that was let
+     * into a vault took the key with it, and ending the connection is what
+     * closes that as well.
+     */
+    async function disconnect(extension: ExtensionSessionView) {
+        const ok = await confirm({
+            title: "Disconnect this extension?",
+            description:
+                extension.vaultClients > 0
+                    ? `${extension.browser} on ${extension.os} will lose this account and the vault it was let into. It can be connected again from the extension.`
+                    : `${extension.browser} on ${extension.os} will have to be connected again from the extension.`,
+            confirmLabel: "Disconnect",
+            danger: true
+        });
+        if (!ok) return;
+        setBusyId(extension.id);
+        setError(null);
+        const result = await disconnectExtensionAction(extension.id);
         setBusyId(null);
         if (result.error) setError(result.error);
         else router.refresh();
@@ -222,6 +254,8 @@ export function SessionsView({
                     </div>
 
                     <SessionsTable
+                        extensions={extensions}
+                        onDisconnect={disconnect}
                         sessions={active}
                         clients={clients}
                         busyId={busyId}
@@ -238,15 +272,15 @@ export function SessionsView({
                         with no rows this page answers neither "is anything
                         connected" nor "where do I go about it", which is the
                         question that brings people here. */}
-                    {clients.length === 0 ? (
+                    {extensions.length === 0 && clients.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            No app is connected. The browser extension appears here once you let it
-                            in.{" "}
+                            Nothing else is connected. The browser extension appears here once it is
+                            connected to this account.{" "}
                             <Link
-                                href="/vault/clients"
+                                href="/account/extension"
                                 className="underline-offset-2 hover:text-foreground hover:underline"
                             >
-                                Connected apps
+                                Connect one
                             </Link>
                         </p>
                     ) : null}
