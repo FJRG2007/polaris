@@ -21,7 +21,10 @@
  *   rest of the transactional pile because it is the only mail that is worth
  *   reading BEFORE it happens - a receipt tells you what you spent, and one of
  *   these tells you what you are about to spend, which is the one somebody would
- *   have wanted to see.
+ *   have wanted to see. It also holds the mail that follows a purchase rather
+ *   than announcing one: a bulk message about credit the reader already has, or
+ *   a survey asking what they thought of something they bought - see
+ *   `FINANCING_MENTION`, `FINANCING_NOUNS` and `SURVEY_WORDS` below.
  * - **updates** is a receipt, an order, a statement, a delivery - transactional
  *   mail nobody replies to but everybody needs to find later.
  * - **primary** is what is left, which is what somebody actually wants to read.
@@ -52,7 +55,7 @@
  * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
  * new rule apply to tomorrow's mail and no further.
  */
-export const MAIL_CATEGORY_VERSION = 5;
+export const MAIL_CATEGORY_VERSION = 6;
 
 export const MAIL_CATEGORIES = [
     "primary",
@@ -628,6 +631,212 @@ const FINANCING: readonly RegExp[] = [
 ];
 
 /**
+ * Credit as a thing the reader already has, said without any of the words above.
+ *
+ * The strong patterns above answer "was credit applied for, approved or
+ * refused". They say nothing about the mail that comes AFTER that - the survey
+ * about the purchase it paid for, the note about the instalment plan, the
+ * lender writing about the arrangement itself:
+ *
+ *     Financiación Cetelem en APPLE. Tu opinión es muy importante para nosotros
+ *
+ * There is no possessive, no decision and no receipt in that, so every question
+ * missed it and a mailing-list survey about somebody's own financed purchase
+ * landed under Updates with the parcels. Three things make these safe to use:
+ * they are asked below the offer, so a lender selling credit is still an advert;
+ * they are guarded by `FINANCING_OFFER` below, so an advert that mentions no
+ * offer word is not read as somebody's own credit; and they are asked of bulk
+ * mail only, so the word in a person's own message is left exactly where it is.
+ *
+ * Each of these only ever describes paying for something in parts, so one of
+ * them is enough on its own. The bare nouns for credit are not: see
+ * `FINANCING_NOUNS`.
+ */
+const FINANCING_MENTION: readonly RegExp[] = [
+    // Spanish
+    /\bcompras? financiadas?\b/,
+    /\ba plazos\b/,
+    /\bpagos? aplazados?\b/,
+    /\bpaga en \d\b/,
+    /\bprestamo personal\b/,
+    /\bcredito al consumo\b/,
+    // English
+    /\bfinanced purchase\b/,
+    /\bpay in \d\b/,
+    /\bbuy now,? pay later\b/,
+    // Portuguese
+    /\bprestacoes\b/,
+    /\bparcelado\b/,
+    // French
+    /\bpaiement en \d fois\b/,
+    /\bcredit a la consommation\b/,
+    // German
+    /\bratenzahlung\b/,
+    /\bratenkauf\b/,
+    // Italian
+    /\bpagamento rateale\b/,
+    /\brateizzato\b/
+];
+
+/**
+ * The bare words for credit, which are not enough on their own.
+ *
+ * Newsletters use them all day with no purchase in sight - "así afecta a tu
+ * hipoteca", "closes a $40M financing round", "proyecto financiado por la Unión
+ * Europea". So a bulk mail that names one of these is somebody's own credit only
+ * when it also names the purchase as theirs (`OWN_PURCHASE`) or asks what they
+ * thought (`SURVEY_WORDS`), which is the lender writing and not a digest.
+ */
+const FINANCING_NOUNS: readonly RegExp[] = [
+    // Spanish
+    /\bfinanciacion(?:es)?\b/,
+    /\bfinanciamiento\b/,
+    /\bfinanciad[oa]s?\b/,
+    /\bhipoteca\b/,
+    // English
+    /\bfinancing\b/,
+    // Portuguese
+    /\bfinanciamento\b/,
+    // French
+    /\bfinancement\b/,
+    // German
+    /\bfinanzierung\b/,
+    // Italian
+    /\bfinanziamento\b/
+];
+
+/**
+ * The language a lender sells credit in.
+ *
+ * What tells "your financing" from "financing available": an advert quotes a
+ * rate, a number of months, or asks for an application. None of these appears in
+ * mail about an arrangement somebody already has, and each of them appears in
+ * almost every advert that mentions no offer word at all - which is what would
+ * otherwise slip past `PROMOTION_WORDS` and be read as somebody's own credit.
+ *
+ * Deliberately not added to the promotion words themselves: "sin intereses" is
+ * also how a real instalment receipt describes what was charged, and a receipt
+ * that landed in Promotions would be the worse mistake of the two.
+ *
+ * Six languages, the same six the nouns above are written in, and that pairing
+ * is the point: a guard that stops at Spanish and English leaves "paiement en 3
+ * fois sans frais" and "Ratenzahlung ab 0 Euro - jetzt entdecken" with no offer
+ * word to be recognised by, and an advert nothing recognises is read as
+ * somebody's own credit. The nouns and the guard travel together or the guard
+ * is not one.
+ */
+const FINANCING_OFFER: readonly RegExp[] = [
+    // Spanish
+    /\bsin intereses\b/,
+    /\bal? ?0\s*%/,
+    /\b0\s*%\s*(?:tae|tin|apr)\b/,
+    /\btae\b/,
+    /\bhasta \d{1,2} (?:meses|cuotas)\b/,
+    /\bsolicita(?:lo|la|r)?\b/,
+    /\bdescubre\b/,
+    /\bcontrata(?:lo|la|r)?\b/,
+    /\bpaga en \d con\b/,
+    // English
+    /\bapply now\b/,
+    /\bget approved\b/,
+    /\bas low as\b/,
+    /\bup to \d{1,2} months\b/,
+    /\binterest[ -]free\b/,
+    /\bno (?:fees|interest)\b/,
+    /\bsplit (?:it|your|the|into)\b/,
+    /\bpay in \d with\b/,
+    // Portuguese
+    /\bsem juros\b/,
+    /\bate \d{1,2} (?:meses|prestacoes)\b/,
+    /\bsolicite\b/,
+    /\bdescubra\b/,
+    // French
+    /\bsans frais\b/,
+    /\bsans interets\b/,
+    /\bjusqu\W?a \d{1,2} (?:mois|fois)\b/,
+    /\bdemandez\b/,
+    /\bdecouvrez\b/,
+    // German
+    /\bohne zinsen\b/,
+    /\bzinsfrei\b/,
+    /\bab 0\s*(?:euro|eur|%)/,
+    /\bbis zu \d{1,2} (?:monate|monaten|raten)\b/,
+    /\bjetzt (?:entdecken|beantragen|sichern)\b/,
+    // Italian
+    /\bsenza interessi\b/,
+    /\bfino a \d{1,2} (?:mesi|rate)\b/,
+    /\brichiedi(?:lo|la)?\b/,
+    /\bscopri\b/
+];
+
+/**
+ * Somebody being asked what they thought.
+ *
+ * A survey on its own is not money - "how did we do?" from a helpdesk belongs
+ * exactly where it lands today. A survey about a PURCHASE is the other half of
+ * that purchase, and the person looking for what they bought is the person it is
+ * addressed to, so it belongs with it rather than under the parcels.
+ */
+const SURVEY_WORDS: readonly RegExp[] = [
+    // English
+    /\bsurveys?\b/,
+    /\bquestionnaire\b/,
+    /\brate your\b/,
+    /\bhow did we do\b/,
+    /\btell us what you think\b/,
+    /\byour feedback on\b/,
+    /\b(?:share|leave|give us) your feedback\b/,
+    // Spanish
+    /\bencuestas?\b/,
+    /\b(?:tu|su) opinion\b/,
+    /\bque te (?:ha parecido|parecio)\b/,
+    /\bvalora tu (?:compra|pedido|experiencia)\b/,
+    // Portuguese
+    /\bpesquisa de satisfacao\b/,
+    /\bsua opiniao\b/,
+    // French
+    /\bvotre avis\b/,
+    /\benquete de satisfaction\b/,
+    // German
+    /\bumfragen?\b/,
+    /\bihre meinung\b/,
+    // Italian
+    /\bsondaggio\b/,
+    /\bla tua opinione\b/
+];
+
+/**
+ * What a survey has to be about for it to be money.
+ *
+ * The bare nouns, which is what makes this different from `PURCHASE_WORDS`: a
+ * survey says "tu experiencia de compra" and "how was your purchase", and what
+ * it leaves out is exactly what that list is built from - the possessive and the
+ * confirmation a receipt is written with. They are only ever read together with
+ * a survey word, so a bare "compra" cannot file anything on its own.
+ *
+ * Whole words only, and never the "order" of "in order to": the word is also in
+ * "border" and "reorder", "pago" in "pagoda", "kauf" in "Verkauf".
+ *
+ * Only the nouns no earlier list already answers for. A survey that names an
+ * invoice, a factura or a pedido is decided by the billing and purchase words
+ * above, with the same answer, before this is ever asked - carrying them here
+ * too would claim a reach these words do not have.
+ */
+const PURCHASE_NOUNS =
+    /\b(?:purchase|(?<!\bin )order|payment|compra|pago|achat|(?:ein)?kauf|acquist[oi])s?\b/;
+
+/**
+ * The same nouns, said to be the reader's own: behind a possessive, with room
+ * for the one word a name puts between them - "your MacBook purchase".
+ *
+ * What a word for credit needs beside it when nobody asked for an opinion. News
+ * names credit and a purchase in one breath all day - "hipoteca para la compra
+ * de vivienda", "secures financing for the purchase of" - and never says whose.
+ */
+const OWN_PURCHASE =
+    /\b(?:your|tu|su|sua|seu|votre|ihr(?:e|en|em|er)?|tuo|tua)\s+(?:\S+\s+)?(?:purchase|order|payment|compra|pago|achat|(?:ein)?kauf|acquist[oi])s?\b/;
+
+/**
  * Words that mean something is on its way, or that a record was issued.
  *
  * What is left of the transactional pile once money has been taken out of it: a
@@ -707,6 +916,16 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     const purchased =
         PURCHASE_WORDS.some((word) => words.includes(word)) ||
         PAYMENT_SETTLED.some((pattern) => pattern.test(words));
+    // Credit somebody already has, and the two things that decide whether the
+    // word is theirs: an advert's own language, and a survey about a purchase.
+    const aboutPurchase = PURCHASE_NOUNS.test(words);
+    const asksOpinion = SURVEY_WORDS.some((pattern) => pattern.test(words));
+    const financing =
+        FINANCING_MENTION.some((pattern) => pattern.test(words)) ||
+        (FINANCING_NOUNS.some((pattern) => pattern.test(words)) &&
+            (OWN_PURCHASE.test(words) || asksOpinion));
+    const sellingCredit = FINANCING_OFFER.some((pattern) => pattern.test(words));
+    const asksWhatYouThought = asksOpinion && aboutPurchase;
 
     // Money about to move comes before everything except a code, and before the
     // word that is selling something: half of these arrive dressed as an offer -
@@ -722,6 +941,20 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     if (billed) return "billing";
     if (transactional && !promotional) return "updates";
     if (purchased && !promotional) return "billing";
+    // Credit the reader has rather than credit being sold, and the survey that
+    // follows a purchase. Both sit here, under the offer: a lender advertising
+    // is still an advert, and a campaign that asks for an opinion on its way to
+    // selling something is still a campaign.
+    //
+    // And both are asked of bulk mail only, which is the whole difference
+    // between these two and the strong patterns above them. Those require a
+    // possessive or a decision - "tu financiacion", "loan approved" - and a
+    // person does not write either by accident. A bare noun is a word anybody
+    // may use: a friend writing about the mortgage, a colleague about how the
+    // project is financed, an architect asking what you thought of something you
+    // bought. Those arrive with no list header, and Primary is where they stay.
+    if (bulk && financing && !sellingCredit && !promotional) return "billing";
+    if (bulk && asksWhatYouThought && !promotional) return "billing";
     if (bulk && promotional) return "promotions";
     if (bulk) return "updates";
     if (transactional) return "updates";

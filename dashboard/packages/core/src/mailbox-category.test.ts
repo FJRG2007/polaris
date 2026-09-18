@@ -548,3 +548,195 @@ describe("credit being arranged", () => {
         ).toBe("security");
     });
 });
+
+describe("mail about a purchase somebody financed", () => {
+    /** The shape the lender's mailing list actually sends: a survey, a
+     *  List-Unsubscribe, and the arrangement named in the subject. */
+    const survey = (over: Partial<CategorisableMessage> = {}) =>
+        categoriseMail(
+            message({
+                fromAddress: "experienciacliente@cetelem.es",
+                fromName: "Cetelem",
+                headers: { "list-unsubscribe": "<https://cetelem.es/baja>" },
+                ...over
+            })
+        );
+
+    it("files the survey about a financed purchase with the money, not with the parcels", () => {
+        // Reported from a real inbox. No possessive, no decision, no receipt -
+        // so every question missed it and it landed under Updates.
+        expect(
+            survey({
+                subject:
+                    "Financiación Cetelem en APPLE. Tu opinión es muy importante para nosotros - Sólo serán 3 minutos",
+                snippet: "Cuéntanos qué te ha parecido el proceso. Sólo serán 3 minutos."
+            })
+        ).toBe("billing");
+    });
+
+    it("knows credit named without a possessive, in the languages it arrives in", () => {
+        for (const subject of [
+            "Financiación Cetelem de tu compra en APPLE",
+            "Compra financiada en APPLE",
+            "Detalle del pago aplazado de tu compra",
+            "Financing summary for your MacBook purchase",
+            "Your Pay in 3 balance at Apple",
+            "Financiamento da sua compra",
+            "Paiement en 3 fois de votre achat",
+            "Ratenzahlung für Ihren Einkauf",
+            "Pagamento rateale del tuo acquisto"
+        ]) {
+            expect(survey({ subject }), subject).toBe("billing");
+        }
+    });
+
+    it("files a survey about an order, whatever words the survey uses for it", () => {
+        for (const subject of [
+            "¿Qué te ha parecido tu experiencia de compra?",
+            "Encuesta sobre tu pedido",
+            "Rate your recent purchase",
+            "Your feedback on order 45-2210",
+            "Votre avis sur votre commande"
+        ]) {
+            expect(survey({ subject }), subject).toBe("billing");
+        }
+    });
+
+    it("leaves a survey that is not about a purchase where it was", () => {
+        // A helpdesk asking how it did is not money, and must not be filed as if
+        // it were: the tab is what somebody spent, not everything they were asked.
+        expect(
+            survey({
+                subject: "Encuesta de satisfacción sobre nuestra atención al cliente",
+                snippet: "Cuéntanos cómo te atendimos"
+            })
+        ).toBe("updates");
+        expect(
+            survey({
+                subject: "How did we do? Tell us what you think about our support",
+                snippet: "Two questions, one minute"
+            })
+        ).toBe("updates");
+    });
+
+    it("leaves news that names credit, with no purchase and no survey, where it was", () => {
+        // A digest uses the bare nouns all day. Without the purchase or a
+        // question about it, the word is the news, not somebody's own credit.
+        for (const [subject, snippet] of [
+            ["El Euribor sube y encarece la hipoteca media", "Las claves de la semana"],
+            ["Startup X closes $40M financing round", "This week in tech"],
+            ["Proyecto financiado por la Unión Europea", "Boletín trimestral del proyecto"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");
+        }
+    });
+
+    it("leaves news that names credit and a purchase, but not whose, where it was", () => {
+        for (const [subject, snippet] of [
+            [
+                "Hipoteca para la compra de vivienda: así afecta la subida del Euribor",
+                "Las claves de la semana"
+            ],
+            ["Acme secures financing for the purchase of a new plant", "This week in business"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+    });
+
+    it("does not read ordinary newsletter phrasing as a survey", () => {
+        // "rate your" inside "integrate your", and the soft words - experience,
+        // feedback, valuation - that newsletters use without asking anything.
+        for (const [subject, snippet] of [
+            ["Integrate your payment provider in minutes", "Our new SDK is out"],
+            ["Accelerate your payments with one API", "Now in the dashboard"],
+            ["Mejora tu experiencia de compra con la nueva app", "Ya disponible"],
+            ["Valoración de tu vivienda antes de la compra", "Guía para propietarios"],
+            ["Thanks for your feedback - new payment options", "What changed this month"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+    });
+
+    it("leaves a shop's newsletter with a pay-later footer with the bulk mail", () => {
+        for (const [subject, snippet] of [
+            ["New arrivals are in", "Pay in 4 with Klarna at checkout"],
+            ["Ya llegó la nueva colección", "Paga en 3 con PayPal"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+    });
+
+    it("reads the purchase nouns as whole words", () => {
+        // "in order to", "border", "pagoda" and "Verkauf" are not a purchase.
+        for (const [subject, snippet] of [
+            ["Share your feedback", "In order to improve our service, two questions"],
+            ["Tu opinión sobre la nueva ruta", "Visita guiada a la pagoda"],
+            ["Ihre Meinung zählt", "Unser Verkaufsteam und die Border-Region"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+        expect(survey({ subject: "Ihre Meinung zu Ihrem Einkauf" })).toBe("billing");
+    });
+
+    it("leaves a lender's advert with the adverts, even one that names no offer", () => {
+        // The nouns are what lenders sell with, so an advert that mentions a
+        // rate, a term or an application is still an advert.
+        for (const [subject, snippet] of [
+            ["Financiación al 0% TAE en tu próxima compra", "Solicítala en un minuto"],
+            ["Descubre la financiación Cetelem", "Hasta 24 meses sin intereses"],
+            ["Financing available on every laptop", "Apply now, as low as 0% APR"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");
+        }
+    });
+
+    it("knows an advert in the other four languages the nouns are written in", () => {
+        // The nouns cover six languages, so the words that give an advert away
+        // have to cover the same six: an advert nothing recognises as one is
+        // read as somebody's own credit.
+        for (const [subject, snippet] of [
+            ["Paiement en 3 fois sans frais", "Offre valable jusqu'à dimanche"],
+            ["Ratenzahlung ab 0 Euro Anzahlung - jetzt entdecken", "Finanzieren Sie Ihren Einkauf"],
+            ["Buy now, pay later with Klarna", "Split your total in 4, interest free"],
+            ["Rateizzato senza interessi su tutto", "Scopri il finanziamento"],
+            ["Financiamento sem juros", "Solicite já o seu"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");
+        }
+    });
+
+    it("leaves a person's own message alone, whatever noun they used", () => {
+        // The bare nouns are words anybody may use, so they are read only on
+        // mail that said it was bulk. A friend mentioning the mortgage, a
+        // colleague asking how the purchase went: Primary, where they were.
+        for (const [subject, snippet] of [
+            ["Lo de la hipoteca", "¿Te va bien el jueves para ver la financiación del proyecto?"],
+            ["Re: financing the new machines", "Can we talk on Thursday about how we finance it?"],
+            ["¿Qué te pareció la compra?", "Cuéntanos, que estamos pensando en lo mismo"]
+        ]) {
+            expect(categoriseMail(message({ subject: subject!, snippet: snippet! })), subject).toBe(
+                "primary"
+            );
+        }
+    });
+
+    it("leaves a campaign that mentions a purchase on its way to selling one", () => {
+        expect(
+            survey({
+                subject: "Valora tu compra y llévate un 20% de descuento",
+                snippet: "Oferta válida hasta el domingo"
+            })
+        ).toBe("promotions");
+    });
+
+    it("still files what it always did", () => {
+        // The words that were already money stay money, and a parcel stays a
+        // parcel: this rule sits under both.
+        expect(
+            survey({ subject: "Tu pedido ha sido enviado", snippet: "Seguimiento disponible" })
+        ).toBe("updates");
+        expect(
+            survey({ subject: "Tu factura de octubre", snippet: "Importe pendiente 12,00 EUR" })
+        ).toBe("billing");
+    });
+});
