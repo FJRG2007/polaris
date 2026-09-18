@@ -21,7 +21,10 @@
  *   rest of the transactional pile because it is the only mail that is worth
  *   reading BEFORE it happens - a receipt tells you what you spent, and one of
  *   these tells you what you are about to spend, which is the one somebody would
- *   have wanted to see.
+ *   have wanted to see. It also holds the mail that follows a purchase rather
+ *   than announcing one: a bulk message about credit the reader already has, or
+ *   a survey asking what they thought of something they bought - see
+ *   `FINANCING_MENTION`, `FINANCING_NOUNS` and `SURVEY_WORDS` below.
  * - **updates** is a receipt, an order, a statement, a delivery - transactional
  *   mail nobody replies to but everybody needs to find later.
  * - **primary** is what is left, which is what somebody actually wants to read.
