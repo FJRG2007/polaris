@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { HomeError } from "@/lib/home/home-error";
+import { HomeError } from "@polaris-app/places/src/lib/home-error";
 
 /** The guard the Places actions use, to the letter. */
 async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {

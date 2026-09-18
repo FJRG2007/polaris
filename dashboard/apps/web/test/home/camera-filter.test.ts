@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { filterCameras, zonesOf } from "@/lib/home/camera-filter";
+import { filterCameras, zonesOf } from "@polaris-app/places/src/lib/camera-filter";
 
 const CAMERAS = [
     { name: "Front door", zone: "Outside", address: "192.168.1.10" },
@@ -40,8 +40,7 @@ describe("the areas a house is using", () => {
 });
 
 describe("typing into the list", () => {
-    const names = (query: string) =>
-        filterCameras(CAMERAS, { query }).map((camera) => camera.name);
+    const names = (query: string) => filterCameras(CAMERAS, { query }).map((camera) => camera.name);
 
     it("finds a camera by its name, in any case", () => {
         expect(names("garage")).toEqual(["Garage"]);

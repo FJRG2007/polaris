@@ -1,0 +1,42 @@
+/**
+ * The cameras themselves: adding them, changing them, taking them away.
+ *
+ * Split from the wall on purpose. The wall is what somebody opens twenty times a
+ * day and it should be nothing but pictures; this is the screen they open when
+ * something is wrong or something new arrived.
+ */
+
+import { PageHeader } from "@polaris/ui";
+import { CamerasView } from "../../../screens/cameras/cameras-view";
+import { requireHomeUser } from "../../../lib/access";
+import { currentPlace } from "../../../lib/current-place";
+import { PlaceSwitcher } from "../../../screens/place-switcher";
+
+export const dynamic = "force-dynamic";
+
+export default async function CamerasPage({
+    searchParams
+}: {
+    searchParams: Promise<{ open?: string }>;
+}) {
+    const { install, canManage } = await requireHomeUser("home.read");
+    const place = await currentPlace(install.id);
+    const { open } = await searchParams;
+
+    return (
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <PageHeader
+                    title="Cameras"
+                    description="What each camera is, how Polaris reaches it, and what it is allowed to notice."
+                />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
+            </div>
+            <CamerasView canManage={canManage} openId={open ?? null} />
+        </div>
+    );
+}

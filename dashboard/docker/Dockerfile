@@ -25,6 +25,7 @@ WORKDIR /build
 # The npm cache mount avoids re-downloading even when the layer does rebuild.
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/places/package.json ./apps/places/
 # Every workspace manifest, one line each and all of them: a package missing here
 # is a package `npm ci` never links into node_modules, so it builds its own output
 # and every other package that imports it fails to resolve its types - which is
@@ -33,6 +34,7 @@ COPY apps/web/package.json ./apps/web/
 # agreeing, because nothing else notices until an image build breaks.
 COPY packages/agent-core/package.json ./packages/agent-core/
 COPY packages/agent-runtime/package.json ./packages/agent-runtime/
+COPY packages/app-host/package.json ./packages/app-host/
 COPY packages/ai-provider/package.json ./packages/ai-provider/
 COPY packages/ai-search/package.json ./packages/ai-search/
 COPY packages/auth/package.json ./packages/auth/

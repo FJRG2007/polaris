@@ -9,7 +9,11 @@
 
 import { LIVE_TTL_MS, type LiveBox } from "@polaris/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { liveBoxes, publishLiveBoxes, forgetLiveBoxes } from "@/lib/home/live-boxes";
+import {
+    liveBoxes,
+    publishLiveBoxes,
+    forgetLiveBoxes
+} from "@polaris-app/places/src/lib/live-boxes";
 
 const CAMERA = "019f8506-683f-7dd0-9c13-1e9ee9237fe3";
 

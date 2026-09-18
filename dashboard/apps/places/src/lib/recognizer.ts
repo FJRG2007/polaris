@@ -1,0 +1,355 @@
+/**
+ * The thing that says who somebody is.
+ *
+ * There are two ways a house gets one, and the first is the one that should
+ * happen: Home installs it, on a machine the owner picks, the way it installs the
+ * relay. It is a single container - SCRFD to find faces and ArcFace to tell them
+ * apart, the small variants of each, on the CPU - and it is built here rather
+ * than borrowed because the well-known alternative is a five-container stack that
+ * no button could honestly install.
+ *
+ * The second is for a house that already runs one. The address and key fields
+ * stay, they speak the same dialect, and pointing Home at an existing recognizer
+ * keeps working.
+ *
+ * Where it answers is resolved every time rather than written down. A recognizer
+ * on a machine Polaris reaches over SSH is dialled through a tunnel that only
+ * exists inside this process, and a stored address for that is an address that is
+ * wrong after a restart.
+ *
+ * What it holds never comes back here. Polaris keeps a name; the photographs and
+ * the templates derived from them stay in that container.
+ *
+ * Server-only.
+ */
+
+import { prisma } from "@polaris/db";
+import { HomeError } from "./home-error";
+import { loadEnv } from "@polaris/config";
+import { homeInstall } from "./access";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { assertServer, findService, serviceUrls } from "./side-service";
+import { host } from "@polaris/app-host";
+
+const { installApp } = host.appsInstallService;
+const { setApplicationRunning } = host.deployService;
+const { installEnvSecret } = host.appsInstallSecret;
+
+/** The catalog app this module installs. */
+const RECOGNIZER_APP = "face-recognizer";
+
+/** What the house keeps for itself, on its install row. */
+interface HomeSecrets {
+    /** An address somebody typed, for a recognizer they run themselves. */
+    faceApiUrl?: string;
+    faceApiKey?: string;
+    /** The install of the one Home put up, when it did. Takes precedence: it is
+     *  the one this instance is responsible for. */
+    faceInstallId?: string;
+    /**
+     * Whether the house wants faces put to names at all.
+     *
+     * Absent means off, and that is the default for every house including the
+     * ones that already have a recognizer installed. Recognition is the only
+     * part of Places that costs something while nothing is happening - the
+     * container holds its models in memory whether or not a camera ever asks it
+     * anything - so it is opted into rather than out of.
+     */
+    faceEnabled?: boolean;
+}
+
+/** Whether the house has turned it on. Off unless it was said, deliberately. */
+function isEnabled(secrets: HomeSecrets): boolean {
+    return secrets.faceEnabled === true;
+}
+
+/** Where a recognizer answers, for each of the callers.
+ *
+ *  They are not the same address. Polaris may be reaching it down a tunnel; the
+ *  vision worker is usually another container beside it and reaches it over the
+ *  network they share, by name, without leaving the bridge at all. */
+export interface RecognizerEndpoint {
+    readonly baseUrl: string;
+    readonly directUrl: string;
+    /** Its container's own address, when it is a container Polaris deployed on
+     *  this machine. Null for one somebody runs themselves. */
+    readonly networkUrl: string | null;
+    readonly apiKey: string;
+}
+
+async function readSecrets(installedAppId: string): Promise<HomeSecrets> {
+    const row = await prisma.installedApp.findFirst({
+        where: { id: installedAppId },
+        select: { encryptedSecret: true, secretNonce: true, secretKeyId: true }
+    });
+    if (!row?.encryptedSecret || !row.secretNonce || !row.secretKeyId) return {};
+    try {
+        return JSON.parse(
+            decryptSecret(
+                {
+                    ciphertext: Buffer.from(row.encryptedSecret),
+                    nonce: Buffer.from(row.secretNonce),
+                    keyId: row.secretKeyId
+                },
+                loadEnv().POLARIS_MASTER_KEY
+            )
+        ) as HomeSecrets;
+    } catch {
+        return {};
+    }
+}
+
+async function writeSecrets(installedAppId: string, secrets: HomeSecrets): Promise<void> {
+    const blob = encryptSecret(JSON.stringify(secrets), loadEnv().POLARIS_MASTER_KEY);
+    await prisma.installedApp.update({
+        where: { id: installedAppId },
+        data: { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId }
+    });
+}
+
+/**
+ * Put a recognizer on a server.
+ *
+ * Idempotent, and deliberately so: a server that already has one is adopted
+ * rather than given a second, because two of them would each hold half the
+ * household and neither would recognize everybody.
+ *
+ * Installing is a deploy, so this belongs behind a button somebody pressed. The
+ * container is up long before its models are warm, and it says so on its own
+ * health endpoint - this only wires the address.
+ */
+export async function installRecognizer(
+    ownerId: string,
+    actorId: string,
+    serverId: string
+): Promise<void> {
+    const home = await homeInstall();
+    if (!home) throw new HomeError("Home is not installed");
+    await assertServer(ownerId, serverId);
+
+    if (!(await findService(RECOGNIZER_APP, serverId))) {
+        await installApp(ownerId, actorId, {
+            catalogId: RECOGNIZER_APP,
+            name: "Face recognition",
+            serverId,
+            storage: [],
+            // Its key is minted by the install. Nobody types it and it is never
+            // shown: the only things that call this are Polaris and the workers.
+            env: []
+        });
+    }
+    const service = await findService(RECOGNIZER_APP, serverId);
+    if (!service) throw new HomeError("The recognizer was installed but cannot be found");
+
+    const current = await readSecrets(home.id);
+    // The typed address is left alone rather than cleared. Somebody who had their
+    // own recognizer and then installed this one can go back to it by removing
+    // this install, and losing the address they had would be a small betrayal.
+    //
+    // Installing it is switching it on. Nobody presses a button that pulls down
+    // several hundred megabytes and then means for it to sit there off.
+    await writeSecrets(home.id, {
+        ...current,
+        faceInstallId: service.installedAppId,
+        faceEnabled: true
+    });
+}
+
+/**
+ * Point the house at a recognizer it runs itself, or unpoint it.
+ *
+ * A blank address or a blank key clears the pairing, which is how face
+ * recognition is switched off without touching anything else - the cameras on
+ * that rung fall back to reporting a person and stop asking who.
+ *
+ * The address is only kept if it parses as an http(s) URL with a host. It is
+ * dialled by this server and by every vision worker, so a malformed one is a
+ * failure repeated on several machines with no obvious cause.
+ */
+export async function setFaceRecognition(
+    installedAppId: string,
+    baseUrl: string,
+    apiKey: string
+): Promise<void> {
+    const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
+    if (trimmedUrl) {
+        let parsed: URL;
+        try {
+            parsed = new URL(trimmedUrl);
+        } catch {
+            throw new HomeError("Write the address as http://192.168.1.20:8000");
+        }
+        if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) {
+            throw new HomeError("Write the address as http://192.168.1.20:8000");
+        }
+    }
+    const current = await readSecrets(installedAppId);
+    await writeSecrets(installedAppId, {
+        ...current,
+        faceApiUrl: trimmedUrl || undefined,
+        // An empty key on a save that only changed the address leaves the stored
+        // one alone; clearing the address clears the pairing outright.
+        faceApiKey: trimmedUrl ? apiKey.trim() || current.faceApiKey : undefined
+    });
+}
+
+/** The installed recognizer, resolved now. Null when Home never installed one, or
+ *  when the one it installed has since been removed. */
+async function installedRecognizer(installId: string): Promise<RecognizerEndpoint | null> {
+    const row = await prisma.installedApp.findFirst({
+        where: { id: installId, status: { not: "removed" }, applicationId: { not: null } },
+        select: { applicationId: true, ownerId: true }
+    });
+    if (!row?.applicationId) return null;
+    const [urls, apiKey] = await Promise.all([
+        serviceUrls(row.applicationId, row.ownerId),
+        installEnvSecret(row.applicationId, row.ownerId, "FACE_API_KEY")
+    ]);
+    return urls && apiKey ? { ...urls, apiKey } : null;
+}
+
+/** Where the recognizer is, whichever kind it is. Null when either half is
+ *  missing, which makes the face rung unavailable rather than broken. */
+export async function recognizerFor(installedAppId: string): Promise<RecognizerEndpoint | null> {
+    const secrets = await readSecrets(installedAppId);
+    // Off is off, whichever kind the house has. Every caller already handles a
+    // null - a camera on the face rung reports that somebody is there and stops
+    // asking who - so this one line is the whole of switching it off, and no
+    // worker spends anything on it.
+    if (!isEnabled(secrets)) return null;
+    if (secrets.faceInstallId) {
+        const installed = await installedRecognizer(secrets.faceInstallId);
+        if (installed) return installed;
+    }
+    // One that somebody runs themselves is one address for everybody: Polaris and
+    // the workers both have to be able to reach it, which is the deal they made
+    // by typing it in.
+    return secrets.faceApiUrl && secrets.faceApiKey
+        ? {
+              baseUrl: secrets.faceApiUrl,
+              directUrl: secrets.faceApiUrl,
+              // Typed by a person, so it is one address for everybody: there is
+              // no container of Polaris' to reach it by a shorter path.
+              networkUrl: null,
+              apiKey: secrets.faceApiKey
+          }
+        : null;
+}
+
+/** Where the recognizer is, for the house that has one. The people screen and the
+ *  assignment builder both need it, and neither should have to know which install
+ *  the house is. */
+export async function faceEndpoint(): Promise<RecognizerEndpoint | null> {
+    const home = await homeInstall();
+    return home ? recognizerFor(home.id) : null;
+}
+
+/** What the settings screen shows. The key itself never goes back to a browser. */
+export interface RecognizerSettings {
+    /** Whether the house wants it at all. Off until somebody says otherwise. */
+    readonly enabled: boolean;
+    /**
+     * Whether the container is up.
+     *
+     * Reported next to `enabled` because the two can disagree, and the case
+     * where they do is the one worth showing: a house that installed a
+     * recognizer before there was a switch has it off and running, which is
+     * exactly the resources somebody switching it off wanted back.
+     */
+    readonly running: boolean;
+    /** An address somebody typed, if they did. */
+    readonly baseUrl: string;
+    readonly hasKey: boolean;
+    /** Whether Home is running one of its own, and where. */
+    readonly installedOn: string | null;
+    /** Whether it is answering yet - a fresh install spends a minute or two
+     *  starting, and "installed but silent" is the state people ask about. */
+    readonly answering: boolean;
+}
+
+export async function faceRecognitionSettings(installedAppId: string): Promise<RecognizerSettings> {
+    const secrets = await readSecrets(installedAppId);
+    const endpoint = await recognizerFor(installedAppId);
+    return {
+        enabled: isEnabled(secrets),
+        running: secrets.faceInstallId ? await containerWanted(secrets.faceInstallId) : false,
+        baseUrl: secrets.faceApiUrl ?? "",
+        hasKey: Boolean(secrets.faceApiKey),
+        installedOn: secrets.faceInstallId ? await serverNameFor(secrets.faceInstallId) : null,
+        answering: endpoint ? await answering(endpoint) : false
+    };
+}
+
+/**
+ * Turn recognition on or off, and make the container agree.
+ *
+ * The flag alone would stop every camera asking who somebody is, which is the
+ * behaviour; it would not give back the memory the container holds its models
+ * in, which is the reason anybody switches this off. So the container is started
+ * or stopped with it.
+ *
+ * A house pointed at a recognizer it runs itself keeps only the flag - stopping
+ * something Polaris did not start is not Polaris' to do.
+ */
+export async function setFaceEnabled(installedAppId: string, enabled: boolean): Promise<void> {
+    const current = await readSecrets(installedAppId);
+    await writeSecrets(installedAppId, { ...current, faceEnabled: enabled });
+    if (!current.faceInstallId) return;
+    const row = await prisma.installedApp.findFirst({
+        where: {
+            id: current.faceInstallId,
+            status: { not: "removed" },
+            applicationId: { not: null }
+        },
+        select: { applicationId: true, ownerId: true }
+    });
+    if (!row?.applicationId) return;
+    // The flag is already written, so a container that will not answer leaves
+    // recognition off rather than leaving the screen lying about it.
+    await setApplicationRunning(row.applicationId, row.ownerId, enabled).catch(() => undefined);
+}
+
+/** Whether the installed recognizer is meant to be up. The desired state rather
+ *  than a dial to the machine: this runs while a settings page renders, and what
+ *  the switch below is about is what Polaris asked for. */
+async function containerWanted(installId: string): Promise<boolean> {
+    const row = await prisma.installedApp.findFirst({
+        where: { id: installId, status: { not: "removed" } },
+        select: { applicationId: true }
+    });
+    if (!row?.applicationId) return false;
+    const application = await prisma.application.findFirst({
+        where: { id: row.applicationId },
+        select: { desiredState: true }
+    });
+    return application?.desiredState === "running";
+}
+
+/** Which machine the installed recognizer sits on, in words. Null when the
+ *  install has gone, which is also how the screen offers to put one back. */
+async function serverNameFor(installId: string): Promise<string | null> {
+    const row = await prisma.installedApp.findFirst({
+        where: { id: installId, status: { not: "removed" } },
+        select: { targetId: true }
+    });
+    if (!row) return null;
+    if (!row.targetId) return "this server";
+    const target = await prisma.deployTarget.findFirst({
+        where: { id: row.targetId },
+        select: { kind: true, name: true, host: { select: { name: true } } }
+    });
+    if (!target || target.kind === "local") return "this server";
+    return target.host?.name ?? target.name ?? "another server";
+}
+
+/** Whether it answers at all. Short timeout: this runs while a settings page is
+ *  rendering, and a recognizer that is still starting is a fact rather than a
+ *  reason to hold the page. */
+async function answering(endpoint: RecognizerEndpoint): Promise<boolean> {
+    const response = await fetch(`${endpoint.baseUrl}/healthz`, {
+        signal: AbortSignal.timeout(2500)
+    }).catch(() => null);
+    if (!response?.ok) return false;
+    const body = (await response.json().catch(() => null)) as { status?: string } | null;
+    return body?.status === "ok";
+}

@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let contents = new Map<string, Record<string, string>>();
 let sent: { deviceId: string; action: number }[] = [];
 
-vi.mock("@/lib/integrations/nuki-mqtt", () => ({
+vi.mock("@polaris-app/places/src/lib/integrations/nuki-mqtt", () => ({
     NukiMqttError: class extends Error {
         kind = "unreachable";
     },
@@ -29,9 +29,15 @@ vi.mock("@/lib/integrations/nuki-mqtt", () => ({
     }
 }));
 
-const { nukiLocalDriver } = await import("@/lib/home/drivers/nuki-local");
+const { nukiLocalDriver } = await import("@polaris-app/places/src/lib/drivers/nuki-local");
 
-const BROKER = { host: "192.168.1.20", port: "1883", username: "polaris", password: "x", prefix: "nuki" };
+const BROKER = {
+    host: "192.168.1.20",
+    port: "1883",
+    username: "polaris",
+    password: "x",
+    prefix: "nuki"
+};
 
 /** A Smart Lock Ultra as it publishes itself: type 5, locked, door closed. */
 function lock(over: Record<string, string> = {}): Record<string, string> {

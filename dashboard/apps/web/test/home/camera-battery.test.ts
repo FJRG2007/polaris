@@ -15,8 +15,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DETECTION } from "@/lib/home/detection";
-import { normalizeCameraInput, parseCameraInput } from "@/lib/home/schemas";
+import { DEFAULT_DETECTION } from "@polaris-app/places/src/lib/detection";
+import { normalizeCameraInput, parseCameraInput } from "@polaris-app/places/src/lib/schemas";
 import {
     CAMERA_VENDORS,
     TAPO_CONTROL_PORT,
@@ -25,7 +25,7 @@ import {
     redactSource,
     relaySource,
     reportsOwnAlerts
-} from "@/lib/home/vendors";
+} from "@polaris-app/places/src/lib/vendors";
 
 const c410 = { vendor: "tapo-battery", address: "192.168.1.64", rtspPort: 554 };
 
@@ -43,11 +43,9 @@ describe("a battery Tapo, as the relay is told about it", () => {
     });
 
     it("never falls back to RTSP, whatever paths were left on the row", () => {
-        const source = relaySource(
-            { ...c410, mainPath: "/stream1", subPath: "/stream2" },
-            "main",
-            { password: "hunter2" }
-        );
+        const source = relaySource({ ...c410, mainPath: "/stream1", subPath: "/stream2" }, "main", {
+            password: "hunter2"
+        });
         expect(source.startsWith("tapo://")).toBe(true);
     });
 

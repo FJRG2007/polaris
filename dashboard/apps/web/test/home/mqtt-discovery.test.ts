@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ readRetained: vi.fn(), publish: vi.fn() }));
 
-vi.mock("@/lib/integrations/mqtt-broker", () => ({
+vi.mock("@polaris-app/places/src/lib/integrations/mqtt-broker", () => ({
     BrokerError: class extends Error {
         kind = "unreachable";
     },
@@ -23,9 +23,15 @@ vi.mock("@/lib/integrations/mqtt-broker", () => ({
     publish: mocks.publish
 }));
 
-const { mqttDiscoveryDriver } = await import("@/lib/home/drivers/mqtt-discovery");
+const { mqttDiscoveryDriver } = await import("@polaris-app/places/src/lib/drivers/mqtt-discovery");
 
-const BROKER = { host: "192.168.1.20", port: "1883", username: "", password: "", prefix: "homeassistant" };
+const BROKER = {
+    host: "192.168.1.20",
+    port: "1883",
+    username: "",
+    password: "",
+    prefix: "homeassistant"
+};
 
 /** The two reads the driver makes, in order: the descriptions, then everything
  *  they pointed at. */
@@ -33,7 +39,9 @@ function broker(configs: Record<string, unknown>, states: Record<string, string>
     mocks.readRetained.mockReset();
     mocks.readRetained.mockImplementation(async (_address: unknown, filters: string[]) => {
         if (filters.some((filter) => filter.endsWith("/config"))) {
-            return new Map(Object.entries(configs).map(([topic, body]) => [topic, JSON.stringify(body)]));
+            return new Map(
+                Object.entries(configs).map(([topic, body]) => [topic, JSON.stringify(body)])
+            );
         }
         return new Map(Object.entries(states));
     });

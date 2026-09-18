@@ -8,7 +8,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { afterClick, afterMove, focusAfterMove, rangeBetween, toggled } from "@/lib/list-selection";
+import {
+    afterClick,
+    afterMove,
+    focusAfterMove,
+    rangeBetween,
+    toggled
+} from "@polaris-app/places/src/lib/list-selection";
 
 const KEYS = ["a", "b", "c", "d", "e"];
 
@@ -23,7 +29,9 @@ describe("a click", () => {
         const added = afterClick(new Set(["a"]), KEYS, 2, 0, { ctrlKey: true });
         expect([...added.selected].sort()).toEqual(["a", "c"]);
         expect(added.anchor).toBe(2);
-        expect([...afterClick(added.selected, KEYS, 2, 2, { metaKey: true }).selected]).toEqual(["a"]);
+        expect([...afterClick(added.selected, KEYS, 2, 2, { metaKey: true }).selected]).toEqual([
+            "a"
+        ]);
     });
 
     it("takes everything between the anchor and the row with shift", () => {
@@ -39,7 +47,12 @@ describe("a click", () => {
     });
 
     it("reaches backwards as readily as forwards", () => {
-        expect([...afterClick(new Set(), KEYS, 0, 3, { shiftKey: true }).selected]).toEqual(["a", "b", "c", "d"]);
+        expect([...afterClick(new Set(), KEYS, 0, 3, { shiftKey: true }).selected]).toEqual([
+            "a",
+            "b",
+            "c",
+            "d"
+        ]);
     });
 
     it("leaves the selection alone when the row is not there", () => {

@@ -45,8 +45,10 @@ vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "key" 
 vi.mock("@/lib/deploy-service", () => ({ setApplicationRunning }));
 vi.mock("@/lib/apps/install-service", () => ({ installApp: vi.fn() }));
 vi.mock("@/lib/apps/install-secret", () => ({ installEnvSecret: vi.fn(async () => "face-key") }));
-vi.mock("@/lib/home/access", () => ({ homeInstall: vi.fn(async () => ({ id: "home-1" })) }));
-vi.mock("@/lib/home/side-service", () => ({
+vi.mock("@polaris-app/places/src/lib/access", () => ({
+    homeInstall: vi.fn(async () => ({ id: "home-1" }))
+}));
+vi.mock("@polaris-app/places/src/lib/side-service", () => ({
     assertServer: vi.fn(),
     findService: vi.fn(async () => null),
     serviceUrls: vi.fn(async () => ({
@@ -57,7 +59,7 @@ vi.mock("@/lib/home/side-service", () => ({
 }));
 
 const { recognizerFor, faceRecognitionSettings, setFaceEnabled } = await import(
-    "@/lib/home/recognizer"
+    "@polaris-app/places/src/lib/recognizer"
 );
 
 beforeEach(() => {

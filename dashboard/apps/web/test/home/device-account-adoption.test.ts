@@ -59,12 +59,14 @@ vi.mock("@polaris/db", () => ({
                 accountRows.push(row);
                 return row;
             },
-            findMany: async () =>
-                accountRows.map((row) => ({ ...row, _count: { devices: 0 } })),
+            findMany: async () => accountRows.map((row) => ({ ...row, _count: { devices: 0 } })),
             findFirst: async () => accountRows[0] ?? null
         },
         placeDevice: {
-            updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+            updateMany: async (args: {
+                where: Record<string, unknown>;
+                data: Record<string, unknown>;
+            }) => {
                 devicesPointedAt.push(args);
                 return { count: 1 };
             }
@@ -72,7 +74,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { listAccounts } = await import("@/lib/home/device-accounts");
+const { listAccounts } = await import("@polaris-app/places/src/lib/device-accounts");
 
 /** The old setting as it was actually stored: the encrypted envelope, base64, as
  *  one JSON string. */

@@ -26,6 +26,10 @@ export default defineConfig({
          *
          * A test that genuinely hangs still fails. It just fails on evidence.
          */
+        // What an installable app takes from the dashboard, provided before any
+        // test loads one. Every service in it loads on first use, so a test that
+        // replaces a dashboard module replaces it for the apps too.
+        setupFiles: ["./test/setup/app-host.ts"],
         testTimeout: 30_000,
         hookTimeout: 30_000
     }

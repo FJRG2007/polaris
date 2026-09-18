@@ -8,11 +8,20 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { attrValues, tagValue, tagValues } from "@/lib/home/onvif";
-import { hostsInCidr, vendorFromScopes } from "@/lib/home/discovery";
-import { cameraVendor, redactRtspUrl, rtspUrl } from "@/lib/home/vendors";
-import { normalizeAddress, normalizeCameraInput, normalizeStreamPath } from "@/lib/home/schemas";
-import { DEFAULT_DETECTION, detectorReaches, needsSomewhereToRun, withinHours } from "@/lib/home/detection";
+import { attrValues, tagValue, tagValues } from "@polaris-app/places/src/lib/onvif";
+import { hostsInCidr, vendorFromScopes } from "@polaris-app/places/src/lib/discovery";
+import { cameraVendor, redactRtspUrl, rtspUrl } from "@polaris-app/places/src/lib/vendors";
+import {
+    normalizeAddress,
+    normalizeCameraInput,
+    normalizeStreamPath
+} from "@polaris-app/places/src/lib/schemas";
+import {
+    DEFAULT_DETECTION,
+    detectorReaches,
+    needsSomewhereToRun,
+    withinHours
+} from "@polaris-app/places/src/lib/detection";
 
 describe("addresses", () => {
     it("keeps just the host, however it was pasted", () => {
@@ -23,14 +32,21 @@ describe("addresses", () => {
 
     it("gives a stream path its leading slash and takes a host off it", () => {
         expect(normalizeStreamPath("stream1")).toBe("/stream1");
-        expect(normalizeStreamPath("rtsp://192.168.1.50:554/h264Preview_01_main")).toBe("/h264Preview_01_main");
+        expect(normalizeStreamPath("rtsp://192.168.1.50:554/h264Preview_01_main")).toBe(
+            "/h264Preview_01_main"
+        );
         expect(normalizeStreamPath("  ")).toBe("");
         expect(normalizeStreamPath("/stream1/")).toBe("/stream1");
     });
 
     it("normalizes every text field of a camera in one pass", () => {
         expect(
-            normalizeCameraInput({ name: " Front door ", zone: " Outside ", address: "RTSP://10.0.0.4/x", username: " admin " })
+            normalizeCameraInput({
+                name: " Front door ",
+                zone: " Outside ",
+                address: "RTSP://10.0.0.4/x",
+                username: " admin "
+            })
         ).toEqual({ name: "Front door", zone: "Outside", address: "10.0.0.4", username: "admin" });
     });
 });
@@ -50,7 +66,9 @@ describe("stream URLs", () => {
     });
 
     it("brackets a bare IPv6 address", () => {
-        expect(rtspUrl({ address: "fd00::5", rtspPort: 554 }, "/stream1")).toBe("rtsp://[fd00::5]:554/stream1");
+        expect(rtspUrl({ address: "fd00::5", rtspPort: 554 }, "/stream1")).toBe(
+            "rtsp://[fd00::5]:554/stream1"
+        );
     });
 
     it("hides the password from anything a person reads", () => {
@@ -75,7 +93,7 @@ describe("what a camera says", () => {
     // A real GetProfilesResponse, prefixes and all: the attribute quoting is what
     // a camera actually sends, so it stays as it is.
     const profiles =
-        "<trt:GetProfilesResponse><trt:Profiles token=\"Profile_1\" fixed=\"true\"><tt:Name>mainStream</tt:Name><tt:VideoEncoderConfiguration><tt:Resolution><tt:Width>2560</tt:Width><tt:Height>1440</tt:Height></tt:Resolution></tt:VideoEncoderConfiguration></trt:Profiles><trt:Profiles token=\"Profile_2\"><tt:Name>minorStream</tt:Name><tt:VideoEncoderConfiguration><tt:Resolution><tt:Width>640</tt:Width></tt:Resolution></tt:VideoEncoderConfiguration></trt:Profiles></trt:GetProfilesResponse>";
+        '<trt:GetProfilesResponse><trt:Profiles token="Profile_1" fixed="true"><tt:Name>mainStream</tt:Name><tt:VideoEncoderConfiguration><tt:Resolution><tt:Width>2560</tt:Width><tt:Height>1440</tt:Height></tt:Resolution></tt:VideoEncoderConfiguration></trt:Profiles><trt:Profiles token="Profile_2"><tt:Name>minorStream</tt:Name><tt:VideoEncoderConfiguration><tt:Resolution><tt:Width>640</tt:Width></tt:Resolution></tt:VideoEncoderConfiguration></trt:Profiles></trt:GetProfilesResponse>';
 
     it("reads a value whatever prefix the vendor used", () => {
         expect(tagValue("<tds:Model>C200</tds:Model>", "Model")).toBe("C200");
@@ -94,7 +112,9 @@ describe("what a camera says", () => {
 
     it("recognizes a make from its scopes", () => {
         expect(vendorFromScopes("onvif://www.onvif.org/name/TAPO%20C200")).toBe("tapo");
-        expect(vendorFromScopes("onvif://www.onvif.org/hardware/DS-2CD2042WD Hikvision")).toBe("hikvision");
+        expect(vendorFromScopes("onvif://www.onvif.org/hardware/DS-2CD2042WD Hikvision")).toBe(
+            "hikvision"
+        );
         expect(vendorFromScopes("onvif://www.onvif.org/name/IPCamera")).toBeNull();
     });
 });

@@ -52,22 +52,28 @@ const CAMERA = {
 vi.mock("@polaris/db", () => ({
     prisma: { camera: { findMany: vi.fn(async () => [CAMERA]) } }
 }));
-vi.mock("@/lib/home/relay", () => ({
+vi.mock("@polaris-app/places/src/lib/relay", () => ({
     relayEndpoint: vi.fn(async () => relay),
     relayServerFor: (value: string) => value,
     streamName: (id: string, quality: string) => `${id}-${quality}`
 }));
-vi.mock("@/lib/home/recognizer", () => ({ recognizerFor: vi.fn(async () => faces) }));
-vi.mock("@/lib/home/camera-zones", () => ({ zonesByCamera: vi.fn(async () => new Map()) }));
+vi.mock("@polaris-app/places/src/lib/recognizer", () => ({
+    recognizerFor: vi.fn(async () => faces)
+}));
+vi.mock("@polaris-app/places/src/lib/camera-zones", () => ({
+    zonesByCamera: vi.fn(async () => new Map())
+}));
 vi.mock("@/lib/apps/install-service", () => ({ installApp: vi.fn() }));
 vi.mock("@/lib/apps/install-secret", () => ({ installEnvSecret: vi.fn() }));
-vi.mock("@/lib/domain-service", () => ({ appBaseUrl: vi.fn(async () => "https://polaris.example") }));
-vi.mock("@/lib/home/side-service", () => ({
+vi.mock("@/lib/domain-service", () => ({
+    appBaseUrl: vi.fn(async () => "https://polaris.example")
+}));
+vi.mock("@polaris-app/places/src/lib/side-service", () => ({
     assertServer: vi.fn(),
     findService: vi.fn(async () => null)
 }));
 
-const { assignmentsFor } = await import("@/lib/home/vision");
+const { assignmentsFor } = await import("@polaris-app/places/src/lib/vision");
 
 beforeEach(() => {
     relay = RELAY;

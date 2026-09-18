@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { UNEXPLAINED, explainRelayFailure, relaySaid } from "@/lib/home/relay-failure";
+import {
+    UNEXPLAINED,
+    explainRelayFailure,
+    relaySaid
+} from "@polaris-app/places/src/lib/relay-failure";
 
 /** Exactly as the relay wrote it, from the camera this was built for. */
 const REFUSED =

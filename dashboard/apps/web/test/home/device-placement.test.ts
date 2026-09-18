@@ -72,7 +72,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { listDeviceEvents, listDevices } = await import("@/lib/home/devices");
+const { listDeviceEvents, listDevices } = await import("@polaris-app/places/src/lib/devices");
 
 describe("the devices of a place", () => {
     beforeEach(() => {

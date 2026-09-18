@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as registry from "@/lib/home/device-connections";
+import * as registry from "@polaris-app/places/src/lib/device-connections";
 
 const NUKI_WEB = "nuki-web";
 
@@ -29,7 +29,9 @@ describe("the ways in", () => {
     });
 
     it("finds a make by what its owner would call the thing they bought", () => {
-        expect(registry.searchConnections("smart lock").map((entry) => entry.id)).toContain(NUKI_WEB);
+        expect(registry.searchConnections("smart lock").map((entry) => entry.id)).toContain(
+            NUKI_WEB
+        );
     });
 
     it("counts the ways in per make, so a screen can say there was a choice", () => {

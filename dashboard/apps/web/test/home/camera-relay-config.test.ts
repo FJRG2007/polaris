@@ -19,7 +19,12 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { HLS_FILES, hlsAssetPath, hlsMasterPath, streamPath } from "@/lib/home/relay";
+import {
+    HLS_FILES,
+    hlsAssetPath,
+    hlsMasterPath,
+    streamPath
+} from "@polaris-app/places/src/lib/relay";
 
 const ENTRYPOINT = readFileSync(
     join(process.cwd(), "../../services/camera-relay/entrypoint.sh"),

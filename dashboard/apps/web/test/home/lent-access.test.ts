@@ -40,7 +40,7 @@ vi.mock("@/lib/access/grants", () => ({
     spendGrant
 }));
 
-const sharing = await import("@/lib/home/sharing");
+const sharing = await import("@polaris-app/places/src/lib/sharing");
 
 const VISITOR = { id: "u9", isAdmin: false } as unknown as SessionUser;
 

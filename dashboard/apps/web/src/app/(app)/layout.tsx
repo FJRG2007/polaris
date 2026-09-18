@@ -11,8 +11,16 @@
 import type { ReactNode } from "react";
 import { requireUser } from "@/lib/session";
 import { AppChrome } from "@/components/app-chrome";
+import { ProvideAppHostUi } from "@/components/app-host/client";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
-    return <AppChrome user={user}>{children}</AppChrome>;
+    return (
+        <AppChrome user={user}>
+            {/* Before the screens, so an installable app's components find the
+                dashboard's pieces when they render. */}
+            <ProvideAppHostUi />
+            {children}
+        </AppChrome>
+    );
 }
