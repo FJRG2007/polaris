@@ -1,6 +1,7 @@
 /**
  * Server-side Host service. A Host is a global SSH server registered once and
- * consumed by multiple apps (Docker over SSH in Containers, SFTP in Drive). This
+ * consumed by multiple apps (Docker over SSH in Containers, SFTP in Drive, and
+ * as the tunnel a database connection is reached through in Databases). This
  * turns a stored Host into connection parameters for the shared SSH primitive,
  * and adds/removes Hosts - trust-on-add captures and pins the server key so later
  * connections verify it, and credentials are envelope-encrypted at rest with the

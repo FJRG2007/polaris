@@ -1,13 +1,19 @@
 /**
  * Shared SSH client. One place that opens an authenticated ssh2 connection with
- * mandatory host-key verification, so both connectors that need SSH - the Docker
- * connector (`docker system dial-stdio`) and the SFTP storage driver - behave
+ * mandatory host-key verification, so every connector that needs SSH - the
+ * Docker connector (`docker system dial-stdio`), the SFTP storage driver, the
+ * loopback tunnels for remote cameras and database connections - behaves
  * identically and neither reinvents auth or pinning.
  *
  * Host-key pinning: the verifier runs during the handshake, before any credential
  * is sent. A registered host carries a pinned key (base64 of the raw key blob);
  * a mismatch is refused. During "add host" no key is pinned yet, so the first key
  * is accepted once and reported via `onHostKey` for the caller to store.
+ *
+ * `sock` connects over an already-open stream instead of dialling a new TCP
+ * socket - a `direct-tcpip` channel opened on another SSH connection, so a
+ * target reachable only through a jump host is reached the same way as one
+ * reachable directly.
  */
 
 import { Client } from "ssh2";

@@ -139,7 +139,8 @@ with one thing does not get the rest.
   Polaris's own MCP server.
 - **Code** - the pull requests and issues you have open on GitHub, read as you.
 - **Databases** - Postgres, MySQL, MariaDB, MongoDB and Redis: browse, query and
-  back up what you deployed.
+  back up what you deployed, or connect to one elsewhere - directly or through an
+  SSH tunnel, via a registered server or a login typed into the connection.
 
 **Work and people**
 

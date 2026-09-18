@@ -23,6 +23,14 @@
  * it came from - `managed:<id>`, `polaris` - and each shape re-asks the question
  * behind it in `addressOf`, because an id in a request is a request rather than
  * a permission.
+ *
+ * A database somewhere else may also be reached through an SSH tunnel rather
+ * than directly - through a server already registered in Servers, or through an
+ * SSH login typed into the connection itself and pinned the way a Host is (see
+ * `tunnel.ts`). The tunnel's own login is a second, separate secret from the
+ * database's, encrypted the same way; `addressOf` resolves it fresh on every
+ * open so a rotated key or a removed server is caught there rather than at a
+ * saved address that quietly stopped being reachable.
  */
 
 import { prisma } from "@polaris/db";
@@ -30,11 +38,11 @@ import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
-import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
-import { getHostConnection, HostCredentialsError } from "@/lib/host-service";
 import { databaseCredentials } from "@/lib/database-service";
+import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
 import { captureHostKey, TunnelError, type DataTunnel } from "./tunnel";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { getHostConnection, HostCredentialsError } from "@/lib/host-service";
 import { saveConnectionSchema, type SaveConnectionInput, type SshAuthMethod } from "./connection-schema";
 
 export type { SaveConnectionInput } from "./connection-schema";
@@ -637,7 +645,6 @@ function serverOptions(server: OwnedServer): SshConnectOptions {
         pinnedHostKey: [server.hostKey as string]
     };
 }
-
 
 export async function deleteConnection(userId: string, id: string): Promise<void> {
     const deleted = await prisma.dataConnection.deleteMany({ where: { id, ownerId: userId } });
