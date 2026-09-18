@@ -5,5 +5,5 @@ import { renderAppPage, type AppPageProps } from "@/lib/app-bundles/serve-page";
 export const dynamic = "force-dynamic";
 
 export default function Page(props: AppPageProps) {
-    return renderAppPage("/places", props);
+    return renderAppPage("/places", "home", props);
 }

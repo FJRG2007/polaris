@@ -14,10 +14,17 @@ import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { resetEnvCache } from "@polaris/config";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { sharedServerModules } from "@/lib/app-bundles/shared-server";
 import { SHARED_CLIENT_MODULES } from "@/components/app-bundles/runtime";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+
+// What is installed here, as the lifecycle asks it.
+const installed = new Set<string>();
+vi.mock("@/lib/apps/install-presence", () => ({
+    isAppInstalled: async (id: string) => installed.has(id),
+    invalidateInstallPresence: () => undefined
+}));
 
 const DASHBOARD = resolve(__dirname, "../../../..");
 const BUNDLER = pathToFileURL(join(DASHBOARD, "packages/app-host/bundler/build.mjs")).href;
@@ -157,5 +164,65 @@ describe("a bundle that is not what the image says", () => {
             expect(existsSync(outside), outside).toBe(false);
         }
         if (dir) expect(readdirSync(dir).sort()).toEqual(["manifest.json", "outside.txt"]);
+    });
+});
+
+beforeEach(() => installed.clear());
+
+describe("at boot, an app's code", () => {
+    it("brings the code of the apps installed here, and only theirs", async () => {
+        const { prepareAppBundles } = await import("@/lib/app-bundles/lifecycle");
+        const { loadedBundle, unloadBundle } = await import("@/lib/app-bundles/loader");
+        // A fresh boot: nothing loaded, nothing on the volume.
+        for (const id of ["home", "game-servers"]) unloadBundle(id);
+        rmSync(join(root, "data", "apps"), { recursive: true, force: true });
+        installed.add("game-servers");
+        await prepareAppBundles();
+        expect(loadedBundle("game-servers")?.server.extension.id).toBe("game-servers");
+        expect(loadedBundle("home")).toBeUndefined();
+        expect(existsSync(join(root, "data", "apps", "home"))).toBe(false);
+    });
+});
+
+describe("installing an app", () => {
+    it("brings the app's code, and its extension answers from then on", async () => {
+        const { appInstalled } = await import("@/lib/app-bundles/lifecycle");
+        const { appExtensions } = await import("@/lib/app-bundles/code");
+        await appInstalled("home");
+        expect(appExtensions().map((extension) => extension.id)).toContain("home");
+    });
+
+    it("fails with the reason when the code cannot be had", async () => {
+        const store = await import("@/lib/app-bundles/store");
+        const { appInstalled } = await import("@/lib/app-bundles/lifecycle");
+        const { unloadBundle } = await import("@/lib/app-bundles/loader");
+        unloadBundle("home");
+        rmSync(join(root, "data", "apps", "home"), { recursive: true, force: true });
+        const image = join(root, "image");
+        const index = JSON.parse(readFileSync(join(image, "index.json"), "utf8"));
+        const good = readFileSync(join(image, "home.zip"));
+        writeFileSync(join(image, "home.zip"), Buffer.concat([good, Buffer.from("tampered")]));
+        store.forgetBundleIndex();
+        try {
+            await expect(appInstalled("home")).rejects.toThrow(
+                /^Places could not be installed\. What was downloaded is not what this Polaris was built with/
+            );
+        } finally {
+            writeFileSync(join(image, "home.zip"), good);
+            writeFileSync(join(image, "index.json"), JSON.stringify(index));
+            store.forgetBundleIndex();
+        }
+    });
+});
+
+describe("uninstalling an app", () => {
+    it("takes the code off this server", async () => {
+        const { appInstalled, appUninstalled } = await import("@/lib/app-bundles/lifecycle");
+        const { loadedBundle } = await import("@/lib/app-bundles/loader");
+        await appInstalled("home");
+        expect(existsSync(join(root, "data", "apps", "home"))).toBe(true);
+        await appUninstalled("home");
+        expect(loadedBundle("home")).toBeUndefined();
+        expect(existsSync(join(root, "data", "apps", "home"))).toBe(false);
     });
 });

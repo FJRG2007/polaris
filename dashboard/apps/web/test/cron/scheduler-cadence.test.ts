@@ -24,13 +24,17 @@ const { runJobBody, gates } = vi.hoisted(() => {
     return { runJobBody, gates };
 });
 
-vi.mock("../../src/lib/cron/jobs", () => ({
-    runJobBody: (job: { key: string }) => runJobBody(job),
-    SCHEDULED_JOBS: [
+vi.mock("../../src/lib/cron/jobs", () => {
+    const jobs = [
         { key: "minute", everyMs: 60_000, leaseMs: null, run: async () => "minute" },
         { key: "wake", everyMs: 15_000, leaseMs: null, run: async () => "wake" }
-    ]
-}));
+    ];
+    return {
+        runJobBody: (job: { key: string }) => runJobBody(job),
+        SCHEDULED_JOBS: jobs,
+        scheduledJobs: () => jobs
+    };
+});
 
 const { startScheduledWork } = await import("../../src/lib/cron/scheduler");
 

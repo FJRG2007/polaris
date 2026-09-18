@@ -19,7 +19,7 @@
  * owns it; this file owns only when.
  */
 
-import { runJobBody, SCHEDULED_JOBS, type ScheduledJob } from "./jobs";
+import { runJobBody, scheduledJobs, SCHEDULED_JOBS, type ScheduledJob } from "./jobs";
 
 /** How often the table is looked at. The floor on any job's cadence but the few
  *  that ask for less, which are looked at on their own shorter interval. */
@@ -80,7 +80,7 @@ export function due(everyMs: number, last: number | undefined, now: number, tick
  * to.
  */
 export async function runScheduledJob(key: string): Promise<unknown> {
-    const job = SCHEDULED_JOBS.find((entry) => entry.key === key);
+    const job = scheduledJobs().find((entry) => entry.key === key);
     if (!job) throw new Error(`No scheduled job called ${key}`);
     return run(job);
 }
@@ -130,9 +130,9 @@ export function startScheduledWork(): void {
     }
     started = true;
 
-    const ticker = (jobs: readonly ScheduledJob[], tickMs: number) => (): void => {
+    const ticker = (jobs: () => readonly ScheduledJob[], tickMs: number) => (): void => {
         const now = Date.now();
-        for (const job of jobs) {
+        for (const job of jobs()) {
             if (!due(job.everyMs, lastRunAt.get(job.key), now, tickMs)) continue;
             void run(job).catch((error: unknown) =>
                 console.error(`polaris: the ${job.key} pass failed:`, error)
@@ -140,14 +140,16 @@ export function startScheduledWork(): void {
         }
     };
 
-    const tick = ticker(SCHEDULED_JOBS.filter((job) => job.everyMs >= TICK_MS), TICK_MS);
+    // The list is read on every tick: an installed app's jobs arrive with its code.
+    const tick = ticker(() => scheduledJobs().filter((job) => job.everyMs >= TICK_MS), TICK_MS);
     setTimeout(tick, FIRST_PASS_MS).unref?.();
     setInterval(tick, TICK_MS).unref?.();
 
+    // Only Polaris' own jobs run quicker than a tick; an app's are a minute or more.
     const quick = SCHEDULED_JOBS.filter((job) => job.everyMs < TICK_MS);
     if (quick.length === 0) return;
     const quickMs = Math.max(QUICK_TICK_FLOOR_MS, Math.min(...quick.map((job) => job.everyMs)));
-    const quickTick = ticker(quick, quickMs);
+    const quickTick = ticker(() => quick, quickMs);
     setTimeout(() => {
         quickTick();
         setInterval(quickTick, quickMs).unref?.();

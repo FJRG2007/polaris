@@ -460,7 +460,7 @@ describe("what the panel does with them", () => {
             "8f1b6b2e-0000-4000-8000-000000000000",
             known
         );
-        expect(picture?.url).toBe("/mcicons/minecraft_stone.png");
+        expect(picture?.url).toBe("/api/app-bundles/game-servers/current/assets/mcicons/minecraft_stone.png");
     });
 
     it("draws a square picture whole and a strip as its first square", () => {

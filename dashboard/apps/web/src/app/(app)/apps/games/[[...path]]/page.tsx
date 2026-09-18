@@ -5,5 +5,5 @@ import { renderAppPage, type AppPageProps } from "@/lib/app-bundles/serve-page";
 export const dynamic = "force-dynamic";
 
 export default function Page(props: AppPageProps) {
-    return renderAppPage("/apps/games", props);
+    return renderAppPage("/apps/games", "game-servers", props);
 }

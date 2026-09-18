@@ -16,14 +16,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const runJobBody = vi.fn(async (job: { key: string }) => `${job.key} done`);
 
-vi.mock("../../src/lib/cron/jobs", () => ({
-    runJobBody: (job: { key: string }) => runJobBody(job),
-    SCHEDULED_JOBS: [
+vi.mock("../../src/lib/cron/jobs", () => {
+    const jobs = [
         { key: "fast", everyMs: 60_000, leaseMs: null, run: async () => "fast" },
         { key: "slow", everyMs: 600_000, leaseMs: null, run: async () => "slow" },
         { key: "on-demand", everyMs: 24 * 60 * 60_000, leaseMs: null, run: async () => "on demand" }
-    ]
-}));
+    ];
+    return {
+        runJobBody: (job: { key: string }) => runJobBody(job),
+        SCHEDULED_JOBS: jobs,
+        scheduledJobs: () => jobs
+    };
+});
 
 const { due, runScheduledJob, startScheduledWork } = await import("../../src/lib/cron/scheduler");
 
@@ -164,5 +168,16 @@ describe("the tick", () => {
         await vi.advanceTimersByTimeAsync(60_000);
         await vi.advanceTimersByTimeAsync(60_000);
         expect(starts("fast")).toBe(before + 2);
+    });
+
+    // An installed app's jobs arrive with its code, which can be after the
+    // schedule started: its bundle is fetched at boot, or it is installed later.
+    it("runs a job that appeared after the schedule started", async () => {
+        const { SCHEDULED_JOBS } = await import("../../src/lib/cron/jobs");
+        (SCHEDULED_JOBS as { key: string; everyMs: number; leaseMs: null; run: () => Promise<string> }[]).push(
+            { key: "arrived-later", everyMs: 60_000, leaseMs: null, run: async () => "later" }
+        );
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(starts("arrived-later")).toBe(1);
     });
 });

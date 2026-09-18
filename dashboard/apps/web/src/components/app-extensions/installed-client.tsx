@@ -3,16 +3,13 @@
 /**
  * Draws what an installable app puts inside a core screen.
  *
- * The client half of the app extension registry, and the one client-side place
- * allowed to name an app's components. A slot was built on the server by the
- * app (`AppExtension.firewallSlot`, `installedPanelSlot`); this hands it to the
- * app's own component.
+ * The client half of the app extension registry. A slot was built on the server
+ * by the app (`AppExtension.firewallSlot`, `installedPanelSlot`), with where the
+ * app's component that draws it is in its bundle; this loads and draws it.
  */
 
 import type { Permission } from "@polaris/core";
 import type { AppSlot } from "@/lib/app-extensions/types";
-import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
-import { GameServersSlot } from "@polaris-app/game-servers/src/screens/extension-slot";
 import { AppBundleMount } from "@/components/app-bundles/mount";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 
@@ -28,14 +25,7 @@ export interface InstalledSlotHost {
 }
 
 export function AppSlotView({ slot, host }: { slot: AppSlot; host?: InstalledSlotHost }) {
-    // An app that came as a bundle draws its own slot, from its own module.
-    if (slot.bundle) {
-        return <AppBundleMount src={slot.bundle.src} name={slot.bundle.name} props={{ slot, host }} />;
-    }
-    switch (slot.app) {
-        case GAME_SERVERS_APP_ID:
-            return <GameServersSlot slot={slot} host={host} />;
-        default:
-            return null;
-    }
+    // The app draws it, with the component its bundle names for its slots.
+    if (!slot.bundle) return null;
+    return <AppBundleMount src={slot.bundle.src} name={slot.bundle.name} props={{ slot, host }} />;
 }

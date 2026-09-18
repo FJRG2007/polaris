@@ -109,6 +109,15 @@ const prisma = commandScript("prisma", dbDir);
 run(process.execPath, [prisma, "generate", `--schema=${sqliteSchema}`], env);
 run(process.execPath, [prisma, "db", "push", `--schema=${sqliteSchema}`, "--skip-generate", "--accept-data-loss"], env);
 
+// The installable apps reach a server as bundles (packages/app-host/bundler), so
+// a local dashboard gets them the way an image built on its own host does: built
+// here, and unpacked from this folder when one is installed. After a change to an
+// app, run this again (or just `node packages/app-host/bundler/build.mjs <dir>`).
+const appBundles = join(root, ".app-bundles");
+log("Building the installable apps");
+run(process.execPath, [join(root, "packages", "app-host", "bundler", "build.mjs"), appBundles], env);
+env.POLARIS_APP_BUNDLES_DIR = toUrlPath(appBundles);
+
 log(`First run? Open http://localhost:3000/oauth/setup?token=${env.POLARIS_SETUP_TOKEN}`);
 log("Starting the dashboard at http://localhost:3000 (Ctrl+C to stop)");
 const dev = spawn(process.execPath, [commandScript("next", webDir), "dev"], { cwd: webDir, env, stdio: "inherit" });

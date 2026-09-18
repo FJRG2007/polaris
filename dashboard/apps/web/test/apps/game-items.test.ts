@@ -52,11 +52,11 @@ describe("typedItemId", () => {
 
 describe("itemIconUrl", () => {
     it("points at the staged set, named after the id", () => {
-        expect(itemIconUrl("minecraft:diamond_sword")).toBe("/mcicons/minecraft_diamond_sword.png");
+        expect(itemIconUrl("minecraft:diamond_sword")).toBe("/api/app-bundles/game-servers/current/assets/mcicons/minecraft_diamond_sword.png");
     });
 
     it("namespaces a bare name first", () => {
-        expect(itemIconUrl("apple")).toBe("/mcicons/minecraft_apple.png");
+        expect(itemIconUrl("apple")).toBe("/api/app-bundles/game-servers/current/assets/mcicons/minecraft_apple.png");
     });
 
     it("has no picture for a modded id, rather than one that always 404s", () => {

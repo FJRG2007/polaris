@@ -535,11 +535,19 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // it stopped and start two.
         leaseMs: 10 * MINUTE,
         run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
-    },
-
-    // What the installed apps run, each only while its app is installed.
-    ...appJobs()
+    }
 ];
+
+/**
+ * Everything to run now: Polaris' own jobs and the installed apps'.
+ *
+ * Asked again on every tick rather than read once, because an app's jobs arrive
+ * with its code - at boot, a moment after the schedule starts when its bundle had
+ * to be fetched first, or whenever somebody installs it.
+ */
+export function scheduledJobs(): ScheduledJob[] {
+    return [...SCHEDULED_JOBS, ...appJobs()];
+}
 
 /** Run one job's body, taking its lease first when it has one. Null means another
  *  process is already running it. */

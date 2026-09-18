@@ -45,10 +45,12 @@ coverage/
 dashboard/apps/web/public/pdfjs/
 # pdf.js annotation and editor icons, which its viewer looks for at /images/
 dashboard/apps/web/public/images/
-# Minecraft item icons, staged into public/ at build time from resources/mcicons
-dashboard/apps/web/public/mcicons/
-# ARK item icons, staged into public/ at build time from resources/arkicons
-dashboard/apps/web/public/arkicons/
+# What an app package ships besides its code, staged for its bundle at build time
+# (the Game servers item icons, from resources/mcicons and resources/arkicons,
+# and the login mod's jars).
+dashboard/apps/*/.assets/
+# The same apps built into bundles for a local dashboard (scripts/dev-up.mjs).
+dashboard/.app-bundles/
 # Noise-suppression worklets and models, staged into public/ at build time
 dashboard/apps/web/public/audio/
 # The embedded editors' fonts, staged into public/ at build time from the

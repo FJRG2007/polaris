@@ -69,6 +69,26 @@ describe("which servers have a build", () => {
         for (const file of login.MOD_FILES) expect(dockerfile).toContain(`/out/${file}.version`);
         expect(dockerfile).toContain('-Pmod_version="$version"');
     });
+
+    // The route serves them from Game servers' bundle, so they have to be staged
+    // where its package says its jars are before the bundler runs, or every
+    // bundle is built without them and every download is a 404.
+    it("is put in the Game servers bundle", () => {
+        const dockerfile = readFileSync(
+            join(__dirname, "..", "..", "..", "..", "docker", "Dockerfile"),
+            "utf8"
+        );
+        const assets = JSON.parse(
+            readFileSync(join(__dirname, "..", "..", "..", "game-servers", "package.json"), "utf8")
+        ).polaris.assets as Record<string, string>;
+        const staged = `./apps/game-servers/${assets["minecraft-mods"]?.replace(/^\.\//, "")}`;
+        for (const stage of ["minecraft-mods", "minecraft-plugins"]) {
+            expect(dockerfile).toContain(`COPY --from=${stage} /out ${staged}`);
+        }
+        expect(dockerfile.indexOf(`COPY --from=minecraft-plugins /out ${staged}`)).toBeLessThan(
+            dockerfile.indexOf("RUN node packages/app-host/bundler/build.mjs")
+        );
+    });
 });
 
 describe("a server on an older build", () => {

@@ -36,7 +36,8 @@ sha() { echo "sha256:$(sha256sum "$1" | cut -d' ' -f1)"; }
 # Upload a file as a blob unless the registry already has it.
 push_blob() {
     local file=$1 digest=$2 location separator
-    if curl -fsS -o /dev/null -I -H "$auth" "$API/blobs/$digest"; then
+    # -s without -S: a blob the registry does not have yet is the ordinary case.
+    if curl -fs -o /dev/null -I -H "$auth" "$API/blobs/$digest"; then
         echo "  $digest already published"
         return 0
     fi

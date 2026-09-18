@@ -100,20 +100,6 @@ RUN npm run db:generate
 ARG NODE_BUILD_OPTIONS=""
 RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" npm run build
 
-# Build every installable app into the bundle a server that installs it downloads
-# (packages/app-host/bundler). The image itself keeps only the index: which bundle,
-# by digest, belongs to this build. CI publishes the bundles next to the image and
-# the dashboard fetches them from there, checking each against this index.
-#
-# An image built on the operator's own machine (the "build" update source) has
-# nothing published for it, so by default it carries its bundles inside, and the
-# dashboard unpacks them from there instead. CI passes POLARIS_APP_BUNDLES=publish.
-ARG POLARIS_APP_BUNDLES=embed
-RUN node packages/app-host/bundler/build.mjs /build/app-bundles \
-    && mkdir -p /build/app-bundles-image \
-    && cp /build/app-bundles/index.json /build/app-bundles-image/ \
-    && if [ "$POLARIS_APP_BUNDLES" = "embed" ]; then cp /build/app-bundles/*.zip /build/app-bundles-image/; fi
-
 # Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
 # a separate process alongside the Next server, outside the standalone bundle, so
 # its imports (@polaris/hostd-client, @polaris/ssh, ws) must be inlined or they
@@ -131,14 +117,6 @@ RUN node_modules/.bin/esbuild apps/web/ws-server.mjs --bundle --platform=node \
 # The standalone tracer omits an app that ships no public/ dir; guarantee the
 # directory exists so the runtime COPY below never fails.
 RUN mkdir -p /build/apps/web/public
-
-# ---------------------------------------------------------------------------
-# App bundles - what CI publishes beside the image, exported from the same build
-# (`--target app-bundles --output type=local`) so the digests the image names are
-# the digests of the files published.
-# ---------------------------------------------------------------------------
-FROM scratch AS app-bundles
-COPY --from=builder /build/app-bundles /
 
 # ---------------------------------------------------------------------------
 # Minecraft mods - Polaris login, built from resources/minecraft and served by
@@ -174,6 +152,34 @@ RUN cd /mods/polaris-paper \
     && mkdir -p /out \
     && cp "build/libs/polaris-$version.jar" /out/polaris-paper.jar \
     && printf '%s\n' "$version" > /out/polaris-paper.jar.version
+
+# ---------------------------------------------------------------------------
+# App bundles - every installable app built into the bundle a server that
+# installs it downloads (packages/app-host/bundler), including what an app ships
+# besides code: Game servers carries the login mod's jars built above.
+#
+# The image keeps only the index: which bundle, by digest, belongs to this build.
+# CI publishes the bundles next to the image and the dashboard fetches them from
+# there, checking each against this index. An image built on the operator's own
+# machine (the "build" update source) has nothing published for it, so by
+# default it carries its bundles inside and the dashboard unpacks them from
+# there instead. CI passes POLARIS_APP_BUNDLES=publish.
+# ---------------------------------------------------------------------------
+FROM builder AS app-bundles-build
+
+COPY --from=minecraft-mods /out ./apps/game-servers/.assets/minecraft-mods
+COPY --from=minecraft-plugins /out ./apps/game-servers/.assets/minecraft-mods
+ARG POLARIS_APP_BUNDLES=embed
+RUN node packages/app-host/bundler/build.mjs /build/app-bundles \
+    && mkdir -p /build/app-bundles-image \
+    && cp /build/app-bundles/index.json /build/app-bundles-image/ \
+    && if [ "$POLARIS_APP_BUNDLES" = "embed" ]; then cp /build/app-bundles/*.zip /build/app-bundles-image/; fi
+
+# What CI publishes beside the image, exported from the same build
+# (`--target app-bundles --output type=local`) so the digests the image names are
+# the digests of the files published.
+FROM scratch AS app-bundles
+COPY --from=app-bundles-build /build/app-bundles /
 
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
@@ -223,18 +229,13 @@ COPY --from=builder --chown=node:node /build/apps/web/.next/standalone ./
 COPY --from=builder --chown=node:node /build/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=node:node /build/apps/web/public ./apps/web/public
 
-# The Minecraft mods the dashboard serves. The build keeps each jar's modification
-# time, which is what a game server's image compares against on every boot.
-COPY --from=minecraft-mods --chown=node:node /out ./minecraft-mods
-COPY --from=minecraft-plugins --chown=node:node /out ./minecraft-mods
-
 # The deploy terminal sidecar, bundled into a single self-contained CJS file in
 # the builder stage. server.js does not import it, so Next's output tracing omits
 # it; the bundle inlines every dependency, so no node_modules copy is needed.
 COPY --from=builder --chown=node:node /build/apps/web/ws-server.bundle.cjs ./apps/web/ws-server.bundle.cjs
 
 # Which app bundle belongs to this build (and, built here, the bundles themselves).
-COPY --from=builder --chown=node:node /build/app-bundles-image ./app-bundles
+COPY --from=app-bundles-build --chown=node:node /build/app-bundles-image ./app-bundles
 
 # Schema + migrations so the entrypoint can run `prisma migrate deploy`.
 COPY --from=builder --chown=node:node /build/packages/db/prisma ./packages/db/prisma
