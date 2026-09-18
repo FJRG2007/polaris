@@ -562,8 +562,30 @@ configured means the machine's own address, as before.
 - **Mods and plugins are `MODRINTH_PROJECTS`.** The image installs what the list
   names and removes what is taken off it, so the Mods screen edits that value
   instead of pushing files into a running container. Search is proxied through
-  the web (`/api/apps/installed/[id]/minecraft/modrinth`) so the browser never
-  calls Modrinth directly.
+  the web (`/api/apps/installed/[id]/minecraft/modrinth`, which also takes
+  `side=player` for the client-only search below) so the browser never calls
+  Modrinth directly.
+- **Client-only mods (a minimap, a HUD) live on the install, not the server.**
+  Anything with no server side would abort the image's own boot if it sat on
+  `MODRINTH_PROJECTS`, so the Mods screen's client-only section searches
+  Modrinth's client-side facets (`side: "player"`) and keeps the chosen entries
+  in the install's own config (`clientMods`/`CLIENT_MODS_KEY`,
+  `lib/apps/minecraft/client-pack.ts`) - no new table, nothing duplicated out of
+  the existing config column. `updateClientModsAction` writes it and restarts
+  nothing.
+- **One command installs the server's mods and the client-only ones together.**
+  `GET /api/minecraft/pack/<id>/<token>/install.sh` (`.ps1` on Windows) serves a
+  script built by `lib/apps/minecraft/pack-scripts.ts`; `packCommands` gives the
+  panel the one-liner per OS (`irm ... | iex` on Windows, `curl ... | sh`
+  elsewhere) so a friend with no Polaris account can run it. The token is an
+  HMAC of the install's id under `POLARIS_AUTH_SECRET` (`packToken`) rather than
+  a stored value, so a server removed takes its link with it and rotating the
+  secret invalidates every link outstanding. The script reads `pack.tsv`
+  (both lists resolved to a file, a sha1 and a Modrinth URL by `resolvePack`),
+  downloads what is missing or changed, and removes only what it installed on a
+  prior run (tracked in `.polaris-pack.txt` beside the jars) - a mod the player
+  added themselves is never touched, and a run that could not resolve every
+  entry removes nothing at all rather than guessing.
 
 Panels the referenced projects have that this does not: world management,
 scheduled tasks/restarts, per-world game rules, a file manager of its own (Deploy

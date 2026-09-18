@@ -124,6 +124,10 @@ export interface ModrinthProject {
     /** Who publishes it. The answer to "is this the real one", which is the
      *  question behind installing anything with two similarly named results. */
     readonly author: string | null;
+    /** Whether it only runs in the player's own game. One of those on a server's
+     *  list is a mod the server cannot load; it belongs in the list the players
+     *  install instead. */
+    readonly clientOnly: boolean;
 }
 
 /** A Minecraft version, as Modrinth writes them. Kept strict because it is put
@@ -140,7 +144,8 @@ const searchResponseSchema = z.object({
                 downloads: z.number().nonnegative().catch(0),
                 categories: z.array(z.string().max(64)).max(32).catch([]),
                 icon_url: z.string().max(512).nullish().catch(null),
-                author: z.string().max(120).nullish().catch(null)
+                author: z.string().max(120).nullish().catch(null),
+                server_side: z.string().max(32).catch("")
             })
         )
         .max(50)
@@ -155,20 +160,22 @@ function hitToProject(hit: z.infer<typeof searchResponseSchema>["hits"][number])
         categories: hit.categories,
         // Only Modrinth's own CDN. An icon_url is a URL out of somebody else's
         // database, and the page it lands on is one an operator is logged into.
-        iconUrl: isModrinthIcon(hit.icon_url) ? (hit.icon_url ?? null) : null,
-        author: hit.author ?? null
+        iconUrl: isModrinthUrl(hit.icon_url) ? (hit.icon_url ?? null) : null,
+        author: hit.author ?? null,
+        clientOnly: hit.server_side === "unsupported"
     };
 }
 
 /**
- * Whether a URL is an icon on Modrinth's own CDN.
+ * Whether a URL is on Modrinth's own CDN.
  *
- * An `icon_url` is a URL out of somebody else's database, and what it reaches is
- * fetched by Polaris and rendered inside a dashboard an operator is logged into.
- * So it has to be https, and it has to be them - anything else is dropped and the
- * row draws its initials instead.
+ * Every URL here comes out of somebody else's database, and what it reaches is
+ * either fetched by Polaris and rendered inside a dashboard an operator is logged
+ * into, or downloaded onto a player's machine by the installer. So it has to be
+ * https, and it has to be them - an icon that is not draws its initials instead,
+ * and a file that is not is reported rather than installed.
  */
-export function isModrinthIcon(url: string | null | undefined): boolean {
+export function isModrinthUrl(url: string | null | undefined): boolean {
     if (!url) return false;
     try {
         const parsed = new URL(url);
@@ -193,14 +200,28 @@ export function isModrinthIcon(url: string | null | undefined): boolean {
 export async function searchModrinth(
     query: string,
     loader: string,
-    options: { version?: string | null; category?: string; limit?: number } = {}
+    options: {
+        version?: string | null;
+        category?: string;
+        limit?: number;
+        /** Whose install the results are for. A server's search is the mods with a
+         *  server side; a player's is the mods with a client side, which is the
+         *  opposite set and is where every minimap and HUD lives. */
+        side?: "server" | "player";
+    } = {}
 ): Promise<ModrinthProject[]> {
     const projectType = isPluginLoader(loader) ? "plugin" : "mod";
     const facets: string[][] = [[`project_type:${projectType}`], [`categories:${loader}`]];
     // A plugin is server-side by definition and Modrinth does not always tag one,
     // so this is only worth asking of mods - where the client-only ones are the
     // majority of what a search returns.
-    if (projectType === "mod") facets.push(["server_side:required", "server_side:optional"]);
+    if (projectType === "mod") {
+        facets.push(
+            options.side === "player"
+                ? ["client_side:required", "client_side:optional"]
+                : ["server_side:required", "server_side:optional"]
+        );
+    }
     const version = (options.version ?? "").trim();
     if (VERSION.test(version)) facets.push([`versions:${version}`]);
     if (options.category) facets.push([`categories:${options.category}`]);
@@ -228,6 +249,7 @@ const projectSchema = z.object({
     downloads: z.number().nonnegative().catch(0),
     categories: z.array(z.string().max(64)).max(32).catch([]),
     icon_url: z.string().max(512).nullish().catch(null),
+    server_side: z.string().max(32).catch(""),
     game_versions: z.array(z.string().max(32)).max(500).catch([]),
     loaders: z.array(z.string().max(32)).max(64).catch([])
 });
@@ -293,6 +315,7 @@ export async function readInstalledProjects(
                 categories: [],
                 iconUrl: null,
                 author: null,
+                clientOnly: false,
                 known: false,
                 fitsVersion: null,
                 fitsLoader: true
@@ -305,8 +328,9 @@ export async function readInstalledProjects(
             description: project.description,
             downloads: project.downloads,
             categories: project.categories,
-            iconUrl: isModrinthIcon(project.icon_url) ? (project.icon_url ?? null) : null,
+            iconUrl: isModrinthUrl(project.icon_url) ? (project.icon_url ?? null) : null,
             author: null,
+            clientOnly: project.server_side === "unsupported",
             known: true,
             fitsVersion: VERSION.test(pinned) ? project.game_versions.includes(pinned) : null,
             // A project that lists no loader at all is a datapoint Modrinth is
@@ -316,21 +340,37 @@ export async function readInstalledProjects(
     });
 }
 
-const versionSchema = z
-    .array(
-        z.object({
-            dependencies: z
-                .array(
-                    z.object({
-                        project_id: z.string().max(64).nullish().catch(null),
-                        dependency_type: z.string().max(32).catch("")
-                    })
-                )
-                .max(64)
-                .catch([])
-        })
-    )
-    .max(50);
+/**
+ * A project's builds, as many as are worth reading.
+ *
+ * Sliced rather than refused past the limit: Modrinth answers with every build a
+ * project ever published for that loader - Balm has two hundred - and a schema
+ * that rejected the list over its length reported the whole project as having no
+ * build here. TrashSlot then read as "needs Balm, which has no build here" on a
+ * server where Balm installs perfectly well. Newest first is Modrinth's order, so
+ * what is kept is the part any of this asks about.
+ */
+const BUILDS_READ = 200;
+
+const someBuilds = <T extends z.ZodTypeAny>(build: T) =>
+    z.preprocess(
+        (value) => (Array.isArray(value) ? value.slice(0, BUILDS_READ) : value),
+        z.array(build)
+    );
+
+const versionSchema = someBuilds(
+    z.object({
+        dependencies: z
+            .array(
+                z.object({
+                    project_id: z.string().max(64).nullish().catch(null),
+                    dependency_type: z.string().max(32).catch("")
+                })
+            )
+            .max(64)
+            .catch([])
+    })
+);
 
 /** Two projects on the same list that their own publishers say cannot both be
  *  installed. */
@@ -440,11 +480,13 @@ const WALK_CONCURRENCY = 8;
 /**
  * `items.map(run)`, a few at a time, in order.
  *
- * The walks below ask one question per project. One after another, a list of
+ * The walks here ask one question per project. One after another, a list of
  * twenty is twenty round trips end to end; all at once, it is a burst against
- * somebody else's rate limit.
+ * somebody else's rate limit. Exported because the pack a player installs is the
+ * same shape of walk over the same API, and a second answer to how many at once
+ * is a second rate limit to get wrong.
  */
-async function walk<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {
+export async function walk<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {
     const results = new Array<R>(items.length);
     let next = 0;
     async function worker(): Promise<void> {
@@ -458,10 +500,16 @@ async function walk<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Pr
 }
 
 /** A project's releases for one loader, newest first, or null when they could not
- *  be read. One address for every walk here, so they share the answer. */
-function projectVersions(slug: string, loader: string): Promise<unknown> {
+ *  be read. One address for every walk here, so they share the answer - and the
+ *  release the server runs is part of it, since that is what is being asked about
+ *  and it is the difference between thirty builds and three hundred. */
+function projectVersions(slug: string, loader: string, version = ""): Promise<unknown> {
+    const filters = [`loaders=${encodeURIComponent(JSON.stringify([loader]))}`];
+    if (VERSION.test(version)) {
+        filters.push(`game_versions=${encodeURIComponent(JSON.stringify([version]))}`);
+    }
     return modrinthJson(
-        `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
+        `${modrinthApi}/project/${encodeURIComponent(slug)}/version?${filters.join("&")}`
     ).catch(() => null);
 }
 
@@ -600,15 +648,24 @@ export function repinEntry(entry: string, build: string): string {
     return [`${slug}${optional ? "?" : ""}`, ...kept, build].join(":");
 }
 
-const buildSchema = z
-    .array(
-        z.object({
-            version_number: z.string().max(64).catch(""),
-            version_type: z.string().max(32).catch("release"),
-            game_versions: z.array(z.string().max(32)).max(200).catch([])
-        })
-    )
-    .max(50);
+const buildSchema = someBuilds(
+    z.object({
+        version_number: z.string().max(64).catch(""),
+        version_type: z.string().max(32).catch("release"),
+        game_versions: z.array(z.string().max(32)).max(200).catch([]),
+        files: z
+            .array(
+                z.object({
+                    filename: z.string().max(200).catch(""),
+                    url: z.string().max(512).catch(""),
+                    primary: z.boolean().catch(false),
+                    hashes: z.object({ sha1: z.string().max(64).catch("") }).catch({ sha1: "" })
+                })
+            )
+            .max(20)
+            .catch([])
+    })
+);
 
 /**
  * The newest build of one project this server would actually take, or null.
@@ -629,7 +686,7 @@ async function admittedBuild(
     version: string,
     release: ReleaseType
 ): Promise<string | null> {
-    const builds = buildSchema.safeParse(await projectVersions(slug, loader));
+    const builds = buildSchema.safeParse(await projectVersions(slug, loader, version));
     if (!builds.success) return null;
     // Newest first is Modrinth's own order.
     const admitted = builds.data.find(
@@ -639,6 +696,50 @@ async function admittedBuild(
             (!VERSION.test(version) || build.game_versions.includes(version))
     );
     return admitted?.version_number ?? null;
+}
+
+/** One build, as the thing a player would download. */
+export interface ModrinthBuild {
+    readonly version: string;
+    readonly filename: string;
+    readonly url: string;
+    readonly sha1: string;
+}
+
+/**
+ * The build an entry installs on this server, with the file behind it.
+ *
+ * The same three questions `admittedBuild` asks - the loader, the release, how
+ * finished a build has to be - answered with the file, because that is what the
+ * mod pack a player installs is made of.
+ */
+export async function buildFor(
+    entry: string,
+    loader: string,
+    version: string | null
+): Promise<ModrinthBuild | null> {
+    const slug = projectSlug(entry);
+    if (!slug) return null;
+    const wanted = (version ?? "").trim();
+    const pin = pinnedBuild(entry);
+    const builds = buildSchema.safeParse(await projectVersions(slug, loader, wanted));
+    if (!builds.success) return null;
+    const release = entryReleaseType(entry);
+    const admitted = builds.data.find(
+        (build) =>
+            build.version_number.length > 0 &&
+            (pin === null || build.version_number === pin) &&
+            admitsBuild(release, build.version_type) &&
+            (!VERSION.test(wanted) || build.game_versions.includes(wanted))
+    );
+    const file = admitted?.files.find((one) => one.primary) ?? admitted?.files[0];
+    if (!admitted || !file || !file.url || !file.filename) return null;
+    return {
+        version: admitted.version_number,
+        filename: file.filename,
+        url: file.url,
+        sha1: file.hashes.sha1
+    };
 }
 
 /**

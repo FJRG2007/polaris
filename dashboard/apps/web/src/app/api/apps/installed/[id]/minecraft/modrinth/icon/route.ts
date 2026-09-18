@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { imageTypeOfBytes } from "@/lib/mime";
 import { requireGameServer } from "@/lib/apps/install-access";
-import { isModrinthIcon } from "@/lib/apps/minecraft/modrinth";
+import { isModrinthUrl } from "@/lib/apps/minecraft/modrinth";
 import { cachedModImage, keepModImage } from "@/lib/apps/mod-image-cache";
 
 export const runtime = "nodejs";
@@ -26,14 +26,17 @@ const MAX_BYTES = 512 * 1024;
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"];
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     await requireGameServer("games.read", id);
 
     const url = new URL(request.url).searchParams.get("url") ?? "";
     // Only ever Modrinth's own CDN, so this is not a way to make Polaris fetch
     // whatever somebody puts in a query string.
-    if (!isModrinthIcon(url)) return new NextResponse(null, { status: 400 });
+    if (!isModrinthUrl(url)) return new NextResponse(null, { status: 400 });
 
     // Polaris's own copy first: it is faster, it tells Modrinth nothing about who
     // is looking, and it is what keeps the picture for an installed mod on the
