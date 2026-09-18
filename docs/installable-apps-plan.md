@@ -116,10 +116,20 @@ load those into a core path that never uses them.
    `app/api/minecraft`, and the `app/api/cron/game-*` triggers). Still compiled
    into the image, loaded through the registry. Verifiable here.
 
-   Places has moved (`apps/places`, `@polaris-app/places`): its services,
-   screens and route bodies live there, its Next routes are one-line bridges in
-   the dashboard, and `test/build/app-packages.test.ts` fails if either side
-   reaches past that. Game servers is next.
+   Both have moved. Places lives in `apps/places` (`@polaris-app/places`) and
+   Game servers in `apps/game-servers` (`@polaris-app/game-servers`): their
+   services, screens and route bodies live there, their Next routes are one-line
+   bridges in the dashboard, and `test/build/app-packages.test.ts` fails if
+   either side reaches past that.
+
+   What both sides read as plain data - the list of games, the probe timeout -
+   lives in `@polaris/core` rather than on the host, because the host offers
+   functions only (an app may take a service before the dashboard has provided
+   it, and only a function can stand in for one). The few synchronous helpers an
+   app calls while rendering are offered as they are and named, each with its
+   reason, in `test/build/app-host-contract.test.ts`; everything else loads on
+   first use, and on the client anything with a graph of its own - the charts,
+   the log viewer, the sharing dialog - is loaded when it is first drawn.
 
    The host API is `@polaris/app-host`. An app takes the dashboard's services
    from `host.<area>.<name>` and its client pieces from `hostUi.<area>.<name>`;

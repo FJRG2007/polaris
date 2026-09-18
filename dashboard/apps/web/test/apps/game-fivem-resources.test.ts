@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as resources from "@/lib/apps/fivem/resources";
+import * as resources from "@polaris-app/game-servers/src/lib/fivem/resources";
 
 const ROOT = "/config/resources/";
 

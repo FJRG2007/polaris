@@ -26,7 +26,7 @@ import {
     scriptName,
     scriptUrl,
     shellInstaller
-} from "@/lib/apps/minecraft/pack-scripts";
+} from "@polaris-app/game-servers/src/lib/minecraft/pack-scripts";
 
 /**
  * A name typed by an operator, written the way somebody would to get a command

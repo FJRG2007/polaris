@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as parse from "@/lib/apps/minecraft/parse";
+import * as parse from "@polaris-app/game-servers/src/lib/minecraft/parse";
 
 describe("parsePlayerList", () => {
     it("reads the modern reply, with names", () => {

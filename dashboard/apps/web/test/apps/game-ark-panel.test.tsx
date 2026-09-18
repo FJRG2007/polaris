@@ -15,8 +15,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { GameContext } from "@/app/(app)/apps/installed/[id]/game-context";
-import { playerAction, playerFilters, playerStanding } from "@/lib/apps/player-vocabulary";
+import type { GameContext } from "@polaris-app/game-servers/src/screens/installed/game-context";
+import { playerAction, playerFilters, playerStanding } from "@polaris-app/game-servers/src/lib/player-vocabulary";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
 const INSTALL = "aaaaaaaa-1111-4111-8111-111111111111";
 
@@ -34,11 +36,11 @@ vi.mock("next/navigation", () => ({
 
 // Server actions, which the panel only calls from an event handler. Rendering it
 // must not drag the database and the session into the test.
-vi.mock("@/app/(app)/apps/installed/[id]/ark-actions", () => ({}));
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({}));
+vi.mock("@polaris-app/game-servers/src/screens/installed/ark-actions", () => ({}));
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({}));
 vi.mock("@/app/(app)/apps/installed/[id]/access-actions", () => ({}));
 
-const { ArkPanel } = await import("@/app/(app)/apps/installed/[id]/ark-panel");
+const { ArkPanel } = await import("@polaris-app/game-servers/src/screens/installed/ark-panel");
 
 /** A server with two people on its allow list and nothing known about it live. */
 function context(overrides: Partial<GameContext> = {}): GameContext {

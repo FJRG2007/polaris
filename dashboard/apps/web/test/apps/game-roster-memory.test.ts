@@ -37,7 +37,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { rememberRoster, rememberedRoster } = await import("@/lib/apps/minecraft/roster-memory");
+const { rememberRoster, rememberedRoster } = await import("@polaris-app/game-servers/src/lib/minecraft/roster-memory");
 
 const SERVER = "0190c1d2-0000-7000-8000-0000000000a1";
 

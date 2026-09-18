@@ -32,7 +32,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { findGameIdentity } = await import("@/lib/apps/game-identity");
+const { findGameIdentity } = await import("@polaris-app/game-servers/src/lib/game-identity");
 
 beforeEach(() => {
     people = [{ id: PAU, name: "Pau", username: "pau", email: "pau@example.com" }];

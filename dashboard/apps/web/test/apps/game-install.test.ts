@@ -63,7 +63,7 @@ vi.mock("@/lib/apps/install-service", () => ({
     }
 }));
 
-const { adoptGameServersApp, installGameServersApp } = await import("@/lib/apps/game-install");
+const { adoptGameServersApp, installGameServersApp } = await import("@polaris-app/game-servers/src/lib/game-install");
 
 /** A row as the database holds it. */
 function row(id: string, catalogId: string, createdAt: string, status = "running"): Row {

@@ -10,7 +10,7 @@
 import "@/lib/app-host/server";
 import type { AppExtension } from "./types";
 import { placesExtension } from "@polaris-app/places/src/lib/places-extension";
-import { gameServersExtension } from "@/lib/apps/games-extension";
+import { gameServersExtension } from "@polaris-app/game-servers/src/lib/games-extension";
 
 export function installedExtensions(): readonly AppExtension[] {
     return [gameServersExtension, placesExtension];

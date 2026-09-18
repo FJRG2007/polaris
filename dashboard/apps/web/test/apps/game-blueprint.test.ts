@@ -12,19 +12,19 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { joinGuardEntry } from "@/lib/apps/minecraft/join-guard";
+import { joinGuardEntry } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 import {
     entryReleaseType,
     forgetModrinthAnswers,
     projectSlug
-} from "@/lib/apps/minecraft/modrinth";
-import { commonVersions, knownUnsupported } from "@/lib/apps/minecraft/blueprint-version";
-import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@/lib/apps/games-create";
+} from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
+import { commonVersions, knownUnsupported } from "@polaris-app/game-servers/src/lib/minecraft/blueprint-version";
+import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@polaris-app/game-servers/src/lib/games-create";
 import {
     CROSSPLAY_PROJECTS,
     GAME_BLUEPRINTS,
     findBlueprint
-} from "@/lib/apps/minecraft/blueprints";
+} from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
 
 /** Minecraft's releases as the tag endpoint gives them: newest first, and with
  *  the snapshots a blueprint must never pin mixed in. */

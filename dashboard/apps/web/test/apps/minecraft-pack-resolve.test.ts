@@ -14,8 +14,8 @@ vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_AUTH_SECRET: "test
 
 const builds = new Map<string, { version: string; filename: string; url: string; sha1: string }>();
 
-vi.mock("@/lib/apps/minecraft/modrinth", async (importOriginal) => {
-    const real = await importOriginal<typeof import("@/lib/apps/minecraft/modrinth")>();
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOriginal) => {
+    const real = await importOriginal<typeof import("@polaris-app/game-servers/src/lib/minecraft/modrinth")>();
     return {
         ...real,
         buildFor: vi.fn(
@@ -25,7 +25,7 @@ vi.mock("@/lib/apps/minecraft/modrinth", async (importOriginal) => {
 });
 
 const { clientMods, packCommands, packToken, packTokenMatches, packUrl, resolvePack } =
-    await import("@/lib/apps/minecraft/client-pack");
+    await import("@polaris-app/game-servers/src/lib/minecraft/client-pack");
 
 function build(slug: string) {
     return {

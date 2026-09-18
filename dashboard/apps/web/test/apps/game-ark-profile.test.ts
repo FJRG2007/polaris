@@ -6,7 +6,7 @@ import {
     readProfileLevel,
     readProfileName,
     steamIdOfProfileFile
-} from "@/lib/apps/ark/profile";
+} from "@polaris-app/game-servers/src/lib/ark/profile";
 
 /** Unreal writes a string as its length including the terminator, then the bytes,
  *  then the terminator itself. */

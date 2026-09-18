@@ -10,7 +10,7 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import * as login from "@/lib/apps/minecraft/polaris-login";
+import * as login from "@polaris-app/game-servers/src/lib/minecraft/polaris-login";
 
 const BASE = "https://polaris.example";
 const JAR = "polaris-neoforge-1.21.4.jar";

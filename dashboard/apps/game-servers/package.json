@@ -1,0 +1,25 @@
+{
+    "name": "@polaris-app/game-servers",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Game servers: Minecraft, ARK and FiveM servers, their players, worlds and settings. An installable Polaris app.",
+    "dependencies": {
+        "@polaris/app-host": "0.1.0",
+        "@polaris/auth": "0.1.0",
+        "@polaris/config": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "@polaris/deploy": "0.1.0",
+        "@polaris/ssh": "0.1.0",
+        "@polaris/storage": "0.1.0",
+        "@polaris/ui": "0.1.0",
+        "lucide-react": "0.469.0",
+        "zod": "3.24.1"
+    },
+    "peerDependencies": {
+        "next": "*",
+        "react": "^19",
+        "react-dom": "^19"
+    }
+}

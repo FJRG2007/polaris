@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { maxStackFor, stacksFor } from "@/lib/apps/minecraft/items";
+import { maxStackFor, stacksFor } from "@polaris-app/game-servers/src/lib/minecraft/items";
 
 describe("cutting a total into stacks", () => {
     it("gives one stack when it fits in one", () => {

@@ -22,9 +22,9 @@ process.env.POLARIS_DATABASE_URL ??= "postgresql://polaris:polaris@localhost:543
 process.env.POLARIS_AUTH_SECRET ??= "a-long-enough-string-for-the-schema";
 process.env.POLARIS_MASTER_KEY ??= Buffer.alloc(32, 7).toString("base64");
 
-const { modItemIcon } = await import("@/lib/apps/minecraft/mod-items-service");
+const { modItemIcon } = await import("@polaris-app/game-servers/src/lib/minecraft/mod-items-service");
 const { forgetModItems, loadModItems } = await import(
-    "@/app/(app)/apps/installed/[id]/minecraft-mod-items"
+    "@polaris-app/game-servers/src/screens/installed/minecraft-mod-items"
 );
 
 const BUILD = "d45f4a0290360cc5bcbe241cd35785a8085d1d1b";

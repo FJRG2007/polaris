@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { foldFivemPlayers, matchesFivemFilter, matchesFivemPlayer, sameRoster } from "@/lib/apps/fivem/roster";
+import { foldFivemPlayers, matchesFivemFilter, matchesFivemPlayer, sameRoster } from "@polaris-app/game-servers/src/lib/fivem/roster";
 
 const LICENSE = "license:0123456789abcdef0123456789abcdef01234567";
 const DISCORD = "discord:112233445566778899";

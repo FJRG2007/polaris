@@ -24,15 +24,15 @@
 import JSZip from "jszip";
 import { deflateSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildFor, forgetModrinthAnswers } from "@/lib/apps/minecraft/modrinth";
+import { buildFor, forgetModrinthAnswers } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
 import {
     firstModelId,
     pickTexture,
     pngSize,
     readJarItems,
     type JarFiles
-} from "@/lib/apps/minecraft/mod-items";
-import { noteFor } from "@/app/(app)/apps/installed/[id]/minecraft-mod-items";
+} from "@polaris-app/game-servers/src/lib/minecraft/mod-items";
+import { noteFor } from "@polaris-app/game-servers/src/screens/installed/minecraft-mod-items";
 import {
     modCatalogItems,
     searchItems,
@@ -41,7 +41,7 @@ import {
     readModItems,
     vanillaTextureName,
     type ModItemView
-} from "@/lib/apps/minecraft/items";
+} from "@polaris-app/game-servers/src/lib/minecraft/items";
 
 /** A real PNG of the given size. Only the header is ever read, but a file that is
  *  not actually a PNG would make the assertions about sizes meaningless. */

@@ -13,11 +13,11 @@ const readContainerFile = vi.fn();
 
 vi.mock("@/lib/apps/install-access", () => ({ requireGameServer }));
 vi.mock("@/lib/container-files-service", () => ({ readContainerFile }));
-vi.mock("@/lib/apps/minecraft/world-service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/world-service", () => ({
     backupPathInContainer: (name: string) => `/data/backups/${name}`
 }));
 
-const { GET } = await import("@/app/api/apps/installed/[id]/minecraft/world/[name]/route");
+const { GET } = await import("@polaris-app/game-servers/src/routes/api/installed/minecraft/world/[name]/route");
 
 const params = Promise.resolve({ id: "server", name: "2026-09-16T23-48-10-774.tar.gz" });
 

@@ -18,7 +18,8 @@ const nextConfig = {
         "@polaris/ui",
         "@polaris/file-parse",
         "@polaris/app-host",
-        "@polaris-app/places"
+        "@polaris-app/places",
+        "@polaris-app/game-servers"
     ],
     serverExternalPackages: [
         "@prisma/client",

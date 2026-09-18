@@ -6,7 +6,7 @@ import {
     parseDifficulty,
     parseGameRules,
     ruleGroups
-} from "@/lib/apps/minecraft/rules";
+} from "@polaris-app/game-servers/src/lib/minecraft/rules";
 
 describe("parseGameRules", () => {
     it("reads the value out of each reply", () => {

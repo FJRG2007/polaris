@@ -15,8 +15,8 @@
 
 import { findApp } from "@/lib/apps/catalog";
 import { describe, expect, it, vi } from "vitest";
-import { protectionFor } from "@/lib/apps/games-create";
-import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import { protectionFor } from "@polaris-app/game-servers/src/lib/games-create";
+import { parseProjectList, projectSlug } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
 import {
     defaultModFor,
     foreignLogin,
@@ -29,7 +29,7 @@ import {
     JOIN_GUARD_SLUGS,
     PROJECTS_KEY,
     SOFTWARE_KEY
-} from "@/lib/apps/minecraft/join-guard";
+} from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 
 /** The slugs on a list, lowercased, suffixes and pins dropped. */
 function slugs(list: string): string[] {

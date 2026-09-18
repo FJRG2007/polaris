@@ -16,7 +16,7 @@ const CRON_DIR = join(process.cwd(), "src/app/api/cron");
 /** Core's job table and the job tables the installed apps register. */
 const JOBS = [
     "src/lib/cron/jobs.ts",
-    "src/lib/apps/games-jobs.ts",
+    "../game-servers/src/lib/games-jobs.ts",
     "../places/src/lib/places-extension.ts"
 ]
     .map((path) => readFileSync(join(process.cwd(), path), "utf8"))

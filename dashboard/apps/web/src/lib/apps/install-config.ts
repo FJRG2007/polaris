@@ -10,21 +10,9 @@
 
 import { prisma } from "@polaris/db";
 
-export type InstallConfig = Record<string, unknown>;
+import { readInstallConfig, type InstallConfig } from "./install-config-value";
 
-/** The config as an object. A column that is not readable JSON reads as empty -
- *  it is a settings blob, and no caller should fail to render over one. */
-export function readInstallConfig(raw: string | null | undefined): InstallConfig {
-    if (!raw) return {};
-    try {
-        const parsed: unknown = JSON.parse(raw);
-        return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-            ? (parsed as InstallConfig)
-            : {};
-    } catch {
-        return {};
-    }
-}
+export { readInstallConfig, type InstallConfig } from "./install-config-value";
 
 /** Merge keys into an install's config, leaving the rest of it alone. */
 export async function patchInstallConfig(installedAppId: string, patch: InstallConfig): Promise<void> {

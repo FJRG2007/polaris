@@ -5,7 +5,7 @@ import {
     readPendingRestart,
     restartDue,
     type PendingRestart
-} from "@/lib/apps/games-restart";
+} from "@polaris-app/game-servers/src/lib/games-restart";
 
 const NOW = new Date("2026-08-16T20:00:00.000Z");
 const LATER = new Date("2026-08-16T23:00:00.000Z");

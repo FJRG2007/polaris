@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { neededBy, requiredBy, type ModrinthRequirement } from "@/lib/apps/minecraft/modrinth";
+import { neededBy, requiredBy, type ModrinthRequirement } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
 
 /** One requirement, with only the fields a given test cares about spelled out. */
 function need(

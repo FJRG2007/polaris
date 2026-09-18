@@ -24,7 +24,7 @@ let consoleRefuses = false;
 /** The install's settings blob, as `configOf`/`patchInstallConfig` see it. */
 let config: Record<string, unknown> = {};
 
-vi.mock("@/lib/apps/fivem/transport", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/fivem/transport", () => ({
     NO_HTTP_CLIENT: 97,
     RCON_PASSWORD_VAR: "RCON_PASSWORD",
     withFivemServer: async (_ownerId: string, _installedAppId: string, work: (server: unknown) => unknown) =>
@@ -58,7 +58,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/apps/catalog", () => ({ findApp: () => null, appHasCapability: () => false }));
-vi.mock("@/lib/apps/games-health", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/games-health", () => ({
     readCrashLoop: async () => null,
     readRestartWatch: async () => null
 }));
@@ -88,7 +88,7 @@ const {
     setConsolePassword,
     setFivemAdmin,
     writeFivemRules
-} = await import("@/lib/apps/fivem/service");
+} = await import("@polaris-app/game-servers/src/lib/fivem/service");
 
 beforeEach(() => {
     ran = [];

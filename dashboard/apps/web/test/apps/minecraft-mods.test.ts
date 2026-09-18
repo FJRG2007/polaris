@@ -10,7 +10,7 @@
  * operator is logged into.
  */
 
-import * as modrinth from "@/lib/apps/minecraft/modrinth";
+import * as modrinth from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Every URL Modrinth was asked for, and what it was answered with. */

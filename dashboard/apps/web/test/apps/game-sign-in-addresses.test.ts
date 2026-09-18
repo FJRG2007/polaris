@@ -36,7 +36,7 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "5.6.7.8" }));
 
-const { signInAddresses, signedIn } = await import("@/lib/apps/game-sign-in-addresses");
+const { signInAddresses, signedIn } = await import("@polaris-app/game-servers/src/lib/game-sign-in-addresses");
 
 const ADA = "ada";
 const BOB = "bob";

@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { InventoryItem } from "@/lib/apps/minecraft/inventory";
-import { AIR, isMovable, itemArgument, replaceSlot, writableSlots } from "@/lib/apps/minecraft/item-argument";
+import type { InventoryItem } from "@polaris-app/game-servers/src/lib/minecraft/inventory";
+import { AIR, isMovable, itemArgument, replaceSlot, writableSlots } from "@polaris-app/game-servers/src/lib/minecraft/item-argument";
 
 function stack(overrides: Partial<InventoryItem> = {}): InventoryItem {
     return { slot: 0, id: "minecraft:stone", count: 1, data: null, ...overrides };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDataReply, isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
+import { isDataReply, isMissingEntityReply } from "@polaris-app/game-servers/src/lib/minecraft/snbt";
 import {
     ARMOUR_SLOTS,
     HOTBAR_SLOTS,
@@ -9,7 +9,7 @@ import {
     extraSlots,
     parseInventory,
     slotLabel
-} from "@/lib/apps/minecraft/inventory";
+} from "@polaris-app/game-servers/src/lib/minecraft/inventory";
 
 describe("parseInventory", () => {
     it("reads the slot, the id and the count of every stack", () => {

@@ -24,7 +24,7 @@ import {
     withOfflineNames,
     withoutInventedIdentities,
     withoutName
-} from "@/lib/apps/minecraft/offline-identity";
+} from "@polaris-app/game-servers/src/lib/minecraft/offline-identity";
 
 /** A whitelist as the game writes one. */
 function file(entries: readonly { uuid: string; name: string }[]): string {

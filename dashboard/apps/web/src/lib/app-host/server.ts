@@ -18,9 +18,40 @@
  */
 
 import { provideAppHost } from "@polaris/app-host";
+import * as appsCatalogSearch from "@/lib/apps/catalog-search";
 import * as appsCatalog from "@/lib/apps/catalog";
+import * as appsInstallDefaults from "@/lib/apps/install-defaults";
+import * as appsPortAdvice from "@/lib/apps/port-advice";
+import * as appsPortBlock from "@/lib/apps/port-block";
+import * as backupsSchemas from "@/lib/backups/schemas";
+import * as backupsSourcesTypes from "@/lib/backups/sources/types";
+import * as hostAddress from "@/lib/host-address";
+import * as metricsShared from "@/lib/metrics-shared";
+import * as mime from "@/lib/mime";
+import { hostPortForApp } from "@/lib/deploy/host-port";
+import { portKey } from "@/lib/apps/port-key";
+import { readInstallConfig } from "@/lib/apps/install-config-value";
+import type { InstalledSlotHost } from "@/components/app-extensions/installed-client";
 import type { LiveGrant } from "@/lib/access/grants";
-import type { AppExtension } from "@/lib/app-extensions/types";
+import type { AppExtension, AppJob, AppSlot } from "@/lib/app-extensions/types";
+import type { SearchableItem } from "@/lib/apps/catalog-search";
+import type { InstallConfig } from "@/lib/apps/install-config";
+import type { InstallSeed, InstalledAppSetting } from "@/lib/apps/install-service";
+import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-sharing";
+import type {
+    GamePort,
+    GamePortRow,
+    GamePortsReading,
+    GameReachAdvice
+} from "@/lib/apps/port-advice";
+import type {
+    BackupSource,
+    DiscoveredTarget,
+    InPlaceCopy,
+    SourceResource,
+    StagedArtifact
+} from "@/lib/backups/sources/types";
+import type { TargetRow } from "@/lib/deploy/runtime";
 import type { SessionUser } from "@/lib/session";
 
 /** A service that is loaded when it is first called, so it always answers later. */
@@ -44,22 +75,47 @@ function once<M>(load: () => Promise<M>): () => Promise<M> {
 const load = {
     accessGrants: once(() => import("@/lib/access/grants")),
     apiSession: once(() => import("@/lib/api-session")),
+    appContainerMetrics: once(() => import("@/lib/app-container-metrics")),
+    appsInstallAccess: once(() => import("@/lib/apps/install-access")),
+    appsInstallConfig: once(() => import("@/lib/apps/install-config")),
     appsInstallPresence: once(() => import("@/lib/apps/install-presence")),
     appsInstallSecret: once(() => import("@/lib/apps/install-secret")),
     appsInstallService: once(() => import("@/lib/apps/install-service")),
+    appsPortBlockStore: once(() => import("@/lib/apps/port-block-store")),
+    appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
     auditService: once(() => import("@/lib/audit-service")),
+    backupsManage: once(() => import("@/lib/backups/manage")),
     chatLive: once(() => import("@/lib/chat/live")),
+    containerFilesService: once(() => import("@/lib/container-files-service")),
+    cronOwners: once(() => import("@/lib/cron/owners")),
     deployDial: once(() => import("@/lib/deploy/dial")),
     deployReleases: once(() => import("@/lib/deploy/releases")),
+    deployRuntime: once(() => import("@/lib/deploy/runtime")),
     deployService: once(() => import("@/lib/deploy-service")),
+    domainDns: once(() => import("@/lib/domain-dns")),
     domainService: once(() => import("@/lib/domain-service")),
+    domainZones: once(() => import("@/lib/domain-zones")),
+    envVarService: once(() => import("@/lib/env-var-service")),
     footageStorage: once(() => import("@/lib/footage-storage")),
     hostService: once(() => import("@/lib/host-service")),
+    integrationService: once(() => import("@/lib/integration-service")),
+    integrationsCloudflareAccountService: once(
+        () => import("@/lib/integrations/cloudflare-account-service")
+    ),
+    integrationsCloudflareApi: once(() => import("@/lib/integrations/cloudflare-api")),
+    netPortProbe: once(() => import("@/lib/net/port-probe")),
+    networkService: once(() => import("@/lib/network-service")),
+    notificationService: once(() => import("@/lib/notification-service")),
     notificationsDispatch: once(() => import("@/lib/notifications/dispatch")),
     notificationsPreferences: once(() => import("@/lib/notifications/preferences")),
+    rateLimitService: once(() => import("@/lib/rate-limit-service")),
+    requestContext: once(() => import("@/lib/request-context")),
+    serverMetricsService: once(() => import("@/lib/server-metrics-service")),
     session: once(() => import("@/lib/session")),
+    sessionDirectory: once(() => import("@/lib/session-directory")),
     settingStore: once(() => import("@/lib/setting-store")),
-    storageTarget: once(() => import("@/lib/storage-target"))
+    storageTarget: once(() => import("@/lib/storage-target")),
+    wafService: once(() => import("@/lib/waf-service"))
 };
 
 export const serverHost = {
@@ -73,46 +129,170 @@ export const serverHost = {
     apiSession: {
         apiUser: later(load.apiSession, "apiUser")
     },
+    appContainerMetrics: {
+        readAppContainerMetricsOrNull: later(
+            load.appContainerMetrics,
+            "readAppContainerMetricsOrNull"
+        ),
+        readAppContainerRuntime: later(load.appContainerMetrics, "readAppContainerRuntime")
+    },
     appsCatalog: {
         catalogApps: appsCatalog.catalogApps,
-        findApp: appsCatalog.findApp
+        envFormatHint: appsCatalog.envFormatHint,
+        findApp: appsCatalog.findApp,
+        isAllowedEnvValue: appsCatalog.isAllowedEnvValue,
+        isGameServerApp: appsCatalog.isGameServerApp,
+        normalizeEnvValue: appsCatalog.normalizeEnvValue,
+        promptedEnvVars: appsCatalog.promptedEnvVars,
+        tunableEnvVars: appsCatalog.tunableEnvVars
+    },
+    appsCatalogSearch: {
+        searchCatalog: appsCatalogSearch.searchCatalog
+    },
+    appsInstallAccess: {
+        gamePermissionsFor: later(load.appsInstallAccess, "gamePermissionsFor"),
+        installRef: later(load.appsInstallAccess, "installRef"),
+        reachableInstallIds: later(load.appsInstallAccess, "reachableInstallIds"),
+        requireGameServer: later(load.appsInstallAccess, "requireGameServer"),
+        requireGameServerOwner: later(load.appsInstallAccess, "requireGameServerOwner")
+    },
+    appsInstallConfig: {
+        patchInstallConfig: later(load.appsInstallConfig, "patchInstallConfig"),
+        readInstallConfig
+    },
+    appsInstallDefaults: {
+        defaultInstallInput: appsInstallDefaults.defaultInstallInput
     },
     appsInstallPresence: {
         isAppInstalled: later(load.appsInstallPresence, "isAppInstalled")
     },
     appsInstallSecret: {
         installEnvSecret: later(load.appsInstallSecret, "installEnvSecret"),
-        installEnvValue: later(load.appsInstallSecret, "installEnvValue")
+        installEnvValue: later(load.appsInstallSecret, "installEnvValue"),
+        readInstallEnvSecret: later(load.appsInstallSecret, "readInstallEnvSecret")
     },
     appsInstallService: {
-        installApp: later(load.appsInstallService, "installApp")
+        installApp: later(load.appsInstallService, "installApp"),
+        listInstalledApps: later(load.appsInstallService, "listInstalledApps"),
+        uninstallApp: later(load.appsInstallService, "uninstallApp")
+    },
+    appsPortAdvice: {
+        describeBlocksFor: appsPortAdvice.describeBlocksFor,
+        describePorts: appsPortAdvice.describePorts,
+        gameReachAdvice: appsPortAdvice.gameReachAdvice,
+        gameStoppedAdvice: appsPortAdvice.gameStoppedAdvice
+    },
+    appsPortBlock: {
+        describeBlock: appsPortBlock.describeBlock,
+        inBlock: appsPortBlock.inBlock
+    },
+    appsPortBlockStore: {
+        getPortBlocks: later(load.appsPortBlockStore, "getPortBlocks"),
+        getPortPolicy: later(load.appsPortBlockStore, "getPortPolicy")
+    },
+    appsPortRegistry: {
+        availableHostPort: later(load.appsPortRegistry, "availableHostPort"),
+        availableHostPortRun: later(load.appsPortRegistry, "availableHostPortRun"),
+        portKey,
+        takenHostPorts: later(load.appsPortRegistry, "takenHostPorts")
     },
     auditService: {
         recordAudit: later(load.auditService, "recordAudit")
     },
+    backupsManage: {
+        applyWorldSchedule: later(load.backupsManage, "applyWorldSchedule")
+    },
+    backupsSchemas: {
+        buildSelector: backupsSchemas.buildSelector
+    },
+    backupsSourcesTypes: {
+        SourceUnavailableError: backupsSourcesTypes.SourceUnavailableError,
+        shellQuote: backupsSourcesTypes.shellQuote,
+        stageDir: backupsSourcesTypes.stageDir,
+        stagedFrom: backupsSourcesTypes.stagedFrom
+    },
     chatLive: {
         publishChatChange: later(load.chatLive, "publishChatChange")
+    },
+    containerFilesService: {
+        readContainerFile: later(load.containerFilesService, "readContainerFile"),
+        writeContainerFile: later(load.containerFilesService, "writeContainerFile")
+    },
+    cronOwners: {
+        ownersWithApps: later(load.cronOwners, "ownersWithApps")
     },
     deployDial: {
         localDialHost: later(load.deployDial, "localDialHost")
     },
     deployReleases: {
+        currentReleaseRef: later(load.deployReleases, "currentReleaseRef"),
         serviceRef: later(load.deployReleases, "serviceRef")
+    },
+    deployRuntime: {
+        getPorts: later(load.deployRuntime, "getPorts")
     },
     deployService: {
         deployApplication: later(load.deployService, "deployApplication"),
-        hostPortForApp: later(load.deployService, "hostPortForApp"),
+        hostPortForApp,
+        readAppRuntimeLog: later(load.deployService, "readAppRuntimeLog"),
         setApplicationRunning: later(load.deployService, "setApplicationRunning")
     },
+    domainDns: {
+        provisionHostnameDns: later(load.domainDns, "provisionHostnameDns")
+    },
     domainService: {
-        appBaseUrl: later(load.domainService, "appBaseUrl")
+        appBaseUrl: later(load.domainService, "appBaseUrl"),
+        getPublicIp: later(load.domainService, "getPublicIp"),
+        publicAppUrl: later(load.domainService, "publicAppUrl"),
+        requestOrigin: later(load.domainService, "requestOrigin")
+    },
+    domainZones: {
+        getDomainZones: later(load.domainZones, "getDomainZones")
+    },
+    envVarService: {
+        listEnvVars: later(load.envVarService, "listEnvVars"),
+        revealEnvVar: later(load.envVarService, "revealEnvVar"),
+        setEnvVars: later(load.envVarService, "setEnvVars")
     },
     footageStorage: {
         footageTarget: later(load.footageStorage, "footageTarget")
     },
+    hostAddress: {
+        getHostLanIp: hostAddress.getHostLanIp,
+        isLanAddress: hostAddress.isLanAddress
+    },
     hostService: {
         getHostConnection: later(load.hostService, "getHostConnection"),
         listHosts: later(load.hostService, "listHosts")
+    },
+    integrationService: {
+        getIntegrationSecret: later(load.integrationService, "getIntegrationSecret")
+    },
+    integrationsCloudflareAccountService: {
+        loadCloudflareToken: later(load.integrationsCloudflareAccountService, "loadCloudflareToken")
+    },
+    integrationsCloudflareApi: {
+        deleteDnsRecord: later(load.integrationsCloudflareApi, "deleteDnsRecord"),
+        findDnsRecords: later(load.integrationsCloudflareApi, "findDnsRecords"),
+        resolveZoneForHostname: later(load.integrationsCloudflareApi, "resolveZoneForHostname"),
+        upsertSrvRecord: later(load.integrationsCloudflareApi, "upsertSrvRecord")
+    },
+    metricsShared: {
+        resolveRange: metricsShared.resolveRange
+    },
+    mime: {
+        imageTypeOfBytes: mime.imageTypeOfBytes
+    },
+    netPortProbe: {
+        probeTcpPort: later(load.netPortProbe, "probeTcpPort"),
+        publicProbeHost: later(load.netPortProbe, "publicProbeHost")
+    },
+    networkService: {
+        getLocalEnvironment: later(load.networkService, "getLocalEnvironment"),
+        networkPublicIp: later(load.networkService, "networkPublicIp")
+    },
+    notificationService: {
+        createNotification: later(load.notificationService, "createNotification")
     },
     notificationsDispatch: {
         notify: later(load.notificationsDispatch, "notify")
@@ -120,12 +300,28 @@ export const serverHost = {
     notificationsPreferences: {
         ruleFor: later(load.notificationsPreferences, "ruleFor")
     },
+    rateLimitService: {
+        rateLimit: later(load.rateLimitService, "rateLimit"),
+        resetRateLimit: later(load.rateLimitService, "resetRateLimit")
+    },
+    requestContext: {
+        clientIp: later(load.requestContext, "clientIp")
+    },
+    serverMetricsService: {
+        getServerMetrics: later(load.serverMetricsService, "getServerMetrics"),
+        peekServerMetrics: later(load.serverMetricsService, "peekServerMetrics")
+    },
     session: {
         homePathForUser: later(load.session, "homePathForUser"),
         requirePermission: later(load.session, "requirePermission"),
+        requirePermissionAny: later(load.session, "requirePermissionAny"),
         requireUser: later(load.session, "requireUser"),
         sessionCan: later(load.session, "sessionCan"),
-        sessionCanAny: later(load.session, "sessionCanAny")
+        sessionCanAny: later(load.session, "sessionCanAny"),
+        userHasManage: later(load.session, "userHasManage")
+    },
+    sessionDirectory: {
+        userSessionAddresses: later(load.sessionDirectory, "userSessionAddresses")
     },
     settingStore: {
         getSetting: later(load.settingStore, "getSetting"),
@@ -136,8 +332,11 @@ export const serverHost = {
         placeFile: later(load.storageTarget, "placeFile"),
         safeName: later(load.storageTarget, "safeName"),
         storageTargetOptions: later(load.storageTarget, "storageTargetOptions")
+    },
+    wafService: {
+        resolveWaf: later(load.wafService, "resolveWaf")
     }
-} satisfies Record<string, Record<string, (...args: never[]) => unknown>>;
+};
 
 type ServerHost = typeof serverHost;
 
@@ -145,8 +344,27 @@ declare module "@polaris/app-host" {
     interface AppHost extends ServerHost {}
     interface AppHostTypes {
         AppExtension: AppExtension;
+        AppJob: AppJob;
+        AppSlot: AppSlot;
+        BackupSource: BackupSource;
+        DiscoveredTarget: DiscoveredTarget;
+        GamePort: GamePort;
+        GamePortRow: GamePortRow;
+        GamePortsReading: GamePortsReading;
+        GameReachAdvice: GameReachAdvice;
+        InPlaceCopy: InPlaceCopy;
+        InstallAccessEntry: InstallAccessEntry;
+        InstallAccessView: InstallAccessView;
+        InstallConfig: InstallConfig;
+        InstallSeed: InstallSeed;
+        InstalledAppSetting: InstalledAppSetting;
+        InstalledSlotHost: InstalledSlotHost;
         LiveGrant: LiveGrant;
+        SearchableItem: SearchableItem;
         SessionUser: SessionUser;
+        SourceResource: SourceResource;
+        StagedArtifact: StagedArtifact;
+        TargetRow: TargetRow;
     }
 }
 

@@ -13,7 +13,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TimeoutCommands } from "@/lib/apps/player-timeout-service";
+import type { TimeoutCommands } from "@polaris-app/game-servers/src/lib/player-timeout-service";
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const INSTALL = "aaaaaaaa-1111-4111-8111-111111111111";
@@ -36,9 +36,9 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const { grantTimeout, liftTimeout, sweepTimeouts, readPlayerTimeouts } = await import(
-    "@/lib/apps/player-timeout-service"
+    "@polaris-app/game-servers/src/lib/player-timeout-service"
 );
-const { timeoutFor, timeoutRemaining } = await import("@/lib/apps/player-timeout");
+const { timeoutFor, timeoutRemaining } = await import("@polaris-app/game-servers/src/lib/player-timeout");
 
 /** A game that accepts everything, and remembers what it was told. */
 function game(overrides: Partial<TimeoutCommands> = {}): TimeoutCommands & {

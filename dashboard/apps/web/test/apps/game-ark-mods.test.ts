@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isWorkshopImage, parseWorkshopId, workshopUrl } from "@/lib/apps/ark/workshop";
-import { formatModIds, isModId, MAX_MODS, movedMod, parseModIds, withMod, withoutMod } from "@/lib/apps/ark/mods";
+import { isWorkshopImage, parseWorkshopId, workshopUrl } from "@polaris-app/game-servers/src/lib/ark/workshop";
+import { formatModIds, isModId, MAX_MODS, movedMod, parseModIds, withMod, withoutMod } from "@polaris-app/game-servers/src/lib/ark/mods";
 
 const ONE = "731604991";
 const TWO = "1404697612";

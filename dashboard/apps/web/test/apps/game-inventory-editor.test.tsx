@@ -14,8 +14,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
     readPlayerInventoryAction: async () => ({ reading: { items: [], live: false, takenAt: null } }),
     recentItemsAction: async () => ({ items: [] }),
     pendingActionsAction: async () => ({ pending: [] }),
@@ -27,7 +29,7 @@ vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
     cancelQueuedActionAction: async () => ({})
 }));
 
-const { InventoryEditor } = await import("@/app/(app)/apps/installed/[id]/minecraft-inventory-editor");
+const { InventoryEditor } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-inventory-editor");
 
 describe("InventoryEditor", () => {
     it("draws the whole panel before any read has landed", () => {

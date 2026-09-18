@@ -8,7 +8,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createGameServerSchema } from "@/lib/apps/games-schema";
+import { createGameServerSchema } from "@polaris-app/game-servers/src/lib/games-schema";
 
 const installApp = vi.fn(async (..._args: unknown[]) => ({
     installedAppId: "created",
@@ -19,17 +19,17 @@ vi.mock("@/lib/apps/install-service", () => ({ installApp }));
 const publicAppUrl = vi.fn(async (): Promise<string | null> => "https://polaris.example");
 vi.mock("@/lib/domain-service", () => ({ publicAppUrl }));
 vi.mock("@/lib/apps/install-config", () => ({ patchInstallConfig: vi.fn(async () => undefined) }));
-vi.mock("@/lib/apps/minecraft/player-access", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     grantPlayerAccess: vi.fn(async () => undefined)
 }));
-vi.mock("@/lib/apps/minecraft/address", () => ({ setGameHostname: vi.fn(async () => null) }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/address", () => ({ setGameHostname: vi.fn(async () => null) }));
 vi.mock("@/lib/apps/port-registry", () => ({ availableHostPort: vi.fn(async () => 19132) }));
-vi.mock("@/lib/apps/minecraft/blueprint-version", async (original) => ({
-    ...(await original<typeof import("@/lib/apps/minecraft/blueprint-version")>()),
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/blueprint-version", async (original) => ({
+    ...(await original<typeof import("@polaris-app/game-servers/src/lib/minecraft/blueprint-version")>()),
     commonVersions: vi.fn(async () => [])
 }));
 
-const { createGameServer } = await import("@/lib/apps/games-create");
+const { createGameServer } = await import("@polaris-app/game-servers/src/lib/games-create");
 
 type Env = { key: string; value: string }[];
 type Seed = { installedAppId: string; env: { key: string; value: string; isSecret: boolean }[] };

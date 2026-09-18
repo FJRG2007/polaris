@@ -26,7 +26,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { minecraftRoutes, routesConfig } = await import("../../src/lib/apps/minecraft/router-service");
+const { minecraftRoutes, routesConfig } = await import("@polaris-app/game-servers/src/lib/minecraft/router-service");
 
 /** An install as the table reads it: a game, a name, and a port to send traffic to. */
 function server(

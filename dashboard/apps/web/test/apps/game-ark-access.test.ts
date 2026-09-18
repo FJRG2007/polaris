@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as access from "@/lib/apps/ark/access";
+import * as access from "@polaris-app/game-servers/src/lib/ark/access";
 
 const ALICE = "76561198000000001";
 const BOB = "76561198000000002";

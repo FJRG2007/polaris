@@ -11,17 +11,19 @@
  */
 
 import userEvent from "@testing-library/user-event";
-import type { MinecraftStatus } from "@/lib/apps/minecraft/service";
+import type { MinecraftStatus } from "@polaris-app/game-servers/src/lib/minecraft/service";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import { MinecraftPlayers } from "@/app/(app)/apps/installed/[id]/minecraft-players";
-import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
+import { MinecraftPlayers } from "@polaris-app/game-servers/src/screens/installed/minecraft-players";
+import * as loginActions from "@polaris-app/game-servers/src/screens/installed/minecraft-login-actions";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({}));
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({}));
 // Reached through the row dialogs' imports; nothing here signs anybody in.
 vi.mock("@/lib/session", () => ({}));
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-login-actions", () => ({
     loginStateAction: vi.fn(),
     setLoginAction: vi.fn(),
     forgetLoginAction: vi.fn()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dimensionLabel, formatCoordinates, parseDimension, parsePosition } from "@/lib/apps/minecraft/position";
+import { dimensionLabel, formatCoordinates, parseDimension, parsePosition } from "@polaris-app/game-servers/src/lib/minecraft/position";
 
 describe("parsePosition", () => {
     it("reads the three numbers out of the reply", () => {

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
+import type { GameServerFacts, GameServerLive } from "@polaris-app/game-servers/src/lib/games-service";
 import {
     canBrowseFiles,
     filterServers,
@@ -19,7 +19,7 @@ import {
     statusOf,
     uptimeLine,
     type ServerView
-} from "@/app/(app)/apps/games/list";
+} from "@polaris-app/game-servers/src/screens/list";
 
 function facts(over: Partial<GameServerFacts> = {}): GameServerFacts {
     return {

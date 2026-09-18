@@ -5,7 +5,7 @@ import {
     parseAdminList,
     withAdmin,
     withoutAdmin
-} from "@/lib/apps/ark/admins";
+} from "@polaris-app/game-servers/src/lib/ark/admins";
 
 const ONE = "76561198012345678";
 const TWO = "76561198087654321";

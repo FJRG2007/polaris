@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as settings from "@/lib/apps/fivem/settings";
+import * as settings from "@polaris-app/game-servers/src/lib/fivem/settings";
 
 const setting = (key: string): settings.FivemSetting => {
     const found = settings.findSetting(key);

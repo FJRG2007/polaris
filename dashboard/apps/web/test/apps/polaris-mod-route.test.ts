@@ -19,8 +19,8 @@ writeFileSync(join(dir, JAR), "jar-bytes");
 writeFileSync(join(dir, `${JAR}.version`), "0.1.0+abc123\n");
 process.env.POLARIS_MINECRAFT_MODS_DIR = dir;
 
-const route = await import("../../src/app/api/minecraft/mod/[file]/route");
-const files = await import("../../src/lib/apps/minecraft/polaris-mod-files");
+const route = await import("@polaris-app/game-servers/src/routes/api/minecraft/mod/[file]/route");
+const files = await import("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files");
 const params = (file: string) => ({ params: Promise.resolve({ file }) });
 const request = (method: string, headers: Record<string, string> = {}) =>
     new Request(`https://polaris.example/api/minecraft/mod/${JAR}`, { method, headers });

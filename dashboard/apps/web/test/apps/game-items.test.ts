@@ -7,7 +7,7 @@ import {
     readItemCatalog,
     searchItems,
     typedItemId
-} from "@/lib/apps/minecraft/items";
+} from "@polaris-app/game-servers/src/lib/minecraft/items";
 
 describe("normalizeItemId", () => {
     it("namespaces a bare name, because `give Alice stone` is what gets typed", () => {

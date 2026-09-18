@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ARK_MOD_SHELVES, findSuggestion, shelfModIds } from "@/lib/apps/ark/mod-catalog";
+import { ARK_MOD_SHELVES, findSuggestion, shelfModIds } from "@polaris-app/game-servers/src/lib/ark/mod-catalog";
 
 const entries = ARK_MOD_SHELVES.flatMap((shelf) => shelf.entries);
 

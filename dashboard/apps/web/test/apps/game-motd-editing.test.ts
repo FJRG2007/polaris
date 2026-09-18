@@ -6,7 +6,7 @@ import {
     replaceMotdPlain,
     stripMotd,
     toggleCenterMotd
-} from "@/lib/apps/minecraft/motd";
+} from "@polaris-app/game-servers/src/lib/minecraft/motd";
 
 describe("motdMap", () => {
     it("gives the text without its codes, and where each character came from", () => {

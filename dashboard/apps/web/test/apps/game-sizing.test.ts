@@ -9,9 +9,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseMemoryMb } from "@/lib/apps/games-service";
-import { blueprintsFor, findBlueprint, formatMemory } from "@/lib/apps/minecraft/blueprints";
-import { plannedHeapMb } from "@/lib/apps/minecraft/memory-plan";
+import { parseMemoryMb } from "@polaris-app/game-servers/src/lib/games-service";
+import { blueprintsFor, findBlueprint, formatMemory } from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
+import { plannedHeapMb } from "@polaris-app/game-servers/src/lib/minecraft/memory-plan";
 
 describe("the heap a server is sized with", () => {
     it("gives a small server enough to run at all", () => {

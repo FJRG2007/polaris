@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { describePorts, gameReachAdvice, gameStoppedAdvice, type GamePort } from "@/lib/apps/minecraft/reach-advice";
+import { describePorts, gameReachAdvice, gameStoppedAdvice, type GamePort } from "@polaris-app/game-servers/src/lib/minecraft/reach-advice";
 
 const TCP: readonly GamePort[] = [{ port: 25566, protocol: "tcp" }];
 const BLOCKS = { tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19231 } };

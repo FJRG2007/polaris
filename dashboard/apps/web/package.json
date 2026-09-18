@@ -20,6 +20,7 @@
         "@github/relative-time-element": "4.4.4",
         "@napi-rs/canvas": "1.0.2",
         "@pdfslick/react": "4.0.2",
+        "@polaris-app/game-servers": "0.1.0",
         "@polaris-app/places": "0.1.0",
         "@polaris/agent-runtime": "*",
         "@polaris/app-host": "0.1.0",

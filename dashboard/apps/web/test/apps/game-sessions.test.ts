@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePlayerSessions, playerActivity, sessionsByPlayer } from "@/lib/apps/minecraft/sessions";
+import { parsePlayerSessions, playerActivity, sessionsByPlayer } from "@polaris-app/game-servers/src/lib/minecraft/sessions";
 
 /** A Java server's log, as docker hands it back: RFC3339 stamp, then the line. */
 const JAVA_LOG = [

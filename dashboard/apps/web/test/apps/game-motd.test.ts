@@ -17,7 +17,7 @@ import {
     motdLineWidth,
     motdSpans,
     stripMotd
-} from "@/lib/apps/minecraft/motd";
+} from "@polaris-app/game-servers/src/lib/minecraft/motd";
 
 describe("motdSpans", () => {
     it("splits a line into the runs a client would draw", () => {

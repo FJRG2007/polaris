@@ -27,7 +27,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:
 
 const here = dirname(fileURLToPath(import.meta.url));
 const iconsDir = join(here, "icons");
-const catalogFile = join(here, "..", "..", "apps", "web", "src", "lib", "apps", "ark", "item-catalog.json");
+const catalogFile = join(here, "..", "..", "apps", "game-servers", "src", "lib", "ark", "item-catalog.json");
 
 const ITEMS_URL = "https://raw.githubusercontent.com/arkutils/Obelisk/master/data/wiki/items.json";
 const WIKI_API = "https://ark.wiki.gg/api.php";

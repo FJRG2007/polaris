@@ -13,7 +13,7 @@ import {
     parseIniSection,
     RECOMMENDED_ARK_SETTINGS,
     writeArkOverrides
-} from "@/lib/apps/ark/settings";
+} from "@polaris-app/game-servers/src/lib/ark/settings";
 
 /** What the image's own template leaves in the file. None of it is this screen's. */
 const IMAGE_CONFIG = [
