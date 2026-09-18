@@ -83,11 +83,44 @@ export interface HeardFrom {
     readonly reachable: boolean;
     /** Packets from them have arrived recently. */
     readonly arriving: boolean;
-    /** Those packets carried sound rather than silence, recently. */
+    /** Something they sent has carried a sound at some point since they joined.
+     *  Not "recently": somebody listening without muting is silent for as long as
+     *  they listen, and that is a person being quiet, not a broken microphone. */
     readonly carrying: boolean;
     /** Turned down to nothing in this browser, which is this reader's own doing
      *  and has to be said rather than diagnosed around. */
     readonly turnedDown: boolean;
+}
+
+/**
+ * Whether anything somebody sent has ever carried a sound.
+ *
+ * Two readings, because neither is enough on its own: this browser's own energy
+ * counter only moves for audio it actually plays out, so a person routed anywhere
+ * but a playing element reads as silent here while every ear in the room hears
+ * them; and the call server's own speaker detection is measured from what they
+ * send, so it is true of their microphone whatever happens at this end.
+ *
+ * Sticky on purpose. Somebody listening without muting is silent for as long as
+ * they listen, and a call that accused them of a broken microphone every time
+ * they stopped talking for half a minute was a call telling two people who could
+ * hear each other perfectly that one of them could not be heard. A microphone
+ * that has never carried a sound is the fault worth naming; one that has and then
+ * went quiet is a person being quiet.
+ */
+export function carriedSound(reading: {
+    /** What the last look concluded. */
+    readonly before: boolean;
+    readonly energyBefore: number;
+    readonly energyNow: number;
+    /** When the call server last heard them speak, if it ever has. */
+    readonly lastSpokeAt: Date | undefined;
+    /** Now, and how far back a report from the call server still counts. */
+    readonly at: number;
+    readonly within: number;
+}): boolean {
+    if (reading.before || reading.energyNow > reading.energyBefore) return true;
+    return reading.lastSpokeAt instanceof Date && reading.lastSpokeAt.getTime() >= reading.at - reading.within;
 }
 
 /** Everything the verdict is reached from. */

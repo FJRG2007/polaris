@@ -65,7 +65,15 @@ export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
                 <span className="min-w-0 flex-1 font-medium">{audio.headline}</span>
             </p>
             {audio.fix && <p className="pl-[1.375rem] text-muted-foreground">{audio.fix}</p>}
-            <dl className="flex flex-col gap-1 pl-[1.375rem]">
+            {/* The checks behind the verdict, folded: they are there so the
+                reader can see which one failed rather than take a verdict on
+                trust, and that is worth a press - not four lines of a call that
+                may have very few to spare. */}
+            <details className="pl-[1.375rem]">
+                <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
+                    What was checked
+                </summary>
+            <dl className="mt-1 flex flex-col gap-1">
                 {audio.lines.map((line) => (
                     <div key={line.label} className="flex items-baseline gap-3">
                         <dt className="w-40 shrink-0 text-muted-foreground">{line.label}</dt>
@@ -82,6 +90,7 @@ export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
                     </div>
                 ))}
             </dl>
+            </details>
         </section>
     );
 }

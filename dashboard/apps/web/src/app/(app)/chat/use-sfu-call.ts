@@ -80,6 +80,7 @@ import {
     type CombineRequest
 } from "./call-combine";
 import {
+    carriedSound,
     diagnoseCall,
     settlingFor,
     UNKNOWN_AUDIO,
@@ -209,18 +210,16 @@ const SIGNAL_RECONNECTING = "signalReconnecting" as Room["state"];
 const AUDIO_CHECK_MS = 3_000;
 
 /**
- * How long a counter may sit still before it is treated as stopped.
+ * How long the byte counter may sit still before it is treated as stopped.
  *
- * Two windows, because the two counters stop for different reasons. Bytes keep
- * arriving through a pause - audio is sent discontinuously, so silence is cheap
- * frames rather than no frames - and a gap of several seconds in those is a
- * connection that has stopped carrying. Energy is the opposite: it only moves
- * while somebody is making a sound, so it has to be allowed to sit still for as
- * long as a person can reasonably listen without saying anything, or the call
- * would accuse every quiet participant of a broken microphone.
+ * Bytes keep arriving through a pause - audio is sent discontinuously, so
+ * silence is cheap frames rather than no frames - and a gap of several seconds in
+ * those is a connection that has stopped carrying. Sound is not timed at all:
+ * whether somebody's audio carries sound is asked once, of everything they have
+ * sent since they joined, because a person listening without muting is silent for
+ * as long as they listen - see `heardFrom`.
  */
 const ARRIVING_WITHIN_MS = 8_000;
-const CARRYING_WITHIN_MS = 30_000;
 
 /*
  * How long the room is left alone after it changes before anything is judged -
@@ -575,7 +574,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * the question asked of it is how long ago that was.
      */
     const flow = useRef(
-        new Map<string, { bytes: number; energy: number; bytesAt: number; energyAt: number }>()
+        new Map<string, { bytes: number; energy: number; bytesAt: number; heard: boolean }>()
     );
 
     /** When the room last changed under this browser. Nothing is judged for a
@@ -2661,13 +2660,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 bytes,
                 energy,
                 bytesAt: at,
-                energyAt: at
+                heard: false
             };
+            const heard = carriedSound({
+                before: before.heard,
+                energyBefore: before.energy,
+                energyNow: energy,
+                lastSpokeAt: (remote as { lastSpokeAt?: Date } | undefined)?.lastSpokeAt,
+                at,
+                within: AUDIO_CHECK_MS * 2
+            });
             const moved = {
                 bytes,
                 energy,
                 bytesAt: bytes > before.bytes ? at : before.bytesAt,
-                energyAt: energy > before.energy ? at : before.energyAt
+                heard
             };
             flow.current.set(person.id, moved);
             return {
@@ -2678,7 +2685,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 sharing,
                 reachable,
                 arriving: at - moved.bytesAt < ARRIVING_WITHIN_MS,
-                carrying: at - moved.energyAt < CARRYING_WITHIN_MS,
+                carrying: moved.heard,
                 turnedDown
             };
         }

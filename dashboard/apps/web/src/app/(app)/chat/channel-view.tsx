@@ -2038,7 +2038,7 @@ export function ChannelView({
                         // changes rather than pinned to one window's pixels.
                         style={bandHeight === null ? undefined : { height: bandHeight }}
                         className={cn(
-                            "flex min-h-0 shrink-0 flex-col border-b border-border",
+                            "flex min-h-0 shrink-0 flex-col overflow-hidden border-b border-border",
                             // How much of the column this is allowed to take -
                             // see `call-band`, which is where the reasoning
                             // lives.
