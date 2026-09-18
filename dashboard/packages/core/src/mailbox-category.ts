@@ -639,45 +639,67 @@ const FINANCING: readonly RegExp[] = [
  *
  * There is no possessive, no decision and no receipt in that, so every question
  * missed it and a mailing-list survey about somebody's own financed purchase
- * landed under Updates with the parcels. The noun on its own is the signal, and
- * three things make it safe to use: it is asked below the offer, so a lender
- * selling credit is still an advert; it is guarded by `FINANCING_OFFER` below,
- * so an advert that mentions no offer word is not read as somebody's own
- * credit; and it is asked of bulk mail only, so the word in a person's own
- * message is left exactly where it is.
+ * landed under Updates with the parcels. Three things make these safe to use:
+ * they are asked below the offer, so a lender selling credit is still an advert;
+ * they are guarded by `FINANCING_OFFER` below, so an advert that mentions no
+ * offer word is not read as somebody's own credit; and they are asked of bulk
+ * mail only, so the word in a person's own message is left exactly where it is.
+ *
+ * Each of these only ever describes paying for something in parts, so one of
+ * them is enough on its own. The bare nouns for credit are not: see
+ * `FINANCING_NOUNS`.
  */
 const FINANCING_MENTION: readonly RegExp[] = [
     // Spanish
-    /\bfinanciacion(?:es)?\b/,
-    /\bfinanciamiento\b/,
-    /\bfinanciad[oa]s?\b/,
+    /\bcompras? financiadas?\b/,
     /\ba plazos\b/,
     /\bpagos? aplazados?\b/,
     /\bpaga en \d\b/,
     /\bprestamo personal\b/,
     /\bcredito al consumo\b/,
-    /\bhipoteca\b/,
     // English
-    /\bfinancing\b/,
     /\bfinanced purchase\b/,
     /\bpay in \d\b/,
     /\bbuy now,? pay later\b/,
     // Portuguese
-    /\bfinanciamento\b/,
     /\bprestacoes\b/,
     /\bparcelado\b/,
     // French
-    /\bfinancement\b/,
     /\bpaiement en \d fois\b/,
     /\bcredit a la consommation\b/,
     // German
     /\bratenzahlung\b/,
     /\bratenkauf\b/,
-    /\bfinanzierung\b/,
     // Italian
-    /\bfinanziamento\b/,
     /\bpagamento rateale\b/,
     /\brateizzato\b/
+];
+
+/**
+ * The bare words for credit, which are not enough on their own.
+ *
+ * Newsletters use them all day with no purchase in sight - "así afecta a tu
+ * hipoteca", "closes a $40M financing round", "proyecto financiado por la Unión
+ * Europea". So a bulk mail that names one of these is somebody's own credit only
+ * when it also names the purchase (`PURCHASE_NOUNS`) or asks what they thought
+ * (`SURVEY_WORDS`), which is the lender writing and not a digest.
+ */
+const FINANCING_NOUNS: readonly RegExp[] = [
+    // Spanish
+    /\bfinanciacion(?:es)?\b/,
+    /\bfinanciamiento\b/,
+    /\bfinanciad[oa]s?\b/,
+    /\bhipoteca\b/,
+    // English
+    /\bfinancing\b/,
+    // Portuguese
+    /\bfinanciamento\b/,
+    // French
+    /\bfinancement\b/,
+    // German
+    /\bfinanzierung\b/,
+    // Italian
+    /\bfinanziamento\b/
 ];
 
 /**
@@ -790,23 +812,18 @@ const SURVEY_WORDS: readonly string[] = [
  * survey says "tu experiencia de compra" and "how was your purchase", and what
  * it leaves out is exactly what that list is built from - the possessive and the
  * confirmation a receipt is written with. They are only ever read together with
- * a survey word, so a bare "compra" cannot file anything on its own.
+ * a survey word or a word for credit, so a bare "compra" cannot file anything on
+ * its own.
+ *
+ * Whole words only, and never the "order" of "in order to": the word is also in
+ * "border" and "reorder", "pago" in "pagoda", "kauf" in "Verkauf".
  *
  * Only the nouns no earlier list already answers for. A survey that names an
  * invoice, a factura or a pedido is decided by the billing and purchase words
  * above, with the same answer, before this is ever asked - carrying them here
  * too would claim a reach these words do not have.
  */
-const PURCHASE_NOUNS: readonly string[] = [
-    "purchase",
-    "order",
-    "payment",
-    "compra",
-    "pago",
-    "achat",
-    "kauf",
-    "acquisto"
-];
+const PURCHASE_NOUNS = /\b(?:purchase|(?<!\bin )order|payment|compra|pago|achat|(?:ein)?kauf|acquist[oi])s?\b/;
 
 /**
  * Words that mean something is on its way, or that a record was issued.
@@ -890,11 +907,13 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
         PAYMENT_SETTLED.some((pattern) => pattern.test(words));
     // Credit somebody already has, and the two things that decide whether the
     // word is theirs: an advert's own language, and a survey about a purchase.
-    const financing = FINANCING_MENTION.some((pattern) => pattern.test(words));
+    const aboutPurchase = PURCHASE_NOUNS.test(words);
+    const asksOpinion = SURVEY_WORDS.some((word) => words.includes(word));
+    const financing =
+        FINANCING_MENTION.some((pattern) => pattern.test(words)) ||
+        (FINANCING_NOUNS.some((pattern) => pattern.test(words)) && (aboutPurchase || asksOpinion));
     const sellingCredit = FINANCING_OFFER.some((pattern) => pattern.test(words));
-    const asksWhatYouThought =
-        SURVEY_WORDS.some((word) => words.includes(word)) &&
-        PURCHASE_NOUNS.some((word) => words.includes(word));
+    const asksWhatYouThought = asksOpinion && aboutPurchase;
 
     // Money about to move comes before everything except a code, and before the
     // word that is selling something: half of these arrive dressed as an offer -

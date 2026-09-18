@@ -576,10 +576,10 @@ describe("mail about a purchase somebody financed", () => {
 
     it("knows credit named without a possessive, in the languages it arrives in", () => {
         for (const subject of [
-            "Financiación Cetelem en APPLE",
+            "Financiación Cetelem de tu compra en APPLE",
             "Compra financiada en APPLE",
             "Detalle del pago aplazado de tu compra",
-            "Financing summary for your MacBook",
+            "Financing summary for your MacBook purchase",
             "Your Pay in 3 balance at Apple",
             "Financiamento da sua compra",
             "Paiement en 3 fois de votre achat",
@@ -617,6 +617,30 @@ describe("mail about a purchase somebody financed", () => {
                 snippet: "Two questions, one minute"
             })
         ).toBe("updates");
+    });
+
+    it("leaves news that names credit, with no purchase and no survey, where it was", () => {
+        // A digest uses the bare nouns all day. Without the purchase or a
+        // question about it, the word is the news, not somebody's own credit.
+        for (const [subject, snippet] of [
+            ["El Euribor sube y encarece la hipoteca media", "Las claves de la semana"],
+            ["Startup X closes $40M financing round", "This week in tech"],
+            ["Proyecto financiado por la Unión Europea", "Boletín trimestral del proyecto"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");
+        }
+    });
+
+    it("reads the purchase nouns as whole words", () => {
+        // "in order to", "border", "pagoda" and "Verkauf" are not a purchase.
+        for (const [subject, snippet] of [
+            ["Share your feedback", "In order to improve our service, two questions"],
+            ["Tu opinión sobre la nueva ruta", "Visita guiada a la pagoda"],
+            ["Ihre Meinung zählt", "Unser Verkaufsteam und die Border-Region"]
+        ]) {
+            expect(survey({ subject: subject!, snippet: snippet! }), subject).toBe("updates");
+        }
+        expect(survey({ subject: "Ihre Meinung zu Ihrem Einkauf" })).toBe("billing");
     });
 
     it("leaves a lender's advert with the adverts, even one that names no offer", () => {
