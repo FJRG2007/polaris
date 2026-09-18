@@ -388,6 +388,18 @@ describe("what the panel does with them", () => {
         expect(noteFor({}, 0)).toBeNull();
     });
 
+    it("counts the mods it does not name, and says when a list is still being read", () => {
+        expect(noteFor({ unread: ["a", "b", "c", "d", "e", "f"] }, 0)).toBe(
+            "Could not read the items a, b, c, d and 2 more adds. They can still be typed as ids."
+        );
+        expect(noteFor({ skipped: ["late"] }, 0)).toBe(
+            "Not searching late: only the first mods on a long list are read. They can still be typed as ids."
+        );
+        expect(noteFor({ complete: false }, 0)).toBe(
+            "Some mods are still being read. Open the picker again to see their items."
+        );
+    });
+
     it("searches a modded item by its mod as well as its name", () => {
         const items: ModItemView[] = [
             {

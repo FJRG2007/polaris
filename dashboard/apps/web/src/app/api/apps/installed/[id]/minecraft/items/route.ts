@@ -30,5 +30,5 @@ export async function GET(
     // panel needs it: what it does with an answer is keep it for a few minutes,
     // and keeping a half-read one that long is the rest of the list not appearing
     // until somebody reloads the tab.
-    return NextResponse.json(read ?? { items: [], unread: [], complete: false });
+    return NextResponse.json(read ?? { items: [], unread: [], skipped: [], complete: false });
 }

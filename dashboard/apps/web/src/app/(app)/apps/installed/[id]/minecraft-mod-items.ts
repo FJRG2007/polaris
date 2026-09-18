@@ -149,14 +149,27 @@ export function noteFor(payload: unknown, found: number): string | null {
     if (found > 0) {
         lines.push(`Also searching ${found} items this server's mods add. Type a mod's name for just those.`);
     }
-    const unread = (payload as { unread?: unknown } | null)?.unread;
-    const names = Array.isArray(unread)
-        ? unread.filter((name): name is string => typeof name === "string").slice(0, 4)
-        : [];
-    if (names.length > 0) {
-        lines.push(`Could not read the items ${names.join(", ")} adds. They can still be typed as ids.`);
+    const answer = payload as { unread?: unknown; skipped?: unknown; complete?: unknown } | null;
+    const unread = namesIn(answer?.unread);
+    if (unread !== null) {
+        lines.push(`Could not read the items ${unread} adds. They can still be typed as ids.`);
+    }
+    const skipped = namesIn(answer?.skipped);
+    if (skipped !== null) {
+        lines.push(`Not searching ${skipped}: only the first mods on a long list are read. They can still be typed as ids.`);
+    }
+    if (answer?.complete === false) {
+        lines.push("Some mods are still being read. Open the picker again to see their items.");
     }
     return lines.length > 0 ? lines.join(" ") : null;
+}
+
+/** Up to four names from a list in the answer, and how many more there are. */
+function namesIn(list: unknown): string | null {
+    const names = Array.isArray(list) ? list.filter((name): name is string => typeof name === "string") : [];
+    if (names.length === 0) return null;
+    const shown = names.slice(0, 4).join(", ");
+    return names.length > 4 ? `${shown} and ${names.length - 4} more` : shown;
 }
 
 /** Drop everything held, so a test starts from the state a fresh tab is in. */

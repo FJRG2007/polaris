@@ -107,9 +107,12 @@ export interface ServerModItems {
     /** Mods whose jar could not be read, by the name on the list. The screen says
      *  so rather than quietly showing a shorter catalogue than the server has. */
     readonly unread: readonly string[];
+    /** Mods past `MAX_PROJECTS` on the list, which are not read at all. Named so
+     *  the screen can say the catalogue stops short of the server's. */
+    readonly skipped: readonly string[];
 }
 
-const EMPTY: ServerModItems = { items: [], unread: [], complete: true };
+const EMPTY: ServerModItems = { items: [], unread: [], skipped: [], complete: true };
 
 /**
  * Everything the mods on one server add.
@@ -125,17 +128,22 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
     // read and no reason to fetch anything.
     if (loader === null || isPluginLoader(loader)) return EMPTY;
 
-    const entries = parseProjectList(settings.projects).slice(0, MAX_PROJECTS);
-    if (entries.length === 0) return EMPTY;
+    // Entries with no Modrinth slug are files placed by hand, which have nothing
+    // to download, so they are left out before the cap rather than spending it.
+    const listed = parseProjectList(settings.projects).flatMap((entry) => {
+        const slug = projectSlug(entry);
+        return slug === null ? [] : [{ entry, slug }];
+    });
+    if (listed.length === 0) return EMPTY;
+    const entries = listed.slice(0, MAX_PROJECTS);
+    const skipped = listed.slice(MAX_PROJECTS).map((item) => item.slug);
 
     const items: ServerModItem[] = [];
     const taken = new Set<string>();
     const unread: string[] = [];
     const until = Date.now() + READ_BUDGET_MS;
     let complete = true;
-    for (const entry of entries) {
-        const slug = projectSlug(entry);
-        if (slug === null) continue;
+    for (const { entry, slug } of entries) {
         // Out of time is not the same as unreadable, and is not reported as it:
         // what is left is read on the next open, from a cache that is by then one
         // mod shorter.
@@ -166,7 +174,7 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
         // that are then dropped, so the walk stops here and not just the copy.
         if (items.length >= MAX_ITEMS) break;
     }
-    return { items, unread, complete };
+    return { items, unread, skipped, complete };
 }
 
 /** One kept picture, or null when nothing was ever kept under that name. */
