@@ -11,9 +11,10 @@
  * kept here, and the two lists are handed out together.
  *
  * The screen before this one shows the server's list. This one is about the
- * people who join it: what they need that the server does not run, and the
- * command that puts all of it - both lists - into their game and keeps it in step
- * afterwards. Nothing here restarts anything: the server does not load these.
+ * people who join it: the server's mods they need too, which are shown here and
+ * changed there, what they need that the server does not run, and the command
+ * that puts all of it into their game and keeps it in step afterwards. Nothing
+ * here restarts anything: the server does not load the players' own list.
  */
 
 import { CopyButton } from "@polaris/ui";
@@ -25,6 +26,55 @@ import { Badge, Button, Card, CardBody, Input, Skeleton } from "@polaris/ui";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 
 const SEARCH_DEBOUNCE_MS = 400;
+
+/** One of the server's mods a player installs too. */
+interface ServerMod {
+    readonly slug: string;
+    readonly title: string;
+    readonly description: string;
+    readonly iconUrl: string | null;
+    /** The mods on the list that pulled it in, for a library nobody chose. */
+    readonly neededBy: readonly string[];
+}
+
+/**
+ * The server's mods that go in a player's game too, with the libraries they need.
+ *
+ * The same answer the install command gives: everything on the list but the
+ * server-only mods, plus the required libraries the server installs on its own -
+ * a list that shows TrashSlot and not Balm is a list a player copies by hand and
+ * then cannot start the game with.
+ */
+export function serverMods(
+    projects: readonly modrinth.InstalledProject[],
+    requires: readonly modrinth.ModrinthRequirement[]
+): ServerMod[] {
+    const mods: ServerMod[] = projects
+        .filter((project) => !project.serverOnly)
+        .map(({ slug, title, description, iconUrl }) => ({
+            slug,
+            title,
+            description,
+            iconUrl,
+            neededBy: []
+        }));
+    const titleOf = new Map(mods.map((mod) => [mod.slug.toLowerCase(), mod.title]));
+    const libraries = new Map<string, ServerMod>();
+    for (const need of requires) {
+        const by = titleOf.get(need.slug.toLowerCase());
+        if (!by || need.onList || need.needsServerOnly) continue;
+        const key = need.needs.toLowerCase();
+        const known = libraries.get(key);
+        libraries.set(key, {
+            slug: need.needs,
+            title: need.needsTitle,
+            description: "",
+            iconUrl: null,
+            neededBy: known ? [...new Set([...known.neededBy, by])] : [by]
+        });
+    }
+    return [...mods, ...libraries.values()];
+}
 
 /** What each command is for, in the order somebody scans for their own machine. */
 const SYSTEMS = [
@@ -38,7 +88,8 @@ export function MinecraftClientMods({
     loader,
     version,
     entries,
-    serverMods,
+    serverProjects,
+    requires,
     packCommands
 }: {
     installedAppId: string;
@@ -47,9 +98,11 @@ export function MinecraftClientMods({
      *  newest - in which case nothing can be filtered by release. */
     version: string;
     entries: readonly string[];
-    /** How many mods the server itself runs, so the command can say what it
-     *  installs without this screen reading that list again. */
-    serverMods: number;
+    /** The server's list as the screen above read it, null until it answers - so
+     *  this one does not read it again. */
+    serverProjects: readonly modrinth.InstalledProject[] | null;
+    /** What those mods need, as the screen above read it. */
+    requires: readonly modrinth.ModrinthRequirement[];
     packCommands: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
 }) {
     const [list, setList] = useState<string[]>([...entries]);
@@ -104,6 +157,7 @@ export function MinecraftClientMods({
                         iconUrl: null,
                         author: null,
                         clientOnly: true,
+                        serverOnly: false,
                         known: true,
                         fitsVersion: null,
                         fitsLoader: true
@@ -167,6 +221,8 @@ export function MinecraftClientMods({
         });
     }
 
+    const fromServer = serverMods(serverProjects ?? [], requires);
+
     if (!loader || modrinth.isPluginLoader(loader)) return null;
 
     return (
@@ -176,9 +232,8 @@ export function MinecraftClientMods({
                     <div>
                         <h3 className="text-sm font-medium">What the players install</h3>
                         <p className="text-xs text-muted-foreground">
-                            The mods that run in their game and not on the server - a minimap, a
-                            world map, a HUD. The server never loads these, so nothing here restarts
-                            it.
+                            Everything a player needs in their own game to join: the server&apos;s
+                            mods, and the ones that only run in the game.
                         </p>
                     </div>
                     {changed && (
@@ -190,6 +245,63 @@ export function MinecraftClientMods({
                 </div>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
+
+                <div className="flex flex-col gap-2">
+                    <div>
+                        <h4 className="text-xs font-medium">From the server</h4>
+                        <p className="text-xs text-muted-foreground">
+                            These run on both sides. Change them in the server&apos;s list above.
+                        </p>
+                    </div>
+                    {serverProjects === null ? (
+                        <Skeleton className="h-12 w-full" />
+                    ) : fromServer.length === 0 ? (
+                        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            None of the server&apos;s mods run in the game.
+                        </p>
+                    ) : (
+                        <ul className="flex flex-col gap-2">
+                            {fromServer.map((project) => (
+                                <li
+                                    key={project.slug}
+                                    className="flex items-center gap-3 rounded-md border border-border p-2"
+                                >
+                                    <ProjectIcon installedAppId={installedAppId} project={project} />
+                                    <div className="min-w-0 flex-1">
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={project.title}
+                                        >
+                                            {project.title}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {project.neededBy.length > 0
+                                                ? `Needed by ${project.neededBy.join(", ")}`
+                                                : project.description}
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={`https://modrinth.com/project/${project.slug}`}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                        className="text-muted-foreground hover:text-foreground"
+                                        title={`Open ${project.title} on Modrinth`}
+                                    >
+                                        <ExternalLink className="size-3.5" />
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div>
+                    <h4 className="text-xs font-medium">Only in the game</h4>
+                    <p className="text-xs text-muted-foreground">
+                        A minimap, a world map, a HUD. The server never loads these, so nothing here
+                        restarts it.
+                    </p>
+                </div>
 
                 {rows === null ? (
                     <Skeleton className="h-12 w-full" />
@@ -309,8 +421,8 @@ export function MinecraftClientMods({
                         <div>
                             <h3 className="text-sm font-medium">Send this to the players</h3>
                             <p className="text-xs text-muted-foreground">
-                                One line installs the {serverMods + entries.length} mods for this
-                                server into their game, and running it again is how they update: it
+                                One line installs the {fromServer.length + entries.length} mods for
+                                this server into their game, and running it again is how they update: it
                                 replaces what changed and takes away what came off the lists.
                                 Anything else in their mods folder is left alone. The link needs no
                                 account here.

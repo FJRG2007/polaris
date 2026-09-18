@@ -128,6 +128,10 @@ export interface ModrinthProject {
      *  list is a mod the server cannot load; it belongs in the list the players
      *  install instead. */
     readonly clientOnly: boolean;
+    /** Whether it only runs on the server. The one kind of mod on a server's list
+     *  a player does not put in their own game - everything else there has a part
+     *  in it, and a player without it cannot join. */
+    readonly serverOnly: boolean;
 }
 
 /** A Minecraft version, as Modrinth writes them. Kept strict because it is put
@@ -153,7 +157,8 @@ const searchResponseSchema = z.object({
                 categories: z.array(z.string().max(64)).max(32).catch([]),
                 icon_url: z.string().max(512).nullish().catch(null),
                 author: z.string().max(120).nullish().catch(null),
-                server_side: z.string().max(32).catch("")
+                server_side: z.string().max(32).catch(""),
+                client_side: z.string().max(32).catch("")
             })
         )
         .max(50)
@@ -170,7 +175,8 @@ function hitToProject(hit: z.infer<typeof searchResponseSchema>["hits"][number])
         // database, and the page it lands on is one an operator is logged into.
         iconUrl: isModrinthUrl(hit.icon_url) ? (hit.icon_url ?? null) : null,
         author: hit.author ?? null,
-        clientOnly: hit.server_side === "unsupported"
+        clientOnly: hit.server_side === "unsupported",
+        serverOnly: hit.client_side === "unsupported"
     };
 }
 
@@ -259,6 +265,7 @@ const projectSchema = z.object({
     categories: z.array(z.string().max(64)).max(32).catch([]),
     icon_url: z.string().max(512).nullish().catch(null),
     server_side: z.string().max(32).catch(""),
+    client_side: z.string().max(32).catch(""),
     game_versions: z.array(z.string().max(32)).max(500).catch([]),
     loaders: z.array(z.string().max(32)).max(64).catch([])
 });
@@ -325,6 +332,7 @@ export async function readInstalledProjects(
                 iconUrl: null,
                 author: null,
                 clientOnly: false,
+                serverOnly: false,
                 known: false,
                 fitsVersion: null,
                 fitsLoader: true
@@ -340,6 +348,7 @@ export async function readInstalledProjects(
             iconUrl: isModrinthUrl(project.icon_url) ? (project.icon_url ?? null) : null,
             author: null,
             clientOnly: project.server_side === "unsupported",
+            serverOnly: project.client_side === "unsupported",
             known: true,
             fitsVersion: isGameVersion(pinned) ? project.game_versions.includes(pinned) : null,
             // A project that lists no loader at all is a datapoint Modrinth is
@@ -828,6 +837,9 @@ export interface ModrinthRequirement {
     readonly available: boolean;
     /** Whether it is already on the list, so nothing offers to add it twice. */
     readonly onList: boolean;
+    /** Whether that dependency only runs on the server, so the players' install
+     *  leaves it out like any other server-only mod. */
+    readonly needsServerOnly: boolean;
 }
 
 /**
@@ -927,7 +939,8 @@ export async function readRequirements(
             needs: dependency.slug,
             needsTitle: dependency.title || dependency.slug,
             available: buildable.get(dependency.slug) ?? false,
-            onList: onList.has(dependency.slug.toLowerCase())
+            onList: onList.has(dependency.slug.toLowerCase()),
+            needsServerOnly: dependency.client_side === "unsupported"
         });
     }
     return found;

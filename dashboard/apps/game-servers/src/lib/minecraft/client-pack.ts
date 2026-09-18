@@ -31,6 +31,8 @@ import {
     loaderForType,
     parseProjectList,
     projectSlug,
+    readInstalledProjects,
+    readRequirements,
     walk,
     type ModrinthBuild
 } from "./modrinth";
@@ -127,7 +129,8 @@ export async function resolvePack(input: {
     if (!loader) return { server: input.name, loader, version, mods, missing };
     // A file the image installs by path, not a project: nothing to resolve and
     // nothing a player could download.
-    const asked = [...server, ...player].filter(({ entry }) => projectSlug(entry));
+    const listed = [...server, ...player].filter(({ entry }) => projectSlug(entry));
+    const asked = await withRequirements(await playerSide(listed, loader, version), loader, version);
     const builds = await walk(asked, ({ entry }) => buildFor(entry, loader, version || null));
     for (const [index, { entry, where }] of asked.entries()) {
         const build = builds[index] ?? null;
@@ -141,6 +144,71 @@ export async function resolvePack(input: {
         mods.push({ entry, where, ...build, sha1 });
     }
     return { server: input.name, loader, version, mods, missing };
+}
+
+type PackEntry = { readonly entry: string; readonly where: PackMod["where"] };
+
+/**
+ * The entries a player puts in their own game: all of them but the server-only.
+ *
+ * A server-only mod in a player's folder is at best a jar that does nothing and at
+ * worst one that stops the game from starting. When Modrinth cannot be asked, the
+ * list is kept whole - a spare jar is the cheaper mistake than a missing one.
+ */
+async function playerSide(
+    listed: readonly PackEntry[],
+    loader: string,
+    version: string
+): Promise<PackEntry[]> {
+    const sides = await readInstalledProjects(
+        listed.map(({ entry }) => entry),
+        loader,
+        version || null
+    );
+    return listed.filter((_, index) => !sides[index]?.serverOnly);
+}
+
+/** How many layers of "needs" are followed. Libraries rarely need more than one;
+ *  the bound is what keeps a publisher's cycle from being a walk without end. */
+const REQUIREMENT_DEPTH = 3;
+
+/**
+ * The entries, plus everything they cannot run without.
+ *
+ * The server installs a mod's required dependencies itself, so its list names
+ * TrashSlot and never Balm - and a player given only the list gets a game that
+ * refuses to start over the missing library. The same declarations the mods
+ * screen reads decide what is added here, so the two cannot disagree about what a
+ * mod needs. A dependency takes the side of whatever needed it.
+ */
+async function withRequirements(
+    entries: readonly PackEntry[],
+    loader: string,
+    version: string
+): Promise<PackEntry[]> {
+    const all = [...entries];
+    const seen = new Set(all.map(({ entry }) => (projectSlug(entry) ?? entry).toLowerCase()));
+    let layer = all;
+    for (let depth = 0; depth < REQUIREMENT_DEPTH && layer.length > 0; depth++) {
+        const whereOf = new Map(
+            layer.map(({ entry, where }) => [(projectSlug(entry) ?? entry).toLowerCase(), where])
+        );
+        const needs = await readRequirements(
+            layer.map(({ entry }) => entry),
+            loader,
+            version || null
+        );
+        const next: PackEntry[] = [];
+        for (const need of needs) {
+            const slug = need.needs.toLowerCase();
+            if (need.needsServerOnly || seen.has(slug)) continue;
+            seen.add(slug);
+            next.push({ entry: need.needs, where: whereOf.get(need.slug.toLowerCase()) ?? "server" });
+        }
+        all.push(...next);
+        layer = next;
+    }
+    return all;
 }
 
 /** A jar name and nothing else: no folder to escape the mods folder with, no tab
