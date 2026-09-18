@@ -16,7 +16,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_PORT_BLOCKS } from "../../src/lib/apps/port-block";
 import type { GamePortsReading } from "@polaris-app/game-servers/src/lib/games-service";
 import { GamePortsLive } from "../../src/app/(app)/admin/domains/game-ports-live";
-import { gameReachAdvice, gameStoppedAdvice } from "@polaris-app/game-servers/src/lib/minecraft/reach-advice";
+import { gameReachAdvice, gameStoppedAdvice } from "@/lib/apps/port-advice";
 
 const pending = [{ port: 25565, protocol: "tcp" as const }];
 

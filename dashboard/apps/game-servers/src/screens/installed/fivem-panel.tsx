@@ -37,7 +37,6 @@ import type { ServerPresence } from "../../lib/games-service";
 import { useGamePresence } from "../../components/use-game-presence";
 import { presenceLine, seenFor } from "../../lib/games-activity";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
-import type { GameReachAdvice } from "../../lib/minecraft/reach-advice";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import type { FivemAccessView, FivemStatus } from "../../lib/fivem/service";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
@@ -103,6 +102,9 @@ import {
     Switch
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import type { AppHostTypes } from "@polaris/app-host";
+
+type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 
 const { CopyButton } = hostUi.copyButton;
 const { useConfirm } = hostUi.confirmDialog;

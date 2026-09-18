@@ -9,8 +9,8 @@
  * and the other proof needs nothing at all: a player who joined from a public
  * address is a packet that arrived, and no router can fake that.
  *
- * What the operator is told once this has decided is `reach-advice.ts`, which is
- * pure and can be rendered in the browser; everything here is sockets and rows.
+ * What the operator is told once this has decided is the dashboard's port advice
+ * (`host.appsPortAdvice`), which is pure; everything here is sockets and rows.
  */
 
 import { PROBE_TIMEOUT_MS } from "@polaris/core";
@@ -18,13 +18,16 @@ import { prisma } from "@polaris/db";
 import { pingSteamQuery } from "../ark/a2s";
 import { pingJava } from "./slp";
 import { pingBedrock } from "./raknet";
-import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "./reach-advice";
 import { host } from "@polaris/app-host";
+import type { AppHostTypes } from "@polaris/app-host";
 
 const { getLocalEnvironment } = host.networkService;
 const { getHostLanIp, isLanAddress } = host.hostAddress;
 const { getPortBlocks, getPortPolicy } = host.appsPortBlockStore;
 const { probeTcpPort, publicProbeHost } = host.netPortProbe;
+const { gameReachAdvice, gameStoppedAdvice } = host.appsPortAdvice;
+type GamePort = AppHostTypes["GamePort"];
+type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
 /** The ports a game install actually publishes, from what its deploy pinned. */

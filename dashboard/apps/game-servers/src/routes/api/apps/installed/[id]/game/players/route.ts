@@ -11,7 +11,7 @@
  * nobody was playing.
  */
 
-import { readPlayerCounts } from "../../../../../lib/games-activity-service";
+import { readPlayerCounts } from "../../../../../../../lib/games-activity-service";
 import { host } from "@polaris/app-host";
 
 const { resolveRange } = host.metricsShared;

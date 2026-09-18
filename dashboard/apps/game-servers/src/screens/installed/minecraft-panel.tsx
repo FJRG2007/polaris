@@ -45,7 +45,6 @@ import { MinecraftJoinPassword } from "./minecraft-join-password";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
 import type { PlayerSessionEvent } from "../../lib/minecraft/sessions";
-import type { GameReachAdvice } from "../../lib/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
@@ -66,6 +65,7 @@ const { CopyButton } = hostUi.copyButton;
 const { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } = hostUi.appAppsInstalledIdTabs;
 const { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } = hostUi.metricsHistory;
 type InstalledAppSetting = AppHostTypes["InstalledAppSetting"];
+type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 
 /** Mods are managed on their own screen, so their variables are not repeated as
  *  raw fields on Settings. */

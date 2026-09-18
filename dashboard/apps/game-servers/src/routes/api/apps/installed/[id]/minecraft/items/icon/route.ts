@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { modItemIcon } from "../../../../../../lib/minecraft/mod-items-service";
+import { modItemIcon } from "../../../../../../../../lib/minecraft/mod-items-service";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

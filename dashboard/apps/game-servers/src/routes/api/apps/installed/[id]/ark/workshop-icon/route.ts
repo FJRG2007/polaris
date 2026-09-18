@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { isWorkshopImage } from "../../../../../lib/ark/workshop";
-import { cachedModImage, keepModImage } from "../../../../../lib/mod-image-cache";
+import { isWorkshopImage } from "../../../../../../../lib/ark/workshop";
+import { cachedModImage, keepModImage } from "../../../../../../../lib/mod-image-cache";
 import { host } from "@polaris/app-host";
 
 const { imageTypeOfBytes } = host.mime;

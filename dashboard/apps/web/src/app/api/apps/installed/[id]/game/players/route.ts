@@ -1,5 +1,5 @@
 // Game servers route. The screen lives in the app's own package.
 import "@/lib/app-host/server";
-export { GET } from "@polaris-app/game-servers/src/routes/api/installed/game/players/route";
+export { GET } from "@polaris-app/game-servers/src/routes/api/apps/installed/[id]/game/players/route";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

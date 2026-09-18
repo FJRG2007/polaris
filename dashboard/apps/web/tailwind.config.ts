@@ -11,7 +11,8 @@ const config: Config = {
     content: [
         "./src/**/*.{ts,tsx}",
         "../../packages/ui/src/**/*.{ts,tsx}",
-        "../places/src/**/*.{ts,tsx}"
+        "../places/src/**/*.{ts,tsx}",
+        "../game-servers/src/**/*.{ts,tsx}"
     ]
 };
 

@@ -1,20 +1,20 @@
 import { after, NextResponse } from "next/server";
-import { reachAdviceFor } from "../../../../lib/minecraft/reach";
-import { readLastSeen } from "../../../../lib/games-activity-service";
-import { sweepGameSchedules } from "../../../../lib/minecraft/schedule-service";
-import { drainQueue, pendingFor } from "../../../../lib/minecraft/queue-service";
-import { sweepInventorySnapshots } from "../../../../lib/minecraft/inventory-service";
-import { rememberRoster, rememberedRoster } from "../../../../lib/minecraft/roster-memory";
-import { rememberLevels, rememberedLevels } from "../../../../lib/minecraft/level-memory";
-import { readPlayerTimeouts, sweepTimeouts } from "../../../../lib/minecraft/timeout-service";
-import { enforcePlayerAddresses, listPlayerAccess } from "../../../../lib/minecraft/player-access";
+import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
+import { readLastSeen } from "../../../../../../lib/games-activity-service";
+import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
+import { drainQueue, pendingFor } from "../../../../../../lib/minecraft/queue-service";
+import { sweepInventorySnapshots } from "../../../../../../lib/minecraft/inventory-service";
+import { rememberRoster, rememberedRoster } from "../../../../../../lib/minecraft/roster-memory";
+import { rememberLevels, rememberedLevels } from "../../../../../../lib/minecraft/level-memory";
+import { readPlayerTimeouts, sweepTimeouts } from "../../../../../../lib/minecraft/timeout-service";
+import { enforcePlayerAddresses, listPlayerAccess } from "../../../../../../lib/minecraft/player-access";
 import {
     getPlayerLevels,
     getPlayerSessions,
     getServerFirewall,
     getServerRoster,
     getServerStatus
-} from "../../../../lib/minecraft/service";
+} from "../../../../../../lib/minecraft/service";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { gameServerFacts } from "../../../../lib/games-service";
-import { reachAdviceFor } from "../../../../lib/minecraft/reach";
-import { sweepArkTimeouts } from "../../../../lib/ark/timeout-service";
-import { applyPendingArkRules } from "../../../../lib/ark/settings-service";
-import { readPlayerTimeouts } from "../../../../lib/player-timeout-service";
-import { readLastSeen } from "../../../../lib/games-activity-service";
-import type { ArkProfile } from "../../../../lib/ark/profile";
-import { sweepGameSchedules } from "../../../../lib/minecraft/schedule-service";
+import { gameServerFacts } from "../../../../../../lib/games-service";
+import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
+import { sweepArkTimeouts } from "../../../../../../lib/ark/timeout-service";
+import { applyPendingArkRules } from "../../../../../../lib/ark/settings-service";
+import { readPlayerTimeouts } from "../../../../../../lib/player-timeout-service";
+import { readLastSeen } from "../../../../../../lib/games-activity-service";
+import type { ArkProfile } from "../../../../../../lib/ark/profile";
+import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import {
     applyAllowList,
     getArkStatus,
     readArkAccess,
     readArkAdmins,
     readArkProfiles
-} from "../../../../lib/ark/service";
+} from "../../../../../../lib/ark/service";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

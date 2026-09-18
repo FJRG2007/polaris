@@ -813,7 +813,7 @@ export async function sweepGameReach(): Promise<{ pending: number; proven: numbe
     return { pending: pending.length, proven: proven.length };
 }
 
-export type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
+export type { GamePortRow, GamePortsReading };
 
 /**
  * The whole of what the Domains card shows, in one read.

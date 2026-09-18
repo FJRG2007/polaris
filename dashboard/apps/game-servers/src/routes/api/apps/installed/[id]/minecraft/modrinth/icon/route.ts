@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { isModrinthUrl } from "../../../../../../lib/minecraft/modrinth";
-import { cachedModImage, keepModImage } from "../../../../../../lib/mod-image-cache";
+import { isModrinthUrl } from "../../../../../../../../lib/minecraft/modrinth";
+import { cachedModImage, keepModImage } from "../../../../../../../../lib/mod-image-cache";
 import { host } from "@polaris/app-host";
 
 const { imageTypeOfBytes } = host.mime;

@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { gameServerFacts } from "../../../../lib/games-service";
-import { reachAdviceFor } from "../../../../lib/minecraft/reach";
-import { primaryIdentifier } from "../../../../lib/fivem/players";
-import { readLastSeen } from "../../../../lib/games-activity-service";
-import { sweepGameSchedules } from "../../../../lib/minecraft/schedule-service";
+import { gameServerFacts } from "../../../../../../lib/games-service";
+import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
+import { primaryIdentifier } from "../../../../../../lib/fivem/players";
+import { readLastSeen } from "../../../../../../lib/games-activity-service";
+import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import {
     applyFivemAccess,
     applyPendingSetup,
     getFivemStatus,
     readFivemAccess,
     sweepFivemBans
-} from "../../../../lib/fivem/service";
+} from "../../../../../../lib/fivem/service";
 import { host } from "@polaris/app-host";
 
 const { requireGameServer } = host.appsInstallAccess;

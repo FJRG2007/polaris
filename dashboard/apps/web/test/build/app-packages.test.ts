@@ -11,10 +11,10 @@
  * registry and in the one-line bridges Next needs for the app's routes.
  */
 
+import tailwind from "../../tailwind.config";
 import { describe, expect, it } from "vitest";
 import { dirname, join, relative, resolve } from "node:path";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import tailwind from "../../tailwind.config";
 
 const DASHBOARD = resolve(__dirname, "../../../..");
 const WEB = join(DASHBOARD, "apps/web");
@@ -25,11 +25,23 @@ const PACKAGES: Readonly<Record<string, { dir: string; routes: readonly RegExp[]
     "@polaris-app/places": {
         dir: join(DASHBOARD, "apps/places"),
         routes: [/^app\/\(app\)\/places\//, /^app\/api\/home\//]
+    },
+    "@polaris-app/game-servers": {
+        dir: join(DASHBOARD, "apps/game-servers"),
+        routes: [
+            /^app\/\(app\)\/apps\/games\//,
+            /^app\/api\/apps\/games\//,
+            /^app\/api\/apps\/installed\/\[id\]\/(ark|fivem|game|minecraft)\//,
+            /^app\/api\/minecraft\//
+        ]
     }
 };
 
 const ROUTE_FILE = /\/(page|layout|route|loading|error|not-found|template|default)\.tsx?$/;
-const REGISTRY = [/^lib\/app-extensions\/installed\.ts$/];
+const REGISTRY = [
+    /^lib\/app-extensions\/installed\.ts$/,
+    /^components\/app-extensions\/installed-client\.tsx$/
+];
 /** What provides the host, which the app's module reads as it is evaluated. */
 const HOST_IMPORT = /^import "@\/lib\/app-host\/server";$/;
 /** What hands the request on, and so evaluates the app's module. */
@@ -108,6 +120,24 @@ describe("apps in packages of their own", () => {
             return found;
         };
 
+        // An app's route lives at the path it answers, route groups aside, so a
+        // bundle's routes can be served by matching the URL against its own tree
+        // with no table in between.
+        it(`a ${name} route bridge hands on the app's file at the same path`, () => {
+            const moved: string[] = [];
+            for (const { where, code } of bridges()) {
+                const target = code
+                    .map((line) => /^export \{[^}]*\} from "([^"]+)";$/.exec(line)?.[1])
+                    .find(Boolean);
+                const expected = `${name}/src/routes/${where
+                    .replace(/^app\//, "")
+                    .replace(/\([^)]+\)\//g, "")
+                    .replace(/\.tsx?$/, "")}`;
+                if (target !== expected) moved.push(`${where} -> ${target ?? "nothing"}`);
+            }
+            expect(moved).toEqual([]);
+        });
+
         it(`a ${name} route bridge only hands the request to the app`, () => {
             const bloated: string[] = [];
             for (const { where, code } of bridges()) {
@@ -133,6 +163,8 @@ describe("apps in packages of their own", () => {
             let loaders = 0;
             for (const file of walk(WEB_SRC)) {
                 const code = readFileSync(file, "utf8").split("\n");
+                // A client module takes the client host, which the layout provides.
+                if (/^["']use client["'];?$/.test(code[0] ?? "")) continue;
                 const loads = code.findIndex(
                     (line) =>
                         !line.startsWith("import type") &&
