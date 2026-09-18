@@ -28,6 +28,7 @@ arbitrary host access are disabled and shown as "unlock host access".
 dashboard/
 ├── apps/
 │   ├── web/        # the dashboard (Next.js App Router)
+│   ├── places/     # @polaris-app/places, an installable app: cameras, devices, people, alerts
 │   ├── landing/    # marketing site (Astro)
 │   └── demo/       # seeded, read-only demo of web
 └── packages/
@@ -37,6 +38,7 @@ dashboard/
     ├── auth/           # @polaris/auth         better-auth + roles + invites
     ├── storage/        # @polaris/storage      storage-provider drivers + registry + crypto
     ├── hostd-client/   # @polaris/hostd-client typed client for polaris-hostd
+    ├── app-host/       # @polaris/app-host     the dashboard's services, as an installable app sees them
     └── ui/             # @polaris/ui           self-hosted component system + shell
 ```
 
@@ -44,6 +46,10 @@ Packages depend on each other's built `dist/`; `npm run build:packages` reads
 that order out of the manifests and builds each wave in parallel, so no
 dependency order needs to be tracked here. App code owns only routing and
 composition; anything a second app could reuse lives in a package.
+
+An installable app (`apps/places`) is neither: it never imports the
+dashboard's own modules, only `@polaris/app-host` (see
+[`docs/installable-apps-plan.md`](../docs/installable-apps-plan.md)).
 
 ## Development
 

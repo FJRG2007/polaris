@@ -129,7 +129,7 @@ load those into a core path that never uses them.
    is type-checked against the running dashboard and a service taken away breaks
    the app at compile time rather than at runtime.
 
-   Three rules the implementation is held to:
+   Four rules the implementation is held to:
 
    - Every server service is loaded when it is first called, so importing the
      host costs nothing and a test that replaces a dashboard module replaces it
@@ -138,6 +138,14 @@ load those into a core path that never uses them.
      objects to inside a template string, so
      `test/build/app-host-contract.test.ts` refuses one whose module is not
      already asynchronous unless every call in every app awaits it.
+   - Every service the host offers is a function, so a name an app takes before
+     the dashboard has provided anything - a module evaluated at its top level,
+     ahead of the request that would otherwise have provided them - gets back a
+     stand-in that finds the real service when it is called rather than when it
+     is looked up. Only calling one before boot still fails, and says so.
+     `instrumentation.ts` imports `lib/app-host/server` first, before anything
+     else runs, so that window is only ever a module reached outside a normal
+     page, route or server action.
    - What is pure and shared moves to a package instead of the host: the zoom
      arithmetic went to `@polaris/ui/zoom`, `LOCAL_TARGET` was already in
      `@polaris/core`.

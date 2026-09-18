@@ -29,9 +29,10 @@ polaris/
 │       └── homeassistant/     # HACS-installable integration (Python glue)
 ├── dashboard/
 │   ├── apps/web/              # the dashboard (Next.js App Router)
+│   ├── apps/places/           # an installable app, kept out of core (see docs/installable-apps-plan.md)
 │   ├── apps/landing, apps/demo
 │   ├── mdns/                  # polaris.local responder
-│   ├── packages/              # @polaris/{config,core,db,auth,storage,ui,...}
+│   ├── packages/              # @polaris/{config,core,db,auth,storage,ui,app-host,...}
 │   ├── docker/                # Dockerfile, compose, Caddy
 │   └── scripts/               # install / update / dev
 └── desktop/                   # native desktop app (Electron, own npm workspace)
