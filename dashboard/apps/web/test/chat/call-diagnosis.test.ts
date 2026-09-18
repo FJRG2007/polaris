@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    carriedSound,
     diagnoseCall,
     settlingFor,
     type CallAudioFacts,
@@ -459,5 +460,61 @@ describe("how long a call is left alone", () => {
         expect(diagnoseCall(working({ link: "lost" })).farEnd).toBe(false);
         const nothing = working({ others: [heard({ subscribed: false, arriving: false })] });
         expect(diagnoseCall(nothing).farEnd).toBe(true);
+    });
+});
+
+/**
+ * The false alarm this guards against was seen in a real call: two people talking
+ * normally, hearing each other fine, and the panel telling one of them that the
+ * other's microphone was picking nothing up. Silence is not evidence of a broken
+ * microphone once that microphone has carried a sound, and this browser's own
+ * energy counter is not the only witness to whether it has.
+ */
+describe("whether somebody's audio has carried a sound", () => {
+    const at = 1_000_000;
+
+    it("stays true through a long silence once they have been heard", () => {
+        // Spoke once, then listened for a minute without muting.
+        expect(
+            carriedSound({ before: true, energyBefore: 5, energyNow: 5, lastSpokeAt: undefined, at, within: 6_000 })
+        ).toBe(true);
+    });
+
+    it("takes the call server's word for it when nothing plays out here", () => {
+        // This browser's energy counter never moved - their audio is not played
+        // through an element it measures - but the server heard them speak.
+        expect(
+            carriedSound({
+                before: false,
+                energyBefore: 0,
+                energyNow: 0,
+                lastSpokeAt: new Date(at - 2_000),
+                at,
+                within: 6_000
+            })
+        ).toBe(true);
+    });
+
+    it("counts sound measured here", () => {
+        expect(
+            carriedSound({ before: false, energyBefore: 1, energyNow: 1.4, lastSpokeAt: undefined, at, within: 6_000 })
+        ).toBe(true);
+    });
+
+    it("is false only for audio that has never carried anything", () => {
+        expect(
+            carriedSound({ before: false, energyBefore: 0, energyNow: 0, lastSpokeAt: undefined, at, within: 6_000 })
+        ).toBe(false);
+        // A report from before they were being watched is not about this call.
+        expect(
+            carriedSound({
+                before: false,
+                energyBefore: 0,
+                energyNow: 0,
+                lastSpokeAt: new Date(at - 60_000),
+                at,
+                within: 6_000
+            })
+        ).toBe(false);
     });
 });
