@@ -14,9 +14,11 @@
 import { describe, expect, it } from "vitest";
 import { dirname, join, relative, resolve } from "node:path";
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import tailwind from "../../tailwind.config";
 
 const DASHBOARD = resolve(__dirname, "../../../..");
-const WEB_SRC = join(DASHBOARD, "apps/web/src");
+const WEB = join(DASHBOARD, "apps/web");
+const WEB_SRC = join(WEB, "src");
 
 /** The apps that have moved into packages of their own, and where their routes are. */
 const PACKAGES: Readonly<Record<string, { dir: string; routes: readonly RegExp[] }>> = {
@@ -66,6 +68,17 @@ describe("apps in packages of their own", () => {
                 }
             }
             expect(escapes).toEqual([]);
+        });
+
+        // Tailwind only emits the classes it finds in the files it scans, so an
+        // app package it does not scan builds and passes every other check
+        // while its screens render without the layout they were written with.
+        it(`Tailwind scans ${name}`, () => {
+            const content = Array.isArray(tailwind.content) ? tailwind.content : tailwind.content.files;
+            const scanned = content
+                .filter((entry): entry is string => typeof entry === "string")
+                .map((glob) => posix(resolve(WEB, glob)));
+            expect(scanned).toContain(posix(join(app.dir, "src/**/*.{ts,tsx}")));
         });
 
         it(`the dashboard names ${name} only in the registry and the route bridges`, () => {
