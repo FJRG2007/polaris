@@ -23,6 +23,7 @@
  */
 
 import type { DbEngine } from "@polaris/core";
+import type { DataTunnel } from "./tunnel";
 
 /** The engines the browser can open. The same set Polaris can provision, which
  *  is not a coincidence: a database Polaris made is the first thing anybody
@@ -64,6 +65,9 @@ export interface DataAddress {
     /** Refuses anything that would write. Enforced by the driver, not by the
      *  screen: a statement box is a statement box. */
     readonly readOnly: boolean;
+    /** The SSH tunnel the database is reached through, when it is not reached
+     *  directly. `host` and `port` are then as the SSH server sees them. */
+    readonly tunnel?: DataTunnel | null;
 }
 
 /** A container of things: a schema, a database, a numbered Redis keyspace. */
@@ -261,7 +265,9 @@ export const MAX_ROWS = 1000;
  *  say the one useful thing about it rather than printing an engine's error. */
 export class ReadOnlyError extends Error {
     constructor(what: string) {
-        super(`This connection is read-only, and ${what} would change the database. Turn read-only off on the connection if you meant to.`);
+        super(
+            `This connection is read-only, and ${what} would change the database. Turn read-only off on the connection if you meant to.`
+        );
         this.name = "ReadOnlyError";
     }
 }

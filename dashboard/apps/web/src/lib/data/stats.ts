@@ -20,6 +20,7 @@
 import { withDriver } from "./open";
 import { addressOf } from "./connections";
 import type { DataAddress } from "./driver";
+import type { RedisDriver } from "./drivers/redis";
 
 /** One number, named for a chart. */
 export interface StatValue {
@@ -57,15 +58,22 @@ export async function engineStats(userId: string, connectionId: string): Promise
     }
 }
 
-function gauge(key: string, label: string, value: number, unit: StatValue["unit"] = "count"): StatValue {
+function gauge(
+    key: string,
+    label: string,
+    value: number,
+    unit: StatValue["unit"] = "count"
+): StatValue {
     return { key, label, value, unit };
 }
 
 /** Redis reports everything in one text blob of `field:value` lines. */
 async function redisStats(address: DataAddress): Promise<DatabaseStats> {
-    const { RedisDriver } = await import("./drivers/redis");
-    const driver = new RedisDriver(address);
-    try {
+    // Through `withDriver` like every other read, so a tunnelled connection is
+    // reached through its tunnel rather than at an address only the far side
+    // can see.
+    return withDriver(address, async (opened) => {
+        const driver = opened as RedisDriver;
         const info = await driver.info();
         const read = (field: string): number => {
             const match = new RegExp(`^${field}:([^\r\n]+)`, "m").exec(info);
@@ -98,9 +106,7 @@ async function redisStats(address: DataAddress): Promise<DatabaseStats> {
                 gauge("net_out", "Bytes out", read("total_net_output_bytes"), "bytes")
             ]
         };
-    } finally {
-        await driver.close();
-    }
+    });
 }
 
 async function postgresStats(address: DataAddress): Promise<DatabaseStats> {
@@ -166,7 +172,11 @@ async function mysqlStats(address: DataAddress): Promise<DatabaseStats> {
             counters: [
                 gauge("questions", "Statements", read("Questions")),
                 gauge("selects", "Selects", read("Com_select")),
-                gauge("writes", "Writes", read("Com_insert") + read("Com_update") + read("Com_delete")),
+                gauge(
+                    "writes",
+                    "Writes",
+                    read("Com_insert") + read("Com_update") + read("Com_delete")
+                ),
                 gauge("hits", "Buffer pool hits", read("Innodb_buffer_pool_read_requests")),
                 gauge("misses", "Read from disk", read("Innodb_buffer_pool_reads")),
                 gauge("slow", "Slow queries", read("Slow_queries")),
@@ -192,7 +202,10 @@ async function mongoStats(address: DataAddress): Promise<DatabaseStats> {
             const index = result?.columns.indexOf(field) ?? -1;
             if (index === -1) return 0;
             try {
-                const parsed = JSON.parse(String(result?.rows[0]?.[index] ?? "{}")) as Record<string, unknown>;
+                const parsed = JSON.parse(String(result?.rows[0]?.[index] ?? "{}")) as Record<
+                    string,
+                    unknown
+                >;
                 const value = Number(parsed[key]);
                 return Number.isFinite(value) ? value : 0;
             } catch {

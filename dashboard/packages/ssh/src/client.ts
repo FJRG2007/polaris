@@ -1,17 +1,24 @@
 /**
  * Shared SSH client. One place that opens an authenticated ssh2 connection with
- * mandatory host-key verification, so both connectors that need SSH - the Docker
- * connector (`docker system dial-stdio`) and the SFTP storage driver - behave
+ * mandatory host-key verification, so every connector that needs SSH - the
+ * Docker connector (`docker system dial-stdio`), the SFTP storage driver, the
+ * loopback tunnels for remote cameras and database connections - behaves
  * identically and neither reinvents auth or pinning.
  *
  * Host-key pinning: the verifier runs during the handshake, before any credential
  * is sent. A registered host carries a pinned key (base64 of the raw key blob);
  * a mismatch is refused. During "add host" no key is pinned yet, so the first key
  * is accepted once and reported via `onHostKey` for the caller to store.
+ *
+ * `sock` connects over an already-open stream instead of dialling a new TCP
+ * socket - a `direct-tcpip` channel opened on another SSH connection, so a
+ * target reachable only through a jump host is reached the same way as one
+ * reachable directly.
  */
 
 import { Client } from "ssh2";
 import type { ConnectConfig } from "ssh2";
+import type { Duplex } from "node:stream";
 
 const DEFAULT_READY_TIMEOUT_MS = 15_000;
 
@@ -51,6 +58,9 @@ export interface SshConnectOptions {
     /** Invoked with the server's key (base64) as soon as it is presented. */
     readonly onHostKey?: (hostKey: string) => void;
     readonly readyTimeoutMs?: number;
+    /** An already-open stream to the server to speak SSH over instead of a new
+     *  TCP connection - a `direct-tcpip` channel from a jump host, typically. */
+    readonly sock?: Duplex;
 }
 
 /**
@@ -111,6 +121,7 @@ function buildConnectConfig(options: SshConnectOptions): ConnectConfig {
         readyTimeout: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
         keepaliveInterval: KEEPALIVE_INTERVAL_MS,
         keepaliveCountMax: KEEPALIVE_COUNT_MAX,
+        ...(options.sock ? { sock: options.sock as ConnectConfig["sock"] } : {}),
         hostVerifier: (key: Buffer): boolean => {
             const presented = key.toString("base64");
             options.onHostKey?.(presented);

@@ -18,12 +18,19 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as browser from "@/lib/data/browser";
+import { listHosts } from "@/lib/host-service";
 import { requirePermission } from "@/lib/session";
 import * as connections from "@/lib/data/connections";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
 import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
 import { DataRequestError, ReadOnlyError } from "@/lib/data/driver";
-import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
+import type {
+    DataColumn,
+    DataNamespace,
+    DataPage,
+    DataRelation,
+    QueryResult
+} from "@/lib/data/driver";
 
 const PATH = "/apps/databases";
 
@@ -95,7 +102,9 @@ export async function deleteConnectionAction(id: string): Promise<{ error?: stri
 }
 
 /** Open it and say what answered, which is the only test worth running. */
-export async function testConnectionAction(id: string): Promise<{ version?: string; error?: string }> {
+export async function testConnectionAction(
+    id: string
+): Promise<{ version?: string; error?: string }> {
     const me = await actor();
     const result = await guard(() => browser.version(me.id, String(id)));
     return result.error ? { error: result.error } : { version: result.value };
@@ -184,9 +193,7 @@ export async function redisValueAction(
 
 /** One reading of what the database is doing. Polled by the stats panel, which
  *  keeps the readings and draws the window. */
-export async function statsAction(
-    id: string
-): Promise<{ stats?: DatabaseStats; error?: string }> {
+export async function statsAction(id: string): Promise<{ stats?: DatabaseStats; error?: string }> {
     const me = await actor();
     const result = await guard(() => engineStats(me.id, String(id)));
     return result.error ? { error: result.error } : { stats: result.value };
@@ -207,9 +214,27 @@ export async function insightsAction(
     return result.error ? { error: result.error } : { insights: result.value };
 }
 
+/**
+ * The servers this account has registered, for the tunnel picker.
+ *
+ * Name and address only: the form offers a server to tunnel through, and what
+ * it signs in with stays on this side.
+ */
+export async function listTunnelServersAction(): Promise<{
+    servers: { id: string; name: string; address: string }[];
+}> {
+    const me = await actor();
+    const hosts = await listHosts(me.id);
+    return {
+        servers: hosts.map((host) => ({ id: host.id, name: host.name, address: host.address }))
+    };
+}
+
 /** The engines a connection can be made for, for the form's picker. Server-side
  *  so the list cannot drift from what the drivers actually support. */
-export async function engineOptionsAction(): Promise<{ engines: { id: string; label: string; port: number }[] }> {
+export async function engineOptionsAction(): Promise<{
+    engines: { id: string; label: string; port: number }[];
+}> {
     await actor();
     return {
         engines: core.DB_ENGINES.map((engine) => ({

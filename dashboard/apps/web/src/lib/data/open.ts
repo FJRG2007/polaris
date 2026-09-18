@@ -9,6 +9,7 @@
  */
 
 import * as data from "./driver";
+import { openTunnel, TunnelError } from "./tunnel";
 
 export async function openDriver(address: data.DataAddress): Promise<data.DataDriver> {
     switch (address.engine) {
@@ -46,6 +47,30 @@ export async function openDriver(address: data.DataAddress): Promise<data.DataDr
  * Redis a socket, until the process noticed.
  */
 export async function withDriver<T>(
+    address: data.DataAddress,
+    use: (driver: data.DataDriver) => Promise<T>
+): Promise<T> {
+    if (!address.tunnel) return withOpenDriver(address, use);
+
+    // Through SSH: the driver dials a loopback port that leads to the database
+    // as the SSH server sees it, and the tunnel closes with the call.
+    const tunnel = await openTunnel(address.tunnel, address.host, address.port).catch(
+        (error: unknown) => {
+            if (error instanceof TunnelError) throw new data.DataRequestError(error.message);
+            throw error;
+        }
+    );
+    try {
+        return await withOpenDriver(
+            { ...address, host: tunnel.host, port: tunnel.port, tunnel: null },
+            use
+        );
+    } finally {
+        tunnel.close();
+    }
+}
+
+async function withOpenDriver<T>(
     address: data.DataAddress,
     use: (driver: data.DataDriver) => Promise<T>
 ): Promise<T> {

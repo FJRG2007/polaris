@@ -21,9 +21,8 @@
  * Server-only.
  */
 
-import { createServer, type Server, type Socket } from "node:net";
-import { forwardOut, openSshClient, type Client } from "@polaris/ssh";
 import { host } from "@polaris/app-host";
+import { listenForward, openSshClient, type Client, type LocalForward } from "@polaris/ssh";
 
 const { getHostConnection } = host.hostService;
 
@@ -37,10 +36,10 @@ const REAP_MS = 60_000;
 
 interface Tunnel {
     readonly url: string;
-    readonly server: Server;
+    /** The loopback listener. Its open sockets are what keeps a tunnel in use
+     *  from being reaped mid-stream. */
+    readonly forward: LocalForward;
     readonly client: Client;
-    /** Open sockets, so a tunnel in use is never reaped mid-stream. */
-    live: number;
     lastUsed: number;
 }
 
@@ -58,7 +57,7 @@ async function close(key: string): Promise<void> {
     if (!pending) return;
     const tunnel = await pending.catch(() => null);
     if (!tunnel) return;
-    tunnel.server.close();
+    tunnel.forward.close();
     tunnel.client.end();
 }
 
@@ -74,7 +73,8 @@ function startReaper(): void {
                     tunnels.delete(key);
                     continue;
                 }
-                if (tunnel.live === 0 && Date.now() - tunnel.lastUsed > IDLE_MS) await close(key);
+                if (tunnel.forward.live() === 0 && Date.now() - tunnel.lastUsed > IDLE_MS)
+                    await close(key);
             }
             if (tunnels.size === 0 && reaper) {
                 clearInterval(reaper);
@@ -100,54 +100,30 @@ async function open(
         ...(connection.hostKey ? { pinnedHostKey: connection.hostKey } : {})
     });
 
-    const tunnel: Tunnel = {
-        url: "",
-        server: createServer(),
-        client,
-        live: 0,
-        lastUsed: Date.now()
-    };
-
-    tunnel.server.on("connection", (socket: Socket) => {
-        tunnel.live += 1;
-        tunnel.lastUsed = Date.now();
-        const done = () => {
-            tunnel.live = Math.max(0, tunnel.live - 1);
-            tunnel.lastUsed = Date.now();
-        };
-        socket.on("close", done);
-        socket.on("error", () => socket.destroy());
-        void forwardOut(client, remoteHost, remotePort)
-            .then((channel) => {
-                // Both directions, and either end closing takes the other with it:
-                // a viewer that walks away must not leave a channel open on the
-                // far side holding the camera.
-                socket.pipe(channel).pipe(socket);
-                channel.on("error", () => socket.destroy());
-                channel.on("close", () => socket.destroy());
-            })
-            .catch(() => socket.destroy());
-    });
-
     // The connection dying takes the listener with it, so the next request builds
     // a fresh one rather than dialling a port that forwards nowhere.
     const key = keyFor(hostId, remoteHost, remotePort);
     client.on("error", () => void close(key));
     client.on("close", () => void close(key));
 
-    const port = await new Promise<number>((resolve, reject) => {
-        tunnel.server.once("error", reject);
-        // Loopback only. This is a door into another network, and it is not one
-        // that should be open to the machine's own LAN.
-        tunnel.server.listen(0, "127.0.0.1", () => {
-            const address = tunnel.server.address();
-            if (address && typeof address === "object") resolve(address.port);
-            else reject(new Error("The tunnel could not be opened"));
+    let forward: LocalForward;
+    try {
+        forward = await listenForward(client, remoteHost, remotePort, () => {
+            tunnel.lastUsed = Date.now();
         });
-    });
+    } catch (error) {
+        client.end();
+        throw error;
+    }
+    const tunnel: Tunnel = {
+        url: `http://127.0.0.1:${forward.port}`,
+        forward,
+        client,
+        lastUsed: Date.now()
+    };
 
     startReaper();
-    return { ...tunnel, url: `http://127.0.0.1:${port}` };
+    return tunnel;
 }
 
 /**
