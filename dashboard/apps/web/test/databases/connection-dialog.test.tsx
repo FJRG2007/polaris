@@ -24,7 +24,9 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
     }),
     listManagedAction: async () => ({ databases: [] }),
     listTunnelServersAction: async () => ({
-        servers: [{ id: "22222222-2222-4222-8222-222222222222", name: "lirio-0", address: "10.0.0.2" }]
+        servers: [
+            { id: "22222222-2222-4222-8222-222222222222", name: "lirio-0", address: "10.0.0.2" }
+        ]
     }),
     saveConnectionAction: async (input: unknown) => {
         saved.push(input);
@@ -50,7 +52,9 @@ afterEach(() => {
 });
 
 function open() {
-    return render(<ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />);
+    return render(
+        <ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />
+    );
 }
 
 /** A saved connection reached over SSH, as the list hands one to the form. */
@@ -109,13 +113,17 @@ describe("the connection form", () => {
 
     it("leaves read-only off until somebody turns it on", () => {
         open();
-        expect(screen.getByRole("switch", { name: "Read-only" }).getAttribute("aria-checked")).toBe("false");
+        expect(screen.getByRole("switch", { name: "Read-only" }).getAttribute("aria-checked")).toBe(
+            "false"
+        );
     });
 
     it("offers the SSH tunnel, with the servers Polaris already has", async () => {
         open();
         await userEvent.click(screen.getByRole("switch", { name: "Reach it over SSH" }));
-        expect(await screen.findByRole("combobox", { name: "Server to tunnel through" })).toBeTruthy();
+        expect(
+            await screen.findByRole("combobox", { name: "Server to tunnel through" })
+        ).toBeTruthy();
 
         await userEvent.click(screen.getByRole("radio", { name: "Another login" }));
         expect(screen.getByPlaceholderText("ssh.example.com")).toBeTruthy();

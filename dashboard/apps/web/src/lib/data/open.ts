@@ -54,12 +54,17 @@ export async function withDriver<T>(
 
     // Through SSH: the driver dials a loopback port that leads to the database
     // as the SSH server sees it, and the tunnel closes with the call.
-    const tunnel = await openTunnel(address.tunnel, address.host, address.port).catch((error: unknown) => {
-        if (error instanceof TunnelError) throw new data.DataRequestError(error.message);
-        throw error;
-    });
+    const tunnel = await openTunnel(address.tunnel, address.host, address.port).catch(
+        (error: unknown) => {
+            if (error instanceof TunnelError) throw new data.DataRequestError(error.message);
+            throw error;
+        }
+    );
     try {
-        return await withOpenDriver({ ...address, host: tunnel.host, port: tunnel.port, tunnel: null }, use);
+        return await withOpenDriver(
+            { ...address, host: tunnel.host, port: tunnel.port, tunnel: null },
+            use
+        );
     } finally {
         tunnel.close();
     }

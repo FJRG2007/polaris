@@ -29,9 +29,9 @@ describe("a connection somewhere else", () => {
     });
 
     it("refuses a whole connection string in the host field", () => {
-        expect(connectionIssues(draft({ host: "postgres://user@db.example.com:5432/app" })).host).toContain(
-            "without the rest of a URL"
-        );
+        expect(
+            connectionIssues(draft({ host: "postgres://user@db.example.com:5432/app" })).host
+        ).toContain("without the rest of a URL");
     });
 
     it("refuses a port that is not one", () => {
@@ -40,7 +40,9 @@ describe("a connection somewhere else", () => {
     });
 
     it("reads a blank optional field as nothing at all", () => {
-        const parsed = saveConnectionSchema.parse(draft({ database: "  ", username: "", password: "" }));
+        const parsed = saveConnectionSchema.parse(
+            draft({ database: "  ", username: "", password: "" })
+        );
         expect(parsed.database).toBeNull();
         expect(parsed.username).toBeNull();
         expect(parsed.password).toBeNull();
@@ -53,13 +55,17 @@ describe("a connection somewhere else", () => {
 
 describe("a database Polaris runs", () => {
     it("needs no address", () => {
-        expect(connectionIssues({ name: "App", engine: "postgres", managedDatabaseId: HOST_ID })).toEqual({});
+        expect(
+            connectionIssues({ name: "App", engine: "postgres", managedDatabaseId: HOST_ID })
+        ).toEqual({});
     });
 });
 
 describe("the SSH tunnel", () => {
     it("takes a server Polaris already has", () => {
-        const parsed = saveConnectionSchema.parse(draft({ ssh: { mode: "server", hostId: HOST_ID } }));
+        const parsed = saveConnectionSchema.parse(
+            draft({ ssh: { mode: "server", hostId: HOST_ID } })
+        );
         expect(parsed.ssh).toEqual({ mode: "server", hostId: HOST_ID });
     });
 
@@ -71,15 +77,33 @@ describe("the SSH tunnel", () => {
 
     it("defaults the SSH port to 22 and keeps the secret optional", () => {
         const parsed = saveConnectionSchema.parse(
-            draft({ ssh: { mode: "manual", host: "ssh.example.com", username: "root", authMethod: "key" } })
+            draft({
+                ssh: {
+                    mode: "manual",
+                    host: "ssh.example.com",
+                    username: "root",
+                    authMethod: "key"
+                }
+            })
         );
-        expect(parsed.ssh).toMatchObject({ mode: "manual", port: 22, privateKey: null, jumpHostId: null });
+        expect(parsed.ssh).toMatchObject({
+            mode: "manual",
+            port: 22,
+            privateKey: null,
+            jumpHostId: null
+        });
     });
 
     it("checks the SSH host and user the same way", () => {
         const issues = connectionIssues(
             draft({
-                ssh: { mode: "manual", host: "root@ssh.example.com", port: 22, username: "", authMethod: "password" }
+                ssh: {
+                    mode: "manual",
+                    host: "root@ssh.example.com",
+                    port: 22,
+                    username: "",
+                    authMethod: "password"
+                }
             })
         );
         expect(issues["ssh.host"]).toContain("without the rest of a URL");

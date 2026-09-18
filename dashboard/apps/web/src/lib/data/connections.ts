@@ -43,7 +43,11 @@ import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
 import { captureHostKey, TunnelError, type DataTunnel } from "./tunnel";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { getHostConnection, HostCredentialsError } from "@/lib/host-service";
-import { saveConnectionSchema, type SaveConnectionInput, type SshAuthMethod } from "./connection-schema";
+import {
+    saveConnectionSchema,
+    type SaveConnectionInput,
+    type SshAuthMethod
+} from "./connection-schema";
 
 export type { SaveConnectionInput } from "./connection-schema";
 
@@ -224,7 +228,11 @@ interface TunnelColumns {
 
 function tunnelView(row: TunnelColumns): TunnelView | null {
     if (row.sshMode === "server") {
-        return { mode: "server", hostId: row.sshHostId ?? null, hostName: row.sshServer?.name ?? null };
+        return {
+            mode: "server",
+            hostId: row.sshHostId ?? null,
+            hostName: row.sshServer?.name ?? null
+        };
     }
     if (row.sshMode === "manual" || row.sshMode === "manual-jump") {
         return {
@@ -266,7 +274,10 @@ const UNREACHABLE =
 const REDIS_CLUSTER =
     "A Redis cluster spreads its keys over several masters, and the browser reads one server at a time, so it cannot open one.";
 
-function isRedisCluster(row: { readonly engine: string; readonly clusterMasters: number | null }): boolean {
+function isRedisCluster(row: {
+    readonly engine: string;
+    readonly clusterMasters: number | null;
+}): boolean {
     return row.engine === "redis" && Boolean(row.clusterMasters);
 }
 
@@ -376,7 +387,9 @@ function polarisAddress(): DataAddress | null {
         database,
         username: decodeURIComponent(url.username) || null,
         password: decodeURIComponent(url.password) || null,
-        tls: (url.searchParams.get("sslmode") ?? "") !== "" && url.searchParams.get("sslmode") !== "disable",
+        tls:
+            (url.searchParams.get("sslmode") ?? "") !== "" &&
+            url.searchParams.get("sslmode") !== "disable",
         readOnly: true
     };
 }
@@ -399,13 +412,16 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
     const existing = parsed.id
         ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
         : null;
-    if (parsed.id && !existing) throw new DataConnectionError("That connection is not there any more.");
+    if (parsed.id && !existing)
+        throw new DataConnectionError("That connection is not there any more.");
 
     const secret =
         parsed.password && !parsed.managedDatabaseId
             ? encryptCredentials({ password: parsed.password }, loadEnv().POLARIS_MASTER_KEY)
             : null;
-    const tunnel = parsed.managedDatabaseId ? CLEAR_TUNNEL : await tunnelColumns(userId, parsed, existing);
+    const tunnel = parsed.managedDatabaseId
+        ? CLEAR_TUNNEL
+        : await tunnelColumns(userId, parsed, existing);
 
     const fields = {
         name: parsed.name,
@@ -508,9 +524,13 @@ async function tunnelColumns(
         ? await ownServer(userId, ssh.jumpHostId, "The server to jump through is not one of yours.")
         : null;
 
-    const stored = existing && (existing.sshMode === "manual" || existing.sshMode === "manual-jump") ? existing : null;
+    const stored =
+        existing && (existing.sshMode === "manual" || existing.sshMode === "manual-jump")
+            ? existing
+            : null;
     const typed = typedSecret(ssh);
-    const keepSecret = !typed && stored?.sshAuthMethod === ssh.authMethod && stored.sshEncryptedCredential;
+    const keepSecret =
+        !typed && stored?.sshAuthMethod === ssh.authMethod && stored.sshEncryptedCredential;
     if (!typed && !keepSecret) {
         throw new DataConnectionError(
             ssh.authMethod === "password"
@@ -532,7 +552,8 @@ async function tunnelColumns(
             ? stored.sshHostKey
             : null;
 
-    const unchanged = !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
+    const unchanged =
+        !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
 
     let hostKey = unchanged ? pinned : null;
     if (!hostKey) {
@@ -581,8 +602,11 @@ type SshCredentials =
     | { method: "password"; password: string }
     | { method: "key"; privateKey: string; passphrase?: string };
 
-function typedSecret(ssh: Extract<ReturnType<typeof validate>["ssh"], { mode: "manual" }>): SshCredentials | null {
-    if (ssh.authMethod === "password") return ssh.password ? { method: "password", password: ssh.password } : null;
+function typedSecret(
+    ssh: Extract<ReturnType<typeof validate>["ssh"], { mode: "manual" }>
+): SshCredentials | null {
+    if (ssh.authMethod === "password")
+        return ssh.password ? { method: "password", password: ssh.password } : null;
     if (!ssh.privateKey) return null;
     return ssh.passphrase
         ? { method: "key", privateKey: ssh.privateKey, passphrase: ssh.passphrase }
@@ -648,7 +672,8 @@ function serverOptions(server: OwnedServer): SshConnectOptions {
 
 export async function deleteConnection(userId: string, id: string): Promise<void> {
     const deleted = await prisma.dataConnection.deleteMany({ where: { id, ownerId: userId } });
-    if (deleted.count === 0) throw new DataConnectionError("That connection is not there any more.");
+    if (deleted.count === 0)
+        throw new DataConnectionError("That connection is not there any more.");
 }
 
 /**
@@ -714,7 +739,10 @@ export async function addressOf(userId: string, id: string): Promise<DataAddress
  * The logins a saved tunnel needs, re-read on every open: a registered server's
  * from its own row, so rotating its key reaches every connection through it.
  */
-async function resolveTunnel(userId: string, row: StoredTunnel & TunnelColumns): Promise<DataTunnel | null> {
+async function resolveTunnel(
+    userId: string,
+    row: StoredTunnel & TunnelColumns
+): Promise<DataTunnel | null> {
     const view = tunnelView(row);
     if (!view) return null;
     const broken = tunnelBroken(view);
@@ -730,10 +758,16 @@ async function resolveTunnel(userId: string, row: StoredTunnel & TunnelColumns):
     }
 
     if (!row.sshHostKey || !row.sshEncryptedCredential || !row.sshCredentialNonce) {
-        throw new DataConnectionError("This connection's SSH login is incomplete. Edit it and save it again.");
+        throw new DataConnectionError(
+            "This connection's SSH login is incomplete. Edit it and save it again."
+        );
     }
     const jump = view.jumpHostId
-        ? await ownServer(userId, view.jumpHostId, "The server this tunnel jumps through is not one of yours any more.")
+        ? await ownServer(
+              userId,
+              view.jumpHostId,
+              "The server this tunnel jumps through is not one of yours any more."
+          )
         : null;
     return {
         target: {
@@ -770,7 +804,9 @@ export async function managedAddress(
     });
     if (!row) throw new DataConnectionError("That database is not there any more.");
     if (!core.isDbEngine(row.engine)) {
-        throw new DataConnectionError("An object store is browsed from its Buckets panel, not as a database.");
+        throw new DataConnectionError(
+            "An object store is browsed from its Buckets panel, not as a database."
+        );
     }
     if (isRedisCluster(row)) throw new DataConnectionError(REDIS_CLUSTER);
 
@@ -826,7 +862,9 @@ function address(
 function validate(input: SaveConnectionInput) {
     const parsed = saveConnectionSchema.safeParse(input);
     if (!parsed.success) {
-        throw new DataConnectionError(parsed.error.issues[0]?.message ?? "That connection is not valid.");
+        throw new DataConnectionError(
+            parsed.error.issues[0]?.message ?? "That connection is not valid."
+        );
     }
     const value = parsed.data;
     if (value.managedDatabaseId) {
@@ -842,5 +880,9 @@ function validate(input: SaveConnectionInput) {
         };
     }
     // A port left out is the engine's own, which is what a client assumes too.
-    return { ...value, host: value.host as string, port: value.port ?? core.DB_ENGINE_INFO[value.engine].port };
+    return {
+        ...value,
+        host: value.host as string,
+        port: value.port ?? core.DB_ENGINE_INFO[value.engine].port
+    };
 }

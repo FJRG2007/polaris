@@ -321,9 +321,9 @@ export function ConnectionDialog({
                                     chosenManaged &&
                                     !chosenManaged.reachable && (
                                         <p className="text-xs text-warning">
-                                            This one runs on another server and is not published on a
-                                            port, so Polaris cannot reach it from here. Publish it on a
-                                            port from the database&apos;s own screen first.
+                                            This one runs on another server and is not published on
+                                            a port, so Polaris cannot reach it from here. Publish it
+                                            on a port from the database&apos;s own screen first.
                                         </p>
                                     )
                                 )}
@@ -417,8 +417,8 @@ export function ConnectionDialog({
                                     {tunnelKind === "server" ? (
                                         servers.length === 0 ? (
                                             <p className="text-sm text-muted-foreground">
-                                                No servers are connected yet. Add one under Servers, or
-                                                use another login here.
+                                                No servers are connected yet. Add one under Servers,
+                                                or use another login here.
                                             </p>
                                         ) : (
                                             <Field
@@ -428,7 +428,11 @@ export function ConnectionDialog({
                                                         ? "The server this connection tunnelled through was removed from Servers. Pick another."
                                                         : undefined
                                                 }
-                                                hint={serverId === "" ? issues["ssh.hostId"] : undefined}
+                                                hint={
+                                                    serverId === ""
+                                                        ? issues["ssh.hostId"]
+                                                        : undefined
+                                                }
                                             >
                                                 <Select
                                                     value={serverId}
@@ -534,7 +538,10 @@ export function ConnectionDialog({
                                                     <Field
                                                         label="Key passphrase"
                                                         hint="If it has one."
-                                                        error={shown("ssh.passphrase", sshPassphrase)}
+                                                        error={shown(
+                                                            "ssh.passphrase",
+                                                            sshPassphrase
+                                                        )}
                                                     >
                                                         <Input
                                                             type="password"
@@ -562,7 +569,10 @@ export function ConnectionDialog({
                                                         aria-label="Server to jump through"
                                                         placeholder="Pick one..."
                                                         options={[
-                                                            { value: NO_JUMP, label: "Straight to it" },
+                                                            {
+                                                                value: NO_JUMP,
+                                                                label: "Straight to it"
+                                                            },
                                                             ...serverOptions
                                                         ]}
                                                     />
@@ -571,8 +581,8 @@ export function ConnectionDialog({
                                         </>
                                     )}
                                     <p className="text-xs text-muted-foreground">
-                                        The SSH server&apos;s key is remembered when this is saved, and
-                                        checked on every connection after.
+                                        The SSH server&apos;s key is remembered when this is saved,
+                                        and checked on every connection after.
                                     </p>
                                 </div>
                             )}
@@ -587,7 +597,10 @@ export function ConnectionDialog({
                     />
 
                     {error && (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     )}
@@ -626,7 +639,11 @@ function Field({
         <label className={cn("flex flex-col gap-1 text-xs text-muted-foreground", className)}>
             {label}
             {children}
-            {error ? <span className="text-danger">{error}</span> : hint ? <span>{hint}</span> : null}
+            {error ? (
+                <span className="text-danger">{error}</span>
+            ) : hint ? (
+                <span>{hint}</span>
+            ) : null}
         </label>
     );
 }

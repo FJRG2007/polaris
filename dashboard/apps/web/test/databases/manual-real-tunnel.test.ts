@@ -13,7 +13,13 @@ import { describe, expect, it } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { Server as SshServer, type Connection } from "ssh2";
 import { openSshClient, forwardOut, type SshConnectOptions } from "@polaris/ssh";
-import { captureHostKey, connectTunnel, openTunnel, TunnelError, type DataTunnel } from "@/lib/data/tunnel";
+import {
+    captureHostKey,
+    connectTunnel,
+    openTunnel,
+    TunnelError,
+    type DataTunnel
+} from "@/lib/data/tunnel";
 
 function hostKeyPem(): string {
     const { privateKey } = generateKeyPairSync("rsa", {
@@ -26,12 +32,19 @@ function hostKeyPem(): string {
 
 /** A real sshd-like server: password auth, and direct-tcpip forwarded to
  *  whatever address/port the client asks for (an sshd with AllowTcpForwarding). */
-function startSshServer(username: string, password: string): Promise<{ port: number; close: () => void }> {
+function startSshServer(
+    username: string,
+    password: string
+): Promise<{ port: number; close: () => void }> {
     return new Promise((resolve) => {
         const server = new SshServer({ hostKeys: [hostKeyPem()] }, (client: Connection) => {
             client
                 .on("authentication", (ctx) => {
-                    if (ctx.method === "password" && ctx.username === username && ctx.password === password) {
+                    if (
+                        ctx.method === "password" &&
+                        ctx.username === username &&
+                        ctx.password === password
+                    ) {
                         return ctx.accept();
                     }
                     ctx.reject(["password"]);
@@ -100,7 +113,10 @@ describe("a real SSH tunnel reaching a database (unmocked)", () => {
 
             const pinned = await captureHostKey(target, null);
             expect(pinned.length).toBeGreaterThan(0);
-            console.log("[manual] captured and pinned target host key:", `${pinned.slice(0, 24)}...`);
+            console.log(
+                "[manual] captured and pinned target host key:",
+                `${pinned.slice(0, 24)}...`
+            );
 
             const tunnel: DataTunnel = {
                 target: { ...target, pinnedHostKey: pinned },
@@ -108,7 +124,9 @@ describe("a real SSH tunnel reaching a database (unmocked)", () => {
                 label: "127.0.0.1"
             };
             const opened = await openTunnel(tunnel, "127.0.0.1", db.port);
-            console.log(`[manual] loopback tunnel listening at ${opened.host}:${opened.port} -> db 127.0.0.1:${db.port}`);
+            console.log(
+                `[manual] loopback tunnel listening at ${opened.host}:${opened.port} -> db 127.0.0.1:${db.port}`
+            );
             try {
                 const reply = await speak(opened.host, opened.port, "SELECT 1");
                 console.log("[manual] round trip through the tunnel:", JSON.stringify(reply));
@@ -126,7 +144,9 @@ describe("a real SSH tunnel reaching a database (unmocked)", () => {
                 label: "127.0.0.1"
             };
             await expect(connectTunnel(wrongPin)).rejects.toThrow();
-            console.log("[manual] connection refused when the presented key did not match the pin - confirmed");
+            console.log(
+                "[manual] connection refused when the presented key did not match the pin - confirmed"
+            );
         } finally {
             ssh.close();
             db.close();
@@ -150,7 +170,12 @@ describe("a real SSH tunnel reaching a database (unmocked)", () => {
                 username: "jumpuser",
                 auth: { method: "password", password: "jump-pass" },
                 pinnedHostKey: await captureHostKey(
-                    { host: "127.0.0.1", port: jump.port, username: "jumpuser", auth: { method: "password", password: "jump-pass" } },
+                    {
+                        host: "127.0.0.1",
+                        port: jump.port,
+                        username: "jumpuser",
+                        auth: { method: "password", password: "jump-pass" }
+                    },
                     null
                 )
             };
@@ -165,7 +190,10 @@ describe("a real SSH tunnel reaching a database (unmocked)", () => {
             console.log(`[manual] jump-chained tunnel listening at ${opened.host}:${opened.port}`);
             try {
                 const reply = await speak(opened.host, opened.port, "PING");
-                console.log("[manual] round trip through jump + target + db:", JSON.stringify(reply));
+                console.log(
+                    "[manual] round trip through jump + target + db:",
+                    JSON.stringify(reply)
+                );
                 expect(reply).toBe("FAKE_DB_READY\nDB_ECHO:PING");
             } finally {
                 opened.close();
@@ -186,7 +214,12 @@ describe("a real SSH tunnel reaching a database (unmocked)", () => {
                 username: "dbuser",
                 auth: { method: "password", password: "wrong-password" },
                 pinnedHostKey: await captureHostKey(
-                    { host: "127.0.0.1", port: ssh.port, username: "dbuser", auth: { method: "password", password: "right-password" } },
+                    {
+                        host: "127.0.0.1",
+                        port: ssh.port,
+                        username: "dbuser",
+                        auth: { method: "password", password: "right-password" }
+                    },
                     null
                 )
             };

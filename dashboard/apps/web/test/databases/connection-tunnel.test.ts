@@ -56,12 +56,16 @@ vi.mock("@polaris/storage", () => ({
         nonce: Buffer.from("nonce"),
         keyId: "k1"
     }),
-    decryptCredentials: (blob: { ciphertext: Buffer }) => JSON.parse(blob.ciphertext.toString("utf8"))
+    decryptCredentials: (blob: { ciphertext: Buffer }) =>
+        JSON.parse(blob.ciphertext.toString("utf8"))
 }));
 vi.mock("@/lib/database-service", () => ({ databaseCredentials: async () => ({}) }));
 vi.mock("@/lib/host-service", () => {
     class HostCredentialsError extends Error {
-        constructor(readonly hostName: string, message: string) {
+        constructor(
+            readonly hostName: string,
+            message: string
+        ) {
             super(message);
             this.name = "HostCredentialsError";
         }
@@ -70,7 +74,8 @@ vi.mock("@/lib/host-service", () => {
 
     async function getHostConnection(hostId: string, ownerId: string) {
         if (ownerId !== ALICE) throw new Error("Host not found");
-        if (hostId === UNREADABLE) throw new HostCredentialsError("nas-01", "Host has no stored credentials");
+        if (hostId === UNREADABLE)
+            throw new HostCredentialsError("nas-01", "Host has no stored credentials");
         if (hostId === SERVER) {
             return {
                 id: SERVER,
@@ -114,7 +119,10 @@ vi.mock("@/lib/data/tunnel", async (importOriginal) => {
     const real = await importOriginal<typeof import("@/lib/data/tunnel")>();
     return {
         ...real,
-        captureHostKey: async (target: Record<string, unknown>, jump: Record<string, unknown> | null) => {
+        captureHostKey: async (
+            target: Record<string, unknown>,
+            jump: Record<string, unknown> | null
+        ) => {
             captured.push({ target, jump });
             if (captureRefuses) throw new real.TunnelError(captureRefuses);
             if (captureFails) throw new Error("no route to host");
@@ -221,7 +229,11 @@ describe("saving a tunnel through a login typed in the form", () => {
     it("signs in once to pin the server's key, and keeps the secret encrypted", async () => {
         await saveConnection(ALICE, { ...base, ssh: manual });
 
-        expect(captured[0]?.target).toMatchObject({ host: "ssh.example.com", port: 2222, username: "root" });
+        expect(captured[0]?.target).toMatchObject({
+            host: "ssh.example.com",
+            port: 2222,
+            username: "root"
+        });
         expect(written).toMatchObject({
             sshMode: "manual",
             sshHost: "ssh.example.com",
@@ -238,7 +250,10 @@ describe("saving a tunnel through a login typed in the form", () => {
     it("goes through the jump server when one is named", async () => {
         await saveConnection(ALICE, { ...base, ssh: { ...manual, jumpHostId: BASTION } });
 
-        expect(captured[0]?.jump).toMatchObject({ host: "10.0.0.9", pinnedHostKey: ["BASTIONKEY"] });
+        expect(captured[0]?.jump).toMatchObject({
+            host: "10.0.0.9",
+            pinnedHostKey: ["BASTIONKEY"]
+        });
         expect(written).toMatchObject({ sshMode: "manual-jump", sshJumpHostId: BASTION });
     });
 
@@ -258,7 +273,9 @@ describe("saving a tunnel through a login typed in the form", () => {
                 sshPort: 2222,
                 sshUsername: "root",
                 sshAuthMethod: "key",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "key", privateKey: "PRIVATE" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "key", privateKey: "PRIVATE" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "SSHKEY"
@@ -269,7 +286,13 @@ describe("saving a tunnel through a login typed in the form", () => {
             saveConnection(ALICE, {
                 ...base,
                 id: CONNECTION,
-                ssh: { ...manual, authMethod: "key", password: null, privateKey: null, passphrase: "new-pass" }
+                ssh: {
+                    ...manual,
+                    authMethod: "key",
+                    password: null,
+                    privateKey: null,
+                    passphrase: "new-pass"
+                }
             })
         ).rejects.toThrow(/Paste the private key this passphrase is for/);
         expect(written).toBeNull();
@@ -300,7 +323,9 @@ describe("saving a tunnel through a login typed in the form", () => {
                 sshPort: 2222,
                 sshUsername: "root",
                 sshAuthMethod: "password",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "hunter2" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "SSHKEY"
@@ -326,14 +351,20 @@ describe("saving a tunnel through a login typed in the form", () => {
                 sshPort: 2222,
                 sshUsername: "root",
                 sshAuthMethod: "password",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "hunter2" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "SSHKEY"
             })
         ];
 
-        await saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: "rotated" } });
+        await saveConnection(ALICE, {
+            ...base,
+            id: CONNECTION,
+            ssh: { ...manual, password: "rotated" }
+        });
 
         expect(captured[0]?.target).toMatchObject({ pinnedHostKey: ["SSHKEY"] });
     });
@@ -346,7 +377,9 @@ describe("saving a tunnel through a login typed in the form", () => {
                 sshPort: 2222,
                 sshUsername: "root",
                 sshAuthMethod: "password",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "hunter2" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "SSHKEY"
@@ -373,7 +406,9 @@ describe("saving a tunnel through a login typed in the form", () => {
                 sshPort: 2222,
                 sshUsername: "root",
                 sshAuthMethod: "password",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "hunter2" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "SSHKEY"
@@ -382,7 +417,11 @@ describe("saving a tunnel through a login typed in the form", () => {
         captureRefuses =
             "ssh.example.com:2222 answered with a different key than the one Polaris pinned for this connection.";
         await expect(
-            saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: "rotated" } })
+            saveConnection(ALICE, {
+                ...base,
+                id: CONNECTION,
+                ssh: { ...manual, password: "rotated" }
+            })
         ).rejects.toThrow(/different key than the one Polaris pinned/);
         expect(written).toBeNull();
     });
@@ -395,14 +434,20 @@ describe("saving a tunnel through a login typed in the form", () => {
                 sshPort: 22,
                 sshUsername: "root",
                 sshAuthMethod: "password",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "hunter2" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "hunter2" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "OLDKEY"
             })
         ];
 
-        await saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: null } });
+        await saveConnection(ALICE, {
+            ...base,
+            id: CONNECTION,
+            ssh: { ...manual, password: null }
+        });
 
         expect(captured).toHaveLength(1);
         expect(captured[0]?.target).not.toHaveProperty("pinnedHostKey");
@@ -417,7 +462,12 @@ describe("opening one", () => {
         const address = await addressOf(ALICE, CONNECTION);
 
         expect(address.tunnel).toMatchObject({
-            target: { host: "10.0.0.2", port: 22, username: "polaris", pinnedHostKey: ["SERVERKEY"] },
+            target: {
+                host: "10.0.0.2",
+                port: 22,
+                username: "polaris",
+                pinnedHostKey: ["SERVERKEY"]
+            },
             jump: null,
             label: "lirio-0"
         });
@@ -433,7 +483,9 @@ describe("opening one", () => {
                 sshPort: 2222,
                 sshUsername: "root",
                 sshAuthMethod: "key",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "key", privateKey: "PRIVATE" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "key", privateKey: "PRIVATE" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: "SSHKEY"
@@ -464,7 +516,9 @@ describe("opening one", () => {
     it("refuses a server with no key on record rather than failing to sign in", async () => {
         saved = [row({ sshMode: "server", sshHostId: UNPINNED })];
 
-        await expect(addressOf(ALICE, CONNECTION)).rejects.toThrow(/no key on record to check old-box against/);
+        await expect(addressOf(ALICE, CONNECTION)).rejects.toThrow(
+            /no key on record to check old-box against/
+        );
     });
 
     it("refuses a typed login with no pinned key rather than trusting what answers", async () => {
@@ -475,7 +529,9 @@ describe("opening one", () => {
                 sshPort: 22,
                 sshUsername: "root",
                 sshAuthMethod: "password",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "password", password: "x" })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "x" })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: null
@@ -502,6 +558,10 @@ describe("the list", () => {
         const [listed] = await listConnections(ALICE);
 
         expect(listed?.where).toBe("127.0.0.1:5432 via lirio-0");
-        expect(listed?.tunnel).toMatchObject({ mode: "server", hostId: SERVER, hostName: "lirio-0" });
+        expect(listed?.tunnel).toMatchObject({
+            mode: "server",
+            hostId: SERVER,
+            hostName: "lirio-0"
+        });
     });
 });

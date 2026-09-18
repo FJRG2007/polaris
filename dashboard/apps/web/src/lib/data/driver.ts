@@ -265,7 +265,9 @@ export const MAX_ROWS = 1000;
  *  say the one useful thing about it rather than printing an engine's error. */
 export class ReadOnlyError extends Error {
     constructor(what: string) {
-        super(`This connection is read-only, and ${what} would change the database. Turn read-only off on the connection if you meant to.`);
+        super(
+            `This connection is read-only, and ${what} would change the database. Turn read-only off on the connection if you meant to.`
+        );
         this.name = "ReadOnlyError";
     }
 }

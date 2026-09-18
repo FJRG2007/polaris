@@ -73,7 +73,8 @@ function startReaper(): void {
                     tunnels.delete(key);
                     continue;
                 }
-                if (tunnel.forward.live() === 0 && Date.now() - tunnel.lastUsed > IDLE_MS) await close(key);
+                if (tunnel.forward.live() === 0 && Date.now() - tunnel.lastUsed > IDLE_MS)
+                    await close(key);
             }
             if (tunnels.size === 0 && reaper) {
                 clearInterval(reaper);

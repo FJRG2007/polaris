@@ -22,7 +22,10 @@ const hostname = (what: string) =>
         .trim()
         .min(1, `Give the address of the ${what}.`)
         .max(253, "That address is too long.")
-        .refine((value) => !/[\s/@]/.test(value), "Enter a hostname or an IP address, without the rest of a URL.");
+        .refine(
+            (value) => !/[\s/@]/.test(value),
+            "Enter a hostname or an IP address, without the rest of a URL."
+        );
 
 const port = z
     .number({ invalid_type_error: "That is not a port." })
@@ -73,7 +76,9 @@ export const sshTunnelSchema = z.discriminatedUnion("mode", [
         password: optionalSecret(1024),
         privateKey: optionalSecret(16_384),
         passphrase: optionalSecret(1024),
-        jumpHostId: uuid("Pick the server to jump through.").nullish().transform((value) => value ?? null)
+        jumpHostId: uuid("Pick the server to jump through.")
+            .nullish()
+            .transform((value) => value ?? null)
     })
 ]);
 
@@ -82,10 +87,18 @@ export type SshTunnel = z.output<typeof sshTunnelSchema>;
 
 export const saveConnectionSchema = z
     .object({
-        id: uuid("That connection is not there any more.").nullish().transform((value) => value ?? null),
-        name: z.string().trim().min(1, "Give the connection a name.").max(80, "That name is too long."),
+        id: uuid("That connection is not there any more.")
+            .nullish()
+            .transform((value) => value ?? null),
+        name: z
+            .string()
+            .trim()
+            .min(1, "Give the connection a name.")
+            .max(80, "That name is too long."),
         engine: z.enum(DB_ENGINES, { errorMap: () => ({ message: "Unknown engine." }) }),
-        managedDatabaseId: uuid("Pick a database.").nullish().transform((value) => value ?? null),
+        managedDatabaseId: uuid("Pick a database.")
+            .nullish()
+            .transform((value) => value ?? null),
         host: z.string().trim().max(253).nullish(),
         port: port.nullish(),
         database: optionalText(128),
@@ -99,7 +112,12 @@ export const saveConnectionSchema = z
     .superRefine((value, context) => {
         if (value.managedDatabaseId) return;
         const ssh = value.ssh;
-        if (ssh?.mode === "manual" && ssh.authMethod === "key" && ssh.passphrase && !ssh.privateKey) {
+        if (
+            ssh?.mode === "manual" &&
+            ssh.authMethod === "key" &&
+            ssh.passphrase &&
+            !ssh.privateKey
+        ) {
             context.addIssue({
                 code: "custom",
                 path: ["ssh", "passphrase"],
@@ -108,7 +126,11 @@ export const saveConnectionSchema = z
         }
         const host = hostname("database").safeParse(value.host ?? "");
         if (!host.success) {
-            context.addIssue({ code: "custom", path: ["host"], message: host.error.issues[0]!.message });
+            context.addIssue({
+                code: "custom",
+                path: ["host"],
+                message: host.error.issues[0]!.message
+            });
         }
     });
 

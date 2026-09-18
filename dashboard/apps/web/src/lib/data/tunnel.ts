@@ -59,7 +59,10 @@ const REAL: TunnelDeps = { connect: openSshClient, forward: forwardOut };
  * The SSH connection to the target, through the jump server when there is one.
  * Returns every client opened, in the order they must be closed.
  */
-export async function connectTunnel(tunnel: DataTunnel, deps: TunnelDeps = REAL): Promise<Client[]> {
+export async function connectTunnel(
+    tunnel: DataTunnel,
+    deps: TunnelDeps = REAL
+): Promise<Client[]> {
     if (!tunnel.jump) return [await deps.connect(tunnel.target)];
     const jump = await deps.connect(tunnel.jump);
     try {

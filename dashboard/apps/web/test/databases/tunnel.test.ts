@@ -9,7 +9,13 @@
 
 import type { SshConnectOptions } from "@polaris/ssh";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { captureHostKey, connectTunnel, openTunnel, TunnelError, type DataTunnel } from "@/lib/data/tunnel";
+import {
+    captureHostKey,
+    connectTunnel,
+    openTunnel,
+    TunnelError,
+    type DataTunnel
+} from "@/lib/data/tunnel";
 
 interface FakeClient {
     readonly name: string;
@@ -107,7 +113,9 @@ describe("openTunnel", () => {
         refuse = "ssh.example.com";
         const failed = vi.spyOn(console, "error").mockImplementation(() => undefined);
         await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(TunnelError);
-        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(/ssh.example.com/);
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            /ssh.example.com/
+        );
         failed.mockRestore();
     });
 });
@@ -135,9 +143,9 @@ describe("captureHostKey", () => {
             throw new Error("Handshake failed: no matching host key");
         };
 
-        await expect(captureHostKey(TARGET, null, { connect, forward: deps.forward })).rejects.toThrow(
-            /different key than the one Polaris pinned/
-        );
+        await expect(
+            captureHostKey(TARGET, null, { connect, forward: deps.forward })
+        ).rejects.toThrow(/different key than the one Polaris pinned/);
     });
 
     it("passes a failure that was not the key through as itself", async () => {
@@ -146,8 +154,8 @@ describe("captureHostKey", () => {
             throw new Error("All configured authentication methods failed");
         };
 
-        await expect(captureHostKey(TARGET, null, { connect, forward: deps.forward })).rejects.toThrow(
-            /authentication methods failed/
-        );
+        await expect(
+            captureHostKey(TARGET, null, { connect, forward: deps.forward })
+        ).rejects.toThrow(/authentication methods failed/);
     });
 });
