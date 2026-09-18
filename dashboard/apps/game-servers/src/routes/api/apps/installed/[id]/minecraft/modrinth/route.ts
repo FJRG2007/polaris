@@ -10,6 +10,7 @@ import {
     searchModrinth
 } from "../../../../../../../lib/minecraft/modrinth";
 import { host } from "@polaris/app-host";
+import { packEntries } from "../../../../../../../lib/minecraft/client-pack";
 
 const { requireGameServer } = host.appsInstallAccess;
 
@@ -52,6 +53,21 @@ const installedSchema = searchSchema.extend({
     installed: z.string().max(4000)
 });
 
+/** Both lists a player's install is made of, as the screen holds them. */
+const packSchema = searchSchema.extend({
+    server: z.string().max(4000).default(""),
+    player: z.string().max(4000).default("")
+});
+
+/** A list as the container holds it, as its entries. */
+function entriesOf(list: string): string[] {
+    return list
+        .split(/[,\n]/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .slice(0, 100);
+}
+
 /**
  * Browse Modrinth for what fits this server, or resolve what is already on it.
  *
@@ -75,6 +91,27 @@ export async function GET(
         side: url.searchParams.get("side") ?? "server"
     };
 
+    if (url.searchParams.get("pack") !== null) {
+        const parsed = packSchema.safeParse({
+            ...asked,
+            server: url.searchParams.get("server") ?? "",
+            player: url.searchParams.get("player") ?? ""
+        });
+        if (!parsed.success)
+            return NextResponse.json(
+                { error: "Could not read this server's lists" },
+                { status: 400 }
+            );
+        return NextResponse.json({
+            pack: await packEntries({
+                server: entriesOf(parsed.data.server),
+                player: entriesOf(parsed.data.player),
+                loader: parsed.data.loader,
+                version: parsed.data.version ?? ""
+            })
+        });
+    }
+
     const installed = url.searchParams.get("installed");
     if (installed !== null) {
         const parsed = installedSchema.safeParse({ ...asked, installed });
@@ -83,11 +120,7 @@ export async function GET(
                 { error: "Could not read this server's list" },
                 { status: 400 }
             );
-        const entries = parsed.data.installed
-            .split(/[,\n]/)
-            .map((entry) => entry.trim())
-            .filter((entry) => entry.length > 0)
-            .slice(0, 100);
+        const entries = entriesOf(parsed.data.installed);
         // Both at once: what each project is, and what any two of them say about
         // each other. A conflict is only worth reporting between things that are
         // both actually on the list.

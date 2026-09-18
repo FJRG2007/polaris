@@ -13,18 +13,59 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_AUTH_SECRET: "test-secret" }) }));
 
 const builds = new Map<string, { version: string; filename: string; url: string; sha1: string }>();
+/** Modrinth's client_side, by slug: "unsupported" is a server-only mod. */
+const sides = new Map<string, string>();
+/** Required dependencies, by the slug that needs them. */
+const needs = new Map<string, string[]>();
+/** Modrinth's project ids, to the slug each one is. */
+const ids = new Map<string, string>();
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOriginal) => {
-    const real = await importOriginal<typeof import("@polaris-app/game-servers/src/lib/minecraft/modrinth")>();
+    const real =
+        await importOriginal<
+            typeof import("@polaris-app/game-servers/src/lib/minecraft/modrinth")
+        >();
     return {
         ...real,
         buildFor: vi.fn(
             async (entry: string) => builds.get(real.projectSlug(entry) ?? entry) ?? null
-        )
+        ),
+        readInstalledProjects: vi.fn(async (entries: readonly string[]) =>
+            entries.map((entry) => {
+                const asked = real.projectSlug(entry) ?? entry;
+                const slug = ids.get(asked) ?? asked;
+                return {
+                    entry,
+                    slug,
+                    title: slug.toUpperCase(),
+                    description: `${slug} does things`,
+                    iconUrl: null,
+                    serverOnly: sides.get(slug) === "unsupported"
+                };
+            })
+        ),
+        readRequirements: vi.fn(async (entries: readonly string[]) => {
+            const resolved = (entry: string) => {
+                const asked = real.projectSlug(entry) ?? entry;
+                return ids.get(asked) ?? asked;
+            };
+            return entries.flatMap((entry) => {
+                const slug = resolved(entry);
+                return (needs.get(slug) ?? []).map((needed) => ({
+                    slug,
+                    needs: needed,
+                    needsTitle: needed.toUpperCase(),
+                    available: true,
+                    onList: entries.some((other) => resolved(other) === needed),
+                    needsServerOnly: sides.get(needed) === "unsupported",
+                    release: real.entryReleaseType(entry)
+                }));
+            });
+        })
     };
 });
 
-const { clientMods, packCommands, packToken, packTokenMatches, packUrl, resolvePack } =
+const { clientMods, packCommands, packEntries, packToken, packTokenMatches, packUrl, resolvePack } =
     await import("@polaris-app/game-servers/src/lib/minecraft/client-pack");
 
 function build(slug: string) {
@@ -38,6 +79,9 @@ function build(slug: string) {
 
 beforeEach(() => {
     builds.clear();
+    sides.clear();
+    needs.clear();
+    ids.clear();
     builds.set("securitycraft", build("securitycraft"));
     builds.set("xaeros-minimap", build("xaeros-minimap"));
 });
@@ -107,6 +151,114 @@ describe("the pack a player installs", () => {
         expect(pack.mods[0]?.sha1).toBe("");
     });
 
+    it("leaves out a mod that only runs on the server", async () => {
+        builds.set("spark-server", build("spark-server"));
+        sides.set("spark-server", "unsupported");
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "securitycraft?,spark-server",
+            config: {}
+        });
+
+        expect(pack.mods.map((mod) => mod.filename)).toEqual(["securitycraft-1.0.0.jar"]);
+        expect(pack.missing).toEqual([]);
+    });
+
+    it("carries the libraries the server installs on its own, and theirs", async () => {
+        builds.set("trashslot", build("trashslot"));
+        builds.set("balm", build("balm"));
+        builds.set("rechiseled", build("rechiseled"));
+        builds.set("core-lib", build("core-lib"));
+        builds.set("config-lib", build("config-lib"));
+        needs.set("trashslot", ["balm"]);
+        needs.set("rechiseled", ["core-lib"]);
+        needs.set("core-lib", ["config-lib"]);
+        needs.set("xaeros-minimap", ["balm"]);
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "trashslot,rechiseled",
+            config: { clientMods: ["xaeros-minimap"] }
+        });
+
+        expect(pack.mods.map((mod) => [mod.entry, mod.where])).toEqual([
+            ["trashslot", "server"],
+            ["rechiseled", "server"],
+            ["xaeros-minimap", "player"],
+            ["balm", "server"],
+            ["core-lib", "server"],
+            ["config-lib", "server"]
+        ]);
+    });
+
+    it("does not hand a player a library that only runs on the server", async () => {
+        builds.set("rechiseled", build("rechiseled"));
+        builds.set("fusion", build("fusion"));
+        needs.set("rechiseled", ["fusion"]);
+        sides.set("fusion", "unsupported");
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "rechiseled",
+            config: {}
+        });
+
+        expect(pack.mods.map((mod) => mod.entry)).toEqual(["rechiseled"]);
+    });
+
+    it("asks for a library at the release type of the mod that needs it", async () => {
+        builds.set("somemod", build("somemod"));
+        builds.set("somelib", build("somelib"));
+        needs.set("somemod", ["somelib"]);
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "somemod:beta",
+            config: {}
+        });
+
+        expect(pack.mods.map((mod) => mod.entry)).toEqual(["somemod:beta", "somelib:beta"]);
+    });
+
+    it("hands out a library once when the list names it by its id", async () => {
+        builds.set("sodium", build("sodium"));
+        builds.set("P7dR8mSH", build("fabric-api"));
+        builds.set("fabric-api", build("fabric-api"));
+        ids.set("P7dR8mSH", "fabric-api");
+        needs.set("sodium", ["fabric-api"]);
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "FABRIC",
+            version: "1.21.4",
+            projects: "P7dR8mSH",
+            config: { clientMods: ["sodium"] }
+        });
+
+        expect(pack.mods.map((mod) => [mod.entry, mod.where])).toEqual([
+            ["P7dR8mSH", "server"],
+            ["sodium", "player"]
+        ]);
+    });
+
+    it("hands out a mod on both lists once", async () => {
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "securitycraft",
+            config: { clientMods: ["securitycraft"] }
+        });
+
+        expect(pack.mods.map((mod) => [mod.entry, mod.where])).toEqual([
+            ["securitycraft", "server"]
+        ]);
+    });
+
     it("has nothing to hand out for a server whose software loads no mods", async () => {
         const pack = await resolvePack({
             name: "Bedrock",
@@ -124,6 +276,58 @@ describe("the pack a player installs", () => {
         expect(clientMods({ clientMods: ["a", "b"] })).toEqual(["a", "b"]);
         expect(clientMods({})).toEqual([]);
         expect(clientMods({ clientMods: "not a list" })).toEqual([]);
+    });
+});
+
+describe("the server's mods a player is shown", () => {
+    it("is what the install hands out, with the libraries labelled by what needs them", async () => {
+        needs.set("trashslot", ["balm"]);
+        needs.set("comforts", ["balm"]);
+        needs.set("balm", ["balm-core"]);
+        sides.set("spark", "unsupported");
+        const shown = await packEntries({
+            server: ["trashslot", "comforts", "spark", "@/data/local.jar"],
+            player: [],
+            loader: "neoforge",
+            version: "1.21.4"
+        });
+
+        expect(shown.map((mod) => [mod.key, mod.title, mod.neededBy])).toEqual([
+            ["trashslot", "TRASHSLOT", []],
+            ["comforts", "COMFORTS", []],
+            ["balm", "BALM", ["TRASHSLOT", "COMFORTS"]],
+            ["balm-core", "BALM-CORE", ["BALM"]]
+        ]);
+    });
+
+    it("does not repeat a library already on the list, or one the game never loads", async () => {
+        needs.set("rechiseled", ["core-lib", "fusion"]);
+        sides.set("fusion", "unsupported");
+        const shown = await packEntries({
+            server: ["rechiseled", "core-lib"],
+            player: [],
+            loader: "neoforge",
+            version: "1.21.4"
+        });
+
+        expect(shown.map((mod) => mod.key)).toEqual(["rechiseled", "core-lib"]);
+    });
+
+    it("puts a library on the server's side when a server mod needs it too", async () => {
+        needs.set("xaeros-minimap", ["balm"]);
+        needs.set("trashslot", ["balm"]);
+        const shown = await packEntries({
+            server: ["trashslot"],
+            player: ["xaeros-minimap"],
+            loader: "neoforge",
+            version: "1.21.4"
+        });
+
+        expect(shown.map((mod) => [mod.key, mod.where])).toEqual([
+            ["trashslot", "server"],
+            ["xaeros-minimap", "player"],
+            ["balm", "server"]
+        ]);
     });
 });
 

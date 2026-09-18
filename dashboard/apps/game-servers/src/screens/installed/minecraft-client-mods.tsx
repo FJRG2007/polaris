@@ -11,15 +11,17 @@
  * kept here, and the two lists are handed out together.
  *
  * The screen before this one shows the server's list. This one is about the
- * people who join it: what they need that the server does not run, and the
- * command that puts all of it - both lists - into their game and keeps it in step
- * afterwards. Nothing here restarts anything: the server does not load these.
+ * people who join it: the server's mods they need too, which are shown here and
+ * changed there, what they need that the server does not run, and the command
+ * that puts all of it into their game and keeps it in step afterwards. Nothing
+ * here restarts anything: the server does not load the players' own list.
  */
 
 import { CopyButton } from "@polaris/ui";
 import { ProjectIcon } from "./minecraft-project-icon";
 import * as modrinth from "../../lib/minecraft/modrinth";
 import { updateClientModsAction } from "./minecraft-actions";
+import type { PackEntry } from "../../lib/minecraft/client-pack";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Input, Skeleton } from "@polaris/ui";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
@@ -38,7 +40,7 @@ export function MinecraftClientMods({
     loader,
     version,
     entries,
-    serverMods,
+    serverEntries,
     packCommands
 }: {
     installedAppId: string;
@@ -47,14 +49,14 @@ export function MinecraftClientMods({
      *  newest - in which case nothing can be filtered by release. */
     version: string;
     entries: readonly string[];
-    /** How many mods the server itself runs, so the command can say what it
-     *  installs without this screen reading that list again. */
-    serverMods: number;
+    /** The server's list as the screen above holds it. */
+    serverEntries: readonly string[];
     packCommands: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
 }) {
     const [list, setList] = useState<string[]>([...entries]);
     const [rows, setRows] = useState<modrinth.InstalledProject[] | null>(null);
     const [query, setQuery] = useState("");
+    const [pack, setPack] = useState<PackEntry[] | "unread" | null>(null);
     const [results, setResults] = useState<modrinth.ModrinthProject[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -104,11 +106,32 @@ export function MinecraftClientMods({
                         iconUrl: null,
                         author: null,
                         clientOnly: true,
+                        serverOnly: false,
                         known: true,
                         fitsVersion: null,
                         fitsLoader: true
                     }))
                 );
+            }
+        },
+        [installedAppId, loader, query_]
+    );
+
+    /** Everything the install command hands out for these two lists, read from
+     *  the same place the command reads it. */
+    const readPack = useCallback(
+        async (player: readonly string[], server: readonly string[], signal: AbortSignal) => {
+            if (!loader) return;
+            try {
+                const response = await fetch(
+                    `/api/apps/installed/${installedAppId}/minecraft/modrinth?${query_({ pack: "1", server: server.join(","), player: player.join(",") })}`,
+                    { cache: "no-store", signal }
+                );
+                if (!response.ok) throw new Error("unread");
+                const data = (await response.json()) as { pack?: PackEntry[] };
+                setPack(data.pack ?? []);
+            } catch {
+                if (!signal.aborted) setPack("unread");
             }
         },
         [installedAppId, loader, query_]
@@ -152,6 +175,12 @@ export function MinecraftClientMods({
 
     useEffect(() => {
         const abort = new AbortController();
+        void readPack(list, serverEntries, abort.signal);
+        return () => abort.abort();
+    }, [list, serverEntries, readPack]);
+
+    useEffect(() => {
+        const abort = new AbortController();
         const timer = setTimeout(() => void browse(query, abort.signal), SEARCH_DEBOUNCE_MS);
         return () => {
             clearTimeout(timer);
@@ -167,6 +196,8 @@ export function MinecraftClientMods({
         });
     }
 
+    const fromServer = Array.isArray(pack) ? pack.filter((mod) => mod.where === "server") : [];
+
     if (!loader || modrinth.isPluginLoader(loader)) return null;
 
     return (
@@ -176,9 +207,8 @@ export function MinecraftClientMods({
                     <div>
                         <h3 className="text-sm font-medium">What the players install</h3>
                         <p className="text-xs text-muted-foreground">
-                            The mods that run in their game and not on the server - a minimap, a
-                            world map, a HUD. The server never loads these, so nothing here restarts
-                            it.
+                            Everything a player needs in their own game to join: the server&apos;s
+                            mods, and the ones that only run in the game.
                         </p>
                     </div>
                     {changed && (
@@ -190,6 +220,71 @@ export function MinecraftClientMods({
                 </div>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
+
+                <div className="flex flex-col gap-2">
+                    <div>
+                        <h4 className="text-xs font-medium">From the server</h4>
+                        <p className="text-xs text-muted-foreground">
+                            These run on both sides. Change them in the server&apos;s list above.
+                        </p>
+                    </div>
+                    {pack === null ? (
+                        <Skeleton className="h-12 w-full" />
+                    ) : pack === "unread" ? (
+                        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            Modrinth could not be reached, so this list is not shown. The command
+                            below still installs all of it.
+                        </p>
+                    ) : fromServer.length === 0 ? (
+                        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            None of the server&apos;s mods run in the game.
+                        </p>
+                    ) : (
+                        <ul className="flex flex-col gap-2">
+                            {fromServer.map((project) => (
+                                <li
+                                    key={project.key}
+                                    className="flex items-center gap-3 rounded-md border border-border p-2"
+                                >
+                                    <ProjectIcon
+                                        installedAppId={installedAppId}
+                                        project={project}
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={project.title}
+                                        >
+                                            {project.title}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {project.neededBy.length > 0
+                                                ? `Needed by ${project.neededBy.join(", ")}`
+                                                : project.description}
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={`https://modrinth.com/project/${encodeURIComponent(project.key)}`}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                        className="text-muted-foreground hover:text-foreground"
+                                        title={`Open ${project.title} on Modrinth`}
+                                    >
+                                        <ExternalLink className="size-3.5" />
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div>
+                    <h4 className="text-xs font-medium">Only in the game</h4>
+                    <p className="text-xs text-muted-foreground">
+                        A minimap, a world map, a HUD. The server never loads these, so nothing here
+                        restarts it.
+                    </p>
+                </div>
 
                 {rows === null ? (
                     <Skeleton className="h-12 w-full" />
@@ -309,11 +404,12 @@ export function MinecraftClientMods({
                         <div>
                             <h3 className="text-sm font-medium">Send this to the players</h3>
                             <p className="text-xs text-muted-foreground">
-                                One line installs the {serverMods + entries.length} mods for this
-                                server into their game, and running it again is how they update: it
-                                replaces what changed and takes away what came off the lists.
-                                Anything else in their mods folder is left alone. The link needs no
-                                account here.
+                                One line installs{" "}
+                                {Array.isArray(pack) ? `the ${pack.length} mods` : "the mods"} for
+                                this server into their game, and running it again is how they
+                                update: it replaces what changed and takes away what came off the
+                                lists. Anything else in their mods folder is left alone. The link
+                                needs no account here.
                             </p>
                             {changed && (
                                 <p className="mt-1 text-xs text-warning">

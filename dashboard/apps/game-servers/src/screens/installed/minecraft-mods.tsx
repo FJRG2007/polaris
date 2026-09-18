@@ -359,7 +359,7 @@ export function MinecraftMods({
                 loader={loader}
                 version={version}
                 entries={clientMods}
-                serverMods={projects.length}
+                serverEntries={projects}
                 packCommands={packCommands}
             />
 
@@ -593,6 +593,7 @@ function unreadRow(entry: string): InstalledRow {
         iconUrl: null,
         author: null,
         clientOnly: false,
+        serverOnly: false,
         known: true,
         fitsVersion: null,
         fitsLoader: true
