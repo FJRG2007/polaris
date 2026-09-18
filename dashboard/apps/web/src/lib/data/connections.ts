@@ -608,8 +608,9 @@ type OwnedServer = Awaited<ReturnType<typeof getHostConnection>>;
  * their own server is not theirs is untrue and leaves them nothing to do about it.
  */
 async function ownServer(userId: string, hostId: string, refusal: string): Promise<OwnedServer> {
+    let server: OwnedServer;
     try {
-        return await getHostConnection(hostId, userId);
+        server = await getHostConnection(hostId, userId);
     } catch (error) {
         if (error instanceof HostCredentialsError) {
             console.error("databases: a tunnel server's stored login could not be read", error);
@@ -619,6 +620,12 @@ async function ownServer(userId: string, hostId: string, refusal: string): Promi
         }
         throw new DataConnectionError(refusal);
     }
+    if (!server.hostKey) {
+        throw new DataConnectionError(
+            `Polaris has no key on record to check ${server.name} against, so it will not tunnel through it. Remove it under Servers and add it again, then save this connection.`
+        );
+    }
+    return server;
 }
 
 function serverOptions(server: OwnedServer): SshConnectOptions {
@@ -627,9 +634,7 @@ function serverOptions(server: OwnedServer): SshConnectOptions {
         port: server.port,
         username: server.username,
         auth: server.auth,
-        // A registered server is pinned when it is added; one with no key on
-        // record (added before pinning) is refused rather than trusted.
-        pinnedHostKey: server.hostKey ? [server.hostKey] : []
+        pinnedHostKey: [server.hostKey as string]
     };
 }
 

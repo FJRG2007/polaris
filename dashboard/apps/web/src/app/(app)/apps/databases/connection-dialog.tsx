@@ -531,7 +531,11 @@ export function ConnectionDialog({
                                                             className="font-mono text-xs"
                                                         />
                                                     </Field>
-                                                    <Field label="Key passphrase" hint="If it has one.">
+                                                    <Field
+                                                        label="Key passphrase"
+                                                        hint="If it has one."
+                                                        error={shown("ssh.passphrase", sshPassphrase)}
+                                                    >
                                                         <Input
                                                             type="password"
                                                             value={sshPassphrase}

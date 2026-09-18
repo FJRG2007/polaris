@@ -98,6 +98,14 @@ export const saveConnectionSchema = z
     })
     .superRefine((value, context) => {
         if (value.managedDatabaseId) return;
+        const ssh = value.ssh;
+        if (ssh?.mode === "manual" && ssh.authMethod === "key" && ssh.passphrase && !ssh.privateKey) {
+            context.addIssue({
+                code: "custom",
+                path: ["ssh", "passphrase"],
+                message: "Paste the private key this passphrase is for, or clear the passphrase."
+            });
+        }
         const host = hostname("database").safeParse(value.host ?? "");
         if (!host.success) {
             context.addIssue({ code: "custom", path: ["host"], message: host.error.issues[0]!.message });

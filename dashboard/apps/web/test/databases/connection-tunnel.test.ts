@@ -16,6 +16,7 @@ const SERVER = "22222222-2222-4222-8222-222222222222";
 const BASTION = "33333333-3333-4333-8333-333333333333";
 const CONNECTION = "44444444-4444-4444-8444-444444444444";
 const UNREADABLE = "55555555-5555-4555-8555-555555555555";
+const UNPINNED = "66666666-6666-4666-8666-666666666666";
 
 let saved: Record<string, unknown>[] = [];
 let written: Record<string, unknown> | null = null;
@@ -79,6 +80,18 @@ vi.mock("@/lib/host-service", () => {
                 username: "polaris",
                 auth: { method: "key", privateKey: "server-key" },
                 hostKey: "SERVERKEY",
+                sudo: false
+            };
+        }
+        if (hostId === UNPINNED) {
+            return {
+                id: UNPINNED,
+                name: "old-box",
+                address: "10.0.0.5",
+                port: 22,
+                username: "polaris",
+                auth: { method: "key", privateKey: "old-key" },
+                hostKey: undefined,
                 sudo: false
             };
         }
@@ -186,6 +199,13 @@ describe("saving a tunnel through a registered server", () => {
         ).rejects.toThrow(/cannot read the login stored for nas-01/);
         failed.mockRestore();
     });
+
+    it("refuses a server with no key on record, and says how to give it one", async () => {
+        await expect(
+            saveConnection(ALICE, { ...base, ssh: { mode: "server", hostId: UNPINNED } })
+        ).rejects.toThrow(/no key on record to check old-box against.*add it again/);
+        expect(written).toBeNull();
+    });
 });
 
 describe("saving a tunnel through a login typed in the form", () => {
@@ -220,6 +240,39 @@ describe("saving a tunnel through a login typed in the form", () => {
 
         expect(captured[0]?.jump).toMatchObject({ host: "10.0.0.9", pinnedHostKey: ["BASTIONKEY"] });
         expect(written).toMatchObject({ sshMode: "manual-jump", sshJumpHostId: BASTION });
+    });
+
+    it("refuses a jump server with no key on record before signing in", async () => {
+        await expect(
+            saveConnection(ALICE, { ...base, ssh: { ...manual, jumpHostId: UNPINNED } })
+        ).rejects.toThrow(/no key on record to check old-box against/);
+        expect(captured).toHaveLength(0);
+        expect(written).toBeNull();
+    });
+
+    it("refuses a passphrase typed without the key it belongs to", async () => {
+        saved = [
+            row({
+                sshMode: "manual",
+                sshHost: "ssh.example.com",
+                sshPort: 2222,
+                sshUsername: "root",
+                sshAuthMethod: "key",
+                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "key", privateKey: "PRIVATE" })),
+                sshCredentialNonce: Buffer.from("nonce"),
+                sshCredentialKeyId: "k1",
+                sshHostKey: "SSHKEY"
+            })
+        ];
+
+        await expect(
+            saveConnection(ALICE, {
+                ...base,
+                id: CONNECTION,
+                ssh: { ...manual, authMethod: "key", password: null, privateKey: null, passphrase: "new-pass" }
+            })
+        ).rejects.toThrow(/Paste the private key this passphrase is for/);
+        expect(written).toBeNull();
     });
 
     it("says the login did not work rather than storing one that cannot open", async () => {
@@ -406,6 +459,12 @@ describe("opening one", () => {
         const [listed] = await listConnections(ALICE);
         expect(listed?.unreachable).toBe(true);
         expect(listed?.note).toContain("removed from Servers");
+    });
+
+    it("refuses a server with no key on record rather than failing to sign in", async () => {
+        saved = [row({ sshMode: "server", sshHostId: UNPINNED })];
+
+        await expect(addressOf(ALICE, CONNECTION)).rejects.toThrow(/no key on record to check old-box against/);
     });
 
     it("refuses a typed login with no pinned key rather than trusting what answers", async () => {
