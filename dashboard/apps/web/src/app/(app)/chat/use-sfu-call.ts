@@ -433,13 +433,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const hosting = Boolean(
         participantId &&
-            meeting &&
-            meeting.participants.some(
-                (person) =>
-                    person.id === participantId &&
-                    person.userId !== null &&
-                    person.userId === meeting.hostId
-            )
+        meeting &&
+        meeting.participants.some(
+            (person) =>
+                person.id === participantId &&
+                person.userId !== null &&
+                person.userId === meeting.hostId
+        )
     );
     /**
      * Whether this browser is holding a room nobody else is in.

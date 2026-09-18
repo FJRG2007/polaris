@@ -565,13 +565,13 @@ export function CallRoom({
                 the pictures, and the controls somebody needs to leave the call
                 - were pushed out over the conversation. */}
             <div className="flex min-h-12 shrink flex-col gap-3 overflow-y-auto overscroll-contain empty:hidden">
-            {/* Why the call is silent, when it is. Everything else on this
+                {/* Why the call is silent, when it is. Everything else on this
                 screen is true before any sound has moved, so a call carrying
                 nothing looked exactly like one that worked. See
                 `call-diagnosis`. */}
-            <CallDiagnosisPanel audio={call.audio} />
+                <CallDiagnosisPanel audio={call.audio} />
 
-            {/* A microphone that opened but is picking nothing up looks exactly
+                {/* A microphone that opened but is picking nothing up looks exactly
                 like somebody who is not talking, and the person it is happening
                 to has no way of telling. See `no-audio-notice`.
 
@@ -579,25 +579,25 @@ export function CallRoom({
                 a noise filter running they are two different tracks, and a graph
                 that has stopped producing anything leaves the device reading
                 perfectly while the call carries silence. */}
-            <NoAudioNotice
-                track={call.outgoing}
-                device={call.localStream?.getAudioTracks()[0] ?? null}
-                micOn={call.micOn}
-            />
+                <NoAudioNotice
+                    track={call.outgoing}
+                    device={call.localStream?.getAudioTracks()[0] ?? null}
+                    micOn={call.micOn}
+                />
 
-            {/* Said before anything else on the screen, and to everybody: a
+                {/* Said before anything else on the screen, and to everybody: a
                 call being written down is the one fact in a room that changes
                 what people are willing to say in it. */}
-            {recorded && (
-                <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
-                    <Circle className="size-3 shrink-0 fill-current" />
-                    <span className="min-w-0 flex-1">
-                        {call.recording
-                            ? "You are recording this call. Everybody in it can see that."
-                            : `${recordedBy} is recording this call.`}
-                    </span>
-                </p>
-            )}
+                {recorded && (
+                    <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                        <Circle className="size-3 shrink-0 fill-current" />
+                        <span className="min-w-0 flex-1">
+                            {call.recording
+                                ? "You are recording this call. Everybody in it can see that."
+                                : `${recordedBy} is recording this call.`}
+                        </span>
+                    </p>
+                )}
             </div>
 
             <CombineStrip call={call} />
